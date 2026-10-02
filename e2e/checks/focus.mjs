@@ -11,7 +11,7 @@
  * The board is the flow fixture, because it is the one board in this deck that is longer than
  * the window and "scroll easily" is what the view is for.
  */
-import { editMode, open, pillButton, say, selectBoard, settle } from "../harness.mjs";
+import { editMode, open, pressBoardAction, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 const NOTES = "boards/notes.html";
@@ -32,7 +32,7 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  * for the same thing. The pill shows when the board is selected, so it is selected first.
  */
 await selectBoard(page, NOTES);
-const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] [data-act]")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
+const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
 say(
 	"the pill over the board offers fit, focus, fullscreen, a tab, a comment and going away, in that order",
 	bar.join(",") === "Fit,Focus,Fullscreen,New tab,Comment,Hide",
@@ -61,7 +61,7 @@ const markedBefore = await page.evaluate(() => {
 });
 /* Focus, from the board's own pill. */
 await selectBoard(page, NOTES);
-await pillButton(page, "Focus").click();
+await pressBoardAction(page, "Focus");
 await settle(page, 700);
 
 const state = () =>
@@ -282,7 +282,7 @@ await page.keyboard.press("Escape");
 await settle(page, 300);
 await selectBoard(page, NOTES);
 // Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
-await pillButton(page, "Comment").click();
+await pressBoardAction(page, "Comment");
 await page.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
 const whole = await page.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
 say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole board"), JSON.stringify(whole));

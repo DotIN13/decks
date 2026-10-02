@@ -13,6 +13,7 @@ import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import BookOpen from "lucide-solid/icons/book-open";
 import Maximize from "lucide-solid/icons/maximize-2";
 import Scan from "lucide-solid/icons/scan";
+import Ellipsis from "lucide-solid/icons/ellipsis";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
@@ -121,6 +122,14 @@ export function BoardFrame(props: {
 	marks?: Mark[];
 	/** Agents at work on this board: a cursor each, and the blocks they hold or just wrote (`acts.ts`). */
 	acts?: AgentAct[];
+	/**
+	 * Where an agent's cursor stands for its act on this board, in board coordinates, or undefined
+	 * once the act has left it. The cursor itself is drawn by the stage (`Stage.tsx`), so it glides
+	 * from board to board rather than leaving one and appearing on the next.
+	 */
+	onActPoint?: (agentId: string, at: { x: number; y: number } | undefined) => void;
+	/** The board's size just changed from outside a drag: its box and bar ease to it (`Stage`'s `sizingPaths`). */
+	sizing?: boolean;
 	/**
 	 * The board is news — an agent named it and the person has not read it — drawn as a glow in
 	 * this colour (the writer's) until it is read. Absent for a board that is not news.
@@ -1039,8 +1048,11 @@ export function BoardFrame(props: {
 		const zoom = props.camera.zoom;
 		let moved = false;
 
+		let over = false;
 		const move = (moveEvent: PointerEvent) => {
 			if (moveEvent.pointerId !== event.pointerId) return;
+			// A mouse move with no button held: the release went somewhere this never heard. It is over.
+			if (moveEvent.pointerType === "mouse" && (moveEvent.buttons & 1) === 0) return finish();
 			// A second finger means this was the start of a pinch, not of a move. The
 			// board goes back to where it was and the camera takes over.
 			if (touched && props.gestures.pinching()) {
@@ -1057,10 +1069,18 @@ export function BoardFrame(props: {
 			});
 		};
 
+		/* Ended once: the release, a cancel or the capture being lost, wherever it is heard (`Stage.follow` says why). */
 		const finish = (abandon = false) => {
+			if (over) return;
+			over = true;
 			listener.removeEventListener("pointermove", move as EventListener);
 			listener.removeEventListener("pointerup", end as EventListener);
 			listener.removeEventListener("pointercancel", end as EventListener);
+			handle.removeEventListener("lostpointercapture", end as EventListener);
+			if (listener !== window) {
+				window.removeEventListener("pointerup", end as EventListener, true);
+				window.removeEventListener("pointercancel", end as EventListener, true);
+			}
 			setDragging(false);
 			const landed = abandon ? null : ghost();
 			// The ghost stays until the server's board.changed comes back with the
@@ -1076,6 +1096,11 @@ export function BoardFrame(props: {
 		listener.addEventListener("pointermove", move as EventListener);
 		listener.addEventListener("pointerup", end as EventListener);
 		listener.addEventListener("pointercancel", end as EventListener);
+		handle.addEventListener("lostpointercapture", end as EventListener);
+		if (listener !== window) {
+			window.addEventListener("pointerup", end as EventListener, true);
+			window.addEventListener("pointercancel", end as EventListener, true);
+		}
 	};
 
 	/**
@@ -1162,6 +1187,7 @@ export function BoardFrame(props: {
 			data-inert={inert()}
 			data-dormant={dormant() ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
+			data-sizing={props.sizing ? "true" : undefined}
 			data-path={props.board.path}
 			style={{
 				left: `${at().x}px`,
@@ -1186,7 +1212,48 @@ export function BoardFrame(props: {
 				under the pointer, or the board is selected.
 			*/}
 			<Show when={props.barLayer}>
-				{(layer) => (
+				{(layer) => {
+					/*
+					 * The ⋯ menu: zoomed out below 50% (`Stage`'s `BAR_ZOOM`) the selected board's bar has
+					 * no title and only ⋯ and ×, and ⋯ lists the other actions (`canvas.css`).
+					 */
+					const [menu, setMenu] = createSignal(false);
+					createEffect(() => {
+						if (!props.selected) setMenu(false);
+					});
+					const away = (event: Event) => {
+						if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target as Element | null)?.closest?.(".bar-menu, .act.more")) setMenu(false);
+					};
+					createEffect(() => {
+						if (!menu()) return;
+						window.addEventListener("pointerdown", away, true);
+						window.addEventListener("keydown", away, true);
+						onCleanup(() => {
+							window.removeEventListener("pointerdown", away, true);
+							window.removeEventListener("keydown", away, true);
+						});
+					});
+					/** A row of the ⋯ menu, which closes it once pressed. */
+					const row = (label: string, act: string, icon: typeof Scan, run: () => void) => (
+						<button
+							type="button"
+							role="menuitem"
+							data-row
+							data-flat="true"
+							data-act={act}
+							onClick={() => {
+								setMenu(false);
+								run();
+							}}
+						>
+							<span class="row-icon">
+								<Icon of={icon} size={15} />
+							</span>
+							<span class="row-label">{label}</span>
+						</button>
+					);
+					return (
+
 					<Portal mount={layer()}>
 						<div
 							class="chrome"
@@ -1194,6 +1261,7 @@ export function BoardFrame(props: {
 							data-dragging={dragging() || !!props.shift}
 							data-hover={hovered() || undefined}
 							data-selected={props.selected || undefined}
+							data-sizing={props.sizing ? "true" : undefined}
 							ref={(bar) => {
 								createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));
 							}}
@@ -1244,15 +1312,46 @@ export function BoardFrame(props: {
 										<Icon of={MessageSquarePlus} size={12} />
 									</button>
 								</Show>
+								<button
+									type="button"
+									class="act more"
+									data-act="More"
+									aria-haspopup="menu"
+									aria-expanded={menu()}
+									title="More actions"
+									aria-label={`More actions for ${props.board.title}`}
+									onClick={() => setMenu((open) => !open)}
+								>
+									<Icon of={Ellipsis} size={12} />
+								</button>
 								<Show when={props.onHide}>
 									<button type="button" class="act hide" data-act="Hide" title="Take this board off the canvas. The agent keeps it in context." aria-label={`Hide ${props.board.title}`} onClick={() => props.onHide?.()}>
 										<Icon of={X} size={12} />
 									</button>
 								</Show>
+								<Show when={menu() && props.selected}>
+									<div class="popover bar-menu" role="menu" aria-label={`${props.board.title}: more actions`}>
+										{row("Fit to screen", "Fit", Scan, () => props.onOpen())}
+										<Show when={props.onFocus}>{row(props.focused ? "Back to the canvas" : "Focus", "Focus", BookOpen, () => props.onFocus?.())}</Show>
+										<Show when={props.onPresent && !props.board.live}>
+											{row(props.board.format === "slides" ? "Present" : "Fullscreen", props.board.format === "slides" ? "Present" : "Fullscreen", Maximize, () => props.onPresent?.())}
+										</Show>
+										<Show when={!props.board.live}>
+											<a role="menuitem" data-row data-flat="true" data-act="New tab" href={deckFileUrl(props.board.path)} target="_blank" rel="noopener" onClick={() => setMenu(false)}>
+												<span class="row-icon">
+													<Icon of={ExternalLink} size={15} />
+												</span>
+												<span class="row-label">Open in a new tab</span>
+											</a>
+										</Show>
+										<Show when={props.onComment}>{row("Comment", "Comment", MessageSquarePlus, () => props.onComment?.())}</Show>
+									</div>
+								</Show>
 							</span>
 						</div>
 					</Portal>
-				)}
+					);
+				}}
 			</Show>
 
 			{/*
@@ -1444,6 +1543,11 @@ export function BoardFrame(props: {
 					);
 					const boxes = () => (rects().length > 0 ? rects() : [{ x: 0, y: 0, w: props.board.w, h: props.board.h }]);
 					const box = (rect: Rect, color: string) => ({ left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px`, "--act": color, "--zoom": zoom() });
+					createEffect(() => {
+						const current = act();
+						if (current) props.onActPoint?.(agentId, cursorFor(current, rects(), props.board));
+					});
+					onCleanup(() => props.onActPoint?.(agentId, undefined));
 					return (
 						<Show when={act()}>
 							{(current) => (
@@ -1451,16 +1555,13 @@ export function BoardFrame(props: {
 									<Show when={holding(current()) ? current().at : undefined} keyed>
 										<Index each={boxes()}>
 											{(rect) => (
-												<div class="act-hold" style={box(rect(), current().color)}>
-													<span class="who">{current().label}</span>
-												</div>
+												<div class="act-hold" style={box(rect(), current().color)} />
 											)}
 										</Index>
 									</Show>
 									<Show when={landed(current()) ? current().at : undefined} keyed>
 										<Index each={rects()}>{(rect) => <div class="act-land" style={box(rect(), current().color)} />}</Index>
 									</Show>
-									<AgentCursor cursor={{ ...cursorFor(current(), rects(), props.board), label: current().label, color: current().color }} zoom={zoom()} />
 								</>
 							)}
 						</Show>

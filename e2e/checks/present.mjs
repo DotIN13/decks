@@ -17,7 +17,7 @@
  * reach *it* — and Escape then has to work from inside a board's document, which it can only
  * do because the overlay listens there too (same origin) rather than only on this window.
  */
-import { WEB, deckState, editMode, flyToBoard, open, say, selectBoard, settle } from "../harness.mjs";
+import { WEB, deckState, editMode, flyToBoard, open, pressBoardAction, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 900 });
 
@@ -40,10 +40,7 @@ const sizeOf = (path) =>
 /** Press the board's own fullscreen button, on its pill — the affordance, not a keyboard route. */
 const present = async (path) => {
 	await selectBoard(page, path);
-	const button = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"]), .bar-layer .chrome[data-selected] :is([data-act="Present"], [data-act="Fullscreen"])').first();
-	if ((await button.count()) === 0) return false;
-	await button.click();
-	return true;
+	return pressBoardAction(page, ["Present", "Fullscreen"]);
 };
 
 /**

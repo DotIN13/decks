@@ -111,6 +111,8 @@ export class PenLayer {
 	private carryingNow: ReadonlySet<string> = new Set();
 	/** The document the current layout was made from. */
 	drawnDoc: PenDocument | undefined;
+	/** Whether the last frame shown was drawn by CanvasKit, with the drawing in it (`shot.ts` waits for one). */
+	drewDrawing = false;
 
 	/** What each item looks like it covers, by id (`boundsOf`): what is outlined, hit and boxed in. */
 	bounds: ReadonlyMap<string, Frame> = new Map();
@@ -212,6 +214,7 @@ export class PenLayer {
 			return;
 		}
 		this.bitmaps.transferFromImageBitmap(frame.bitmap);
+		this.drewDrawing = frame.gpu === true;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
 		const { x, y, zoom } = frame.camera;
 		sheet.style.width = `${frame.width}px`;

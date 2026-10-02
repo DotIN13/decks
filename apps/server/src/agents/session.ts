@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces, type Box } from "../deck/place.ts";
 import type { BoardSpot } from "../stage/pens.ts";
@@ -636,6 +636,7 @@ export class DeckAgent {
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
+			drew: (stage: string, ids: string[], boxes: ActBox[]) => this.host.act?.(this.id, { kind: "draw", stage, ids, boxes }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 			stageName: () => this.stageName(true),
 			isolated: () => this.isolatedOn,

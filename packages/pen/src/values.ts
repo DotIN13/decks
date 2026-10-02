@@ -1,4 +1,4 @@
-import type { Fill, Fills, LegacyStroke, PenDocument, PenNode, VariableValue } from "./types.ts";
+import { IMPORTED, type Fill, type Fills, type LegacyStroke, type PenDocument, type PenNode, type VariableValue } from "./types.ts";
 
 /**
  * What a property means once its variables are resolved.
@@ -33,7 +33,10 @@ export function isVariable(value: unknown): value is string {
 
 /** A variable's value in this theme, following `$a` → `$b` chains; undefined when it does not exist. */
 export function variable(doc: PenDocument, name: string, theme: ThemeState, depth = 0): VariableValue | undefined {
-	const def = doc.variables?.[name.replace(/^\$/, "")];
+	const key = name.replace(/^\$/, "");
+	// This file's own first, then an imported file's: a component from another file keeps its colours.
+	let def = doc.variables?.[key];
+	if (!def) for (const other of Object.values(doc[IMPORTED] ?? {})) if ((def = other?.variables?.[key])) break;
 	if (!def || depth > 8) return undefined;
 	let value: VariableValue | undefined;
 	if (Array.isArray(def.value)) {

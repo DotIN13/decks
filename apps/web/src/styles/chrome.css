@@ -1163,6 +1163,8 @@ svg.lucide {
 	.act-hold,
 	.act-land,
 	.act-land::before,
+	.act-draw,
+	.act-draw::before,
 	.board-node > .news-glow::after {
 		animation: none;
 	}

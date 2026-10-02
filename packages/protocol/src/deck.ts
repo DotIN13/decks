@@ -123,10 +123,23 @@ export interface Board {
 	seenAt?: number;
 }
 
+/** A `.pen` file kept with the boards: in `boards/` or `frames/`, placed on a stage by a ref to its path. */
+export interface DeckPen {
+	/** Deck-relative, with `.pen`: `frames/ui/button.pen`. */
+	path: string;
+	/** What places it: `{ type: "ref", ref }`, the path without `.pen`. */
+	ref: string;
+	/** The file's first item's name, or the file's own. */
+	title: string;
+	modifiedAt: number;
+}
+
 export interface DeckState {
 	/** Absolute path of the open deck. */
 	path: string;
 	name: string;
 	boards: Board[];
 	roots: Root[];
+	/** The `.pen` files in `boards/` and `frames/`, sorted by path. */
+	pens?: DeckPen[];
 }

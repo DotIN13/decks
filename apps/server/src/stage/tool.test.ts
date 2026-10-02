@@ -844,6 +844,33 @@ test("stage.screenshot hands the picture to the model with the run's result, and
 	}
 });
 
+test("stage.screenshot of a .pen path pictures that file whole; an item's id path stays an item", async () => {
+	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const deckPath = (service as unknown as { deck: Deck }).deck.path;
+	const asked: Array<Record<string, unknown>> = [];
+	service.shots = {
+		take: async (request: Record<string, unknown>) => {
+			asked.push(request);
+			return { file: ".decks/shots/x.png", bytes: Buffer.from("png!"), format: "png", width: 20, height: 10, box: { x1: 0, y1: 0, x2: 10, y2: 5 } };
+		},
+	} as unknown as NonNullable<typeof service.shots>;
+	service.pens = new StagePens(deckPath, () => {});
+	try {
+		mkdirSync(join(deckPath, "frames", "ui"), { recursive: true });
+		writeFileSync(join(deckPath, "frames", "ui", "button.pen"), JSON.stringify({ version: "2.14", children: [{ id: "button", type: "rectangle", width: 10, height: 10 }] }));
+		for (const of of ["frames/ui/button.pen", "frames/ui/button", "card-1/title", { x1: 0, y1: 0, x2: 10, y2: 10 }]) {
+			const result = await tool.run(`return await stage.screenshot({ of: ${JSON.stringify(of)} })`);
+			assert.equal(result.isError, false, result.text);
+		}
+		assert.deepEqual(asked.map((one) => one.file ?? one.of), ["frames/ui/button.pen", "frames/ui/button", "card-1/title", { x1: 0, y1: 0, x2: 10, y2: 10 }]);
+		assert.equal(asked[0]!.file, "frames/ui/button.pen", "a .pen path is a file");
+		assert.equal(asked[2]!.of, "card-1/title", "an id path with no such file is an item");
+	} finally {
+		service.pens.close();
+		cleanup();
+	}
+});
+
 test("at is two numbers, and places one board at a time", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	const bad = await tool.run(`return await stage.newBoard({ title: "Where", at: { x1: "left" } })`);

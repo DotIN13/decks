@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { boardFolders } from "./stage-boards.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import type { Board, DeckState } from "@decks/protocol";
+import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
 import { defaultWidth, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
@@ -143,7 +143,34 @@ export class Deck {
 		onPlace?: (path: string, at: { x: number; y: number }) => void,
 		onCanvas?: readonly string[],
 	): DeckState {
-		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots };
+		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots, pens: this.pens() };
+	}
+
+	/** The `.pen` files in `boards/` and `frames/`, each with the ref that places it and a title to list it by. */
+	pens(): DeckPen[] {
+		const out: DeckPen[] = [];
+		const walk = (current: string) => {
+			if (!existsSync(current)) return;
+			for (const entry of readdirSync(current, { withFileTypes: true })) {
+				if (entry.name.startsWith(".")) continue;
+				const full = join(current, entry.name);
+				if (entry.isDirectory()) walk(full);
+				else if (entry.name.endsWith(".pen")) {
+					const path = normalizeBoardPath(relative(this.path, full));
+					let title = entry.name.replace(/\.pen$/, "");
+					try {
+						const first = (JSON.parse(readFileSync(full, "utf8")) as { children?: Array<{ name?: unknown }> }).children?.[0];
+						if (typeof first?.name === "string" && first.name.trim()) title = first.name.trim();
+					} catch {
+						/* a file that does not parse is listed by its name, and draws as missing where it is used */
+					}
+					out.push({ path, ref: path.replace(/\.pen$/, ""), title, modifiedAt: modifiedAtOf(full) });
+				}
+			}
+		};
+		walk(join(this.path, "boards"));
+		walk(join(this.path, "frames"));
+		return out.sort((a, b) => a.path.localeCompare(b.path));
 	}
 
 	/**

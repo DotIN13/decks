@@ -278,6 +278,10 @@
 		gap: 8px;
 		padding: 10px;
 		pointer-events: auto;
+		/* A turn's corner follows the panel's, inset by the 10px of padding, so the two curves stay
+		   concentric: 8px on a laptop, 16px on a phone. Not the controls' corner, which a phone
+		   makes a 999px capsule, and a capsule of five lines is an oval. */
+		--control-radius: max(8px, calc(var(--radius-panel, 12px) - 10px));
 	}
 	/* A turn: a bubble on the panel, one hairline, no lift. Yours takes the accent line. */
 	.stream[data-shown="true"] .stream-card,
@@ -290,6 +294,11 @@
 	}
 	.stream[data-shown="true"] .stream-bubble {
 		border-color: var(--color-accent);
+	}
+	/* The way back to the latest turn floats over the roll's foot, clear of the panel's edge and its
+	   rounded corners: `--gutter` is 0 in the panel, which set it on the border. */
+	.stream[data-shown="true"] .stream-jump {
+		bottom: 12px;
 	}
 	.stream-head {
 		display: none;
@@ -306,6 +315,10 @@
 	}
 	.stream[data-shown="true"] .stream-head {
 		display: flex;
+	}
+	/* The composer's grip, at the head of the history, on a phone only: pull it down to put the history away. */
+	.stream-grip {
+		display: none;
 	}
 	.stream-head-name {
 		font-weight: 600;
@@ -370,7 +383,27 @@
 			resize: none;
 		}
 		.stream-head {
+			position: relative;
 			cursor: default;
+			touch-action: none;
+		}
+	}
+	@media (pointer: coarse) {
+		.stream[data-shown="true"] .stream-head {
+			height: 44px;
+			padding-top: 6px;
+		}
+		.stream-grip {
+			position: absolute;
+			top: 6px;
+			left: 50%;
+			display: block;
+			width: 36px;
+			height: 5px;
+			margin-left: -18px;
+			border-radius: 3px;
+			background: var(--line-strong);
+			opacity: 0.8;
 		}
 	}
 	/* Narrow: the composer's own margins. The width is a utility in the markup (`Stream.tsx`). */
@@ -412,7 +445,7 @@
 			/* Start clipped from the top: the paper has not emerged yet. Hiding with clip-path
 			   rather than opacity lets the scroll container stay live for the opening frame,
 			   so the newest card is already scrolled into view when the paper arrives. */
-			clip-path: inset(100% 0 0 0 round 12px);
+			clip-path: inset(100% 0 0 0 round var(--radius-panel, 12px));
 			opacity: 1;
 			translate: none;
 			transition:
@@ -420,8 +453,11 @@
 				transform 300ms ease;
 		}
 		.stream[data-shown="true"] {
-			/* Reveal from the bottom upward — the clip collapses to nothing. */
-			clip-path: inset(0% 0 0 0 round 12px);
+			/* Reveal from the bottom upward. Open, the clip stands 32px outside the panel with the
+			   panel's corner grown by as much, so the shadow is whole: a clip at the panel's edge
+			   cut the shadow off outside it and left it showing in the corners inside it, a grey
+			   square under each rounded corner. */
+			clip-path: inset(-32px round calc(var(--radius-panel, 12px) + 32px));
 		}
 	}
 	@media ((max-width: 1100px) or (pointer: coarse)) and (prefers-reduced-motion: reduce) {

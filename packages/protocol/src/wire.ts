@@ -14,7 +14,7 @@ import type {
 } from "./chat.ts";
 import type { Board, DeckSettings, DeckState } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
-import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
+import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 
 /**
  * One stage, as the manager lists it.
@@ -397,7 +397,7 @@ export type ServerMessage =
 	 * file landing, with the blocks whose markup changed, or a stage verb. `at` is the act's
 	 * own clock, so two of them are two.
 	 */
-	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: ActKind; ids?: string[]; label: string; color: string; at: number }
+	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: ActKind; ids?: string[]; boxes?: ActBox[]; label: string; color: string; at: number }
 	/**
 	 * A question an agent is waiting on, and **which agent is waiting**.
 	 *

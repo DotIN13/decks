@@ -163,7 +163,22 @@ export function createHttpApp(app: App): Express {
 			let gone = false;
 			res.on("close", () => (gone = !res.writableEnded));
 			try {
-				const file = await app.thumbs.get(board, req.query.scheme === "dark" ? "dark" : "light", () => gone, req.query.whole === "1" ? "whole" : "card");
+				const scheme = req.query.scheme === "dark" ? "dark" : "light";
+				const kind = req.query.whole === "1" ? "whole" : "card";
+				/*
+				 * An older picture of the board while the current one is taken: not cached, and said
+				 * to be a stand-in, so the canvas asks again until the real one comes (`pen/scene.ts`).
+				 * Whole pictures only: a gallery card is an `<img>`, which would keep the stand-in.
+				 */
+				const standIn = kind === "whole" ? app.thumbs.standIn(board, scheme, kind) : undefined;
+				if (standIn) {
+					res.setHeader("Cache-Control", "no-store");
+					res.setHeader("X-Decks-Stand-In", "1");
+					res.type(standIn.endsWith(".webp") ? "webp" : "jpeg");
+					await sendFile(res, standIn);
+					return;
+				}
+				const file = await app.thumbs.get(board, scheme, () => gone, kind);
 				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
 				res.type(file.endsWith(".webp") ? "webp" : "jpeg");
@@ -219,6 +234,26 @@ export function createHttpApp(app: App): Express {
 		const frame = pens.frame("", name) as { doc: unknown; base: string };
 		res.setHeader("Cache-Control", "no-store");
 		res.json({ doc: frame.doc, base: frame.base, boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
+	});
+
+	/**
+	 * Any .pen file as `shot.html` draws it: a saved frame, or a stage by its file. `path` is relative
+	 * to the deck or absolute (`StagePens.penFile`).
+	 */
+	api.get("/pen-file", (req, res) => {
+		const pens = app.stage.pens;
+		if (!pens || typeof req.query.path !== "string") {
+			res.status(404).end();
+			return;
+		}
+		try {
+			const frame = pens.fileFrame(req.query.path);
+			const boards = frame.stage ? pens.boards(frame.stage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			res.setHeader("Cache-Control", "no-store");
+			res.json({ doc: frame.doc, base: frame.base, boards });
+		} catch (error) {
+			res.status(404).type("text").send((error as Error).message);
+		}
 	});
 
 	/**

@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Board, DeckPen } from "@decks/protocol";
 
 /**
  * What the boards panel lists, and which of its three sections each board belongs to.
@@ -42,6 +42,8 @@ export type SectionKind = "canvas" | "held" | "deck";
 /** One board, and the two things a row's appearance depends on. */
 export interface PanelRow {
 	board: Board;
+	/** A `.pen` file listed among the boards (`board` then carries its path and name), placed on the stage by a press. */
+	pen?: DeckPen;
 	/** In play: gets the accent dot. */
 	onCanvas: boolean;
 	/** Held but not shown, so the name is drawn muted rather than at full strength. */
@@ -67,6 +69,8 @@ export interface PanelInput {
 	inPlay?: string[];
 	/** What is typed in the search field. Filters the rows; the sections stay in order. */
 	query?: string;
+	/** The `.pen` files in `boards/` and `frames/`: listed in the deck section beside the boards, by path. */
+	pens?: DeckPen[];
 }
 
 /** The last segment of a deck-relative path: `boards/the-shell.html` → `the-shell.html`. */
@@ -135,9 +139,15 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	 * The rest of the deck, in the *deck's* order: this section is not about the canvas, and
 	 * `boards` arrives sorted by path.
 	 */
-	const rest = input.boards.filter((board) => !claimed.has(board.path) && matches(board, needle));
+	const rest: PanelRow[] = input.boards.filter((board) => !claimed.has(board.path) && matches(board, needle)).map((board) => ({ board, onCanvas: false, dim: false }));
+	// A pen file stands among the boards, in path order: a row whose `board` is just its path and name.
+	for (const pen of input.pens ?? []) {
+		const board = { path: pen.path, title: pen.title } as Board;
+		if (matches(board, needle)) rest.push({ board, pen, onCanvas: false, dim: false });
+	}
+	rest.sort((a, b) => a.board.path.localeCompare(b.board.path));
 	if (rest.length > 0) {
-		sections.push({ kind: "deck", label: "In the deck", rows: rest.map((board) => ({ board, onCanvas: false, dim: false })) });
+		sections.push({ kind: "deck", label: "In the deck", rows: rest });
 	}
 
 	return sections;

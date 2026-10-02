@@ -268,3 +268,50 @@ test("an arrow's style: straight by default, a curve square to both edges, an el
 	assert.equal(arrowShape(curve, 2, { route: "curved", heads: "both" }).geometry.split("M").length - 1, 3);
 	assert.equal(arrowShape([[0, 0], [100, 0]], 2, { heads: "none" }).geometry, "M2 2 L102 2");
 });
+
+test("a ref names an item in an imported file as name:id, and its variables come from that file", () => {
+	const components = parse(
+		JSON.stringify({
+			version: "2.14",
+			variables: { "color.card": { type: "color", value: "#123456" } },
+			children: [
+				{ id: "badge", type: "rectangle", reusable: true, width: 20, height: 10 },
+				{ id: "agent-card", type: "frame", reusable: true, layout: "vertical", width: 100, height: "fit_content", fill: "$color.card", children: [{ id: "title", type: "text", content: "Agent" }, { id: "mark", type: "ref", ref: "badge" }] },
+			],
+		}),
+	);
+	const doc = parse(
+		JSON.stringify({
+			version: "2.14",
+			imports: { deck: "../../components.pen" },
+			children: [
+				{ id: "wren", type: "ref", ref: "deck:agent-card", x: 10, y: 20, descendants: { title: { content: "Wren" } } },
+				{ id: "lost", type: "ref", ref: "nowhere:card", width: 30, height: 30 },
+			],
+		}),
+	);
+	doc["decks.imported"] = { deck: components };
+	const [wren, lost] = expand(doc);
+	assert.equal(wren!.type, "frame");
+	assert.equal(wren!.children![0]!.content, "Wren");
+	assert.equal(wren!.children![1]!.type, "rectangle", "a ref inside the imported item resolves in that file");
+	assert.equal(wren!.children![1]!.id, "wren/mark");
+	assert.equal(lost!.type, "missing");
+	assert.deepEqual(color(doc, wren!.fill, {}), [0x12 / 255, 0x34 / 255, 0x56 / 255, 1], "the imported file's variable");
+});
+
+test("a slot frame takes its children from the instance, and refs among them are expanded", () => {
+	const doc = parse(
+		JSON.stringify({
+			version: "2.14",
+			children: [
+				{ id: "chip", type: "rectangle", reusable: true, width: 12, height: 12 },
+				{ id: "panel", type: "frame", reusable: true, layout: "vertical", children: [{ id: "body", type: "frame", slot: ["chip"], layout: "horizontal", children: [] }] },
+				{ id: "p1", type: "ref", ref: "panel", descendants: { body: { children: [{ id: "c1", type: "ref", ref: "chip" }, { id: "t", type: "text", content: "hi" }] } } },
+			],
+		}),
+	);
+	const p1 = expand(doc)[2]!;
+	const body = p1.children![0]!;
+	assert.deepEqual(body.children!.map((c) => [c.id, c.type]), [["p1/c1", "rectangle"], ["p1/t", "text"]]);
+});

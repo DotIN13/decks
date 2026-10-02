@@ -9,7 +9,7 @@ import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf }
 import { WorkingSign } from "./StatusLine.tsx";
 import { turnCards, type TurnCard } from "./turn-cards.ts";
 import { signPlacement } from "./working-sign.ts";
-import { attachSwipeClose } from "./swipe-close.ts";
+import { attachPullClose, attachSwipeClose } from "./swipe-close.ts";
 import { Turn } from "./Turn.tsx";
 
 /**
@@ -199,6 +199,8 @@ export function Stream(props: {
 	onMount(() => {
 		const detach = attachSwipeClose(column, historyShown, closeHistory);
 		onCleanup(detach);
+		// And down, by the grip on its header (on a phone, where the header is not a float's handle).
+		if (head) onCleanup(attachPullClose(column, head, historyShown, closeHistory));
 	});
 
 	/*
@@ -446,6 +448,8 @@ export function Stream(props: {
 			 * button calls, so the two never disagree.
 			 */}
 			<div class="stream-head" ref={head}>
+				{/* The grip a phone pulls the history down by (`attachPullClose`); hidden where the header moves a float. */}
+				<span class="stream-grip" aria-hidden="true" />
 				<span class="stream-head-name">{props.name}</span>
 				<span class="stream-head-state">{props.state === "idle" ? "" : props.state}</span>
 				<button type="button" class="icon-button stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => closeHistory()}>

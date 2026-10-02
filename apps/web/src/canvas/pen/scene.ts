@@ -131,6 +131,8 @@ export type SceneOutput =
 			 * nothing is carried. `boards` are the boards drawn in it, whose pages hide while it shows.
 			 */
 			carried?: { bitmap: ImageBitmap; boards: string[] };
+			/** Drawn by CanvasKit, with the drawing in it; false while it loads, when only boards are drawn. */
+			gpu?: boolean;
 	  }
 	/** A new layout of the drawing, after a change, for the page's hit tests. */
 	| { type: "layout"; seq: number; placed: Array<[string, Placed]>; bounds: Array<[string, Frame]>; cards: CardGeometry[] }
@@ -188,6 +190,9 @@ async function pictureWidth(blob: Blob): Promise<number | undefined> {
 }
 /** Pictures fetched at once. The server takes two at a time; four keeps it busy. */
 const FETCHES = 4;
+/** How long after a stand-in picture the real one is asked for again, and how many times. */
+const STAND_IN_RETRY_MS = 2500;
+const STAND_IN_TRIES = 24;
 /** How long the camera has to be still before a picture is decoded at a new size. */
 const SETTLE_MS = 200;
 
@@ -197,6 +202,13 @@ interface PictureEntry {
 	blob?: Blob;
 	/** The picture's own width, from its header: no level is decoded wider. */
 	natural?: number;
+	/**
+	 * The server sent an older picture of the board while it takes the current one
+	 * (`X-Decks-Stand-In`): drawn as it is, and asked for again until the real one comes.
+	 */
+	standIn?: { tries: number; timer?: ReturnType<typeof setTimeout> };
+	/** A new picture arrived over one already decoded: decode it again, keeping the old until then. */
+	redecode?: boolean;
 	fetching?: boolean;
 	failed?: boolean;
 	/** The decoded picture, and the width it was decoded at. */
@@ -461,7 +473,7 @@ export class StageScene {
 		const cssW = Math.ceil(width * (1 + 2 * overscan));
 		const cssH = Math.ceil(height * (1 + 2 * overscan));
 		const boards = this.boardsInView(cssW, cssH);
-		this.wantPictures(boards);
+		this.wantPictures(this.boardsNear(cssW, cssH));
 		const useGpu = !!this.ck && (!this.drawingEmpty() || this.ink.length > 0) && !this.off.has("gpu");
 		const anyPicture = boards.some((b) => !b.live && this.hasPicture(b.path));
 		this.reportPictured(boards);
@@ -504,7 +516,7 @@ export class StageScene {
 			carried?.bitmap.close();
 			return;
 		}
-		this.host.post({ type: "frame", bitmap, camera, width: cssW, height: cssH, ...(carried ? { carried } : {}) }, carried ? [bitmap, carried.bitmap] : [bitmap]);
+		this.host.post({ type: "frame", bitmap, camera, width: cssW, height: cssH, gpu: useGpu, ...(carried ? { carried } : {}) }, carried ? [bitmap, carried.bitmap] : [bitmap]);
 		this.shown = { camera, rect: covered };
 	}
 
@@ -532,6 +544,17 @@ export class StageScene {
 	private sheetRect(cssW: number, cssH: number): Rect {
 		const { x, y, zoom } = this.camera;
 		return { x: x - cssW / 2 / zoom, y: y - cssH / 2 / zoom, w: cssW / zoom, h: cssH / zoom };
+	}
+
+	/**
+	 * The boards within one sheet of the sheet on every side: their pictures are fetched and decoded
+	 * ahead, so a board that comes into view during a zoom-out or a pan has its picture already. Read
+	 * only for pictures, where a board coming in had been blank for the fetch and the decode, about
+	 * 200 ms; nothing outside the sheet is drawn.
+	 */
+	private boardsNear(cssW: number, cssH: number): SceneBoard[] {
+		const r = this.sheetRect(cssW, cssH);
+		return (this.boardIndex?.search({ x: r.x - r.w, y: r.y - r.h, w: r.w * 3, h: r.h * 3 }) ?? []).map((at) => this.boards[at]!);
 	}
 
 	/** The boards the sheet covers, in their order: later ones are drawn over earlier ones. */
@@ -826,7 +849,7 @@ export class StageScene {
 			const has = entry.bitmap || entry.image ? entry.level : 0;
 			// Decoded once as soon as it arrives; at a new size only when the camera has stopped.
 			const busy = this.off.has("serial") && [...this.entries.values()].some((one) => one.decoding !== undefined);
-			if (entry.decoding === undefined && !busy && (has === 0 || (still && has !== level))) this.decode(entry, level);
+			if (entry.decoding === undefined && !busy && (has === 0 || entry.redecode || (still && has !== level))) this.decode(entry, level);
 		}
 		this.keepToBudget(boards);
 	}
@@ -835,13 +858,21 @@ export class StageScene {
 		entry.fetching = true;
 		this.fetching++;
 		void fetch(entry.url, { credentials: "same-origin" })
-			.then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
-			.then(async (blob) => {
+			.then(async (response) => {
+				if (!response.ok) throw new Error(String(response.status));
+				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
+				const blob = await response.blob();
+				if (this.disposed || this.entries.get(entry.path) !== entry) return;
 				entry.natural = await pictureWidth(blob).catch(() => undefined);
+				if (entry.blob) entry.redecode = true;
 				entry.blob = blob;
+				if (standIn) this.askAgain(entry);
+				else entry.standIn = undefined;
 			})
 			.catch(() => {
-				entry.failed = true;
+				// A retry that failed keeps the stand-in it has; only a board with nothing to draw has failed.
+				if (!entry.blob) entry.failed = true;
+				else if (entry.standIn) this.askAgain(entry);
 			})
 			.finally(() => {
 				entry.fetching = false;
@@ -854,6 +885,7 @@ export class StageScene {
 		const blob = entry.blob;
 		if (!blob) return;
 		entry.decoding = level;
+		entry.redecode = false;
 		void createImageBitmap(blob, { resizeWidth: level, resizeQuality: "high" } as ImageBitmapOptions)
 			.then((bitmap) => {
 				if (this.disposed || this.entries.get(entry.path) !== entry) {
@@ -896,7 +928,19 @@ export class StageScene {
 		}
 	}
 
+	/** A stand-in is drawn; the real picture is asked for again a little later, a bounded number of times. */
+	private askAgain(entry: PictureEntry): void {
+		const tries = (entry.standIn?.tries ?? 0) + 1;
+		if (tries > STAND_IN_TRIES) return;
+		const timer = setTimeout(() => {
+			if (this.disposed || this.entries.get(entry.path) !== entry || entry.fetching) return;
+			this.fetchPicture(entry);
+		}, STAND_IN_RETRY_MS);
+		entry.standIn = { tries, timer };
+	}
+
 	private letGo(entry: PictureEntry | undefined): void {
+		clearTimeout(entry?.standIn?.timer);
 		entry?.bitmap?.close();
 		entry?.image?.delete();
 	}

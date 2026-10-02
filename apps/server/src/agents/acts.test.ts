@@ -135,3 +135,11 @@ test("a second tool call on the same board replaces the first hold", () => {
 	h.fire(HOLD_LIMIT_MS);
 	assert.equal(h.acted().filter((m) => m.phase === "done").length, 1);
 });
+
+test("a drawing edit says which items it touched and their boxes on the stage, and an edit with none says nothing", () => {
+	const h = host({});
+	h.acts.act("a1", { kind: "draw", stage: "main", ids: ["note-1"], boxes: [{ x1: 10, y1: 20, x2: 110, y2: 80 }] });
+	assert.deepEqual(h.acted(), [{ type: "agent.act", agentId: "a1", path: "stages/main/stage.pen", phase: "done", what: "draw", ids: ["note-1"], boxes: [{ x1: 10, y1: 20, x2: 110, y2: 80 }], label: "Agent a1", color: "#123456", at: 1000 }]);
+	h.acts.act("a1", { kind: "draw", stage: "main", ids: [], boxes: [] });
+	assert.equal(h.acted().length, 1);
+});

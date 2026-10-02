@@ -79,7 +79,12 @@ export function BoardRow(props: {
 		 * arrangement a menu row uses for its × (`.row-act` in `chrome.css`), spelled again in
 		 * `panel.css` because that one's scope restyles anything wearing `data-row`.
 		 */
-		<div class="board-act" onPointerLeave={disarm} onFocusOut={(event) => {
+		/*
+		 * Leaving the row lets an armed delete go, for a pointer that hovers. Not for a finger: a touch
+		 * pointer "leaves" the moment it lifts, so the first tap's arming was taken back before the
+		 * second could confirm it, and on a phone the bin could never delete anything.
+		 */
+		<div class="board-act" onPointerLeave={(event) => event.pointerType !== "touch" && disarm()} onFocusOut={(event) => {
 			// Focus that lands somewhere else in the same box — the row to the button — is not
 			// leaving, and disarming on it would make the keyboard route impossible.
 			if (!event.currentTarget.contains(event.relatedTarget as Node | null)) disarm();

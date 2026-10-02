@@ -4,7 +4,7 @@ import { canvasNameReminder } from "./canvas-name.ts";
 import { isIsolatedStage } from "./isolated-stages.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
-import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
@@ -132,6 +132,8 @@ export interface StageAgentHooks {
 	worked?(path: string): void;
 	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
 	acted?(what: ActKind, path: string): void;
+	/** The agent edited its stage's drawing: the canvas outlines what it touched (`agents/acts.ts`). */
+	drew?(stage: string, ids: string[], boxes: ActBox[]): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
@@ -935,30 +937,55 @@ export function createStageTool(deps: {
 				const at = here().find((board) => board.path === of)!;
 				return { file, width: size.width, height: size.height, box: { x1: at.x, y1: at.y, x2: at.x + at.w, y2: at.y + at.h }, how: seen.how === "none" ? ("server" as const) : seen.how, note };
 			}
-			const shot = await service.shots.take({ stage: needStage(), of, ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}) });
+			/*
+			 * A .pen file, whole: a saved frame (`"frames/ui/button.pen"`), another stage's file, any .pen
+			 * by path. Named by a path that ends in .pen, or by one that is not an item on this stage and is a file.
+			 */
+			const pens = service.pens;
+			const penFileOf = (asked: unknown): string | undefined => {
+				if (!pens || typeof asked !== "string" || !asked.includes("/")) return undefined;
+				if (!asked.endsWith(".pen") && pens.placedOf(needStage()).has(asked)) return undefined;
+				try {
+					return existsSync(pens.penFile(asked).file) ? asked : undefined;
+				} catch {
+					return undefined;
+				}
+			};
+			const file = penFileOf(of);
+			const shot = await service.shots.take({ stage: needStage(), ...(file ? { file } : { of }), ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}) });
 			if (shot.format !== "pdf") images.push({ data: shot.bytes.toString("base64"), mimeType: shot.format === "jpeg" ? "image/jpeg" : "image/png" });
 			return { file: shot.file, width: shot.width, height: shot.height, box: shot.box };
 		},
 
 		pen: {
 			file: async () => `stages/${needStage()}/stage.pen`,
-			read: async () => {
+			read: async (path?: string) => {
+				// Any .pen file by its path (relative to frames/, or absolute in the deck); the stage's own without one.
+				if (path !== undefined) return needPens().readFile(path);
 				const { file: _file, ...view } = needPens().read(needStage());
 				return { ...view, file: `stages/${view.stage}/stage.pen` };
 			},
-			edit: async (ops: readonly unknown[]) => {
+			edit: async (ops: readonly unknown[], options?: { path?: string }) => {
 				const pens = needPens();
+				if (options?.path !== undefined) return pens.editFile(options.path, ops as readonly Op[]);
 				// Checked by `apply`, which answers a malformed edit with a sentence naming it.
 				const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
 				const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path));
-				const placed = placements(entry.doc, { theme: baseTheme(entry.doc, "light") });
-				return {
-					rev: entry.rev,
-					results: results.map((result) => {
-						const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
-						return { ...result, ...(box ? { box } : {}) };
-					}),
-				};
+				const placed = placements(pens.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light") });
+				const answered = results.map((result) => {
+					const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
+					return { ...result, ...(box ? { box } : {}) };
+				});
+				const touched = answered.filter((result) => result.box && !result.id.startsWith("board:"));
+				if (touched.length > 0) agent.drew?.(needStage(), touched.map((result) => result.id), touched.map((result) => result.box!));
+				return { rev: entry.rev, results: answered };
+			},
+			/** A new frame file in frames/, with `item` as its one reusable item, ready to be placed by the ref it answers. */
+			create: async (path: string, item?: Record<string, unknown>) => needPens().createFile(path, item as never),
+			/** Save an item as a frame file and, unless `replace` is false, put a ref to it in its place. */
+			save: async (id: string, path: string, options?: { replace?: boolean }) => {
+				if (typeof id !== "string" || !id) throw new Error("stage.pen.save(id, path) needs the item's id, from stage.pen.read().");
+				return needPens().saveFrame(needStage(), id, path, options?.replace !== false);
 			},
 		},
 

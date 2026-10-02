@@ -94,6 +94,16 @@ function heardState(id: string, state_: AgentState, hooks: FrameHooks): void {
  * it touches is a module it imports — the store, the notices, the selection — which is the
  * point of the state split: a frame changes the app's state, not the component's.
  */
+/** Drop an agent's act after the linger, if it is still the latest and the agent has stopped working. */
+function letActGo(agentId: string, at: number): void {
+	setTimeout(() => {
+		if (state.acts[agentId]?.at !== at) return;
+		const chat = state.chats.find((one) => one.id === agentId);
+		if (chat && chat.state !== "idle") return;
+		setState("acts", agentId, undefined);
+	}, DONE_LINGER_MS);
+}
+
 export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 	switch (message.type) {
 				case "runtimes":
@@ -268,21 +278,21 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 
 				/*
-				 * An agent acting on a board: kept as the latest act per agent, which is what the
-				 * frame draws a cursor and marks from. A finished act stays for a moment so the
-				 * landing can be seen, then goes — unless a newer act has replaced it by then.
+				 * An agent acting on a board or a drawing: kept as the latest act per agent, which is
+				 * what the canvas draws a cursor and marks from. It stays while the agent is working,
+				 * so the cursor waits where it last acted between two tool calls instead of leaving
+				 * and coming back; once the agent is idle it goes a moment after its last act, unless
+				 * a newer act has replaced it by then.
 				 */
 				case "agent.act":
 					setState("acts", message.agentId, message);
-					if (message.phase === "done") {
-						setTimeout(() => {
-							if (state.acts[message.agentId]?.at === message.at) setState("acts", message.agentId, undefined);
-						}, DONE_LINGER_MS);
-					}
+					if (message.phase === "done") letActGo(message.agentId, message.at);
 					return;
 
 				case "agent.state": {
 					setState("chats", (chats) => chats.map((chat) => (chat.id === message.id ? { ...chat, state: message.state } : chat)));
+					const act = state.acts[message.id];
+					if (message.state === "idle" && act) letActGo(message.id, act.at);
 					heardState(message.id, message.state, hooks);
 					return;
 				}

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Board } from "@decks/protocol";
 
@@ -229,6 +229,35 @@ export class ThumbService {
 	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false, kind: ThumbKind = "card"): Promise<string> {
 		this.wanted().add(kind === "card" ? scheme : `${scheme}/${kind}`);
 		return this.ask(board, scheme, gone, false, kind);
+	}
+
+	/**
+	 * Something to show while the picture is being taken: the newest older picture of this board,
+	 * in this scheme and kind (an earlier revision, or one from before a `PICTURE_LOOK` change),
+	 * with the real one asked for behind it. Undefined when the real one is already on disk or
+	 * there is nothing older, and the caller waits for the picture as before.
+	 *
+	 * Without it a board with no current picture was blank on the canvas until the server's Chrome,
+	 * two pages at a time, reached it: zooming out over dozens of boards after a look change was a
+	 * screen of empty rectangles filling in over a minute.
+	 */
+	standIn(board: Board, scheme: ThumbScheme, kind: ThumbKind = "card"): string | undefined {
+		if (existsSync(join(this.host.dir, thumbName(board.path, board.rev, scheme, kind)))) return undefined;
+		const any = pictureOf(board.path, scheme, kind);
+		let best: { file: string; at: number } | undefined;
+		try {
+			for (const name of readdirSync(this.host.dir)) {
+				if (!any.test(name)) continue;
+				const file = join(this.host.dir, name);
+				const at = statSync(file).mtimeMs;
+				if (!best || at > best.at) best = { file, at };
+			}
+		} catch {
+			return undefined;
+		}
+		if (!best) return undefined;
+		this.get(board, scheme, () => false, kind).catch(() => {});
+		return best.file;
 	}
 
 	/**

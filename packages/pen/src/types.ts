@@ -147,6 +147,9 @@ export interface PenNode {
 	scrollX?: number;
 	scrollY?: number;
 
+	/** Prompts: the model the prompt is for. */
+	model?: string;
+
 	/** Icons. */
 	library?: string;
 	icon?: string;
@@ -165,10 +168,18 @@ export interface PenVariable {
 	value: VariableValue | Array<{ value: VariableValue; theme?: Record<string, string> }>;
 }
 
+/**
+ * The documents a file `imports`, by the short name it gives each, read by the server and handed
+ * over beside the document (`withImported`); never saved. A ref says `"name:id"` to use an item
+ * from one, and its variables resolve from that file's.
+ */
+export const IMPORTED = "decks.imported";
+
 export interface PenDocument {
 	version: string;
 	themes?: Record<string, string[]>;
 	imports?: Record<string, string>;
+	[IMPORTED]?: Record<string, PenDocument>;
 	variables?: Record<string, PenVariable>;
 	children: PenNode[];
 	[key: string]: unknown;

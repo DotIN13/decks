@@ -16,6 +16,8 @@ const shotWindow = window as ShotWindow;
 
 const query = new URLSearchParams(location.search);
 const stage = query.get("stage") ?? "";
+/** A .pen file to draw instead of a stage: a saved frame, by its path (`/api/pen-file`). */
+const penPath = query.get("pen");
 const box = { x1: Number(query.get("x1")), y1: Number(query.get("y1")), x2: Number(query.get("x2")), y2: Number(query.get("y2")) };
 const scheme = query.get("scheme") === "dark" ? "dark" : "light";
 
@@ -24,8 +26,8 @@ const QUIET_MS = 500;
 const BOARD_MS = 10_000;
 
 async function main(): Promise<void> {
-	const response = await fetch(`/api/stage-pen/${encodeURIComponent(stage)}`);
-	if (!response.ok) throw new Error(`no stage "${stage}" (${response.status})`);
+	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`) : await fetch(`/api/stage-pen/${encodeURIComponent(stage)}`);
+	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no stage "${stage}" (${response.status})`);
 	const { doc, base, boards } = (await response.json()) as { doc: PenDocument; base: string; boards: Array<{ path: string; x: number; y: number; w: number; h: number }> };
 
 	const view = { width: innerWidth, height: innerHeight };
@@ -78,7 +80,9 @@ async function main(): Promise<void> {
 	const started = performance.now();
 	for (;;) {
 		await new Promise((resolve) => setTimeout(resolve, 100));
-		if (drawnOnce && performance.now() - lastDrawn > QUIET_MS) break;
+		// A drawing waits for a frame CanvasKit drew: until it has loaded, the sheet shows the boards alone.
+		const drawingShown = doc.children.length === 0 || layer.drewDrawing;
+		if (drawnOnce && drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
 		if (performance.now() - started > BOARD_MS) break;
 	}
 	// Two frames, so the last picture is on the screen and not only recorded.

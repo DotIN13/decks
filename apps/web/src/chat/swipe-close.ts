@@ -107,3 +107,76 @@ export function attachSwipeClose(
 		off();
 	};
 }
+const PULL_START = 6; // pixels down before the pull takes the sheet
+const PULL_FRACTION = 0.2; // of the sheet's own height
+
+/**
+ * Pull the history down by its grip to put it away, as a phone's bottom sheet goes.
+ *
+ * Only from the grip and the header around it, never from the turns: a downward drag in the
+ * roll is a scroll. The sheet follows the finger down (never up), and on release it goes if it
+ * travelled a fifth of its height or was flicked; otherwise it settles back on the panel's own
+ * transition. The header's buttons keep their taps.
+ */
+export function attachPullClose(sheet: HTMLElement, grip: HTMLElement, isOpen: () => boolean, onClose: () => void): () => void {
+	let owner: number | undefined;
+	let startY = 0;
+	let dy = 0;
+	let pulling = false;
+	let lastMove = 0;
+	let lastDy = 0;
+	let speed = 0;
+
+	const reset = () => {
+		owner = undefined;
+		pulling = false;
+		sheet.style.transition = "";
+		sheet.style.transform = "";
+		window.removeEventListener("pointermove", onMove);
+		window.removeEventListener("pointerup", onUp);
+		window.removeEventListener("pointercancel", onUp);
+	};
+
+	const onDown = (event: PointerEvent) => {
+		if (event.pointerType === "mouse" || !isOpen() || owner !== undefined) return;
+		if ((event.target as Element | null)?.closest?.("button, a")) return;
+		owner = event.pointerId;
+		startY = event.clientY;
+		dy = 0;
+		lastDy = 0;
+		speed = 0;
+		lastMove = event.timeStamp;
+		window.addEventListener("pointermove", onMove, { passive: false });
+		window.addEventListener("pointerup", onUp);
+		window.addEventListener("pointercancel", onUp);
+	};
+
+	const onMove = (event: PointerEvent) => {
+		if (event.pointerId !== owner) return;
+		dy = Math.max(0, event.clientY - startY);
+		if (!pulling) {
+			if (dy < PULL_START) return;
+			pulling = true;
+			sheet.style.transition = "none";
+		}
+		const elapsed = Math.max(1, event.timeStamp - lastMove);
+		speed = (dy - lastDy) / elapsed;
+		lastDy = dy;
+		lastMove = event.timeStamp;
+		sheet.style.transform = `translateY(${dy}px)`;
+		if (event.cancelable) event.preventDefault();
+	};
+
+	const onUp = (event: PointerEvent) => {
+		if (event.pointerId !== owner) return;
+		const go = pulling && (dy > sheet.clientHeight * PULL_FRACTION || (speed > VELOCITY && event.timeStamp - lastMove < 80));
+		reset();
+		if (go) onClose();
+	};
+
+	grip.addEventListener("pointerdown", onDown);
+	return () => {
+		grip.removeEventListener("pointerdown", onDown);
+		reset();
+	};
+}

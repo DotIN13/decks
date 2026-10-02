@@ -25,6 +25,8 @@ export type ShotOf = string | string[] | Partial<Box> | undefined;
 
 export interface ShotRequest {
 	stage: string;
+	/** A .pen file to picture instead of the stage, whole: a saved frame, or any other (`StagePens.penFile`). */
+	file?: string;
 	of?: ShotOf;
 	scale?: number;
 	scheme?: "light" | "dark";
@@ -98,8 +100,14 @@ export class StageShots {
 
 	async take(request: ShotRequest): Promise<Shot> {
 		const { stage } = request;
-		if (!this.host.pens.names().includes(stage)) throw new Error(`There is no stage "${stage}".`);
-		const box = shotBox(this.host.pens, stage, request.of);
+		const fileFrame = request.file ? this.host.pens.fileFrame(request.file) : undefined;
+		if (!fileFrame && !this.host.pens.names().includes(stage)) throw new Error(`There is no stage "${stage}".`);
+		let box: Box;
+		if (fileFrame?.stage) box = shotBox(this.host.pens, fileFrame.stage, request.of);
+		else if (fileFrame) {
+			if (!fileFrame.box) throw new Error(`${request.file} has nothing in it to picture.`);
+			box = { x1: Math.floor(fileFrame.box.x1 - MARGIN), y1: Math.floor(fileFrame.box.y1 - MARGIN), x2: Math.ceil(fileFrame.box.x2 + MARGIN), y2: Math.ceil(fileFrame.box.y2 + MARGIN) };
+		} else box = shotBox(this.host.pens, stage, request.of);
 		const format: ShotFormat = request.format === "jpeg" || request.format === "pdf" ? request.format : "png";
 		const scale = Math.min(3, Math.max(0.25, Number.isFinite(request.scale) ? Number(request.scale) : 1));
 		const scheme = request.scheme === "dark" ? "dark" : "light";
@@ -108,7 +116,7 @@ export class StageShots {
 		const zoom = Math.min(1, MAX_CSS / Math.max(w, h));
 		const width = Math.max(1, Math.round(w * zoom));
 		const height = Math.max(1, Math.round(h * zoom));
-		const query = new URLSearchParams({ stage, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme });
+		const query = new URLSearchParams({ ...(fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage }), x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
 		const bytes = await this.host.borrow(async (browser) => {
@@ -127,7 +135,8 @@ export class StageShots {
 		});
 
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${stage}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
+		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : stage;
+		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
 		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, bytes);
 		return { file: relative(this.host.deck, target), bytes, format, width: Math.round(width * scale), height: Math.round(height * scale), box };

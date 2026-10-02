@@ -119,7 +119,7 @@ export class PenFonts {
 	}
 
 	/** A laid-out paragraph in this style, which the caller deletes. */
-	paragraph(text: string, style: TextStyle, options: { color?: Float32Array; align?: string; width: number; underline?: boolean; strike?: boolean }): Paragraph {
+	paragraph(text: string, style: TextStyle, options: { color?: Float32Array; align?: string; width: number; underline?: boolean; strike?: boolean; shadows?: Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> }): Paragraph {
 		const ck = this.ck;
 		const align = options.align === "center" ? ck.TextAlign.Center : options.align === "right" ? ck.TextAlign.Right : options.align === "justify" ? ck.TextAlign.Justify : ck.TextAlign.Left;
 		const decoration = (options.underline ? ck.UnderlineDecoration : 0) | (options.strike ? ck.LineThroughDecoration : 0);
@@ -133,6 +133,7 @@ export class PenFonts {
 				letterSpacing: style.letterSpacing,
 				...(style.lineHeight !== undefined ? { heightMultiplier: style.lineHeight, halfLeading: true } : {}),
 				...(decoration ? { decoration, decorationColor: options.color ?? ck.BLACK } : {}),
+				...(options.shadows?.length ? { shadows: options.shadows } : {}),
 			},
 		});
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, this.provider);

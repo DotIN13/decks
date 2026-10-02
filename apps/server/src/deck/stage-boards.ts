@@ -15,14 +15,18 @@ export function stageBoardsDir(stage: string): string {
 	return `stages/${stage}/boards`;
 }
 
-/** True for a deck-relative path in any board folder: `boards/…` or `stages/<name>/boards/…`. */
+/** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `stages/<name>/boards/…`. */
 export function inBoardFolder(path: string): boolean {
-	return /^boards\/.+/.test(path) || /^stages\/[^/]+\/boards\/.+/.test(path);
+	return /^(?:boards|frames)\/.+/.test(path) || /^stages\/[^/]+\/boards\/.+/.test(path);
 }
 
-/** Every board folder in a deck, deck-relative: `boards`, then each stage's that exists. */
+/**
+ * Every board folder in a deck, deck-relative: `boards`, `frames` when it is there (saved frames,
+ * and any page kept beside them), then each stage's that exists.
+ */
 export function boardFolders(deck: string): string[] {
 	const folders = ["boards"];
+	if (existsSync(join(deck, "frames"))) folders.push("frames");
 	const stages = join(deck, "stages");
 	if (!existsSync(stages)) return folders;
 	for (const entry of readdirSync(stages, { withFileTypes: true })) {

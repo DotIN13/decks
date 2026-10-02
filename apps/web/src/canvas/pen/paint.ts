@@ -105,7 +105,7 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			break;
 		}
 		case "polygon": {
-			const path = polygonPath(ck, placed, Math.max(3, Math.round(num(doc, node.polygonCount, theme, 3))));
+			const path = polygonPath(ck, placed, Math.max(3, Math.round(num(doc, node.polygonCount, theme, 3))), radiiOf(doc, node, theme)[0] ?? 0);
 			paintShadows(canvas, ctx, node, theme, (paint) => canvas.drawPath(path, paint));
 			paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawPath(path, paint));
 			paintStroke(canvas, ctx, node, theme, placed, (paint) => canvas.drawPath(path, paint), (op) => canvas.clipPath(path, op, true));
@@ -115,6 +115,16 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		case "path": {
 			const path = geometryPath(ck, node, placed);
 			if (!path) break;
+			// A shadow of what the path draws: its fill's area, or its line when it has only a stroke.
+			const hasFill = fillsOf(node.fill).length > 0;
+			const lineWidth = strokeOf(doc, node, theme)?.widths[0] ?? 0;
+			paintShadows(canvas, ctx, node, theme, (paint) => {
+				if (!hasFill && lineWidth > 0) {
+					paint.setStyle(ck.PaintStyle.Stroke);
+					paint.setStrokeWidth(lineWidth);
+				}
+				canvas.drawPath(path, paint);
+			});
 			paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawPath(path, paint));
 			// An arrow is a line: its stroke is centred however it was aligned, or its head would be clipped away.
 			const stroke = strokeOf(doc, node, theme);
@@ -191,6 +201,12 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			}
 			// A card's words are dark on its light colour, whatever the stage's scheme.
 			paintText(canvas, ctx, node, theme, placed, NOTE_PAD, "#1f2328");
+			// A prompt names the model it is for: small, in the top padding's right corner, clear of its words.
+			if (node.type === "prompt" && typeof node.model === "string" && node.model.trim()) {
+				const label = ctx.fonts.paragraph(node.model.trim(), { fontFamily: "Inter", fontSize: 11, fontWeight: 500, fontStyle: "normal", letterSpacing: 0, lineHeight: undefined }, { color: ck.Color4f(0.25, 0.2, 0.45, 0.75), align: "right", width: Math.max(20, w - NOTE_PAD * 2) });
+				canvas.drawParagraph(label, x + NOTE_PAD, y + Math.max(1, (NOTE_PAD - label.getHeight()) / 2));
+				label.delete();
+			}
 			break;
 		}
 		case "group":
@@ -253,16 +269,32 @@ function ellipsePath(ck: CanvasKit, placed: Placed, doc: PenDocument, theme: The
 	return builder.detachAndDelete();
 }
 
-function polygonPath(ck: CanvasKit, placed: Placed, sides: number): Path {
+/** A regular polygon in its box, its corners rounded by `cornerRadius` (pen's polygons take one). */
+function polygonPath(ck: CanvasKit, placed: Placed, sides: number, radius = 0): Path {
 	const { x, y, w, h } = placed.box;
-	const points: number[] = [];
+	const points: Array<[number, number]> = [];
 	for (let i = 0; i < sides; i++) {
 		// The first corner at the top, as pen.dev draws a triangle point-up.
 		const angle = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
-		points.push(x + w / 2 + (w / 2) * Math.cos(angle), y + h / 2 + (h / 2) * Math.sin(angle));
+		points.push([x + w / 2 + (w / 2) * Math.cos(angle), y + h / 2 + (h / 2) * Math.sin(angle)]);
 	}
 	const builder = new ck.PathBuilder();
-	builder.addPolygon(points, true);
+	if (radius <= 0) {
+		builder.addPolygon(points.flat(), true);
+		return builder.detachAndDelete();
+	}
+	// Each corner an arc tangent to its two edges, no wider than half the shorter edge allows.
+	const edge = Math.min(...points.map(([px, py], i) => Math.hypot(points[(i + 1) % sides]![0] - px, points[(i + 1) % sides]![1] - py)));
+	const r = Math.min(radius, edge / 2);
+	const [lx, ly] = points[sides - 1]!;
+	const [fx, fy] = points[0]!;
+	builder.moveTo((lx + fx) / 2, (ly + fy) / 2);
+	for (let i = 0; i < sides; i++) {
+		const [cx, cy] = points[i]!;
+		const [nx, ny] = points[(i + 1) % sides]!;
+		builder.arcToTangent(cx, cy, nx, ny, r);
+	}
+	builder.close();
 	return builder.detachAndDelete();
 }
 
@@ -478,12 +510,28 @@ function paintText(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: Them
 		width: node.type === "text" && (node.textGrowth ?? "auto") === "auto" ? width + 1 : width,
 		underline: bool(doc, node.underline, theme, false),
 		strike: bool(doc, node.strikethrough, theme, false),
+		// A text's outer shadows are the glyphs' own (a card's are its card's, drawn above).
+		shadows: node.type === "text" ? textShadows(ctx, node, theme) : [],
 	});
 	const inner = h - pad * 2;
 	const vertical = node.textAlignVertical ?? "top";
 	const offset = vertical === "middle" ? (inner - paragraph.getHeight()) / 2 : vertical === "bottom" ? inner - paragraph.getHeight() : 0;
 	canvas.drawParagraph(paragraph, x + pad, y + pad + Math.max(0, offset));
 	paragraph.delete();
+}
+
+/** A text's outer `shadow` effects, as the paragraph's own text shadows. */
+function textShadows(ctx: PaintContext, node: PenNode, theme: ThemeState): Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> {
+	const { ck, doc } = ctx;
+	const effects = node.effect === undefined ? [] : Array.isArray(node.effect) ? node.effect : [node.effect];
+	const out: Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> = [];
+	for (const effect of effects) {
+		if (!effect || effect.type !== "shadow" || effect.shadowType === "inner" || !bool(doc, effect.enabled, theme, true)) continue;
+		const rgba = color(doc, effect.color ?? "#00000040", theme);
+		if (!rgba) continue;
+		out.push({ color: rgbaColor(ck, rgba), offset: [num(doc, effect.offset?.x, theme, 0), num(doc, effect.offset?.y, theme, 0)], blurRadius: num(doc, effect.blur, theme, 0) / 2 });
+	}
+	return out;
 }
 
 /** A markdown card's words, set as markdown inside its padding (`fonts.markdown`). */

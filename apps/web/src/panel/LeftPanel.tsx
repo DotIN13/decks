@@ -1,4 +1,4 @@
-import type { Board } from "@decks/protocol";
+import type { Board, DeckPen } from "@decks/protocol";
 import Rows2 from "lucide-solid/icons/rows-2";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
@@ -7,7 +7,7 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup,
 import { createStore, reconcile } from "solid-js/store";
 import { DecksMark, Icon } from "../ui/icons.tsx";
 import { BoardRow } from "./BoardRow.tsx";
-import { panelSections } from "./panel-groups.ts";
+import { basename as basenameOf, panelSections } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
@@ -99,6 +99,9 @@ export function LeftPanel(props: {
 	ask?: { tab: PanelTab; at: number };
 	/** Every board there is. The list is all of them, in three sections. */
 	boards: Board[];
+	/** The `.pen` files in `boards/` and `frames/`, listed after the boards; a press places one on the stage. */
+	pens?: DeckPen[];
+	onPlacePen?: (pen: DeckPen) => void;
 	/**
 	 * Whether the rest of the list may be drawn. The first screenful is drawn at once; the rows
 	 * below it wait for the app and its canvas to have opened (`App`), then arrive a chunk at a
@@ -215,6 +218,24 @@ export function LeftPanel(props: {
 		if (ask) setTab(ask.tab);
 	});
 	const sheet = createSheet();
+
+	/*
+	 * A sheet over the canvas closes with a tap on the canvas beside it, as a phone's drawer does.
+	 * The tap only closes: taken in the capture phase before the stage sees it, so it does not
+	 * also select a board or start a pan under a panel that is going away.
+	 */
+	createEffect(() => {
+		if (!props.open || !sheet()) return;
+		const away = (event: PointerEvent) => {
+			const target = event.target as Element | null;
+			if (!target?.closest?.(".stage") || target.closest('aside[aria-label="Boards"]')) return;
+			event.stopPropagation();
+			event.preventDefault();
+			props.onOpenChange(false);
+		};
+		window.addEventListener("pointerdown", away, true);
+		onCleanup(() => window.removeEventListener("pointerdown", away, true));
+	});
 
 	/*
 	 * The width is the person's to set, by the handle on the panel's right edge. Only beside
@@ -378,6 +399,7 @@ export function LeftPanel(props: {
 			kept: props.kept,
 			inPlay: props.inPlay,
 			query: query(),
+			pens: props.pens ?? [],
 		}),
 	);
 
@@ -882,15 +904,30 @@ export function LeftPanel(props: {
 									</div>
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
-											<BoardRow
-												board={row.board}
-												current={props.current === row.board.path}
-												dim={row.dim}
-												onCanvas={row.onCanvas}
-												{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
-												{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
-												onPick={() => props.onPick(row.board)}
-											/>
+											<Show
+												when={row.pen}
+												fallback={
+													<BoardRow
+														board={row.board}
+														current={props.current === row.board.path}
+														dim={row.dim}
+														onCanvas={row.onCanvas}
+														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
+														{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
+														onPick={() => props.onPick(row.board)}
+													/>
+												}
+											>
+												{(pen) => (
+													/* A .pen file among the boards: not a page, so a press places it on the stage as a ref. Named by its file, as a board's row is. */
+													<div class="board-act">
+														<button class="board-row" type="button" data-row data-pen={pen().path} title={`${pen().title}, ${pen().path}: place it on the stage`} onClick={() => props.onPlacePen?.(pen())}>
+															<span class="board-thumb" aria-hidden="true" />
+															<span class="row-name">{basenameOf(pen().path)}</span>
+														</button>
+													</div>
+												)}
+											</Show>
 										)}
 									</For>
 								</div>

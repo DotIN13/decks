@@ -15,7 +15,12 @@ interface WorkerScope {
 const scope = self as unknown as WorkerScope;
 
 let scene: StageScene | undefined;
-scope.onmessage = (event) => {
+/*
+ * Once per worker. WebKit evaluates a module worker's entry again when a chunk imports it, and a
+ * second handler with no scene behind it took every message after that (`vite.config.ts` keeps the
+ * entry out of the shared chunk; this keeps a second evaluation harmless if it ever is).
+ */
+if (!scope.onmessage) scope.onmessage = (event) => {
 	const message = event.data;
 	if (message.type === "init") {
 		scene = new StageScene({

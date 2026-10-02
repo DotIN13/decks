@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -235,4 +235,24 @@ test("the two kinds of picture have names of their own, and neither is taken for
 	// The card's pattern for "any revision of this picture" must not reach the whole one.
 	const cardAny = new RegExp(`^${card.slice(0, 16)}-\\d+-light(-\\d+)?(-l\\d+)?\\.jpg$`);
 	assert.ok(cardAny.test(card) && !cardAny.test(whole));
+});
+
+test("while a whole picture is taken, the board's older one stands in, and the new one is asked for behind it", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	const chrome = fake();
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const a = board("boards/a.html", 4);
+	assert.equal(thumbs.standIn(a, "light", "whole"), undefined, "nothing older: the caller waits");
+	// A picture from before a look change, at an older revision, under the old name and format.
+	const old = join(dir, thumbName("boards/a.html", 3, "light", "whole").replace(/-l\d+\.webp$/, ".jpg"));
+	writeFileSync(old, "old");
+	assert.equal(thumbs.standIn(a, "light", "whole"), old);
+	assert.equal(thumbs.standIn(a, "dark", "whole"), undefined, "another scheme's picture is not a stand-in");
+	await tick();
+	assert.equal(chrome.opened.length, 1, "the current picture is being taken");
+	await chrome.release();
+	await thumbs.get(a, "light", () => false, "whole");
+	assert.equal(thumbs.standIn(a, "light", "whole"), undefined, "the current one exists: no stand-in");
+	assert.equal(existsSync(old), false, "and the older one is gone");
+	thumbs.dispose();
 });

@@ -1,6 +1,6 @@
 import { parse, serializeOuter } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
-import type { ActKind, ServerMessage } from "@decks/protocol";
+import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
 
 /**
  * What an agent is doing to a board, said by the server rather than the agent.
@@ -37,7 +37,11 @@ export interface ToolEvent {
 	phase: "start" | "end";
 }
 
-export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string };
+/**
+ * `draw` is an edit to a stage's drawing (`stage.pen.edit`): the items it touched and their boxes
+ * on the stage, which the server already has, so the canvas outlines them without a lookup.
+ */
+export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string } | { kind: "draw"; stage: string; ids: string[]; boxes: ActBox[] };
 
 export interface ActsHost {
 	emit(message: ServerMessage): void;
@@ -75,6 +79,11 @@ export class Acts {
 	act(agentId: string, act: Act): void {
 		if (act.kind === "verb") {
 			this.say(agentId, act.path, "done", act.what);
+			return;
+		}
+		if (act.kind === "draw") {
+			if (act.boxes.length === 0) return;
+			this.say(agentId, `stages/${act.stage}/stage.pen`, "done", "draw", act.ids.slice(0, MAX_IDS), act.boxes.slice(0, MAX_IDS));
 			return;
 		}
 		const { event } = act;
@@ -129,10 +138,10 @@ export class Acts {
 		this.pending.delete(path);
 	}
 
-	private say(agentId: string, path: string, phase: "start" | "done", what: ActKind, ids?: string[]): void {
+	private say(agentId: string, path: string, phase: "start" | "done", what: ActKind, ids?: string[], boxes?: ActBox[]): void {
 		const who = this.host.identity(agentId);
 		if (!who) return;
-		this.host.emit({ type: "agent.act", agentId, path, phase, what, ...(ids ? { ids } : {}), label: who.name, color: who.color, at: this.host.now?.() ?? Date.now() });
+		this.host.emit({ type: "agent.act", agentId, path, phase, what, ...(ids ? { ids } : {}), ...(boxes ? { boxes } : {}), label: who.name, color: who.color, at: this.host.now?.() ?? Date.now() });
 	}
 
 	private later(ms: number, run: () => void): () => void {

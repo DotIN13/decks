@@ -28,6 +28,7 @@ import { on, send, start } from "./state/socket.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { pens } from "./state/pens.ts";
+import { optionFor } from "./chat/composer/thinking.ts";
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
@@ -1369,6 +1370,13 @@ export function App() {
 						nonces={state.nonces}
 						cursor={state.cursor}
 						acts={state.acts}
+						stageName={state.focused ? pens()[state.focused]?.stage : undefined}
+						agentLabel={(agentId, name) => {
+							// "Name · Model", as a design tool tags a collaborator: the model by the name its picker shows.
+							const chat = state.chats.find((one) => one.id === agentId);
+							const model = chat?.model ? (optionFor(runtimeFor(chat.kind)?.models ?? [], chat.model)?.label ?? chat.model.model) : undefined;
+							return model ? `${name} · ${model}` : name;
+						}}
 						news={newsGlow()}
 						onRead={(path) => send({ type: "board.seen", path })}
 						onViewport={() => reportCameraSoon(camera())}
@@ -1715,6 +1723,13 @@ export function App() {
 				<LeftPanel
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
 					boards={state.boards}
+					pens={state.deck?.pens ?? []}
+					onPlacePen={(pen) => {
+						// A pen file goes on the stage as a ref, its corner at the middle of the view, as an agent places one.
+						const agentId = state.focused;
+						const at = camera();
+						if (agentId) send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }] });
+					}}
 					listMayGrow={boardsStarted()}
 					current={selected()}
 					/* `stageBoards` is the same answer the stage draws from, so the panel's "on the

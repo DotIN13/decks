@@ -165,3 +165,122 @@ test("a stage's name is its own: kept as written, changed freely, and the folder
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test("a stage's imports are read from inside the deck, used for its boxes and its frame, and never saved", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		writeFileSync(join(dir, "components.pen"), JSON.stringify({ version: "2.14", children: [{ id: "card", type: "rectangle", reusable: true, width: 120, height: 40 }] }));
+		const outside = mkdtempSync(join(tmpdir(), "outside-"));
+		writeFileSync(join(outside, "x.pen"), JSON.stringify({ version: "2.14", children: [{ id: "card", type: "rectangle", reusable: true, width: 5, height: 5 }] }));
+		const name = pens.claim("Wren");
+		pens.replace(
+			name,
+			JSON.stringify({
+				version: "2.14",
+				imports: { deck: "../../components.pen", far: join(outside, "x.pen") },
+				children: [
+					{ id: "a", type: "ref", ref: "deck:card", x: 10, y: 20 },
+					{ id: "b", type: "ref", ref: "far:card", x: 0, y: 0, width: 30, height: 30 },
+				],
+			}),
+		);
+		const view = pens.read(name);
+		assert.deepEqual(view.children[0]!.box, { x1: 10, y1: 20, x2: 130, y2: 60 }, "the imported card's own size");
+		const frame = pens.frame("agent", name) as unknown as { doc: Record<string, unknown> };
+		assert.deepEqual(Object.keys((frame.doc["decks.imported"] ?? {}) as object), ["deck", "far"], "a file outside the deck is read too");
+		const saved = readFileSync(join(dir, "stages", name, "stage.pen"), "utf8");
+		assert.equal(saved.includes("decks.imported"), false);
+		rmSync(outside, { recursive: true, force: true });
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("an item saved as a frame goes to frames/, any stage places it by frames/<name>, and a change to the file reaches every stage using it", async () => {
+	const dir = deck();
+	const heard: string[] = [];
+	const pens = new StagePens(dir, (name) => heard.push(name));
+	try {
+		const one = pens.claim("One");
+		const two = pens.claim("Two");
+		pens.edit(one, [{ op: "insert", node: { type: "frame", id: "card", layout: "vertical", width: 200, height: 80, fill: "#ffffff", children: [{ type: "text", id: "title", content: "Wren" }] }, box: { x1: 40, y1: 50 } }]);
+		const saved = pens.saveFrame(one, "card", "frames/agent-card");
+		assert.deepEqual(saved, { frame: "frames/agent-card.pen", ref: "frames/agent-card", replaced: true, overwrote: false });
+		const file = JSON.parse(readFileSync(join(dir, "frames", "agent-card.pen"), "utf8"));
+		assert.equal(file.children[0].id, "agent-card");
+		assert.equal(file.children[0].reusable, true);
+		assert.equal(file.children[0].x, undefined, "where it sat on the stage is not part of the frame");
+		const onStage = JSON.parse(readFileSync(join(dir, "stages", one, "stage.pen"), "utf8")).children[0];
+		assert.deepEqual(onStage, { type: "ref", id: "card", ref: "frames/agent-card", x: 40, y: 50 });
+		assert.deepEqual(pens.read(one).children[0]!.box, { x1: 40, y1: 50, x2: 240, y2: 130 });
+
+		pens.edit(two, [{ op: "insert", node: { type: "ref", id: "c2", ref: "frames/agent-card", descendants: { title: { content: "Ada" } } }, box: { x1: 0, y1: 0 } }]);
+		assert.deepEqual(pens.read(two).children[0]!.box, { x1: 0, y1: 0, x2: 200, y2: 80 });
+		assert.equal(pens.read(two).children[0]!.inside?.find((item: { id: string }) => item.id === "c2/title")?.content, "Ada");
+
+		heard.length = 0;
+		file.children[0].width = 300;
+		writeFileSync(join(dir, "frames", "agent-card.pen"), JSON.stringify(file));
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		assert.deepEqual([...new Set(heard)].sort(), [one, two].sort(), "both stages are sent again");
+		assert.equal(pens.read(two).children[0]!.box.x2, 300);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("any .pen file by path: create one in frames/, read and edit it by path, and place it by its ref", () => {
+	const dir = deck();
+	const heard: string[] = [];
+	const pens = new StagePens(dir, (name) => heard.push(name));
+	try {
+		const stage = pens.claim("One");
+		const made = pens.createFile("frames/ui/button", { type: "frame", layout: "horizontal", padding: 8, fill: "#3b5cf6", children: [{ type: "text", id: "label", content: "Go" }] });
+		assert.deepEqual(made, { file: "frames/ui/button.pen", ref: "frames/ui/button", id: "button" });
+		assert.throws(() => pens.createFile("frames/ui/button.pen"), /already there/);
+		assert.throws(() => pens.createFile("frames/Bad Name"), /letters, digits/);
+
+		const view = pens.readFile("frames/ui/button");
+		assert.equal((view as { ref?: string }).ref, "frames/ui/button");
+		assert.equal(view.children[0]!.id, "button");
+
+		pens.edit(stage, [{ op: "insert", node: { type: "ref", id: "b1", ref: "frames/ui/button" }, box: { x1: 100, y1: 100 } }]);
+		heard.length = 0;
+		const edited = pens.editFile("frames/ui/button.pen", [{ op: "update", id: "label", set: { content: "Stop" } }]);
+		assert.equal(edited.file, "frames/ui/button.pen");
+		assert.deepEqual(heard, [stage], "the stage that uses it is sent again at once");
+		const inside = pens.read(stage).children[0]!.inside as Array<{ id: string; content?: string }>;
+		assert.equal(inside.find((item) => item.id === "b1/label")?.content, "Stop");
+
+		// A stage's own file, by its path in the deck or absolutely, is the stage.
+		assert.equal(pens.readFile(`stages/${stage}/stage.pen`).children[0]!.id, "b1");
+		const absolute = join(dir, "stages", stage, "stage.pen");
+		assert.equal(pens.readFile(absolute).children[0]!.id, "b1");
+		pens.editFile(absolute, [{ op: "update", id: "b1", box: { x1: 300, y1: 100 } }]);
+		assert.equal(pens.read(stage).children[0]!.box.x1, 300);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a .pen file outside the deck is read and edited by its absolute path", () => {
+	const dir = deck();
+	const elsewhere = mkdtempSync(join(tmpdir(), "elsewhere-"));
+	const pens = new StagePens(dir, () => {});
+	try {
+		const file = join(elsewhere, "kit.pen");
+		const made = pens.createFile(file, { type: "rectangle", width: 10, height: 10 });
+		assert.equal(made.file, file);
+		assert.equal(made.ref, undefined, "only a file in frames/ has a frames ref");
+		pens.editFile(file, [{ op: "update", id: "kit", set: { width: 40 } }]);
+		assert.equal(pens.readFile(file).children[0]!.box.x2, 40);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+		rmSync(elsewhere, { recursive: true, force: true });
+	}
+});

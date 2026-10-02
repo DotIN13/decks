@@ -161,7 +161,27 @@ leaves the layout and sits at its own `x`, `y`. Want five notes in a tidy column
 
 **Reuse.** Mark an item `reusable: true` and place copies with `{ type: "ref", ref: "<its id>" }`.
 Change the original and every copy follows. `descendants: { "<child id>": { content: "…" } }`
-overrides inside a copy; an override with a `type` replaces that child whole.
+overrides inside a copy; an override with a `type` replaces that child whole. A frame inside the
+reusable item marked `slot: ["<item id>", …]` is a place for content: a copy fills it with
+`descendants: { "<slot id>": { children: [ … ] } }`, refs included.
+
+**Saved frames.** A frame worth using again goes in the deck's `frames/` folder, as a board goes in
+`boards/`, in folders if you like. Two ways in:
+
+- `stage.pen.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
+  `frames/ui/agent-card.pen` with that frame as its one reusable item;
+- `stage.pen.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
+  puts a ref to it where the item was.
+
+Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
+with nothing to declare. `stage.pen.read("frames/ui/agent-card")` reads it and `stage.pen.edit([...],
+{ path: "frames/ui/agent-card" })` edits it with the same edits a stage takes; every stage using it
+shows the change. A path is relative to the deck, as a board's is, so `"stages/<name>/stage.pen"`
+reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
+
+Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
+the stage file names it (relative to the stage file, inside the deck), and `ref: "kit:<id>"` places a
+copy; that file's variables come with it.
 
 ## Arrows
 

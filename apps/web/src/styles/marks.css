@@ -97,7 +97,8 @@
  * fades, then nothing — the changed mark on the title bar is what stays.
  */
 .act-hold,
-.act-land {
+.act-land,
+.act-draw {
 	position: absolute;
 	z-index: var(--z-over-board);
 	border-radius: var(--radius-chip);
@@ -105,31 +106,21 @@
 	--act: var(--color-accent);
 	--line-w: calc(1.5px / var(--zoom, 1));
 }
-	.act-hold {
-	box-shadow:
-		0 0 0 var(--line-w) var(--act),
-		0 0 0 calc(var(--line-w) * 4) color-mix(in srgb, var(--act) 18%, transparent);
-	animation: act-breathe 2.2s ease-in-out infinite;
+	/*
+	 * What an agent holds while it writes, and what it just drew on the stage: a dashed line in its
+	 * colour, the way a design tool marks a collaborator's selection. Counter-scaled like the cursor.
+	 */
+	.act-hold,
+	.act-draw {
+	outline: var(--line-w) dashed var(--act);
+	outline-offset: calc(var(--line-w) * 1.5);
 }
-	.act-hold > .who {
-	position: absolute;
-	right: 0;
-	bottom: 100%;
-	padding: 1px 7px;
-	border-radius: var(--radius-thumb) 5px 0 0;
-	background: var(--act);
-	color: #fff;
-	font-size: var(--type-note);
-	font-weight: 600;
-	white-space: nowrap;
-	transform: scale(calc(1 / var(--zoom, 1)));
-	transform-origin: 100% 100%;
-}
-	.act-land {
+	.act-land,
+	.act-draw {
 	overflow: hidden;
 	animation: act-settle 900ms ease-out both;
 }
-	.act-land::before {
+	:is(.act-land, .act-draw)::before {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -137,13 +128,6 @@
 	background-size: 60% 100%;
 	background-repeat: no-repeat;
 	animation: act-sweep 420ms ease-out both;
-}
-	@keyframes act-breathe {
-	50% {
-		box-shadow:
-			0 0 0 var(--line-w) var(--act),
-			0 0 0 calc(var(--line-w) * 7) color-mix(in srgb, var(--act) 10%, transparent);
-	}
 }
 	@keyframes act-settle {
 	from {
@@ -162,15 +146,17 @@
 	}
 }
 	/*
- * An agent's cursor (`canvas/AgentCursor.tsx`): it drifts, it breathes, and it puts its name
- * away. The drift is a transition on `left`/`top`, which are board coordinates, so it follows
- * the board at any zoom; the counter-scale keeps the dot and the name one size on the screen.
+ * An agent's cursor (`canvas/AgentCursor.tsx`): an arrow and a name tag in the agent's colour,
+ * lightened, with dark words, as a design tool draws a collaborator. The drift is a transition on
+ * `left`/`top`, which are stage coordinates, so it follows the canvas at any zoom; the
+ * counter-scale keeps the arrow and the tag one size on the screen. The tip is the point.
  */
 .agent-cursor {
+	--cursor-soft: color-mix(in srgb, var(--cursor-color) 52%, #fff);
 	position: absolute;
-	display: flex;
-	gap: 6px;
-	align-items: center;
+	z-index: 4;
+	width: 0;
+	height: 0;
 	transform: scale(calc(1 / var(--zoom, 1)));
 	transform-origin: 0 0;
 	pointer-events: none;
@@ -187,28 +173,24 @@
 	.agent-cursor[data-gone="true"] {
 	opacity: 0;
 }
-	.agent-cursor .dot {
-	position: relative;
-	width: 11px;
-	height: 11px;
-	border: 2px solid var(--bg);
-	border-radius: var(--radius-pill);
-	background: var(--cursor-color);
-	box-shadow: 0 1px 5px rgb(0 0 0 / 35%);
+	.agent-cursor .arrow {
+	position: absolute;
+	top: -3px;
+	left: -3px;
+	overflow: visible;
+	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 28%));
 	animation: cursor-bob 3.2s ease-in-out infinite;
 }
-	.agent-cursor .halo {
-	position: absolute;
-	inset: -7px;
-	border-radius: var(--radius-pill);
-	background: var(--cursor-color);
-	opacity: 0.16;
-	animation: cursor-breathe 3.2s ease-in-out infinite;
+	.agent-cursor .arrow path {
+	fill: var(--cursor-soft);
+	stroke: #fff;
+	stroke-width: 1.6;
+	stroke-linejoin: round;
 }
 	.agent-cursor .ring {
 	position: absolute;
-	left: 50%;
-	top: 50%;
+	left: 0;
+	top: 0;
 	width: 8px;
 	height: 8px;
 	margin: -4px 0 0 -4px;
@@ -218,26 +200,23 @@
 	animation: cursor-ping 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 	.agent-cursor .label {
-	padding: 1px 7px;
-	border-radius: var(--radius-pill);
-	background: var(--cursor-color);
-	color: #fff;
-	font-size: var(--type-note);
-	font-weight: 600;
+	position: absolute;
+	top: 22px;
+	left: 20px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--cursor-soft);
+	box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+	color: #11131a;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 18px;
 	white-space: nowrap;
-	transform-origin: 0 50%;
-	transition:
-		opacity 200ms ease-out 60ms,
-		transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms;
+	transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms;
 }
-	/* The name lags the dot by a breath while it travels: carried, not drawn. */
+	/* The tag lags the arrow by a breath while it travels: carried, not drawn. */
 .agent-cursor[data-moving="true"] .label {
-	transform: translateX(-7px);
-}
-	/* Nothing new for a while: the name goes into the dot, and comes back on the next move. */
-.agent-cursor[data-quiet="true"] .label {
-	opacity: 0;
-	transform: scale(0.55);
+	transform: translate(-6px, -4px);
 }
 	@keyframes cursor-bob {
 	0%,
@@ -245,18 +224,7 @@
 		transform: translateY(0);
 	}
 	50% {
-		transform: translateY(-2.5px);
-	}
-}
-	@keyframes cursor-breathe {
-	0%,
-	100% {
-		transform: scale(1);
-		opacity: 0.16;
-	}
-	50% {
-		transform: scale(1.22);
-		opacity: 0.08;
+		transform: translateY(-1.5px);
 	}
 }
 	@keyframes cursor-ping {
@@ -285,15 +253,10 @@
 	.agent-cursor .label {
 		transition: none;
 	}
-	.agent-cursor .dot,
-	.agent-cursor .halo,
+	.agent-cursor .arrow,
 	.agent-cursor .ring,
 	.agent-cursor[data-jump="true"] {
 		animation: none;
-	}
-	.agent-cursor[data-quiet="true"] .label {
-		opacity: 1;
-		transform: none;
 	}
 }
 }

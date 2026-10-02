@@ -7,7 +7,8 @@ import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
-import type { AgentAct } from "./acts.ts";
+import { cursorFor, type AgentAct } from "./acts.ts";
+import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, isPhone, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
@@ -177,6 +178,10 @@ export function Stage(props: {
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
 	acts?: Record<string, AgentAct | undefined>;
+	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
+	stageName?: string | undefined;
+	/** The words on an agent's cursor tag, from its id and the name its act carries. */
+	agentLabel?: (agentId: string, name: string) => string;
 	/** The boards that are news, by path, each with the colour its glow is drawn in (`board/glow.ts`). */
 	news?: Record<string, string>;
 	/** A board that was news was read on the canvas. */
@@ -1118,7 +1123,9 @@ export function Stage(props: {
 		const start = { x: event.clientX, y: event.clientY };
 		let moved = false;
 		let last: PointerEvent | undefined;
+		let over = false;
 		const onMove = (e: PointerEvent) => {
+			if (e.pointerId !== event.pointerId || released(e)) return;
 			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
 			moved = true;
 			last = e;
@@ -1127,17 +1134,43 @@ export function Stage(props: {
 		const replay = () => {
 			if (moved && last) move(last);
 		};
+		/** A mouse move with no button held: the release went somewhere this never heard, so it is over. */
+		const released = (e: PointerEvent) => {
+			if (e.pointerType !== "mouse" || (e.buttons & 1) !== 0) return false;
+			finish(e);
+			return true;
+		};
+		const watch = (e: PointerEvent) => {
+			if (e.pointerId === event.pointerId) released(e);
+		};
 		cameraWatchers.add(replay);
+		/*
+		 * Ended once, by whichever of these comes first: the release or a cancel at the element that
+		 * captured the pointer, the same anywhere in the window, the capture being lost (the element
+		 * left the page, or the browser took it back), or a move with no button held. Listening on
+		 * the captured element alone, a release it never heard left the drag following the cursor and
+		 * the camera after the button was up: zoomed out to 20%, moving a board or a group.
+		 */
 		const finish = (e: PointerEvent) => {
+			if (over || e.pointerId !== event.pointerId) return;
+			over = true;
 			cameraWatchers.delete(replay);
 			on.removeEventListener("pointermove", onMove);
 			on.removeEventListener("pointerup", finish);
 			on.removeEventListener("pointercancel", finish);
+			on.removeEventListener("lostpointercapture", finish);
+			window.removeEventListener("pointermove", watch, true);
+			window.removeEventListener("pointerup", finish, true);
+			window.removeEventListener("pointercancel", finish, true);
 			done(moved, e);
 		};
 		on.addEventListener("pointermove", onMove);
 		on.addEventListener("pointerup", finish);
 		on.addEventListener("pointercancel", finish);
+		on.addEventListener("lostpointercapture", finish);
+		window.addEventListener("pointermove", watch, true);
+		window.addEventListener("pointerup", finish, true);
+		window.addEventListener("pointercancel", finish, true);
 	};
 
 	/**
@@ -1805,6 +1838,11 @@ export function Stage(props: {
 	const BAR_ABOVE = 26;
 	/** A board narrower than this on screen gets no bar: its words would not fit, and a bar costs a layout per zoom. */
 	const BAR_MIN_PX = 64;
+	/**
+	 * The zoom the bars show from. Below it they fade away, all but the selected board's, which keeps
+	 * only ⋯ and ×, with the other actions in the ⋯ menu (`BoardFrame`).
+	 */
+	const BAR_ZOOM = 0.5;
 	const positionBar = (bar: HTMLElement, cam: Camera) => {
 		const at = barAt.get(bar);
 		if (!at) return;
@@ -1843,8 +1881,8 @@ export function Stage(props: {
 		const layer = barLayer();
 		if (layer) {
 			for (const bar of layer.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
-			// Below the live zoom the bars fade out, and fade back in as the zoom crosses it, mid-gesture (`canvas.css`).
-			const low = cam.zoom < INTERACT_ZOOM;
+			// Below `BAR_ZOOM` the bars fade out, and fade back in as the zoom crosses it, mid-gesture (`canvas.css`).
+			const low = cam.zoom < BAR_ZOOM;
 			if (low !== (layer.dataset.low === "true")) layer.dataset.low = low ? "true" : "false";
 		}
 	};
@@ -2886,6 +2924,9 @@ export function Stage(props: {
 		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
 	});
 
+	/** `rendered`, as a set to look a board up in. */
+	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+
 	/**
 	 * The zoom as of the camera's last rest. What a board is given by size — a document, its glow —
 	 * changes when the camera stops, never partway through a pinch, where a board crossing the line
@@ -3091,6 +3132,8 @@ export function Stage(props: {
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
 							acts={actsByPath().get(board.path)}
+							onActPoint={actPointOn(board.path)}
+							sizing={sizingPaths().has(board.path)}
 							news={alone || paged(board) ? props.news?.[board.path] : undefined}
 							onRead={() => props.onRead?.(board.path)}
 							editor={props.editor}
@@ -3144,6 +3187,90 @@ export function Stage(props: {
 		return map;
 	});
 
+	/*
+	 * Boards whose size just changed from outside a drag (`fit`, an agent's `resize`, a write that
+	 * measured taller): for `SIZE_MS` their box, title bar and outline ease to the new size rather
+	 * than jump (`canvas.css`, `[data-sizing]`). A size the person drags is never eased: it follows
+	 * the pointer, and the board takes it while `boardResize` still holds it, so nothing changes here.
+	 */
+	const SIZE_MS = 280;
+	const [sizingPaths, setSizingPaths] = createSignal<ReadonlySet<string>>(new Set());
+	const lastSizes = new Map<string, { size: string; since: number }>();
+	/** A board that arrived this recently is still taking its measured height: it is not eased. */
+	const SETTLE_MS = 2500;
+	const sizingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	createEffect(() => {
+		const held = boardResize()?.path;
+		const grew: string[] = [];
+		for (const board of props.boards) {
+			const size = `${board.w}x${board.h}`;
+			const before = lastSizes.get(board.path);
+			const now = performance.now();
+			lastSizes.set(board.path, { size, since: before?.since ?? now });
+			if (before !== undefined && before.size !== size && board.path !== held && now - before.since > SETTLE_MS) grew.push(board.path);
+		}
+		if (grew.length === 0) return;
+		untrack(() => setSizingPaths(new Set([...sizingPaths(), ...grew])));
+		for (const path of grew) {
+			clearTimeout(sizingTimers.get(path));
+			sizingTimers.set(
+				path,
+				setTimeout(() => {
+					sizingTimers.delete(path);
+					const next = new Set(sizingPaths());
+					next.delete(path);
+					setSizingPaths(next);
+				}, SIZE_MS + 60),
+			);
+		}
+	});
+	onCleanup(() => {
+		for (const timer of sizingTimers.values()) clearTimeout(timer);
+	});
+
+	/*
+	 * The agents' cursors, one per agent, on the stage rather than on a board. A board says where
+	 * on it the cursor stands for its act (`onActPoint`); a drawing act says it with the boxes it
+	 * touched. Kept per agent for as long as the page is open, so an agent's cursor is one element
+	 * that glides from a board to a drawn item to the next board, and fades when it has nothing.
+	 */
+	const [actPoints, setActPoints] = createSignal<Record<string, { path: string; x: number; y: number }>>({});
+	const actPointOn = (path: string) => (agentId: string, at: { x: number; y: number } | undefined) =>
+		setActPoints((points) => {
+			const known = points[agentId];
+			if (!at) {
+				if (known?.path !== path) return points;
+				const { [agentId]: _gone, ...rest } = points;
+				return rest;
+			}
+			if (known && known.path === path && known.x === at.x && known.y === at.y) return points;
+			return { ...points, [agentId]: { path, x: at.x, y: at.y } };
+		});
+	const stagePenPath = () => (props.stageName ? `stages/${props.stageName}/stage.pen` : undefined);
+	const cursorAgents = createMemo<string[]>((seen) => {
+		const ids = Object.keys(props.acts ?? {}).filter((id) => props.acts?.[id] && !seen.includes(id));
+		return ids.length > 0 ? [...seen, ...ids] : seen;
+	}, []);
+	const cursorOf = (agentId: string): CursorAt | undefined => {
+		const act = props.acts?.[agentId];
+		if (!act) return undefined;
+		const label = props.agentLabel?.(agentId, act.label) ?? act.label;
+		if (act.what === "draw") {
+			const box = act.boxes?.[0];
+			if (!box || act.path !== stagePenPath()) return undefined;
+			const w = box.x2 - box.x1;
+			const h = box.y2 - box.y1;
+			return { x: box.x1 + Math.min(14, Math.max(4, w / 2)), y: box.y1 + Math.min(12, Math.max(4, h / 2)), label, color: act.color, key: act.at };
+		}
+		const board = props.boards.find((one) => one.path === act.path);
+		if (!board) return undefined;
+		const point = actPoints()[agentId];
+		const at = point?.path === act.path ? point : cursorFor(act, [], board);
+		return { x: board.x + at.x, y: board.y + at.y, label, color: act.color, key: act.at };
+	};
+	/** What agents just drew on this stage, outlined in their colours. */
+	const drawActs = createMemo(() => Object.values(props.acts ?? {}).filter((act): act is AgentAct => !!act && act.what === "draw" && act.path === stagePenPath()));
+
 	return (
 		<div
 			class="stage"
@@ -3196,9 +3323,23 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
-			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
-				<For each={rendered()} fallback={null}>
-					{(board) => boardNode(board)}
+			<div class="world" data-sizing={sizingPaths().size > 0 ? "true" : undefined} data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
+				{/*
+				 * A place for every board on the canvas, in file order, filled while it is within reach.
+				 *
+				 * A list of only the boards in reach was reconciled as boards came and went, and the
+				 * reconciler kept the order by moving nodes: **moving an iframe reloads its page**, and
+				 * zooming out from 60 to 40% reloaded six loaded boards of twenty-three. Even a list that
+				 * only gains boards in the middle is diffed with moves. So each board has a slot of its own
+				 * that never moves (`display: contents`, so it lays nothing out), filled while the board
+				 * is within reach: only a slot's inside changes, and boards still stack in file order.
+				 */}
+				<For each={props.boards} fallback={null}>
+					{(board) => (
+						<div class="board-slot">
+							<Show when={renderedPaths().has(board.path)}>{boardNode(board)}</Show>
+						</div>
+					)}
 				</For>
 				{/*
 				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
@@ -3210,11 +3351,26 @@ export function Stage(props: {
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
 				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
 				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
+				{/* Keyed on the act's clock, so a second drawing act on the same item flashes again. */}
+				<For each={drawActs()}>
+					{(act) => (
+						<For each={act.boxes ?? []}>
+							{(box) => (
+								<div
+									class="act-draw"
+									style={{ left: `${box.x1}px`, top: `${box.y1}px`, width: `${box.x2 - box.x1}px`, height: `${box.y2 - box.y1}px`, "--act": act.color, "--zoom": props.camera.zoom }}
+								/>
+							)}
+						</For>
+					)}
+				</For>
+				<For each={cursorAgents()}>{(agentId) => <AgentCursor cursor={cursorOf(agentId)} zoom={props.camera.zoom} />}</For>
 				<Index each={penOutlines()}>
 					{(box) => (
 						<div
 							class="pen-selection"
 							data-board={box().id.startsWith("board:") ? "true" : undefined}
+							data-sizing={box().id.startsWith("board:") && sizingPaths().has(box().id.slice(6)) ? "true" : undefined}
 							data-round={rounded(box().id) ? "true" : undefined}
 							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
@@ -3450,7 +3606,7 @@ export function Stage(props: {
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
 			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}
-			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} data-low={untrack(() => props.camera.zoom) < INTERACT_ZOOM ? "true" : "false"} ref={setBarLayer} />
+			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} data-low={untrack(() => props.camera.zoom) < BAR_ZOOM ? "true" : "false"} ref={setBarLayer} />
 			<Show when={!BARS && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout

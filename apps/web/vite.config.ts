@@ -82,8 +82,17 @@ export default defineConfig({
 	/*
 	 * The stage's sheet is painted in a module worker (`canvas/pen/scene.worker.ts`), which imports
 	 * CanvasKit on demand: a code-split worker has to be an ES module.
+	 *
+	 * Everything but CanvasKit goes in one chunk of its own, so the entry file is only a facade.
+	 * Left to itself, Rollup kept the shared code in the entry and had the CanvasKit chunk import it
+	 * from there, and WebKit evaluates a worker's entry a second time when a chunk imports it: the
+	 * second copy set its own message handler with no scene behind it, so on Safari every message
+	 * after CanvasKit loaded was dropped and the sheet stopped drawing pictures.
 	 */
-	worker: { format: "es" },
+	worker: {
+		format: "es",
+		rollupOptions: { output: { manualChunks: (id) => (/[\\/]canvaskit-wasm[\\/]/.test(id) ? "canvaskit" : /scene\.worker\.ts$/.test(id) ? undefined : "scene") } },
+	},
 	build: {
 		target: "es2022",
 		sourcemap: true,

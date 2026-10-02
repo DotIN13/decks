@@ -767,14 +767,30 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 /** Select a board and fly the camera to it with the pill's Fit — what a double-click on its bar used to do. */
 export async function flyToBoard(page, path) {
 	await selectBoard(page, path);
-	await pillButton(page, "Fit").click();
+	await pressBoardAction(page, "Fit");
 	await page.waitForTimeout(900);
 }
 
 /** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
-export function pillButton(page, label) {
-	// The pill on a touch screen, the selected board's title bar on a desktop: the same actions under the same names.
-	return page.locator(`.board-callout [role=menuitem][aria-label="${label}"], .bar-layer .chrome[data-selected] [data-act="${label}"]`).first();
+export async function pressBoardAction(page, label) {
+	// The selected board's title bar on a desktop; below 50% zoom it keeps only ⋯ and ×, and the
+	// other actions are rows of the ⋯ menu (`BoardFrame`). The pill on a touch screen. `label` may be
+	// a list, of which the first the board offers is pressed; false when it offers none.
+	const labels = [label].flat();
+	const any = (prefix) => labels.map((one) => `${prefix}[data-act="${one}"]`).join(", ");
+	const bar = page.locator(`.bar-layer:not([data-low="true"]) .chrome[data-selected] :is(${any("")})`).first();
+	if (await bar.count()) return bar.click().then(() => true);
+	const low = page.locator(`.bar-layer[data-low="true"] .chrome[data-selected]`).first();
+	if (await low.count()) {
+		if (labels.includes("Hide")) return low.locator('[data-act="Hide"]').click().then(() => true);
+		if ((await low.locator(".bar-menu").count()) === 0) await low.locator('[data-act="More"]').click();
+		const row = low.locator(`.bar-menu :is(${any("")})`).first();
+		if ((await row.count()) === 0) return false;
+		return row.click().then(() => true);
+	}
+	const pill = page.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
+	if ((await pill.count()) === 0) return false;
+	return pill.click().then(() => true);
 }
 
 /**

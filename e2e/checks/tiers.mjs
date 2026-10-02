@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, emptyCanvas, freshAgent, open, openAgents, openAllBoards, openPanel, pillButton, say, selectBoard, settle, socket } from "../harness.mjs";
+import { deckState, emptyCanvas, freshAgent, open, openAgents, openAllBoards, openPanel, pressBoardAction, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -109,7 +109,7 @@ say("the panel's own two headings list the same two", (await mine()).join() === 
 // neighbouring board begins — which is a fact about the camera, not about hiding.
 const first = two[0];
 await selectBoard(page, first);
-await pillButton(page, "Hide").click();
+await pressBoardAction(page, "Hide");
 await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*

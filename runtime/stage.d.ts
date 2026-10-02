@@ -119,9 +119,11 @@ export interface Stage {
 	newStage(title: string): Promise<{ stage: string }>;
 	/**
 	 * A picture of your stage, or part of it, as the person sees it: drawing and boards together.
-	 * You see it in this call's result; it is also saved to `file`. `of` is an item's id, a board's
-	 * path, a list of them, or a box; nothing is the whole stage. Check your drawing with it after a
-	 * big change. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
+	 * You see it in this call's result; it is also saved to `file`. `of` is an item's id (one inside a
+	 * placed frame by its id path, `"card-1/title"`), a board's path, a list of them, or a box on the
+	 * stage; nothing is the whole stage. A `.pen` file's path (`"frames/ui/button.pen"`, another stage's
+	 * `"stages/<name>/stage.pen"`) pictures that file whole, placed on no stage. Check your drawing with
+	 * it after a big change. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
 	 *
 	 * One board's path alone is that board as the person's browser has it now, with what they did on
 	 * the page (tabs pressed, text typed, boxes scrolled): `how` is "canvas" or "snapshot". When the
@@ -138,8 +140,24 @@ export interface Stage {
 	 */
 	pen: {
 		file(): Promise<string>;
-		read(): Promise<{ stage: string; file: string; version: string; error?: string; children: Array<PenItem & { box: Box }> }>;
-		edit(edits: PenEdit[]): Promise<{ rev: number; results: Array<{ op: string; id: string; box?: Box; note?: string }> }>;
+		/**
+		 * Your stage's items, or with `path` any .pen file's: relative to the deck, as a board's path is
+		 * (`"frames/ui/button"`, `"stages/wren/stage.pen"`; `.pen` may be left off), or absolute anywhere.
+		 * A file in `frames/` also answers the `ref` that places it.
+		 */
+		read(path?: string): Promise<{ stage?: string; file: string; ref?: string; version: string; error?: string; children: Array<PenItem & { box: Box }> }>;
+		/** Edit your stage, or with `path` any .pen file, as `read` names them. A frame's edit shows on every stage using it. */
+		edit(edits: PenEdit[], options?: { path?: string }): Promise<{ rev?: number; file?: string; ref?: string; results: Array<{ op: string; id: string; box?: Box; note?: string }> }>;
+		/**
+		 * A new .pen file at `path` (`"frames/ui/button"`), with `item` (a vertical frame unless said otherwise)
+		 * as its one reusable item. One in `frames/` is placed on any stage with `{ type: "ref", ref }`.
+		 */
+		create(path: string, item?: Partial<PenItem>): Promise<{ file: string; ref?: string; id: string }>;
+		/**
+		 * Save an item of your stage as a frame file at `path` in `frames/` (`"frames/agent-card"`), and put a ref to it in its
+		 * place (`replace: false` leaves the stage alone). Saving over a path changes it everywhere it is used.
+		 */
+		save(id: string, path: string, options?: { replace?: boolean }): Promise<{ frame: string; ref: string; replaced: boolean; overwrote: boolean }>;
 	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
 	/**

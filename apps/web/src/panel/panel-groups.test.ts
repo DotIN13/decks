@@ -119,3 +119,20 @@ test("basename is the name the row shows", () => {
 	assert.equal(basename("boards/nested/one-agent-at-a-time.html"), "one-agent-at-a-time.html");
 	assert.equal(basename("loose.html"), "loose.html");
 });
+
+test("pen files stand among the boards in the deck section, in path order, and the search finds them by name", () => {
+	const pens = [
+		{ path: "frames/ui/agent-card.pen", ref: "frames/ui/agent-card", title: "Agent card", modifiedAt: 0 },
+		{ path: "boards/kit.pen", ref: "boards/kit", title: "Shape kit", modifiedAt: 0 },
+	];
+	const boards = [{ path: "boards/b.html", title: "B" }, { path: "frames/ui/note.html", title: "Note" }] as never[];
+	const [deck] = panelSections({ boards, pens });
+	assert.equal(deck!.kind, "deck");
+	assert.deepEqual(deck!.rows.map((row) => [row.board.path, !!row.pen]), [
+		["boards/b.html", false],
+		["boards/kit.pen", true],
+		["frames/ui/agent-card.pen", true],
+		["frames/ui/note.html", false],
+	]);
+	assert.deepEqual(panelSections({ boards, pens, query: "agent" })[0]!.rows.map((row) => row.board.path), ["frames/ui/agent-card.pen"]);
+});
