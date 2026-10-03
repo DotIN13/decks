@@ -1,0 +1,581 @@
+@layer components {
+	/*
+	 * The drawing's properties panel and its insert panel (`canvas/pen/Properties.tsx`, `Insert.tsx`),
+	 * and the marks the stage draws for arrows that keep to a side.
+	 *
+	 * **The properties panel scrolls down and never across.** It is 276px wide, and every row in it is
+	 * built to fit that: number fields in grids of columns that may shrink to nothing
+	 * (`minmax(0, 1fr)`), sets of buttons and swatches that wrap, and a `min-width: 0` on everything
+	 * inside, so a long value wraps or is cut short in its own field instead of pushing the panel
+	 * sideways. `overflow-x: hidden` is the last word, not the plan.
+	 */
+	.props-panel {
+		top: calc(var(--inset-top, 52px) + 8px);
+		right: 12px;
+		z-index: var(--z-float, 20);
+		display: flex;
+		width: 276px;
+		max-height: calc(100% - var(--inset-top, 52px) - var(--dock, 88px) - 28px);
+		flex-direction: column;
+		overflow: hidden;
+		font-size: var(--type-ui);
+	}
+	.props-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 8px 8px 10px;
+		border-bottom: 1px solid var(--line);
+	}
+	.props-kind {
+		display: grid;
+		width: 24px;
+		height: 24px;
+		flex: none;
+		place-items: center;
+		border-radius: var(--control-radius, 8px);
+		background: color-mix(in srgb, var(--fg) 6%, transparent);
+		color: var(--muted);
+	}
+	.props-title {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		border: 0;
+		background: none;
+		color: var(--fg);
+		font: inherit;
+		font-weight: 600;
+		outline: none;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.props-head .close {
+		display: grid;
+		width: var(--control-sm);
+		height: var(--control-sm);
+		flex: none;
+		padding: 0;
+		border: 0;
+		border-radius: var(--control-radius);
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		place-items: center;
+	}
+	.props-head .close:hover {
+		background: color-mix(in srgb, var(--fg) 10%, transparent);
+		color: var(--fg);
+	}
+	.props-body {
+		min-height: 0;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 0 10px 8px;
+	}
+	.props-body * {
+		min-width: 0;
+	}
+	.props-sec {
+		border-bottom: 1px solid var(--line);
+		padding: 8px 0;
+	}
+	.props-sec:last-child {
+		border-bottom: 0;
+	}
+	.props-sec > summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 0 6px;
+		color: var(--muted);
+		cursor: pointer;
+		font-size: var(--type-micro, 11px);
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		list-style: none;
+		user-select: none;
+	}
+	.props-sec > summary::-webkit-details-marker {
+		display: none;
+	}
+	.props-sec > summary::after {
+		content: "›";
+		font-size: 14px;
+		line-height: 1;
+		transform: rotate(90deg);
+	}
+	.props-sec:not([open]) > summary {
+		padding: 0;
+	}
+	.props-sec:not([open]) > summary::after {
+		transform: none;
+	}
+	.props-sec-body {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.props-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.props-label {
+		width: 46px;
+		flex: none;
+		color: var(--muted);
+		font-size: var(--type-note, 12px);
+	}
+	.props-nums {
+		display: grid;
+		flex: 1;
+		gap: 4px;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.props-nums.two {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.props-row > .props-num {
+		width: 64px;
+		flex: none;
+	}
+	.props-num {
+		overflow: hidden;
+		gap: 3px;
+		padding: 0 6px;
+	}
+	.props-num > b {
+		flex: none;
+		color: var(--faint);
+		font-size: 10px;
+		font-weight: 500;
+	}
+	.props-num > :is(input, select) {
+		width: 100%;
+		min-width: 0;
+		border: 0;
+		background: none;
+		color: var(--fg);
+		font: inherit;
+		font-size: var(--type-note, 12px);
+		font-variant-numeric: tabular-nums;
+		outline: none;
+	}
+	.props-num > input::placeholder {
+		color: var(--faint);
+		font-style: italic;
+	}
+	.props-select {
+		height: var(--field, 24px);
+		min-width: 0;
+		flex: 1;
+		box-sizing: border-box;
+		padding: 0 4px;
+		border: 1px solid var(--line);
+		border-radius: var(--control-radius, 8px);
+		background: var(--panel);
+		color: var(--fg);
+		font: inherit;
+		font-size: var(--type-note, 12px);
+	}
+	.props-side {
+		flex: none;
+		width: 108px;
+	}
+	.props-text {
+		flex: 1;
+		padding: 0 7px;
+		color: var(--fg);
+		font: inherit;
+		font-size: var(--type-note, 12px);
+		outline: none;
+	}
+	.props-font {
+		width: 100px;
+		flex: none;
+		padding: 0 7px;
+		color: var(--fg);
+		font: inherit;
+		font-size: var(--type-note, 12px);
+		outline: none;
+	}
+	.props-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2px;
+	}
+	.props-buttons.wide {
+		width: 100%;
+	}
+	.props-buttons > .icon-button[data-danger="true"]:hover {
+		background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+		color: var(--color-danger);
+	}
+	.props-glyph {
+		width: 16px;
+		height: 16px;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-width: 2;
+	}
+	.props-swatches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+	}
+	.props-swatch {
+		position: relative;
+		width: 20px;
+		height: 20px;
+		flex: none;
+		padding: 0;
+		border: 0;
+		border-radius: 6px;
+		background: var(--swatch);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent);
+		cursor: pointer;
+	}
+	.props-swatch[data-on="true"] {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.props-picker {
+		overflow: hidden;
+		background:
+			linear-gradient(var(--swatch), var(--swatch)),
+			conic-gradient(#f87171, #fbbf24, #34d399, #60a5fa, #a78bfa, #f472b6, #f87171);
+	}
+	.props-picker > input {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.props-color {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
+	}
+	.props-hex {
+		flex: 1;
+	}
+	.props-range {
+		min-width: 0;
+		flex: 1;
+		accent-color: var(--color-accent);
+	}
+	.props-check {
+		margin-left: auto;
+		accent-color: var(--color-accent);
+	}
+	.props-btn {
+		flex: none;
+	}
+	.props-endname {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		color: var(--fg);
+		font-size: var(--type-note, 12px);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/*
+	 * The colour picker a colour field's swatch opens (`canvas/pen/ColorPicker.tsx`): shade and
+	 * brightness in a square, hue in a strip, the hex, and the swatches. Fixed, over everything, so
+	 * the panel's scrolling never clips it.
+	 */
+	.color-picker {
+		position: fixed;
+		z-index: var(--z-menu, 40);
+		display: flex;
+		width: 232px;
+		box-sizing: border-box;
+		flex-direction: column;
+		gap: 8px;
+		padding: 10px;
+		font-size: var(--type-ui);
+	}
+	.color-sv {
+		position: relative;
+		height: 150px;
+		border-radius: 8px;
+		background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--hue));
+		cursor: crosshair;
+		touch-action: none;
+	}
+	.color-hue {
+		position: relative;
+		height: 12px;
+		border-radius: 6px;
+		background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00);
+		cursor: ew-resize;
+		touch-action: none;
+	}
+	.color-knob {
+		position: absolute;
+		width: 14px;
+		height: 14px;
+		box-sizing: border-box;
+		border: 2px solid #fff;
+		border-radius: 50%;
+		box-shadow: 0 0 0 1px rgb(0 0 0 / 25%), 0 1px 3px rgb(0 0 0 / 30%);
+		pointer-events: none;
+		transform: translate(-50%, -50%);
+	}
+	.color-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.color-now {
+		width: 24px;
+		height: 24px;
+		flex: none;
+		border-radius: 6px;
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent);
+	}
+	.color-hex {
+		min-width: 0;
+		flex: 1;
+		gap: 2px;
+	}
+	.color-hex > input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--fg);
+		font: inherit;
+		font-family: var(--font-mono);
+		font-size: var(--type-note, 12px);
+		outline: none;
+	}
+	.color-palette {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+	}
+
+	/* A set of choices that read as one control: the pressed one is a raised card in a tray. */
+	.seg-set {
+		display: flex;
+		width: 100%;
+		gap: 2px;
+		padding: 2px;
+		box-sizing: border-box;
+		border-radius: var(--control-radius, 8px);
+		background: color-mix(in srgb, var(--fg) 6%, transparent);
+	}
+	.seg-set > button {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		padding: 3px 4px;
+		border: 0;
+		border-radius: calc(var(--control-radius, 8px) - 2px);
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-note, 12px);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.seg-set > button[data-on="true"] {
+		background: var(--panel);
+		box-shadow: var(--shadow-row, 0 1px 2px rgb(0 0 0 / 10%));
+		color: var(--fg);
+	}
+
+	/* A tool in the column that opens a panel says so, with a tick in its corner. */
+	.pen-tools .pen-more {
+		position: relative;
+	}
+	.pen-tools .pen-more::after {
+		position: absolute;
+		right: 3px;
+		bottom: 3px;
+		border: 2.5px solid transparent;
+		border-right-color: currentColor;
+		border-bottom-color: currentColor;
+		content: "";
+		opacity: 0.5;
+	}
+
+	/* The insert panel: beside the tool column, or where the canvas menu was opened. */
+	.insert-panel {
+		position: fixed;
+		z-index: var(--z-menu, 40);
+		display: flex;
+		width: 288px;
+		max-height: min(520px, calc(100vh - 16px));
+		box-sizing: border-box;
+		flex-direction: column;
+		gap: 8px;
+		padding: 10px;
+		font-size: var(--type-ui);
+	}
+	/* A little taller than a panel's fields: it is the first thing in the panel, and what you look for things with. */
+	/* Two pixels more above than below: centred, the words and the icon read high in a box this
+	   tall, because the words' capitals sit above the middle of their line. */
+	.insert-search {
+		flex: none;
+		height: 32px;
+		padding: 2px 9px 0;
+		gap: 7px;
+	}
+	/* Its 11px words sit higher on their line than the panel's 12px, so the icon goes a little further. */
+	.insert-search > svg.lucide-search:first-child {
+		translate: 0 -1.25px;
+	}
+	.insert-search > input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--fg);
+		font: inherit;
+		outline: none;
+	}
+	.insert-libs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+	/* The library in use reads as chosen, as a chosen control does everywhere: the raised card. */
+	.insert-libs > .chip-button[aria-pressed="true"] {
+		background: var(--raise);
+		box-shadow: inset 0 0 0 1px var(--line-strong);
+		color: var(--fg);
+	}
+	.insert-body {
+		display: flex;
+		min-height: 0;
+		flex-direction: column;
+		gap: 6px;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	.insert-group {
+		margin: 2px 2px 0;
+		color: var(--muted);
+		font-size: var(--type-micro, 11px);
+		font-weight: 600;
+		letter-spacing: 0.02em;
+	}
+	.insert-grid {
+		display: grid;
+		gap: 4px;
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+	.insert-grid.icons {
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+	}
+	.insert-cell {
+		display: grid;
+		aspect-ratio: 1;
+		padding: 0;
+		border: 0;
+		border-radius: var(--control-radius, 8px);
+		background: none;
+		color: var(--fg);
+		cursor: pointer;
+		place-items: center;
+	}
+	.insert-cell:hover {
+		background: color-mix(in srgb, var(--fg) 7%, transparent);
+	}
+	.insert-cell[data-on="true"] {
+		background: var(--color-accent-soft, color-mix(in srgb, var(--color-accent) 14%, transparent));
+	}
+	.insert-cell > svg {
+		width: 26px;
+		height: 22px;
+		overflow: visible;
+	}
+	.insert-cell > svg > path {
+		fill: var(--panel);
+		stroke: currentColor;
+		stroke-linejoin: round;
+		stroke-width: 1.4;
+		vector-effect: non-scaling-stroke;
+	}
+	.insert-cell > svg > path[data-line="true"] {
+		fill: none;
+	}
+	.insert-cell > img {
+		width: 20px;
+		height: 20px;
+	}
+	:root[data-color-scheme="dark"] .insert-cell > img {
+		filter: invert(1);
+	}
+	.insert-note {
+		margin: 0 2px;
+		color: var(--muted);
+		font-size: var(--type-note, 12px);
+		line-height: 1.4;
+	}
+
+	/* Where an arrow end can keep to: the four sides' middles, the one it is near filled. */
+	.world > .pen-side,
+	.world > .pen-anchor {
+		position: absolute;
+		z-index: 3;
+		box-sizing: border-box;
+		border: 1.5px solid var(--color-accent);
+		border-radius: 50%;
+		background: var(--panel);
+	}
+	.world > .pen-side {
+		pointer-events: none;
+	}
+	.world > .pen-side[data-on="true"] {
+		background: var(--color-accent);
+	}
+	.world > .pen-anchor {
+		background: color-mix(in srgb, var(--color-accent) 22%, var(--panel));
+		cursor: crosshair;
+		opacity: 0.85;
+	}
+	.world > .pen-anchor:hover {
+		background: var(--color-accent);
+		opacity: 1;
+	}
+
+	/* On a phone both are sheets along the bottom, over the zoom controls, as the board inspector is. */
+	@media (max-width: 760px) {
+		.props-panel {
+			top: auto;
+			right: max(8px, env(safe-area-inset-right));
+			bottom: calc(var(--dock, 88px) + 20px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
+			left: max(8px, env(safe-area-inset-left));
+			width: auto;
+			max-height: 46vh;
+		}
+		.insert-panel[data-sheet="true"] {
+			right: max(8px, env(safe-area-inset-right));
+			bottom: calc(var(--dock, 88px) + 20px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
+			left: max(8px, env(safe-area-inset-left));
+			width: auto;
+			max-height: 52vh;
+		}
+		.insert-grid {
+			grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+		}
+		.insert-grid.icons {
+			grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+		}
+	}
+}

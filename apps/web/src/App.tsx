@@ -617,6 +617,14 @@ export function App() {
 		return pen ? { doc: pen.doc, base: pen.base } : undefined;
 	});
 
+	/**
+	 * Ink on the boards, which only browse mode has. A memo here rather than `a() && b()` in the
+	 * prop: Solid compiles a conditional prop into a getter that makes a new computation on every
+	 * read, and the stage reads this one in its pointer handlers, outside any owner, so each move
+	 * warned that the computation would never be disposed.
+	 */
+	const inking = createMemo(() => drawing() && mode() === "browse");
+
 	/** Undo or redo the person's own last edit to the drawing (`StagePens.step`). */
 	const penStep = (direction: "undo" | "redo") => {
 		const agentId = state.focused;
@@ -1276,7 +1284,7 @@ export function App() {
 							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
 						}}
 						onPenStep={penStep}
-						drawing={drawing() && mode() === "browse"}
+						drawing={inking()}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}

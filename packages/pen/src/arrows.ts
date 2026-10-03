@@ -12,7 +12,10 @@ import type { PenDocument, PenNode } from "./types.ts";
  *     { "type": "path", "id": "then", "metadata": { "type": "decks.arrow", "from": "draft", "to": "boards/report.html" } }
  *
  * `from` and `to` name an item by id, a board by its path, or a point on the stage as `[x, y]` —
- * the end of an arrow that stops on bare canvas. After an edit, `reroute` redraws every such path
+ * the end of an arrow that stops on bare canvas. An end that should stay on one side of what it
+ * joins says so: `{ "item": "check", "side": "right" }`, with `top`, `right`, `bottom` or `left`,
+ * and leaves from the middle of that side, square to it. Without a side, an end meets the edge that
+ * faces the other end, which can change as things move. After an edit, `reroute` redraws every such path
  * between the nearest edges of its two ends: the box, the viewBox and the geometry are rewritten,
  * and the stroke is left as the writer set it. An arrow whose end cannot be found is left alone.
  *
@@ -44,13 +47,11 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 	let changed = false;
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node)) continue;
-		const meta = node.metadata as { from?: unknown; to?: unknown };
-		const from = arrowEnd(meta.from, placed, extra);
-		const to = arrowEnd(meta.to, placed, extra);
-		if (!from || !to) continue;
+		const points = arrowPoints(node.metadata, placed, extra);
+		if (!points) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
 		const style = arrowStyle(node.metadata);
-		const shape = arrowShape(arrowRoute(from, to, style.route), stroke, style);
+		const shape = arrowShape(points, stroke, style);
 		const parent = index.get(node.id)?.parent;
 		const origin = parent ? placed.get(parent.id)?.box : undefined;
 		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
@@ -77,6 +78,12 @@ export interface ArrowStyle {
 	dash: boolean;
 }
 
+/** The words on an arrow, drawn at the middle of its line (`metadata.label`). */
+export function arrowLabel(metadata: unknown): string | undefined {
+	const label = (metadata as { label?: unknown } | undefined)?.label;
+	return typeof label === "string" && label.trim() ? label : undefined;
+}
+
 /** An arrow's style from its metadata, with the defaults for what it does not say. */
 export function arrowStyle(metadata: unknown): ArrowStyle {
 	const meta = (metadata ?? {}) as { route?: unknown; heads?: unknown; dash?: unknown };
@@ -90,10 +97,87 @@ export function isPointEnd(end: unknown): end is Point {
 	return Array.isArray(end) && end.length === 2 && typeof end[0] === "number" && typeof end[1] === "number";
 }
 
+export type ArrowSide = "top" | "right" | "bottom" | "left";
+export const ARROW_SIDES: readonly ArrowSide[] = ["top", "right", "bottom", "left"];
+
+/** The item or board an end joins, whether it names a side or not; undefined for a point. */
+export function arrowEndItem(end: unknown): string | undefined {
+	if (typeof end === "string") return end;
+	if (end && typeof end === "object" && !Array.isArray(end) && typeof (end as { item?: unknown }).item === "string") return (end as { item: string }).item;
+	return undefined;
+}
+
+/** The side an end keeps to, when it names one. */
+export function arrowEndSide(end: unknown): ArrowSide | undefined {
+	const side = end && typeof end === "object" && !Array.isArray(end) ? (end as { side?: unknown }).side : undefined;
+	return ARROW_SIDES.includes(side as ArrowSide) ? (side as ArrowSide) : undefined;
+}
+
 /** Where an arrow's end is: an item's box, a board's (through `extra`), or a point as a box of no size. */
 export function arrowEnd(end: unknown, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): Frame | undefined {
 	if (isPointEnd(end)) return { x: end[0], y: end[1], w: 0, h: 0 };
-	return typeof end === "string" ? (placed.get(end)?.box ?? extra?.(end)) : undefined;
+	const item = arrowEndItem(end);
+	return item !== undefined ? (placed.get(item)?.box ?? extra?.(item)) : undefined;
+}
+
+/** The middle of one side of a box. */
+export function sidePoint(box: Frame, side: ArrowSide): Point {
+	if (side === "top") return [box.x + box.w / 2, box.y];
+	if (side === "bottom") return [box.x + box.w / 2, box.y + box.h];
+	if (side === "left") return [box.x, box.y + box.h / 2];
+	return [box.x + box.w, box.y + box.h / 2];
+}
+
+/** The line an arrow's metadata describes, through where its ends are now; undefined when an end cannot be found. */
+export function arrowPoints(metadata: unknown, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): Point[] | undefined {
+	const meta = (metadata ?? {}) as { from?: unknown; to?: unknown };
+	const from = arrowEnd(meta.from, placed, extra);
+	const to = arrowEnd(meta.to, placed, extra);
+	if (!from || !to) return undefined;
+	const route = arrowStyle(metadata).route;
+	const fromSide = arrowEndSide(meta.from);
+	const toSide = arrowEndSide(meta.to);
+	return fromSide || toSide ? sidedRoute(from, to, route, fromSide, toSide) : arrowRoute(from, to, route);
+}
+
+const NORMAL: Record<ArrowSide, Point> = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
+
+/** The side of `box` that faces a point: across when the point is further across than down. */
+function facing(box: Frame, toward: Point): ArrowSide {
+	const dx = toward[0] - (box.x + box.w / 2);
+	const dy = toward[1] - (box.y + box.h / 2);
+	return Math.abs(dx) * Math.max(1, box.h) >= Math.abs(dy) * Math.max(1, box.w) ? (dx >= 0 ? "right" : "left") : dy >= 0 ? "bottom" : "top";
+}
+
+/**
+ * A line between two ends of which at least one keeps to a side: it leaves that side from its
+ * middle, square to it. An end with no side meets the side of its box that faces the other end. A
+ * point end (a box of no size) is the point itself.
+ */
+export function sidedRoute(a: Frame, b: Frame, route: ArrowRoute, aSide?: ArrowSide, bSide?: ArrowSide): Point[] {
+	const centre = (f: Frame): Point => [f.x + f.w / 2, f.y + f.h / 2];
+	const sa = aSide ?? facing(a, bSide ? sidePoint(b, bSide) : centre(b));
+	const sb = bSide ?? facing(b, sidePoint(a, sa));
+	const p = a.w === 0 && a.h === 0 ? ([a.x, a.y] as Point) : sidePoint(a, sa);
+	const q = b.w === 0 && b.h === 0 ? ([b.x, b.y] as Point) : sidePoint(b, sb);
+	if (route === "straight") return [p, q];
+	const na = NORMAL[sa];
+	const nb = NORMAL[sb];
+	if (route === "curved") {
+		const reach = Math.max(24, Math.hypot(q[0] - p[0], q[1] - p[1]) / 3);
+		return [p, [p[0] + na[0] * reach, p[1] + na[1] * reach], [q[0] + nb[0] * reach, q[1] + nb[1] * reach], q];
+	}
+	// Elbow: out of each side, then across, in at most three turns.
+	const across = (side: ArrowSide) => side === "left" || side === "right";
+	if (across(sa) && across(sb)) {
+		const mid = (p[0] + q[0]) / 2;
+		return p[1] === q[1] ? [p, q] : [p, [mid, p[1]], [mid, q[1]], q];
+	}
+	if (!across(sa) && !across(sb)) {
+		const mid = (p[1] + q[1]) / 2;
+		return p[0] === q[0] ? [p, q] : [p, [p[0], mid], [q[0], mid], q];
+	}
+	return across(sa) ? [p, [q[0], p[1]], q] : [p, [p[0], q[1]], q];
 }
 
 /** An arrow's metadata with its point ends moved by `dx dy`; joined ends stay joined. */

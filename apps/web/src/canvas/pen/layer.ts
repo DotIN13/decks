@@ -1,4 +1,4 @@
-import { indexOf, NOTE_PAD, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { indexOf, isShape, NOTE_PAD, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
@@ -293,8 +293,9 @@ export class PenLayer {
 		}
 		if (!best) return undefined;
 		if (!options?.deep) {
+			// A group is picked whole, and so is a shape (`@decks/pen`, `shapes.ts`): its outline and words are parts of it.
 			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
-				if (up.node.type === "group") best = up;
+				if (up.node.type === "group" || isShape(up.node)) best = up;
 			}
 		}
 		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };
@@ -369,6 +370,8 @@ export class PenLayer {
 		for (const at of this.placedIndex.search(r)) {
 			const { node, box: given } = this.placedList[at]!;
 			if (node.id.includes("/") || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
+			// A shape's outline and words are never picked apart from it.
+			if (isShape(index.get(node.id)?.parent)) continue;
 			const box = this.bounds.get(node.id) ?? given;
 			if (box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h) inside.add(node.id);
 		}
@@ -528,6 +531,8 @@ export class PenLayer {
 			if (node.id.includes("/") && node.type === "group") return;
 			if (node.type === "browser" && node.metadata?.type === "decks.board") return;
 			if (node.type === "group") return;
+			// A shape is clicked where its outline is drawn, which has its own click shape: its box's corners are not it.
+			if (isShape(node)) return;
 			let shape: SVGElement;
 			if (node.type === "ellipse") {
 				shape = document.createElementNS(NS, "ellipse");

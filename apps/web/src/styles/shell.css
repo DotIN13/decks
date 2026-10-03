@@ -6,15 +6,17 @@
  * which of two rules for one selector wins (see the note on splitting `index.css`).
  */
 /*
- * The colour a float is painted: the board's `--b-bg-layer`, one rung *below* the ground in
- * light and one *above* it in dark. `--panel` is white, and white on a near-white ground had
- * the composer, the toolbars and the conversation reading as holes rather than things.
+ * The colour a float is painted. In light it is white — the toolbars, the composer, the
+ * conversation, the sidebar, every panel and menu — over a ground one step deeper (`--stage`,
+ * `index.css`), so a float reads as a thing on the canvas. White on the old near-white ground
+ * read as holes rather than things, which is why the ground moved and not the floats. In dark it
+ * is one rung above the ground.
  */
 :root {
-	--layer: var(--color-grey-200);
-	/* The colour a chosen control is raised in: a card on the layer. White on the light
-	   layer; a rung *lighter* than the layer in dark, where a white card would glare. */
-	--raise: var(--color-grey-50);
+	--layer: var(--color-grey-50);
+	/* The colour a chosen control is raised in: a soft grey card on the white layer; a rung
+	   *lighter* than the layer in dark, where a white card would glare. */
+	--raise: #efeff1;
 }
 [data-color-scheme="dark"] {
 	--layer: var(--color-grey-1000);

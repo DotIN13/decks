@@ -773,20 +773,25 @@ export async function flyToBoard(page, path) {
 
 /** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
 export async function pressBoardAction(page, label) {
-	// The selected board's title bar on a desktop; below 50% zoom it keeps only ⋯ and ×, and the
-	// other actions are rows of the ⋯ menu (`BoardFrame`). The pill on a touch screen. `label` may be
-	// a list, of which the first the board offers is pressed; false when it offers none.
+	// The selected board's title bar on a desktop. A bar too narrow for its buttons shows none (there
+	// is no ⋯ to hold them, `BoardFrame`), so there the board's own keys are used where it has them, and
+	// otherwise the camera frames the board (`1`) so the bar has its buttons. The pill on a touch screen.
+	// `label` may be a list, of which the first the board offers is pressed; false when it offers none.
 	const labels = [label].flat();
 	const any = (prefix) => labels.map((one) => `${prefix}[data-act="${one}"]`).join(", ");
-	const bar = page.locator(`.bar-layer:not([data-low="true"]) .chrome[data-selected] :is(${any("")})`).first();
-	if (await bar.count()) return bar.click().then(() => true);
-	const low = page.locator(`.bar-layer[data-low="true"] .chrome[data-selected]`).first();
-	if (await low.count()) {
-		if (labels.includes("Hide")) return low.locator('[data-act="Hide"]').click().then(() => true);
-		if ((await low.locator(".bar-menu").count()) === 0) await low.locator('[data-act="More"]').click();
-		const row = low.locator(`.bar-menu :is(${any("")})`).first();
-		if ((await row.count()) === 0) return false;
-		return row.click().then(() => true);
+	const bar = () => page.locator(`.bar-layer .chrome[data-selected]:not([data-tight]) :is(${any("")})`).first();
+	if (await bar().count()) return bar().click().then(() => true);
+	if ((await page.locator(`.bar-layer .chrome[data-selected][data-tight]`).count()) > 0) {
+		const key = labels.includes("Present") || labels.includes("Fullscreen") ? "f" : labels.includes("Focus") ? "d" : undefined;
+		if (key) {
+			await page.keyboard.press(key);
+			return true;
+		}
+		// `1` frames the selected board, which brings its bar back with its buttons.
+		await page.keyboard.press("1");
+		for (let i = 0; i < 10 && (await bar().count()) === 0; i++) await page.waitForTimeout(200);
+		if (await bar().count()) return bar().click().then(() => true);
+		return false;
 	}
 	const pill = page.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
 	if ((await pill.count()) === 0) return false;

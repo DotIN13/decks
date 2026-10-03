@@ -107,6 +107,10 @@ no field for: `{ type: "…", … }`).
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
 | `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — put up with `stage.show`, not inserted |
+| `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
+
+Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;
+pen.dev draws the line solid).
 
 **Text.** `textGrowth` decides the size: `"auto"` (the default) is one line as long as the words,
 and ignores `width`; `"fixed-width"` wraps at `width` and grows down; `"fixed-width-height"` is the
@@ -183,6 +187,41 @@ Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.
 the stage file names it (relative to the stage file, inside the deck), and `ref: "kit:<id>"` places a
 copy; that file's variables come with it.
 
+## Shapes
+
+A diamond, a cylinder, a speech bubble: the person picks these from a library of 32, and you make
+the same ones. A shape is a `frame` marked `decks.shape` that holds its outline, a `path` drawn in a
+100 by 100 box, and, for words in it, a `text`. The frame is what is selected, moved and sized;
+**the outline follows the frame's size by itself after every edit**, so size the frame and leave
+the path's box alone. Fill and line go on the outline.
+
+```ts
+{ op: "insert", box: { x1: 400, y1: 0, x2: 560, y2: 120 }, node: {
+  type: "frame", id: "check", name: "Decision", layout: "vertical", justifyContent: "center",
+  alignItems: "center", padding: 10, clip: false, metadata: { type: "decks.shape", kind: "Decision" },
+  children: [
+    { type: "path", id: "check-o", layoutPosition: "absolute", x: 0, y: 0, viewBox: [0, 0, 100, 100],
+      geometry: "M50 0L100 50L50 100L0 50Z", fill: "#fde68a", stroke: "#1f2328", strokeWidth: 1.5, strokeAlignment: "center" },
+    { type: "text", id: "check-t", content: "Signed in?", fontSize: 14, fontWeight: 500,
+      textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "#1f2328" },
+  ] } }
+```
+
+The kinds and their outlines (`kind` is the name; each geometry in a 100 by 100 box):
+
+- **Basic:** Rectangle `M0 0H100V100H0Z`, Rounded, Ellipse `M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z`,
+  Triangle `M50 0L100 100H0Z`, Diamond `M50 0L100 50L50 100L0 50Z`, Pentagon, Hexagon
+  `M25 0H75L100 50L75 100H25L0 50Z`, Octagon, Star, Parallelogram `M22 0H100L78 100H0Z`, Trapezoid,
+  Plus, Ring, Heart.
+- **Flowchart:** Process (a rectangle), Decision (a diamond), Terminator
+  `M22 0H78A22 50 0 0 1 78 100H22A22 50 0 0 1 22 0Z`, Document `M0 0H100V82C75 66 25 100 0 82Z`, Data
+  (a parallelogram), Database `M0 14A50 14 0 0 1 100 14V86A50 14 0 0 1 0 86ZM0 14A50 14 0 0 0 100 14`,
+  Manual input, Predefined, Delay, Off-page, Preparation, Card.
+- **Arrows and callouts:** Arrow right, Arrow both, Chevron, Speech, Cloud, Brace (a line, no fill).
+
+A geometry you write yourself works too: any SVG path in the 100 by 100 box, with the `kind` you
+choose; the person's panel then shows its kind as it is, and can swap it for one of the library's.
+
 ## Arrows
 
 pen has no arrow type: an arrow is a `path` whose `metadata` says what it joins. Give the ends and
@@ -196,7 +235,11 @@ await stage.pen.edit([
 ```
 
 `from` and `to` are an item's id, a board's path, or a point on the stage as `[x, y]`: an end
-that stops on bare canvas, which the person makes by letting an arrow go there. A point end stays
+that stops on bare canvas, which the person makes by letting an arrow go there. An end can also
+keep to one side of what it joins — `{ item: "check", side: "right" }`, with `"top"`, `"right"`,
+`"bottom"` or `"left"` — and then leaves the middle of that side, square to it, however things
+move; a flowchart reads best that way (out of a decision's right and bottom, into the next box's
+top or left). An end with no side meets whichever edge faces the other end. A point end stays
 where it is on the stage, so to move such an arrow shift its points in `metadata` along with its
 `x` and `y`, or the next redraw puts it back.
 
@@ -205,7 +248,8 @@ Its style is three more `metadata` fields, each optional: `route` is `"straight"
 `"end"` (the default), `"both"` or `"none"`, for a plain connector; and `dash: true` dashes the
 line. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
 the path is redrawn for you. Set `stroke` and `strokeWidth` if you want a colour or weight other
-than the grey default; a label is a `text` placed by the arrow's `box`.
+than the grey default. Words on the line — "yes", "no", "then" — are `label` in its metadata,
+drawn on the middle of the line.
 
 ## Look at it
 
@@ -257,6 +301,9 @@ near. Leave it as they drew it: move or delete a stroke only when asked.
   above its top edge. Insert it at `index: 0` so it paints first.
 - **A flow:** boards left to right with `decks.arrow` paths between them; the arrows follow when
   a board is moved.
+- **A flowchart:** `decks.shape` frames (a Terminator to start, Process boxes, Decision diamonds)
+  in a column 60 to 80 apart, joined by arrows whose ends name their sides, with `label`s on the
+  arrows out of each decision.
 - **Boards in a row:** a frame with `gap: 80` and no size, then `move` each board's item into it:
   the frame lines them up, and keeps them lined up as they grow.
 - **A labelled icon:** a row frame with `alignItems: "center"`, `gap: 8`, an `icon` and a `text`.

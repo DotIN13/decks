@@ -42,6 +42,7 @@
 @import "./styles/markdown.css";
 @import "./styles/composer.css";
 @import "./styles/connections.css";
+@import "./styles/properties.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.
@@ -210,7 +211,8 @@
 	--control-sm: 22px;
 	--field: 24px;
 	--control-radius: 8px;
-	--bg: var(--color-grey-100);
+	/* The ground under the white chrome, one step deeper than it (`styles/shell.css`, `--layer`). */
+	--bg: #f1f1f3;
 	--bg-deep: var(--color-grey-200);
 	/*
 	 * Opaque, where it used to be 88% over a blur.
@@ -228,10 +230,10 @@
 	--line: rgb(0 0 0 / 10%);
 	--line-strong: rgb(0 0 0 / 20%);
 	/* The hairline around a *floating window*: the toolbars, the composer, the conversation,
-	   the sidebar, a menu, the preview panel. The same as `--line-strong` here; in dark it is
-	   quieter, because a large box on a dark ground needs far less edge than a chip does to
-	   be seen, and 24% rimmed every float in white. Chips, fields and rings keep the token. */
-	--border-strong: var(--line-strong);
+	   the sidebar, a menu, the preview panel. Quieter than `--line-strong` in both schemes: a
+	   white float on the grey ground is told apart by its colour and shadow, and needs little
+	   edge; in dark, 24% rimmed every float in white. Chips, fields and rings keep the token. */
+	--border-strong: rgb(0 0 0 / 8%);
 	/*
 	 * The ground under a small filled thing: a tag, a runtime, a provider chip.
 	 *
@@ -246,7 +248,7 @@
 	--fill: var(--color-grey-400);
 	/* The board's own `--b-shadow`: 12px of reach, not 24. A float in the shell is drawn with
 	   the same weight as a card on a board, so the two read as one program. */
-	--shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 5%);
+	--shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 18px rgb(0 0 0 / 6%);
 	/*
 	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
 	 *
@@ -263,9 +265,8 @@
 	 * to say "higher" without a border.
 	 */
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
-	/* One rung above white, like the board's `--b-bg-deep`: the floats sit a rung *below*
-	   it (`--layer`), so a float reads as a thing on the ground rather than a hole in it. */
-	--stage: var(--color-grey-100);
+	/* A step below white, so the white floats (`--layer`) and the white boards read as things on it. */
+	--stage: #f1f1f3;
 	/*
 	 * The type scale: ten sizes with names, because thirteen sizes without them is what the
 	 * app had.

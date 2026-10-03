@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, fitShapes, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
@@ -1094,6 +1094,8 @@ export class StageScene {
 				if (change.h !== undefined && !(found.node.type === "text" && found.node.textGrowth !== "fixed-width-height")) found.node.height = change.h;
 				if (change.w !== undefined && found.node.type === "text" && (found.node.textGrowth ?? "auto") === "auto") found.node.textGrowth = "fixed-width";
 			}
+			// A shape being sized draws its outline at the new size, as the saved edit will (`fitShapes`).
+			fitShapes(copy);
 			doc = copy;
 		}
 		if ([...walk(doc.children)].some((node) => isArrow(node))) {

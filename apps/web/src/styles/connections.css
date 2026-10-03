@@ -105,7 +105,7 @@
 	 * not drawn rather than drawn and refused: no composer, no conversation, no drawing tools, and in
 	 * the pill nothing but the panel button and the camera.
 	 */
-	.app[data-reader] :is(.dock, .stream, .pen-tools, .pen-bar),
+	.app[data-reader] :is(.dock, .stream, .pen-tools, .pen-bar, .props-panel, .insert-panel),
 	.app[data-reader] .pill :is(.pill-agent, .new-agent, .mode-set, .pill-sep),
 	.app[data-reader] [data-writes] {
 		display: none !important;

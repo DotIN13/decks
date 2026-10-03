@@ -36,10 +36,11 @@ import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
+import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
+import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
@@ -740,6 +741,8 @@ export function Stage(props: {
 	const [hoverBoard, setHoverBoard] = createSignal<string | undefined>();
 	/** What an arrow's end would join if it were let go now: an item or a board, lit up. */
 	const [joinHint, setJoinHint] = createSignal<readonly Box[]>([]);
+	/** The four sides an arrow end can keep to, on what it would join, and the one it is near (`sideNear`). */
+	const [sideHint, setSideHint] = createSignal<ReadonlyArray<{ box: Box; side?: ArrowSide }>>([]);
 	/** An arrow end being dragged: the line from the end that stays to the pointer. */
 	const [endDraft, setEndDraft] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
@@ -845,6 +848,27 @@ export function Stage(props: {
 		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
 		return outlines[0]!;
 	});
+	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
+	const penAnchors = createMemo(() => {
+		const box = penHandles();
+		if (!box || penDraft() || penResize() || !props.onPenEdit) return undefined;
+		const node = penLayer.placed.get(box.id)?.node;
+		if (!node || node.type === "path" || node.type === "text") return undefined;
+		return box;
+	});
+	/*
+	 * Where each selected item is, for the properties panel's position and size: the box the stage
+	 * draws, kept current as the drawing changes (`state/pen-tools.ts`).
+	 */
+	createEffect(() => {
+		penDrawn();
+		const boxes = new Map<string, { x: number; y: number; w: number; h: number }>();
+		for (const id of penSelection()) {
+			const box = penLayer.placed.get(id)?.box;
+			if (box) boxes.set(id, { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) });
+		}
+		setPenBoxes(boxes);
+	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const boardHandles = createMemo(() => {
 		const outlines = penOutlines();
@@ -891,6 +915,36 @@ export function Stage(props: {
 			grows: node.type === "text" ? ((node.textGrowth ?? "auto") === "auto" ? "wide" : "tall") : "tall",
 			...(isMarkdown(node) ? { markdown: true } : {}),
 		};
+	};
+	/** The shape an item is, or is part of (its outline or its words): the frame, by id. */
+	const shapeOf = (id: string): string | undefined => {
+		const doc = props.pen?.doc;
+		if (!doc) return undefined;
+		const found = indexOf(doc).get(id);
+		if (!found) return undefined;
+		if (isShape(found.node)) return found.node.id;
+		return isShape(found.parent) ? found.parent!.id : undefined;
+	};
+	/**
+	 * Type a shape's words: its own, or a new text made inside it, centred and as wide as the shape,
+	 * which goes again if nothing is typed (`commitPenText`, `fresh`).
+	 */
+	const openShapeWords = (id: string) => {
+		const doc = props.pen?.doc;
+		const frame = doc ? indexOf(doc).get(id)?.node : undefined;
+		const box = penLayer.placed.get(id)?.box;
+		if (!frame || !box) return;
+		setPenSelection([id]);
+		const label = shapeLabel(frame);
+		if (label) {
+			const placed = penLayer.placed.get(label.id);
+			openPenText({ id: label.id, node: label, box: placed?.box ?? box });
+			return;
+		}
+		const labelId = freshId();
+		const node = makeLabel(labelId);
+		penEdit([{ op: "insert", parent: id, node }]);
+		openPenText({ id: labelId, node, box: { x: box.x + 10, y: box.y + box.h / 2 - 10, w: Math.max(20, box.w - 20), h: 20 } }, true);
 	};
 	const openPenText = (hit: PenHit, fresh?: boolean) => {
 		const node = hit.node;
@@ -1619,7 +1673,7 @@ export function Stage(props: {
 	});
 
 	/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
-	const MADE: Record<Exclude<PenTool, "select" | "arrow">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
+	const MADE: Record<Exclude<PenTool, "select" | "arrow" | "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
 		rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 		frame: { node: { type: "frame", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
@@ -1632,6 +1686,28 @@ export function Stage(props: {
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
+	/** Shapes that are as tall as they are wide when made with a click: a circle, a star, a ring. */
+	const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pentagon", "Hexagon", "Plus", "Heart", "Triangle"]);
+	/** The size a click makes, for every tool: a shape's by its kind, an icon's 48 square. */
+	const madeSize = (tool: Exclude<PenTool, "select" | "arrow">): { w: number; h: number } => {
+		if (tool === "shape") return SQUARE_SHAPES.has(penShape()) ? { w: 120, h: 120 } : penShape() === "Decision" ? { w: 160, h: 120 } : { w: 160, h: 100 };
+		if (tool === "icon") return { w: 48, h: 48 };
+		return MADE[tool];
+	};
+	/** The item a tool makes, with its id: a shape from the library (`@decks/pen`, `makeShape`), the icon picked, or the tool's own. */
+	const madeNode = (tool: Exclude<PenTool, "select" | "arrow">, id: string, size: { w: number; h: number }): PenNode => {
+		if (tool === "shape") {
+			const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
+			taken.add(id);
+			return makeShape(shapeKind(penShape()) ?? SHAPES[0]!, { frame: id, outline: newId(taken) }, size);
+		}
+		if (tool === "icon") {
+			const icon = penIcon();
+			return { type: "icon", id, name: icon.name, library: icon.library, icon: icon.name, fill: "#1f2328", weight: 400 } as PenNode;
+		}
+		return { ...MADE[tool].node, id } as PenNode;
+	};
+
 	/** The board under a stage point, when there is one: an arrow may start or end on it. */
 	const boardAt = (point: { x: number; y: number }) =>
 		props.boards.findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
@@ -1641,13 +1717,36 @@ export function Stage(props: {
 	 * to light up. Never an arrow — joining one line to another is not something the drawing does —
 	 * and never the arrow whose end it is.
 	 */
-	const joinAt = (point: { x: number; y: number }, not?: string): { name: string; box: Box } | undefined => {
+	const joinAt = (point: { x: number; y: number }, not?: string): { name: string; box: Box; side?: ArrowSide } | undefined => {
 		const hit = penLayer.hitTest(point, { skip: (node) => isArrow(node) || node.id === not });
-		if (hit) return { name: hit.id, box: hit.box };
-		const path = boardAt(point);
-		const board = path ? props.boards.find((candidate) => candidate.path === path) : undefined;
-		return board ? { name: board.path, box: { x: board.x, y: board.y, w: board.w, h: board.h } } : undefined;
+		const found = hit
+			? { name: hit.id, box: hit.box }
+			: (() => {
+					const path = boardAt(point);
+					const board = path ? props.boards.find((candidate) => candidate.path === path) : undefined;
+					return board ? { name: board.path, box: { x: board.x, y: board.y, w: board.w, h: board.h } } : undefined;
+				})();
+		if (!found) return undefined;
+		const side = sideNear(found.box, point);
+		return side ? { ...found, side } : found;
 	};
+	/**
+	 * The side of a box whose middle a point is close to, if any: an arrow end let go there keeps to
+	 * that side (`@decks/pen`, `sidedRoute`). Close is a few screen pixels, or a fifth of a small box.
+	 */
+	const SIDE_PX = 14;
+	const sideNear = (box: Box, point: { x: number; y: number }): ArrowSide | undefined => {
+		const reach = Math.min(SIDE_PX / localCamera.zoom, Math.max(6 / localCamera.zoom, Math.min(box.w, box.h) / 4));
+		let best: { side: ArrowSide; d: number } | undefined;
+		for (const side of ARROW_SIDES) {
+			const [x, y] = sidePoint(box, side);
+			const d = Math.hypot(point.x - x, point.y - y);
+			if (d <= reach && (!best || d < best.d)) best = { side, d };
+		}
+		return best?.side;
+	};
+	/** How a join is written as an arrow's end: an item, or an item and the side it keeps to. */
+	const endOf = (join: { name: string; side?: ArrowSide }) => (join.side ? { item: join.name, side: join.side } : join.name);
 	const pointEnd = (point: { x: number; y: number }): [number, number] => [Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10];
 
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
@@ -1657,12 +1756,9 @@ export function Stage(props: {
 		if (ids.length !== 1 || boardPicks().length) return undefined;
 		const node = penLayer.placed.get(ids[0]!)?.node;
 		if (!node || !isArrow(node)) return undefined;
-		const meta = node.metadata as { from?: unknown; to?: unknown; route?: unknown };
 		const boards = (name: string) => props.boards.find((board) => board.path === name);
-		const from = arrowEnd(meta.from, penLayer.placed, boards);
-		const to = arrowEnd(meta.to, penLayer.placed, boards);
-		if (!from || !to) return undefined;
-		const points = arrowRoute(from, to, meta.route === "elbow");
+		const points = arrowPoints(node.metadata, penLayer.placed, boards);
+		if (!points) return undefined;
 		const drag = penDrag();
 		const [fx, fy] = points[0]!;
 		const [tx, ty] = points[points.length - 1]!;
@@ -1690,19 +1786,21 @@ export function Stage(props: {
 				batch(() => {
 					setEndDraft(which === "from" ? { x1: now.x, y1: now.y, x2: stays.x, y2: stays.y } : { x1: stays.x, y1: stays.y, x2: now.x, y2: now.y });
 					setJoinHint(join ? [join.box] : []);
+					setSideHint(join ? [{ box: join.box, ...(join.side ? { side: join.side } : {}) }] : []);
 				});
 			},
 			(moved, e) => {
 				batch(() => {
 					setEndDraft(undefined);
 					setJoinHint([]);
+					setSideHint([]);
 				});
 				if (!moved) return;
 				const now = worldAt(e);
-				const other = node.metadata![which === "from" ? "to" : "from"];
+				const other = arrowEndItem(node.metadata![which === "from" ? "to" : "from"]);
 				const join = joinAt(now, ends.id);
 				// An arrow from a thing to itself is a point on it instead.
-				const end = join && join.name !== other ? join.name : pointEnd(now);
+				const end = join && join.name !== other ? endOf(join) : pointEnd(now);
 				penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: end } } }]);
 			},
 		);
@@ -1720,10 +1818,10 @@ export function Stage(props: {
 		return best?.id;
 	};
 
-	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }) => {
+	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }, from?: { name: string; box: Box; side?: ArrowSide }) => {
 		setPenDraft({ tool, x1: at.x, y1: at.y, x2: at.x, y2: at.y });
 		// An arrow lights up what each of its ends would join, from the first press to the release.
-		const startJoin = tool === "arrow" ? joinAt(at) : undefined;
+		const startJoin = tool === "arrow" ? (from ?? joinAt(at)) : undefined;
 		if (startJoin) setJoinHint([startJoin.box]);
 		follow(
 			event,
@@ -1732,12 +1830,15 @@ export function Stage(props: {
 				setPenDraft({ tool, x1: at.x, y1: at.y, x2: now.x, y2: now.y });
 				if (tool === "arrow") {
 					const endJoin = joinAt(now);
-					setJoinHint([...(startJoin ? [startJoin.box] : []), ...(endJoin && endJoin.name !== startJoin?.name ? [endJoin.box] : [])]);
+					const other = endJoin && endJoin.name !== startJoin?.name ? endJoin : undefined;
+					setJoinHint([...(startJoin ? [startJoin.box] : []), ...(other ? [other.box] : [])]);
+					setSideHint(other ? [{ box: other.box, ...(other.side ? { side: other.side } : {}) }] : []);
 				}
 			},
 			(moved, e) => {
 				setPenDraft(undefined);
 				setJoinHint([]);
+				setSideHint([]);
 				setPenTool("select");
 				penMadeAt = performance.now();
 				const end = worldAt(e);
@@ -1747,17 +1848,17 @@ export function Stage(props: {
 					 * Each end joins what it was let go on, and follows it from then on; an end on bare
 					 * canvas is a point there. A click with no drag makes an arrow only between two things.
 					 */
-					const fromJoin = joinAt(at)?.name;
-					const toJoin = joinAt(end)?.name;
-					const from = fromJoin ?? pointEnd(at);
-					const to = toJoin && toJoin !== fromJoin ? toJoin : pointEnd(end);
-					if (!moved && (!fromJoin || !toJoin || fromJoin === toJoin)) return;
+					const fromJoin = startJoin;
+					const toJoin = joinAt(end);
+					const from = fromJoin ? endOf(fromJoin) : pointEnd(at);
+					const to = toJoin && toJoin.name !== fromJoin?.name ? endOf(toJoin) : pointEnd(end);
+					if (!moved && (!fromJoin || !toJoin || fromJoin.name === toJoin.name)) return;
 					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to } } }]);
 					selectMade([id]);
 					return;
 				}
 				if (!moved) return penMakeAt(tool, at);
-				const made = MADE[tool];
+				const made = madeSize(tool);
 				const x1 = Math.round(moved ? Math.min(at.x, end.x) : at.x);
 				const y1 = Math.round(moved ? Math.min(at.y, end.y) : at.y);
 				const w = moved ? Math.max(8, Math.round(Math.abs(end.x - at.x))) : made.w;
@@ -1767,9 +1868,10 @@ export function Stage(props: {
 				// A card is as tall as its words, so only its width is taken, drawn or not.
 				const box =
 					tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
-				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
+				const node = madeNode(tool, id, { w, h });
+				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 				selectMade([id]);
-				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w, h: tool === "card" ? 80 : h } }, true);
+				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box: { x: x1, y: y1, w, h: tool === "card" ? 80 : h } }, true);
 			},
 		);
 	};
@@ -1778,17 +1880,19 @@ export function Stage(props: {
 	 * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
 	 * from the canvas menu. Words open for typing at once.
 	 */
-	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: { x: number; y: number }) => {
+	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: { x: number; y: number }, centred = false) => {
 		penMadeAt = performance.now();
 		const id = freshId();
-		const made = MADE[tool];
-		const x1 = Math.round(at.x);
-		const y1 = Math.round(at.y);
+		const made = madeSize(tool);
+		// From the insert panel, the item is put with its middle where it is put; from a click, its corner.
+		const x1 = Math.round(centred ? at.x - made.w / 2 : at.x);
+		const y1 = Math.round(centred ? at.y - made.h / 2 : at.y);
 		const parent = frameAt(at);
 		const box = tool === "text" || tool === "note" ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
-		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
+		const node = madeNode(tool, id, made);
+		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 		selectMade([id]);
-		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w: made.w, h: tool === "card" ? 80 : made.h } }, true);
+		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box: { x: x1, y: y1, w: made.w, h: tool === "card" ? 80 : made.h } }, true);
 	};
 
 	/**
@@ -1815,7 +1919,22 @@ export function Stage(props: {
 		setCanvasMenu(undefined);
 		if (!menu) return;
 		if (tool === "arrow") setPenTool("arrow");
+		// A shape or an icon is chosen first, in the insert panel, and put where the menu was opened.
+		else if (tool === "shape" || tool === "icon") setInsertPanel({ tab: tool === "shape" ? "shapes" : "icons", at: menu.world, client: menu.client });
 		else penMakeAt(tool, menu.world);
+	};
+	/** A pick in the insert panel: put where the canvas menu was opened, or else armed for the next press. */
+	const insertPicked = (tool: "shape" | "icon") => {
+		const open = insertPanel();
+		setInsertPanel(undefined);
+		// Another icon for one already drawn: the same place, size and colour, a new name.
+		if (open?.replace && tool === "icon") {
+			const icon = penIcon();
+			penEdit([{ op: "update", id: open.replace, set: { library: icon.library, icon: icon.name, name: icon.name } }]);
+			return;
+		}
+		if (open?.at) penMakeAt(tool, open.at, true);
+		else setPenTool(tool);
 	};
 	createEffect(() => {
 		if (!canvasMenu()) return;
@@ -1858,6 +1977,10 @@ export function Stage(props: {
 	 * only ⋯ and ×, with the other actions in the ⋯ menu (`BoardFrame`).
 	 */
 	const BAR_ZOOM = 0.5;
+	/** A bar button and its gap, the hairline before Hide, and the least title worth showing beside them, in screen pixels. */
+	const BAR_BUTTON_PX = 22;
+	const BAR_HIDE_GAP_PX = 8;
+	const BAR_TITLE_PX = 70;
 	const positionBar = (bar: HTMLElement, cam: Camera) => {
 		const at = barAt.get(bar);
 		if (!at) return;
@@ -1871,6 +1994,14 @@ export function Stage(props: {
 		if (barWidth.get(bar) !== width) {
 			barWidth.set(bar, width);
 			bar.style.width = `${width}px`;
+			/*
+			 * Too narrow for the buttons: none, never a ⋯ (`canvas.css`). Zoomed out the bar has no
+			 * title, so the buttons need only their own width; above it, room for some title as well.
+			 */
+			const buttons = bar.querySelectorAll(".acts > .act").length;
+			const needs = buttons * BAR_BUTTON_PX + BAR_HIDE_GAP_PX + (cam.zoom < BAR_ZOOM ? 0 : BAR_TITLE_PX);
+			if (width < needs) bar.dataset.tight = "";
+			else delete bar.dataset.tight;
 		}
 	};
 	const placeBar = (bar: HTMLElement, at: { x: number; y: number; w: number }) => {
@@ -2748,9 +2879,11 @@ export function Stage(props: {
 			}
 			if (performance.now() - since > 600) return;
 			const deep = penLayer.hitTest(at, { deep: true });
-			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && TEXTY.has(deep.node.type)) {
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (TEXTY.has(deep.node.type) || shapeOf(deep.id))) {
 				lastTap = undefined;
-				openPenText(deep);
+				const shape = shapeOf(deep.id);
+				if (shape && !TEXTY.has(deep.node.type)) openShapeWords(shape);
+				else openPenText(deep);
 				return;
 			}
 			const href = props.mode === "browse" ? penLayer.linkAt(at) : undefined;
@@ -2791,6 +2924,12 @@ export function Stage(props: {
 			if (performance.now() - penMadeAt < 500) return;
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
 			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
+			// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
+			const shape = hit ? shapeOf(hit.id) : undefined;
+			if (shape && !(hit && TEXTY.has(hit.node.type))) {
+				openShapeWords(shape);
+				return;
+			}
 			if (hit && TEXTY.has(hit.node.type)) {
 				openPenText(hit);
 				return;
@@ -3410,6 +3549,51 @@ export function Stage(props: {
 						/>
 					)}
 				</For>
+				<For each={sideHint()}>
+					{(hint) => (
+						<For each={ARROW_SIDES}>
+							{(side) => {
+								const [x, y] = sidePoint(hint.box, side);
+								const size = () => ((hint.side === side ? 12 : 8) / props.camera.zoom);
+								return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={{ left: `${x - size() / 2}px`, top: `${y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.camera.zoom}px` }} />;
+							}}
+						</For>
+					)}
+				</For>
+				{/*
+					The four places an arrow can leave a selected item from, just outside the middle of each
+					side: a drag from one draws an arrow that keeps to that side (`penCreate`).
+				*/}
+				<Show when={penAnchors()}>
+					{(box) => (
+						<For each={ARROW_SIDES}>
+							{(side) => {
+								const gap = () => 14 / props.camera.zoom;
+								const size = () => (coarse ? 16 : 10) / props.camera.zoom;
+								const at = () => {
+									const [x, y] = sidePoint(box(), side);
+									const [nx, ny] = side === "top" ? [0, -1] : side === "bottom" ? [0, 1] : side === "left" ? [-1, 0] : [1, 0];
+									return { x: x + nx * gap(), y: y + ny * gap() };
+								};
+								return (
+									<div
+										class="pen-anchor"
+										data-side={side}
+										title="Drag to draw an arrow from this side"
+										style={{ left: `${at().x - size() / 2}px`, top: `${at().y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.camera.zoom}px` }}
+										onPointerDown={(event) => {
+											if (event.button !== 0) return;
+											event.preventDefault();
+											event.stopPropagation();
+											const start = sidePoint(box(), side);
+											penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box().id, box: { x: box().x, y: box().y, w: box().w, h: box().h }, side });
+										}}
+									/>
+								);
+							}}
+						</For>
+					)}
+				</Show>
 				<Show when={guides().length > 0}>
 					<svg class="pen-guides" width="1" height="1" overflow="visible" aria-hidden="true">
 						<For each={guides()}>
@@ -3638,13 +3822,22 @@ export function Stage(props: {
 					</div>
 				)}
 			</Show>
+			<Show when={insertPanel()}>
+				{(open) => <Insert open={open()} onPick={insertPicked} onClose={() => setInsertPanel(undefined)} />}
+			</Show>
 			{/*
 				Boards have no title bars: the selected board's name and actions are a pill over it
 				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
 			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}
-			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} data-low={untrack(() => props.camera.zoom) < BAR_ZOOM ? "true" : "false"} ref={setBarLayer} />
+			<div
+				class="bar-layer"
+				data-hidden={props.focus ? "true" : undefined}
+				data-low={untrack(() => props.camera.zoom) < BAR_ZOOM ? "true" : "false"}
+				data-moving={boardDrag() || boardResize() || ownDrag() ? "true" : undefined}
+				ref={setBarLayer}
+			/>
 			<Show when={!BARS && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout

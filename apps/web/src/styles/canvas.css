@@ -598,7 +598,7 @@
 .board-node > .shade {
 	position: absolute;
 	border-radius: var(--radius-board, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
-	box-shadow: var(--shadow);
+	/* No shadow: a board lies flat on the canvas, its edge the 1px outline alone. */
 	inset: 0;
 	outline: 1px solid var(--line);
 	pointer-events: none;
@@ -770,53 +770,29 @@
 	display: none;
 }
 	/*
-	 * Zoomed out below 50% (`Stage`'s `BAR_ZOOM`), the bars fade away, and fade back as the zoom comes
-	 * up through it. The selected board's stays, with no title and only ⋯ and ×; ⋯ opens a menu of
-	 * the other actions (`BoardFrame`).
+	 * Zoomed out below 50% (`Stage`'s `BAR_ZOOM`), a bar loses its title and path and keeps its
+	 * buttons, which show as they do above it (on hover, or for the selected board), until the bar is
+	 * too narrow to hold them (`data-tight`). There is never a ⋯ to hold them instead.
 	 */
-	.stage > .bar-layer .chrome {
-	transition: opacity 180ms ease-out;
+	.stage > .bar-layer[data-low="true"] .chrome :is(.title, .file) {
+	display: none;
 }
-	.stage > .bar-layer[data-low="true"] .chrome:not([data-selected]) {
+	/* Narrower on screen than its buttons need (`Stage.positionBar`): no buttons, only the title if it is shown. */
+	.bar-layer .chrome[data-tight] .acts {
+	display: none !important;
+}
+	/*
+	 * A board being moved or sized, by its bar, its edge or its handles: every bar is gone at once,
+	 * and fades back in where the board lands, as the touch screens' pill does (`.board-callout`).
+	 * Hidden, not removed, so a drag that began on a bar keeps the element holding its pointer.
+	 */
+	.stage > .bar-layer[data-moving="true"] .chrome {
+	visibility: hidden;
 	opacity: 0;
-	pointer-events: none;
+	transition: none;
 }
-	.stage > .bar-layer[data-low="true"] .chrome[data-selected] {
-	min-width: 56px;
-	overflow: visible;
-}
-	.stage > .bar-layer[data-low="true"] .chrome[data-selected] :is(.title, .file, .act:not(.more, .hide)) {
-	display: none;
-}
-	.bar-layer .chrome .act.more {
-	display: none;
-}
-	.stage > .bar-layer[data-low="true"] .chrome[data-selected] .act.more {
-	display: grid;
-}
-	.stage > .bar-layer:not([data-low="true"]) .bar-menu {
-	display: none;
-}
-	/* Under the ⋯, hung from it: the menu's left edge on the button's, the app's own dropdown card and rows. */
-	.bar-layer .chrome .act-more-wrap {
-	position: relative;
-	display: grid;
-}
-	.bar-layer .chrome .bar-menu {
-	position: absolute;
-	top: calc(100% + 6px);
-	left: 0;
-	width: 200px;
-	cursor: default;
-}
-	/* No room below, beside the composer or at the window's foot: above the ⋯ instead. */
-	.bar-layer .chrome .bar-menu[data-up="true"] {
-	top: auto;
-	bottom: calc(100% + 6px);
-}
-	.bar-layer .chrome .bar-menu > a[data-row] {
-	color: inherit;
-	text-decoration: none;
+	.stage > .bar-layer:not([data-moving="true"]) .chrome {
+	transition: opacity 90ms ease-out;
 }
 	.bar-layer .chrome {
 	position: absolute;
@@ -1107,7 +1083,6 @@
 	gap: 2px;
 	padding: 5px;
 	transform: translateY(-50%);
-	border-color: var(--line-strong);
 }
 	/* A phone on its side is 390px tall and the column is 405px: it scrolls rather than running
 	   off both ends. The height left is the window's less the top clusters and the composer. */
@@ -1151,7 +1126,7 @@
 	/* On a phone the panel is a sheet over the canvas, and the canvas's tools stood over it at
 	   the float layer: the rectangle tool sat on the search field. While a sheet is open they
 	   are not the canvas's to show. */
-	.app:has(.panel-shell[data-sheet="true"][data-open="true"]) :is(.pen-tools, .ink-bar, .pen-bar) {
+	.app:has(.panel-shell[data-sheet="true"][data-open="true"]) :is(.pen-tools, .ink-bar, .props-panel, .insert-panel) {
 	visibility: hidden;
 }
 	/*
@@ -1225,73 +1200,6 @@
 	height: 1px;
 	margin: 3px 0;
 	background: var(--line-strong);
-}
-	/* What the selection is, in the ink bar's place and shape: there only while something is selected. */
-	.pen-bar {
-	position: absolute;
-	z-index: var(--z-float);
-	top: calc(var(--control, 28px) + 32px);
-	left: calc(var(--inset-left, 0px) + 12px);
-	max-width: calc(100% - var(--inset-left, 0px) - 24px);
-	gap: 2px;
-	overflow-x: auto;
-	scrollbar-width: none;
-}
-	.pen-bar .pen-custom {
-	position: relative;
-	cursor: pointer;
-}
-	.pen-bar .pen-custom::before {
-	background: conic-gradient(from 90deg, #f87171, #fbbf24, #4ade80, #60a5fa, #c084fc, #f87171);
-}
-	.pen-bar .pen-line::before {
-	background: var(--swatch);
-}
-	.pen-bar .pen-custom > input {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	opacity: 0;
-	cursor: pointer;
-}
-	.pen-bar .pen-word {
-	height: 24px;
-	padding: 0 7px;
-	border-radius: var(--radius-item);
-	color: var(--muted, inherit);
-	font-size: var(--type-ui);
-}
-	.pen-bar .pen-word[data-on="true"] {
-	background: var(--line);
-	color: var(--fg);
-}
-	.pen-bar .pen-none {
-	display: block;
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
-	box-shadow: inset 0 0 0 1.5px currentColor;
-	background: linear-gradient(135deg, transparent 45%, currentColor 45% 55%, transparent 55%);
-}
-	.pen-bar .pen-field {
-	display: flex;
-	flex: none;
-	align-items: center;
-	gap: 4px;
-	padding: 0 4px;
-	font-size: var(--type-ui);
-	color: var(--muted, inherit);
-}
-	.pen-bar .pen-field > input {
-	width: 48px;
-	height: 24px;
-	padding: 0 4px;
-	border: 1px solid var(--line-strong);
-	border-radius: var(--radius-item);
-	background: transparent;
-	color: var(--fg);
-	font: inherit;
 }
 	/* A tool is armed: the press is the drawing's, even over a board, and the cursor says so. */
 	.stage[data-pen-tool] {

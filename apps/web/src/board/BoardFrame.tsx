@@ -14,7 +14,6 @@ import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import BookOpen from "lucide-solid/icons/book-open";
 import Maximize from "lucide-solid/icons/maximize-2";
 import Scan from "lucide-solid/icons/scan";
-import Ellipsis from "lucide-solid/icons/ellipsis";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
@@ -1231,65 +1230,11 @@ export function BoardFrame(props: {
 				The title bar, on a desktop: in the stage's bar layer, which does not zoom, so it is the
 				same size on screen at every zoom and is only moved (`Stage.placeBar`). It holds every
 				action the touch screens' pill has (`BoardCallout`), shown while the board or its bar is
-				under the pointer, or the board is selected.
+				under the pointer, or the board is selected. Never a ⋯: where the buttons have no room —
+				zoomed out, or a board narrow on screen — the bar shows none (`canvas.css`, `data-tight`).
 			*/}
 			<Show when={props.barLayer}>
 				{(layer) => {
-					/*
-					 * The ⋯ menu: zoomed out below 50% (`Stage`'s `BAR_ZOOM`) the selected board's bar has
-					 * no title and only ⋯ and ×, and ⋯ lists the other actions (`canvas.css`).
-					 */
-					const [menu, setMenu] = createSignal(false);
-					/*
-					 * Hung from the ⋯ by its left edge; a ⋯ near the window's right edge would push it off, so it
-					 * slides back in. And it opens upward when below would run into the composer or the bottom of
-					 * the window: it lives in the canvas's layer, which the composer is drawn over.
-					 */
-					const keepOnScreen = (el: HTMLElement) => {
-						el.style.left = "";
-						delete el.dataset.up;
-						const box = el.getBoundingClientRect();
-						const over = box.right - (window.innerWidth - 8);
-						if (over > 0) el.style.left = `${-over}px`;
-						const dock = document.querySelector(".dock")?.getBoundingClientRect();
-						const besideDock = !!dock && dock.height > 0 && box.right > dock.left && box.left < dock.right;
-						const floor = Math.min(window.innerHeight - 8, besideDock && dock ? dock.top - 6 : Infinity);
-						if (box.bottom > floor) el.dataset.up = "true";
-					};
-					createEffect(() => {
-						if (!props.selected) setMenu(false);
-					});
-					const away = (event: Event) => {
-						if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target as Element | null)?.closest?.(".bar-menu, .act.more")) setMenu(false);
-					};
-					createEffect(() => {
-						if (!menu()) return;
-						window.addEventListener("pointerdown", away, true);
-						window.addEventListener("keydown", away, true);
-						onCleanup(() => {
-							window.removeEventListener("pointerdown", away, true);
-							window.removeEventListener("keydown", away, true);
-						});
-					});
-					/** A row of the ⋯ menu, which closes it once pressed. */
-					const row = (label: string, act: string, icon: typeof Scan, run: () => void) => (
-						<button
-							type="button"
-							role="menuitem"
-							data-row
-							data-flat="true"
-							data-act={act}
-							onClick={() => {
-								setMenu(false);
-								run();
-							}}
-						>
-							<span class="row-icon">
-								<Icon of={icon} size={15} />
-							</span>
-							<span class="row-label">{label}</span>
-						</button>
-					);
 					return (
 
 					<Portal mount={layer()}>
@@ -1350,39 +1295,6 @@ export function BoardFrame(props: {
 										<Icon of={MessageSquarePlus} size={12} />
 									</button>
 								</Show>
-								{/* The ⋯ and its menu together, so the menu hangs from the button, their left edges in line. */}
-								<span class="act-more-wrap">
-									<button
-										type="button"
-										class="act more"
-										data-act="More"
-										aria-haspopup="menu"
-										aria-expanded={menu()}
-										title="More actions"
-										aria-label={`More actions for ${props.board.title}`}
-										onClick={() => setMenu((open) => !open)}
-									>
-										<Icon of={Ellipsis} size={12} />
-									</button>
-									<Show when={menu() && props.selected}>
-										<div ref={(el) => requestAnimationFrame(() => keepOnScreen(el))} class="popover bar-menu" role="menu" aria-label={`${props.board.title}: more actions`}>
-											{row("Fit to screen", "Fit", Scan, () => props.onOpen())}
-											<Show when={props.onFocus}>{row(props.focused ? "Back to the canvas" : "Focus", "Focus", BookOpen, () => props.onFocus?.())}</Show>
-											<Show when={props.onPresent && !props.board.live}>
-												{row(props.board.format === "slides" ? "Present" : "Fullscreen", props.board.format === "slides" ? "Present" : "Fullscreen", Maximize, () => props.onPresent?.())}
-											</Show>
-											<Show when={!props.board.live}>
-												<a role="menuitem" data-row data-flat="true" data-act="New tab" href={deckFileUrl(props.board.path)} target="_blank" rel="noopener" onClick={() => setMenu(false)}>
-													<span class="row-icon">
-														<Icon of={ExternalLink} size={15} />
-													</span>
-													<span class="row-label">Open in a new tab</span>
-												</a>
-											</Show>
-											<Show when={props.onComment}>{row("Comment", "Comment", MessageSquarePlus, () => props.onComment?.())}</Show>
-										</div>
-									</Show>
-								</span>
 								<Show when={props.onHide}>
 									<button type="button" class="act hide" data-act="Hide" title="Take this board off the canvas. The agent keeps it in context." aria-label={`Hide ${props.board.title}`} onClick={() => props.onHide?.()}>
 										<Icon of={X} size={12} />

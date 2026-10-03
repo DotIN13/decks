@@ -1,6 +1,7 @@
 import { check, clone, ids, indexOf, newId, PenError } from "./doc.ts";
 import { layout, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
+import { fitShapes } from "./shapes.ts";
 import type { Box, PenDocument, PenNode, PenVariable } from "./types.ts";
 import type { ThemeState } from "./values.ts";
 
@@ -54,6 +55,8 @@ export function apply(doc: PenDocument, ops: readonly Op[], options: ApplyOption
 			throw new PenError(`Edit ${i + 1} (${(op as { op?: string })?.op ?? "?"}) failed, and nothing was saved: ${why}`);
 		}
 	});
+	// A shape's outline is its frame's size, however the frame was sized (`shapes.ts`).
+	fitShapes(next);
 	check(next);
 	return { doc: next, results };
 }

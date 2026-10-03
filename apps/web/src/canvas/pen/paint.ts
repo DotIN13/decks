@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
-import { arrowStyle, bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
+import { arrowLabel, arrowStyle, bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
 import { CARD_PALETTE } from "./markdown-layout.ts";
 import type { IconShape } from "./icons.ts";
@@ -129,7 +129,7 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			// An arrow is a line: its stroke is centred however it was aligned, or its head would be clipped away.
 			const stroke = strokeOf(doc, node, theme);
 			if (stroke) {
-				const paint = strokePaint(ctx, stroke.fills, theme, placed.box, stroke.widths[0], stroke);
+				const paint = strokePaint(ctx, stroke.fills, theme, placed.box, stroke.widths[0], stroke, isArrow(node) ? undefined : dashOf(node, stroke.widths[0]));
 				if (paint) {
 					if (isArrow(node) && arrowStyle(node.metadata).dash && typeof node.geometry === "string") {
 						// Dashed on the line alone, the geometry's first subpath; the heads after it stay solid.
@@ -151,6 +151,7 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 					paint.delete();
 				}
 			}
+			if (isArrow(node)) paintArrowLabel(canvas, ctx, node, placed);
 			path.delete();
 			break;
 		}
@@ -417,7 +418,7 @@ function paintFills(canvas: Canvas, ctx: PaintContext, fills: PenNode["fill"], t
 	void canvas;
 }
 
-function strokePaint(ctx: PaintContext, fills: Fill[], theme: ThemeState, box: Placed["box"], width: number, spec: { cap: string; join: string }): Paint | undefined {
+function strokePaint(ctx: PaintContext, fills: Fill[], theme: ThemeState, box: Placed["box"], width: number, spec: { cap: string; join: string }, dash?: number[]): Paint | undefined {
 	const { ck } = ctx;
 	// A stroke takes its first fill that draws; several stroke fills are rare enough to take one.
 	for (const fill of fills) {
@@ -427,9 +428,59 @@ function strokePaint(ctx: PaintContext, fills: Fill[], theme: ThemeState, box: P
 		paint.setStrokeWidth(width);
 		paint.setStrokeCap(spec.cap === "round" ? ck.StrokeCap.Round : spec.cap === "square" ? ck.StrokeCap.Square : ck.StrokeCap.Butt);
 		paint.setStrokeJoin(spec.join === "round" ? ck.StrokeJoin.Round : spec.join === "bevel" ? ck.StrokeJoin.Bevel : ck.StrokeJoin.Miter);
+		if (dash) {
+			const effect = ck.PathEffect.MakeDash(dash, 0);
+			if (effect) {
+				paint.setPathEffect(effect);
+				effect.delete();
+			}
+		}
 		return paint;
 	}
 	return undefined;
+}
+
+/**
+ * A line drawn in dashes or dots, from `strokeDash` (`"dashed"` or `"dotted"`): a field of ours
+ * that pen.dev carries and draws solid. Arrows keep their own `dash`, in their metadata.
+ */
+function dashOf(node: PenNode, width: number): number[] | undefined {
+	const w = Math.max(1, width);
+	if (node.strokeDash === "dashed") return [w * 4, w * 3];
+	if (node.strokeDash === "dotted") return [0.01, w * 2.5];
+	return undefined;
+}
+
+/**
+ * An arrow's words (`metadata.label`), at the middle of its line, on a patch of the canvas's own
+ * colour so the line does not run through them.
+ */
+function paintArrowLabel(canvas: Canvas, ctx: PaintContext, node: PenNode, placed: Placed): void {
+	const label = arrowLabel(node.metadata);
+	if (!label || typeof node.geometry !== "string") return;
+	const { ck } = ctx;
+	const [line = ""] = node.geometry.split(/(?=M)/);
+	const path = geometryPath(ck, { ...node, geometry: line }, placed);
+	if (!path) return;
+	const measure = new ck.ContourMeasureIter(path, false, 1);
+	const contour = measure.next();
+	const at = contour ? contour.getPosTan(contour.length() / 2) : undefined;
+	contour?.delete();
+	measure.delete();
+	path.delete();
+	if (!at) return;
+	const ax = at[0] ?? 0;
+	const ay = at[1] ?? 0;
+	const dark = ctx.scheme === "dark";
+	const paragraph = ctx.fonts.paragraph(label, { fontFamily: "Inter", fontSize: 13, fontWeight: 500, fontStyle: "normal", letterSpacing: 0, lineHeight: undefined }, { color: dark ? ck.Color4f(0.82, 0.82, 0.85, 1) : ck.Color4f(0.27, 0.29, 0.33, 1), align: "center", width: 400 });
+	const w = Math.min(400, paragraph.getLongestLine());
+	const h = paragraph.getHeight();
+	const patch = new ck.Paint();
+	patch.setColor(dark ? ck.Color4f(0.11, 0.11, 0.12, 1) : ck.Color4f(0.96, 0.96, 0.97, 1));
+	canvas.drawRRect(ck.RRectXY(ck.LTRBRect(ax - w / 2 - 5, ay - h / 2 - 2, ax + w / 2 + 5, ay + h / 2 + 2), 5, 5), patch);
+	patch.delete();
+	canvas.drawParagraph(paragraph, ax - 200, ay - h / 2);
+	paragraph.delete();
 }
 
 /** Inside or outside the edge: clip to the shape (or out of it) and draw the stroke twice as wide. */
@@ -449,7 +500,7 @@ function paintStroke(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: Th
 	const [top, right, bottom, left] = stroke.widths;
 	const uniform = top === right && right === bottom && bottom === left;
 	if (uniform) {
-		const paint = strokePaint(ctx, stroke.fills, theme, placed.box, top, stroke);
+		const paint = strokePaint(ctx, stroke.fills, theme, placed.box, top, stroke, dashOf(node, top));
 		if (!paint) return;
 		paintAligned(canvas, ck, stroke.align, paint, top, draw, clip);
 		paint.delete();

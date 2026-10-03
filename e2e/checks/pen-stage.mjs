@@ -161,9 +161,9 @@ if (spot) {
 	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
 	const handles = await until(() => page.evaluate(() => document.querySelectorAll(".pen-handle").length === 8));
 	say("…and it is selected, with eight handles", !!handles);
-	await page.locator('.pen-bar [aria-label="Fill #fde68a"]').click();
+	await page.locator('.props-panel [aria-label="Fill #fde68a"]').click();
 	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
-	say("the bar's fill colours the selected item in the file", !!filled);
+	say("the properties panel's fill colours the selected item in the file", !!filled);
 	await page.keyboard.press("Control+z");
 	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));

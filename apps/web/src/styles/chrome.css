@@ -866,6 +866,17 @@
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
+	/*
+	 * The magnifier in a search field, lifted to the words beside it. `align-items: center`
+	 * centres the icon's box, but the words' capitals sit above the middle of their line, so a
+	 * centred icon read as low: 0.3 to 1.3px in every search bar, measured from the pixels.
+	 * Three-quarters of a pixel up leaves each within half a pixel of the words. One rule for
+	 * all of them: the panel's, the canvases', the models', and the shapes' and icons'.
+	 */
+	label > svg.lucide-search:first-child {
+		translate: 0 -0.75px;
+	}
+
 	.field > .kv-key {
 		flex: none;
 		color: var(--faint);

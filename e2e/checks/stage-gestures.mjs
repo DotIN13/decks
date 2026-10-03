@@ -366,22 +366,22 @@ let ITEM_WASH = "";
 		say("carrying an end over an item lights it up", litEnd === 1, String(litEnd));
 		const rejoined = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.to === "g-b");
 		say("…and letting go joins the arrow to it", !!rejoined, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		// Its style, from the bar: a curve, heads at both ends, dashed. The path is redrawn from it.
-		await page.click('.pen-bar [data-route="curved"]');
+		// Its style, from the properties panel: a curve, heads at both ends, dashed. The path is redrawn from it.
+		await page.click('.props-panel [data-route="curved"]');
 		const curved = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			// Two items side by side on one level are joined by a straight line even when curved.
 			return now?.metadata.route === "curved" ? now : undefined;
 		});
 		say("an arrow's bar makes it curved", !!curved, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await page.click('.pen-bar [data-heads="both"]');
-		await page.click('.pen-bar [aria-label="Dashed line"]');
+		await page.click('.props-panel [data-heads="both"]');
+		await page.click('.props-panel [data-dash="dashed"]');
 		const styled = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now?.metadata.heads === "both" && now.metadata.dash === true && now.geometry.split("M").length - 1 === 3 ? now : undefined;
 		});
 		say("…with a head at each end, and dashed", !!styled, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await page.click('.pen-bar [data-route="straight"]');
+		await page.click('.props-panel [data-route="straight"]');
 		const straight = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now && now.metadata.route === undefined && !/ C/.test(now.geometry) ? now : undefined;

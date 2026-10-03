@@ -161,6 +161,11 @@ const CHECKS = [
 	 */
 	{ file: "stage-gestures.mjs", needsAgent: false },
 	/*
+	 * The canvas editor: a shape from the library, the properties panel that swaps, words and sizes
+	 * it without ever scrolling sideways, and an arrow that keeps to the side it was drawn from.
+	 */
+	{ file: "shapes.mjs", needsAgent: false },
+	/*
 	 * The stage manager: what stages exist, and the person's way between them. The one surface
 	 * where a deck of several stages is visible at all — the pill's name, the panel of cards, the
 	 * search, and the landing.

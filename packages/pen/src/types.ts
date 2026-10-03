@@ -102,6 +102,8 @@ export interface PenNode {
 	strokeLinecap?: "butt" | "round" | "square";
 	strokeLinejoin?: "miter" | "bevel" | "round";
 	strokeAlignment?: "inner" | "center" | "outer";
+	/** Ours, not pen's: a line drawn in dashes or dots. pen.dev carries it and draws the line solid. */
+	strokeDash?: "dashed" | "dotted";
 	effect?: Effect | Effect[];
 	cornerRadius?: NumberOrVariable | NumberOrVariable[];
 
