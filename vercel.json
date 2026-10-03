@@ -1,0 +1,11 @@
+{
+  "installCommand": "npm install --include=dev",
+  "buildCommand": "npm run build:public -w @decks/web",
+  "outputDirectory": "apps/web/dist-public",
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
+  ]
+}
