@@ -171,7 +171,7 @@ export function Corner(props: {
 			 */}
 			<span class="flex items-center max-[1100px]:hidden">
 				<Popover
-					placement="bottom-end"
+					placement="bottom-start"
 					label="Zoom"
 					class="w-[196px]"
 					trigger={(api) => (
@@ -261,7 +261,7 @@ export function Corner(props: {
 				file. Ordinary board first, because it is what almost every press wants.
 			*/}
 			<Popover
-				placement="bottom-end"
+				placement="bottom-start"
 				label="A new board"
 				class="w-[236px]"
 				trigger={(api) => (
@@ -382,7 +382,7 @@ export function Corner(props: {
 			{/* Everything that folded, plus the deck's own commands. Its contents are the
 			    integrator's — this is the handle. */}
 			<Popover
-				placement="bottom-end"
+				placement="bottom-start"
 				label="More"
 				/* As wide as its longest row: three short words on a desktop, the folded toolbar on a phone. */
 				class="w-max min-w-[168px] max-w-[248px]"

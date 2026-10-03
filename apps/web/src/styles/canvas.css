@@ -797,13 +797,22 @@
 	.stage > .bar-layer:not([data-low="true"]) .bar-menu {
 	display: none;
 }
-	/* Under the ⋯, from the bar's right-hand end: the app's own dropdown card and rows. */
+	/* Under the ⋯, hung from it: the menu's left edge on the button's, the app's own dropdown card and rows. */
+	.bar-layer .chrome .act-more-wrap {
+	position: relative;
+	display: grid;
+}
 	.bar-layer .chrome .bar-menu {
 	position: absolute;
-	top: calc(100% + 4px);
-	right: 0;
+	top: calc(100% + 6px);
+	left: 0;
 	width: 200px;
 	cursor: default;
+}
+	/* No room below, beside the composer or at the window's foot: above the ⋯ instead. */
+	.bar-layer .chrome .bar-menu[data-up="true"] {
+	top: auto;
+	bottom: calc(100% + 6px);
 }
 	.bar-layer .chrome .bar-menu > a[data-row] {
 	color: inherit;

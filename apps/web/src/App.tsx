@@ -1367,8 +1367,8 @@ export function App() {
 						 * `files.boardAt` owns the request-and-hear-the-path dance, because the server
 						 * mints the name and only it knows what the path is.
 						 */
-						onCreateBoard={(at) =>
-							void files.boardAt(at).then((path) => {
+						onCreateBoard={(at, format) =>
+							void files.boardAt(at, format).then((path) => {
 								if (!path) return;
 								setSelected(path);
 								setComponent(undefined);
@@ -1730,6 +1730,7 @@ export function App() {
 				*/}
 				<LeftPanel
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
+					news={newsGlow()}
 					boards={state.boards}
 					pens={state.deck?.pens ?? []}
 					onPlacePen={(pen) => {

@@ -462,6 +462,18 @@ export function BoardFrame(props: {
 	 * this app, and an old board that never sets the flag must cost nothing more than a
 	 * few checks that come to nothing.
 	 */
+	/** Whether the frame has been pointed at a document that has not replaced the one in it yet. */
+	const pendingLoad = (frame: HTMLIFrameElement): boolean => {
+		const wanted = frame.getAttribute("src");
+		if (!wanted) return false;
+		try {
+			const showing = frame.contentWindow?.location.href;
+			return !!showing && showing !== "about:blank" && new URL(wanted, location.href).href !== showing;
+		} catch {
+			return false;
+		}
+	};
+
 	const reportExtent = (frame: HTMLIFrameElement, rev: number) => {
 		clearTimeout(measuring);
 		if (!props.onExtent) return;
@@ -471,6 +483,15 @@ export function BoardFrame(props: {
 			// A reload replaced the document this measurement was for; the new one will
 			// ask again on its own `load`.
 			if (frame !== frameEl || !frame.isConnected) return;
+			/*
+			 * And a reload that has not happened yet. A new revision changes the frame's address, but
+			 * the document in it is still the last one until the new one loads, and measured now it
+			 * reports the old content under the new revision: a new board, a title tall, sent the
+			 * canvas back down to that for a frame just as its content arrived. The new document
+			 * reports on its own `load`. A revision that keeps its document (the person's own edit,
+			 * applied in place) keeps its address too, so it is measured here as before.
+			 */
+			if (pendingLoad(frame)) return;
 			const extent = measureFrame(frame);
 			if (extent) {
 				props.onExtent?.({ rev, ...extent });
@@ -1219,6 +1240,22 @@ export function BoardFrame(props: {
 					 * no title and only ⋯ and ×, and ⋯ lists the other actions (`canvas.css`).
 					 */
 					const [menu, setMenu] = createSignal(false);
+					/*
+					 * Hung from the ⋯ by its left edge; a ⋯ near the window's right edge would push it off, so it
+					 * slides back in. And it opens upward when below would run into the composer or the bottom of
+					 * the window: it lives in the canvas's layer, which the composer is drawn over.
+					 */
+					const keepOnScreen = (el: HTMLElement) => {
+						el.style.left = "";
+						delete el.dataset.up;
+						const box = el.getBoundingClientRect();
+						const over = box.right - (window.innerWidth - 8);
+						if (over > 0) el.style.left = `${-over}px`;
+						const dock = document.querySelector(".dock")?.getBoundingClientRect();
+						const besideDock = !!dock && dock.height > 0 && box.right > dock.left && box.left < dock.right;
+						const floor = Math.min(window.innerHeight - 8, besideDock && dock ? dock.top - 6 : Infinity);
+						if (box.bottom > floor) el.dataset.up = "true";
+					};
 					createEffect(() => {
 						if (!props.selected) setMenu(false);
 					});
@@ -1313,41 +1350,45 @@ export function BoardFrame(props: {
 										<Icon of={MessageSquarePlus} size={12} />
 									</button>
 								</Show>
-								<button
-									type="button"
-									class="act more"
-									data-act="More"
-									aria-haspopup="menu"
-									aria-expanded={menu()}
-									title="More actions"
-									aria-label={`More actions for ${props.board.title}`}
-									onClick={() => setMenu((open) => !open)}
-								>
-									<Icon of={Ellipsis} size={12} />
-								</button>
+								{/* The ⋯ and its menu together, so the menu hangs from the button, their left edges in line. */}
+								<span class="act-more-wrap">
+									<button
+										type="button"
+										class="act more"
+										data-act="More"
+										aria-haspopup="menu"
+										aria-expanded={menu()}
+										title="More actions"
+										aria-label={`More actions for ${props.board.title}`}
+										onClick={() => setMenu((open) => !open)}
+									>
+										<Icon of={Ellipsis} size={12} />
+									</button>
+									<Show when={menu() && props.selected}>
+										<div ref={(el) => requestAnimationFrame(() => keepOnScreen(el))} class="popover bar-menu" role="menu" aria-label={`${props.board.title}: more actions`}>
+											{row("Fit to screen", "Fit", Scan, () => props.onOpen())}
+											<Show when={props.onFocus}>{row(props.focused ? "Back to the canvas" : "Focus", "Focus", BookOpen, () => props.onFocus?.())}</Show>
+											<Show when={props.onPresent && !props.board.live}>
+												{row(props.board.format === "slides" ? "Present" : "Fullscreen", props.board.format === "slides" ? "Present" : "Fullscreen", Maximize, () => props.onPresent?.())}
+											</Show>
+											<Show when={!props.board.live}>
+												<a role="menuitem" data-row data-flat="true" data-act="New tab" href={deckFileUrl(props.board.path)} target="_blank" rel="noopener" onClick={() => setMenu(false)}>
+													<span class="row-icon">
+														<Icon of={ExternalLink} size={15} />
+													</span>
+													<span class="row-label">Open in a new tab</span>
+												</a>
+											</Show>
+											<Show when={props.onComment}>{row("Comment", "Comment", MessageSquarePlus, () => props.onComment?.())}</Show>
+										</div>
+									</Show>
+								</span>
 								<Show when={props.onHide}>
 									<button type="button" class="act hide" data-act="Hide" title="Take this board off the canvas. The agent keeps it in context." aria-label={`Hide ${props.board.title}`} onClick={() => props.onHide?.()}>
 										<Icon of={X} size={12} />
 									</button>
 								</Show>
-								<Show when={menu() && props.selected}>
-									<div class="popover bar-menu" role="menu" aria-label={`${props.board.title}: more actions`}>
-										{row("Fit to screen", "Fit", Scan, () => props.onOpen())}
-										<Show when={props.onFocus}>{row(props.focused ? "Back to the canvas" : "Focus", "Focus", BookOpen, () => props.onFocus?.())}</Show>
-										<Show when={props.onPresent && !props.board.live}>
-											{row(props.board.format === "slides" ? "Present" : "Fullscreen", props.board.format === "slides" ? "Present" : "Fullscreen", Maximize, () => props.onPresent?.())}
-										</Show>
-										<Show when={!props.board.live}>
-											<a role="menuitem" data-row data-flat="true" data-act="New tab" href={deckFileUrl(props.board.path)} target="_blank" rel="noopener" onClick={() => setMenu(false)}>
-												<span class="row-icon">
-													<Icon of={ExternalLink} size={15} />
-												</span>
-												<span class="row-label">Open in a new tab</span>
-											</a>
-										</Show>
-										<Show when={props.onComment}>{row("Comment", "Comment", MessageSquarePlus, () => props.onComment?.())}</Show>
-									</div>
-								</Show>
+
 							</span>
 						</div>
 					</Portal>

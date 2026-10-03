@@ -11,7 +11,7 @@ function board(path: string, over: Partial<Board> = {}): Board {
 }
 
 test("a board is news until the person reads it, and again once it is named after that", () => {
-	const written = board("boards/plan.html", { modifiedAt: NOW - HOUR });
+	const written = board("boards/plan.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "a1" });
 	assert.equal(isNews(written, NOW), true);
 	assert.equal(isNews({ ...written, seenAt: NOW - HOUR }, NOW), false, "read at the moment it was written");
 	assert.equal(isNews({ ...written, seenAt: NOW - 10 * 60 * 1000 }, NOW), false, "read since");
@@ -48,7 +48,7 @@ test("the person's own act is not news to them", () => {
 	assert.equal(isNews(board("boards/legacy-agent.html", { modifiedAt: NOW - 60_000, lastWrittenBy: "a1" }), NOW), true);
 });
 
-test("a file written with no byline at all is still news", () => {
-	assert.equal(isNews(board("boards/script.html", { modifiedAt: NOW - 60_000 }), NOW), true);
+test("a file written with no byline at all is not news: only an agent's change is", () => {
+	assert.equal(isNews(board("boards/script.html", { modifiedAt: NOW - 60_000 }), NOW), false);
 });
 

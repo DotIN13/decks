@@ -43,3 +43,21 @@ test("a page is measured as a document, and a board of boxes is not", async () =
 	assert.equal(style.height, "590px", "and put back, so nothing on the board moves");
 	assert.equal(documentHeight({ body: null } as unknown as Document), undefined);
 });
+
+test("a board with no stated height is measured without the frame's own height as its floor", async () => {
+	const { documentHeight } = await import("./extent.ts");
+	// `board.js` gives such a board `min-height: 100vh`, the frame it is drawn in; read with it in
+	// place, a new board could never come out shorter than the frame it started at.
+	const style: { height: string; minHeight: string } = { height: "auto", minHeight: "100vh" };
+	const asked: string[] = [];
+	const body = {
+		style,
+		get scrollHeight() {
+			asked.push(style.minHeight);
+			return style.minHeight === "0" ? 410 : 750;
+		},
+	};
+	assert.equal(documentHeight({ body } as unknown as Document), 410);
+	assert.deepEqual(asked, ["0"], "asked with the floor lifted");
+	assert.equal(style.minHeight, "100vh", "and the floor put back");
+});

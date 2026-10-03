@@ -317,8 +317,30 @@ export class BoardService {
 		// The watcher would find it in 80ms; refreshing now means the caller can attach
 		// and show it in the same turn without a race.
 		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+		if (board) {
+			this.blank.set(path, board.rev);
+			this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+		}
 		return path;
+	}
+
+	/**
+	 * Boards written by `newBoard` and not touched since, by path, at the revision they were made.
+	 *
+	 * A new board is a title and nothing else for the second or two before its writer fills it in.
+	 * Measured in that moment it is a strip a title tall, so the canvas shrank it and then grew it
+	 * again when the content landed: a board flickering while it was being written. Its first size
+	 * is kept until the file changes, and the first measurement of real content sets it.
+	 */
+	private readonly blank = new Map<string, number>();
+
+	/** Whether this revision of a board is still the blank one `newBoard` wrote. */
+	stillBlank(path: string, rev: number): boolean {
+		const made = this.blank.get(path);
+		if (made === undefined) return false;
+		if (made === rev) return true;
+		this.blank.delete(path);
+		return false;
 	}
 
 	/**

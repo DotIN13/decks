@@ -118,7 +118,8 @@ export const boards = {
 		 *   of one that no longer exists.
 		 */
 		const measured = wire.deck.board(message.path);
-		if (measured && measured.rev === message.rev) {
+		// A board `newBoard` has just made, before anything is written in it, keeps the size it was made at.
+		if (measured && measured.rev === message.rev && !wire.boards.stillBlank(message.path, message.rev)) {
 			const resized = wire.deck.setHeight(message.path, message.h);
 			if (resized) wire.send({ type: "deck.state", deck: wire.stageState() });
 		}

@@ -4,7 +4,11 @@ import type { Board } from "@decks/protocol";
 const CHANGED_WITHIN = 24 * 60 * 60 * 1000;
 
 /**
- * Whether a board is news: an agent named it, and the person had not read it since.
+ * Whether a board is news: an agent changed it, and the person had not read it since.
+ *
+ * **Only an agent's change.** A file with no byline, moved by a script, a copy or a checkout, is not
+ * news: nobody here wrote it, so there is no colour to mark it in and nothing to tell. That was the
+ * one case the rule used to let through, and on a deck copied for a test it marked every board.
  *
  * Two times can be the newest one, and they mean different things. `namedAt` is the last act that
  * named a writer: an agent fitting, showing or reporting a board, or the person's own edit.
@@ -21,6 +25,7 @@ export function isNews(board: Board, now = Date.now()): boolean {
 	 * that file moved, and the mark clears on a read either way. A *timed* act older than the file
 	 * is the other case — something else wrote it afterwards — and that is news.
 	 */
+	if (!board.lastWrittenBy) return false;
 	if (board.lastWrittenBy === "you" && (named === 0 || named >= file)) return false;
 	const at = Math.max(named, file);
 	return at > (board.seenAt ?? 0) && at > now - CHANGED_WITHIN;

@@ -284,6 +284,10 @@ const spot = await page.evaluate(() => {
 say("there is empty canvas to double-click on", spot !== null, JSON.stringify(spot));
 
 await page.mouse.dblclick(spot.x, spot.y);
+// A double-click opens the canvas menu there; its first row is a board.
+const menuOpen = await page.waitForSelector('.canvas-menu [data-new-board="board"]', { timeout: 3000 }).catch(() => null);
+say("a double-click on empty canvas opens the menu of things to add, a board first", !!menuOpen);
+await page.locator('.canvas-menu [data-new-board="board"]').click();
 await settle(page, 1800);
 const created = await page.evaluate(([at]) => {
 	const nodes = [...document.querySelectorAll(".board-node")];
@@ -299,7 +303,7 @@ const created = await page.evaluate(([at]) => {
 		at,
 	};
 }, [spot]);
-say("a double-click on empty canvas makes a board", created !== null && created.count === 1, JSON.stringify(created));
+say("…and Board makes one", created !== null && created.count === 1, JSON.stringify(created));
 say(
 	"…centred on the point that was pressed, not hung off its corner",
 	created !== null && Math.abs(created.centre.x - created.at.x) <= 4 && Math.abs(created.centre.y - created.at.y) <= 4,

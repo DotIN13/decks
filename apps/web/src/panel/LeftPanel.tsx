@@ -156,6 +156,8 @@ export function LeftPanel(props: {
 	chats?: AgentChat[];
 	identities?: Record<string, Identity>;
 	unread?: Record<string, number>;
+	/** Boards that are news, each in its writer's colour: the dot at the end of the row (`BoardRow`). */
+	news?: Record<string, string>;
 	onFocusAgent?: (id: string) => void;
 	/** Make an agent in a workspace (`undefined` for none) — the `+` on a heading of the workspace cut. */
 	onNewAgent?: (workspace: string | undefined, kind: AgentKind) => void;
@@ -916,6 +918,7 @@ export function LeftPanel(props: {
 														current={props.current === row.board.path}
 														dim={row.dim}
 														onCanvas={row.onCanvas}
+														{...(props.news?.[row.board.path] ? { news: props.news[row.board.path] } : {})}
 														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
 														{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
 														onPick={() => props.onPick(row.board)}

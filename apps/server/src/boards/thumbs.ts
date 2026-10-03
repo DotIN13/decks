@@ -193,9 +193,12 @@ const MEASURE = `(() => {
 	}
 	if (h === 0) return 0;
 	const held = document.body.style.height;
+	const floor = document.body.style.minHeight;
 	document.body.style.height = "auto";
+	document.body.style.minHeight = "0";
 	const page = document.body.scrollHeight;
 	document.body.style.height = held;
+	document.body.style.minHeight = floor;
 	if (page > h) h = page;
 	return Math.ceil(h);
 })()`;

@@ -6,10 +6,13 @@ import X from "lucide-solid/icons/x";
 import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
+import { can } from "../connections/backend.ts";
+import FilePlus from "lucide-solid/icons/file-plus";
+import Presentation from "lucide-solid/icons/presentation";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
-import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, isPhone, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -171,7 +174,8 @@ export function Stage(props: {
 	 * The gesture that makes a board. Absent means the app does not want one, and nothing is
 	 * asked of the server.
 	 */
-	onCreateBoard?: (at: { x: number; y: number }) => void;
+	/** A board where the canvas menu was opened, in stage pixels: an ordinary board or a slide deck. */
+	onCreateBoard?: (at: { x: number; y: number }, format?: "board" | "slides") => void;
 	onHide?: (path: string) => void;
 	/** Per-board reload counters, from `stage.reload`. */
 	nonces?: Record<string, number>;
@@ -1788,12 +1792,23 @@ export function Stage(props: {
 	};
 
 	/**
-	 * The canvas menu: on a phone, the drawing's tools at the place a double-tap on bare canvas
-	 * landed. A phone has no room for the tool column (`PenBar`), and a menu where the finger is
-	 * puts the new thing where it was asked for: a pick makes it there, and the arrow, which needs
-	 * a drag, is put in hand. No board: on a phone a board is made from `⋯`, not by a double-tap.
+	 * The canvas menu: everything that can be added, at the place a double-click or a double-tap on
+	 * bare canvas landed, on every device. A board or a slide deck first, then the drawing's tools.
+	 * One gesture means one thing everywhere: it used to make a board straight away with a mouse and
+	 * open the tools with a finger. A pick makes the thing there; the arrow, which needs a drag, is
+	 * put in hand.
 	 */
-	const [canvasMenu, setCanvasMenu] = createSignal<{ client: { x: number; y: number }; world: { x: number; y: number } } | undefined>();
+	const [canvasMenu, setCanvasMenu] = createSignal<{ client: { x: number; y: number }; world: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
+	const openCanvasMenu = (event: { clientX: number; clientY: number }) => {
+		// A canvas that can only be read (one opened from a file) has nothing to add.
+		if (!can("write")) return;
+		setCanvasMenu({ client: { x: event.clientX, y: event.clientY }, world: worldAt(event), stage: stagePoint(event as PointerEvent) });
+	};
+	const boardFromMenu = (format: "board" | "slides") => {
+		const menu = canvasMenu();
+		setCanvasMenu(undefined);
+		if (menu) props.onCreateBoard?.(menu.stage, format);
+	};
 	let lastBareTap: { x: number; y: number; at: number } | undefined;
 	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
 		const menu = canvasMenu();
@@ -2662,12 +2677,11 @@ export function Stage(props: {
 				setPenSelection([]);
 				setBoardPicks([]);
 			});
-			// A second tap close by, soon after: the canvas menu, on a phone.
-			if (!isPhone()) return;
+			// A second tap close by, soon after: the canvas menu, as a double-click is with a mouse.
 			const now = performance.now();
 			const twice = lastBareTap && now - lastBareTap.at < 350 && Math.hypot(e.clientX - lastBareTap.x, e.clientY - lastBareTap.y) < 30;
 			lastBareTap = twice ? undefined : { x: e.clientX, y: e.clientY, at: now };
-			if (twice) setCanvasMenu({ client: { x: e.clientX, y: e.clientY }, world: worldAt(e) });
+			if (twice) openCanvasMenu(e);
 		};
 		window.addEventListener("pointermove", move);
 		window.addEventListener("pointerup", up);
@@ -2764,7 +2778,7 @@ export function Stage(props: {
 	let pannedAt = 0;
 
 	/**
-	 * A double-click on empty canvas: a board, there.
+	 * A double-click on empty canvas: the canvas menu, there (`canvasMenu`).
 	 *
 	 * "Empty" is anything that is not inside a `.board-node`. The stage's own background is the
 	 * common case, but a board's title bar is in *this* document too — a keystroke that lands in
@@ -2786,16 +2800,18 @@ export function Stage(props: {
 				return;
 			}
 		}
-		// Not on a phone: a double-tap there is the canvas menu, and a board is made from `⋯`.
-		if (!props.onCreateBoard || isPhone()) return;
+		// Nothing can be added where nothing can be written: a canvas opened from a file.
+		if (!props.onCreateBoard && !props.onPenEdit) return;
 		/*
 		 * Only on the bare stage itself. Not on a board, its title bar, something drawn, or anything
 		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
-		 * to pick a word in it made a board.
+		 * to pick a word in it opened the menu.
 		 */
 		if (event.target !== element) return;
 		if (performance.now() - pannedAt < 400) return;
-		props.onCreateBoard(stagePoint(event));
+		// A finger's two taps already opened it (`onPointerDown`); a touch screen's own dblclick is the same gesture.
+		if (canvasMenu()) return;
+		openCanvasMenu(event);
 	};
 
 	const onPointerDown = (event: PointerEvent) => {
@@ -3580,13 +3596,34 @@ export function Stage(props: {
 						role="menu"
 						aria-label="Add to the canvas"
 						style={{
-							left: `${Math.max(8, Math.min(menu.client.x - 110, window.innerWidth - 228))}px`,
+							// Its left edge at the point, as a dropdown's is at its button's, and kept on the screen.
+							left: `${Math.max(8, Math.min(menu.client.x, window.innerWidth - 228))}px`,
 							top: `${menu.client.y}px`,
 							width: "220px",
-							// Above the finger in the lower half of the screen, under it in the upper half.
+							// Above the point in the lower half of the screen, under it in the upper half.
 							transform: menu.client.y > window.innerHeight / 2 ? "translateY(calc(-100% - 12px))" : "translateY(12px)",
 						}}
 					>
+						<Show when={props.onCreateBoard}>
+							<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => boardFromMenu("board")}>
+								<span class="row-icon">
+									<Icon of={FilePlus} size={15} />
+								</span>
+								<span class="row-label">Board</span>
+								<span class="row-note">.html</span>
+							</button>
+							<button type="button" role="menuitem" data-row data-flat="true" data-new-board="slides" onClick={() => boardFromMenu("slides")}>
+								<span class="row-icon">
+									<Icon of={Presentation} size={15} />
+								</span>
+								<span class="row-label">Slides</span>
+								<span class="row-note">.slides.html</span>
+							</button>
+							<Show when={props.onPenEdit}>
+								<div class="rule" aria-hidden="true" />
+							</Show>
+						</Show>
+						<Show when={props.onPenEdit}>
 						<For each={TOOLS}>
 							{(entry) => (
 								<button type="button" role="menuitem" data-row data-flat="true" data-tool={entry.tool} onClick={() => pickFromMenu(entry.tool as Exclude<PenTool, "select">)}>
@@ -3597,6 +3634,7 @@ export function Stage(props: {
 								</button>
 							)}
 						</For>
+						</Show>
 					</div>
 				)}
 			</Show>

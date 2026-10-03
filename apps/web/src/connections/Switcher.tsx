@@ -1,6 +1,7 @@
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Download from "lucide-solid/icons/download";
 import FileUp from "lucide-solid/icons/file-up";
+import Pencil from "lucide-solid/icons/pencil";
 import Plug from "lucide-solid/icons/plug";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Show } from "solid-js";
@@ -11,7 +12,7 @@ import { state } from "../state/deck.ts";
 import { stageOf } from "../state/stages.ts";
 import { backend, can } from "./backend.ts";
 import { forget, openBundle } from "./bundle.ts";
-import { active, api, connections, newId, saveConnections, switchTo, type Connection } from "./connection.ts";
+import { active, api, connections, nameOf, newId, rename, saveConnections, switchTo, type Connection } from "./connection.ts";
 import { available, ensureWorker, reach } from "./worker.ts";
 
 /**
@@ -62,10 +63,36 @@ export function Switcher(props: { label?: string } = {}) {
 	const [busy, setBusy] = createSignal(false);
 	const [address, setAddress] = createSignal("");
 	const [code, setCode] = createSignal("");
+	const [label, setLabel] = createSignal("");
 	let picker: HTMLInputElement | undefined;
 
 	const current = () => active();
-	const name = () => (current()?.kind === "here" ? (backend()?.name ?? state.deck?.name ?? "Decks") : (current()?.label ?? "Decks"));
+	/** This server's own name, which only its greeting says: known while the tab is on it. */
+	const ownName = () => backend()?.name ?? state.deck?.name;
+	const name = () => {
+		const one = current();
+		return one ? nameOf(one, ownName() ?? "Decks") : "Decks";
+	};
+	/** A row's name: yours for it, or its own; "This server" for the page's own when another is open. */
+	const rowName = (one: Connection) => nameOf(one, current()?.kind === "here" ? ownName() : undefined);
+
+	/** The row being renamed, and what is typed so far. */
+	const [editing, setEditing] = createSignal<string | undefined>();
+	const [draftName, setDraftName] = createSignal("");
+	const startRename = (one: Connection) => {
+		setDraftName(rowName(one));
+		setEditing(one.id);
+	};
+	const finishRename = (keep: boolean) => {
+		const id = editing();
+		if (!id) return;
+		setEditing(undefined);
+		if (!keep) return;
+		const one = connections().find((each) => each.id === id);
+		// Typing the backend's own name back is clearing yours.
+		const own = one?.kind === "here" ? ownName() : one?.label;
+		rename(id, draftName().trim() === own ? "" : draftName());
+	};
 	const stage = () => stageOf(state.focused);
 
 	const opened = (open: boolean) => {
@@ -114,7 +141,8 @@ export function Switcher(props: { label?: string } = {}) {
 			const said = (await response.json().catch(() => ({}))) as { token?: string; name?: string; error?: string };
 			if (!response.ok || !said.token) throw new Error(said.error ?? `The server answered ${response.status}.`);
 			const id = newId();
-			saveConnections([...connections(), { id, kind: "server", label: said.name ?? new URL(base).host, base, token: said.token, added: Date.now() }]);
+			const given = label().replace(/\s+/g, " ").trim().slice(0, 60);
+			saveConnections([...connections(), { id, kind: "server", label: said.name ?? new URL(base).host, ...(given ? { name: given } : {}), base, token: said.token, added: Date.now() }]);
 			await go(id);
 		} catch (failed) {
 			const text = (failed as Error).message;
@@ -218,6 +246,23 @@ export function Switcher(props: { label?: string } = {}) {
 									/>
 								</label>
 							</div>
+							<div class="switcher-label">
+								<span>
+									Name <span class="text-faint">· optional</span>
+								</span>
+								<label class="field h-8 flex-none rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+									<input
+										type="text"
+										autocomplete="off"
+										maxLength={60}
+										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+										placeholder="What the server calls itself"
+										value={label()}
+										onInput={(event) => setLabel(event.currentTarget.value)}
+										data-connect-name
+									/>
+								</label>
+							</div>
 							<Show when={error()}>{(text) => <p class="switcher-error">{text()}</p>}</Show>
 							<div class="switcher-actions">
 								<button type="button" class="btn" onClick={() => setView("list")}>
@@ -234,20 +279,56 @@ export function Switcher(props: { label?: string } = {}) {
 						<For each={connections()}>
 							{(one) => (
 								<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined}>
-									<button type="button" role="menuitem" data-row data-flat="true" class="min-w-0 flex-1" data-connection={one.id} onClick={() => void go(one.id)}>
-										<span class="switcher-dot" data-reach={one.id === current()?.id ? "ok" : (reached()[one.id] ?? "unknown")} aria-hidden="true" />
-										<span class="flex min-w-0 flex-1 flex-col items-start">
-											<span class="row-label w-full truncate text-left">{one.kind === "here" ? (current()?.kind === "here" ? name() : "This server") : one.label}</span>
-											<span class="row-note w-full truncate text-left text-faint">
-												{kindNote(one)}
-												{reached()[one.id] === "off" ? " · not reachable" : reached()[one.id] === "unpaired" ? " · pairing revoked" : ""}
-											</span>
-										</span>
-									</button>
-									<Show when={one.kind !== "here" && one.id !== current()?.id}>
-										<button type="button" class="close" title={one.kind === "bundle" ? "Remove this canvas from this browser" : "Forget this server"} aria-label={`Forget ${one.label}`} onClick={() => void forget(one.id)}>
-											<Icon of={X} size={12} />
-										</button>
+									<Show
+										when={editing() === one.id}
+										fallback={
+											<>
+												<button type="button" role="menuitem" data-row data-flat="true" class="min-w-0 flex-1" data-connection={one.id} onClick={() => void go(one.id)}>
+													<span class="switcher-dot" data-reach={one.id === current()?.id ? "ok" : (reached()[one.id] ?? "unknown")} aria-hidden="true" />
+													<span class="flex min-w-0 flex-1 flex-col items-start">
+														<span class="row-label w-full truncate text-left">{rowName(one)}</span>
+														<span class="row-note w-full truncate text-left text-faint">
+															{kindNote(one)}
+															{one.name && one.kind !== "here" && one.name !== one.label ? ` · ${one.label}` : ""}
+															{reached()[one.id] === "off" ? " · not reachable" : reached()[one.id] === "unpaired" ? " · pairing revoked" : ""}
+														</span>
+													</span>
+												</button>
+												<button type="button" class="close" title="Rename" aria-label={`Rename ${rowName(one)}`} onClick={() => startRename(one)} data-rename={one.id}>
+													<Icon of={Pencil} size={12} />
+												</button>
+												<Show when={one.kind !== "here" && one.id !== current()?.id}>
+													<button type="button" class="close" title={one.kind === "bundle" ? "Remove this canvas from this browser" : "Forget this server"} aria-label={`Forget ${rowName(one)}`} onClick={() => void forget(one.id)}>
+														<Icon of={X} size={12} />
+													</button>
+												</Show>
+											</>
+										}
+									>
+										{/*
+											Renaming in the row itself. Its keys stop here: the menu listens on the document
+											for Escape and the arrows, and they mean the text while it is being typed.
+										*/}
+										<label class="field switcher-rename h-8 min-w-0 flex-1 rounded-lg pointer-coarse:h-10 pointer-coarse:px-2.5">
+											<input
+												ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
+												type="text"
+												maxLength={60}
+												class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+												placeholder={one.kind === "here" ? (ownName() ?? "This server") : one.label}
+												value={draftName()}
+												onInput={(event) => setDraftName(event.currentTarget.value)}
+												/* `on:` binds to the field itself; Solid's `onKeyDown` is delegated to the
+												   document, where the menu's own listener would already have the key. */
+												on:keydown={(event: KeyboardEvent) => {
+													event.stopPropagation();
+													if (event.key === "Enter") finishRename(true);
+													else if (event.key === "Escape") finishRename(false);
+												}}
+												onBlur={() => finishRename(true)}
+												data-rename-input
+											/>
+										</label>
 									</Show>
 								</div>
 							)}

@@ -1150,7 +1150,8 @@
 	}
 
 	/*
-	 * On the canvas: six pixels of accent, in the right-hand column.
+	 * News: six pixels in the colour of the agent that changed it, in the right-hand column, for
+	 * as long as the board glows on the canvas (`BoardRow`, `news`).
 	 *
 	 * The disc is drawn by the pseudo-element and the slot is 20px, so the dot and the bin
 	 * that replaces it occupy exactly the same box — the swap on hover is a swap and not a
@@ -1168,7 +1169,7 @@
 		width: 6px;
 		height: 6px;
 		border-radius: var(--radius-pill);
-		background: var(--color-accent);
+		background: var(--news, var(--color-accent));
 		content: "";
 		transition: opacity 120ms ease;
 	}

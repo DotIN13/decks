@@ -332,8 +332,13 @@ export class Deck {
 			 * Unless the file's own number moved, which is a drag or a `stage.fit` writing a new floor.
 			 * That one is deliberate and has to land now, or a fit that tightens a board would appear to do
 			 * nothing until something else reloaded it.
+			 *
+			 * A file that states no height keeps the reading outright. Taking the larger of it and the
+			 * placeholder made a board shorter than the placeholder (a new one, a title and nothing yet)
+			 * jump to it on every write and back down to its content a beat later.
 			 */
-			if (board.format !== "slides" && floorBefore === this.floors.get(path)) board.h = Math.max(previous.h, board.h);
+			const floor = this.floors.get(path) ?? 0;
+			if (board.format !== "slides" && floorBefore === floor) board.h = floor > 0 ? Math.max(previous.h, floor) : previous.h;
 		} else {
 			autoPlace([board], this.boards);
 		}

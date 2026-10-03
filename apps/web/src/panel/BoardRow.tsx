@@ -9,7 +9,7 @@ import { basename } from "./panel-groups.ts";
 const ARMED_MS = 4000;
 
 /**
- * One board, as a line: an empty box the shape of a board, its filename, and a dot if it is up.
+ * One board, as a line: an empty box the shape of a board, its filename, and a dot if it is news.
  *
  * It says the **filename**, not the title. A row this size reads left to right like a
  * filename, which is what a board mostly is — and titles are sentences, which ellipsise into
@@ -27,8 +27,14 @@ export function BoardRow(props: {
 	current?: boolean;
 	/** Held but not shown — the muted name that used to be 45% opacity on a picture. */
 	dim?: boolean;
-	/** In play: the accent dot at the right end. */
+	/** In play: the row can be taken off the canvas (`onHide`). */
 	onCanvas?: boolean;
+	/**
+	 * News: an agent changed it and you have not read it since, in that agent's colour. The same
+	 * rule and colour as the glow round the board on the canvas (`App.tsx`, `newsGlow`), so the
+	 * dot and the glow come and go together.
+	 */
+	news?: string;
 	/**
 	 * Delete the board's file. Absent means the row has no delete on it.
 	 *
@@ -120,9 +126,8 @@ export function BoardRow(props: {
 			>
 				<span class="board-thumb" aria-hidden="true" />
 				<span class="row-name">{name()}</span>
-				<Show when={props.onCanvas}>
-					{/* Decorative: "on the canvas" is already said by the section this row is in. */}
-					<span class="dot" aria-hidden="true" />
+				<Show when={props.news}>
+					{(color) => <span class="dot" role="img" aria-label="Changed by an agent since you read it" title="Changed by an agent since you read it" style={{ "--news": color() }} />}
 				</Show>
 			</button>
 

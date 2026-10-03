@@ -17,10 +17,14 @@ import { createSignal } from "solid-js";
  * it always was; for any other it is under `/c/<id>/`, which is what the service worker answers.
  * A board's own relative references stay under that prefix, so they route too.
  */
+/**
+ * `label` is what the backend calls itself: a server's deck name, a file's canvas title. `name` is
+ * what you call it, set when connecting or later from the switcher, and it wins when there is one.
+ */
 export type Connection =
-	| { id: "here"; kind: "here"; label: string }
-	| { id: string; kind: "server"; label: string; base: string; token: string; added: number }
-	| { id: string; kind: "bundle"; label: string; from: string; added: number; boards: number };
+	| { id: "here"; kind: "here"; label: string; name?: string }
+	| { id: string; kind: "server"; label: string; name?: string; base: string; token: string; added: number }
+	| { id: string; kind: "bundle"; label: string; name?: string; from: string; added: number; boards: number };
 
 const LIST = "decks.connections";
 const LAST = "decks.connection.last";
@@ -28,7 +32,15 @@ const LAST = "decks.connection.last";
 /** Built without a server: the public Decks, which has no "here" to fall back on. */
 export const PUBLIC = import.meta.env?.VITE_DECKS_PUBLIC === "1";
 
-const HERE: Connection = { id: "here", kind: "here", label: "This server" };
+const HERE_NAME = "decks.connection.here.name";
+
+/** What you call the server this page came from, if anything: kept apart, since it is not in the list. */
+const [hereName, setHereName] = createSignal<string | undefined>(typeof localStorage === "undefined" ? undefined : (localStorage.getItem(HERE_NAME) ?? undefined));
+
+function here(): Connection {
+	const name = hereName();
+	return { id: "here", kind: "here", label: "This server", ...(name ? { name } : {}) };
+}
 
 function readList(): Connection[] {
 	try {
@@ -43,7 +55,7 @@ const [others, setOthers] = createSignal<Connection[]>(typeof localStorage === "
 
 /** Every connection this browser knows, this server first. */
 export function connections(): Connection[] {
-	return PUBLIC ? others() : [HERE, ...others()];
+	return PUBLIC ? others() : [here(), ...others()];
 }
 
 /** Write the list, and tell the service worker, which routes by it. */
@@ -52,6 +64,32 @@ export function saveConnections(list: Connection[]): void {
 	localStorage.setItem(LIST, JSON.stringify(kept));
 	setOthers(kept);
 	void import("./worker.ts").then(({ tellWorker }) => tellWorker());
+}
+
+/**
+ * Name a connection, or with nothing clear the name and go back to what the backend calls itself.
+ * Names are this browser's own: another browser, or the server, never sees them.
+ */
+export function rename(id: string, name: string): void {
+	const clean = name.replace(/\s+/g, " ").trim().slice(0, 60);
+	if (id === "here") {
+		if (clean) localStorage.setItem(HERE_NAME, clean);
+		else localStorage.removeItem(HERE_NAME);
+		setHereName(clean || undefined);
+		return;
+	}
+	saveConnections(
+		connections().map((one) => {
+			if (one.id !== id) return one;
+			const { name: _old, ...rest } = one;
+			return (clean ? { ...rest, name: clean } : rest) as Connection;
+		}),
+	);
+}
+
+/** What to call a connection: your name for it, or what it calls itself (`fallback` for this server, whose own name arrives with its greeting). */
+export function nameOf(one: Connection, fallback?: string): string {
+	return one.name ?? (one.kind === "here" ? (fallback ?? one.label) : one.label);
 }
 
 /** The id in this tab's address, or none. */
@@ -81,7 +119,7 @@ export function active(): Connection | undefined {
 	const id = addressed();
 	const list = connections();
 	if (id) return list.find((one) => one.id === id);
-	if (!PUBLIC) return HERE;
+	if (!PUBLIC) return here();
 	const last = typeof localStorage === "undefined" ? undefined : localStorage.getItem(LAST);
 	return list.find((one) => one.id === last);
 }

@@ -123,12 +123,14 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
  * sits under it. Neither is in any block's box. Left out, the canvas gives the board a
  * rectangle shorter than the document it is showing, and the page scrolls inside it.
  *
- * `scrollHeight` answers this, with one catch that is the reason for the two lines around
- * it: `board.js` gives the body the height in the board's `<meta>` tag, so asking a body
- * that is already that tall how tall it is answers the tag rather than the content, and the
- * board could then never shrink. Releasing the height for the read is what makes it a
- * measurement. It is synchronous — nothing paints in between — and it happens once per
- * revision, not once per frame.
+ * `scrollHeight` answers this, with one catch that is the reason for the lines around it:
+ * `board.js` gives the body the height in the board's `<meta>` tag, or when there is none a
+ * `min-height` of the frame itself (`100vh`), so asking a body that is already that tall how
+ * tall it is answers the tag or the frame rather than the content, and the board could then
+ * never shrink. A new board starts at the frame's size, so every board an agent wrote came
+ * out at least that tall, and was squeezed and fitted back by hand. Releasing both for the
+ * read is what makes it a measurement. It is synchronous — nothing paints in between — and
+ * it happens once per revision, not once per frame.
  *
  * The height only. A board's width is the author's, stated in its `<meta>` tag, and is
  * never taken from a measurement.
@@ -137,9 +139,12 @@ export function documentHeight(doc: Document): number | undefined {
 	const body = doc.body as HTMLElement | null;
 	if (!body) return undefined;
 	const held = body.style.height;
+	const floor = body.style.minHeight;
 	body.style.height = "auto";
+	body.style.minHeight = "0";
 	const measured = body.scrollHeight;
 	body.style.height = held;
+	body.style.minHeight = floor;
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 

@@ -345,7 +345,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 * the place somebody wants the board and the place is the board, not its corner. The size is
 	 * the blank board's own (880×400), sent for that arithmetic and not to choose anything.
 	 */
-	const boardAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
+	const boardAt = async (at: { x: number; y: number }, format: "board" | "slides" = "board"): Promise<string | undefined> => {
 		const stage = document.querySelector(".stage");
 		if (!stage) return undefined;
 		// `at` is already in stage pixels — the stage is the viewport (`camera/coords.ts`).
@@ -354,7 +354,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		return askForBoard((request) =>
 			send({
 				type: "board.create",
-				format: "board",
+				format,
 				title: "Untitled",
 				size,
 				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
