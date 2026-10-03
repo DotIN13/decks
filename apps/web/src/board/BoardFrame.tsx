@@ -1162,10 +1162,13 @@ export function BoardFrame(props: {
 	};
 	onCleanup(stopReading);
 	createEffect(() => {
+		// Only a board that is news and on screen listens to the camera: on a stage of 400 boards, every
+		// board re-running this on every camera frame was half the script of a pan.
+		if (!props.news || !props.visible) return stopReading();
 		void props.camera;
 		const node = nodeEl;
 		let now = false;
-		if (props.news && props.visible && node && zoom() >= READ_ZOOM) {
+		if (node && zoom() >= READ_ZOOM) {
 			const stage = node.closest(".stage")?.getBoundingClientRect();
 			const within = stage ? { x: stage.left, y: stage.top, w: stage.width, h: stage.height } : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
 			const rect = node.getBoundingClientRect();
