@@ -766,6 +766,12 @@
 	overflow: clip;
 	pointer-events: none;
 }
+	/* Moved by the camera as one (`Stage.writeTransform`); each bar sits on it at its board's corner times the zoom. */
+	.stage > .bar-layer > .bar-track {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
 	.stage > .bar-layer[data-hidden="true"] {
 	display: none;
 }

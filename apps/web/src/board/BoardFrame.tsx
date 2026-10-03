@@ -1248,6 +1248,7 @@ export function BoardFrame(props: {
 							data-hover={hovered() || undefined}
 							data-selected={props.selected || undefined}
 							data-sizing={props.sizing ? "true" : undefined}
+							data-acts={1 + (props.onFocus ? 1 : 0) + (props.onPresent && !props.board.live ? 1 : 0) + (props.board.live ? 0 : 1) + (props.onComment ? 1 : 0) + (props.onHide ? 1 : 0)}
 							ref={(bar) => {
 								createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));
 							}}
@@ -1258,6 +1259,12 @@ export function BoardFrame(props: {
 						>
 							<span class="title">{props.board.title}</span>
 							<span class="file">{props.board.path}</span>
+							{/*
+								Built only while the bar is hovered or its board selected, which is the only time they show
+								(`canvas.css`): a zoom that came to rest used to build five or six icon buttons for every
+								bar in reach. `data-acts` says how many there would be, for `Stage.positionBar`.
+							*/}
+							<Show when={hovered() || props.selected}>
 							<span class="acts" onPointerDown={(event) => event.stopPropagation()} onDblClick={(event) => event.stopPropagation()}>
 								<button type="button" class="act" data-act="Fit" title="Fit the board to the screen" aria-label={`Fit ${props.board.title}`} onClick={() => props.onOpen()}>
 									<Icon of={Scan} size={12} />
@@ -1305,6 +1312,7 @@ export function BoardFrame(props: {
 								</Show>
 
 							</span>
+							</Show>
 						</div>
 					</Portal>
 					);

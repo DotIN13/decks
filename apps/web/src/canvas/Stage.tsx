@@ -1980,7 +1980,15 @@ export function Stage(props: {
 	 * moves the boards. A touch screen has no bars: the selected board gets the pill instead.
 	 */
 	const BARS = hasTitleBars();
+	/**
+	 * Where the bars are mounted: a track inside the layer that moves with the camera, so a pan moves
+	 * every bar with one transform. Each bar is placed on the track at its board's corner times the
+	 * zoom, which only changes with the zoom; on a stage of 83 boards a pan used to write 69 bar
+	 * transforms a step.
+	 */
 	const [barLayer, setBarLayer] = createSignal<HTMLElement>();
+	let barOuter: HTMLElement | undefined;
+	let barZoom = 0;
 	const barAt = new WeakMap<HTMLElement, { x: number; y: number; w: number }>();
 	const barWidth = new WeakMap<HTMLElement, number>();
 	/** Above the board's top edge by the bar's 24 pixels and a 2-pixel gap. */
@@ -1999,11 +2007,10 @@ export function Stage(props: {
 	const positionBar = (bar: HTMLElement, cam: Camera) => {
 		const at = barAt.get(bar);
 		if (!at) return;
-		const v = view();
 		const dpr = window.devicePixelRatio || 1;
-		// Whole device pixels, so the words are never drawn between two.
-		const x = Math.round((v.width / 2 + (at.x - cam.x) * cam.zoom) * dpr) / dpr;
-		const y = Math.round((v.height / 2 + (at.y - cam.y) * cam.zoom - BAR_ABOVE) * dpr) / dpr;
+		// Whole device pixels on the track, which itself sits on whole device pixels, so the words are never drawn between two.
+		const x = Math.round(at.x * cam.zoom * dpr) / dpr;
+		const y = Math.round(at.y * cam.zoom * dpr) / dpr;
 		bar.style.transform = `translate(${x}px, ${y}px)`;
 		const width = Math.round(at.w * cam.zoom);
 		if (barWidth.get(bar) !== width) {
@@ -2013,7 +2020,7 @@ export function Stage(props: {
 			 * Too narrow for the buttons: none, never a ⋯ (`canvas.css`). Zoomed out the bar has no
 			 * title, so the buttons need only their own width; above it, room for some title as well.
 			 */
-			const buttons = bar.querySelectorAll(".acts > .act").length;
+			const buttons = Number(bar.dataset.acts ?? 0);
 			const needs = buttons * BAR_BUTTON_PX + BAR_HIDE_GAP_PX + (cam.zoom < BAR_ZOOM ? 0 : BAR_TITLE_PX);
 			if (width < needs) bar.dataset.tight = "";
 			else delete bar.dataset.tight;
@@ -2038,15 +2045,28 @@ export function Stage(props: {
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
-		// And the title bars, which are in a layer of their own that does not zoom.
-		const layer = barLayer();
-		if (layer) {
-			for (const bar of layer.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
+		// And the title bars, which are in a layer of their own that does not zoom: the track moves, and the bars only when the zoom changes.
+		const track = barLayer();
+		if (track) {
+			const dpr = window.devicePixelRatio || 1;
+			const tx = Math.round((v.width / 2 - cam.x * cam.zoom) * dpr) / dpr;
+			const ty = Math.round((v.height / 2 - cam.y * cam.zoom - BAR_ABOVE) * dpr) / dpr;
+			track.style.transform = `translate(${tx}px, ${ty}px)`;
+			if (cam.zoom !== barZoom) {
+				barZoom = cam.zoom;
+				for (const bar of track.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
+			}
 			// Below `BAR_ZOOM` the bars fade out, and fade back in as the zoom crosses it, mid-gesture (`canvas.css`).
 			const low = cam.zoom < BAR_ZOOM;
-			if (low !== (layer.dataset.low === "true")) layer.dataset.low = low ? "true" : "false";
+			if (barOuter && low !== (barOuter.dataset.low === "true")) barOuter.dataset.low = low ? "true" : "false";
 		}
 	};
+	// A track mounted after the camera last moved starts where the camera is, its bars placed afresh.
+	createEffect(() => {
+		if (!barLayer()) return;
+		barZoom = 0;
+		writeTransform(localCamera);
+	});
 
 
 
@@ -3851,8 +3871,10 @@ export function Stage(props: {
 				data-hidden={props.focus ? "true" : undefined}
 				data-low={untrack(() => props.camera.zoom) < BAR_ZOOM ? "true" : "false"}
 				data-moving={boardDrag() || boardResize() || ownDrag() ? "true" : undefined}
-				ref={setBarLayer}
-			/>
+				ref={(el) => (barOuter = el)}
+			>
+				<div class="bar-track" ref={setBarLayer} />
+			</div>
 			<Show when={!BARS && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout
