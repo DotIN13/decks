@@ -28,6 +28,7 @@ import { attachBoardOpen } from "./board-links.ts";
 import { attachBoardEval } from "./board-eval.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
+import { holdFrames, type FrameHold } from "./hold-frames.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "../canvas/picture.ts";
 
@@ -302,6 +303,8 @@ export function BoardFrame(props: {
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachSelect: (() => void) | undefined;
+	/** The page's animation frames, held while the camera moves (`hold-frames.ts`). */
+	let frames: FrameHold | undefined;
 	let detachComments: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
 	let detachDrop: (() => void) | undefined;
@@ -441,6 +444,7 @@ export function BoardFrame(props: {
 		check();
 	};
 	onCleanup(() => {
+		frames?.detach();
 		detachSelect?.();
 		detachComments?.();
 		detachEditor?.();
@@ -736,6 +740,8 @@ export function BoardFrame(props: {
 	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and
 	 * the measurement. Called from the frame's `load` whichever renderer put it there.
 	 */
+	const cameraMoving = () => !!(props.moving || props.scaling);
+	createEffect(() => frames?.hold(cameraMoving()));
 	const wire = (frame: HTMLIFrameElement) => {
 		paintFrame(frame);
 		markEditing(frame);
@@ -748,6 +754,9 @@ export function BoardFrame(props: {
 		detachLinks?.();
 		detachEval?.();
 		detachSelect?.();
+		frames?.detach();
+		frames = frame.contentWindow ? holdFrames(frame.contentWindow) : undefined;
+		frames?.hold(untrack(cameraMoving));
 		/*
 		 * A press inside a board selects that board — **every** format, either mode.
 		 *
@@ -860,6 +869,8 @@ export function BoardFrame(props: {
 		detachLinks?.();
 		detachEval?.();
 		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachEval = undefined;
+		frames?.detach();
+		frames = undefined;
 		clearTimeout(measuring);
 		if (frameEl === element) {
 			frameEl = undefined;
