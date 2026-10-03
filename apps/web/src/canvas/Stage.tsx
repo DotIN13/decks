@@ -3241,6 +3241,13 @@ export function Stage(props: {
 		view,
 		moving: () => moving() || gliding() || glidePending() || landing() || !!props.switching,
 		live: liveNow,
+		onScreen: (board) => {
+			const v = view();
+			const a = toScreen(props.camera, v, { x: board.x, y: board.y });
+			const b = toScreen(props.camera, v, { x: board.x + board.w, y: board.y + board.h });
+			return b.x > 0 && a.x < v.width && b.y > 0 && a.y < v.height;
+		},
+		ready: (board) => untrack(liveBoards).has(board.path),
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,
@@ -3319,7 +3326,16 @@ export function Stage(props: {
 								/* The selected board and the edited one are live at any zoom, on any device. */
 								props.selected === board.path ||
 								props.editing?.path === board.path ||
-								(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
+								(ONE_LIVE
+									? centreBoard() === board.path
+									: /*
+										 * A page still kept, asleep, wakes as soon as the camera is at the live zoom and it is in
+										 * reach, mid-gesture or not: it costs nothing to start again (`keptPages`), and waiting for the
+										 * zoom to rest kept a page already loaded behind its picture for another 300 to 400 ms.
+										 */
+										keptPages().has(board.path)
+										? liveNow() && isVisible(board)
+										: liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 							}
 							/*
 							 * No title bar in the focus view, and that is a decision rather than an

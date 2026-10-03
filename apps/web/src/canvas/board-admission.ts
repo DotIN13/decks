@@ -47,6 +47,12 @@ const QUIET_MS = 1000;
 const STILL_MS = 250;
 /** How many boards start a document together, each group after the page has had an idle moment. */
 const BATCH = 3;
+/**
+ * How long the camera stays still before boards *off* the screen start pages, ready for a pan.
+ * Zooming in on two boards started nineteen pages, all on the app's one thread, and the two on
+ * screen took four seconds to show behind the seventeen that were not.
+ */
+const AHEAD_MS = 1000;
 
 const whenIdle = (fn: () => void, timeout: number) => {
 	const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
@@ -78,6 +84,10 @@ export interface AdmissionHost {
 	lastMoved: () => number;
 	/** Where a board's centre is on screen, for letting the nearest one in first. */
 	screenCentre: (board: Board) => { x: number; y: number };
+	/** Whether a board is on the screen itself, not only within the margin `isVisible` allows. */
+	onScreen: (board: Board) => boolean;
+	/** Whether a board's page is up and showing. */
+	ready: (board: Board) => boolean;
 	/** Whether the camera is at the zoom where boards have pages, now: below it nothing is let in. */
 	live: () => boolean;
 	/** Whether the app has opened far enough for any board to start. */
@@ -216,7 +226,18 @@ export function createAdmission(host: AdmissionHost): Admission {
 		if (!host.live()) return;
 		const still = performance.now() - host.lastMoved();
 		if (host.moving() || still < STILL_MS) return pump(Math.max(50, STILL_MS - still));
-		const waiting = host.boards().filter((board) => host.isVisible(board) && !admitted.has(board.path));
+		/*
+		 * The screen first, and the rest only once the screen is done: every page admitted is up, and the
+		 * camera has been still a while longer. A group waits for the one before it to finish loading,
+		 * because they all load on the app's thread and the nearest should not wait behind the next.
+		 */
+		// On screen only: a page off it is kept asleep, and never says it is showing.
+		const loading = host.boards().some((board) => admitted.has(board.path) && host.onScreen(board) && !host.ready(board));
+		if (loading) return pump(120);
+		const all = host.boards().filter((board) => host.isVisible(board) && !admitted.has(board.path));
+		const shown = all.filter((board) => host.onScreen(board));
+		if (shown.length === 0 && all.length > 0 && still < AHEAD_MS) return pump(AHEAD_MS - still);
+		const waiting = shown.length > 0 ? shown : all;
 		if (waiting.length === 0) {
 			if (!started) {
 				started = true;
