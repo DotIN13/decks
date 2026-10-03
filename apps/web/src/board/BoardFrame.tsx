@@ -602,7 +602,10 @@ export function BoardFrame(props: {
 	const markEditing = (frame: HTMLIFrameElement | undefined) => {
 		const root = frame?.contentDocument?.documentElement;
 		if (!root) return;
-		if (untrack(() => props.editor.enabled())) root.setAttribute("data-decks-edit", "");
+		// Only a change is written: a write, even of what is there, restyles the page, and a canvas switch asked every page at once (540 ms on 83 boards).
+		const on = untrack(() => props.editor.enabled());
+		if (root.hasAttribute("data-decks-edit") === on) return;
+		if (on) root.setAttribute("data-decks-edit", "");
 		else root.removeAttribute("data-decks-edit");
 	};
 	createEffect(() => {

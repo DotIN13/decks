@@ -30,8 +30,9 @@ export const pen = {
 	 *
 	 * The same call the agent makes with `stage.open`, so nothing here knows anything the agent's
 	 * own path does not: the session takes that stage's boards as its own and sends its browser the
-	 * drawing. The arrangement goes back to the asker, because the boards on the canvas have just
-	 * been replaced and `deck.state` is how a browser is told where they are.
+	 * drawing. The arrangement goes to every browser from `openStage` itself (`arranged`), so it is
+	 * not sent again here: a second copy of the deck state was 400 KB more for the page to take in
+	 * on every switch of canvas.
 	 */
 	"agent.stage": (message, reply, wire) => {
 		const agent = wire.agents.get(message.id);
@@ -42,7 +43,6 @@ export const pen = {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 			return;
 		}
-		reply({ type: "deck.state", deck: wire.stageState() });
 		wire.publishStages();
 	},
 
