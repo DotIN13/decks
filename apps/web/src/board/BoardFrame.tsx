@@ -1186,8 +1186,8 @@ export function BoardFrame(props: {
 
 	/** Where the edge band sits, in board units: `EDGE_OUT_PX` outside the border and `EDGE_IN_PX` in. */
 	const edgeBand = (side: "n" | "s" | "w" | "e") => {
-		const out = EDGE_OUT_PX / props.camera.zoom;
-		const band = (EDGE_OUT_PX + EDGE_IN_PX) / props.camera.zoom;
+		const out = EDGE_OUT_PX / zoom();
+		const band = (EDGE_OUT_PX + EDGE_IN_PX) / zoom();
 		const along = side === "n" || side === "s";
 		return {
 			left: `${side === "e" ? `calc(100% + ${out}px - ${band}px)` : `${-out}px`}`,
@@ -1342,7 +1342,12 @@ export function BoardFrame(props: {
 				over this one covers its band too. Mostly outside the border, so the page keeps its edges;
 				a mouse, a pen or one finger moves it; a second finger makes it a pinch.
 			*/}
-			<Show when={!inert() && !props.focused && !props.editing}>
+			{/*
+				Only on the board under the pointer, or the selected one, which is the one a finger moves. Four
+				bands on every live board were restyled on every zoom step: 616 style writes a step on a stage
+				of 83 boards, and a third of what a zoom cost.
+			*/}
+			<Show when={!inert() && !props.focused && !props.editing && (hovered() || props.selected)}>
 				<For each={["n", "s", "w", "e"] as const}>
 					{(side) => (
 						<div

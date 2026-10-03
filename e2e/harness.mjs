@@ -803,6 +803,14 @@ export async function pressBoardAction(page, label) {
  * screen and uncovered, or null. The band shows on a board whose page takes the pointer.
  */
 export async function boardEdge(page, path) {
+	// The bands are drawn on the board under the pointer (or the selected one), so point at it first.
+	const box = await page.locator(`.board-node[data-path="${path}"]`).boundingBox();
+	if (box) {
+		const x = Math.min(Math.max(box.x + box.width / 2, 2), page.viewportSize().width - 2);
+		const y = Math.min(Math.max(box.y + Math.min(box.height / 2, 40), 2), page.viewportSize().height - 2);
+		await page.mouse.move(x, y);
+		await page.waitForFunction((wanted) => [...document.querySelectorAll(".board-edge")].some((band) => band.closest(".board-node")?.dataset.path === wanted), path, { timeout: 2000 }).catch(() => {});
+	}
 	return page.evaluate((wanted) => {
 		for (const band of document.querySelectorAll(".board-edge")) {
 			if (band.closest(".board-node")?.dataset.path !== wanted) continue;
