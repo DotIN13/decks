@@ -108,6 +108,8 @@ export function Stage(props: {
 	 * boards may start. Until it is true no board has a document (`admitted` below).
 	 */
 	boardsMayStart: boolean;
+	/** The person has picked another canvas and its camera has not landed yet: no board starts a page (`App.landOnStage`). */
+	switching?: boolean;
 	/**
 	 * What the canvas should do when this conversation's boards first arrive.
 	 *
@@ -3228,7 +3230,7 @@ export function Stage(props: {
 		boards: () => props.boards,
 		isVisible,
 		view,
-		moving: () => moving() || gliding() || glidePending() || landing(),
+		moving: () => moving() || gliding() || glidePending() || landing() || !!props.switching,
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,

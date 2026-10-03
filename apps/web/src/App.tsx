@@ -1128,6 +1128,20 @@ export function App() {
 		moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
 	};
 
+	/**
+	 * From the pick of another canvas until its camera has landed. The new canvas's boards can reach
+	 * the page before the message that names the canvas, and drawn at the old camera they started
+	 * pages for a view that lasted half a second; this holds every page from the moment of the pick.
+	 */
+	const [switchingCanvas, setSwitchingCanvas] = createSignal(false);
+	let switchingTimer: ReturnType<typeof setTimeout> | undefined;
+	const switchingFor = (on: boolean) => {
+		clearTimeout(switchingTimer);
+		setSwitchingCanvas(on);
+		// Never for long: a switch the server refuses must not hold the canvas's pages.
+		if (on) switchingTimer = setTimeout(() => setSwitchingCanvas(false), 4000);
+	};
+
 	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
 	const [stagesOpen, setStagesOpen] = createSignal(false);
 
@@ -1172,6 +1186,7 @@ export function App() {
 			moveCamera(view.camera);
 			setSelected(view.selected);
 			reportCamera(camera(), state.focused);
+			switchingFor(false);
 			return;
 		}
 		const asked = Date.now();
@@ -1187,6 +1202,7 @@ export function App() {
 			const size = { width: stage.clientWidth, height: stage.clientHeight };
 			moveCamera(middleOf(boards.map(boxOf), canvasBox(size), size, camera()));
 			setSelected(undefined);
+			switchingFor(false);
 			reportCamera(camera(), state.focused);
 		}, 200);
 	};
@@ -1281,6 +1297,7 @@ export function App() {
 						 */
 						opening={state.focused ? { camera: openingCamera() } : undefined}
 						boardsMayStart={boardsMayStart()}
+						switching={switchingCanvas()}
 						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
 						onBoardsStarted={canvasOpened}
 						mode={mode()}
@@ -1541,6 +1558,7 @@ export function App() {
 						const agentId = state.focused;
 						if (!agentId || stageOf(agentId)?.name === name) return;
 						// The camera follows when the server says the agent is there (the canvas effect above).
+						switchingFor(true);
 						send({ type: "agent.stage", id: agentId, stage: name });
 					}}
 					onNew={(title) => {
