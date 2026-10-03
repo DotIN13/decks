@@ -740,6 +740,11 @@ export function BoardFrame(props: {
 	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and
 	 * the measurement. Called from the frame's `load` whichever renderer put it there.
 	 */
+	/** Whether this board's bar has built its buttons yet: once it has been hovered or selected. */
+	const [actsBuilt, setActsBuilt] = createSignal(false);
+	createEffect(() => {
+		if (!actsBuilt() && (hovered() || props.selected)) setActsBuilt(true);
+	});
 	const cameraMoving = () => !!(props.moving || props.scaling);
 	createEffect(() => frames?.hold(cameraMoving()));
 	const wire = (frame: HTMLIFrameElement) => {
@@ -1271,11 +1276,12 @@ export function BoardFrame(props: {
 							<span class="title">{props.board.title}</span>
 							<span class="file">{props.board.path}</span>
 							{/*
-								Built only while the bar is hovered or its board selected, which is the only time they show
-								(`canvas.css`): a zoom that came to rest used to build five or six icon buttons for every
-								bar in reach. `data-acts` says how many there would be, for `Stage.positionBar`.
+								Built the first time the bar is hovered or its board selected, which is the only time they
+								show (`canvas.css`), and kept from then on: a zoom that came to rest used to build five or six
+								icon buttons for every bar in reach, and building them on every hover made a pointer sweep
+								across the boards cost 45 ms a move. `data-acts` says how many there are, for `Stage.positionBar`.
 							*/}
-							<Show when={hovered() || props.selected}>
+							<Show when={actsBuilt()}>
 							<span class="acts" onPointerDown={(event) => event.stopPropagation()} onDblClick={(event) => event.stopPropagation()}>
 								<button type="button" class="act" data-act="Fit" title="Fit the board to the screen" aria-label={`Fit ${props.board.title}`} onClick={() => props.onOpen()}>
 									<Icon of={Scan} size={12} />
