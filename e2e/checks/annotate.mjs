@@ -34,7 +34,7 @@ await page.evaluate(() => {
 });
 const prompts = () => page.evaluate(() => window.__prompts);
 
-await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
+await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
 await page.keyboard.press("1");
 await settle(page, 900);
 

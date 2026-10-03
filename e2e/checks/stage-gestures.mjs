@@ -163,13 +163,15 @@ say("dragging one selected item moves the whole selection", !!movedBoth, JSON.st
 
 // A press on a board's picture, clear of anything drawn over it: the part its title bar used to be.
 const bar = await page.evaluate(() => {
-	for (const node of document.querySelectorAll(".board-node")) {
+	for (const one of window.__decksBoards()) {
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 		const r = node.getBoundingClientRect();
 		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
 			const x = r.x + r.width * fx;
 			const y = r.y + r.height * fy;
 			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 90 && y < 900 && at?.closest(".board-node") === node && !at.closest("a, button")) return { x, y, path: node.dataset.path };
+			if (x > 320 && x < 1560 && y > 90 && y < 900 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button")) return { x, y, path: node.dataset.path };
 		}
 	}
 });
@@ -463,14 +465,16 @@ let ITEM_WASH = "";
 	await page.keyboard.press("End");
 	await page.keyboard.type(" and more");
 	// A double-click inside the editor picks a word; it is not a double-click on the canvas.
-	const boardsBefore = await count(".board-node");
+	// Every board on the stage, with a node or only a picture.
+	const boards = () => page.evaluate(() => window.__decksBoards().length);
+	const boardsBefore = await boards();
 	const inEditor = await page.evaluate(() => {
 		const r = document.querySelector(".pen-text").getBoundingClientRect();
 		return { x: r.x + 20, y: r.y + r.height / 2 };
 	});
 	await page.mouse.dblclick(inEditor.x, inEditor.y);
 	await settle(page, 800);
-	say("a double-click inside the editor makes no board", (await count(".board-node")) === boardsBefore && (await count(".pen-text")) === 1, `${boardsBefore} -> ${await count(".board-node")}`);
+	say("a double-click inside the editor makes no board", (await boards()) === boardsBefore && (await count(".pen-text")) === 1, `${boardsBefore} -> ${await boards()}`);
 	await page.keyboard.press("Control+Enter");
 	say("…and what is typed is the note's words in the file", !!(await until(() => item("g-note")?.content === "Words to edit and more")));
 	await page.keyboard.press("Escape");
@@ -507,22 +511,23 @@ let ITEM_WASH = "";
 	await page.mouse.move(room.x + 5, room.y + 5);
 	say("…and the outline goes when the pointer leaves it", !!(await until(() => count(".pen-hover").then((n) => n === 0), 2000)));
 	const spot = await page.evaluate(() => {
-		for (const node of document.querySelectorAll(".board-node")) {
+		for (const one of window.__decksBoards()) {
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			if (node.dataset.selected === "true") continue;
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width - 30;
 			const y = r.y + Math.min(80, r.height / 2);
-			if (x > 320 && x < 1560 && y > 120 && y < 880 && document.elementFromPoint(x, y)?.closest(".board-node") === node) return { x, y, path: node.dataset.path };
+			if (x > 320 && x < 1560 && y > 120 && y < 880 && (node.picture ? document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : document.elementFromPoint(x, y)?.closest(".board-node") === node)) return { x, y, path: node.dataset.path };
 		}
 	});
 	if (spot) {
 		await page.mouse.move(spot.x, spot.y, { steps: 3 });
 		const outlined = await until(() => page.evaluate((path) => {
 			const hover = document.querySelector('.pen-hover[data-board="true"]');
-			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-			if (!hover || !node) return undefined;
+			const n = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect() ?? window.__decksBoards().find((one) => one.path === path)?.rect;
+			if (!hover || !n) return undefined;
 			const h = hover.getBoundingClientRect();
-			const n = node.getBoundingClientRect();
 			return Math.abs(h.x - n.x) < 2 && Math.abs(h.width - n.width) < 2 ? { width: getComputedStyle(hover).boxShadow } : undefined;
 		}, spot.path), 2000);
 		say("…and a board does too, round its own edge", !!outlined, JSON.stringify(outlined));
@@ -537,13 +542,15 @@ let ITEM_WASH = "";
 {
 	// The boards sit behind the panel and under the composer here, so the canvas is panned to them and back.
 	const find = () => page.evaluate(() => {
-		for (const node of document.querySelectorAll(".board-node")) {
+		for (const one of window.__decksBoards()) {
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			const r = node.getBoundingClientRect();
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				const at = document.elementFromPoint(x, y);
-				if (x > 320 && x < 1500 && y > 290 && y < 880 && at?.closest(".board-node") === node && !at.closest("a, button")) return { x, y, path: node.dataset.path };
+				if (x > 320 && x < 1500 && y > 290 && y < 880 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button")) return { x, y, path: node.dataset.path };
 			}
 		}
 	});
@@ -665,12 +672,14 @@ await page.keyboard.press("Escape");
 	await settle(page, 400);
 	// A live board is dragged by the band along its edge.
 	const path = await page.evaluate(() => {
-		for (const node of document.querySelectorAll(".board-node")) {
+		for (const one of window.__decksBoards()) {
+			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width / 2;
 			const y = r.y + Math.min(r.height / 2, 60);
 			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 150 && y < 800 && at?.closest(".board-node") === node) return node.dataset.path;
+			if (x > 320 && x < 1560 && y > 150 && y < 800 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node)) return node.dataset.path;
 		}
 	});
 	let chrome;

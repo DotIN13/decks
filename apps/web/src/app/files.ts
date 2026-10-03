@@ -414,7 +414,8 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 						notice("info", "This canvas was opened from a file, so it can only be read.");
 						return;
 					}
-					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node, .bar-layer .chrome");
+					// A board zoomed out has no node, only its picture on the sheet: the stage says whether one is there.
+					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node, .bar-layer .chrome") ?? (globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt?.(at.x, at.y);
 					// While the timeline is being previewed the frames take no pointer events, so
 					// every drop arrives here — and "zoom in" would be a lie about why.
 					if (deps.preview()) {

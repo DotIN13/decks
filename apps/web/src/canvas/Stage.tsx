@@ -1045,6 +1045,19 @@ export function Stage(props: {
 		const r = element.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
+	/** For the browser checks: every board on the canvas and where it is on screen, node or picture (`rendered`). */
+	(globalThis as { __decksBoards?: () => Array<{ path: string; node: boolean; rect: DOMRect }> }).__decksBoards = () => {
+		if (!element) return [];
+		const r = element.getBoundingClientRect();
+		const nodes = renderedPaths();
+		return props.boards
+			.filter((board) => board.path !== props.focus)
+			.map((board) => {
+				const a = toScreen(localCamera, view(), { x: board.x, y: board.y });
+				const b = toScreen(localCamera, view(), { x: board.x + board.w, y: board.y + board.h });
+				return { path: board.path, node: nodes.has(board.path), rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
+			});
+	};
 	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
 	const onCanvas = (target: EventTarget | null) => target === element || onDrawn(target);
 	/** The ink on the stage, each stroke in stage pixels, for the eraser and the lasso. */
@@ -1060,6 +1073,32 @@ export function Stage(props: {
 	};
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(localCamera, view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
+
+	/**
+	 * The board whose picture is under a point and that has no node of its own to take the press
+	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
+	 */
+	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => {
+		const at = worldAt(event);
+		const nodes = renderedPaths();
+		let top = -1;
+		for (const i of boardIndex().search({ x: at.x, y: at.y, w: 0, h: 0 })) {
+			const board = props.boards[i]!;
+			if (i <= top || nodes.has(board.path) || board.path === props.focus) continue;
+			if (at.x >= board.x && at.x <= board.x + board.w && at.y >= board.y && at.y <= board.y + board.h) top = i;
+		}
+		return top < 0 ? undefined : props.boards[top]!.path;
+	};
+	/** For the file drop (`app/files.ts`): whether a board's picture, with no node to find, is under a point on screen. */
+	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? pictureUnder({ clientX: x, clientY: y }) : undefined);
+	/** A board selected by a press on it, as `BoardFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
+	const selectBoard = (path: string) => {
+		if (!untrack(boardPicks).includes(path) && (untrack(boardPicks).length || untrack(penSelection).length)) {
+			setBoardPicks([]);
+			setPenSelection([]);
+		}
+		props.onSelect(path);
+	};
 
 	/** The keys of the drawing, in edit mode; true when the key was one of them. */
 	const penKey = (event: KeyboardEvent): boolean => {
@@ -1515,7 +1554,7 @@ export function Stage(props: {
 	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
 	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
 	 */
-	const dragBoard = (path: string, event: PointerEvent): boolean => {
+	const dragBoard = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
 		if (event.button !== 0) return false;
 		event.stopPropagation();
 		event.preventDefault();
@@ -1530,7 +1569,7 @@ export function Stage(props: {
 			setPenSelection([]);
 		}
 		props.onSelect(path);
-		dragSelection(event, group ? penSelection() : [], group ? picks : [path], event.currentTarget as HTMLElement);
+		dragSelection(event, group ? penSelection() : [], group ? picks : [path], on);
 		return true;
 	};
 
@@ -2775,15 +2814,20 @@ export function Stage(props: {
 	 */
 	let hoverFrame: number | undefined;
 	let hoverAt: { x: number; y: number } | undefined;
+	let hoverPoint: { clientX: number; clientY: number } | undefined;
+	/** The board under the pointer that has no node to say so (`pictureUnder`). */
+	const [pictureHover, setPictureHover] = createSignal<string | undefined>();
 	const onHover = (event: PointerEvent) => {
 		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
 		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
 			hoverAt = undefined;
 			if (hoverId()) setHoverId(undefined);
+			if (pictureHover()) setPictureHover(undefined);
 			if (overLink()) setOverLink(false);
 			return;
 		}
 		hoverAt = worldAt(event);
+		hoverPoint = { clientX: event.clientX, clientY: event.clientY };
 		hoverFrame ??= requestAnimationFrame(() => {
 			hoverFrame = undefined;
 			const href = hoverAt ? penLayer.linkAt(hoverAt) : undefined;
@@ -2792,6 +2836,8 @@ export function Stage(props: {
 			if (props.mode !== "edit") return;
 			const hit = hoverAt ? penLayer.hitTest(hoverAt) : undefined;
 			setHoverId(hit && !penSelection().includes(hit.id) ? hit.id : undefined);
+			// A board with no node says nothing when the pointer is over it, so the stage asks.
+			setPictureHover(!hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined);
 		});
 	};
 	onCleanup(() => {
@@ -2805,7 +2851,7 @@ export function Stage(props: {
 		const bounds = id && id !== penText()?.id ? penLayer.bounds.get(id) : undefined;
 		if (bounds) return { ...bounds, id };
 		// A board under the pointer, unless it is the one selected, which has its own outline, or a drag is on.
-		const path = hoverBoard();
+		const path = hoverBoard() ?? pictureHover();
 		const board = path && path !== props.selected && !boardDrag() && !panning() ? props.boards.find((candidate) => candidate.path === path) : undefined;
 		return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
 	});
@@ -2983,7 +3029,7 @@ export function Stage(props: {
 		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
 		 * to pick a word in it opened the menu.
 		 */
-		if (event.target !== element) return;
+		if (event.target !== element || pictureUnder(event)) return;
 		if (performance.now() - pannedAt < 400) return;
 		// A finger's two taps already opened it (`onPointerDown`); a touch screen's own dblclick is the same gesture.
 		if (canvasMenu()) return;
@@ -3010,7 +3056,11 @@ export function Stage(props: {
 				penPress(event);
 				return;
 			}
+			// A finger on a board's picture picks the board, and may still pan or pinch, as on its node.
+			const picture = event.target === element && touches.count() === 0 && !(pen && pressOnDrawn(event)) ? pictureUnder(event) : undefined;
+			if (picture) selectBoard(picture);
 			beginTouch(event);
+			if (picture) return;
 			if (pen && pressOnDrawn(event)) touchOnDrawing(event);
 			else if (pen) tapToDeselect(event);
 			return;
@@ -3021,6 +3071,17 @@ export function Stage(props: {
 		 * it up, a shift-press adds it to the selection or takes it out, and a drag on empty canvas
 		 * draws a marquee. The camera pans with Space and a drag, the middle button, a scroll or a pinch.
 		 */
+		/*
+		 * A press on a board's picture, where the board has no node (below the live zoom): picked up and
+		 * moved as a press on its node does, unless a tool is armed or something drawn is over it.
+		 */
+		if (event.button === 0 && event.target === element && !spaceHeld() && !props.drawing && (!props.onPenEdit || penTool() === "select") && !penLayer.hitTest(worldAt(event))) {
+			const picture = pictureUnder(event);
+			if (picture) {
+				if (!props.onPenEdit || !dragBoard(picture, event, element)) selectBoard(picture);
+				return;
+			}
+		}
 		if (props.onPenEdit && !props.drawing && event.button === 0 && onCanvas(event.target) && !spaceHeld()) {
 			if (penPress(event)) return;
 		}
@@ -3085,40 +3146,6 @@ export function Stage(props: {
 	 * the bar, the glow's read check — is then paid for the boards near the window, not for the stage.
 	 * The sheet draws the rest (`pen/scene.ts`), from the same kind of index.
 	 */
-	const boardIndex = createMemo(() => new BoxIndex(props.boards));
-	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
-	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
-	const reach = () => {
-		const v = view();
-		const corner = toWorld(props.camera, v, { x: -v.width, y: -v.height });
-		return { x: corner.x, y: corner.y, w: (3 * v.width) / props.camera.zoom, h: (3 * v.height) / props.camera.zoom };
-	};
-	const rendered = createMemo<readonly Board[]>((was) => {
-		const boards = props.boards;
-		if (view().width === 0) return was ?? [];
-		const found = new Set(boardIndex().search(reach()));
-		const keep = (path: string | undefined) => {
-			const at = path === undefined ? undefined : boardSlot().get(path);
-			if (at !== undefined) found.add(at);
-		};
-		for (const path of liveBoards().keys()) keep(path);
-		// A kept page stays a node wherever the camera goes, or leaving would unload it.
-		for (const path of keptPages()) keep(path);
-		keep(props.selected);
-		keep(props.editing?.path);
-		for (const path of boardDrag()?.paths ?? []) keep(path);
-		keep(boardResize()?.path);
-		const next = [...found]
-			.sort((a, b) => a - b)
-			.map((at) => boards[at]!)
-			.filter((board) => board.path !== props.focus);
-		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
-		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
-	});
-
-	/** `rendered`, as a set to look a board up in. */
-	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
-
 	/**
 	 * The zoom as of the camera's last rest. What a board is given by size — a document, its glow —
 	 * changes when the camera stops, never partway through a pinch, where a board crossing the line
@@ -3132,6 +3159,20 @@ export function Stage(props: {
 	 * the page's own glow, which breathes.
 	 */
 	const liveZoom = createMemo(() => restZoom() >= INTERACT_ZOOM);
+	/*
+	 * The acts on each board, grouped once per change rather than filtered per frame: a
+	 * handful of agents at most, and every frame would otherwise walk the same record.
+	 */
+	const actsByPath = createMemo(() => {
+		const map = new Map<string, AgentAct[]>();
+		for (const act of Object.values(props.acts ?? {})) {
+			if (!act) continue;
+			const list = map.get(act.path);
+			if (list) list.push(act);
+			else map.set(act.path, [act]);
+		}
+		return map;
+	});
 	/**
 	 * The camera is at the live zoom *now*, not only as of its last rest. `liveZoom` holds the zoom of
 	 * the last rest through a gesture, so pages are not dropped and remade mid-gesture; but a page
@@ -3141,6 +3182,54 @@ export function Stage(props: {
 	 * re-runs only when it flips.
 	 */
 	const liveNow = createMemo(() => props.camera.zoom >= INTERACT_ZOOM);
+	const boardIndex = createMemo(() => new BoxIndex(props.boards));
+	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
+	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
+	const reach = () => {
+		const v = view();
+		const corner = toWorld(props.camera, v, { x: -v.width, y: -v.height });
+		return { x: corner.x, y: corner.y, w: (3 * v.width) / props.camera.zoom, h: (3 * v.height) / props.camera.zoom };
+	};
+	const rendered = createMemo<readonly Board[]>((was) => {
+		const boards = props.boards;
+		if (view().width === 0) return was ?? [];
+		/*
+		 * Below the live zoom a board is its picture on the sheet and nothing else, so it has no node:
+		 * 400 of them cost a pan step 10 ms of the page's time, and each camera step reached every one.
+		 * The stage finds the board under a press itself (`pictureUnder`). Not under the Canvas renderer,
+		 * where a board's node draws its own picture.
+		 *
+		 * Live as of the last rest *and* now: the zoom of the last rest holds through a gesture, and a
+		 * wheel zoom out from a board made nodes for 380 boards as their reach grew, to drop them all
+		 * when it stopped.
+		 */
+		const found = new Set(props.renderer !== "dom" || (liveZoom() && liveNow()) ? boardIndex().search(reach()) : []);
+		const keep = (path: string | undefined) => {
+			const at = path === undefined ? undefined : boardSlot().get(path);
+			if (at !== undefined) found.add(at);
+		};
+		for (const path of liveBoards().keys()) keep(path);
+		// A kept page stays a node wherever the camera goes, or leaving would unload it.
+		for (const path of keptPages()) keep(path);
+		keep(props.selected);
+		keep(props.editing?.path);
+		for (const path of boardDrag()?.paths ?? []) keep(path);
+		keep(boardResize()?.path);
+		// What is drawn on a board rather than in it: an agent's act, a mark, a cursor.
+		for (const path of actsByPath().keys()) keep(path);
+		for (const mark of props.marks ?? []) keep(mark.path);
+		keep(props.cursor?.path);
+		const next = [...found]
+			.sort((a, b) => a - b)
+			.map((at) => boards[at]!)
+			.filter((board) => board.path !== props.focus);
+		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
+		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
+	});
+
+	/** `rendered`, as a set to look a board up in. */
+	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+
 	/**
 	 * On screen as of the camera's last rest, with a tenth of the window to spare. A page loaded for
 	 * a board just off screen, ready for a pan, sleeps until then (`BoardFrame`, `asleep`): 48
@@ -3332,8 +3421,10 @@ export function Stage(props: {
 										 * A page still kept, asleep, wakes as soon as the camera is at the live zoom and it is in
 										 * reach, mid-gesture or not: it costs nothing to start again (`keptPages`), and waiting for the
 										 * zoom to rest kept a page already loaded behind its picture for another 300 to 400 ms.
+										 * Only the DOM renderer keeps pages; under the Canvas renderer a page started mid-pan
+										 * blanked the picture it draws into.
 										 */
-										keptPages().has(board.path)
+										props.renderer === "dom" && keptPages().has(board.path)
 										? liveNow() && isVisible(board)
 										: liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 							}
@@ -3397,14 +3488,7 @@ export function Stage(props: {
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 							{...(props.onBoardEval ? { onBoardEval: props.onBoardEval } : {})}
-							onSelect={() => {
-								// A press in a board is that board alone, unless it is part of the selection already.
-								if (!untrack(boardPicks).includes(board.path) && (untrack(boardPicks).length || untrack(penSelection).length)) {
-									setBoardPicks([]);
-									setPenSelection([]);
-								}
-								props.onSelect(board.path);
-							}}
+							onSelect={() => selectBoard(board.path)}
 							drag={(event) => (props.onPenEdit ? dragBoard(board.path, event) : false)}
 							shift={boardDrag()?.paths.includes(board.path) ? boardDrag() : undefined}
 							resized={boardResize()?.path === board.path ? boardResize() : undefined}
@@ -3421,20 +3505,6 @@ export function Stage(props: {
 						/>
 );
 
-	/*
-	 * The acts on each board, grouped once per change rather than filtered per frame: a
-	 * handful of agents at most, and every frame would otherwise walk the same record.
-	 */
-	const actsByPath = createMemo(() => {
-		const map = new Map<string, AgentAct[]>();
-		for (const act of Object.values(props.acts ?? {})) {
-			if (!act) continue;
-			const list = map.get(act.path);
-			if (list) list.push(act);
-			else map.set(act.path, [act]);
-		}
-		return map;
-	});
 
 	/*
 	 * Boards whose size just changed from outside a drag (`fit`, an agent's `resize`, a write that

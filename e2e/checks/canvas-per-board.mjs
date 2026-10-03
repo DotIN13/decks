@@ -23,7 +23,7 @@ say("the renderer is on", (await page.evaluate(() => document.querySelector(".st
 say("each board is a canvas with its page inside it", (await page.locator(".board-node canvas.picture iframe").count()) > 0);
 
 const node = page.locator(".board-node").first();
-await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
+await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
 await page.keyboard.press("1");
 await settle(page, 2500);
 await page.mouse.click(1395, 895);

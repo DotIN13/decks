@@ -226,7 +226,9 @@ export async function editMode(page, on = true) {
  */
 export async function liveZoom(page, { tries = 12 } = {}) {
 	await page.waitForSelector(".stage", { timeout: 30000 });
-	await page.waitForSelector(".board-node", { timeout: 30000 }).catch(() => {});
+	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
+	const boards = () => page.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
+	await page.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
 		await page.waitForTimeout(i === 0 ? 400 : 350);
 		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
@@ -236,7 +238,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 				.catch(() => {});
 			return true;
 		}
-		if ((await page.locator(".board-node").count()) === 0) return false;
+		if ((await boards()) === 0) return false;
 		await page.evaluate(() => {
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();
@@ -249,12 +251,10 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 export async function ready(page, { timeout = 30000 } = {}) {
 	/*
 	 * Below the device's live zoom a board is its picture on the stage's sheet and none has a
-	 * document (`Stage.tsx`, `data-live`): ready is the boards being on the stage, and the sheet
-	 * having drawn them.
+	 * document (`Stage.tsx`, `data-live`) and no node either: ready is the sheet having drawn them.
 	 */
 	await page.waitForSelector(".stage", { timeout });
 	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true")) {
-		await page.waitForSelector(".board-node", { timeout });
 		await page.waitForFunction(() => document.querySelector(".stage-sheet")?.hidden === false, null, { timeout });
 		return;
 	}
@@ -295,7 +295,7 @@ export async function still(page, { timeout = 5000 } = {}) {
  * before it emptied.
  */
 export async function emptyCanvas(page, { timeout = 15000 } = {}) {
-	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0, null, { timeout });
+	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksBoards?.().length ?? 0) === 0, null, { timeout });
 }
 
 /**
@@ -708,17 +708,19 @@ export function rangeOfAttr(html, attr, value) {
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
 export async function selectBoard(page, path, { timeout = 4000 } = {}) {
+	// A board below the live zoom has no node, only its picture on the stage's sheet (`Stage.tsx`): the stage says where it is.
 	const spot = () => page.evaluate((wanted) => {
 		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-		if (!node) return null;
-		const r = node.getBoundingClientRect();
+		const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+		if (!r) return null;
+		const stage = document.querySelector(".stage");
 		for (const fy of [0.08, 0.2, 0.35, 0.5, 0.65, 0.8]) {
 			for (const fx of [0.5, 0.25, 0.75, 0.1, 0.9]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
 				const hit = document.elementFromPoint(x, y);
-				if (hit && (hit.closest(".board-node") === node) && !hit.closest("a, button, input, textarea, select")) return { x, y };
+				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : hit === stage && window.__decksPictureAt?.(x, y) === wanted) return { x, y };
 			}
 		}
 		return null;
@@ -737,8 +739,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const off = await page.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			if (!node) return null;
-			const r = node.getBoundingClientRect();
+			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			if (!r) return null;
 			return { dx: r.x + r.width / 2 - innerWidth / 2, dy: r.y + r.height / 2 - innerHeight / 2 };
 		}, path);
 		if (off) {
@@ -751,8 +753,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	if (!at) {
 		const why = await page.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
-			if (!node) return "not on the canvas";
-			const r = node.getBoundingClientRect();
+			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			if (!r) return "not on the canvas";
 			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
 			return `at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}, its middle under ${hit?.tagName.toLowerCase()}.${String(hit?.className ?? "").split(" ")[0]}`;
 		}, path);

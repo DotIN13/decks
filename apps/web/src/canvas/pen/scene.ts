@@ -480,7 +480,8 @@ export class StageScene {
 		const boards = this.boardsInView(cssW, cssH);
 		this.wantPictures(this.boardsNear(cssW, cssH));
 		const useGpu = !!this.ck && (!this.drawingEmpty() || this.ink.length > 0) && !this.off.has("gpu");
-		const anyPicture = boards.some((b) => !b.live && this.hasPicture(b.path));
+		// A board with no page is drawn here, as its picture or, until that comes, as its paper.
+		const anyPicture = boards.some((b) => !b.live);
 		this.reportPictured(boards);
 		const anyNews = boards.some((b) => b.glow && b.news);
 		// Carried boards, with a picture to carry: a board with none keeps its page, which the stage moves.
@@ -600,20 +601,37 @@ export class StageScene {
 		const s = dpr * camera.zoom;
 		ctx.setTransform(s, 0, 0, s, dpr * (cssW / 2 - camera.x * camera.zoom), dpr * (cssH / 2 - camera.y * camera.zoom));
 		ctx.imageSmoothingQuality = "medium";
+		const sharp = NOTE_RADIUS * camera.zoom * dpr >= 0.5;
+		const paper = CARD_PALETTE[this.scheme].paper;
 		for (const board of boards) {
-			ctx.save();
-			ctx.beginPath();
-			if ("roundRect" in ctx) ctx.roundRect(board.x, board.y, board.w, board.h, NOTE_RADIUS);
-			else (ctx as CanvasRenderingContext2D).rect(board.x, board.y, board.w, board.h);
-			ctx.clip();
 			const entry = board.live ? undefined : this.entries.get(board.path);
-			if (entry?.bitmap) {
-				ctx.fillStyle = CARD_PALETTE[this.scheme].paper;
+			if (!board.live) {
+				// As on CanvasKit (`paintBoardsGpu`): paper, the picture cut at the board's foot, a clip only for a corner that shows.
+				if (sharp) {
+					ctx.save();
+					ctx.beginPath();
+					if ("roundRect" in ctx) ctx.roundRect(board.x, board.y, board.w, board.h, NOTE_RADIUS);
+					else (ctx as CanvasRenderingContext2D).rect(board.x, board.y, board.w, board.h);
+					ctx.clip();
+				}
+				ctx.fillStyle = paper;
 				ctx.fillRect(board.x, board.y, board.w, board.h);
-				ctx.drawImage(entry.bitmap, board.x, board.y, board.w, (board.w * entry.h) / entry.w);
-				entry.used = this.frameNo;
-			} else ctx.clearRect(board.x - 1, board.y - 1, board.w + 2, board.h + 2);
-			ctx.restore();
+				if (entry?.bitmap) {
+					const h = (board.w * entry.h) / entry.w;
+					const shown = Math.min(h, board.h);
+					ctx.drawImage(entry.bitmap, 0, 0, entry.bitmap.width, (entry.bitmap.height * shown) / h, board.x, board.y, board.w, shown);
+					entry.used = this.frameNo;
+				}
+				if (sharp) ctx.restore();
+			} else {
+				ctx.save();
+				ctx.beginPath();
+				if ("roundRect" in ctx) ctx.roundRect(board.x, board.y, board.w, board.h, NOTE_RADIUS);
+				else (ctx as CanvasRenderingContext2D).rect(board.x, board.y, board.w, board.h);
+				ctx.clip();
+				ctx.clearRect(board.x - 1, board.y - 1, board.w + 2, board.h + 2);
+				ctx.restore();
+			}
 		}
 		// The news mark of each board with no page, as `paintNewsGpu` draws it.
 		const width = NEWS_OUTLINE_PX / camera.zoom;
@@ -696,6 +714,8 @@ export class StageScene {
 
 	private paintBoardsGpu(canvas: Canvas, boards: SceneBoard[], surface: Surface): void {
 		const ck = this.ck!;
+		const paper = ck.parseColorString(CARD_PALETTE[this.scheme].paper);
+		const sharp = NOTE_RADIUS * this.camera.zoom * this.view.dpr >= 0.5;
 		for (const board of boards) {
 			const rect = ck.LTRBRect(board.x, board.y, board.x + board.w, board.y + board.h);
 			const rrect = ck.RRectXY(rect, NOTE_RADIUS, NOTE_RADIUS);
@@ -711,14 +731,25 @@ export class StageScene {
 				}
 			}
 			if (entry && image) {
-				canvas.save();
-				canvas.clipRRect(rrect, ck.ClipOp.Intersect, true);
-				this.boardPaint!.setColor(ck.parseColorString(CARD_PALETTE[this.scheme].paper));
+				// A corner under half a pixel on screen is a square one: no clip, which is most of a board's cost at 2%.
+				const round = sharp;
+				if (round) {
+					canvas.save();
+					canvas.clipRRect(rrect, ck.ClipOp.Intersect, true);
+				}
+				this.boardPaint!.setColor(paper);
 				canvas.drawRect(rect, this.boardPaint!);
+				// A picture taller than its board is cut at the board's foot, by its source rather than a clip.
 				const h = (board.w * entry.h) / entry.w;
-				canvas.drawImageRectOptions(image, ck.XYWHRect(0, 0, image.width(), image.height()), ck.XYWHRect(board.x, board.y, board.w, h), ck.FilterMode.Linear, ck.MipmapMode.None, null);
-				canvas.restore();
+				const shown = Math.min(h, board.h);
+				canvas.drawImageRectOptions(image, ck.XYWHRect(0, 0, image.width(), (image.height() * shown) / h), ck.XYWHRect(board.x, board.y, board.w, shown), ck.FilterMode.Linear, ck.MipmapMode.None, null);
+				if (round) canvas.restore();
 				entry.used = this.frameNo;
+			} else if (!board.live) {
+				// No picture yet and no page: the board's paper, where its page element used to show through.
+				this.boardPaint!.setColor(paper);
+				if (sharp) canvas.drawRRect(rrect, this.boardPaint!);
+				else canvas.drawRect(rect, this.boardPaint!);
 			} else canvas.drawRRect(rrect, this.clearPaint!);
 		}
 	}

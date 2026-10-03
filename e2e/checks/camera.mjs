@@ -85,7 +85,8 @@ await page.keyboard.press("0");
 await settle(page, 400);
 const fitted = await page.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();
-	const nodes = [...document.querySelectorAll(".board-node")].map((n) => n.getBoundingClientRect());
+	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
+	const nodes = window.__decksBoards().map((one) => one.rect);
 	return {
 		inside: nodes.every(
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,
@@ -514,7 +515,7 @@ say("a scroll landing on a board's outline pans the canvas", stuck.length === 0,
  */
 await page.keyboard.press("0");
 await settle(page, 900);
-await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
+await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
 await page.keyboard.press("1");
 await settle(page, 5000);
 await page.evaluate(() => {
