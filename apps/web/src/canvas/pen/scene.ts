@@ -188,8 +188,11 @@ async function pictureWidth(blob: Blob): Promise<number | undefined> {
 	}
 	return undefined;
 }
-/** Pictures fetched at once. The server takes two at a time; four keeps it busy. */
-const FETCHES = 4;
+/**
+ * Pictures fetched at once. The server renders a missing one two at a time, but most are on its disk
+ * already and come back in about 16 ms, so the limit is the browser's six connections to a server.
+ */
+const FETCHES = 6;
 /** How long after a stand-in picture the real one is asked for again, and how many times. */
 const STAND_IN_RETRY_MS = 2500;
 const STAND_IN_TRIES = 24;
@@ -274,6 +277,8 @@ export class StageScene {
 
 	private readonly entries = new Map<string, PictureEntry>();
 	private fetching = 0;
+	/** The boards the last frame wanted pictures for, so a fetch that lands can start the next without waiting for a frame. */
+	private lastWanted: SceneBoard[] = [];
 	private pictured = "";
 
 	/** The two canvases: a 2D one for boards alone, and CanvasKit's once the drawing has anything in it. */
@@ -824,6 +829,7 @@ export class StageScene {
 
 	/** Fetch and decode what the boards on the sheet need, nearest the middle first. */
 	private wantPictures(boards: SceneBoard[]): void {
+		this.lastWanted = boards;
 		const { zoom } = this.camera;
 		const still = !this.cameraMoving && performance.now() - this.movedAt >= SETTLE_MS;
 		const middle = { x: this.camera.x, y: this.camera.y };
@@ -877,7 +883,14 @@ export class StageScene {
 			.finally(() => {
 				entry.fetching = false;
 				this.fetching--;
-				if (!this.disposed) this.again();
+				if (this.disposed) return;
+				/*
+				 * The next fetch, and this picture's decode, start now rather than with the next frame: a frame
+				 * of a big sheet takes 150 to 250 ms, and asking only then let 83 pictures arrive four at a
+				 * time over 5.7 seconds when the server answered each in 16 ms.
+				 */
+				this.wantPictures(this.lastWanted);
+				this.again();
 			});
 	}
 
