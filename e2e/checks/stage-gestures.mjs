@@ -104,7 +104,7 @@ const onDisk = () => {
 	return lastRead;
 };
 const item = (id) => onDisk().children.find((n) => n.id === id);
-await until(() => page.evaluate(() => document.querySelectorAll('.pen-hits [data-id="g-b"]').length === 1));
+await until(() => page.evaluate(() => !!window.__decksPenBox?.("g-b")));
 await settle(page, 300);
 const centre = async (id) => {
 	const n = item(id);
@@ -116,9 +116,8 @@ const drawnWhereFileSays = (id) =>
 	until(async () => {
 		const want = await centre(id);
 		return page.evaluate(({ id, want }) => {
-			const hit = document.querySelector(`.pen-hits [data-id="${id}"]`);
-			if (!hit) return false;
-			const r = hit.getBoundingClientRect();
+			const r = window.__decksPenBox?.(id);
+			if (!r) return false;
 			return Math.abs(r.x + r.width / 2 - want.x) < 3 && Math.abs(r.y + r.height / 2 - want.y) < 3;
 		}, { id, want });
 	}, 4000);
@@ -396,7 +395,7 @@ let ITEM_WASH = "";
 {
 	await drawnWhereFileSays("g-a");
 	const a = await centre("g-a");
-	const touch = (type, id, x, y, target = ".pen-hits") =>
+	const touch = (type, id, x, y, target = ".stage") =>
 		page.evaluate(({ type, id, x, y, target }) => {
 			const t = type === "pointerdown" ? document.elementFromPoint(x, y) : document.querySelector(target) ?? window;
 			t.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 31, clientX: x, clientY: y, bubbles: true, composed: true, buttons: type === "pointerup" ? 0 : 1 }));
@@ -442,20 +441,20 @@ let ITEM_WASH = "";
 {
 	const at = item("g-b");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "g-note", content: "Words to edit" }, box: { x1: at.x, y1: at.y + at.height + Math.round(60 / m.a) } }] });
-	await until(() => page.evaluate(() => !!document.querySelector('.pen-hits [data-id="g-note"]')));
+	await until(() => page.evaluate(() => !!window.__decksPenBox?.("g-note")));
 	// A note is as tall as its words, so the file has no size for it: aim at what is drawn.
 	await settle(page, 400);
 	const c = await page.evaluate(() => {
-		const r = document.querySelector('.pen-hits [data-id="g-note"]').getBoundingClientRect();
+		const r = window.__decksPenBox("g-note");
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	});
 	await page.mouse.dblclick(c.x, c.y);
 	const fit = await until(() => page.evaluate(() => {
 		const editor = document.querySelector(".pen-text");
-		const hit = document.querySelector('.pen-hits [data-id="g-note"]');
+		const hit = window.__decksPenBox?.("g-note");
 		if (!editor || !hit) return undefined;
 		const e = editor.getBoundingClientRect();
-		const h = hit.getBoundingClientRect();
+		const h = hit;
 		return { dx: Math.abs(e.x - h.x), dy: Math.abs(e.y - h.y), dw: Math.abs(e.width - h.width), handles: document.querySelectorAll(".pen-handle").length };
 	}), 3000);
 	say("double-clicking a note opens an editor exactly on it, with no handles over it", !!fit && fit.dx < 2 && fit.dy < 2 && fit.dw < 2 && fit.handles === 0, JSON.stringify(fit));
@@ -481,14 +480,14 @@ let ITEM_WASH = "";
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
 	const at = await page.evaluate(() => {
-		const r = document.querySelector('.pen-hits [data-id="g-note"]').getBoundingClientRect();
+		const r = window.__decksPenBox("g-note");
 		return { x: r.x, y: r.y + r.height + 40 };
 	});
 	await page.keyboard.press("c");
 	await page.mouse.click(at.x, at.y);
 	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.markdown"));
 	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 3000);
-	const height = () => page.evaluate((id) => document.querySelector(`.pen-hits [data-id="${id}"]`)?.getBoundingClientRect().height ?? 0, card?.id);
+	const height = () => page.evaluate((id) => window.__decksPenBox?.(id)?.height ?? 0, card?.id);
 	const before = await until(height, 3000);
 	await page.keyboard.type("# A heading\n\nA paragraph long enough to wrap onto a second and then a third line of the card\n\n- a point\n- another");
 	const grown = await until(async () => (await height()) > before * 1.3, 3000);

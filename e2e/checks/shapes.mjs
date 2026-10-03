@@ -127,16 +127,14 @@ await page.mouse.click(spots[1].x, spots[1].y);
 const second = await until(() => shapesNow().find((n) => !had2.has(n.id)));
 say("a second shape, a Process", second?.metadata?.kind === "Process");
 // Select the first again, and draw from its bottom side to the second, once the page has drawn it.
-await until(() => page.locator(`.pen-hit[data-id="${second?.children?.[0]?.id}"]`).count());
-// A shape is clicked on its outline, which has the click shape (`pen/layer.ts`).
+await until(() => page.evaluate((id) => !!window.__decksPenBox?.(id), second?.children?.[0]?.id));
+// A shape is clicked on its outline; the page says where it draws it (`__decksPenBox`, `Stage.tsx`).
 const first = await page.evaluate((id) => {
-	const el = document.querySelector(`.pen-hit[data-id="${id}"]`);
-	const r = el?.getBoundingClientRect();
+	const r = window.__decksPenBox?.(id);
 	return r ? { x: r.x + r.width / 2, y: r.y + r.height / 3 } : undefined;
 }, made?.children?.find((n) => n.type === "path")?.id);
 const target = await page.evaluate((id) => {
-	const el = document.querySelector(`.pen-hit[data-id="${id}"]`);
-	const r = el?.getBoundingClientRect();
+	const r = window.__decksPenBox?.(id);
 	return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined;
 }, second?.children?.find((n) => n.type === "path")?.id);
 if (first && target) {
@@ -158,7 +156,7 @@ if (first && target) {
 			say("words on an arrow are its label", !!worded);
 		}
 	}
-} else say("both shapes are on screen", false, JSON.stringify({ first, target, ids: [made?.id, second?.id], hits: await page.evaluate(() => [...document.querySelectorAll(".pen-hit")].map((el) => el.dataset.id)) }));
+} else say("both shapes are on screen", false, JSON.stringify({ first, target, ids: [made?.id, second?.id], boxes: await page.evaluate((ids) => ids.map((id) => !!window.__decksPenBox?.(id)), [made?.id, second?.id]) }));
 
 say("no errors in the page", errors.length === 0, errors.join(" | "));
 link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.metadata?.type === "decks.shape" || n.metadata?.type === "decks.arrow" || n.id === "shapes-anchor").map((n) => ({ op: "delete", id: n.id })) });

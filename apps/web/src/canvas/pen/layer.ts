@@ -41,7 +41,7 @@ const PICTURE_WIDEST = coarse ? 1024 : 2048;
 
 /**
  * The stage's drawing, as the page sees it: one `<canvas>` among the boards, and a layer of
- * invisible shapes that catches clicks on what is drawn.
+ * invisible shapes that catches clicks on what is drawn over a board.
  *
  * **Painted somewhere else.** The drawing and the boards' pictures are laid out and painted by
  * `StageScene` (`scene.ts`), in a worker (`scene.worker.ts`) wherever the browser can paint in
@@ -85,6 +85,13 @@ export class PenLayer {
 	private placedIndex: BoxIndex = new BoxIndex([]);
 	/** The stage rectangle the click shapes are written for: the window and one window round it. */
 	private hitWindow: Rect | undefined;
+	/**
+	 * The boards, filed by where they are. A click shape is only needed where a drawn item lies over a
+	 * board, to take the press from the board's page; on bare canvas the stage has the press already and
+	 * `hitTest` answers it. 3,192 shapes on a stage of 3,000 items cost a pan 191 ms a step at 4×.
+	 */
+	private boardIndex: BoxIndex = new BoxIndex([]);
+	private boardBoxes = "";
 	private view = { width: 0, height: 0 };
 	/** Called after every new layout, so the stage can redraw a selection around what moved. */
 	drawn: (() => void) | undefined;
@@ -468,6 +475,12 @@ export class PenLayer {
 		if (key === this.boardKey) return;
 		this.boardKey = key;
 		this.send({ type: "boards", boards: boards.map((b) => ({ ...b })) });
+		const boxes = boards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
+		if (boxes !== this.boardBoxes) {
+			this.boardBoxes = boxes;
+			this.boardIndex = new BoxIndex(boards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
+			this.writeHits();
+		}
 	}
 
 	setScheme(scheme: "light" | "dark"): void {
@@ -579,6 +592,8 @@ export class PenLayer {
 			let top = placed;
 			while (top.parent) top = this.placed.get(top.parent) ?? top;
 			if (top.parent) continue;
+			const box = this.bounds.get(placed.node.id) ?? placed.box;
+			if (this.boardIndex.search(box).length === 0) continue;
 			add(placed);
 		}
 		svg.replaceChildren(...shapes);

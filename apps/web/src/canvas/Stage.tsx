@@ -1026,8 +1026,23 @@ export function Stage(props: {
 		unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
 		props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 	};
-	/** A press on a drawn item's click shape (`pen/layer.ts`), which is over the boards. */
+	/**
+	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
+	 * the press from the board's page; on bare canvas the press is the stage's and `hitTest` finds the item.
+	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
+	/** A press on something drawn, whether or not it lies over a board. */
+	const pressOnDrawn = (event: PointerEvent) => onDrawn(event.target) || (event.target === element && !!penLayer.hitTest(worldAt(event)));
+	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
+	(globalThis as { __decksPenBox?: (id: string) => DOMRect | undefined }).__decksPenBox = (id) => {
+		const placed = penLayer.placed.get(id);
+		if (!placed || !element) return undefined;
+		const box = penLayer.bounds.get(id) ?? placed.box;
+		const a = toScreen(localCamera, view(), { x: box.x, y: box.y });
+		const b = toScreen(localCamera, view(), { x: box.x + box.w, y: box.y + box.h });
+		const r = element.getBoundingClientRect();
+		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
+	};
 	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
 	const onCanvas = (target: EventTarget | null) => target === element || onDrawn(target);
 	/** The ink on the stage, each stroke in stage pixels, for the eraser and the lasso. */
@@ -2974,7 +2989,7 @@ export function Stage(props: {
 				return;
 			}
 			beginTouch(event);
-			if (pen && onDrawn(event.target)) touchOnDrawing(event);
+			if (pen && pressOnDrawn(event)) touchOnDrawing(event);
 			else if (pen) tapToDeselect(event);
 			return;
 		}
