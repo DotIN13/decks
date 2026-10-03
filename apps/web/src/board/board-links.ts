@@ -98,10 +98,13 @@ export function deckBoardLink(href: string, base: string): string | undefined {
 		return undefined;
 	}
 	if (url.origin !== from.origin) return undefined;
-	const parts = from.pathname.split("/").filter(Boolean);
+	let parts = from.pathname.split("/").filter(Boolean);
+	// On another connection the same path is under `/c/<id>` (`connections/connection.ts`).
+	const prefix = parts[0] === "c" && parts.length > 2 ? `/c/${parts[1]}` : "";
+	if (prefix) parts = parts.slice(2);
 	// `/api/f/<deck>/stages/<name>/` — the deck is everything before the last two.
 	if (parts.length < 4 || parts[0] !== "api" || parts[1] !== "f") return undefined;
-	const root = `/${parts.slice(0, -2).join("/")}/`;
+	const root = `${prefix}/${parts.slice(0, -2).join("/")}/`;
 	if (!url.pathname.startsWith(root)) return undefined;
 	const path = url.pathname
 		.slice(root.length)

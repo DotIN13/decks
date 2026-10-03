@@ -51,3 +51,9 @@ export function receiveToolResult(itemId: string, result: string): void {
 export function forgetAskedResults(): void {
 	setAsked(new Set<string>());
 }
+
+/** No outputs held or asked: a switch to another backend (`connections/switch.ts`). */
+export function resetToolResults(): void {
+	setHeld(new Map<string, string>());
+	setAsked(new Set<string>());
+}

@@ -8,6 +8,7 @@ import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../browser/bridge.ts";
+import type { Pairing } from "../share/pairing.ts";
 import type { View } from "../ws.ts";
 import type { DeckAgent } from "../agents/session.ts";
 
@@ -73,6 +74,9 @@ export interface WireContext {
 	/** What each agent is doing to which board, for the cursors the canvas draws (`agents/acts.ts`). */
 	readonly acts: Acts;
 	readonly web: WebBridge;
+	/** Other Decks front ends allowed in (`share/pairing.ts`). */
+	readonly pairing: Pairing;
+	pairingMessage(): ServerMessage;
 	readonly claudeAccounts: ClaudeAccounts;
 	/**
 	 * The stage, for the one frame that runs a board's own code (`wire/boards.ts`).

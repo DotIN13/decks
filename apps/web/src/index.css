@@ -41,6 +41,7 @@
 @import "./styles/marks.css";
 @import "./styles/markdown.css";
 @import "./styles/composer.css";
+@import "./styles/connections.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.

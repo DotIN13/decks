@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
@@ -244,7 +245,7 @@ export function Present(props: {
 				 * flow document wants the opposite — the window *is* its rectangle, and the
 				 * flag's `overflow: hidden` would take away the scrolling it is there to do.
 				 */
-				src={`/api/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`}
+				src={api(`/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`)}
 				/* A board is shown at the size it was written at, which is the size it is read at
 				    on the canvas. A board that had to be wrapped in a shell — a markdown file or a
 				    page from somewhere else — is a document nobody measured: CSS gives that one the

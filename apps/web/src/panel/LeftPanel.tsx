@@ -1,3 +1,5 @@
+import { Switcher } from "../connections/Switcher.tsx";
+import { can } from "../connections/backend.ts";
 import type { Board, DeckPen } from "@decks/protocol";
 import Rows2 from "lucide-solid/icons/rows-2";
 import Rows3 from "lucide-solid/icons/rows-3";
@@ -5,7 +7,7 @@ import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { DecksMark, Icon } from "../ui/icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { BoardRow } from "./BoardRow.tsx";
 import { basename as basenameOf, panelSections } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
@@ -589,13 +591,14 @@ export function LeftPanel(props: {
 						}}
 					/>
 				</Show>
-				<Show when={!sheet()}>
-					{/* The deck's mark, where a title bar would have put it. One deck, one word. */}
-					<div class="panel-mark" aria-hidden="true">
-						<span class="panel-mark-glyph"><DecksMark size={14} /></span>
-						<span class="panel-mark-name">Decks</span>
-					</div>
-				</Show>
+				{/*
+					The deck's mark, where a title bar would have put it, and now the switcher too: it names
+					the backend this tab is on and opens the others (`connections/Switcher.tsx`). On a phone
+					as well, since it is the only way to another server there.
+				*/}
+				<div class="panel-mark">
+					<Switcher />
+				</div>
 				{/*
 					The header: which list, then a field over it.
 
@@ -612,7 +615,8 @@ export function LeftPanel(props: {
 					under the 44px the panel uses for anything pressed.
 				*/}
 				<div class="flex flex-none flex-col gap-2 pb-3">
-					<Show when={props.chats}>
+					{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
+					<Show when={props.chats && can("agents")}>
 						{/*
 							The app's `.segmented`, at `h-8` — 28px buttons inside 2px of padding is a 32px
 							strip, matching the field below it. The removed Context/Deck strip was the

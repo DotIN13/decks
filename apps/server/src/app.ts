@@ -16,6 +16,7 @@ import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
+import { Pairing } from "./share/pairing.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -61,6 +62,8 @@ export class App {
 	readonly boards: BoardService;
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
+	/** Other Decks front ends allowed to use this server (`share/pairing.ts`). */
+	readonly pairing: Pairing;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
@@ -226,6 +229,7 @@ export class App {
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false, "whole"));
 		};
+		this.pairing = new Pairing(join(deck.path, ".decks", "pairing.json"));
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
@@ -611,6 +615,8 @@ export class App {
 	greet(reply: (message: ServerMessage) => void, view?: View): void {
 		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
 		if (view) view.focused = this.agents.looking()?.id;
+		// Who is answering, first: a front end that holds several connections draws its controls from it.
+		reply({ type: "backend", backend: { name: this.deck.name, can: { agents: true, write: true, share: true } } });
 		reply({ type: "deck.state", deck: this.stageState() });
 		/*
 		 * And what this install can run.
@@ -644,6 +650,13 @@ export class App {
 		reply(this.stagesMessage());
 		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
 		reply(this.settingsMessage());
+		reply(this.pairingMessage());
+	}
+
+	/** The code on show and every front end holding a token, for Settings. */
+	pairingMessage(): ServerMessage {
+		const shown = this.pairing.current();
+		return { type: "pairing", ...(shown ? { code: shown.code, expires: shown.expires } : {}), paired: this.pairing.list() };
 	}
 
 	settingsMessage(): ServerMessage {

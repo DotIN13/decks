@@ -102,6 +102,8 @@ export function createAgentScratch() {
 		/** Read without creating — for the guards, which ask about agents that may be gone. */
 		peek: (id: string): AgentScratch | undefined => held.get(id),
 		forget: (id: string) => void held.delete(id),
+		/** Every agent's, for a switch to another backend, where the same id may be somebody else. */
+		clear: () => void held.clear(),
 		/**
 		 * Drop what a dead connection was asked.
 		 *

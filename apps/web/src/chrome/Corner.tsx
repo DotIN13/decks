@@ -269,6 +269,7 @@ export function Corner(props: {
 						ref={api.ref}
 						type="button"
 						class="icon-button max-[640px]:hidden"
+						data-writes
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
@@ -301,6 +302,7 @@ export function Corner(props: {
 			<button
 				type="button"
 				class="icon-button max-[640px]:hidden"
+				data-writes
 				disabled={props.onCanvas === 0}
 				title={
 					props.onCanvas === 0
@@ -346,6 +348,7 @@ export function Corner(props: {
 				<button
 					type="button"
 					class="icon-button isolate-button max-[640px]:hidden"
+					data-writes
 					data-on={props.isolated ? "true" : undefined}
 					aria-pressed={props.isolated === true}
 					title={props.isolated ? "Isolated: this agent sees only the boards on its stage. Press to let it see the deck." : "Isolate: let this agent see only the boards on its stage"}
@@ -362,6 +365,7 @@ export function Corner(props: {
 			<button
 				type="button"
 				class="icon-button max-[1100px]:hidden pointer-coarse:hidden"
+				data-writes
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
 				title={

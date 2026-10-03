@@ -86,9 +86,16 @@
 	 * look at one: there is no app to ask, so every path stays relative and the
 	 * out-of-deck embeds are the only thing that does not work.
 	 */
+	/**
+	 * Where this page's server is: `/api`, or `/c/<id>/api` when the board came from another server
+	 * or a canvas file through one of the app's connections (`web/src/connections`). Every address
+	 * this file builds starts here, so a board on the second server asks the second server.
+	 */
+	const API = `${location.pathname.match(/^(\/c\/[a-z0-9]+)\/api\//)?.[1] ?? ""}/api`;
+
 	const BOARD_PATH = (() => {
-		const match = location.pathname.match(/^\/api\/board\/(.+)$/);
-		return match ? decodeURIComponent(match[1]) : null;
+		if (!location.pathname.startsWith(`${API}/board/`)) return null;
+		return decodeURIComponent(location.pathname.slice(`${API}/board/`.length));
 	})();
 
 	/**
@@ -109,16 +116,18 @@
 		const path = String(raw ?? "").trim();
 		if (!path) return null;
 		if (/^(https?|data|blob):/i.test(path)) return path;
-		if (path.startsWith("/api/f/") || path.startsWith("/api/file")) return path;
+		if (path.startsWith(`${API}/f/`) || path.startsWith(`${API}/file`)) return path;
+		// Written for this server's own page: the same file, under this page's connection.
+		if (path.startsWith("/api/f/") || path.startsWith("/api/file")) return API + path.slice(4);
 		if (!BOARD_PATH) return path;
 
 		if (!path.startsWith("~") && !path.startsWith("/")) {
 			const resolved = new URL(path, location.href);
-			if (resolved.origin === location.origin && resolved.pathname.startsWith("/api/board/")) {
+			if (resolved.origin === location.origin && resolved.pathname.startsWith(`${API}/board/`)) {
 				return resolved.pathname + resolved.search;
 			}
 		}
-		return `/api/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(BOARD_PATH)}`;
+		return `${API}/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(BOARD_PATH)}`;
 	}
 
 	const nameOf = (path) => String(path).split("/").filter(Boolean).pop() ?? String(path);
@@ -164,7 +173,7 @@
 	 * Opened as a plain file with no app above it, a board link opens in a tab as well: there
 	 * is nobody to ask, and a new tab beats losing the board being read.
 	 */
-	const BOARD_PREFIX = "/api/board/";
+	const BOARD_PREFIX = `${API}/board/`;
 	/** What a board file is called (`deck/kinds.ts`): the one thing about a board that a link can be read against. */
 	const BOARD_FILE = /\.(?:html?|mdx?)$/i;
 

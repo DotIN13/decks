@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-public/
 *.tsbuildinfo
 .DS_Store
 
@@ -11,6 +12,7 @@ dist/
 # The dev server's data directory (DECKS_DATA_DIR defaults to it via `npm run dev`).
 # One person's working deck is not the project.
 /data/
+/data2/
 
 # A copy of runtime/lib, so a board in the example deck is standalone. Written by the
 # server when it opens the deck (`App.refreshLib`), and committing it would duplicate

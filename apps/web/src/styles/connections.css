@@ -1,0 +1,151 @@
+@layer components {
+	/*
+	 * The connection switcher at the top of the left panel (`connections/Switcher.tsx`), and what a
+	 * backend that can only be read takes off the screen.
+	 *
+	 * The switcher is the deck's mark grown into a button: the same tile, the backend's name beside it
+	 * where "Decks" was, and a chevron. It fills the 32px row the mark had, so nothing under it moves.
+	 */
+	.panel-mark:has(> .switcher) {
+		padding: 0;
+	}
+	.switcher {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		width: 100%;
+		min-width: 0;
+		height: 32px;
+		padding: 0 8px 0 6px;
+		border: 0;
+		border-radius: var(--radius-item);
+		background: transparent;
+		color: var(--fg);
+		cursor: pointer;
+	}
+	.switcher:hover,
+	.switcher[data-on] {
+		background: var(--line);
+	}
+	.switcher-name {
+		min-width: 0;
+		overflow: hidden;
+		font-size: var(--type-body);
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.switcher-tag {
+		flex: none;
+		padding: 1px 6px;
+		border-radius: 999px;
+		background: var(--line);
+		color: var(--muted);
+		font-size: var(--type-micro);
+	}
+	.switcher > svg:last-child {
+		margin-left: auto;
+	}
+
+	/* Reachable, not reachable, or not asked yet: the dot beside each backend. */
+	.switcher-dot {
+		flex: none;
+		width: 7px;
+		height: 7px;
+		margin: 0 4px 0 2px;
+		border-radius: 50%;
+		background: var(--faint);
+	}
+	.switcher-dot[data-reach="ok"] {
+		background: var(--color-ok);
+	}
+	.switcher-dot[data-reach="off"],
+	.switcher-dot[data-reach="unpaired"] {
+		background: var(--color-danger);
+	}
+	.switcher-card .row-act[data-on="true"] .row-label {
+		font-weight: 600;
+	}
+
+	.switcher-form {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 8px 6px 6px;
+	}
+	.switcher-label {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		font-size: var(--type-note);
+		color: var(--muted);
+	}
+	.switcher-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 6px;
+	}
+	.switcher-error {
+		margin: 4px 6px;
+		color: var(--color-danger);
+		font-size: var(--type-note);
+		line-height: 1.4;
+	}
+
+	/* The code another Decks types, large enough to read off across a desk. */
+	.pair-code {
+		font-size: var(--type-body);
+		font-weight: 600;
+		letter-spacing: 0.12em;
+		color: var(--fg);
+	}
+
+	/*
+	 * A backend that cannot write (`BackendInfo.can`): a canvas opened from a file. Its controls are
+	 * not drawn rather than drawn and refused: no composer, no conversation, no drawing tools, and in
+	 * the pill nothing but the panel button and the camera.
+	 */
+	.app[data-reader] :is(.dock, .stream, .pen-tools, .pen-bar),
+	.app[data-reader] .pill :is(.pill-agent, .new-agent, .mode-set, .pill-sep),
+	.app[data-reader] [data-writes] {
+		display: none !important;
+	}
+
+	/* No backend yet: one card in the middle of the ground (`connections/Start.tsx`). */
+	.start-page {
+		display: grid;
+		place-items: center;
+		height: 100%;
+		padding: 24px;
+		background: var(--bg);
+	}
+	.start-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		width: min(360px, 100%);
+		padding: 28px 24px 20px;
+		text-align: center;
+	}
+	.start-card h1 {
+		margin: 0;
+		font-size: 18px;
+	}
+	.start-card p {
+		margin: 0 0 6px;
+		color: var(--muted);
+		line-height: 1.45;
+	}
+	.start-mark {
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+	}
+	.start-switcher {
+		width: 100%;
+		margin: 0;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-item);
+	}
+}

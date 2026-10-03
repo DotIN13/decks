@@ -8,6 +8,7 @@ import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
 import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
+import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
 import type { AlertPrefs } from "../alerts/policy.ts";
 
@@ -193,6 +194,7 @@ export function Settings(props: {
 
 					<TimeSettings />
 					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
+					<OtherDecks />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
 			</div>
@@ -319,6 +321,80 @@ function Row(props: {
 				</button>
 			</Show>
 		</div>
+	);
+}
+
+/**
+ * Other Decks front ends using this server (`server/src/share/pairing.ts`).
+ *
+ * A code made here is typed into the other Decks' "Connect a server"; it lasts ten minutes and works
+ * once. Each front end that paired is a row, with a way to take its token back. Only on a backend
+ * that can share: a canvas opened from a file has no one to let in.
+ */
+function OtherDecks() {
+	const [now, setNow] = createSignal(Date.now());
+	const tick = setInterval(() => setNow(Date.now()), 1000);
+	onCleanup(() => clearInterval(tick));
+	const shown = () => {
+		const one = pairing();
+		return one.code && one.expires && one.expires > now() ? { code: one.code, left: Math.max(1, Math.round((one.expires - now()) / 60_000)) } : undefined;
+	};
+	const ago = (at: number) => {
+		const minutes = Math.round((Date.now() - at) / 60_000);
+		if (minutes < 2) return "just now";
+		if (minutes < 120) return `${minutes} min ago`;
+		const hours = Math.round(minutes / 60);
+		return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
+	};
+	return (
+		<Show when={can("share")}>
+			<section class="set-group" data-group="other-decks">
+				<header>
+					<span class="set-title">Other Decks</span>
+					<span class="set-note">Another Decks on this machine, your network or your tailnet connects with the address alone. Over the internet it also needs a code from here, typed under Connect a server.</span>
+				</header>
+				<div class="row-list set-rows">
+					<div class="row-act" data-row-static>
+						<div class="min-w-0 flex-1" data-row>
+							<span class="row-label w-full items-baseline">
+								<span class="truncate">Pairing code</span>
+							</span>
+							<span class="row-note flex w-full items-baseline gap-1.5">
+								<Show when={shown()} fallback={<span class="truncate text-muted">None on show</span>}>
+									{(code) => (
+										<>
+											<span class="pair-code font-mono" data-pair-code>{code().code}</span>
+											<span class="truncate text-muted">works once, for {code().left} min</span>
+										</>
+									)}
+								</Show>
+							</span>
+						</div>
+						<button class="set-mini" type="button" data-make-pair-code onClick={() => send({ type: "pair.code" })}>
+							{shown() ? "New code" : "Make a code"}
+						</button>
+					</div>
+					<For each={pairing().paired}>
+						{(row) => (
+							<div class="row-act" data-row-static>
+								<div class="min-w-0 flex-1" data-row>
+									<span class="row-label w-full items-baseline">
+										<span class="truncate">{row.label}</span>
+									</span>
+									<span class="row-note flex w-full items-baseline gap-1.5">
+										<span class="truncate font-mono text-muted">{row.origin || "unknown site"}</span>
+										<span class="flex-none text-faint">{row.last ? `used ${ago(row.last)}` : `paired ${ago(row.at)}`}</span>
+									</span>
+								</div>
+								<button class="set-mini" type="button" title="It will have to pair again with a new code" onClick={() => send({ type: "pair.revoke", id: row.id })}>
+									Revoke
+								</button>
+							</div>
+						)}
+					</For>
+				</div>
+			</section>
+		</Show>
 	);
 }
 

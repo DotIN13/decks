@@ -1,3 +1,4 @@
+import { api } from "../../connections/connection.ts";
 import type { Board } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { thumbUrl } from "../../lib/api.ts";
@@ -109,7 +110,7 @@ export async function takeSnapshot(frame: HTMLIFrameElement, board: Board): Prom
 	const html = snapshotOf(doc);
 	const scheme = document.documentElement.dataset.colorScheme === "dark" ? "dark" : "light";
 	const query = new URLSearchParams({ path: board.path, w: String(board.w), h: String(heightOf(doc, board)), scheme });
-	const answer = await fetch(`/api/snapshot?${query}`, { method: "POST", headers: { "Content-Type": "text/html" }, body: html });
+	const answer = await fetch(api(`/snapshot?${query}`), { method: "POST", headers: { "Content-Type": "text/html" }, body: html });
 	return answer.ok ? await answer.blob() : undefined;
 }
 
@@ -232,4 +233,9 @@ export async function seenPicture(board: Board): Promise<{ how: "canvas" | "snap
 	let binary = "";
 	for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
 	return { how, mime: blob.type || "image/png", data: btoa(binary) };
+}
+
+/** No pictures held: they were of the last backend's boards (`connections/switch.ts`). */
+export function resetTaken(): void {
+	setTaken(new Map());
 }

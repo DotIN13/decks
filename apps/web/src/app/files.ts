@@ -11,6 +11,20 @@ import { selected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { setDraft } from "../state/ui.ts";
 import { embedPath, mayUpload, uploadAsset } from "./upload.ts";
+import { openBundle } from "../connections/bundle.ts";
+import { can } from "../connections/backend.ts";
+import { switchTo } from "../connections/connection.ts";
+import { ensureWorker } from "../connections/worker.ts";
+
+/** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
+async function openDroppedBundle(file: File): Promise<void> {
+	try {
+		await ensureWorker();
+		switchTo(await openBundle(file));
+	} catch (failed) {
+		notice("warn", (failed as Error).message);
+	}
+}
 
 /** The heading a board made by a drop starts under, and where its first row sits. */
 const FIRST_ROW = 152;
@@ -390,6 +404,16 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		onMount(() => {
 			onCleanup(
 				guardDocumentDrops(document, (at, files) => {
+					// A canvas file opens as a canvas, wherever it lands (`connections/`).
+					const bundle = files.find((file) => /\.decks$/i.test(file.name));
+					if (bundle) {
+						void openDroppedBundle(bundle);
+						return;
+					}
+					if (!can("write")) {
+						notice("info", "This canvas was opened from a file, so it can only be read.");
+						return;
+					}
 					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node, .bar-layer .chrome");
 					// While the timeline is being previewed the frames take no pointer events, so
 					// every drop arrives here — and "zoom in" would be a lie about why.

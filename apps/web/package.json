@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "build:public": "tsc -p tsconfig.json --noEmit && VITE_DECKS_PUBLIC=1 vite build --outDir dist-public"
   },
   "dependencies": {
     "@decks/board-kit": "*",

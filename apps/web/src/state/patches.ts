@@ -1,5 +1,5 @@
 import type { BoardPatch } from "@decks/protocol";
-import { createStore } from "solid-js/store";
+import { createStore, reconcile } from "solid-js/store";
 import { state } from "./deck.ts";
 import { send } from "./socket.ts";
 
@@ -258,4 +258,12 @@ export function forgetPatches(path: string): void {
 	patching.delete(path);
 	queued.delete(path);
 	setFrameRevs(path, 0);
+}
+
+/** Nothing in flight and nothing pinned: a switch to another backend (`connections/switch.ts`). */
+export function resetPatches(): void {
+	selfRevs.clear();
+	patching.clear();
+	queued.clear();
+	setFrameRevs(reconcile({}));
 }

@@ -1,3 +1,4 @@
+import { setBackend, setPairing } from "../connections/backend.ts";
 import { stageOf } from "../state/stages.ts";
 import { handsOn } from "../camera/touched.ts";
 import { seenPicture } from "../canvas/shots/adaptors.ts";
@@ -106,6 +107,14 @@ function letActGo(agentId: string, at: number): void {
 
 export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 	switch (message.type) {
+				case "backend":
+					setBackend(message.backend);
+					return;
+				case "pairing": {
+					const { type: _type, ...rest } = message;
+					setPairing(rest);
+					return;
+				}
 				case "runtimes":
 					// A property of the machine rather than of the deck, so it travels beside
 					// the greeting instead of inside it.

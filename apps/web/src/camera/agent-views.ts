@@ -1,3 +1,4 @@
+import { storageKey } from "../connections/connection.ts";
 import type { Camera } from "@decks/protocol";
 import type { AgentView } from "./agent-view.ts";
 
@@ -58,7 +59,8 @@ const cache = new Map<string, AgentViews>();
 export function agentViews(deckPath: string): AgentViews {
 	const found = cache.get(deckPath);
 	if (found) return found;
-	const made = createAgentViews(deckPath);
+	// Per backend as well: two servers can each have a deck at the same path (`connections/`).
+	const made = createAgentViews(storageKey(deckPath));
 	cache.set(deckPath, made);
 	return made;
 }

@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import { AgentCursor } from "../canvas/AgentCursor.tsx";
 import { touchedCanvas } from "../camera/touched.ts";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
@@ -522,7 +523,7 @@ export function BoardFrame(props: {
 	 */
 	const shifted = () => (props.shift && !props.carried && !props.origin && !props.resized && !ghost() ? `translate(${props.shift.dx}px, ${props.shift.dy}px)` : undefined);
 	const frameSrc = () => {
-		if (props.previewSha) return `/api/revision/${props.previewSha}`;
+		if (props.previewSha) return api(`/revision/${props.previewSha}`);
 		// 0 means unpinned: show whatever the board now is.
 		const rev = props.showRev && props.showRev > 0 ? props.showRev : props.board.rev;
 		const url = boardUrl({ path: props.board.path, rev });

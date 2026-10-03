@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import Lock from "lucide-solid/icons/lock";
 import Pencil from "lucide-solid/icons/pencil";
 import Trash from "lucide-solid/icons/trash-2";
@@ -356,7 +357,7 @@ function StageCard(props: {
 				>
 					<img
 						class="stage-shot"
-						src={`/api/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`}
+						src={api(`/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`)}
 						alt=""
 						loading="lazy"
 						onError={() => setBroken(true)}

@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import type { LucideIcon } from "lucide-solid";
 import ChevronUp from "lucide-solid/icons/chevron-up";
 import Upload from "lucide-solid/icons/upload";
@@ -65,7 +66,7 @@ export function FilePicker(props: {
 	 */
 	const [at, setAt] = createSignal<string>("");
 	const [listing] = createResource(at, async (path) => {
-		const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : "/api/browse";
+		const url = path ? api(`/browse?path=${encodeURIComponent(path)}`) : api("/browse");
 		const response = await fetch(url);
 		if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
 		return (await response.json()) as BrowseResult;

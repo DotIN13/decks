@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import { CONFIRM_UPLOAD_BYTES, MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
 import { ask } from "../state/confirm.ts";
 
@@ -52,7 +53,7 @@ function send(file: File, onProgress?: (fraction: number) => void): Promise<Uplo
 		}
 
 		const request = new XMLHttpRequest();
-		request.open("POST", `/api/upload?name=${encodeURIComponent(file.name)}`);
+		request.open("POST", api(`/upload?name=${encodeURIComponent(file.name)}`));
 		// The bytes are the body, so the type says only that. What the file *is* is
 		// decided from its name when it is served, never from what the client claimed.
 		request.setRequestHeader("Content-Type", "application/octet-stream");

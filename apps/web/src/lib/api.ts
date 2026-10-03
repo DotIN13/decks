@@ -1,3 +1,4 @@
+import { api, rebase } from "../connections/connection.ts";
 import type { Board } from "@decks/protocol";
 
 /**
@@ -24,7 +25,7 @@ import type { Board } from "@decks/protocol";
  */
 export function boardUrl(board: Pick<Board, "path" | "rev">): string {
 	const path = board.path.split("/").map(encodeURIComponent).join("/");
-	return `/api/board/${path}?rev=${board.rev}`;
+	return api(`/board/${path}?rev=${board.rev}`);
 }
 
 /** The server's `PICTURE_LOOK` (`boards/thumbs.ts`): raised with it, so a picture taken before a change to how every board looks is a URL the browser has not kept. */
@@ -38,13 +39,13 @@ const PICTURE_LOOK = 3;
  */
 export function thumbUrl(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
 	const path = board.path.split("/").map(encodeURIComponent).join("/");
-	return `/api/thumb/${path}?v=${board.rev}&scheme=${scheme}&look=${PICTURE_LOOK}`;
+	return api(`/thumb/${path}?v=${board.rev}&scheme=${scheme}&look=${PICTURE_LOOK}`);
 }
 
 /** A deck-relative path (a poster, an asset) as a URL. */
 export function deckFileUrl(path: string, rev?: number): string {
 	const encoded = path.split("/").map(encodeURIComponent).join("/");
-	return rev ? `/api/board/${encoded}?rev=${rev}` : `/api/board/${encoded}`;
+	return rev ? api(`/board/${encoded}?rev=${rev}`) : api(`/board/${encoded}`);
 }
 
 /** The six families an embed's file can belong to, as `board.js` counts them. */
@@ -92,14 +93,14 @@ export function embedUrl(boardPath: string, raw: string): string {
 	const path = String(raw ?? "").trim();
 	if (!path) return "";
 	if (/^(https?|data|blob):/i.test(path)) return path;
-	if (path.startsWith("/api/f/") || path.startsWith("/api/file")) return path;
+	if (path.startsWith("/api/f/") || path.startsWith("/api/file")) return rebase(path);
 	/*
 	 * Everything else — a sibling, an absolute path, a `~` one — is asked of the server with
 	 * the board named, and *it* decides: a path inside the deck resolves to the file, one
 	 * outside a declared root is refused. Making the app the judge of that would be a second
 	 * opinion about the roots, and the two would eventually differ.
 	 */
-	return `/api/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(boardPath)}`;
+	return api(`/file?path=${encodeURIComponent(path)}&from=${encodeURIComponent(boardPath)}`);
 }
 
 /**

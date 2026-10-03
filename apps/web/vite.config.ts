@@ -70,8 +70,14 @@ export default defineConfig({
 			 * (`server/web/bridge.ts`), and a dev server that only proxied the app's own `/ws`
 			 * refused the extension with nothing in any log to say why.
 			 */
-			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true },
-			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true },
+			/*
+			 * `xfwd` says who the browser is: the server asks no pairing code of a private network
+			 * (`server/src/share/pairing.ts`), and through a proxy every request is from loopback.
+			 */
+			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
+			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true, xfwd: true },
+			// Another server passed through this one, for a page with no service worker (`share/relay.ts`).
+			"/c": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, xfwd: true },
 		},
 	},
 	/*

@@ -25,6 +25,8 @@ import { ensureHistory, loadEarlier } from "./state/history.ts";
 import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start } from "./state/socket.ts";
+import { api } from "./connections/connection.ts";
+import { can } from "./connections/backend.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { pens } from "./state/pens.ts";
@@ -262,6 +264,12 @@ export function App() {
 	createEffect(() => {
 		// A comment on the whole board, from its pill, is not a selection and stays in any mode.
 		if ((mode() !== "browse" || drawing()) && untrack(commenting)?.range) setCommenting(undefined);
+	});
+	/* A backend that cannot write is read: no edit mode and no pen, whichever key asked for them. */
+	createEffect(() => {
+		if (can("write")) return;
+		if (mode() !== "browse") setMode("browse");
+		if (drawing()) setDrawing(false);
 	});
 
 	/*
@@ -1214,7 +1222,7 @@ export function App() {
 
 
 	return (
-		<div class="app">
+		<div class="app" data-reader={can("write") ? undefined : ""}>
 			{/*
 				No title bar.
 				*
@@ -1676,7 +1684,7 @@ export function App() {
 								// A link the browser downloads: the picture is taken on the server, which can take a moment.
 								notice("info", "Taking the picture…");
 								const link = document.createElement("a");
-								link.href = `/api/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format: "png", scheme: scheme() })}`;
+								link.href = api(`/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format: "png", scheme: scheme() })}`);
 								link.download = "";
 								link.click();
 							}}

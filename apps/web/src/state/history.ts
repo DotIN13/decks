@@ -79,3 +79,8 @@ export function resolveEarlier(before: string, added: number): void {
 	waiting.delete(before);
 	resolve(added);
 }
+
+/** Nobody waiting on scrollback: a switch to another backend (`connections/switch.ts`). */
+export function resetHistory(): void {
+	waiting.clear();
+}

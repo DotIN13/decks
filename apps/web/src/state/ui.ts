@@ -1,3 +1,4 @@
+import { api } from "../connections/connection.ts";
 import type { UsageReport } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -84,7 +85,7 @@ function createUi() {
 	 * ⌥, as the bytes it is.
 	 */
 	const openSource = (path: string) => {
-		void fetch(`/api/board/${path}?raw=1`)
+		void fetch(api(`/board/${path}?raw=1`))
 			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
 			.then((source) => {
 				/*

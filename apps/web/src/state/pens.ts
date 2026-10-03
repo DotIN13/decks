@@ -1,3 +1,4 @@
+import { rebase } from "../connections/connection.ts";
 import { createSignal } from "solid-js";
 import type { ServerMessage } from "@decks/protocol";
 
@@ -15,7 +16,9 @@ const [pens, setPens] = createSignal<Record<string, StagePen>>({});
 export { pens };
 
 export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }>): void {
-	const { type: _type, agentId, ...pen } = message;
+	const { type: _type, agentId, ...given } = message;
+	// The folder image fills are read against is a path on the backend, so it goes under this tab's prefix.
+	const pen = { ...given, base: rebase(given.base) };
 	const known = pens()[agentId];
 	if (known && known.rev === pen.rev && known.stage === pen.stage) return;
 	setPens({ ...pens(), [agentId]: pen });
@@ -25,4 +28,9 @@ export function forgetPen(agentId: string): void {
 	if (!(agentId in pens())) return;
 	const { [agentId]: _gone, ...rest } = pens();
 	setPens(rest);
+}
+
+/** No drawings: a switch to another backend (`connections/switch.ts`). */
+export function resetPens(): void {
+	setPens({});
 }

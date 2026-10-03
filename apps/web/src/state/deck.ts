@@ -187,3 +187,29 @@ export const clearPreview = () => state.focused && state.agents[state.focused] &
 
 /** The focused agent's preview, if it is looking at its own past. */
 export const preview = () => (state.focused ? state.agents[state.focused]?.preview : undefined);
+
+/**
+ * Everything the last backend said, forgotten, for a switch to another (`connections/switch.ts`).
+ * The new one's greeting fills it again, as on a first load.
+ */
+export function resetDeck(): void {
+	setState({
+		deck: undefined,
+		boards: [],
+		notices: [],
+		chats: [],
+		focused: undefined,
+		identities: {},
+		agents: {},
+		web: undefined,
+		contexts: {},
+		nonces: {},
+		cursor: undefined,
+		acts: {},
+		runtimes: [],
+		accounts: [],
+		settings: {},
+		machineZone: "",
+		activeAccount: "default",
+	});
+}

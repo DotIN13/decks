@@ -37,3 +37,8 @@ export function searchStages(list: StageRow[], query: string): Array<{ stage: St
 		hit: q === "" || `${stage.title} ${stage.name} ${stage.words} ${stage.agents.map((agent) => agent.name).join(" ")}`.toLowerCase().includes(q),
 	}));
 }
+
+/** No stages: a switch to another backend (`connections/switch.ts`). */
+export function resetStages(): void {
+	setStages([]);
+}

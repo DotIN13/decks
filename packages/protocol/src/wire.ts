@@ -23,6 +23,31 @@ import type { ActBox, ActKind, StageCall, StageResult, Camera } from "./stage.ts
  * Both are read off the server's own records rather than the file, because a stage nobody has
  * opened is still a stage and has to be listed.
  */
+/** Another Decks front end this server has given a token to (`server/src/share/pairing.ts`). */
+export interface PairedRow {
+	id: string;
+	/** What the other front end called itself when it paired. */
+	label: string;
+	/** The site it was served from. */
+	origin: string;
+	at: number;
+	/** When it last used its token, to the minute. */
+	last?: number;
+}
+
+/**
+ * What the backend on the other end of the socket can do.
+ *
+ * A server can do everything; a canvas opened from a file can only be read (`web/src/connections`).
+ * The front end draws only the controls the backend can serve, so a reader has no composer and no
+ * editing tools rather than ones that fail when pressed.
+ */
+export interface BackendInfo {
+	/** What the switcher calls it: the deck's name, or the canvas's title for a file. */
+	name: string;
+	can: { agents: boolean; write: boolean; share: boolean };
+}
+
 export interface StageRow {
 	/** The folder: the stage's id, which agents open it by and never changes. */
 	name: string;
@@ -282,7 +307,11 @@ export type ClientMessage =
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
-	| { type: "web.repair" };
+	| { type: "web.repair" }
+	/** A fresh code another Decks can pair with. Answered with `pairing`. */
+	| { type: "pair.code" }
+	/** Take a token back: that front end can no longer reach this server. */
+	| { type: "pair.revoke"; id: string };
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
@@ -438,5 +467,9 @@ export type ServerMessage =
 	| { type: "web.status"; status: WebStatus; code?: string }
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
 	| { type: "settings"; settings: DeckSettings; machineZone: string }
+	/** The code being shown, if any, and every front end holding a token. */
+	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[] }
+	/** Who is answering, and what it can do: the first frame of every greeting. */
+	| { type: "backend"; backend: BackendInfo }
 	| { type: "error"; text: string };
 

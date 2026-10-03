@@ -14,6 +14,10 @@ import { refuseCrossSite, storeAssetStream, UploadRefused } from "./files/upload
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
+import type { ServerMessage } from "@decks/protocol";
+import { buildBundle, bundleFileName } from "./share/bundle.ts";
+import { fromAnotherSite, fromPrivateNetwork, tokenOf } from "./share/pairing.ts";
+import { Relay } from "./share/relay.ts";
 
 /**
  * The HTTP surface: reading files, writing one kind of file, and the built UI.
@@ -64,7 +68,88 @@ export function createHttpApp(app: App): Express {
 	server.disable("x-powered-by");
 	server.use(express.json({ limit: "8mb" }));
 
+	/*
+	 * Another Decks, served from another site, using this server (`share/pairing.ts`).
+	 *
+	 * This server's own front end is untouched: its requests are same-origin and go straight on.
+	 * A request from another site is let through only with a paired token, and then with the
+	 * headers that let that site read the answer: CORS, and Chrome's private-network permission,
+	 * which a public page needs to call an address on your own network. The preflight before a
+	 * request carries no token, so it is answered for anyone; the request after it is not.
+	 * `/api/web` is the Decks extension, which has its own pairing and is left as it was.
+	 */
+	server.use((req, res, next) => {
+		const origin = req.headers.origin;
+		if (!origin || !req.path.startsWith("/api/") || req.path.startsWith("/api/web/") || !fromAnotherSite(req.headers)) {
+			next();
+			return;
+		}
+		res.setHeader("Vary", "Origin");
+		res.setHeader("Access-Control-Allow-Origin", origin);
+		res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+		res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+		res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
+		if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
+		if (req.method === "OPTIONS") {
+			res.status(204).end();
+			return;
+		}
+		if (req.path === "/api/pair" || req.path === "/api/hello" || app.pairing.check(tokenOf(req.headers, req.originalUrl))) {
+			next();
+			return;
+		}
+		res.status(401).type("text").send("This Decks has not been paired with that server. Ask it for a pairing code in its Settings.");
+	});
+
 	const api = express.Router();
+	const relay = new Relay(join(app.deck.path, ".decks", "relay.json"));
+	server.all("/c/:id/*rest", asyncRoute((req, res) => relay.pass(req, res)));
+
+	/**
+	 * Trade a pairing code for a token: the one route another site may call without one. Answered
+	 * with the deck's name, which is what the other front end will call this server.
+	 */
+	api.post("/pair", (req, res) => {
+		const body = (req.body ?? {}) as { code?: unknown; label?: unknown };
+		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
+		const origin = String(req.headers.origin ?? "");
+		const label = typeof body.label === "string" ? body.label : "";
+		// No code from this machine or a private network; over the internet, only with one.
+		if (!code && !fromPrivateNetwork(req.socket.remoteAddress, req.headers)) {
+			res.status(403).json({ needsCode: true, error: "This server is reached over the internet, so it needs a pairing code. Make one in its Settings, under Other Decks." });
+			return;
+		}
+		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
+		if (!token) {
+			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one in the server's Settings." });
+			return;
+		}
+		app.send(app.pairingMessage());
+		res.json({ token, name: app.deck.name });
+	});
+
+	/**
+	 * Pass another server through this one, for a page with no service worker (`share/relay.ts`).
+	 * The page names the connection and its token; `/c/<id>/...` below is then that server's.
+	 */
+	api.post("/relay", (req, res) => {
+		const body = (req.body ?? {}) as { id?: unknown; base?: unknown; token?: unknown };
+		const refused = typeof body.id === "string" && typeof body.base === "string" && typeof body.token === "string" ? relay.register(body.id, body.base, body.token) : "Name the connection, its address and its token.";
+		if (refused) {
+			res.status(400).json({ error: refused });
+			return;
+		}
+		res.json({ ok: true });
+	});
+
+	/**
+	 * Whether this is a Decks server, and which: what the switcher's reachability dot asks. Open to
+	 * any site, since it says nothing but the name; `paired` says whether the token sent still works.
+	 */
+	api.get("/hello", (req, res) => {
+		res.setHeader("Cache-Control", "no-store");
+		res.json({ decks: true, name: app.deck.name, paired: app.pairing.check(tokenOf(req.headers, req.originalUrl)) });
+	});
 
 	api.get("/deck", (_req, res) => {
 		res.json({ deck: app.deck.state(), warnings: app.deck.warnings });
@@ -217,6 +302,43 @@ export function createHttpApp(app: App): Express {
 			} catch (error) {
 				res.status(503).type("text").send((error as Error).message);
 			}
+		}),
+	);
+
+	/**
+	 * A canvas as one `.decks` file, to download and open in any Decks (`share/bundle.ts`).
+	 *
+	 * Pictures already taken go in as they are; one not taken yet gets the time left of a shared
+	 * minute, and a board without one is drawn from its page when the reader opens it.
+	 */
+	api.get(
+		"/bundle/:name",
+		asyncRoute(async (req, res) => {
+			const pens = app.stage.pens;
+			const name = String(req.params.name ?? "");
+			if (!pens || !pens.names().includes(name)) {
+				res.status(404).type("text").send("No such canvas.");
+				return;
+			}
+			const frame = pens.frame("", name) as Extract<ServerMessage, { type: "stage.pen" }>;
+			const until = Date.now() + 60_000;
+			const { bytes } = await buildBundle({
+				deckPath: app.deck.path,
+				deckName: app.deck.name,
+				board: (path) => app.deck.board(path),
+				stage: { dir: join(pens.dir, name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.boards(name) },
+				picture: async (board, scheme) => {
+					const older = app.thumbs.standIn(board, scheme, "whole");
+					if (older) return older;
+					const left = until - Date.now();
+					if (left <= 0) return undefined;
+					return Promise.race([app.thumbs.get(board, scheme, () => false, "whole"), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);
+				},
+			});
+			const file = bundleFileName(pens.titleOf(name));
+			res.setHeader("Content-Disposition", `attachment; filename="${file.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'")}"; filename*=UTF-8''${encodeURIComponent(file)}`);
+			res.setHeader("Cache-Control", "no-store");
+			res.type("application/zip").send(bytes);
 		}),
 	);
 

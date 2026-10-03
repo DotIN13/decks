@@ -1,5 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { batch } from "solid-js";
+import { BundleBackend } from "../connections/bundle.ts";
+import { active, socketUrl } from "../connections/connection.ts";
 
 /**
  * The one connection to the server, and the frames that go down it.
@@ -55,6 +57,8 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 	/** Frames that have arrived and are waiting to be applied together (`wave` below). */
 	const arrived: ServerMessage[] = [];
 	let socket: WebSocket | undefined;
+	/** Disposed: a close is the end, not a drop to recover from. */
+	let closed = false;
 	let attempt = 0;
 	let timer: number | undefined;
 	let painting: number | undefined;
@@ -90,10 +94,15 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 		});
 	};
 
-	const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+	/*
+	 * Which backend: this server, another one by its own address and token, or a canvas file served
+	 * from this tab, which has a stand-in with the socket's shape (`connections/`).
+	 */
+	const url = socketUrl();
+	const here = active();
 
 	const open = () => {
-		socket = new WebSocket(url);
+		socket = here?.kind === "bundle" ? (new BundleBackend(here.id) as unknown as WebSocket) : new WebSocket(url);
 
 		socket.onopen = () => {
 			attempt = 0;
@@ -115,6 +124,7 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 		};
 
 		socket.onclose = () => {
+			if (closed) return;
 			onStateChange(false);
 			// Back off, but not far: this is localhost, and the common cause is a
 			// server that is three seconds from being back.
@@ -140,6 +150,7 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 			return socket?.readyState === WebSocket.OPEN;
 		},
 		[Symbol.dispose]: () => {
+			closed = true;
 			if (painting !== undefined) cancelAnimationFrame(painting);
 			if (soon !== undefined) clearTimeout(soon);
 			if (timer) clearTimeout(timer);
@@ -189,5 +200,14 @@ export const started = (): boolean => live !== undefined;
 
 /** For tests: forget the connection so the next `start` makes a fresh one. */
 export function reset(): void {
+	live = undefined;
+}
+
+/**
+ * Close the connection for good, for a switch to another backend (`connections/switch.ts`): no
+ * reconnecting, and the next `start` opens whichever backend the tab is on by then.
+ */
+export function stop(): void {
+	(live as (Socket & { [Symbol.dispose]?: () => void }) | undefined)?.[Symbol.dispose]?.();
 	live = undefined;
 }
