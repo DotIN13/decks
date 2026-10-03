@@ -328,6 +328,12 @@ export type ServerMessage =
 	 */
 	| { type: "runtimes"; list: RuntimeInfo[] }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean }
+	/**
+	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
+	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the
+	 * page's time for one number.
+	 */
+	| { type: "board.sized"; path: string; h: number }
 	| { type: "board.patched"; path: string; rev: number; refused?: string }
 	| {
 			type: "agents";

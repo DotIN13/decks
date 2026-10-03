@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Board } from "@decks/protocol";
-import { basename, matches, panelSections } from "./panel-groups.ts";
+import { basename, keepRows, matches, panelSections } from "./panel-groups.ts";
 
 /*
  * The panel is a picture of these three sections, so every case here is one a reader of the
@@ -135,4 +135,18 @@ test("pen files stand among the boards in the deck section, in path order, and t
 		["frames/ui/note.html", false],
 	]);
 	assert.deepEqual(panelSections({ boards, pens, query: "agent" })[0]!.rows.map((row) => row.board.path), ["frames/ui/agent-card.pen"]);
+});
+
+test("a deck that changed one board keeps every other row, and the sections they are in", () => {
+	const boards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
+	const first = keepRows([], panelSections({ boards, inPlay: ["boards/a.html"], query: "" }));
+	const changed = [boards[0]!, { ...boards[1]!, rev: 2 }, boards[2]!];
+	const second = keepRows(first, panelSections({ boards: changed, inPlay: ["boards/a.html"], query: "" }));
+	assert.equal(second[0], first[0], "the canvas section did not change, so it is the same object");
+	const [was, now] = [first[1]!, second[1]!];
+	assert.notEqual(now, was, "the deck section has a changed row");
+	assert.equal(now.rows[1], was.rows[1], "the untouched row is the same object");
+	assert.notEqual(now.rows[0], was.rows[0], "the changed board's row is new");
+	const third = keepRows(second, panelSections({ boards: changed, inPlay: [], query: "" }));
+	assert.notEqual(third.find((section) => section.kind === "deck")!.rows[0], second[0]!.rows[0], "a board that left the canvas gets a row in its new section");
 });

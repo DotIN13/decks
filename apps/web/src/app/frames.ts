@@ -169,6 +169,12 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 				}
 
+				case "board.sized": {
+					// One number on one board; the rest of the deck, and this board's document, are as they were.
+					const index = state.boards.findIndex((existing) => existing.path === message.path);
+					if (index !== -1 && state.boards[index]!.h !== message.h) setState("boards", index, "h", message.h);
+					return;
+				}
 				case "board.changed": {
 					if (message.removed) {
 						forgetPatches(message.path);

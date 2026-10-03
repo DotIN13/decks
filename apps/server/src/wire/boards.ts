@@ -121,7 +121,7 @@ export const boards = {
 		// A board `newBoard` has just made, before anything is written in it, keeps the size it was made at.
 		if (measured && measured.rev === message.rev && !wire.boards.stillBlank(message.path, message.rev)) {
 			const resized = wire.deck.setHeight(message.path, message.h);
-			if (resized) wire.send({ type: "deck.state", deck: wire.stageState() });
+			if (resized) wire.send({ type: "board.sized", path: message.path, h: resized.h });
 		}
 	},
 

@@ -9,7 +9,7 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup,
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { BoardRow } from "./BoardRow.tsx";
-import { basename as basenameOf, panelSections } from "./panel-groups.ts";
+import { basename as basenameOf, keepRows, panelSections, type PanelSection } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
@@ -397,14 +397,18 @@ export function LeftPanel(props: {
 
 	const type = (next: string) => setQuery(next);
 
-	const sections = createMemo(() =>
-		panelSections({
-			boards: props.boards,
-			kept: props.kept,
-			inPlay: props.inPlay,
-			query: query(),
-			pens: props.pens ?? [],
-		}),
+	const sections = createMemo<PanelSection[]>((previous) =>
+		keepRows(
+			previous,
+			panelSections({
+				boards: props.boards,
+				kept: props.kept,
+				inPlay: props.inPlay,
+				query: query(),
+				pens: props.pens ?? [],
+			}),
+		),
+		[],
 	);
 
 	/*

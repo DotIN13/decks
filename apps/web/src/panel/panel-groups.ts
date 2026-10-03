@@ -152,3 +152,30 @@ export function panelSections(input: PanelInput): PanelSection[] {
 
 	return sections;
 }
+
+/**
+ * The new sections, made of the old objects wherever nothing changed.
+ *
+ * `panelSections` builds fresh rows on every call, and the list draws them with `<For>`, which keys by
+ * reference: so every message that touched the deck rebuilt every row on screen, icons and all, about
+ * 60 ms of a second-long stall per board edit on a deck of 400. A row is kept when its section, its
+ * board (the same store object), its pen file and its two flags are the same; a section is kept when
+ * its label and every row are.
+ */
+export function keepRows(previous: readonly PanelSection[], next: PanelSection[]): PanelSection[] {
+	const rowKey = (kind: SectionKind, row: PanelRow) => `${kind}\u0000${row.pen ? `pen:${row.pen.path}` : row.board.path}`;
+	const oldRows = new Map<string, PanelRow>();
+	for (const section of previous) for (const row of section.rows) oldRows.set(rowKey(section.kind, row), row);
+	const oldSections = new Map(previous.map((section) => [section.kind, section]));
+	return next.map((section) => {
+		const rows = section.rows.map((row) => {
+			const was = oldRows.get(rowKey(section.kind, row));
+			if (!was || was.onCanvas !== row.onCanvas || was.dim !== row.dim) return row;
+			if (row.pen) return was.pen && was.pen.path === row.pen.path && was.pen.ref === row.pen.ref && was.pen.title === row.pen.title ? was : row;
+			return was.board === row.board ? was : row;
+		});
+		const was = oldSections.get(section.kind);
+		if (was && was.label === section.label && was.rows.length === rows.length && was.rows.every((row, at) => row === rows[at])) return was;
+		return { ...section, rows };
+	});
+}

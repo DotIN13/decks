@@ -209,7 +209,8 @@ export class App {
 				const board = this.deck.board(path);
 				if (!board || board.format === "slides" || board.rev !== rev) return;
 				if (this.boards.extent(path, rev)) return;
-				if (this.deck.setHeight(path, h)) this.send({ type: "deck.state", deck: this.stageState() });
+				const resized = this.deck.setHeight(path, h);
+				if (resized) this.send({ type: "board.sized", path, h: resized.h });
 			},
 		});
 		/*
