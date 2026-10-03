@@ -43,6 +43,10 @@ const KEEP_MS = 3000;
 const KEEP_ALL = 8;
 /** How long the camera has to have been still before a document is taken away. */
 const QUIET_MS = 1000;
+/** How long the camera has to have been still before any board starts a document. */
+const STILL_MS = 250;
+/** How many boards start a document together, each group after the page has had an idle moment. */
+const BATCH = 3;
 
 const whenIdle = (fn: () => void, timeout: number) => {
 	const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
@@ -74,6 +78,8 @@ export interface AdmissionHost {
 	lastMoved: () => number;
 	/** Where a board's centre is on screen, for letting the nearest one in first. */
 	screenCentre: (board: Board) => { x: number; y: number };
+	/** Whether the camera is at the zoom where boards have pages, now: below it nothing is let in. */
+	live: () => boolean;
 	/** Whether the app has opened far enough for any board to start. */
 	mayStart: () => boolean;
 	/** Every board on screen at the open has been let in. */
@@ -82,7 +88,7 @@ export interface AdmissionHost {
 
 export interface Admission {
 	/** Whether a board has a document: on screen now, or was within the last `KEEP_MS`. */
-	isMounted: (board: Board) => boolean;
+	isMounted: (board: Board, live?: boolean) => boolean;
 	/** Whether the open still holds this board back. */
 	mayHaveDocument: (board: Board) => boolean;
 	/** Called from an effect: start letting boards in once the app has opened. */
@@ -108,7 +114,7 @@ export function createAdmission(host: AdmissionHost): Admission {
 	};
 	onCleanup(() => clearTimeout(sweeper));
 
-	const isMounted = (board: Board): boolean => {
+	const isMounted = (board: Board, liveNow = true): boolean => {
 		void sweep();
 		const now = performance.now();
 		if (host.isVisible(board)) {
@@ -129,7 +135,7 @@ export function createAdmission(host: AdmissionHost): Admission {
 			 * document through the movement, and one whose document was let go while it was away
 			 * is a new start again, because reloading it costs exactly what the first load did.
 			 */
-			if (!live.has(board.path) && host.moving()) return false;
+			if (!live.has(board.path) && (host.moving() || !liveNow)) return false;
 			live.add(board.path);
 			return true;
 		}
@@ -142,7 +148,11 @@ export function createAdmission(host: AdmissionHost): Admission {
 		 * document away again (on screen, not live, moving); and the pan's end started a third.
 		 * Two loads and two white flashes for one pan.
 		 */
-		if (!live.has(board.path)) return false;
+		if (!live.has(board.path)) {
+			// Off screen with no document: it waits its turn again when it comes back.
+			admitted.delete(board.path);
+			return false;
+		}
 		// Counting only boards still on the canvas: one taken off it has no frame to keep.
 		const onCanvas = new Set(host.boards().map((one) => one.path));
 		for (const path of live) if (!onCanvas.has(path)) live.delete(path);
@@ -159,47 +169,59 @@ export function createAdmission(host: AdmissionHost): Admission {
 			return true;
 		}
 		live.delete(board.path);
+		admitted.delete(board.path);
 		return false;
 	};
 
 	/*
-	 * **Boards start after the app has opened, nearest first, one at a time.**
+	 * **Boards start a few at a time, nearest the middle first, once the camera has been still.**
 	 *
-	 * A board is a same-origin document, so it runs on the app's own main thread: its
-	 * stylesheet, `board.js`, markdown, maths and diagrams are parsed and laid out between the
-	 * app's own frames. Opening onto six boards mounted all six in the same second the app was
-	 * drawing its chat, and the page did not answer for 846 ms of it — a keystroke typed then
-	 * would have waited that long.
+	 * A board is a same-origin document, so it runs on the app's own main thread: its stylesheet,
+	 * `board.js`, markdown, maths and diagrams are parsed and laid out between the app's own frames,
+	 * and making its frame at all is several milliseconds of work done there and then. Opening onto
+	 * six boards mounted all six in the same second the app was drawing its chat, and the page did not
+	 * answer for 846 ms of it.
 	 *
-	 * So until the app says it has opened (`mayStart`) no board has a document: the canvas
-	 * shows each one's frame and title, which is where the eye goes first anyway. Then they are
-	 * let in one at a time, nearest the middle of the screen first, each after the browser has
-	 * had an idle moment since the last — that is, once the previous document has done its work.
-	 * When every board on screen is in, the gate is gone for the rest of the session and a board
-	 * mounts the moment it is visible, as it always did.
+	 * That rule used to hold only while the app opened. Afterwards every board in reach got its page
+	 * the moment the camera counted as still, all at once: a wheel zoom out over 400 boards whose steps
+	 * each took longer than the 160 ms that ends a movement made 317 frames in one go, mid-gesture,
+	 * for boards a moment from being specks, and drew 15 frames in 3 seconds. So now it holds always:
+	 * nothing starts until the camera has been still for `STILL_MS`, and then `BATCH` boards at a time,
+	 * each batch after an idle moment, nearest the middle of the screen first.
 	 */
-	const [admitted, setAdmitted] = createSignal<ReadonlySet<string>>(new Set());
-	const [admitting, setAdmitting] = createSignal(true);
-	let admitScheduled = false;
+	const admitted = new Set<string>();
+	const [admittedVersion, setAdmittedVersion] = createSignal(0);
+	let started = false;
+	let pumping = false;
 	let stopped = false;
 	onCleanup(() => {
 		stopped = true;
 	});
 
+	const pump = (after = 0) => {
+		if (pumping || stopped) return;
+		pumping = true;
+		const go = () => requestAnimationFrame(() => whenIdle(admitNext, 100));
+		if (after > 0) window.setTimeout(go, after);
+		else go();
+	};
+
 	const admitNext = () => {
-		admitScheduled = false;
-		if (stopped || !admitting()) return;
+		pumping = false;
+		if (stopped || !host.mayStart()) return;
 		const v = host.view();
 		// Not measured yet: nothing is on screen until it is, and "nothing to let in" is not "done".
-		if (v.width === 0) {
-			admitScheduled = true;
-			window.setTimeout(admitNext, 100);
-			return;
-		}
-		const waiting = host.boards().filter((board) => host.isVisible(board) && !admitted().has(board.path));
+		if (v.width === 0) return pump(100);
+		// Below the live zoom nothing has a page; the next board asked about while live starts this again.
+		if (!host.live()) return;
+		const still = performance.now() - host.lastMoved();
+		if (host.moving() || still < STILL_MS) return pump(Math.max(50, STILL_MS - still));
+		const waiting = host.boards().filter((board) => host.isVisible(board) && !admitted.has(board.path));
 		if (waiting.length === 0) {
-			setAdmitting(false);
-			host.onStarted?.();
+			if (!started) {
+				started = true;
+				host.onStarted?.();
+			}
 			return;
 		}
 		const middle = { x: v.width / 2, y: v.height / 2 };
@@ -207,20 +229,23 @@ export function createAdmission(host: AdmissionHost): Admission {
 			const at = host.screenCentre(board);
 			return Math.hypot(at.x - middle.x, at.y - middle.y);
 		};
-		const next = waiting.reduce((best, board) => (distance(board) < distance(best) ? board : best));
-		setAdmitted((was) => new Set(was).add(next.path));
-		// A frame for it to begin, then an idle moment for it to finish, then the next one.
-		admitScheduled = true;
-		requestAnimationFrame(() => whenIdle(admitNext, 300));
+		waiting.sort((a, b) => distance(a) - distance(b));
+		for (const board of waiting.slice(0, BATCH)) admitted.add(board.path);
+		setAdmittedVersion((n) => n + 1);
+		pump();
 	};
 
 	return {
 		isMounted,
-		mayHaveDocument: (board) => !admitting() || admitted().has(board.path),
+		mayHaveDocument: (board) => {
+			void admittedVersion();
+			if (admitted.has(board.path)) return true;
+			// Asked about one that is waiting: make sure somebody is letting boards in.
+			pump();
+			return false;
+		},
 		begin: () => {
-			if (!host.mayStart() || !admitting() || admitScheduled) return;
-			admitScheduled = true;
-			whenIdle(admitNext, 300);
+			if (host.mayStart()) pump();
 		},
 	};
 }

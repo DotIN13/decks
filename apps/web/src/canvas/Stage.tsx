@@ -3133,6 +3133,15 @@ export function Stage(props: {
 	 */
 	const liveZoom = createMemo(() => restZoom() >= INTERACT_ZOOM);
 	/**
+	 * The camera is at the live zoom *now*, not only as of its last rest. `liveZoom` holds the zoom of
+	 * the last rest through a gesture, so pages are not dropped and remade mid-gesture; but a page
+	 * must never be *started* below the live zoom on its strength. A wheel zoom out from 103% to 3%
+	 * whose steps outlasted a movement's end made 377 pages in one task as it finished, still
+	 * counting as at 103%, and the page froze for six seconds. One answer for the stage, so a board
+	 * re-runs only when it flips.
+	 */
+	const liveNow = createMemo(() => props.camera.zoom >= INTERACT_ZOOM);
+	/**
 	 * On screen as of the camera's last rest, with a tenth of the window to spare. A page loaded for
 	 * a board just off screen, ready for a pan, sleeps until then (`BoardFrame`, `asleep`): 48
 	 * example pages cost 80% of a core at idle shown, and nothing asleep. From the resting camera,
@@ -3231,6 +3240,7 @@ export function Stage(props: {
 		isVisible,
 		view,
 		moving: () => moving() || gliding() || glidePending() || landing() || !!props.switching,
+		live: liveNow,
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,
@@ -3309,7 +3319,7 @@ export function Stage(props: {
 								/* The selected board and the edited one are live at any zoom, on any device. */
 								props.selected === board.path ||
 								props.editing?.path === board.path ||
-								(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board))
+								(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 							}
 							/*
 							 * No title bar in the focus view, and that is a decision rather than an
