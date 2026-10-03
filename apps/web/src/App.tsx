@@ -1162,6 +1162,18 @@ export function App() {
 	});
 
 	const landOnStage = (view?: AgentView) => {
+		/*
+		 * A view this device had of the canvas is a camera, and needs nothing from the server: it is
+		 * taken at once and without a glide, so the canvas's boards are drawn there from their first
+		 * frame. Waiting for them and then gliding from the last canvas's camera drew them at a view
+		 * that belongs to another canvas, and started pages for it (`Stage`, `landing`).
+		 */
+		if (view) {
+			moveCamera(view.camera);
+			setSelected(view.selected);
+			reportCamera(camera(), state.focused);
+			return;
+		}
 		const asked = Date.now();
 		const stop = () => clearInterval(timer);
 		const timer = setInterval(() => {
@@ -1173,8 +1185,8 @@ export function App() {
 			if (boards.length === 0 && Date.now() - asked < 1200) return;
 			stop();
 			const size = { width: stage.clientWidth, height: stage.clientHeight };
-			moveCamera(view ? view.camera : middleOf(boards.map(boxOf), canvasBox(size), size, camera()), { animate: true });
-			setSelected(view?.selected);
+			moveCamera(middleOf(boards.map(boxOf), canvasBox(size), size, camera()));
+			setSelected(undefined);
 			reportCamera(camera(), state.focused);
 		}, 200);
 	};

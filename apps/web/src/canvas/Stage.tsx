@@ -9,7 +9,7 @@ import { Icon } from "../ui/icons.tsx";
 import { can } from "../connections/backend.ts";
 import FilePlus from "lucide-solid/icons/file-plus";
 import Presentation from "lucide-solid/icons/presentation";
-import { For, Index, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { For, Index, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
@@ -3193,11 +3193,42 @@ export function Stage(props: {
 	 * question — and `lastMoved` as a getter, because the gestures write it synchronously in
 	 * their own handler while this reads it from a timer.
 	 */
+	/*
+	 * Arriving on another canvas: its boards come in at the camera of the canvas just left, and the
+	 * camera moves to this canvas's own view a moment later (`App.landOnStage`). Until it has, no
+	 * board starts a page: on an 83-board canvas the old camera started 54 pages that the move threw
+	 * away half a second later, inside one 2.7 s task.
+	 */
+	const [landing, setLanding] = createSignal(false);
+	let landingTimer: ReturnType<typeof setTimeout> | undefined;
+	createEffect(
+		on(
+			() => props.stageName,
+			(name, was) => {
+				if (was === undefined || name === was) return;
+				setLanding(true);
+				clearTimeout(landingTimer);
+				landingTimer = setTimeout(() => setLanding(false), 1500);
+				// The camera that arrives next is this canvas's.
+				createEffect(
+					on(
+						() => props.camera,
+						() => {
+							clearTimeout(landingTimer);
+							setLanding(false);
+						},
+						{ defer: true },
+					),
+				);
+			},
+		),
+	);
+	onCleanup(() => clearTimeout(landingTimer));
 	const admission = createAdmission({
 		boards: () => props.boards,
 		isVisible,
 		view,
-		moving: () => moving() || gliding() || glidePending(),
+		moving: () => moving() || gliding() || glidePending() || landing(),
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,
