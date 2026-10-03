@@ -34,7 +34,7 @@
 		transition: opacity 140ms ease;
 	}
 
-	body:has(.stage-manager[data-open]) .stage > * {
+	body[data-stage-manager] .stage > * {
 		opacity: 0.55;
 	}
 

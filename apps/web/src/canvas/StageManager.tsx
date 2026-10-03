@@ -111,6 +111,15 @@ export function StageManager(props: {
 		}
 	});
 
+	/* The canvas dims behind the panel by a mark on the body (`stages.css`). A `body:has()` rule
+	   did the same, and made the browser restyle the whole app on every step of a zoom: 2,300
+	   elements a step on a 400-board canvas, for a panel that was closed. */
+	createEffect(() => {
+		if (!shown()) return;
+		document.body.dataset.stageManager = "";
+		onCleanup(() => delete document.body.dataset.stageManager);
+	});
+
 	/* Escape closes it wherever the keyboard is, not only from the field: a tap on a card's gap
 	   on a phone, or a click on the count, takes focus out of the field. */
 	createEffect(() => {
