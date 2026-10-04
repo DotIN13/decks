@@ -1,3 +1,4 @@
+import { sentAs } from "../../agents/sent-as.ts";
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
@@ -1246,7 +1247,7 @@ export class ClaudeBackend implements AgentBackend {
 			const item = items[items.length - offset];
 			if (!entry || !item) break;
 			if (item.entryId === entry.uuid) continue;
-			if (!contentStartsWith(entry.message, item.text)) break;
+			if (!sentAs((entry.message as { content?: unknown } | undefined)?.content, item.text)) break;
 			this.context.translator.tagUser(item.id, entry.uuid);
 		}
 	}
@@ -1504,18 +1505,6 @@ function isTyped(message: unknown): boolean {
 }
 
 /** Whether a session message's content begins with the text that was displayed. */
-function contentStartsWith(message: unknown, shown: string): boolean {
-	const content = (message as { content?: unknown } | undefined)?.content;
-	const text =
-		typeof content === "string"
-			? content
-			: Array.isArray(content)
-				? content
-						.map((part) => (part && typeof part === "object" && "text" in part ? String((part as { text: unknown }).text) : ""))
-						.join("")
-				: "";
-	return text.trimStart().startsWith(shown.trimStart());
-}
 
 /** A one-line description of what a tool was asked to do, for the confirm dialog. */
 /**

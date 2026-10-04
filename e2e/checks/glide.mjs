@@ -123,7 +123,9 @@ const stolen = await page.evaluate(async () => {
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	};
 	const stage = document.querySelector(".stage");
-	[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes("risks.html"))?.click();
+	// Back to the plan: the link above has just flown the camera to risks.html, and pressing the board
+	// the camera is already on has nowhere to glide to, so nothing was ever in flight to take back.
+	[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes("plan.html"))?.click();
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	const midFlight = stage.dataset.gliding === "true";
 	// A wheel over the canvas: the smallest thing a person does that moves the camera.

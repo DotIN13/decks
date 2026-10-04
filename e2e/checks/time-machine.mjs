@@ -83,7 +83,8 @@ try {
 	 */
 	await second.locator(".stream-rw").click();
 	await page.waitForSelector(".popover", { timeout: 6000 });
-	await page.locator(".popover [data-row]").filter({ hasText: /^Preview$/ }).first().click();
+	// By the row's label: a described row reads "Preview" and then its sentence.
+	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: /^Preview$/ }) }).first().click();
 	await page.waitForFunction(
 		() => {
 			const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');

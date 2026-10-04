@@ -1,3 +1,4 @@
+import { sentAs } from "../../agents/sent-as.ts";
 import { existsSync } from "node:fs";
 import {
 	createAgentSession,
@@ -391,9 +392,8 @@ export class PiBackend implements AgentBackend {
 			const item = items[items.length - offset];
 			if (!entry || !item) break;
 			if (item.entryId === entry.id) continue;
-			// The entry holds the model-facing text, which can have more appended to it
-			// than was displayed, so the test is that it *starts with* what we showed.
-			if (!entryStartsWith(entry.message.content, item.text)) break;
+			// The entry holds the model-facing text: reminders before it, more after (`sent-as.ts`).
+			if (!sentAs(entry.message.content, item.text)) break;
 			this.context.translator.tagUser(item.id, entry.id);
 		}
 	}
@@ -483,17 +483,6 @@ export class PiBackend implements AgentBackend {
  * Pi stores message content as a string or as content parts; both shapes turn up
  * depending on how the message was built.
  */
-function entryStartsWith(content: unknown, shown: string): boolean {
-	const text =
-		typeof content === "string"
-			? content
-			: Array.isArray(content)
-				? content
-						.map((part) => (part && typeof part === "object" && "text" in part ? String((part as { text: unknown }).text) : ""))
-						.join("")
-				: "";
-	return text.trimStart().startsWith(shown.trimStart());
-}
 
 /** Pi reports extension failures as a structured record, not a string. */
 function formatExtensionError(error: unknown): string {
