@@ -52,6 +52,7 @@ import type { Board } from "@decks/protocol";
 type Playwright = typeof import("playwright");
 type Browser = import("playwright").Browser;
 type Page = import("playwright").Page;
+type BrowserContext = import("playwright").BrowserContext;
 
 export type ThumbScheme = "light" | "dark";
 /**
@@ -59,7 +60,7 @@ export type ThumbScheme = "light" | "dark";
  * the same width, which is what the canvas draws in place of a board that has no document
  * (`canvas/pen/scene.ts`).
  */
-export type ThumbKind = "card" | "whole";
+export type ThumbKind = "card" | "whole" | "small";
 /** The tallest a whole picture is taken, in CSS px of the board: past it the rest is cut. */
 const WHOLE_MAX_H = 12_000;
 
@@ -107,6 +108,8 @@ const ASPECT = 3 / 4;
 const CONCURRENCY = 2;
 const IDLE_MS = 60_000;
 const READY_MS = 8_000;
+/** How long a background picture waits for a board to say it is ready (`take`). */
+const AHEAD_READY_MS = 3_000;
 /** How long a board has to stop changing before its picture is retaken. */
 const SETTLE_MS = 1_500;
 
@@ -128,6 +131,8 @@ export interface ThumbHost {
 	measured?: (path: string, rev: number, h: number) => void;
 	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
 	boards?: () => Board[];
+	/** The boards on any canvas: the indexer takes these first, since they are the ones looked at. */
+	placed?: () => ReadonlySet<string>;
 }
 
 /** How far the indexer has got (`ThumbService.progress`), for the app's ⋯ menu. */
@@ -163,7 +168,9 @@ interface Job {
  */
 export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: ThumbKind = "card"): string {
 	const hash = createHash("sha1").update(path).digest("hex").slice(0, 16);
-	return `${hash}-${rev}-${scheme}-${THUMB_WIDTH}${kind === "whole" ? "-whole" : ""}-l${PICTURE_LOOK}.${kind === "whole" ? "webp" : "jpg"}`;
+	const whole = `${hash}-${rev}-${scheme}-${THUMB_WIDTH}-whole-l${PICTURE_LOOK}.webp`;
+	if (kind === "small") return smallName(whole, SMALL_TAKEN);
+	return kind === "whole" ? whole : `${hash}-${rev}-${scheme}-${THUMB_WIDTH}-l${PICTURE_LOOK}.jpg`;
 }
 
 /**
@@ -176,13 +183,19 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
  */
 export const PICTURE_LOOK = 3;
 
-/** Every picture of this board in this scheme and kind, at any revision and width. */
 /**
  * The widths a whole picture is also kept at (`ThumbService.smaller`). A zoomed-out canvas draws a
  * board a few dozen pixels wide, and the whole picture, up to 2048 px and 289 KB on average, made a
  * first look at 400 boards a download of 118 MB; at 192 px the same look is a few hundred kilobytes.
  */
 export const SMALL_WIDTHS: readonly number[] = [192, 480];
+/**
+ * The width the background takes a board at (`ThumbKind` "small"), straight from the page: a
+ * screenshot at 480 px took 163 ms where the whole one at twice the board's size took 1,522, and
+ * a zoomed-out canvas never draws a board wider. The 192 px copy is cut from it, and the whole
+ * picture is taken only when a board is asked for at that size.
+ */
+export const SMALL_TAKEN = 480;
 
 /** A whole picture's smaller copy, beside it on disk. */
 export function smallName(whole: string, width: number): string {
@@ -195,7 +208,9 @@ function smallOf(path: string, scheme: ThumbScheme): RegExp {
 	return new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole-w\\d+(-l\\d+)?\\.webp$`);
 }
 
+/** Every picture of this board in this scheme and kind, at any revision. */
 function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "card"): RegExp {
+	if (kind === "small") return smallOf(path, scheme);
 	const hash = thumbName(path, 0, scheme).slice(0, 16);
 	return kind === "whole" ? new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole(-l\\d+)?\\.(jpg|webp)$`) : new RegExp(`^${hash}-\\d+-${scheme}(-\\d+)?(-l\\d+)?\\.jpg$`);
 }
@@ -309,6 +324,7 @@ export class ThumbService {
 				(browser as Partial<Pick<Browser, "on">>).on?.("disconnected", () => {
 					if (this.browser === launched) this.browser = undefined;
 					if (this.resizer?.browser === browser) this.resizer = undefined;
+					if (this.tabs?.browser === browser) this.tabs = undefined;
 				}),
 			() => {},
 		);
@@ -320,8 +336,7 @@ export class ThumbService {
 	 * kept beside it when `keep` (a stand-in is not). The whole one when it is that narrow already.
 	 * The copy is WebP at quality 85; made once, it is a file like any other picture.
 	 */
-	async smaller(file: string, width: number, keep = true): Promise<string | Buffer> {
-		const target = smallName(file, width);
+	async smaller(file: string, width: number, keep = true, target = smallName(file, width)): Promise<string | Buffer> {
 		if (keep && existsSync(target)) return target;
 		const known = this.shrinking.get(target);
 		if (known) return known;
@@ -392,8 +407,8 @@ export class ThumbService {
 					for (let next = todo.shift(); next && !this.broken; next = todo.shift()) {
 						const { board, scheme } = next;
 						try {
-							const file = await this.ask(board, scheme, () => false, true, "whole");
-							for (const width of SMALL_WIDTHS) await this.smaller(file, width);
+							// The sizes a canvas draws when zoomed out; the whole picture is taken when a board is asked for at it.
+							for (const width of [...SMALL_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
 						} catch {
 							this.failures.add(`${board.path}:${scheme}`);
 						}
@@ -423,16 +438,23 @@ export class ThumbService {
 	/** Pictures are kept in the schemes the canvas has asked for whole pictures in, and in light before any. */
 	private indexSchemes(): ThumbScheme[] {
 		const schemes = [...this.wanted()].filter((one) => one.endsWith("/whole")).map((one) => one.split("/")[0] as ThumbScheme);
-		return schemes.length > 0 ? schemes : ["light"];
+		if (schemes.length === 0) return ["light"];
+		// The scheme asked for last first: it is the one somebody is looking at.
+		return schemes.sort((a, b) => Number(b === this.lastScheme) - Number(a === this.lastScheme));
 	}
+	/** The scheme of the last whole picture a browser asked for. */
+	private lastScheme: ThumbScheme | undefined;
 
 	/** The boards and schemes without a current whole picture, or without one of its copies. */
 	private missing(have: Set<string>): Array<{ board: Board; scheme: ThumbScheme }> {
 		const out: Array<{ board: Board; scheme: ThumbScheme }> = [];
+		const placed = this.host.placed?.() ?? new Set<string>();
+		// Boards on a canvas first, in the deck's order otherwise.
+		const boards = [...(this.host.boards?.() ?? [])].sort((a, b) => Number(placed.has(b.path)) - Number(placed.has(a.path)));
 		for (const scheme of this.indexSchemes()) {
-			for (const board of this.host.boards?.() ?? []) {
+			for (const board of boards) {
 				const whole = thumbName(board.path, board.rev, scheme, "whole");
-				if (have.has(whole) && SMALL_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
+				if (SMALL_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
 				// A picture this sweep could not take is not missing again until the board changes.
 				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
 				out.push({ board, scheme });
@@ -461,42 +483,82 @@ export class ThumbService {
 	 * a page. Rejects when there is no Chromium, or the board would not draw.
 	 */
 	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false, kind: ThumbKind = "card"): Promise<string> {
-		const want = kind === "card" ? scheme : `${scheme}/${kind}`;
-		if (!this.wanted().has(want)) {
-			this.wanted().add(want);
-			// The first whole picture in a scheme: every board will want one in it.
-			if (kind === "whole") this.indexLater(2_000);
-		}
+		this.asked(scheme, kind);
 		return this.ask(board, scheme, gone, false, kind);
 	}
 
+	/** A browser asked for a picture in this scheme and kind: the indexer keeps that kind from now on, starting now if it is new. */
+	asked(scheme: ThumbScheme, kind: ThumbKind): void {
+		if (kind === "small") kind = "whole";
+		if (kind === "whole") this.lastScheme = scheme;
+		const want = kind === "card" ? scheme : `${scheme}/${kind}`;
+		if (this.wanted().has(want)) return;
+		this.wanted().add(want);
+		// The first whole picture in a scheme: every board will want one in it.
+		if (kind === "whole") this.indexLater(2_000);
+	}
+
 	/**
-	 * Something to show while the picture is being taken: the newest older picture of this board,
-	 * in this scheme and kind (an earlier revision, or one from before a `PICTURE_LOOK` change),
-	 * with the real one asked for behind it. Undefined when the real one is already on disk or
-	 * there is nothing older, and the caller waits for the picture as before.
+	 * A board's picture at a size, made if it is missing: `"whole"`, or a copy's width (`SMALL_WIDTHS`).
+	 * A copy is cut from the whole picture when there is one, the 192 from the 480 otherwise, and the
+	 * 480 is taken straight from the page (`SMALL_TAKEN`). `ahead` is the background's: a browser's
+	 * request is taken before it.
+	 */
+	async picture(board: Board, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
+		const whole = join(this.host.dir, thumbName(board.path, board.rev, scheme, "whole"));
+		if (size === "whole") return this.ask(board, scheme, gone, ahead, "whole");
+		const target = smallName(whole, size);
+		if (existsSync(target)) return target;
+		let source: string;
+		if (existsSync(whole)) source = whole;
+		else if (size !== SMALL_TAKEN) source = await this.picture(board, scheme, SMALL_TAKEN, gone, ahead);
+		else return this.ask(board, scheme, gone, ahead, "small");
+		const made = await this.smaller(source, size, true, target);
+		return typeof made === "string" ? made : target;
+	}
+
+	/**
+	 * What to show for a board at a size right now: the picture itself when it is on disk (`exact`),
+	 * otherwise the nearest one there is of this revision (the smallest at least that size, or else
+	 * the largest), otherwise the same from the newest earlier revision, and undefined when the board
+	 * has no picture at all in this scheme. The caller asks for the real one behind it (`picture`).
 	 *
 	 * Without it a board with no current picture was blank on the canvas until the server's Chrome,
 	 * two pages at a time, reached it: zooming out over dozens of boards after a look change was a
 	 * screen of empty rectangles filling in over a minute.
 	 */
-	standIn(board: Board, scheme: ThumbScheme, kind: ThumbKind = "card"): string | undefined {
-		if (existsSync(join(this.host.dir, thumbName(board.path, board.rev, scheme, kind)))) return undefined;
-		const any = pictureOf(board.path, scheme, kind);
-		let best: { file: string; at: number } | undefined;
-		try {
-			for (const name of readdirSync(this.host.dir)) {
-				if (!any.test(name)) continue;
-				const file = join(this.host.dir, name);
-				const at = statSync(file).mtimeMs;
-				if (!best || at > best.at) best = { file, at };
-			}
-		} catch {
-			return undefined;
+	nearest(board: Board, scheme: ThumbScheme, size: "whole" | number): { file: string; exact: boolean } | undefined {
+		const want = size === "whole" ? Number.POSITIVE_INFINITY : size;
+		const whole = thumbName(board.path, board.rev, scheme, "whole");
+		const exact = size === "whole" ? whole : smallName(whole, size);
+		const wholes = pictureOf(board.path, scheme, "whole");
+		const copies = smallOf(board.path, scheme);
+		const found: Array<{ name: string; rev: string; width: number }> = [];
+		for (const name of this.listDir()) {
+			if (name === exact) return { file: join(this.host.dir, name), exact: true };
+			const copy = copies.test(name);
+			if (!copy && !wholes.test(name)) continue;
+			const width = copy ? Number(/-whole-w(\d+)/.exec(name)?.[1] ?? 0) : Number.POSITIVE_INFINITY;
+			found.push({ name, rev: name.split("-")[1] ?? "", width });
 		}
-		if (!best) return undefined;
-		this.get(board, scheme, () => false, kind).catch(() => {});
-		return best.file;
+		if (found.length === 0) return undefined;
+		const current = whole.slice(0, whole.indexOf("-whole")).replace(/-\d+$/, "");
+		// This revision in this look, or else the revision whose picture was written last.
+		let pool = found.filter((one) => one.name.startsWith(current) && one.name.includes(`-l${PICTURE_LOOK}.`));
+		if (pool.length === 0) {
+			const at = (one: { name: string }) => {
+				try {
+					return statSync(join(this.host.dir, one.name)).mtimeMs;
+				} catch {
+					return 0;
+				}
+			};
+			const newest = found.reduce((a, b) => (at(b) > at(a) ? b : a));
+			pool = found.filter((one) => one.rev === newest.rev);
+		}
+		const atLeast = pool.filter((one) => one.width >= want).sort((a, b) => a.width - b.width)[0];
+		const pick = atLeast ?? pool.sort((a, b) => b.width - a.width)[0]!;
+		return { file: join(this.host.dir, pick.name), exact: false };
 	}
 
 	/**
@@ -513,7 +575,12 @@ export class ThumbService {
 			this.settling.delete(board.path);
 			for (const want of this.wanted()) {
 				const [scheme, kind] = want.split("/") as [ThumbScheme, ThumbKind | undefined];
-				this.ask(board, scheme, () => false, true, kind ?? "card").catch(() => {});
+				// A whole picture is retaken as its small sizes; the whole one when somebody asks for it.
+				if (kind === "whole") {
+					void (async () => {
+						for (const width of [...SMALL_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
+					})().catch(() => {});
+				} else this.ask(board, scheme, () => false, true, kind ?? "card").catch(() => {});
 			}
 		}, this.host.settleMs ?? SETTLE_MS);
 		timer.unref?.();
@@ -632,27 +699,41 @@ export class ThumbService {
 		 * as one.
 		 */
 		const full = thumbClip({ w: job.board.w, h: Number.MAX_SAFE_INTEGER });
-		// A whole picture is laid out at the board's own height, as the canvas lays it out.
-		const tall = job.kind === "whole" ? Math.max(full.height, Math.min(Math.round(job.board.h), WHOLE_MAX_H)) : full.height;
-		const context = await browser.newContext({
-			viewport: { width: full.width, height: tall },
-			deviceScaleFactor: job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : full.scale,
-			colorScheme: job.scheme,
-			reducedMotion: "reduce",
-		});
+		const entire = job.kind !== "card";
+		// A whole picture, or a small one, is laid out at the board's own height, as the canvas lays it out.
+		const tall = entire ? Math.max(full.height, Math.min(Math.round(job.board.h), WHOLE_MAX_H)) : full.height;
+		/*
+		 * The background's small pictures reuse a tab (`lease`): a fresh one per picture was an eighth
+		 * of the time each took. Everything else gets its own, at the scale it is drawn at.
+		 */
+		const lease = job.ahead && job.kind === "small" ? await this.lease(browser, job.scheme) : undefined;
+		const context =
+			lease?.context ??
+			(await browser.newContext({
+				viewport: { width: full.width, height: tall },
+				deviceScaleFactor: job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : job.kind === "small" ? 1 : full.scale,
+				colorScheme: job.scheme,
+				reducedMotion: "reduce",
+			}));
+		let given = false;
 		// A page that never finishes (a script that never stops, a screenshot that never comes) is closed, which ends every call on it.
 		const watchdog = setTimeout(() => {
+			given = true;
 			console.log(`[decks] board pictures: ${job.board.path} took longer than ${TAKE_MS / 1000} s and was given up`);
 			void context.close().catch(() => {});
 		}, TAKE_MS);
 		try {
-			const page = await context.newPage();
+			const page = lease?.page ?? (await context.newPage());
+			if (lease) await page.setViewportSize({ width: full.width, height: tall });
 			const url = `${this.host.origin()}/api/board/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
 			await page.goto(url, { waitUntil: "load", timeout: 20_000 });
-			// `board.js` sets this after fonts, markdown, maths and diagrams. A board that never
-			// says so is drawn as it stands: a late picture beats none.
-			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: READY_MS }).catch(() => {});
-			const clipOf = (b: Pick<Board, "w" | "h">) => (job.kind === "whole" ? { ...thumbClip(b), height: Math.max(150, Math.min(Math.round(b.h), WHOLE_MAX_H)) } : thumbClip(b));
+			/*
+			 * `board.js` sets this after fonts, markdown, maths and diagrams. A board that never says
+			 * so is drawn as it stands: a late picture beats none. The background waits less for one:
+			 * two such boards were an eighth of a sweep's time.
+			 */
+			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
+			const clipOf = (b: Pick<Board, "w" | "h">) => (entire ? { ...thumbClip(b), height: Math.max(150, Math.min(Math.round(b.h), WHOLE_MAX_H)) } : thumbClip(b));
 			let clip = clipOf(job.board);
 			if (job.board.format !== "slides") {
 				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
@@ -668,28 +749,56 @@ export class ThumbService {
 			const shot =
 				job.kind === "whole"
 					? await wholeShot(page, clip, wholeScale({ w: job.board.w, h: tall }))
-					: await page.screenshot({ type: "jpeg", quality: 82, clip: { x: 0, y: 0, width: clip.width, height: clip.height }, animations: "disabled", timeout: 15_000 });
+					: job.kind === "small"
+						? await wholeShot(page, clip, Math.min(2, SMALL_TAKEN / clip.width))
+						: await page.screenshot({ type: "jpeg", quality: 82, clip: { x: 0, y: 0, width: clip.width, height: clip.height }, animations: "disabled", timeout: 15_000 });
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(job.file, shot);
 			this.forgetOlder(job);
-			// Its smaller copies now, while the browser is up, so a canvas zoomed out never waits for one.
+			// The smaller sizes now, while the browser is up, so a canvas zoomed out never waits for one.
+			const whole = join(this.host.dir, thumbName(job.board.path, job.board.rev, job.scheme, "whole"));
 			if (job.kind === "whole") for (const width of SMALL_WIDTHS) void this.smaller(job.file, width).catch(() => {});
+			if (job.kind === "small") for (const width of SMALL_WIDTHS) if (width < SMALL_TAKEN) void this.smaller(job.file, width, true, smallName(whole, width)).catch(() => {});
 		} finally {
 			clearTimeout(watchdog);
-			await context.close().catch(() => {});
+			if (lease && !given) this.release(lease);
+			else await context.close().catch(() => {});
 		}
+	}
+
+	/** Tabs kept for the background's small pictures, by scheme, on the browser they belong to. */
+	private tabs: { browser: Browser; free: Map<ThumbScheme, Array<{ context: BrowserContext; page: Page; scheme: ThumbScheme }>> } | undefined;
+
+	private async lease(browser: Browser, scheme: ThumbScheme): Promise<{ context: BrowserContext; page: Page; scheme: ThumbScheme }> {
+		if (this.tabs?.browser !== browser) this.tabs = { browser, free: new Map() };
+		const kept = this.tabs.free.get(scheme)?.pop();
+		if (kept) return kept;
+		const context = await browser.newContext({ viewport: { width: 1000, height: 800 }, deviceScaleFactor: 1, colorScheme: scheme, reducedMotion: "reduce" });
+		return { context, page: await context.newPage(), scheme };
+	}
+
+	private release(tab: { context: BrowserContext; page: Page; scheme: ThumbScheme }): void {
+		const free = this.tabs?.free;
+		if (!free) {
+			void tab.context.close().catch(() => {});
+			return;
+		}
+		const list = free.get(tab.scheme) ?? [];
+		list.push(tab);
+		free.set(tab.scheme, list);
 	}
 
 	/** A board's earlier revisions, in this scheme: nobody will ask for them again. */
 	private forgetOlder(job: Job): void {
 		const mine = thumbName(job.board.path, job.board.rev, job.scheme, job.kind);
+		const thisRev = `${mine.split("-")[0]}-${job.board.rev}-`;
 		const any = pictureOf(job.board.path, job.scheme, job.kind);
-		const small = job.kind === "whole" ? smallOf(job.board.path, job.scheme) : undefined;
+		// A whole or small picture replaces the small ones of earlier revisions; its own revision's stay.
+		const small = job.kind !== "card" ? smallOf(job.board.path, job.scheme) : undefined;
 		try {
 			for (const name of readdirSync(this.host.dir)) {
-				if (name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });
-				// The smaller copies of an earlier revision: this one's are made again from the new picture.
-				else if (small?.test(name)) rmSync(join(this.host.dir, name), { force: true });
+				if (job.kind !== "small" && name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });
+				else if (small?.test(name) && !name.startsWith(thisRev)) rmSync(join(this.host.dir, name), { force: true });
 			}
 		} catch {
 			/* a directory that cannot be listed keeps its old pictures, which costs bytes and nothing else */
@@ -773,6 +882,7 @@ export class ThumbService {
 		const browser = this.browser;
 		this.browser = undefined;
 		this.resizer = undefined;
+		this.tabs = undefined;
 		await browser?.then((one) => one.close()).catch(() => {});
 	}
 

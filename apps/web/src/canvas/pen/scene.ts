@@ -201,8 +201,8 @@ async function pictureWidth(blob: Blob): Promise<number | undefined> {
  */
 const FETCHES = 6;
 /** How long after a stand-in picture the real one is asked for again, and how many times. */
-const STAND_IN_RETRY_MS = 2500;
-const STAND_IN_TRIES = 24;
+const STAND_IN_RETRY_MS = 1200;
+const STAND_IN_TRIES = 50;
 /** How long the camera has to be still before a picture is decoded at a new size. */
 const SETTLE_MS = 200;
 /**

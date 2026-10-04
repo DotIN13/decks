@@ -271,30 +271,38 @@ export function createHttpApp(app: App): Express {
 				// A smaller copy of a whole picture, for a canvas zoomed out (`SMALL_WIDTHS`).
 				const width = Number(req.query.w);
 				const small = kind === "whole" && SMALL_WIDTHS.includes(width) ? width : undefined;
-				const send = async (file: string | Buffer) => {
-					if (typeof file === "string") {
-						res.type(file.endsWith(".webp") ? "webp" : "jpeg");
-						await sendFile(res, file);
-					} else res.type(pictureType(file)).send(file);
+				const send = async (file: string) => {
+					res.type(file.endsWith(".webp") ? "webp" : "jpeg");
+					await sendFile(res, file);
 				};
-				/*
-				 * An older picture of the board while the current one is taken: not cached, and said
-				 * to be a stand-in, so the canvas asks again until the real one comes (`pen/scene.ts`).
-				 * Whole pictures only: a gallery card is an `<img>`, which would keep the stand-in.
-				 */
-				const standIn = kind === "whole" ? app.thumbs.standIn(board, scheme, kind) : undefined;
-				if (standIn) {
-					res.setHeader("Cache-Control", "no-store");
-					res.setHeader("X-Decks-Stand-In", "1");
-					await send(small ? await app.thumbs.smaller(standIn, small, false) : standIn);
+				if (kind === "card") {
+					const file = await app.thumbs.get(board, scheme, () => gone, kind);
+					if (gone) return;
+					res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
+					await send(file);
 					return;
 				}
-				const file = await app.thumbs.get(board, scheme, () => gone, kind);
-				if (gone) return;
-				const shown = small ? await app.thumbs.smaller(file, small) : file;
+				/*
+				 * A board's picture for the canvas: the one asked for when it is on disk; otherwise
+				 * whatever the board has that is nearest (another size, an earlier revision) at once,
+				 * not cached and said to be a stand-in so the canvas asks again (`pen/scene.ts`), with
+				 * the one asked for made ahead of the background's work. Only a board with no picture at
+				 * all waits. Not for a gallery card: an `<img>` would keep the stand-in.
+				 */
+				const size = small ?? "whole";
+				app.thumbs.asked(scheme, "whole");
+				const near = app.thumbs.nearest(board, scheme, size);
+				if (near && !near.exact) {
+					app.thumbs.picture(board, scheme, size).catch(() => {});
+					res.setHeader("Cache-Control", "no-store");
+					res.setHeader("X-Decks-Stand-In", "1");
+					await send(near.file);
+					return;
+				}
+				const file = near?.file ?? (await app.thumbs.picture(board, scheme, size, () => gone));
 				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
-				await send(shown);
+				await send(file);
 			} catch (error) {
 				if (!gone) res.status(503).type("text").send((error as Error).message);
 			}
@@ -355,8 +363,8 @@ export function createHttpApp(app: App): Express {
 				board: (path) => app.deck.board(path),
 				stage: { dir: join(pens.dir, name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.boards(name) },
 				picture: async (board, scheme) => {
-					const older = app.thumbs.standIn(board, scheme, "whole");
-					if (older) return older;
+					const near = app.thumbs.nearest(board, scheme, "whole");
+					if (near) return near.file;
 					const left = until - Date.now();
 					if (left <= 0) return undefined;
 					return Promise.race([app.thumbs.get(board, scheme, () => false, "whole"), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);

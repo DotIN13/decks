@@ -34,6 +34,7 @@ function fake() {
 					await new Promise<void>((resolve) => gates.push(resolve));
 				},
 				waitForFunction: async () => {},
+				setViewportSize: async () => {},
 				evaluate: async () => 1234,
 				screenshot: async (options: { clip: { height: number } }) => {
 					clips.push(options.clip.height);
@@ -237,27 +238,50 @@ test("the two kinds of picture have names of their own, and neither is taken for
 	assert.ok(cardAny.test(card) && !cardAny.test(whole));
 });
 
-test("while a whole picture is taken, the board's older one stands in, and the new one is asked for behind it", async () => {
+test("what stands in for a picture: this revision at the nearest size, else the newest earlier revision", () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
-	const chrome = fake();
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => fake().browser);
 	const a = board("boards/a.html", 4);
-	assert.equal(thumbs.standIn(a, "light", "whole"), undefined, "nothing older: the caller waits");
-	// A picture from before a look change, at an older revision, under the old name and format.
+	assert.equal(thumbs.nearest(a, "light", 192), undefined, "nothing at all: the caller waits");
+	// An earlier revision's whole picture, from before a look change.
 	const old = join(dir, thumbName("boards/a.html", 3, "light", "whole").replace(/-l\d+\.webp$/, ".jpg"));
 	writeFileSync(old, "old");
-	assert.equal(thumbs.standIn(a, "light", "whole"), old);
-	assert.equal(thumbs.standIn(a, "dark", "whole"), undefined, "another scheme's picture is not a stand-in");
-	await tick();
-	assert.equal(chrome.opened.length, 1, "the current picture is being taken");
-	await chrome.release();
-	await thumbs.get(a, "light", () => false, "whole");
-	assert.equal(thumbs.standIn(a, "light", "whole"), undefined, "the current one exists: no stand-in");
-	assert.equal(existsSync(old), false, "and the older one is gone");
+	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: old, exact: false });
+	assert.equal(thumbs.nearest(a, "dark", 192), undefined, "another scheme's picture does not stand in");
+	// This revision's 480 beats any earlier revision, for a 192 and for the whole picture alike.
+	const whole = thumbName("boards/a.html", 4, "light", "whole");
+	const at480 = join(dir, thumbName("boards/a.html", 4, "light", "small"));
+	writeFileSync(at480, "480");
+	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: at480, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: at480, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", 480), { file: at480, exact: true });
+	// Of this revision's, the smallest at least the size asked for.
+	writeFileSync(join(dir, whole), "whole");
+	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: at480, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: join(dir, whole), exact: true });
 	thumbs.dispose();
 });
 
-test("the indexer takes every missing whole picture and its copies, and says how far it has got", async () => {
+test("a whole picture somebody asks for is taken before the background's small ones", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	const chrome = fake();
+	const boards = ["a", "b", "c", "d"].map((n) => board(`boards/${n}.html`));
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	const sweep = thumbs.index();
+	await tick();
+	const asked = thumbs.picture(board("boards/z.html"), "light", "whole");
+	// The two pages open are the background's; the next one opened is the one asked for.
+	await chrome.release();
+	await tick();
+	assert.match(chrome.opened.at(-1)!.url, /z\.html$/);
+	let done = false;
+	void Promise.all([sweep, asked]).then(() => (done = true));
+	for (let i = 0; i < 40 && !done; i++) await chrome.release();
+	await asked;
+	thumbs.dispose();
+});
+
+test("the indexer takes every board's small pictures, not its whole one, and says how far it has got", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
 	const boards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
@@ -275,7 +299,8 @@ test("the indexer takes every missing whole picture and its copies, and says how
 	assert.deepEqual(thumbs.progress(), { total: 3, ready: 3, working: false, failed: 0 });
 	for (const one of boards) {
 		const whole = thumbName(one.path, one.rev, "light", "whole");
-		assert.ok(existsSync(join(dir, whole)), `${one.path} has its whole picture`);
+		assert.ok(!existsSync(join(dir, whole)), `${one.path} has no whole picture until one is asked for`);
+		assert.ok(existsSync(join(dir, thumbName(one.path, one.rev, "light", "small"))), `${one.path} has its 480 px picture`);
 		assert.ok(readdirSync(dir).some((name) => name.startsWith(whole.replace(/-whole-l\d+\.\w+$/, "-whole-w192"))), `${one.path} has its 192 px copy`);
 	}
 	// Nothing missing: a second sweep takes nothing.
