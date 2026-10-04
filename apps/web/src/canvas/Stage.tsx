@@ -3190,6 +3190,13 @@ export function Stage(props: {
 		const corner = toWorld(props.camera, v, { x: -v.width, y: -v.height });
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / props.camera.zoom, h: (3 * v.height) / props.camera.zoom };
 	};
+	/**
+	 * The boards whose page the admission still holds (`createAdmission`, made further down, which
+	 * sets this). Leaving reach is not leaving: a page is let go only once it has been gone a while
+	 * and the camera has been still, and a node taken away mid-zoom took its page with it, to be
+	 * loaded again as the zoom came back.
+	 */
+	let heldPages: () => readonly string[] = () => [];
 	const rendered = createMemo<readonly Board[]>((was) => {
 		const boards = props.boards;
 		if (view().width === 0) return was ?? [];
@@ -3211,6 +3218,7 @@ export function Stage(props: {
 		for (const path of liveBoards().keys()) keep(path);
 		// A kept page stays a node wherever the camera goes, or leaving would unload it.
 		for (const path of keptPages()) keep(path);
+		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
 		keep(props.editing?.path);
 		for (const path of boardDrag()?.paths ?? []) keep(path);
@@ -3351,6 +3359,11 @@ export function Stage(props: {
 		},
 	});
 	createEffect(() => admission.begin());
+	heldPages = admission.held;
+	// At rest below the live zoom no board has a page, kept ones aside, so the admission holds none.
+	createEffect(() => {
+		if (!liveZoom()) admission.forget();
+	});
 
 
 

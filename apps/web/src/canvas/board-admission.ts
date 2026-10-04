@@ -103,6 +103,13 @@ export interface Admission {
 	mayHaveDocument: (board: Board) => boolean;
 	/** Called from an effect: start letting boards in once the app has opened. */
 	begin: () => void;
+	/**
+	 * The boards that still have a document and that `isMounted` still holds, wherever the camera
+	 * is: the stage keeps a node for each, since a node taken away takes its page with it.
+	 */
+	held: () => string[];
+	/** Every document is gone (the camera came to rest below the live zoom): none is held any more. */
+	forget: () => void;
 }
 
 export function createAdmission(host: AdmissionHost): Admission {
@@ -267,6 +274,19 @@ export function createAdmission(host: AdmissionHost): Admission {
 		},
 		begin: () => {
 			if (host.mayStart()) pump();
+		},
+		held: () => {
+			void sweep();
+			if (live.size === 0) return [];
+			const byPath = new Map(host.boards().map((board) => [board.path, board]));
+			return [...live].filter((path) => {
+				const board = byPath.get(path);
+				return board !== undefined && isMounted(board, host.live());
+			});
+		},
+		forget: () => {
+			live.clear();
+			admitted.clear();
 		},
 	};
 }
