@@ -256,3 +256,30 @@ test("while a whole picture is taken, the board's older one stands in, and the n
 	assert.equal(existsSync(old), false, "and the older one is gone");
 	thumbs.dispose();
 });
+
+test("the indexer takes every missing whole picture and its copies, and says how far it has got", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	const chrome = fake();
+	const boards = [board("boards/a.html"), board("boards/b.html"), board("boards/c.html")];
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, boards: () => boards }, async () => chrome.browser);
+	assert.deepEqual(thumbs.progress(), { total: 3, ready: 0, working: false, failed: 0 });
+	const sweep = thumbs.index();
+	await tick();
+	assert.equal(thumbs.progress().working, true);
+	// Two pages at a time, behind anything a browser asks for.
+	assert.ok(chrome.most() <= 2);
+	let done = false;
+	void sweep.then(() => (done = true));
+	for (let i = 0; i < 20 && !done; i++) await chrome.release();
+	await sweep;
+	assert.deepEqual(thumbs.progress(), { total: 3, ready: 3, working: false, failed: 0 });
+	for (const one of boards) {
+		const whole = thumbName(one.path, one.rev, "light", "whole");
+		assert.ok(existsSync(join(dir, whole)), `${one.path} has its whole picture`);
+		assert.ok(readdirSync(dir).some((name) => name.startsWith(whole.replace(/-whole-l\d+\.\w+$/, "-whole-w192"))), `${one.path} has its 192 px copy`);
+	}
+	// Nothing missing: a second sweep takes nothing.
+	const before = chrome.opened.length;
+	await thumbs.index();
+	assert.equal(chrome.opened.length, before);
+});

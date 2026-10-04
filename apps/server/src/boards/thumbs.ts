@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Board } from "@decks/protocol";
 
@@ -126,7 +126,24 @@ export interface ThumbHost {
 	 * takes the picture has laid the document out, which is the one thing a measurement needs.
 	 */
 	measured?: (path: string, rev: number, h: number) => void;
+	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
+	boards?: () => Board[];
 }
+
+/** How far the indexer has got (`ThumbService.progress`), for the app's ⋯ menu. */
+export interface PictureProgress {
+	/** Boards times the schemes pictures are kept in. */
+	total: number;
+	/** Of those, the ones with a current whole picture and every smaller copy. */
+	ready: number;
+	/** The indexer is sweeping, or pictures are being taken or copied. */
+	working: boolean;
+	/** Pictures this sweep could not take: a board that would not draw. */
+	failed: number;
+}
+
+/** Boards the indexer works on at once; the browser takes two pictures at a time in all (`CONCURRENCY`). */
+const INDEXERS = 2;
 
 interface Job {
 	board: Board;
@@ -301,8 +318,12 @@ export class ThumbService {
 		const known = this.shrinking.get(target);
 		if (known) return known;
 		const bytes = readFileSync(file);
-		// No wider than that already, or not a WebP: the picture itself.
-		if ((webpWidth(bytes) ?? 0) <= width) return file;
+		// No wider than that already, or not a WebP: the picture itself, kept under the copy's name so it is not missing.
+		if ((webpWidth(bytes) ?? 0) <= width) {
+			if (!keep) return file;
+			copyFileSync(file, target);
+			return target;
+		}
 		const making = this.borrow(async (browser) => {
 			if (this.resizer?.browser !== browser) this.resizer = { browser, pages: [], next: 0 };
 			const turn = this.resizer.next++ % RESIZERS;
@@ -321,35 +342,95 @@ export class ThumbService {
 	}
 
 	/**
-	 * Make the smaller copies every whole picture on disk is missing, a few at a time, once the
-	 * server has been up `after` ms: pictures taken before copies existed would otherwise each be
-	 * made while a canvas waits, which for 400 boards was half a minute of one first look.
+	 * Keep a whole picture and its smaller copies of every board, in every scheme the canvas has asked
+	 * for, taking whatever is missing in the background: once `after` ms from the server's start, and
+	 * again when a new scheme is first asked for. Boards that change later are retaken by `changed`.
+	 * Pictures somebody is waiting on go first: the indexer's are asked for as `ahead`, a few at a
+	 * time, and a browser's request jumps the queue (`ask`).
+	 *
+	 * Without it a canvas nobody had zoomed out on had no pictures, and each was taken while the first
+	 * person to look waited, two at a time: half a minute for 400 boards.
 	 */
-	backfillLater(after = 10_000): void {
-		const timer = setTimeout(() => void this.backfill(), after);
+	indexLater(after = 10_000): void {
+		const timer = setTimeout(() => void this.index(), after);
 		timer.unref?.();
 	}
 
-	private async backfill(): Promise<void> {
-		let names: string[];
-		try {
-			names = readdirSync(this.host.dir);
-		} catch {
+	private sweeping = false;
+	private sweepAgain = false;
+	private failures = new Set<string>();
+
+	async index(): Promise<void> {
+		if (!this.host.boards) return;
+		if (this.sweeping) {
+			this.sweepAgain = true;
 			return;
 		}
-		const have = new Set(names);
-		const look = new RegExp(`-whole-l${PICTURE_LOOK}\\.webp$`);
-		const todo: Array<[string, number]> = [];
-		for (const name of names) {
-			if (!look.test(name)) continue;
-			for (const width of SMALL_WIDTHS) if (!have.has(smallName(name, width))) todo.push([join(this.host.dir, name), width]);
+		this.sweeping = true;
+		this.failures.clear();
+		try {
+			do {
+				this.sweepAgain = false;
+				const todo = this.missing(new Set(this.listDir()));
+				const work = async () => {
+					for (let next = todo.shift(); next && !this.broken; next = todo.shift()) {
+						const { board, scheme } = next;
+						try {
+							const file = await this.ask(board, scheme, () => false, true, "whole");
+							for (const width of SMALL_WIDTHS) await this.smaller(file, width);
+						} catch {
+							this.failures.add(`${board.path}:${scheme}`);
+						}
+					}
+				};
+				await Promise.all(Array.from({ length: INDEXERS }, work));
+			} while (this.sweepAgain && !this.broken);
+		} finally {
+			this.sweeping = false;
 		}
-		if (todo.length === 0) return;
-		const work = async () => {
-			for (let next = todo.shift(); next && !this.broken; next = todo.shift()) await this.smaller(next[0], next[1]).catch(() => {});
+	}
+
+	/** How many boards have every picture they should, and whether more are being made. */
+	progress(): PictureProgress {
+		const have = new Set(this.listDir());
+		const boards = this.host.boards?.() ?? [];
+		const total = boards.length * this.indexSchemes().length;
+		const missing = this.missing(have).length;
+		return {
+			total,
+			ready: total - missing,
+			working: this.sweeping || this.running > 0 || this.queue.length > 0 || this.shrinking.size > 0,
+			failed: this.failures.size,
 		};
-		await Promise.all(Array.from({ length: RESIZERS }, work));
-		console.log(`[decks] board pictures: made ${SMALL_WIDTHS.join(" and ")} px copies where they were missing`);
+	}
+
+	/** Pictures are kept in the schemes the canvas has asked for whole pictures in, and in light before any. */
+	private indexSchemes(): ThumbScheme[] {
+		const schemes = [...this.wanted()].filter((one) => one.endsWith("/whole")).map((one) => one.split("/")[0] as ThumbScheme);
+		return schemes.length > 0 ? schemes : ["light"];
+	}
+
+	/** The boards and schemes without a current whole picture, or without one of its copies. */
+	private missing(have: Set<string>): Array<{ board: Board; scheme: ThumbScheme }> {
+		const out: Array<{ board: Board; scheme: ThumbScheme }> = [];
+		for (const scheme of this.indexSchemes()) {
+			for (const board of this.host.boards?.() ?? []) {
+				const whole = thumbName(board.path, board.rev, scheme, "whole");
+				if (have.has(whole) && SMALL_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
+				// A picture this sweep could not take is not missing again until the board changes.
+				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
+				out.push({ board, scheme });
+			}
+		}
+		return out;
+	}
+
+	private listDir(): string[] {
+		try {
+			return readdirSync(this.host.dir);
+		} catch {
+			return [];
+		}
 	}
 
 	/** False once a launch has failed: there is no browser here and asking again will not find one. */
@@ -364,7 +445,12 @@ export class ThumbService {
 	 * a page. Rejects when there is no Chromium, or the board would not draw.
 	 */
 	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false, kind: ThumbKind = "card"): Promise<string> {
-		this.wanted().add(kind === "card" ? scheme : `${scheme}/${kind}`);
+		const want = kind === "card" ? scheme : `${scheme}/${kind}`;
+		if (!this.wanted().has(want)) {
+			this.wanted().add(want);
+			// The first whole picture in a scheme: every board will want one in it.
+			if (kind === "whole") this.indexLater(2_000);
+		}
 		return this.ask(board, scheme, gone, false, kind);
 	}
 

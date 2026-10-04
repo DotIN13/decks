@@ -410,6 +410,29 @@
 	}
 
 	/*
+	 * The board pictures' progress (`chrome/PictureProgress.tsx`): a reading in the ⋯ menu, not a
+	 * place to go, so it does not light up under the pointer. Its bar is the row's own width.
+	 */
+	.popover [data-row].picture-progress:hover {
+		background: none;
+		cursor: default;
+	}
+	.picture-progress-track {
+		display: block;
+		height: 3px;
+		border-radius: 999px;
+		background: var(--line-strong);
+		overflow: hidden;
+	}
+	.picture-progress-fill {
+		display: block;
+		height: 100%;
+		border-radius: inherit;
+		background: var(--color-accent);
+		transition: width 400ms ease-out;
+	}
+
+	/*
 	 * A row that cannot be picked — the account already in use, a model with no key.
 	 *
 	 * It stays in the list and says so, rather than disappearing: a list that hides what you

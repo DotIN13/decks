@@ -205,6 +205,7 @@ export class App {
 			 * So this fills in a height nobody has reported yet — a board no browser has opened,
 			 * which is the reason the callback exists — and never overrules a frame's.
 			 */
+			boards: () => this.deck.boards,
 			measured: (path, rev, h) => {
 				const board = this.deck.board(path);
 				if (!board || board.format === "slides" || board.rev !== rev) return;
@@ -213,7 +214,7 @@ export class App {
 				if (resized) this.send({ type: "board.sized", path, h: resized.h });
 			},
 		});
-		this.thumbs.backfillLater();
+		this.thumbs.indexLater();
 		/*
 		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by

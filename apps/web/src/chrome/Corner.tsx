@@ -18,6 +18,7 @@ import { AgentStack } from "../agents/AgentStack.tsx";
 import { agentOrder } from "../agents/agent-order.ts";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 import { ContextRing } from "./ContextRing.tsx";
+import { PictureProgress } from "./PictureProgress.tsx";
 
 /**
  * The top-right cluster: who is working, how close you are, and the way into the
@@ -537,6 +538,9 @@ export function Corner(props: {
 						</button>
 					)}
 				</For>
+				{/* How far the server has got with the boards' pictures, beside the settings. */}
+				<span class="rule" />
+				<PictureProgress />
 			</Popover>
 		</div>
 	);

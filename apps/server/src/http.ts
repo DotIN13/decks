@@ -239,6 +239,12 @@ export function createHttpApp(app: App): Express {
 		}),
 	);
 
+	/** How far the server has got keeping a picture of every board (`ThumbService.index`), for the ⋯ menu. */
+	api.get("/pictures", (_req, res) => {
+		res.setHeader("Cache-Control", "no-store");
+		res.json(app.thumbs.progress());
+	});
+
 	/**
 	 * A picture of a board, for the panel's thumbnails (`boards/thumbs.ts`).
 	 *
