@@ -334,6 +334,12 @@ export function BoardFrame(props: {
 				shot = "none";
 				return setKeptForShot(false);
 			}
+			/*
+			 * The sheet draws the picture it has from now, not when the new one is back: the page stays
+			 * under it to be photographed, and a snapshot is a round trip to the server's Chrome of 2.5 to
+			 * 4 s, during which the board was a blank hole after every zoom out from reading distance.
+			 */
+			setLiveNow(false);
 			void props
 				.capture(frame)
 				.catch(() => {})

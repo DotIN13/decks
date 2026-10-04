@@ -942,6 +942,12 @@ export class StageScene {
 	}
 
 	private fetchPicture(entry: PictureEntry, size = entry.size ?? 0): void {
+		/*
+		 * A picture the page took of a live board as it went to sleep (`shots/adaptors.ts`) is a
+		 * `blob:` address of its own, with one size: an address with a size added is no address at
+		 * all, and the board was drawn blank after every zoom out from reading distance.
+		 */
+		if (!/^(https?:|\/)/.test(entry.url)) size = 0;
 		entry.fetching = true;
 		this.fetching++;
 		const url = size ? `${entry.url}${entry.url.includes("?") ? "&" : "?"}w=${size}` : entry.url;
