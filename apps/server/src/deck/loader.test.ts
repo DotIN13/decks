@@ -414,3 +414,21 @@ test("an edit keeps the measured height, and a new floor in the file replaces it
 	assert.equal(deck.refresh("boards/a.html")?.h, 500, "the new floor lands at once");
 	rmSync(root, { recursive: true, force: true });
 });
+
+test("a measured height is kept for the next start, at the revision it was measured at", () => {
+	const root = emptyDeck();
+	mkdirSync(join(root, ".decks"), { recursive: true });
+	writeFileSync(join(root, "boards", "a.html"), board("A", 1000, 259));
+	const deck = Deck.open(root);
+	assert.equal(deck.board("boards/a.html")?.h, 259);
+	assert.equal(deck.measured("boards/a.html"), false);
+	deck.setHeight("boards/a.html", 418);
+	deck.saveHeights();
+	const again = Deck.open(root);
+	assert.equal(again.board("boards/a.html")?.h, 418, "opened again, the board is as tall as it was measured");
+	assert.equal(again.measured("boards/a.html"), true);
+	// A different file is a different revision: its measurement is to be taken again, from the floor.
+	writeFileSync(join(root, "boards", "a.html"), board("A, edited", 1000, 259));
+	assert.equal(Deck.open(root).board("boards/a.html")?.h, 259);
+	rmSync(root, { recursive: true, force: true });
+});

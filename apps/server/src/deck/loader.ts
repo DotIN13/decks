@@ -66,11 +66,44 @@ export class Deck {
 	 * which is already the answer.
 	 */
 	private floors = new Map<string, number>();
+	/**
+	 * The last height measured for each board, at the revision it was measured for, kept in
+	 * `.decks/heights.json` (`setHeight`). A board's file states only a floor, so its real height is
+	 * known only once a page has laid it out; kept in memory alone, every restart sent boards back to
+	 * their stated floors, and a board whose picture was already taken was drawn cut short at it until
+	 * somebody zoomed in far enough to load its page.
+	 */
+	private heights = new Map<string, { rev: number; h: number }>();
+	private heightsTimer: ReturnType<typeof setTimeout> | undefined;
 	private resolved: ResolvedRoots;
 	readonly warnings: string[] = [];
 
 	private constructor(readonly path: string) {
 		this.resolved = resolveRoots(path, []);
+		try {
+			const saved = JSON.parse(readFileSync(join(path, ".decks", "heights.json"), "utf8")) as Record<string, { rev: number; h: number }>;
+			for (const [board, at] of Object.entries(saved)) if (Number.isFinite(at?.rev) && Number.isFinite(at?.h)) this.heights.set(board, at);
+		} catch {
+			/* none saved yet */
+		}
+	}
+
+	/** Whether a board's height has been measured at its current revision (`heights`). */
+	measured(boardPath: string): boolean {
+		const board = this.board(boardPath);
+		return !!board && this.heights.get(boardPath)?.rev === board.rev;
+	}
+
+	/** Write the measured heights (`heights`), for the next start. Called a moment after a change, and by tests. */
+	saveHeights(): void {
+		clearTimeout(this.heightsTimer);
+		this.heightsTimer = undefined;
+		try {
+			mkdirSync(join(this.path, ".decks"), { recursive: true });
+			writeFileSync(join(this.path, ".decks", "heights.json"), JSON.stringify(Object.fromEntries(this.heights)));
+		} catch {
+			/* a deck that cannot be written to measures again next time */
+		}
 	}
 
 	static open(path: string): Deck {
@@ -400,6 +433,14 @@ export class Deck {
 		const measured = Number.isFinite(h) && h > 0 ? Math.round(h) : undefined;
 		if (measured === undefined) return undefined;
 		const height = Math.max(measured, this.floors.get(board.path) ?? 0);
+		const known = this.heights.get(board.path);
+		if (known?.rev !== board.rev || known.h !== measured) {
+			this.heights.set(board.path, { rev: board.rev, h: measured });
+			if (this.heightsTimer === undefined) {
+				this.heightsTimer = setTimeout(() => this.saveHeights(), 500);
+				this.heightsTimer.unref?.();
+			}
+		}
 		if (height === board.h) return undefined;
 		board.h = height;
 		return board;
@@ -444,7 +485,10 @@ export class Deck {
 		 */
 		const floor = format === "slides" ? 0 : meta.h ?? 0;
 		this.floors.set(path, floor);
-		const height = format === "slides" ? slideHeight(width, meta.aspect) : floor || (shell === "foreign" ? FOREIGN_H : START_H);
+		const rev = revisionOf(source);
+		// Measured before, at this revision (`heights`): that height, as a measurement now would give.
+		const known = format === "slides" ? undefined : this.heights.get(path);
+		const height = format === "slides" ? slideHeight(width, meta.aspect) : known?.rev === rev ? Math.max(known.h, floor) : floor || (shell === "foreign" ? FOREIGN_H : START_H);
 		return {
 			path,
 			// `.slides.html` before `.html`, or a deck with no title of its own is called
@@ -461,7 +505,7 @@ export class Deck {
 			// writes inside the same millisecond leave it unchanged and the frame
 			// never reloads. A content hash also means an edit that puts a board back
 			// the way it was does not churn every open frame.
-			rev: revisionOf(source),
+			rev,
 			// The *other* reading of the same file, published because the canvas's
 			// "changed" mark needs a time (`board-news.ts`). A reading and not a promise:
 			// a board touched without being edited has a new time and the same revision.

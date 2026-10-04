@@ -257,6 +257,20 @@ const MEASURE = `(() => {
  * Run in the server's Chrome: a picture, as base64, decoded at `width` pixels wide and encoded again
  * as WebP. `null` when it is no wider than that already.
  */
+/** A WebP's size from its header, or undefined for anything else (a card's JPEG). */
+export function webpSize(bytes: Uint8Array): { w: number; h: number } | undefined {
+	const tag = (at: number) => String.fromCharCode(bytes[at]!, bytes[at + 1]!, bytes[at + 2]!, bytes[at + 3]!);
+	if (bytes.length < 30 || tag(0) !== "RIFF" || tag(8) !== "WEBP") return undefined;
+	const chunk = tag(12);
+	if (chunk === "VP8X") return { w: 1 + (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16)), h: 1 + (bytes[27]! | (bytes[28]! << 8) | (bytes[29]! << 16)) };
+	if (chunk === "VP8L") {
+		const bits = bytes[21]! | (bytes[22]! << 8) | (bytes[23]! << 16) | (bytes[24]! << 24);
+		return { w: 1 + (bits & 0x3fff), h: 1 + ((bits >> 14) & 0x3fff) };
+	}
+	if (chunk === "VP8 ") return { w: (bytes[26]! | (bytes[27]! << 8)) & 0x3fff, h: (bytes[28]! | (bytes[29]! << 8)) & 0x3fff };
+	return undefined;
+}
+
 /** A WebP's width from its header, or undefined for anything else (a card's JPEG). */
 export function webpWidth(bytes: Uint8Array): number | undefined {
 	const tag = (at: number) => String.fromCharCode(bytes[at]!, bytes[at + 1]!, bytes[at + 2]!, bytes[at + 3]!);
@@ -402,7 +416,7 @@ export class ThumbService {
 		try {
 			do {
 				this.sweepAgain = false;
-				const todo = this.missing(new Set(this.listDir()));
+				const todo = this.missing(new Set(this.listDir()), true);
 				const work = async () => {
 					for (let next = todo.shift(); next && !this.broken; next = todo.shift()) {
 						const { board, scheme } = next;
@@ -419,6 +433,26 @@ export class ThumbService {
 		} finally {
 			this.sweeping = false;
 		}
+	}
+
+	/**
+	 * A board's height as its picture of this revision shows it: the picture was taken at the height
+	 * the page measured, so its proportions say it, to a pixel or two. The whole picture when there is
+	 * one, else the 480 px one. Undefined when there is neither.
+	 */
+	heightFromPicture(board: Board): number | undefined {
+		for (const scheme of ["light", "dark"] as const) {
+			const whole = join(this.host.dir, thumbName(board.path, board.rev, scheme, "whole"));
+			for (const file of [whole, smallName(whole, SMALL_TAKEN)]) {
+				try {
+					const size = webpSize(readFileSync(file).subarray(0, 64));
+					if (size && size.w > 0) return Math.round((size.h * board.w) / size.w);
+				} catch {
+					/* not taken in this scheme or at this size */
+				}
+			}
+		}
+		return undefined;
 	}
 
 	/** How many boards have every picture they should, and whether more are being made. */
@@ -446,11 +480,11 @@ export class ThumbService {
 	private lastScheme: ThumbScheme | undefined;
 
 	/** The boards and schemes without a current whole picture, or without one of its copies. */
-	private missing(have: Set<string>): Array<{ board: Board; scheme: ThumbScheme }> {
+	private missing(have: Set<string>, ordered = false): Array<{ board: Board; scheme: ThumbScheme }> {
 		const out: Array<{ board: Board; scheme: ThumbScheme }> = [];
-		const placed = this.host.placed?.() ?? new Set<string>();
-		// Boards on a canvas first, in the deck's order otherwise.
-		const boards = [...(this.host.boards?.() ?? [])].sort((a, b) => Number(placed.has(b.path)) - Number(placed.has(a.path)));
+		// For a sweep, boards on a canvas first, in the deck's order otherwise; a count needs no order.
+		const placed = ordered ? (this.host.placed?.() ?? new Set<string>()) : new Set<string>();
+		const boards = ordered ? [...(this.host.boards?.() ?? [])].sort((a, b) => Number(placed.has(b.path)) - Number(placed.has(a.path))) : (this.host.boards?.() ?? []);
 		for (const scheme of this.indexSchemes()) {
 			for (const board of boards) {
 				const whole = thumbName(board.path, board.rev, scheme, "whole");

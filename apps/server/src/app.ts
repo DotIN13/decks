@@ -206,6 +206,7 @@ export class App {
 			 * which is the reason the callback exists — and never overrules a frame's.
 			 */
 			boards: () => this.deck.boards,
+			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.boards(name).map((one) => one.path))),
 			measured: (path, rev, h) => {
 				const board = this.deck.board(path);
 				if (!board || board.format === "slides" || board.rev !== rev) return;
@@ -215,6 +216,15 @@ export class App {
 			},
 		});
 		this.thumbs.indexLater();
+		/*
+		 * A board never measured at its revision since heights were kept starts at its file's floor; its
+		 * picture, taken at the measured height, says what it is. A page that loads measures it properly.
+		 */
+		for (const board of this.deck.boards) {
+			if (this.deck.measured(board.path)) continue;
+			const h = this.thumbs.heightFromPicture(board);
+			if (h !== undefined) this.deck.setHeight(board.path, h);
+		}
 		/*
 		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
