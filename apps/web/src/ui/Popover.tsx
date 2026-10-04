@@ -135,9 +135,22 @@ export function Popover(props: {
 			return;
 		}
 		// Two frames: one for the card to exist, one for fonts to have settled its height.
+		/*
+		 * And again whenever the card changes size: a row that fills in after it opens (the board
+		 * pictures' progress in the ⋯ menu) widened the card past the edge it was lined up with.
+		 */
+		let sized: ResizeObserver | undefined;
+		let closed = false;
 		requestAnimationFrame(() => {
 			place();
 			requestAnimationFrame(place);
+			if (closed || !card || typeof ResizeObserver !== "function") return;
+			sized = new ResizeObserver(() => place());
+			sized.observe(card);
+		});
+		onCleanup(() => {
+			closed = true;
+			sized?.disconnect();
 		});
 		/*
 		 * Picking a row closes the menu.

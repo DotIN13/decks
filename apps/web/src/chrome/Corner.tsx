@@ -383,7 +383,8 @@ export function Corner(props: {
 			{/* Everything that folded, plus the deck's own commands. Its contents are the
 			    integrator's — this is the handle. */}
 			<Popover
-				placement="bottom-start"
+				/* At the toolbar's right edge, as the toolbar ends there: a card from the button's left ran past it. */
+				placement="bottom-end"
 				label="More"
 				/* As wide as its longest row: three short words on a desktop, the folded toolbar on a phone. */
 				class="w-max min-w-[168px] max-w-[248px]"
@@ -539,7 +540,7 @@ export function Corner(props: {
 					)}
 				</For>
 				{/* How far the server has got with the boards' pictures, beside the settings. */}
-				<span class="rule" />
+				<span class="rule block" />
 				<PictureProgress />
 			</Popover>
 		</div>

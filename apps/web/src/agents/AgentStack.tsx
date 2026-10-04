@@ -186,7 +186,8 @@ export function AgentStack(props: {
 						onFocus={props.onFocus}
 						onClose={props.onClose}
 						{...(props.onMore ? { onMore: props.onMore } : {})}
-						placement="bottom-end"
+						/* Under the button that opens it, not at the toolbar's far end. */
+						placement="bottom-start"
 						label="Agents"
 						trigger={(api) => (
 							<button

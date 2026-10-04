@@ -40,7 +40,8 @@ export function PictureProgress() {
 	});
 	const done = () => {
 		const p = progress();
-		return !!p && p.ready >= p.total && !p.working;
+		// Every board has its pictures: a picture being retaken for a board just edited is not a sweep.
+		return !!p && p.ready >= p.total;
 	};
 	const share = () => {
 		const p = progress();
