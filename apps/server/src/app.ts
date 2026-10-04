@@ -213,6 +213,7 @@ export class App {
 				if (resized) this.send({ type: "board.sized", path, h: resized.h });
 			},
 		});
+		this.thumbs.backfillLater();
 		/*
 		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by

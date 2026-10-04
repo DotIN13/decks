@@ -69,7 +69,7 @@ say("the top-left pill has the boards panel's button, and no Home, dashboard tab
 		const answer = await fetch(src, { cache: "no-store" });
 		return { src, status: answer.status, type: answer.headers.get("content-type"), cache: answer.headers.get("cache-control"), ms: Math.round(performance.now() - started) };
 	}, { path: board.path, rev: board.rev });
-	say("…and the server's picture of a board, asked a second time, is answered from the disk, cacheable for a year", again.status === 200 && again.type === "image/jpeg" && /immutable/.test(again.cache ?? "") && again.ms < 300, JSON.stringify(again));
+	say("…and the server's picture of a board, asked a second time, is answered from the disk, cacheable for a year", again.status === 200 && /^image\/(jpeg|webp)$/.test(again.type ?? "") && /immutable/.test(again.cache ?? "") && again.ms < 300, JSON.stringify(again));
 }
 
 /*

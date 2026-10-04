@@ -164,6 +164,13 @@ interface DrawnItem {
  * (`wholeScale` on the server), so a board zoomed in on stays sharp.
  */
 const LEVELS = [96, 192, 384, 720, 1024, 1440, 2048];
+/**
+ * The smaller copies of a whole picture the server keeps (`SMALL_WIDTHS` in the server's
+ * `boards/thumbs.ts`). A board is fetched at the smallest that covers it on screen, and at a larger
+ * one only once the camera stops where it needs it: a first look at 400 boards zoomed out had
+ * downloaded each one's whole picture, 289 KB on average, 118 MB in all.
+ */
+const SMALL = [192, 480];
 
 /** A picture's width from its header, without decoding it: WebP (the server's whole pictures) or JPEG; undefined for anything else. */
 async function pictureWidth(blob: Blob): Promise<number | undefined> {
@@ -214,6 +221,8 @@ interface PictureEntry {
 	blob?: Blob;
 	/** The picture's own width, from its header: no level is decoded wider. */
 	natural?: number;
+	/** The width of the copy `blob` is (`SMALL`), or 0 for the whole picture. */
+	size?: number;
 	/**
 	 * The server sent an older picture of the board while it takes the current one
 	 * (`X-Decks-Stand-In`): drawn as it is, and asked for again until the real one comes.
@@ -908,11 +917,14 @@ export class StageScene {
 				this.entries.set(board.path, entry);
 			}
 			if (entry.failed) continue;
+			const need = board.w * zoom * this.view.dpr;
+			const size = SMALL.find((one) => one >= need) ?? 0;
 			if (!entry.blob) {
-				if (!entry.fetching && this.fetching < (this.off.has("serial") ? 1 : FETCHES)) this.fetchPicture(entry);
+				if (!entry.fetching && this.fetching < (this.off.has("serial") ? 1 : FETCHES)) this.fetchPicture(entry, size);
 				continue;
 			}
-			const need = board.w * zoom * this.view.dpr;
+			// A copy too small for the board on screen: a larger one once the camera has stopped, drawing this one until then.
+			if (still && !entry.fetching && entry.size !== 0 && entry.size !== undefined && (size === 0 || size > entry.size) && this.fetching < FETCHES) this.fetchPicture(entry, size);
 			const most = entry.natural ?? levels[levels.length - 1]!;
 			const level = Math.min(levels.find((one) => one >= need) ?? levels[levels.length - 1]!, most);
 			const has = entry.bitmap || entry.image ? entry.level : 0;
@@ -929,16 +941,19 @@ export class StageScene {
 		}
 	}
 
-	private fetchPicture(entry: PictureEntry): void {
+	private fetchPicture(entry: PictureEntry, size = entry.size ?? 0): void {
 		entry.fetching = true;
 		this.fetching++;
-		void fetch(entry.url, { credentials: "same-origin" })
+		const url = size ? `${entry.url}${entry.url.includes("?") ? "&" : "?"}w=${size}` : entry.url;
+		void fetch(url, { credentials: "same-origin" })
 			.then(async (response) => {
 				if (!response.ok) throw new Error(String(response.status));
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
 				const blob = await response.blob();
 				if (this.disposed || this.entries.get(entry.path) !== entry) return;
 				entry.natural = await pictureWidth(blob).catch(() => undefined);
+				// A picture no wider than the copy asked for came whole: there is nothing larger to ask for.
+				entry.size = size && entry.natural !== undefined && entry.natural < size ? 0 : size;
 				if (entry.blob) entry.redecode = true;
 				entry.blob = blob;
 				if (standIn) this.askAgain(entry);

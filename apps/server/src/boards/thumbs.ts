@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Board } from "@decks/protocol";
 
@@ -160,6 +160,24 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
 export const PICTURE_LOOK = 3;
 
 /** Every picture of this board in this scheme and kind, at any revision and width. */
+/**
+ * The widths a whole picture is also kept at (`ThumbService.smaller`). A zoomed-out canvas draws a
+ * board a few dozen pixels wide, and the whole picture, up to 2048 px and 289 KB on average, made a
+ * first look at 400 boards a download of 118 MB; at 192 px the same look is a few hundred kilobytes.
+ */
+export const SMALL_WIDTHS: readonly number[] = [192, 480];
+
+/** A whole picture's smaller copy, beside it on disk. */
+export function smallName(whole: string, width: number): string {
+	return whole.replace(/-whole(-l\d+)?\.(webp|jpg)$/, (_m, look: string | undefined) => `-whole-w${width}${look ?? ""}.webp`);
+}
+
+/** Every smaller copy of a board's whole pictures, in a scheme, whatever its revision. */
+function smallOf(path: string, scheme: ThumbScheme): RegExp {
+	const hash = thumbName(path, 0, scheme).slice(0, 16);
+	return new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole-w\\d+(-l\\d+)?\\.webp$`);
+}
+
 function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "card"): RegExp {
 	const hash = thumbName(path, 0, scheme).slice(0, 16);
 	return kind === "whole" ? new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole(-l\\d+)?\\.(jpg|webp)$`) : new RegExp(`^${hash}-\\d+-${scheme}(-\\d+)?(-l\\d+)?\\.jpg$`);
@@ -203,6 +221,38 @@ const MEASURE = `(() => {
 	return Math.ceil(h);
 })()`;
 
+/**
+ * Run in the server's Chrome: a picture, as base64, decoded at `width` pixels wide and encoded again
+ * as WebP. `null` when it is no wider than that already.
+ */
+/** A WebP's width from its header, or undefined for anything else (a card's JPEG). */
+export function webpWidth(bytes: Uint8Array): number | undefined {
+	const tag = (at: number) => String.fromCharCode(bytes[at]!, bytes[at + 1]!, bytes[at + 2]!, bytes[at + 3]!);
+	if (bytes.length < 30 || tag(0) !== "RIFF" || tag(8) !== "WEBP") return undefined;
+	const chunk = tag(12);
+	if (chunk === "VP8X") return 1 + (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16));
+	if (chunk === "VP8L") return 1 + (bytes[21]! | ((bytes[22]! & 0x3f) << 8));
+	if (chunk === "VP8 ") return (bytes[26]! | (bytes[27]! << 8)) & 0x3fff;
+	return undefined;
+}
+
+/** Tabs that make smaller copies at once: each decodes and encodes on its own thread. */
+const RESIZERS = 3;
+
+const SHRINK = `async ([b64, width]) => {
+	const text = atob(b64);
+	const bytes = new Uint8Array(text.length);
+	for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+	const bitmap = await createImageBitmap(new Blob([bytes]), { resizeWidth: width, resizeQuality: "high" });
+	const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+	canvas.getContext("2d").drawImage(bitmap, 0, 0);
+	bitmap.close();
+	const out = new Uint8Array(await (await canvas.convertToBlob({ type: "image/webp", quality: 0.85 })).arrayBuffer());
+	let binary = "";
+	for (let i = 0; i < out.length; i += 0x8000) binary += String.fromCharCode(...out.subarray(i, i + 0x8000));
+	return btoa(binary);
+}`;
+
 export class ThumbService {
 	private browser: Promise<Browser> | undefined;
 	private idle: ReturnType<typeof setTimeout> | undefined;
@@ -215,8 +265,92 @@ export class ThumbService {
 	private settling = new Map<string, ReturnType<typeof setTimeout>>();
 	/** The schemes and kinds anybody has asked for, as `light` or `light/whole`. Read off the disk the first time, so it survives a restart. */
 	private schemes: Set<string> | undefined;
+	/** Pages that make smaller copies of pictures (`smaller`), on the current browser, taken in turn. */
+	private resizer: { browser: Browser; pages: Promise<Page>[]; next: number } | undefined;
+	/** Smaller copies being made, by the file they will be. */
+	private shrinking = new Map<string, Promise<string | Buffer>>();
 
 	constructor(private host: ThumbHost, private launch: () => Promise<Browser> = launchChromium) {}
+
+	/**
+	 * The browser, started when there is none. One that goes away (it crashed, or was killed) is
+	 * forgotten, so the next picture starts another: kept, it answered every request after with
+	 * "browser has been closed" until the server restarted, and the canvas had no pictures.
+	 */
+	private started(): Promise<Browser> {
+		const launched = this.launch();
+		void launched.then(
+			(browser) =>
+				(browser as Partial<Pick<Browser, "on">>).on?.("disconnected", () => {
+					if (this.browser === launched) this.browser = undefined;
+					if (this.resizer?.browser === browser) this.resizer = undefined;
+				}),
+			() => {},
+		);
+		return launched;
+	}
+
+	/**
+	 * A whole picture at `width` pixels wide, made from the whole one by the server's Chrome, and
+	 * kept beside it when `keep` (a stand-in is not). The whole one when it is that narrow already.
+	 * The copy is WebP at quality 85; made once, it is a file like any other picture.
+	 */
+	async smaller(file: string, width: number, keep = true): Promise<string | Buffer> {
+		const target = smallName(file, width);
+		if (keep && existsSync(target)) return target;
+		const known = this.shrinking.get(target);
+		if (known) return known;
+		const bytes = readFileSync(file);
+		// No wider than that already, or not a WebP: the picture itself.
+		if ((webpWidth(bytes) ?? 0) <= width) return file;
+		const making = this.borrow(async (browser) => {
+			if (this.resizer?.browser !== browser) this.resizer = { browser, pages: [], next: 0 };
+			const turn = this.resizer.next++ % RESIZERS;
+			// A context each, so each tab is its own renderer and decodes on its own thread.
+			const page = await (this.resizer.pages[turn] ??= browser.newContext().then((context) => context.newPage()));
+			const out = await page.evaluate<string | null>(`(${SHRINK})(${JSON.stringify([bytes.toString("base64"), width])})`);
+			if (out === null) return file;
+			const small = Buffer.from(out, "base64");
+			if (!keep) return small;
+			mkdirSync(this.host.dir, { recursive: true });
+			writeFileSync(target, small);
+			return target;
+		}).finally(() => this.shrinking.delete(target));
+		this.shrinking.set(target, making);
+		return making;
+	}
+
+	/**
+	 * Make the smaller copies every whole picture on disk is missing, a few at a time, once the
+	 * server has been up `after` ms: pictures taken before copies existed would otherwise each be
+	 * made while a canvas waits, which for 400 boards was half a minute of one first look.
+	 */
+	backfillLater(after = 10_000): void {
+		const timer = setTimeout(() => void this.backfill(), after);
+		timer.unref?.();
+	}
+
+	private async backfill(): Promise<void> {
+		let names: string[];
+		try {
+			names = readdirSync(this.host.dir);
+		} catch {
+			return;
+		}
+		const have = new Set(names);
+		const look = new RegExp(`-whole-l${PICTURE_LOOK}\\.webp$`);
+		const todo: Array<[string, number]> = [];
+		for (const name of names) {
+			if (!look.test(name)) continue;
+			for (const width of SMALL_WIDTHS) if (!have.has(smallName(name, width))) todo.push([join(this.host.dir, name), width]);
+		}
+		if (todo.length === 0) return;
+		const work = async () => {
+			for (let next = todo.shift(); next && !this.broken; next = todo.shift()) await this.smaller(next[0], next[1]).catch(() => {});
+		};
+		await Promise.all(Array.from({ length: RESIZERS }, work));
+		console.log(`[decks] board pictures: made ${SMALL_WIDTHS.join(" and ")} px copies where they were missing`);
+	}
 
 	/** False once a launch has failed: there is no browser here and asking again will not find one. */
 	available(): boolean {
@@ -378,7 +512,7 @@ export class ThumbService {
 		clearTimeout(this.idle);
 		let browser: Browser;
 		try {
-			this.browser ??= this.launch();
+			this.browser ??= this.started();
 			browser = await this.browser;
 		} catch (error) {
 			this.browser = undefined;
@@ -431,6 +565,8 @@ export class ThumbService {
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(job.file, shot);
 			this.forgetOlder(job);
+			// Its smaller copies now, while the browser is up, so a canvas zoomed out never waits for one.
+			if (job.kind === "whole") for (const width of SMALL_WIDTHS) void this.smaller(job.file, width).catch(() => {});
 		} finally {
 			await context.close().catch(() => {});
 		}
@@ -440,9 +576,12 @@ export class ThumbService {
 	private forgetOlder(job: Job): void {
 		const mine = thumbName(job.board.path, job.board.rev, job.scheme, job.kind);
 		const any = pictureOf(job.board.path, job.scheme, job.kind);
+		const small = job.kind === "whole" ? smallOf(job.board.path, job.scheme) : undefined;
 		try {
 			for (const name of readdirSync(this.host.dir)) {
 				if (name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });
+				// The smaller copies of an earlier revision: this one's are made again from the new picture.
+				else if (small?.test(name)) rmSync(join(this.host.dir, name), { force: true });
 			}
 		} catch {
 			/* a directory that cannot be listed keeps its old pictures, which costs bytes and nothing else */
@@ -465,7 +604,7 @@ export class ThumbService {
 		clearTimeout(this.idle);
 		let browser: Browser;
 		try {
-			this.browser ??= this.launch();
+			this.browser ??= this.started();
 			browser = await this.browser;
 		} catch {
 			this.browser = undefined;
@@ -500,7 +639,7 @@ export class ThumbService {
 		clearTimeout(this.idle);
 		let browser: Browser;
 		try {
-			this.browser ??= this.launch();
+			this.browser ??= this.started();
 			browser = await this.browser;
 		} catch (error) {
 			this.browser = undefined;
@@ -525,6 +664,7 @@ export class ThumbService {
 	private async close(): Promise<void> {
 		const browser = this.browser;
 		this.browser = undefined;
+		this.resizer = undefined;
 		await browser?.then((one) => one.close()).catch(() => {});
 	}
 

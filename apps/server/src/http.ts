@@ -14,7 +14,7 @@ import { browse } from "./files/browse.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused } from "./files/upload.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
-import { pictureType } from "./boards/thumbs.ts";
+import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
@@ -262,6 +262,15 @@ export function createHttpApp(app: App): Express {
 			try {
 				const scheme = req.query.scheme === "dark" ? "dark" : "light";
 				const kind = req.query.whole === "1" ? "whole" : "card";
+				// A smaller copy of a whole picture, for a canvas zoomed out (`SMALL_WIDTHS`).
+				const width = Number(req.query.w);
+				const small = kind === "whole" && SMALL_WIDTHS.includes(width) ? width : undefined;
+				const send = async (file: string | Buffer) => {
+					if (typeof file === "string") {
+						res.type(file.endsWith(".webp") ? "webp" : "jpeg");
+						await sendFile(res, file);
+					} else res.type(pictureType(file)).send(file);
+				};
 				/*
 				 * An older picture of the board while the current one is taken: not cached, and said
 				 * to be a stand-in, so the canvas asks again until the real one comes (`pen/scene.ts`).
@@ -271,15 +280,15 @@ export function createHttpApp(app: App): Express {
 				if (standIn) {
 					res.setHeader("Cache-Control", "no-store");
 					res.setHeader("X-Decks-Stand-In", "1");
-					res.type(standIn.endsWith(".webp") ? "webp" : "jpeg");
-					await sendFile(res, standIn);
+					await send(small ? await app.thumbs.smaller(standIn, small, false) : standIn);
 					return;
 				}
 				const file = await app.thumbs.get(board, scheme, () => gone, kind);
 				if (gone) return;
+				const shown = small ? await app.thumbs.smaller(file, small) : file;
+				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
-				res.type(file.endsWith(".webp") ? "webp" : "jpeg");
-				await sendFile(res, file);
+				await send(shown);
 			} catch (error) {
 				if (!gone) res.status(503).type("text").send((error as Error).message);
 			}
