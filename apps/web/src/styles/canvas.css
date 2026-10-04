@@ -648,6 +648,19 @@
 	.stage[data-moving="true"] .board-node > .news-glow::after {
 	animation-play-state: paused;
 }
+	/*
+	 * A board being moved or sized: every glow is gone at once and fades back in where the board
+	 * lands, as the title bars do (`.bar-layer[data-moving]`). A filter, not the opacity, which
+	 * already carries the slow fade of being read; and none at rest, so it costs nothing then.
+	 */
+	.stage[data-carrying="true"] .board-node > .news-glow {
+	visibility: hidden;
+	filter: opacity(0);
+	transition: none;
+}
+	.stage:not([data-carrying="true"]) .board-node > .news-glow {
+	transition: opacity var(--read-ms, 1500ms) ease-out, filter 90ms ease-out;
+}
 	/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own
    moment and is at nothing when the read is stamped and the box goes. */
 .board-node > .news-glow[data-reading] {
