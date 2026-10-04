@@ -255,6 +255,14 @@ export function webpWidth(bytes: Uint8Array): number | undefined {
 
 /** Tabs that make smaller copies at once: each decodes and encodes on its own thread. */
 const RESIZERS = 3;
+/**
+ * The longest a picture, or a copy, may take before its tab is closed and it counts as failed.
+ * Taking a picture and making copies share the service's count of work in hand (`running`), which
+ * lets two at a time through: two that never ended stopped every picture after them, and the
+ * indexer with them, with nothing in the log.
+ */
+const TAKE_MS = 45_000;
+const RESIZE_MS = 20_000;
 
 const SHRINK = `async ([b64, width]) => {
 	const text = atob(b64);
@@ -328,8 +336,16 @@ export class ThumbService {
 			if (this.resizer?.browser !== browser) this.resizer = { browser, pages: [], next: 0 };
 			const turn = this.resizer.next++ % RESIZERS;
 			// A context each, so each tab is its own renderer and decodes on its own thread.
-			const page = await (this.resizer.pages[turn] ??= browser.newContext().then((context) => context.newPage()));
-			const out = await page.evaluate<string | null>(`(${SHRINK})(${JSON.stringify([bytes.toString("base64"), width])})`);
+			const opening = (this.resizer.pages[turn] ??= browser.newContext().then((context) => context.newPage()));
+			const page = await opening;
+			const watchdog = setTimeout(() => {
+				console.log(`[decks] board pictures: a ${width} px copy of ${file} took longer than ${RESIZE_MS / 1000} s and was given up`);
+				if (this.resizer?.pages[turn] === opening) delete this.resizer.pages[turn];
+				void page.context().close().catch(() => {});
+			}, RESIZE_MS);
+			const out = await page
+				.evaluate<string | null>(`(${SHRINK})(${JSON.stringify([bytes.toString("base64"), width])})`)
+				.finally(() => clearTimeout(watchdog));
 			if (out === null) return file;
 			const small = Buffer.from(out, "base64");
 			if (!keep) return small;
@@ -624,6 +640,11 @@ export class ThumbService {
 			colorScheme: job.scheme,
 			reducedMotion: "reduce",
 		});
+		// A page that never finishes (a script that never stops, a screenshot that never comes) is closed, which ends every call on it.
+		const watchdog = setTimeout(() => {
+			console.log(`[decks] board pictures: ${job.board.path} took longer than ${TAKE_MS / 1000} s and was given up`);
+			void context.close().catch(() => {});
+		}, TAKE_MS);
 		try {
 			const page = await context.newPage();
 			const url = `${this.host.origin()}/api/board/${job.board.path.split("/").map(encodeURIComponent).join("/")}`;
@@ -654,6 +675,7 @@ export class ThumbService {
 			// Its smaller copies now, while the browser is up, so a canvas zoomed out never waits for one.
 			if (job.kind === "whole") for (const width of SMALL_WIDTHS) void this.smaller(job.file, width).catch(() => {});
 		} finally {
+			clearTimeout(watchdog);
 			await context.close().catch(() => {});
 		}
 	}
