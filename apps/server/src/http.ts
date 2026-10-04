@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { renderShell } from "./boards/shell.ts";
+import { LIB_FOREVER, libVersion, splitLibVersion, versionLibRefs } from "./deck/lib-version.ts";
 import { normalizeBoardPath } from "./deck/schema.ts";
 import { readMeta } from "./deck/meta.ts";
 import { dirname, join, resolve, sep } from "node:path";
@@ -165,7 +167,10 @@ export function createHttpApp(app: App): Express {
 	api.get(
 		"/board/*path",
 		asyncRoute(async (req, res) => {
-			const requested = wildcard(req);
+			let requested = wildcard(req);
+			// The runtime at a versioned address (`deck/lib-version.ts`): the file is the one in `lib/`.
+			const versioned = requested.startsWith("lib/") ? splitLibVersion(requested.slice(4)) : undefined;
+			if (versioned) requested = `lib/${versioned.file}`;
 			const target = resolveInDeck(app.deck.path, requested);
 			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
 			/*
@@ -178,6 +183,7 @@ export function createHttpApp(app: App): Express {
 			 */
 			if (isBoardPath(requested)) boardHeaders(res);
 			else assetHeaders(res, target);
+			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 
 			/*
 			 * A board that is not a document gets one made for it.
@@ -208,7 +214,7 @@ export function createHttpApp(app: App): Express {
 			// from somewhere else (`deck/kinds.ts`).
 			if (board?.shell) {
 				res.type("html").send(
-					renderShell({
+					versionLibRefs(renderShell({
 						path: board.path,
 						format: board.format,
 						shell: board.shell,
@@ -219,8 +225,14 @@ export function createHttpApp(app: App): Express {
 						// window instead of its own rectangle.
 						...(req.query.present === undefined ? {} : { present: true }),
 						...(aspectOf(app.deck, board.path) ? { aspect: aspectOf(app.deck, board.path) as string } : {}),
-					}),
+					}), libVersion(app.deck.path)),
 				);
+				return;
+			}
+			// A board's page, with its runtime at the versioned address; the file itself is untouched,
+			// and `?raw=1` (its text, for the editor) is the file as it is.
+			if (req.query.raw === undefined && isBoardPath(requested) && /\.html?$/i.test(requested)) {
+				res.type("html").send(versionLibRefs(await readFile(target, "utf8"), libVersion(app.deck.path)));
 				return;
 			}
 			await sendFile(res, target);
@@ -417,9 +429,11 @@ export function createHttpApp(app: App): Express {
 	api.get(
 		"/lib/*path",
 		asyncRoute(async (req, res) => {
-			const target = resolveInDeck(app.deck.path, join("lib", wildcard(req)));
+			const versioned = splitLibVersion(wildcard(req));
+			const target = resolveInDeck(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
 			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(wildcard(req), "not a file");
 			boardHeaders(res);
+			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 			await sendFile(res, target);
 		}),
 	);
