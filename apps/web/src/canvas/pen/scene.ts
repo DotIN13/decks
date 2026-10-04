@@ -198,6 +198,15 @@ const STAND_IN_RETRY_MS = 2500;
 const STAND_IN_TRIES = 24;
 /** How long the camera has to be still before a picture is decoded at a new size. */
 const SETTLE_MS = 200;
+/**
+ * How far a zoom may go, in or out, before the frame on screen is drawn again (`covers`). While a
+ * zoom is under way the sheet is drawn this much larger on each side and this much denser, so one
+ * frame serves the steps of a pinch either side of it: about 1.75 times the pixels a frame, for a
+ * frame every 15% of zoom rather than every step. At rest it is drawn at its own size again.
+ */
+const ZOOM_BAND = 1.15;
+/** How often, at most, a moving camera asks which pictures it needs (`wantPictures`). */
+const WANT_EVERY_MS = 100;
 
 interface PictureEntry {
 	path: string;
@@ -235,8 +244,16 @@ export class StageScene {
 	private scheme: "light" | "dark" = "light";
 	private camera: Camera = { x: 0, y: 0, zoom: 1 };
 	private cameraMoving = false;
-	/** The frame last handed to the page: the camera it was drawn for, and what it covers. */
-	private shown: { camera: Camera; rect: Rect } | undefined;
+	/** The frame last handed to the page: the camera it was drawn for, what it covers, and how far it may be zoomed into before it blurs. */
+	private shown: { camera: Camera; rect: Rect; headroom: number } | undefined;
+	/** The camera's zoom has changed since it started moving: frames are drawn with room to zoom (`ZOOM_BAND`). */
+	private zooming = false;
+	/** The pixel density of the frame being drawn: the screen's, times `ZOOM_BAND` while zooming. */
+	private drawDpr = 1;
+	/** When a moving camera last asked for pictures (`WANT_EVERY_MS`). */
+	private wantedAt = 0;
+	/** A picture was decoded since the budget was last checked (`keepToBudget`). */
+	private budgetDirty = false;
 	private movedAt = 0;
 	private view = { width: 0, height: 0, dpr: 1, overscan: 0, budget: 16_000_000, widest: 2048 };
 	private boards: SceneBoard[] = [];
@@ -359,6 +376,8 @@ export class StageScene {
 				this.view = { width: message.width, height: message.height, dpr: message.dpr, overscan: message.overscan, budget: message.budget, widest: message.widest };
 				break;
 			case "camera":
+				if (!message.moving) this.zooming = false;
+				else if (message.camera.zoom !== this.camera.zoom) this.zooming = true;
 				this.camera = message.camera;
 				if (message.moving) this.movedAt = performance.now();
 				this.cameraMoving = message.moving;
@@ -473,12 +492,21 @@ export class StageScene {
 		}
 		if (this.slide && !this.slide.ready) this.recordSlide();
 		this.frameNo++;
-		const { width, height, dpr, overscan } = this.view;
+		const { width, height, overscan } = this.view;
 		if (width === 0 || height === 0) return;
-		const cssW = Math.ceil(width * (1 + 2 * overscan));
-		const cssH = Math.ceil(height * (1 + 2 * overscan));
+		// While zooming, larger and denser, so the next steps of the zoom are served by this frame (`covers`).
+		const band = this.zooming ? ZOOM_BAND : 1;
+		const dpr = this.view.dpr * band;
+		this.drawDpr = dpr;
+		const cssW = Math.ceil(width * (1 + 2 * overscan) * band);
+		const cssH = Math.ceil(height * (1 + 2 * overscan) * band);
 		const boards = this.boardsInView(cssW, cssH);
-		this.wantPictures(this.boardsNear(cssW, cssH));
+		// A moving camera asks which pictures it needs a few times a second, not every frame; a fetch that lands asks again itself.
+		const now = performance.now();
+		if (!this.cameraMoving || now - this.wantedAt >= WANT_EVERY_MS) {
+			this.wantedAt = now;
+			this.wantPictures(this.boardsNear(cssW, cssH));
+		}
 		const useGpu = !!this.ck && (!this.drawingEmpty() || this.ink.length > 0) && !this.off.has("gpu");
 		// A board with no page is drawn here, as its picture or, until that comes, as its paper.
 		const anyPicture = boards.some((b) => !b.live);
@@ -523,19 +551,21 @@ export class StageScene {
 			return;
 		}
 		this.host.post({ type: "frame", bitmap, camera, width: cssW, height: cssH, gpu: useGpu, ...(carried ? { carried } : {}) }, carried ? [bitmap, carried.bitmap] : [bitmap]);
-		this.shown = { camera, rect: covered };
+		this.shown = { camera, rect: covered, headroom: band };
 	}
 
 	/**
-	 * Whether the frame on screen still serves this camera: drawn at the same zoom, with nothing
-	 * changed since, and the window inside it with a margin to spare (half the overscan), so a pan
-	 * keeps showing drawn pixels while the next frame is made. A zoom always draws: a stretched
-	 * frame is a blurred one, and a zoom tolerance of 5% served almost no steps of a real zoom.
+	 * Whether the frame on screen still serves this camera: nothing changed since, the window inside
+	 * it with a margin to spare (half the overscan), so a pan keeps showing drawn pixels while the
+	 * next frame is made, and a zoom within the frame's band: no further in than it has pixels for,
+	 * and no further out than `ZOOM_BAND`. A frame drawn at rest has no pixels to spare, so the first
+	 * step of a zoom draws one that has.
 	 */
 	private covers(camera: Camera): boolean {
 		const shown = this.shown;
 		if (!shown || this.dirty || this.slide || this.moving?.size || this.ink.length > 0) return false;
-		if (shown.camera.zoom !== camera.zoom) return false;
+		const ratio = camera.zoom / shown.camera.zoom;
+		if (ratio > shown.headroom || ratio < 1 / ZOOM_BAND || (ratio !== 1 && shown.headroom === 1)) return false;
 		const { width, height, overscan } = this.view;
 		const spare = overscan / 2;
 		const w = (width * (1 + 2 * spare)) / camera.zoom;
@@ -597,7 +627,7 @@ export class StageScene {
 			ctx.setTransform(1, 0, 0, 1, 0, 0);
 			ctx.clearRect(0, 0, pxW, pxH);
 		}
-		const { dpr } = this.view;
+		const dpr = this.drawDpr;
 		const s = dpr * camera.zoom;
 		ctx.setTransform(s, 0, 0, s, dpr * (cssW / 2 - camera.x * camera.zoom), dpr * (cssH / 2 - camera.y * camera.zoom));
 		ctx.imageSmoothingQuality = "medium";
@@ -687,7 +717,7 @@ export class StageScene {
 		const canvas = surface.getCanvas();
 		canvas.clear(ck.TRANSPARENT);
 		canvas.save();
-		canvas.scale(this.view.dpr, this.view.dpr);
+		canvas.scale(this.drawDpr, this.drawDpr);
 		canvas.translate(cssW / 2, cssH / 2);
 		canvas.scale(camera.zoom, camera.zoom);
 		canvas.translate(-camera.x, -camera.y);
@@ -715,7 +745,7 @@ export class StageScene {
 	private paintBoardsGpu(canvas: Canvas, boards: SceneBoard[], surface: Surface): void {
 		const ck = this.ck!;
 		const paper = ck.parseColorString(CARD_PALETTE[this.scheme].paper);
-		const sharp = NOTE_RADIUS * this.camera.zoom * this.view.dpr >= 0.5;
+		const sharp = NOTE_RADIUS * this.camera.zoom * this.drawDpr >= 0.5;
 		for (const board of boards) {
 			const rect = ck.LTRBRect(board.x, board.y, board.x + board.w, board.y + board.h);
 			const rrect = ck.RRectXY(rect, NOTE_RADIUS, NOTE_RADIUS);
@@ -866,6 +896,10 @@ export class StageScene {
 		const middle = { x: this.camera.x, y: this.camera.y };
 		// Boards showing a picture first, then live boards whose picture is kept ready.
 		const wanted = boards.filter((b) => (!b.live || b.ready) && b.picture).sort((a, b) => Number(a.live) - Number(b.live) || Math.hypot(a.x + a.w / 2 - middle.x, a.y + a.h / 2 - middle.y) - Math.hypot(b.x + b.w / 2 - middle.x, b.y + b.h / 2 - middle.y));
+		// A phone stops at 1024 (`PICTURE_WIDEST` in `layer.ts`).
+		const levels = this.off.has("small") ? LEVELS.slice(0, 2) : LEVELS.filter((one) => one <= this.view.widest);
+		// One decode at a time in the `serial` debugging run.
+		let busy = this.off.has("serial") && [...this.entries.values()].some((one) => one.decoding !== undefined);
 		for (const board of wanted) {
 			let entry = this.entries.get(board.path);
 			if (!entry || entry.url !== board.picture) {
@@ -879,16 +913,20 @@ export class StageScene {
 				continue;
 			}
 			const need = board.w * zoom * this.view.dpr;
-			// A phone stops at 1024 (`PICTURE_WIDEST` in `layer.ts`).
-			const levels = this.off.has("small") ? LEVELS.slice(0, 2) : LEVELS.filter((one) => one <= this.view.widest);
 			const most = entry.natural ?? levels[levels.length - 1]!;
 			const level = Math.min(levels.find((one) => one >= need) ?? levels[levels.length - 1]!, most);
 			const has = entry.bitmap || entry.image ? entry.level : 0;
 			// Decoded once as soon as it arrives; at a new size only when the camera has stopped.
-			const busy = this.off.has("serial") && [...this.entries.values()].some((one) => one.decoding !== undefined);
-			if (entry.decoding === undefined && !busy && (has === 0 || entry.redecode || (still && has !== level))) this.decode(entry, level);
+			if (entry.decoding === undefined && !busy && (has === 0 || entry.redecode || (still && has !== level))) {
+				this.decode(entry, level);
+				busy = this.off.has("serial");
+			}
 		}
-		this.keepToBudget(boards);
+		// Only a decode adds pixels, so the budget is only checked after one.
+		if (this.budgetDirty) {
+			this.budgetDirty = false;
+			this.keepToBudget(boards);
+		}
 	}
 
 	private fetchPicture(entry: PictureEntry): void {
@@ -944,6 +982,7 @@ export class StageScene {
 				entry.w = bitmap.width;
 				entry.h = bitmap.height;
 				entry.level = level;
+				this.budgetDirty = true;
 				this.again();
 			})
 			.catch(() => {
