@@ -518,6 +518,39 @@ table.table,
 	background: var(--b-bg-layer);
 }
 
+/*
+ * Something that plays. A film fills the width and keeps its own shape; a sound is a strip, so
+ * its body is only as tall as the controls rather than a black box with a bar in it.
+ */
+.embed:is([data-kind="video"], [data-kind="audio"]) > .embed-body {
+	background: #000;
+}
+
+.embed > .embed-body > video {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.embed[data-kind="audio"] > .embed-body {
+	background: var(--b-bg-layer);
+	padding: 10px 12px;
+}
+
+.embed > .embed-body > audio {
+	display: block;
+	width: 100%;
+}
+
+/* A container the browser will not decode: the download offered under the player that failed. */
+.embed:is([data-kind="video"], [data-kind="audio"]) > .embed-body > a {
+	display: block;
+	padding: 8px 12px;
+	font-size: 14px;
+	background: var(--b-bg-layer);
+	color: var(--b-fg);
+}
+
 /* A page is an `<img>` once rendered (`stillPicture` in `board.js`); the canvas is transient. */
 .embed .page {
 	display: block;

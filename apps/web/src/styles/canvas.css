@@ -95,6 +95,34 @@
 		object-fit: contain;
 	}
 
+	/* A film, fitted the same way: a window shaped for one aspect never crops another. */
+	.present-video {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+	}
+
+	/* A sound has no picture, so the window holds its name over the controls. */
+	.present-audio {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		align-items: center;
+		width: 100%;
+		max-width: 560px;
+	}
+
+	.present-audio > .name {
+		font-size: 15px;
+		color: var(--muted);
+		text-align: center;
+		overflow-wrap: anywhere;
+	}
+
+	.present-audio > audio {
+		width: 100%;
+	}
+
 	/*
 	 * A document, in a column — which is the whole difference between reading a markdown file
 	 * and reading a wall of text. On the app's surface colours because the overlay's own

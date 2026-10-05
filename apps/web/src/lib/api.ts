@@ -48,12 +48,20 @@ export function deckFileUrl(path: string, rev?: number): string {
 	return rev ? api(`/board/${encoded}?rev=${rev}`) : api(`/board/${encoded}`);
 }
 
-/** The six families an embed's file can belong to, as `board.js` counts them. */
-export type EmbedFamily = "md" | "pdf" | "image" | "html" | "text" | "file";
+/** The families an embed's file can belong to, as `board.js` counts them. */
+export type EmbedFamily = "md" | "pdf" | "image" | "video" | "audio" | "html" | "text" | "file";
 
 const IMAGE = ["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"];
 const TEXTUAL = ["txt", "log", "csv", "tsv", "json", "yaml", "yml", "toml", "xml", "sh", "bash", "py", "ts", "js", "mjs", "css", "sql", "ini", "conf", "env"];
 const MARKDOWN = ["md", "markdown", "mdx"];
+/** What plays. The same two lists as `VIDEO` and `AUDIO` in `lib/board.js`, which must agree. */
+const VIDEO = ["mp4", "m4v", "webm", "mov", "ogv", "mkv"];
+const AUDIO = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"];
+
+/** Whether a family is something the browser plays, which decides who gets a player. */
+export function playable(family: EmbedFamily): family is "video" | "audio" {
+	return family === "video" || family === "audio";
+}
 
 /**
  * Which renderer a file needs, from its extension.
@@ -71,6 +79,8 @@ export function embedFamily(raw: string): EmbedFamily {
 	if (MARKDOWN.includes(extension)) return "md";
 	if (extension === "pdf") return "pdf";
 	if (IMAGE.includes(extension)) return "image";
+	if (VIDEO.includes(extension)) return "video";
+	if (AUDIO.includes(extension)) return "audio";
 	if (["html", "htm", "xhtml"].includes(extension)) return "html";
 	if (TEXTUAL.includes(extension)) return "text";
 	return "file";

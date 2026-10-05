@@ -4,9 +4,11 @@ import ChevronUp from "lucide-solid/icons/chevron-up";
 import Upload from "lucide-solid/icons/upload";
 import File from "lucide-solid/icons/file";
 import FileCode from "lucide-solid/icons/file-code";
+import FileAudio from "lucide-solid/icons/file-audio";
 import FileImage from "lucide-solid/icons/file-image";
 import FileText from "lucide-solid/icons/file-text";
 import FileType from "lucide-solid/icons/file-type";
+import FileVideo from "lucide-solid/icons/file-video";
 import Folder from "lucide-solid/icons/folder";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
@@ -196,6 +198,8 @@ function iconFor(entry: BrowseEntry): LucideIcon {
 	if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) return FileImage;
 	if (["html", "htm", "xhtml"].includes(extension)) return FileCode;
 	if (extension === "pdf") return FileType;
+	if (["mp4", "m4v", "webm", "mov", "ogv", "mkv"].includes(extension)) return FileVideo;
+	if (["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"].includes(extension)) return FileAudio;
 	// Text and source both render as escaped preformatted text on a board, so they
 	// share an icon with markup rather than with prose: what you get is the source.
 	if (PREFORMATTED.has(extension)) return FileCode;

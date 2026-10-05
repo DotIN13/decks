@@ -339,7 +339,7 @@ export type Ui = ReturnType<typeof createUi>;
  */
 export type Presenting =
 	| { kind: "board"; path: string; at: number }
-	| { kind: "embed"; board: string; raw: string; pages?: string; title: string };
+	| { kind: "embed"; board: string; raw: string; pages?: string; poster?: string; title: string };
 
 /** The app's one set of browser state. Tests build their own with `createUi()`. */
 export const ui = createUi();

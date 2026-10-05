@@ -871,6 +871,7 @@ export function App() {
 		board: box.path,
 		raw: box.attrs["data-embed"] ?? "",
 		...(box.attrs["data-pages"] === undefined ? {} : { pages: box.attrs["data-pages"] }),
+		...(box.attrs["data-poster"] === undefined ? {} : { poster: box.attrs["data-poster"] }),
 		title: `${box.attrs["data-embed"] ?? "file"} — ${box.id}`,
 	});
 
@@ -2074,6 +2075,7 @@ export function App() {
 									board={showing.board}
 									raw={showing.raw}
 									{...(showing.pages === undefined ? {} : { pages: showing.pages })}
+									{...(showing.poster === undefined ? {} : { poster: showing.poster })}
 									title={showing.title}
 									onExit={() => setPresenting(undefined)}
 								/>

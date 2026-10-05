@@ -944,6 +944,18 @@
 	const TEXT_LIMIT = 256 * 1024;
 
 	/**
+	 * What plays, which the browser does itself.
+	 *
+	 * Listed by extension rather than asked of the browser with `canPlayType`, because the
+	 * family has to be the same answer everywhere — the app and the fullscreen view read the
+	 * same ladder from their own copy (`lib/api.ts`) and neither has the file in hand. A
+	 * container this browser cannot decode still belongs to the family: it gets a player that
+	 * says so, which is a better answer than a download chip.
+	 */
+	const VIDEO = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv"]);
+	const AUDIO = new Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
+
+	/**
 	 * Which family an extension belongs to — the one place that decides.
 	 *
 	 * It was a ladder of `if`s inside the mount, which was fine until there were six
@@ -954,9 +966,21 @@
 		if (["md", "markdown", "mdx"].includes(extension)) return "md";
 		if (extension === "pdf") return "pdf";
 		if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"].includes(extension)) return "image";
+		if (VIDEO.has(extension)) return "video";
+		if (AUDIO.has(extension)) return "audio";
 		if (["html", "htm", "xhtml"].includes(extension)) return "html";
 		if (TEXTUAL.has(extension)) return "text";
 		return "file";
+	}
+
+	/** A running time as a clock: 1:04, or 1:02:03 for something over an hour. */
+	function clockOf(seconds) {
+		if (!Number.isFinite(seconds) || seconds <= 0) return "";
+		const whole = Math.round(seconds);
+		const pad = (value) => String(value).padStart(2, "0");
+		const minutes = Math.floor(whole / 60) % 60;
+		const hours = Math.floor(whole / 3600);
+		return hours > 0 ? `${hours}:${pad(minutes)}:${pad(whole % 60)}` : `${minutes}:${pad(whole % 60)}`;
 	}
 
 	/** A byte count as a person would say it. */
@@ -1057,6 +1081,41 @@
 				img.src = url;
 				img.alt = label;
 				body.appendChild(img);
+				return;
+			}
+
+			/*
+			 * Something that plays: the browser's own player, with its own controls.
+			 *
+			 * `preload="metadata"` so a board of six films fetches six headers rather than six
+			 * films, and nothing starts on its own — a board that makes a noise when it comes into
+			 * view is not something anybody asked for. The note carries the running time once the
+			 * header has landed, and a container this browser cannot decode says so there instead
+			 * of leaving an empty black box.
+			 *
+			 * `poster` is taken from the host when the board names one, which is what a stage item
+			 * passes down; without one the player shows its own first frame.
+			 */
+			if (family === "video" || family === "audio") {
+				const { body, note } = chrome(host, family, label, "not loaded");
+				const player = document.createElement(family === "video" ? "video" : "audio");
+				player.src = url;
+				player.controls = true;
+				player.preload = "metadata";
+				player.playsInline = true;
+				if (family === "video" && host.dataset.poster) player.poster = urlFor(host.dataset.poster) ?? "";
+				player.addEventListener("loadedmetadata", () => {
+					note.textContent = clockOf(player.duration);
+				});
+				player.addEventListener("error", () => {
+					note.textContent = "this browser cannot play it";
+					const out = document.createElement("a");
+					out.href = url;
+					out.download = label;
+					out.textContent = "download";
+					body.appendChild(out);
+				});
+				body.appendChild(player);
 				return;
 			}
 

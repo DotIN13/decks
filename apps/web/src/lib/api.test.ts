@@ -32,6 +32,9 @@ test("the family comes from the path the board wrote", () => {
 	assert.equal(embedFamily("../../shared/report.html"), "html");
 	assert.equal(embedFamily("assets/log.csv"), "text");
 	assert.equal(embedFamily("assets/archive.zip"), "file");
+	assert.equal(embedFamily("../assets/acoustic-kitty.mp4"), "video");
+	assert.equal(embedFamily("assets/talk.m4a"), "audio");
+	assert.equal(embedFamily("assets/FILM.WEBM"), "video", "the extension is read whatever its case");
 	// An out-of-deck path becomes a query string with no extension in it, which is the case
 	// that made `board.js` read the extension off the raw path rather than the URL.
 	assert.equal(embedFamily("~/notes/whatever.pdf"), "pdf");

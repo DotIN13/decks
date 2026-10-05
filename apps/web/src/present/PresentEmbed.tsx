@@ -54,6 +54,8 @@ export function PresentEmbed(props: {
 	raw: string;
 	/** The box's `data-pages`, for the one family where a range means something. */
 	pages?: string;
+	/** The box's `data-poster`, so a film shows its own still before it has decoded a frame. */
+	poster?: string;
 	title: string;
 	onExit: () => void;
 }) {
@@ -152,6 +154,20 @@ export function PresentEmbed(props: {
 				 */}
 				<Match when={family() === "pdf"}>
 					<iframe class="present-frame" title={props.title} src={pdfUrl(url(), props.pages)} ref={(el) => { frameEl = el; el.addEventListener("load", listenInFrame); }} />
+				</Match>
+				{/*
+				 * A film or a sound, fullscreen: the browser's own player with its own controls.
+				 * Autoplay is on here and nowhere else — opening a film fullscreen is asking to
+				 * watch it, where a board coming into view is not.
+				 */}
+				<Match when={family() === "video"}>
+					<video class="present-video" src={url()} poster={props.poster ? embedUrl(props.board, props.poster) : undefined} controls autoplay playsinline />
+				</Match>
+				<Match when={family() === "audio"}>
+					<div class="present-audio">
+						<span class="name">{props.title}</span>
+						<audio src={url()} controls autoplay />
+					</div>
 				</Match>
 				<Match when={family() === "html"}>
 					<iframe

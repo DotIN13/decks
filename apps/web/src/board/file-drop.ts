@@ -284,6 +284,9 @@ export function isImage(file: File): boolean {
 }
 
 const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"]);
+/** What plays, as `lib/api.ts` and `lib/board.js` both count it. */
+const VIDEO = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv"]);
+const AUDIO = new Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
 
 async function shapeOf(file: File): Promise<{ width: number; height: number }> {
 	const extension = (file.name.split(".").pop() ?? "").toLowerCase();
@@ -301,6 +304,10 @@ async function shapeOf(file: File): Promise<{ width: number; height: number }> {
 	}
 
 	if (extension === "pdf") return { width: 520, height: 680 };
+	// A film is sixteen by nine until something says otherwise, plus the head the picture does not get.
+	if (VIDEO.has(extension)) return { width: 560, height: Math.round(560 * (9 / 16)) + 32 };
+	// A sound is a strip: a head, and the controls under it.
+	if (AUDIO.has(extension)) return { width: 420, height: 96 };
 	if (["html", "htm", "xhtml"].includes(extension)) return { width: 640, height: 440 };
 	if (["md", "markdown", "mdx"].includes(extension)) return { width: 480, height: 400 };
 	if (TEXTUAL.has(extension)) return { width: 520, height: 380 };
