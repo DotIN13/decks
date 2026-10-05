@@ -28,7 +28,7 @@ export function identityGaps(identity: Pick<Identity, "name" | "avatar" | "tags"
 
 const ASK: Record<Gap, string> = {
 	name: "name: a short name of your own, not a number",
-	avatar: 'avatar: { emoji: "…" }',
+	avatar: 'avatar: { svg: "<svg viewBox=\"0 0 64 64\">…</svg>" }, a small picture you draw (or { emoji: "…" })',
 	workspace: "workspace: the project you are working on",
 	tags: "tags: up to four words for what you are doing right now",
 };
