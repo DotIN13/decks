@@ -2,7 +2,7 @@ import { onCleanup, onMount } from "solid-js";
 import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
-import { flow, guardDocumentDrops, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
+import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
 import { MARKDOWN } from "@decks/pen";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
@@ -126,14 +126,23 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 					report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
 				);
 				if (asset.reused) reused += 1;
+				/*
+				 * A film was laid out at sixteen by nine, because nothing had read it yet; the
+				 * upload answers with the picture's real size, so the box takes that shape before
+				 * it is written. The poster the server wrote rides along as `data-poster`, which
+				 * is what the player shows before it has decoded a frame (`lib/board.js`).
+				 */
+				const media = asset.media;
+				const shaped = media?.w && media.h ? { ...boxes[index]!, height: Math.round(boxes[index]!.width * (media.h / media.w)) + HEAD_PX } : boxes[index]!;
 				inserts.push({
 					op: "insert",
 					// `image` and `embed` render the same markup; the kind is what names the
 					// component, so `image-1` in the file says what it is without opening it.
 					kind: isImage(file) ? "image" : "embed",
 					id: "",
-					at: boxes[index]!,
+					at: shaped,
 					embed: embedPath(path, asset.path),
+					...(media?.poster ? { attrs: { "data-poster": embedPath(path, media.poster) } } : {}),
 				});
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);

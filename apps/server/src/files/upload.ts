@@ -4,6 +4,7 @@ import type { Readable } from "node:stream";
 import { join } from "node:path";
 import { MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
 import { resolveAssetWrite } from "../deck/roots.ts";
+import { mediaFacts, posterPath, writePoster } from "./media.ts";
 
 /**
  * A file the user dragged in from outside, copied into the deck (DESIGN §3).
@@ -210,7 +211,7 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
 			const target = resolveAssetWrite(deckRoot, candidate);
 			const relative = `assets/${candidate}`;
 			if (existsSync(target)) {
-				if (statSync(target).size === bytes && (await digestOfFile(target)) === digest) return { path: relative, name: candidate, bytes, reused: true };
+				if (statSync(target).size === bytes && (await digestOfFile(target)) === digest) return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: true });
 				continue;
 			}
 			try {
@@ -219,7 +220,7 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
 				if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
 				throw error;
 			}
-			return { path: relative, name: candidate, bytes, reused: false };
+			return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: false });
 		}
 		throw new UploadRefused(`there are already too many files called ${name}`, 409);
 	} finally {
@@ -229,4 +230,23 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
 			/* never written, or already gone */
 		}
 	}
+}
+
+/**
+ * What an upload answers for a film or a sound: the same record, plus what ffmpeg read out of it
+ * and the poster it wrote beside it (`files/media.ts`).
+ *
+ * Here rather than in the route, so a file that was already on disk — the dedupe path — answers
+ * the same as one that has just been written. A poster is written once and kept, so the second
+ * upload of a film it already has costs the read and nothing more.
+ *
+ * Nothing here can refuse an upload: a deployment with no ffmpeg, or a container it cannot open,
+ * answers with no `media` at all, and what is placed is an item with no still rather than no item.
+ */
+async function withMedia(deckRoot: string, asset: UploadedAsset): Promise<UploadedAsset> {
+	const facts = await mediaFacts(join(deckRoot, asset.path)).catch(() => undefined);
+	if (!facts) return asset;
+	const kept = posterPath(asset.path);
+	const poster = facts.kind === "video" ? (existsSync(join(deckRoot, kept)) ? kept : await writePoster(deckRoot, asset.path, facts)) : undefined;
+	return { ...asset, media: { kind: facts.kind, ...(poster ? { poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.w ? { w: facts.w, h: facts.h } : {}) } };
 }

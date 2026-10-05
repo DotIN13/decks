@@ -284,6 +284,8 @@ export function isImage(file: File): boolean {
 }
 
 const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"]);
+/** The embed's head, which the picture inside it does not get: 29px of chrome, near enough. */
+export const HEAD_PX = 32;
 /** What plays, as `lib/api.ts` and `lib/board.js` both count it. */
 const VIDEO = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv"]);
 const AUDIO = new Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
@@ -300,12 +302,12 @@ async function shapeOf(file: File): Promise<{ width: number; height: number }> {
 		const height = Math.round(width * (natural.height / natural.width));
 		if (height > 640) return { width: Math.round(560 * (640 / height)), height: 640 };
 		// The head is 29px of chrome the picture does not get; near enough to add it.
-		return { width, height: height + 32 };
+		return { width, height: height + HEAD_PX };
 	}
 
 	if (extension === "pdf") return { width: 520, height: 680 };
 	// A film is sixteen by nine until something says otherwise, plus the head the picture does not get.
-	if (VIDEO.has(extension)) return { width: 560, height: Math.round(560 * (9 / 16)) + 32 };
+	if (VIDEO.has(extension)) return { width: 560, height: Math.round(560 * (9 / 16)) + HEAD_PX };
 	// A sound is a strip: a head, and the controls under it.
 	if (AUDIO.has(extension)) return { width: 420, height: 96 };
 	if (["html", "htm", "xhtml"].includes(extension)) return { width: 640, height: 440 };

@@ -24,4 +24,17 @@ export interface UploadedAsset {
 	bytes: number;
 	/** True when an identical file was already there and this one was not written. */
 	reused: boolean;
+	/**
+	 * For a film or a sound, what the server read out of it with ffmpeg (`files/media.ts`): the
+	 * still it wrote, the running time, and the picture's own size. Absent for everything else,
+	 * and for a deployment with no ffmpeg — what is placed then has no poster, not no item.
+	 */
+	media?: {
+		kind: "video" | "audio";
+		/** The poster's own deck path, beside the file. */
+		poster?: string;
+		seconds?: number;
+		w?: number;
+		h?: number;
+	};
 }
