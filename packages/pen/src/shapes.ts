@@ -37,11 +37,17 @@ export interface ShapeKind {
 	/** Drawn as a line alone, with no fill: a brace. */
 	line?: boolean;
 	fillRule?: "evenodd";
+	/**
+	 * Corners the person can round, given as a radius in the 100 by 100 box for a new shape. Such a
+	 * shape is not drawn by stretching its geometry: `fitShapes` rebuilds it in the frame's own
+	 * pixels, so a corner stays a circle however wide the shape is pulled (`roundedGeometry`).
+	 */
+	rounded?: number;
 }
 
 export const SHAPES: readonly ShapeKind[] = [
 	{ group: "Basic", name: "Rectangle", geometry: "M0 0H100V100H0Z" },
-	{ group: "Basic", name: "Rounded", geometry: "M14 0H86Q100 0 100 14V86Q100 100 86 100H14Q0 100 0 86V14Q0 0 14 0Z" },
+	{ group: "Basic", name: "Rounded", geometry: "M14 0H86Q100 0 100 14V86Q100 100 86 100H14Q0 100 0 86V14Q0 0 14 0Z", rounded: 14 },
 	{ group: "Basic", name: "Ellipse", geometry: "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z" },
 	{ group: "Basic", name: "Triangle", geometry: "M50 0L100 100H0Z" },
 	{ group: "Basic", name: "Diamond", geometry: "M50 0L100 50L50 100L0 50Z" },
@@ -59,7 +65,13 @@ export const SHAPES: readonly ShapeKind[] = [
 	{ group: "Flowchart", name: "Terminator", geometry: "M22 0H78A22 50 0 0 1 78 100H22A22 50 0 0 1 22 0Z" },
 	{ group: "Flowchart", name: "Document", geometry: "M0 0H100V82C75 66 25 100 0 82Z" },
 	{ group: "Flowchart", name: "Data", geometry: "M22 0H100L78 100H0Z" },
-	{ group: "Flowchart", name: "Database", geometry: "M0 14A50 14 0 0 1 100 14V86A50 14 0 0 1 0 86ZM0 14A50 14 0 0 0 100 14" },
+	/*
+	 * The cylinder. Both subpaths wind the same way, clockwise: the silhouette's arc runs left to
+	 * right over the top, and the cap's front arc runs right to left under it. Written the other way
+	 * round, the cap wound against the silhouette and a nonzero fill cancelled the two, which is
+	 * what left the top of the cylinder see-through.
+	 */
+	{ group: "Flowchart", name: "Database", geometry: "M0 14A50 14 0 0 1 100 14V86A50 14 0 0 1 0 86ZM100 14A50 14 0 0 1 0 14" },
 	{ group: "Flowchart", name: "Manual input", geometry: "M0 28L100 0V100H0Z" },
 	{ group: "Flowchart", name: "Predefined", geometry: "M0 0H100V100H0ZM12 0V100M88 0V100" },
 	{ group: "Flowchart", name: "Delay", geometry: "M0 0H58A42 50 0 0 1 58 100H0Z" },
@@ -95,6 +107,44 @@ export function shapeLabel(node: PenNode): PenNode | undefined {
 	return node.children?.find((child) => child.type === "text");
 }
 
+/** The most a corner can be rounded in a box: any more and the straight sides are gone. */
+export function maxRadius(w: number, h: number): number {
+	return Math.max(0, Math.min(w, h) / 2);
+}
+
+/**
+ * How round a shape's corners are, in pixels, or `undefined` for a shape that has no such corners.
+ * It is the frame's own `metadata.radius` when it has one, and otherwise the kind's own radius
+ * scaled to this frame, which is what a shape dropped before this existed falls back to.
+ */
+export function shapeRadius(node: PenNode): number | undefined {
+	const kind = isShape(node) ? shapeKind(node.metadata?.kind) : undefined;
+	if (!kind?.rounded) return undefined;
+	const w = typeof node.width === "number" ? node.width : 0;
+	const h = typeof node.height === "number" ? node.height : 0;
+	const saved = node.metadata?.radius;
+	const want = typeof saved === "number" && Number.isFinite(saved) ? saved : (kind.rounded / 100) * Math.min(w, h);
+	return Math.max(0, Math.min(want, maxRadius(w, h)));
+}
+
+/** A rounded rectangle of a size, in its own pixels, so every corner is a circle of radius `r`. */
+export function roundedGeometry(w: number, h: number, r: number): string {
+	const k = Math.max(0, Math.min(r, maxRadius(w, h)));
+	const n = (value: number) => Math.round(value * 100) / 100;
+	if (k <= 0) return `M0 0H${n(w)}V${n(h)}H0Z`;
+	return [
+		`M${n(k)} 0H${n(w - k)}`,
+		`A${n(k)} ${n(k)} 0 0 1 ${n(w)} ${n(k)}`,
+		`V${n(h - k)}`,
+		`A${n(k)} ${n(k)} 0 0 1 ${n(w - k)} ${n(h)}`,
+		`H${n(k)}`,
+		`A${n(k)} ${n(k)} 0 0 1 0 ${n(h - k)}`,
+		`V${n(k)}`,
+		`A${n(k)} ${n(k)} 0 0 1 ${n(k)} 0`,
+		"Z",
+	].join("");
+}
+
 /**
  * A new shape of a kind, at a size, ready to insert. `ids` are the frame's and the outline's, fresh
  * in the document. White with a dark line, except a line-only shape, which has no fill.
@@ -102,6 +152,8 @@ export function shapeLabel(node: PenNode): PenNode | undefined {
 export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string }, size: { w: number; h: number }): PenNode {
 	const w = Math.max(8, Math.round(size.w));
 	const h = Math.max(8, Math.round(size.h));
+	// A shape with corners to round starts at the kind's own radius, in this shape's pixels.
+	const radius = kind.rounded ? Math.round(Math.min((kind.rounded / 100) * Math.min(w, h), maxRadius(w, h))) : undefined;
 	return {
 		type: "frame",
 		id: ids.frame,
@@ -113,7 +165,7 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 		alignItems: "center",
 		padding: 10,
 		clip: false,
-		metadata: { type: SHAPE, kind: kind.name },
+		metadata: { type: SHAPE, kind: kind.name, ...(radius === undefined ? {} : { radius }) },
 		children: [
 			{
 				type: "path",
@@ -123,8 +175,8 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 				y: 0,
 				width: w,
 				height: h,
-				viewBox: [0, 0, 100, 100],
-				geometry: kind.geometry,
+				viewBox: radius === undefined ? [0, 0, 100, 100] : [0, 0, w, h],
+				geometry: radius === undefined ? kind.geometry : roundedGeometry(w, h, radius),
 				...(kind.fillRule ? { fillRule: kind.fillRule } : {}),
 				...(kind.line ? {} : { fill: "#ffffff" }),
 				stroke: "#1f2328",
@@ -144,6 +196,10 @@ export function makeLabel(id: string, content = ""): PenNode {
 /**
  * Every shape's outline set to its frame's size, at its corner. Returns whether anything changed.
  * A frame whose size is not a number (one hugging its words) is left alone.
+ *
+ * A shape with corners the person can round is also redrawn here, in the frame's own pixels rather
+ * than stretched from a 100 by 100 box: stretched, a wide rounded rectangle had wide flat corners
+ * instead of round ones.
  */
 export function fitShapes(doc: PenDocument): boolean {
 	let changed = false;
@@ -152,8 +208,17 @@ export function fitShapes(doc: PenDocument): boolean {
 		const outline = shapeOutline(node);
 		if (!outline || typeof node.width !== "number" || typeof node.height !== "number") continue;
 		const want = { x: 0, y: 0, width: node.width, height: node.height };
-		if (outline.x === want.x && outline.y === want.y && outline.width === want.width && outline.height === want.height && outline.layoutPosition === "absolute") continue;
-		Object.assign(outline, want, { layoutPosition: "absolute" });
+		const fitted = outline.x === want.x && outline.y === want.y && outline.width === want.width && outline.height === want.height && outline.layoutPosition === "absolute";
+		if (!fitted) {
+			Object.assign(outline, want, { layoutPosition: "absolute" });
+			changed = true;
+		}
+		const radius = shapeRadius(node);
+		if (radius === undefined) continue;
+		const geometry = roundedGeometry(node.width, node.height, radius);
+		const viewBox: [number, number, number, number] = [0, 0, node.width, node.height];
+		if (outline.geometry === geometry && Array.isArray(outline.viewBox) && outline.viewBox.every((v, i) => v === viewBox[i])) continue;
+		Object.assign(outline, { geometry, viewBox });
 		changed = true;
 	}
 	return changed;

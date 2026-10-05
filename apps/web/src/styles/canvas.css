@@ -1076,6 +1076,11 @@
 	.world > .pen-handle:is([data-handle="e"], [data-handle="w"]) {
 	cursor: ew-resize;
 }
+	/* The corner radius: a round handle inside the corner, to tell it from the square sizing ones. */
+	.world > .pen-handle[data-handle="radius"] {
+	border-radius: 50%;
+	cursor: nwse-resize;
+}
 	.world > .pen-draft {
 	position: absolute;
 	box-sizing: border-box;

@@ -38,7 +38,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, fitShapes, isShape, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
@@ -816,6 +816,9 @@ export function Stage(props: {
 				out.push(resize);
 				continue;
 			}
+			// An arrow is a line, and a box round it says nothing: its own two round end handles show it.
+			const item = penLayer.placed.get(id)?.node;
+			if (item && isArrow(item)) continue;
 			const box = penLayer.bounds.get(id);
 			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
 		}
@@ -849,6 +852,37 @@ export function Stage(props: {
 		// A group is as big as what is in it, and pen does not scale children, so it moves but is not sized.
 		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
 		return outlines[0]!;
+	});
+	/**
+	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
+	 * made. So it is sized by its width alone: the two side handles, and no height written to the
+	 * file. Dragging a corner used to pin a height on it, and from then on its words were cut off or
+	 * swam in space.
+	 */
+	const widthOnly = (id: string | undefined) => {
+		const node = id ? penLayer.placed.get(id)?.node : undefined;
+		return !!node && isMarkdown(node);
+	};
+	/** The handles an item shows: every edge and corner, or the two sides for something as tall as its words. */
+	const penHandleSet = createMemo(() => (widthOnly(penHandles()?.id) ? (["e", "w"] as const) : HANDLES));
+	/**
+	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
+	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
+	 * corner, as it does in a drawing program, and every corner follows it.
+	 */
+	const radiusHandle = createMemo(() => {
+		const box = penHandles();
+		if (!box || penResize() || penDrag().dx !== 0 || penDrag().dy !== 0 || !props.onPenEdit) return undefined;
+		const node = penLayer.placed.get(box.id)?.node;
+		if (!node) return undefined;
+		const most = maxRadius(box.w, box.h);
+		if (most < 2) return undefined;
+		const shape = shapeRadius(node);
+		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
+		if (node.type !== "rectangle" && node.type !== "frame") return undefined;
+		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
+		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
+		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 	const penAnchors = createMemo(() => {
@@ -960,6 +994,37 @@ export function Stage(props: {
 		if (!props.pen) return;
 		pageFont("Inter", 400, false);
 		pageFont("Inter", 600, false);
+	});
+	/**
+	 * The corner radius being dragged (`radiusFrom`), and the drawing redrawn with it: a copy of the
+	 * document with the one item's radius changed, its outline rebuilt by `fitShapes` as the saved
+	 * edit will, drawn in place of the real one until the drag is let go. Once a frame at most.
+	 */
+	const [penRadius, setPenRadius] = createSignal<{ id: string; radius: number } | undefined>();
+	let radiusFrame: number | undefined;
+	createEffect(() => {
+		const want = penRadius();
+		const doc = props.pen?.doc;
+		if (!doc) return;
+		if (radiusFrame !== undefined) cancelAnimationFrame(radiusFrame);
+		if (!want) {
+			radiusFrame = undefined;
+			penLayer.setDoc(doc, props.pen?.base ?? "");
+			return;
+		}
+		radiusFrame = requestAnimationFrame(() => {
+			radiusFrame = undefined;
+			const copy = structuredClone(doc);
+			const found = indexOf(copy).get(want.id);
+			if (!found) return;
+			if (shapeRadius(found.node) === undefined) found.node.cornerRadius = want.radius <= 0 ? undefined : want.radius;
+			else found.node.metadata = { type: "", ...found.node.metadata, radius: want.radius };
+			fitShapes(copy);
+			penLayer.setDoc(copy, props.pen?.base ?? "");
+		});
+	});
+	onCleanup(() => {
+		if (radiusFrame !== undefined) cancelAnimationFrame(radiusFrame);
 	});
 		/**
 	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
@@ -1582,6 +1647,8 @@ export function Stage(props: {
 		event.stopPropagation();
 		const { id } = box;
 		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
+		// A card's height is its words': the drag sets its width, and its height is left to the layout.
+		const width = widthOnly(id);
 		/*
 		 * The handles are on what the item draws; the file sizes the box it was given. For most items
 		 * they are the same box. For a path drawn in a corner of its viewBox they are not, and the
@@ -1631,14 +1698,50 @@ export function Stage(props: {
 				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(4, Math.round(Math.abs(y2 - y1))) };
 				setPenResize({ id, ...next });
 				const box = givenFor(next);
-				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, h: box.h }]]));
+				// A card's height is left out, so the drawing re-measures its words at the new width.
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(width ? {} : { h: box.h }) }]]));
 			},
 			(moved) => {
 				setGuides([]);
 				if (!moved) return;
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
+				// A card: the width alone, and any height an older drag pinned on it taken off again.
+				if (width) return penEdit([{ op: "update", id, set: { height: null }, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w) } }]);
 				penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w), y2: r(box.y + box.h) } }]);
+			},
+		);
+	};
+
+	/**
+	 * How round the corners are, dragged. The handle starts inside the top-left corner; pulling it
+	 * along the diagonal rounds every corner by as much, up to half the shorter side, where the
+	 * straight sides are gone. A shape from the library keeps it in its own `metadata.radius`, which
+	 * is what redraws its outline (`@decks/pen`, `fitShapes`); pen's rectangle and frame have a
+	 * `cornerRadius` of their own. It is written on the lift, not while dragging, so one drag is one
+	 * edit in the file's history.
+	 */
+	const radiusFrom = (event: PointerEvent) => {
+		const start = radiusHandle();
+		if (event.button !== 0 || !start) return;
+		event.preventDefault();
+		event.stopPropagation();
+		let radius = start.radius;
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				// Along the diagonal from the corner: the nearer of the two reaches, so a pull across rounds as much as a pull down.
+				const reach = Math.min(now.x - start.x, now.y - start.y);
+				radius = Math.max(0, Math.min(Math.round(reach), Math.floor(start.most)));
+				setPenRadius({ id: start.id, radius });
+			},
+			(moved) => {
+				setPenRadius(undefined);
+				if (!moved || radius === start.radius) return;
+				if (!start.shape) return penEdit([{ op: "update", id: start.id, set: { cornerRadius: radius <= 0 ? null : radius } }]);
+				const node = penLayer.placed.get(start.id)?.node;
+				penEdit([{ op: "update", id: start.id, set: { metadata: { type: "", ...node?.metadata, radius } } }]);
 			},
 		);
 	};
@@ -2848,7 +2951,9 @@ export function Stage(props: {
 		penDrawn();
 		const id = hoverId();
 		if (props.mode !== "edit") return undefined;
-		const bounds = id && id !== penText()?.id ? penLayer.bounds.get(id) : undefined;
+		// As with the selection, no box round an arrow: hovering a line should not light up a rectangle.
+		const hovered = id ? penLayer.placed.get(id)?.node : undefined;
+		const bounds = id && id !== penText()?.id && !(hovered && isArrow(hovered)) ? penLayer.bounds.get(id) : undefined;
 		if (bounds) return { ...bounds, id };
 		// A board under the pointer, unless it is the one selected, which has its own outline, or a drag is on.
 		const path = hoverBoard() ?? pictureHover();
@@ -3830,7 +3935,7 @@ export function Stage(props: {
 				</Show>
 				<Show when={penHandles()}>
 					{(box) => (
-						<For each={HANDLES}>
+						<For each={penHandleSet()}>
 							{(handle) => {
 								const size = () => HANDLE_PX / props.camera.zoom;
 								return (
@@ -3850,6 +3955,32 @@ export function Stage(props: {
 							}}
 						</For>
 					)}
+				</Show>
+				<Show when={radiusHandle()}>
+					{(box) => {
+						const live = () => {
+							const dragged = penRadius();
+							return dragged?.id === box().id ? dragged.radius : box().radius;
+						};
+						const size = () => HANDLE_PX / props.camera.zoom;
+						// Clear of the corner handle itself, and never past the middle of the shape.
+						const inset = () => Math.min(Math.max(live(), size()), box().most);
+						return (
+							<div
+								class="pen-handle"
+								data-handle="radius"
+								title="Drag to round the corners"
+								style={{
+									left: `${box().x + inset() - size() / 2}px`,
+									top: `${box().y + inset() - size() / 2}px`,
+									width: `${size()}px`,
+									height: `${size()}px`,
+									"border-width": `${1.5 / props.camera.zoom}px`,
+								}}
+								onPointerDown={radiusFrom}
+							/>
+						);
+					}}
 				</Show>
 				<Show when={boardHandles()}>
 					{(box) => (

@@ -47,3 +47,28 @@ test("a sided route with one side open meets the side facing it", () => {
 	assert.deepEqual(sidedRoute(a, b, "straight", "right", undefined), [[100, 50], [300, 50]]);
 	assert.deepEqual(sidedRoute(a, b, "straight", "top", undefined)[0], [50, 0]);
 });
+
+test("a rounded shape is redrawn in its own pixels, so a wide one keeps round corners", () => {
+	const rounded = shapeKind("Rounded")!;
+	const made = makeShape(rounded, { frame: "r", outline: "r-o" }, { w: 160, h: 100 });
+	// 14% of the shorter side, in pixels, not 14 units of a box that gets stretched.
+	assert.equal(made.metadata?.radius, 14);
+	const { doc } = apply(emptyDocument(), [{ op: "insert", node: made, box: { x1: 0, y1: 0 } }], { theme });
+	const wide = apply(doc, [{ op: "update", id: "r", box: { x1: 0, y1: 0, x2: 600, y2: 100 } }], { theme }).doc;
+	const outline = shapeOutline(wide.children[0]!)!;
+	assert.deepEqual(outline.viewBox, [0, 0, 600, 100], "the outline is drawn in the shape's own pixels");
+	// Every corner arc is the same radius both ways round: a circle, however wide the shape is pulled.
+	assert.match(String(outline.geometry), /A14 14 /);
+	assert.equal(String(outline.geometry).match(/A14 14 /g)?.length, 4);
+	// Dragged rounder, up to half the shorter side.
+	const square = apply(wide, [{ op: "update", id: "r", set: { metadata: { type: "decks.shape", kind: "Rounded", radius: 500 } } }], { theme }).doc;
+	assert.match(String(shapeOutline(square.children[0]!)!.geometry), /A50 50 /, "the radius stops at half the shorter side");
+});
+
+test("the cylinder's cap winds with its body, so its top is filled", () => {
+	const geometry = shapeKind("Database")!.geometry;
+	const [body, cap] = geometry.split(/(?=M)/).filter(Boolean).map((part) => part.trim());
+	// Both arcs sweep the same way: a nonzero fill cancelled them when they did not, leaving a hole.
+	assert.match(String(body), /A50 14 0 0 1 100 14/);
+	assert.match(String(cap), /^M100 14A50 14 0 0 1 0 14$/);
+});
