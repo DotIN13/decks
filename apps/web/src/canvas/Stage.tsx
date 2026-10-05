@@ -38,6 +38,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
+import { angleOf, applyTurn, compose, cssTurn, forBox, invertTurn, isUnturned, linearTurn, matrixAbove, matrixOf, totalAngle, turn, UNTURNED, type Matrix } from "./pen/turn.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, fitShapes, isShape, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { Insert } from "./pen/Insert.tsx";
@@ -654,7 +655,7 @@ export function Stage(props: {
 	 * or a resize is drawn as a preview.
 	 */
 	const [penDrag, setPenDrag] = createSignal({ dx: 0, dy: 0 });
-	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number } | undefined>();
+	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number; given?: { x: number; y: number } } | undefined>();
 	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean } | undefined>();
@@ -866,6 +867,51 @@ export function Stage(props: {
 	/** The handles an item shows: every edge and corner, or the two sides for something as tall as its words. */
 	const penHandleSet = createMemo(() => (widthOnly(penHandles()?.id) ? (["e", "w"] as const) : HANDLES));
 	/**
+	 * The turn the selected item has been given (`pen/turn.ts`), as the matrix that carries its
+	 * upright box to where it is drawn, and the angle in degrees. Everything round a selection — the
+	 * outline, the handles, the arrow anchors — is placed through this, so it sits on the item rather
+	 * than on the upright box the layout gave it.
+	 */
+	const penTurn = createMemo<{ m: Matrix; deg: number }>(() => {
+		const box = penHandles();
+		if (!box) return { m: UNTURNED, deg: 0 };
+		const live = penRotate();
+		if (live?.id === box.id) return { m: live.m, deg: live.deg };
+		const placed = penLayer.placed.get(box.id);
+		const own = angleOf(placed?.node);
+		const above = matrixAbove(penLayer.placed, box.id);
+		/*
+		 * About the corner pen turns about, as it is right now: the item's own box while it is still, and
+		 * the box a resize in progress is writing, so the handles stay on the item as it is dragged.
+		 */
+		const sized = penResize();
+		const about = sized?.id === box.id && sized.given ? sized.given : (placed?.box ?? box);
+		return { m: compose(above, turn(own, { x: about.x, y: about.y })), deg: totalAngle(penLayer.placed, box.id) };
+	});
+	/**
+	 * Whether the selection can be turned: a single item, with a size of its own to turn. An arrow
+	 * is its two ends and has no angle; a card is as tall as its words and gets its side handles
+	 * alone, so there are no corners to reach past.
+	 */
+	const canRotate = createMemo(() => {
+		const box = penHandles();
+		if (!box || penResize() || penRadius() || !props.onPenEdit || widthOnly(box.id)) return false;
+		const node = penLayer.placed.get(box.id)?.node;
+		return !!node && !isArrow(node) && node.type !== "text";
+	});
+	/** Where a point of the selection's upright box is drawn. */
+	const turned = (point: { x: number; y: number }) => applyTurn(penTurn().m, point);
+	/**
+	 * The CSS that turns an outline with the item it is round: nothing at all for an upright item,
+	 * which is nearly every one. A board is never turned, and neither is the marquee.
+	 */
+	const outlineTurn = (id: string | undefined, box: { x: number; y: number }) => {
+		if (!id || id.startsWith("board:")) return {};
+		const m = id === penHandles()?.id ? penTurn().m : matrixOf(penLayer.placed, id);
+		if (isUnturned(m)) return {};
+		return { transform: cssTurn(forBox(m, box)), "transform-origin": "0 0" };
+	};
+	/**
 	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
 	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
 	 * corner, as it does in a drawing program, and every corner follows it.
@@ -1001,30 +1047,48 @@ export function Stage(props: {
 	 * edit will, drawn in place of the real one until the drag is let go. Once a frame at most.
 	 */
 	const [penRadius, setPenRadius] = createSignal<{ id: string; radius: number } | undefined>();
-	let radiusFrame: number | undefined;
+	/** The item being turned, while the drag is on: its angle, and the matrix the handles are placed through. */
+	const [penRotate, setPenRotate] = createSignal<{ id: string; deg: number; m: Matrix } | undefined>();
+	/** The angle and corner being dragged (`rotateFrom`), drawn before the edit is written. */
+	const [penAngle, setPenAngle] = createSignal<{ id: string; deg: number; x: number; y: number } | undefined>();
+	const previewRotation = setPenAngle;
+	let draftFrame: number | undefined;
 	createEffect(() => {
-		const want = penRadius();
+		const radius = penRadius();
+		const angle = penAngle();
 		const doc = props.pen?.doc;
 		if (!doc) return;
-		if (radiusFrame !== undefined) cancelAnimationFrame(radiusFrame);
-		if (!want) {
-			radiusFrame = undefined;
+		if (draftFrame !== undefined) cancelAnimationFrame(draftFrame);
+		if (!radius && !angle) {
+			draftFrame = undefined;
 			penLayer.setDoc(doc, props.pen?.base ?? "");
 			return;
 		}
-		radiusFrame = requestAnimationFrame(() => {
-			radiusFrame = undefined;
+		draftFrame = requestAnimationFrame(() => {
+			draftFrame = undefined;
 			const copy = structuredClone(doc);
-			const found = indexOf(copy).get(want.id);
-			if (!found) return;
-			if (shapeRadius(found.node) === undefined) found.node.cornerRadius = want.radius <= 0 ? undefined : want.radius;
-			else found.node.metadata = { type: "", ...found.node.metadata, radius: want.radius };
+			const index = indexOf(copy);
+			if (radius) {
+				const found = index.get(radius.id);
+				if (found) {
+					if (shapeRadius(found.node) === undefined) found.node.cornerRadius = radius.radius <= 0 ? undefined : radius.radius;
+					else found.node.metadata = { type: "", ...found.node.metadata, radius: radius.radius };
+				}
+			}
+			if (angle) {
+				const found = index.get(angle.id);
+				if (found) {
+					found.node.rotation = angle.deg;
+					found.node.x = angle.x;
+					found.node.y = angle.y;
+				}
+			}
 			fitShapes(copy);
 			penLayer.setDoc(copy, props.pen?.base ?? "");
 		});
 	});
 	onCleanup(() => {
-		if (radiusFrame !== undefined) cancelAnimationFrame(radiusFrame);
+		if (draftFrame !== undefined) cancelAnimationFrame(draftFrame);
 	});
 		/**
 	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
@@ -1669,19 +1733,30 @@ export function Stage(props: {
 			...(handle.includes("s") ? (["y2"] as const) : []),
 		];
 		const from = worldAt(event);
+		/*
+		 * A turned item is sized in its own upright coordinates: the pointer's movement is carried back
+		 * through the turn, so the handle that looks like the right edge moves the right edge. The corner
+		 * opposite the handle is then held where it is drawn, as it is when nothing is turned.
+		 */
+		const m = matrixOf(penLayer.placed, id);
+		const upright = isUnturned(m);
+		const back = invertTurn(m);
+		const anchor = upright ? undefined : applyTurn(m, { x: handle.includes("w") ? start.x + start.w : start.x, y: handle.includes("n") ? start.y + start.h : start.y });
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
-				const dx = now.x - from.x;
-				const dy = now.y - from.y;
+				const step = upright ? { x: now.x - from.x, y: now.y - from.y } : linearTurn(back, { x: now.x - from.x, y: now.y - from.y });
+				const dx = step.x;
+				const dy = step.y;
 				let x1 = start.x + (handle.includes("w") ? dx : 0);
 				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
 				let y1 = start.y + (handle.includes("n") ? dy : 0);
 				let y2 = start.y + start.h + (handle.includes("s") ? dy : 0);
-				// The edges being dragged snap to what is around, unless ⌘ or Ctrl is held.
+				// The edges being dragged snap to what is around, unless ⌘ or Ctrl is held, or it is
+				// turned: a turned edge is not parallel to anything the guides are drawn from.
 				let lines: Guide[] = [];
-				if (!(e.metaKey || e.ctrlKey)) {
+				if (upright && !(e.metaKey || e.ctrlKey)) {
 					const snapped = snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
 					({ x1, y1, x2, y2 } = snapped.box);
 					lines = snapped.guides;
@@ -1696,8 +1771,16 @@ export function Stage(props: {
 					else y2 = y1 + start.h * scale;
 				}
 				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(4, Math.round(Math.abs(y2 - y1))) };
-				setPenResize({ id, ...next });
+				/*
+				 * Turned, the corner pen turns about is the item's own top-left, so a size change swings the
+				 * whole item. The box is moved so the corner opposite the handle stays where the eye has it.
+				 */
+				if (anchor) {
+					const held = linearTurn(m, { x: handle.includes("w") ? next.w : 0, y: handle.includes("n") ? next.h : 0 });
+					next = { ...next, x: anchor.x - held.x, y: anchor.y - held.y };
+				}
 				const box = givenFor(next);
+				setPenResize({ id, ...next, given: { x: box.x, y: box.y } });
 				// A card's height is left out, so the drawing re-measures its words at the new width.
 				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(width ? {} : { h: box.h }) }]]));
 			},
@@ -1742,6 +1825,70 @@ export function Stage(props: {
 				if (!start.shape) return penEdit([{ op: "update", id: start.id, set: { cornerRadius: radius <= 0 ? null : radius } }]);
 				const node = penLayer.placed.get(start.id)?.node;
 				penEdit([{ op: "update", id: start.id, set: { metadata: { type: "", ...node?.metadata, radius } } }]);
+			},
+		);
+	};
+
+	/**
+	 * Turning an item, by dragging from just outside one of its corner handles. The item turns about
+	 * the middle of what it covers, which is where the eye expects it to turn, so the angle and the
+	 * corner pen turns about are written together: pen turns an item about its own top-left
+	 * (`pen/turn.ts`), so holding the middle still means moving that corner as the angle changes.
+	 *
+	 * Shift holds it to 15 degrees. The angle is counter-clockwise, as pen states it, which is why
+	 * the pointer's own clockwise sweep is subtracted.
+	 */
+	const ROTATE_STEP = 15;
+	const ROTATE_GRIPS = ["nw", "ne", "se", "sw"] as const;
+	const rotateFrom = (event: PointerEvent) => {
+		const start = penHandles();
+		if (event.button !== 0 || !start) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const { id } = start;
+		const placed = penLayer.placed.get(id);
+		if (!placed) return;
+		const given = placed.box;
+		const was = totalAngle(penLayer.placed, id);
+		const own = typeof placed.node.rotation === "number" ? placed.node.rotation : 0;
+		// Above this item: the turns it inherits, which the drag does not change.
+		const above = was - own;
+		const m0 = matrixOf(penLayer.placed, id);
+		// The middle of what it covers, held still: in the drawn place, which is where the pointer is.
+		const middle = applyTurn(m0, { x: start.x + start.w / 2, y: start.y + start.h / 2 });
+		const from = worldAt(event);
+		const angleAt = (point: { x: number; y: number }) => (Math.atan2(point.y - middle.y, point.x - middle.x) * 180) / Math.PI;
+		const first = angleAt(from);
+		let deg = own;
+		let corner = { x: given.x, y: given.y };
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				// The pointer sweeps clockwise as its angle grows, and pen counts counter-clockwise.
+				let next = own - (angleAt(now) - first);
+				if (e.shiftKey) next = Math.round((next + above) / ROTATE_STEP) * ROTATE_STEP - above;
+				deg = Math.round(next * 10) / 10;
+				/*
+				 * The corner to turn about, so the middle stays where it is: the middle, less the
+				 * half-diagonal turned by the new angle. Taken in the coordinates this item's parents
+				 * leave, which is what pen's own x and y are in.
+				 */
+				const over = turn(above, { x: 0, y: 0 });
+				const half = linearTurn(compose(over, turn(deg, { x: 0, y: 0 })), { x: given.w / 2, y: given.h / 2 });
+				const want = { x: middle.x - half.x, y: middle.y - half.y };
+				const back = invertTurn(turn(above, { x: 0, y: 0 }));
+				corner = applyTurn(back, want);
+				setPenRotate({ id, deg: deg + above, m: compose(turn(above, { x: 0, y: 0 }), turn(deg, corner)) });
+				previewRotation({ id, deg, x: corner.x, y: corner.y });
+			},
+			(moved) => {
+				setPenRotate(undefined);
+				previewRotation(undefined);
+				if (!moved) return;
+				const r = (value: number) => Math.round(value * 10) / 10;
+				const tidy = ((deg % 360) + 360) % 360;
+				penEdit([{ op: "update", id, set: { rotation: tidy === 0 ? null : r(tidy) }, box: { x1: r(corner.x), y1: r(corner.y), x2: r(corner.x + given.w), y2: r(corner.y + given.h) } }]);
 			},
 		);
 	};
@@ -3821,7 +3968,14 @@ export function Stage(props: {
 							class="pen-hover"
 							data-board={"board" in box() ? "true" : undefined}
 							data-round={"id" in box() && rounded((box() as { id: string }).id) ? "true" : undefined}
-							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
+							style={{
+								left: `${box().x}px`,
+								top: `${box().y}px`,
+								width: `${box().w}px`,
+								height: `${box().h}px`,
+								"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
+								...outlineTurn("id" in box() ? (box() as { id: string }).id : undefined, box()),
+							}}
 						/>
 					)}
 				</Show>
@@ -3935,25 +4089,62 @@ export function Stage(props: {
 				</Show>
 				<Show when={penHandles()}>
 					{(box) => (
-						<For each={penHandleSet()}>
-							{(handle) => {
-								const size = () => HANDLE_PX / props.camera.zoom;
-								return (
-									<div
-										class="pen-handle"
-										data-handle={handle}
-										style={{
-											left: `${box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2) - size() / 2}px`,
-											top: `${box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2) - size() / 2}px`,
-											width: `${size()}px`,
-											height: `${size()}px`,
-											"border-width": `${1.5 / props.camera.zoom}px`,
-										}}
-										onPointerDown={(event) => resizeFrom(event, handle)}
-									/>
-								);
-							}}
-						</For>
+						<>
+							<For each={penHandleSet()}>
+								{(handle) => {
+									const size = () => HANDLE_PX / props.camera.zoom;
+									// On the item as it is drawn, so a turned item's handles sit on its turned corners.
+									const at = () => turned({
+										x: box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2),
+										y: box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2),
+									});
+									return (
+										<div
+											class="pen-handle"
+											data-handle={handle}
+											style={{
+												left: `${at().x - size() / 2}px`,
+												top: `${at().y - size() / 2}px`,
+												width: `${size()}px`,
+												height: `${size()}px`,
+												"border-width": `${1.5 / props.camera.zoom}px`,
+												...(penTurn().deg ? { transform: `rotate(${-penTurn().deg}deg)` } : {}),
+											}}
+											onPointerDown={(event) => resizeFrom(event, handle)}
+										/>
+									);
+								}}
+							</For>
+							{/* Just outside each corner handle: a press there turns the item instead of sizing it. */}
+							<Show when={canRotate()}>
+								<For each={ROTATE_GRIPS}>
+									{(grip) => {
+										const size = () => (HANDLE_PX * 1.8) / props.camera.zoom;
+										const at = () =>
+											turned({
+												x: box().x + (grip.includes("w") ? 0 : box().w),
+												y: box().y + (grip.includes("n") ? 0 : box().h),
+											});
+										// Outward along the corner's own diagonal, which the turn carries round with it.
+										const out = () => linearTurn(penTurn().m, { x: (grip.includes("w") ? -1 : 1) * size() * 0.45, y: (grip.includes("n") ? -1 : 1) * size() * 0.45 });
+										return (
+											<div
+												class="pen-rotate"
+												data-grip={grip}
+												title="Drag to turn"
+												style={{
+													left: `${at().x + out().x - size() / 2}px`,
+													top: `${at().y + out().y - size() / 2}px`,
+													width: `${size()}px`,
+													height: `${size()}px`,
+												}}
+												onPointerDown={rotateFrom}
+											/>
+										);
+									}}
+								</For>
+							</Show>
+						</>
 					)}
 				</Show>
 				<Show when={radiusHandle()}>

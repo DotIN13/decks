@@ -159,7 +159,7 @@ if (spot) {
 	const rect = await until(() => onDisk().children.find((n) => n.type === "rectangle" && !had.has(n.id)));
 	drawnId = rect?.id;
 	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
-	const handles = await until(() => page.evaluate(() => document.querySelectorAll(".pen-handle").length === 8));
+	const handles = await until(() => page.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length === 8));
 	say("…and it is selected, with eight handles", !!handles);
 	await page.locator('.props-panel [aria-label="Fill #fde68a"]').click();
 	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
@@ -182,6 +182,103 @@ if (spot) {
 	await page.keyboard.press("Control+Enter");
 	const titled = await until(() => onDisk().children.find((n) => n.id === cardId)?.content === "## Plan\n\n- **one**\n- two");
 	say("…and what is typed is its markdown in the file, as typed", !!titled, JSON.stringify(onDisk().children.find((n) => n.id === cardId)?.content));
+	// --- the corner radius, the turn, and a card sized by its width alone ---------------------------
+	// The rectangle again: it has corners to round and a size to turn, where a card has neither.
+	await page.keyboard.press("Escape");
+	const rectBox = () => page.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
+	const onRect = await rectBox();
+	await page.mouse.click(onRect.x + onRect.width / 2, onRect.y + onRect.height / 2);
+	await until(() => page.evaluate(() => document.querySelectorAll('.pen-handle[data-handle="radius"]').length === 1));
+	const extras = await page.evaluate(() => ({
+		radius: document.querySelectorAll('.pen-handle[data-handle="radius"]').length,
+		grips: document.querySelectorAll(".pen-rotate").length,
+	}));
+	say("a selected rectangle has one radius handle and four reaches to turn it by", extras.radius === 1 && extras.grips === 4, JSON.stringify(extras));
+
+	// Dragging the radius handle along the diagonal rounds every corner, in the file.
+	const radiusAt = () => page.evaluate(() => {
+		const h = document.querySelector('.pen-handle[data-handle="radius"]').getBoundingClientRect();
+		return { x: h.left + h.width / 2, y: h.top + h.height / 2 };
+	});
+	const grabRadius = await radiusAt();
+	await page.mouse.move(grabRadius.x, grabRadius.y);
+	await page.mouse.down();
+	await page.mouse.move(grabRadius.x + 12, grabRadius.y + 12, { steps: 4 });
+	await page.mouse.move(grabRadius.x + 24, grabRadius.y + 24, { steps: 4 });
+	await page.mouse.up();
+	const round = await until(() => {
+		const r = onDisk().children.find((n) => n.id === drawnId)?.cornerRadius;
+		return typeof r === "number" && r > 8 ? r : undefined;
+	});
+	say("dragging the radius handle rounds the corners in the file", !!round, `cornerRadius ${round}`);
+
+	// Dragging from just outside a corner turns it, and the turn is written with the corner it turns about.
+	const gripAt = (which) => page.evaluate((grip) => {
+		const h = document.querySelector(`.pen-rotate[data-grip="${grip}"]`)?.getBoundingClientRect();
+		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
+	}, which);
+	const grip = await gripAt("ne");
+	const spun = await (async () => {
+		if (!grip) return undefined;
+		const mid = await rectBox();
+		const centre = { x: mid.x + mid.width / 2, y: mid.y + mid.height / 2 };
+		await page.mouse.move(grip.x, grip.y);
+		await page.mouse.down();
+		// A quarter of the way round the middle, in three steps so the drag is seen as one.
+		for (const t of [0.12, 0.25, 0.4]) {
+			const a0 = Math.atan2(grip.y - centre.y, grip.x - centre.x);
+			const r = Math.hypot(grip.x - centre.x, grip.y - centre.y);
+			await page.mouse.move(centre.x + r * Math.cos(a0 + t), centre.y + r * Math.sin(a0 + t), { steps: 4 });
+		}
+		await page.mouse.up();
+		return until(() => {
+			const deg = onDisk().children.find((n) => n.id === drawnId)?.rotation;
+			return typeof deg === "number" && deg !== 0 ? deg : undefined;
+		});
+	})();
+	say("dragging outside a corner turns the item, counter-clockwise in the file", !!spun && spun > 300, `rotation ${spun}`);
+	// Turned, it is still the item the pointer finds: the press is carried back through the turn.
+	const stillThere = await (async () => {
+		await page.keyboard.press("Escape");
+		await settle(page, 300);
+		const box = await rectBox();
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+		return until(() => page.evaluate(() => document.querySelectorAll(".pen-selection").length === 1));
+	})();
+	say("…and a click in the middle of a turned item still selects it", !!stillThere);
+	// The handles sit on the turned item, not on the upright box the layout gave it.
+	const onItem = await page.evaluate(() => {
+		const sel = document.querySelector(".pen-selection");
+		const turn = sel && getComputedStyle(sel).transform;
+		return { turned: !!turn && turn !== "none", handles: document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length };
+	});
+	say("…and its outline is turned with it", onItem.turned && onItem.handles === 8, JSON.stringify(onItem));
+
+	// A card is as tall as its words: two side handles, and a drag writes no height.
+	await page.keyboard.press("Escape");
+	await settle(page, 200);
+	const cardBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 8);
+	const two = await until(() => page.evaluate(() => {
+		const all = [...document.querySelectorAll('.pen-handle:not([data-handle="radius"])')].map((h) => h.dataset.handle).sort();
+		return all.length === 2 && all.join(",") === "e,w" ? all : undefined;
+	}));
+	say("a card shows its two side handles alone, because its height is its words'", !!two, JSON.stringify(two));
+	const wasCard = onDisk().children.find((n) => n.id === cardId);
+	const east = await page.evaluate(() => {
+		const h = document.querySelector('.pen-handle[data-handle="e"]').getBoundingClientRect();
+		return { x: h.left + h.width / 2, y: h.top + h.height / 2 };
+	});
+	await page.mouse.move(east.x, east.y);
+	await page.mouse.down();
+	await page.mouse.move(east.x + 40, east.y, { steps: 4 });
+	await page.mouse.move(east.x + 80, east.y, { steps: 4 });
+	await page.mouse.up();
+	const widened = await until(() => {
+		const card = onDisk().children.find((n) => n.id === cardId);
+		return card && card.width !== wasCard?.width ? card : undefined;
+	});
+	say("dragging its side sets its width, and pins no height on it", !!widened && widened.height === undefined, JSON.stringify({ width: widened?.width, height: widened?.height }));
 }
 // --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
 const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);

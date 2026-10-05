@@ -356,6 +356,13 @@ let ITEM_WASH = "";
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	}));
 	say("…and the selected arrow has a handle on each end", !!end && (await count(".pen-handle[data-end]")) === 2);
+	// A line is shown by its ends, not by a rectangle round it: no box, no sizing handles, nothing to turn.
+	const boxed = await page.evaluate(() => ({
+		selection: document.querySelectorAll(".pen-selection:not([data-board])").length,
+		sizers: document.querySelectorAll(".pen-handle:not([data-end])").length,
+		grips: document.querySelectorAll(".pen-rotate").length,
+	}));
+	say("…and no box round it, since a box round a line says nothing", boxed.selection === 0 && boxed.sizers === 0 && boxed.grips === 0, JSON.stringify(boxed));
 	if (end && arrow) {
 		const b = await centre("g-b");
 		await page.mouse.move(end.x, end.y);

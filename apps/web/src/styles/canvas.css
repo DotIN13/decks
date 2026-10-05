@@ -1081,6 +1081,24 @@
 	border-radius: 50%;
 	cursor: nwse-resize;
 }
+	/*
+	 * Turning an item: a reach just outside each corner handle, which shows nothing until the pointer
+	 * is on it. Bigger than a sizing handle because it is aimed at by feel rather than seen.
+	 */
+	.world > .pen-rotate {
+	position: absolute;
+	box-sizing: border-box;
+	border-radius: 50%;
+	cursor: grab;
+	background: transparent;
+}
+	.world > .pen-rotate:hover,
+	.world > .pen-rotate:active {
+	background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+	.world > .pen-rotate:active {
+	cursor: grabbing;
+}
 	.world > .pen-draft {
 	position: absolute;
 	box-sizing: border-box;
