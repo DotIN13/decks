@@ -237,22 +237,35 @@ if (spot) {
 		});
 	})();
 	say("dragging outside a corner turns the item, counter-clockwise in the file", !!spun && spun > 300, `rotation ${spun}`);
-	// Turned, it is still the item the pointer finds: the press is carried back through the turn.
+	// It is still selected after the drag, and its outline is turned with it rather than left upright.
+	const onItem = await page.evaluate(() => {
+		const sel = document.querySelector(".pen-selection:not([data-board])");
+		const turn = sel && getComputedStyle(sel).transform;
+		const rect = sel?.getBoundingClientRect();
+		return {
+			turned: !!turn && turn !== "none",
+			handles: document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length,
+			middle: rect ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } : undefined,
+		};
+	});
+	const seenTurn = await page.evaluate((id) => globalThis.__decksPenTurn?.(id), drawnId);
+	say("…and its outline is turned with it, handles and all", onItem.turned && onItem.handles === 8, JSON.stringify({ turned: onItem.turned, handles: onItem.handles, seenTurn }));
+	/*
+	 * Turned, it is still the item the pointer finds: a press is carried back through the turn before
+	 * the box test. The middle of where it is drawn, which is not the middle of the upright box the
+	 * layout gave it — that is the whole point.
+	 */
 	const stillThere = await (async () => {
+		if (!onItem.middle) return undefined;
 		await page.keyboard.press("Escape");
 		await settle(page, 300);
-		const box = await rectBox();
-		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-		return until(() => page.evaluate(() => document.querySelectorAll(".pen-selection").length === 1));
+		const upright = await rectBox();
+		const apart = Math.hypot(onItem.middle.x - (upright.x + upright.width / 2), onItem.middle.y - (upright.y + upright.height / 2));
+		await page.mouse.click(onItem.middle.x, onItem.middle.y);
+		const got = await until(() => page.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
+		return { got, apart };
 	})();
-	say("…and a click in the middle of a turned item still selects it", !!stillThere);
-	// The handles sit on the turned item, not on the upright box the layout gave it.
-	const onItem = await page.evaluate(() => {
-		const sel = document.querySelector(".pen-selection");
-		const turn = sel && getComputedStyle(sel).transform;
-		return { turned: !!turn && turn !== "none", handles: document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length };
-	});
-	say("…and its outline is turned with it", onItem.turned && onItem.handles === 8, JSON.stringify(onItem));
+	say("…and a click in the middle of where it is drawn selects it, not the board under it", !!stillThere?.got, JSON.stringify(stillThere));
 
 	// A card is as tall as its words: two side handles, and a drag writes no height.
 	await page.keyboard.press("Escape");

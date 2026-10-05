@@ -860,77 +860,6 @@ export function Stage(props: {
 	 * file. Dragging a corner used to pin a height on it, and from then on its words were cut off or
 	 * swam in space.
 	 */
-	const widthOnly = (id: string | undefined) => {
-		const node = id ? penLayer.placed.get(id)?.node : undefined;
-		return !!node && isMarkdown(node);
-	};
-	/** The handles an item shows: every edge and corner, or the two sides for something as tall as its words. */
-	const penHandleSet = createMemo(() => (widthOnly(penHandles()?.id) ? (["e", "w"] as const) : HANDLES));
-	/**
-	 * The turn the selected item has been given (`pen/turn.ts`), as the matrix that carries its
-	 * upright box to where it is drawn, and the angle in degrees. Everything round a selection — the
-	 * outline, the handles, the arrow anchors — is placed through this, so it sits on the item rather
-	 * than on the upright box the layout gave it.
-	 */
-	const penTurn = createMemo<{ m: Matrix; deg: number }>(() => {
-		const box = penHandles();
-		if (!box) return { m: UNTURNED, deg: 0 };
-		const live = penRotate();
-		if (live?.id === box.id) return { m: live.m, deg: live.deg };
-		const placed = penLayer.placed.get(box.id);
-		const own = angleOf(placed?.node);
-		const above = matrixAbove(penLayer.placed, box.id);
-		/*
-		 * About the corner pen turns about, as it is right now: the item's own box while it is still, and
-		 * the box a resize in progress is writing, so the handles stay on the item as it is dragged.
-		 */
-		const sized = penResize();
-		const about = sized?.id === box.id && sized.given ? sized.given : (placed?.box ?? box);
-		return { m: compose(above, turn(own, { x: about.x, y: about.y })), deg: totalAngle(penLayer.placed, box.id) };
-	});
-	/**
-	 * Whether the selection can be turned: a single item, with a size of its own to turn. An arrow
-	 * is its two ends and has no angle; a card is as tall as its words and gets its side handles
-	 * alone, so there are no corners to reach past.
-	 */
-	const canRotate = createMemo(() => {
-		const box = penHandles();
-		if (!box || penResize() || penRadius() || !props.onPenEdit || widthOnly(box.id)) return false;
-		const node = penLayer.placed.get(box.id)?.node;
-		return !!node && !isArrow(node) && node.type !== "text";
-	});
-	/** Where a point of the selection's upright box is drawn. */
-	const turned = (point: { x: number; y: number }) => applyTurn(penTurn().m, point);
-	/**
-	 * The CSS that turns an outline with the item it is round: nothing at all for an upright item,
-	 * which is nearly every one. A board is never turned, and neither is the marquee.
-	 */
-	const outlineTurn = (id: string | undefined, box: { x: number; y: number }) => {
-		if (!id || id.startsWith("board:")) return {};
-		const m = id === penHandles()?.id ? penTurn().m : matrixOf(penLayer.placed, id);
-		if (isUnturned(m)) return {};
-		return { transform: cssTurn(forBox(m, box)), "transform-origin": "0 0" };
-	};
-	/**
-	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
-	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
-	 * corner, as it does in a drawing program, and every corner follows it.
-	 */
-	const radiusHandle = createMemo(() => {
-		const box = penHandles();
-		if (!box || penResize() || penDrag().dx !== 0 || penDrag().dy !== 0 || !props.onPenEdit) return undefined;
-		const node = penLayer.placed.get(box.id)?.node;
-		if (!node) return undefined;
-		const most = maxRadius(box.w, box.h);
-		if (most < 2) return undefined;
-		const shape = shapeRadius(node);
-		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
-		if (node.type !== "rectangle" && node.type !== "frame") return undefined;
-		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
-		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
-		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
-	});
-	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 	const penAnchors = createMemo(() => {
 		const box = penHandles();
 		if (!box || penDraft() || penResize() || !props.onPenEdit) return undefined;
@@ -1173,6 +1102,12 @@ export function Stage(props: {
 		const b = toScreen(localCamera, view(), { x: box.x + box.w, y: box.y + box.h });
 		const r = element.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
+	};
+	/** For the browser checks: the turn a drawn item has been given, which the canvas draws everything round it through. */
+	(globalThis as { __decksPenTurn?: (id: string) => { deg: number; m: number[] } | undefined }).__decksPenTurn = (id) => {
+		const placed = penLayer.placed.get(id);
+		if (!placed) return undefined;
+		return { deg: totalAngle(penLayer.placed, id), m: [...matrixOf(penLayer.placed, id)] };
 	};
 	/** For the browser checks: every board on the canvas and where it is on screen, node or picture (`rendered`). */
 	(globalThis as { __decksBoards?: () => Array<{ path: string; node: boolean; rect: DOMRect }> }).__decksBoards = () => {
@@ -1892,6 +1827,78 @@ export function Stage(props: {
 			},
 		);
 	};
+
+	const widthOnly = (id: string | undefined) => {
+		const node = id ? penLayer.placed.get(id)?.node : undefined;
+		return !!node && isMarkdown(node);
+	};
+	/** The handles an item shows: every edge and corner, or the two sides for something as tall as its words. */
+	const penHandleSet = createMemo(() => (widthOnly(penHandles()?.id) ? (["e", "w"] as const) : HANDLES));
+	/**
+	 * The turn the selected item has been given (`pen/turn.ts`), as the matrix that carries its
+	 * upright box to where it is drawn, and the angle in degrees. Everything round a selection — the
+	 * outline, the handles, the arrow anchors — is placed through this, so it sits on the item rather
+	 * than on the upright box the layout gave it.
+	 */
+	const penTurn = createMemo<{ m: Matrix; deg: number }>(() => {
+		const box = penHandles();
+		if (!box) return { m: UNTURNED, deg: 0 };
+		const live = penRotate();
+		if (live?.id === box.id) return { m: live.m, deg: live.deg };
+		const placed = penLayer.placed.get(box.id);
+		const own = angleOf(placed?.node);
+		const above = matrixAbove(penLayer.placed, box.id);
+		/*
+		 * About the corner pen turns about, as it is right now: the item's own box while it is still, and
+		 * the box a resize in progress is writing, so the handles stay on the item as it is dragged.
+		 */
+		const sized = penResize();
+		const about = sized?.id === box.id && sized.given ? sized.given : (placed?.box ?? box);
+		return { m: compose(above, turn(own, { x: about.x, y: about.y })), deg: totalAngle(penLayer.placed, box.id) };
+	});
+	/**
+	 * Whether the selection can be turned: a single item, with a size of its own to turn. An arrow
+	 * is its two ends and has no angle; a card is as tall as its words and gets its side handles
+	 * alone, so there are no corners to reach past.
+	 */
+	const canRotate = createMemo(() => {
+		const box = penHandles();
+		if (!box || penResize() || penRadius() || !props.onPenEdit || widthOnly(box.id)) return false;
+		const node = penLayer.placed.get(box.id)?.node;
+		return !!node && !isArrow(node) && node.type !== "text";
+	});
+	/** Where a point of the selection's upright box is drawn. */
+	const turned = (point: { x: number; y: number }) => applyTurn(penTurn().m, point);
+	/**
+	 * The CSS that turns an outline with the item it is round: nothing at all for an upright item,
+	 * which is nearly every one. A board is never turned, and neither is the marquee.
+	 */
+	const outlineTurn = (id: string | undefined, box: { x: number; y: number }) => {
+		if (!id || id.startsWith("board:")) return {};
+		const m = id === penHandles()?.id ? penTurn().m : matrixOf(penLayer.placed, id);
+		if (isUnturned(m)) return {};
+		return { transform: cssTurn(forBox(m, box)), "transform-origin": "0 0" };
+	};
+	/**
+	 * The one selected item's corner radius, when it has corners to round: a rounded shape from the
+	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
+	 * corner, as it does in a drawing program, and every corner follows it.
+	 */
+	const radiusHandle = createMemo(() => {
+		const box = penHandles();
+		if (!box || penResize() || penDrag().dx !== 0 || penDrag().dy !== 0 || !props.onPenEdit) return undefined;
+		const node = penLayer.placed.get(box.id)?.node;
+		if (!node) return undefined;
+		const most = maxRadius(box.w, box.h);
+		if (most < 2) return undefined;
+		const shape = shapeRadius(node);
+		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
+		if (node.type !== "rectangle" && node.type !== "frame") return undefined;
+		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
+		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
+		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
+	});
+	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
 	/**
 	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
@@ -3958,7 +3965,15 @@ export function Stage(props: {
 							data-board={box().id.startsWith("board:") ? "true" : undefined}
 							data-sizing={box().id.startsWith("board:") && sizingPaths().has(box().id.slice(6)) ? "true" : undefined}
 							data-round={rounded(box().id) ? "true" : undefined}
-							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
+							style={{
+								left: `${box().x}px`,
+								top: `${box().y}px`,
+								width: `${box().w}px`,
+								height: `${box().h}px`,
+								"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
+								// A turned item is outlined where it is drawn, turned with it (`pen/turn.ts`).
+								...outlineTurn(box().id, box()),
+							}}
 						/>
 					)}
 				</Index>
