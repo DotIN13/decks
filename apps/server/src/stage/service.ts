@@ -8,6 +8,7 @@ import { withBoardSize } from "../deck/meta.ts";
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 import type { StageShots } from "./shots.ts";
 import type { StagePens } from "./pens.ts";
+import type { Forwards } from "../ports.ts";
 
 /**
  * The single path from a tool to the canvas.
@@ -131,6 +132,8 @@ export class StageService {
 	 * `undefined` in tests that build a service without a deck on disk.
 	 */
 	pens: StagePens | undefined;
+	/** The ports forwarded through Decks, which agents open and close (`ports.ts`). `undefined` in tests without one. */
+	forwards: Forwards | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
 	shots: StageShots | undefined;
 	/** The server's own picture of a whole board, fresh from its file (`boards/thumbs.ts`): what a screenshot falls back to. */

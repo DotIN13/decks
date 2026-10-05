@@ -78,6 +78,9 @@ export default defineConfig({
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true, xfwd: true },
 			// Another server passed through this one, for a page with no service worker (`share/relay.ts`).
 			"/c": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, xfwd: true },
+			// Forwarded ports (`server/ports.ts`), which the server answers for, websockets and all.
+			"/node/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
+			"/rnode/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
 		},
 	},
 	/*

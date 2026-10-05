@@ -67,6 +67,7 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 
 	return {
 		id: conversation.id,
+		board: path,
 		identity: () => identity,
 		context: () => conversation.context(),
 		inPlay: () => conversation.inPlay(),

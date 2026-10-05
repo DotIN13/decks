@@ -30,6 +30,7 @@ import { Cameras } from "./deck/cameras.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
+import { Forwards } from "./ports.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -56,6 +57,8 @@ export class App {
 	readonly stage: StageService;
 	/** Every agent's stage drawing, as `.pen` files under `stages/` (`stage/pens.ts`). */
 	readonly pens: StagePens;
+	/** The ports agents have forwarded through this server (`ports.ts`). */
+	readonly forwards: Forwards;
 	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
@@ -168,6 +171,8 @@ export class App {
 		 */
 		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
 		this.stage.pens = this.pens;
+		this.forwards = new Forwards(deck.path, config.port);
+		this.stage.forwards = this.forwards;
 		this.pens.watch();
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
@@ -699,6 +704,7 @@ export class App {
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.pens.setDeck(this.deck.path);
+		this.forwards.setDeck(this.deck.path);
 		this.boards.setDeck(this.deck);
 		this.settings.setDeck(this.deck.path);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening

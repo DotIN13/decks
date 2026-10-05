@@ -140,6 +140,8 @@ export interface StageAgentHooks {
 	stageName?(): string | undefined;
 	/** Isolated mode (`agents/isolation.ts`): this agent may see only its own stage's boards. */
 	isolated?(): boolean;
+	/** Set when the caller is a board's own code (`stage/board-actor.ts`), not an agent. */
+	board?: string;
 	/** Work on another stage: its boards become this agent's (`agents/session.ts`). */
 	openStage?(name: string): void;
 	/** Make an empty stage from a title, open it, and return its name. */
@@ -733,6 +735,27 @@ export function createStageTool(deps: {
 			if (patch?.tags !== undefined) agent.setTags(patch.tags);
 			if (patch?.workspace !== undefined) agent.setWorkspace(patch.workspace);
 			return agent.identity();
+		},
+
+		/**
+		 * The ports forwarded through Decks, so a board can frame a server this machine runs
+		 * (`ports.ts`): read with nothing, `{ open: port, label }` to forward one, `{ close: port }`
+		 * to stop. Each comes back with its two addresses, as Open OnDemand names them: `node` keeps
+		 * the path (for a server given that base path), `rnode` takes it off (for one at the root).
+		 *
+		 * An agent's verb, not a board's: a board's own code may read the list but not change it, and
+		 * an isolated agent may do neither, since a forwarded port reaches outside its stage.
+		 */
+		ports: async (change?: { open?: number; close?: number; label?: string }) => {
+			if (isolated()) notWhileIsolated("port forwarding");
+			const forwards = service.forwards;
+			if (!forwards) throw new Error("This server forwards no ports.");
+			if (change && (change.open !== undefined || change.close !== undefined)) {
+				if (agent.board) throw new Error("A board's own code cannot open or close ports; ask an agent.");
+				if (change.open !== undefined) forwards.open(change.open, { ...(change.label ? { label: change.label } : {}), by: agent.identity().name });
+				if (change.close !== undefined && !forwards.close(change.close)) throw new Error(`Port ${change.close} was not forwarded.`);
+			}
+			return forwards.all().map((one) => ({ ...one, node: `/node/localhost/${one.port}/`, rnode: `/rnode/localhost/${one.port}/` }));
 		},
 
 		/**

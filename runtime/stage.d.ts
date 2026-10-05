@@ -161,6 +161,15 @@ export interface Stage {
 	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
 	/**
+	 * Servers on this machine, forwarded through Decks so a board can frame them, as Open OnDemand
+	 * does: read with nothing, `{ open: port, label }` to forward one, `{ close: port }` to stop.
+	 * Each comes back with two addresses on the app's own origin: `node` passes the path on as it
+	 * came, for a server told that base path (VS Code's `--server-base-path /node/localhost/8766`);
+	 * `rnode` strips it, for a server at the root. Put one in a board as `<iframe src="…">`. Anyone
+	 * who can open Decks can open what is forwarded, so close a port when you are done with it.
+	 */
+	ports(change?: { open?: number; close?: number; label?: string }): Promise<Array<{ port: number; label?: string; by?: string; at: number; node: string; rnode: string }>>;
+	/**
 	 * Who you are and what you are doing: read with nothing, change with a patch. Answers with the
 	 * identity as stored — tags are slugged, deduped and capped at four, and `workspace` (the
 	 * project you work in) is slugged too. Call it first in every session with all four set; until

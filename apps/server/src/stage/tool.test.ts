@@ -6,6 +6,7 @@ import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
 import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
+import { Forwards } from "../ports.ts";
 import { type StageHost, StageService } from "./service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
 import { StagePens } from "./pens.ts";
@@ -903,4 +904,21 @@ test("every stage result asks an agent that has not said who it is, until it has
 	const whole = toolOn({ x: 0, y: 0, zoom: 1 });
 	assert.equal((await whole.tool.run(`return 1`)).text, "1", "and an agent that has said it all hears nothing");
 	whole.cleanup();
+});
+
+test("stage.ports opens a port with its two addresses, and closes it", async () => {
+	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const none = await tool.run(`return await stage.ports()`);
+	assert.match(none.text, /This server forwards no ports/);
+	const deck = mkdtempSync(join(tmpdir(), "decks-ports-"));
+	service.forwards = new Forwards(deck, 4329);
+	const opened = await tool.run(`return await stage.ports({ open: 8766, label: "VS Code" })`);
+	assert.equal(opened.isError, false, opened.text);
+	assert.match(opened.text, /"node": "\/node\/localhost\/8766\/"/);
+	assert.match(opened.text, /"rnode": "\/rnode\/localhost\/8766\/"/);
+	assert.match(opened.text, /"by": "Ada"/);
+	assert.equal((await tool.run(`return (await stage.ports({ close: 8766 })).length`)).text, "0");
+	assert.match((await tool.run(`return await stage.ports({ close: 8766 })`)).text, /Port 8766 was not forwarded/);
+	cleanup();
+	rmSync(deck, { recursive: true, force: true });
 });
