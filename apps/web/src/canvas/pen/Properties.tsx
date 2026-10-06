@@ -231,6 +231,36 @@ export function Properties(props: {
 		if (!content || !props.doc) return;
 		edit([{ op: "insert", parent: shape.id, node: makeLabel(newId(penIds(props.doc)), content) }]);
 	};
+	/**
+	 * Frames of the selection that are frames in their own right, not a shape from the library.
+	 *
+	 * A frame is the one item that holds others, and the panel showed nothing about how it holds
+	 * them: pen gives it a direction, a gap, padding, two alignments, clipping and a size that can
+	 * hug its children, and every one of those was unreachable. A library shape is a frame too, and
+	 * is left out — its layout is how its own words sit, which it has its own control for.
+	 */
+	const frames = () => selected().filter((node) => node.type === "frame" && !isShape(node));
+	const frameFlow = () => shared(frames(), (node) => (node.layout === "vertical" ? "vertical" : node.layout === "horizontal" ? "horizontal" : "none"));
+	const framePad = () => shared(frames(), (node) => numberOf(Array.isArray(node.padding) ? node.padding[0] : node.padding, 0));
+	const frameGap = () => shared(frames(), (node) => numberOf(node.gap, 0));
+	const frameAlong = () => shared(frames(), (node) => (node.justifyContent === "end" ? "end" : node.justifyContent === "center" ? "center" : node.justifyContent === "space_between" ? "space_between" : "start"));
+	const frameAcross = () => shared(frames(), (node) => (node.alignItems === "end" ? "end" : node.alignItems === "center" ? "center" : "start"));
+	const frameClips = () => shared(frames(), (node) => node.clip !== false);
+	/** Whether a frame's size follows its children. pen's own word for it is `fit_content`. */
+	const frameHugs = (field: "width" | "height") => shared(frames(), (node) => typeof node[field] === "string" && /^(fit|hug)/.test(String(node[field])));
+	/*
+	 * Turning hugging off needs a number, and the number is the size the frame is right now, which
+	 * the panel already keeps for every selected item (`penBoxes`). Without that a frame would snap
+	 * to pen's own fallback the moment it was pinned.
+	 */
+	const setHug = (field: "width" | "height", hug: boolean) =>
+		set(frames(), (node) => {
+			if (hug) return { [field]: "fit_content" };
+			const box = penBoxes().get(node.id);
+			const now = field === "width" ? box?.w : box?.h;
+			return { [field]: Math.max(1, Math.round(now ?? 100)) };
+		});
+
 	/** Where a shape's words sit, top to bottom: its frame's layout. */
 	const shapeVertical = () => shared(shapes(), (node) => (node.justifyContent === "start" ? "top" : node.justifyContent === "end" ? "bottom" : "middle"));
 
@@ -429,6 +459,75 @@ export function Properties(props: {
 									/>
 								</div>
 							</Show>
+						</Section>
+					</Show>
+
+					{/*
+					 * How a frame holds what is in it. Every control here writes one of pen's own
+					 * fields, which the layout pass already reads; none of them was reachable before.
+					 *
+					 * Direction first, because it decides what the rest mean: with no direction a
+					 * child sits where it was put and only padding and clipping do anything, so the
+					 * gap and the two alignments are shown only once there is a direction to have
+					 * them along.
+					 */}
+					<Show when={frames().length > 0}>
+						<Section key="layout" title="Layout">
+							<div class="seg-set" role="group" aria-label="Direction">
+								<For each={[["none", "Free"], ["vertical", "Down"], ["horizontal", "Across"]] as const}>
+									{([value, label]) => (
+										<button type="button" data-on={frameFlow() === value ? "true" : undefined} aria-pressed={frameFlow() === value} onClick={() => set(frames(), () => ({ layout: value }))}>
+											{label}
+										</button>
+									)}
+								</For>
+							</div>
+							<div class="props-row">
+								<NumField label="padding" value={framePad()} min={0} onCommit={(v) => set(frames(), () => ({ padding: v <= 0 ? null : v }))} />
+								<Show when={frameFlow() !== "none"}>
+									<NumField label="gap" value={frameGap()} min={0} onCommit={(v) => set(frames(), () => ({ gap: v <= 0 ? null : v }))} />
+								</Show>
+							</div>
+							<Show when={frameFlow() !== "none"}>
+								<div class="seg-set" role="group" aria-label={frameFlow() === "horizontal" ? "Along the row" : "Down the column"}>
+									<For each={[["start", "Start"], ["center", "Middle"], ["end", "End"], ["space_between", "Spread"]] as const}>
+										{([value, label]) => (
+											<button type="button" data-on={frameAlong() === value ? "true" : undefined} aria-pressed={frameAlong() === value} onClick={() => set(frames(), () => ({ justifyContent: value }))}>
+												{label}
+											</button>
+										)}
+									</For>
+								</div>
+								<div class="seg-set" role="group" aria-label={frameFlow() === "horizontal" ? "Down the row" : "Across the column"}>
+									<For each={[["start", "Start"], ["center", "Middle"], ["end", "End"]] as const}>
+										{([value, label]) => (
+											<button type="button" data-on={frameAcross() === value ? "true" : undefined} aria-pressed={frameAcross() === value} onClick={() => set(frames(), () => ({ alignItems: value }))}>
+												{label}
+											</button>
+										)}
+									</For>
+								</div>
+							</Show>
+							{/*
+							 * Hugging is what makes dropping something into a frame visible: a frame that
+							 * follows its children grows round what you put in it, where a fixed one just
+							 * swallows it. One toggle per side, because a column that hugs its height and
+							 * keeps its width is the common shape.
+							 */}
+							<div class="props-row">
+								<div class="seg-set" role="group" aria-label="Width">
+									<button type="button" data-on={frameHugs("width") === true ? "true" : undefined} aria-pressed={frameHugs("width") === true} onClick={() => setHug("width", true)}>Hug wide</button>
+									<button type="button" data-on={frameHugs("width") === false ? "true" : undefined} aria-pressed={frameHugs("width") === false} onClick={() => setHug("width", false)}>Fixed</button>
+								</div>
+								<div class="seg-set" role="group" aria-label="Height">
+									<button type="button" data-on={frameHugs("height") === true ? "true" : undefined} aria-pressed={frameHugs("height") === true} onClick={() => setHug("height", true)}>Hug tall</button>
+									<button type="button" data-on={frameHugs("height") === false ? "true" : undefined} aria-pressed={frameHugs("height") === false} onClick={() => setHug("height", false)}>Fixed</button>
+								</div>
+							</div>
+							<div class="seg-set" role="group" aria-label="What sticks out">
+								<button type="button" data-on={frameClips() === true ? "true" : undefined} aria-pressed={frameClips() === true} onClick={() => set(frames(), () => ({ clip: true }))}>Clip</button>
+								<button type="button" data-on={frameClips() === false ? "true" : undefined} aria-pressed={frameClips() === false} onClick={() => set(frames(), () => ({ clip: false }))}>Show all</button>
+							</div>
 						</Section>
 					</Show>
 

@@ -1113,6 +1113,11 @@ export function Stage(props: {
 		const r = element.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
+	/** For the browser checks: the frame a drop at a point on the screen would go into, and its box. */
+	(globalThis as { __decksFrameUnder?: (clientX: number, clientY: number) => { frame: string | null; world: { x: number; y: number } } }).__decksFrameUnder = (clientX, clientY) => {
+		const world = worldAt({ clientX, clientY });
+		return { frame: frameUnder(world, []), world };
+	};
 	/** For the browser checks: the turn a drawn item has been given, which the canvas draws everything round it through. */
 	(globalThis as { __decksPenTurn?: (id: string) => { deg: number; m: number[] } | undefined }).__decksPenTurn = (id) => {
 		const placed = penLayer.placed.get(id);
@@ -1237,11 +1242,28 @@ export function Stage(props: {
 	 * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
 	 * because a group's box starts where its children do, not at its own `x` and `y`.
 	 */
-	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number) => {
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null) => {
 		penEdit(
-			idsToMove.flatMap((id) => {
+			idsToMove.flatMap((id): unknown[] => {
 				const node = penNode(id);
-				return node ? [{ op: "update", id, set: movedBy(node, dx, dy) }] : [];
+				if (!node) return [];
+				/*
+				 * Into a frame, or out of one onto the stage: a `move` with the parent and the box the
+				 * item ends up at **in stage coordinates**, which the server turns into the frame's own
+				 * x and y. Writing x and y here instead is what made a frame a trap, since a child's are
+				 * measured from its frame's corner.
+				 *
+				 * `into === undefined` is "the parent is not in question" — the drag was held with ⌘, or
+				 * nothing is carried — and then this is the plain move it always was.
+				 */
+				const parent = penLayer.placed.get(id)?.parent ?? null;
+				if (into !== undefined && into !== parent) {
+					const box = penLayer.placed.get(id)?.box;
+					if (box) {
+						return [{ op: "move", id, parent: into, box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } }];
+					}
+				}
+				return [{ op: "update", id, set: movedBy(node, dx, dy) }];
 			}),
 		);
 	};
@@ -1450,6 +1472,33 @@ export function Stage(props: {
 		];
 	};
 
+	/**
+	 * The frame a live drag would drop what it carries into, or `null` for the stage itself.
+	 *
+	 * `undefined` when nothing is being dragged. A frame used to be a one-way door: a drag wrote an
+	 * item's x and y and never its parent, and since a child's x and y are measured from its frame's
+	 * corner — and the frame tool clips — dragging a child "out" only slid it out of sight inside.
+	 * The op to do it properly has always been there (`move`, with a `parent` and a stage-coordinate
+	 * `box`); this is the half that was missing, which is knowing where the pointer is.
+	 */
+	const [dropInto, setDropInto] = createSignal<string | null | undefined>();
+	/** The frame under a point that a drag could drop into: never one of the items being carried, and never inside one. */
+	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => {
+		const found = frameAt(point);
+		if (!found) return null;
+		if (carrying.includes(found)) return null;
+		// Its own descendant would be a loop, which the op refuses anyway; this keeps it off the screen too.
+		for (let up = penLayer.placed.get(found)?.parent; up; up = penLayer.placed.get(up)?.parent) if (carrying.includes(up)) return null;
+		return found;
+	};
+	/** Where the frame a drag would drop into is, for the outline that says so. */
+	const dropBox = createMemo(() => {
+		const id = dropInto();
+		if (!id) return undefined;
+		const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
+		return box ? { ...box, id } : undefined;
+	});
+
 	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
 	let referTarget: HTMLElement | undefined;
 	const markComposer = (element: HTMLElement | undefined) => {
@@ -1482,6 +1531,12 @@ export function Stage(props: {
 					lines = snapped.guides;
 				}
 				offset = { dx, dy };
+				/*
+				 * What it would join, from the pointer rather than from the items: a selection has no
+				 * one place, and the pointer is the thing the hand is aiming. ⌘ or Ctrl already means
+				 * "ignore what is around me" during a drag, and keeping the parent is the same wish.
+				 */
+				setDropInto(ids.length === 0 || e.metaKey || e.ctrlKey ? undefined : frameUnder(now, ids));
 				markComposer(composerUnder(e, ids, boards));
 				pannedAt = performance.now();
 				batch(() => {
@@ -1497,6 +1552,7 @@ export function Stage(props: {
 				batch(() => {
 					setGuides([]);
 					if (!moved) {
+						setDropInto(undefined);
 						setBoardDrag(undefined);
 						onTap?.();
 						return;
@@ -1508,17 +1564,20 @@ export function Stage(props: {
 					 * name now in what you are typing.
 					 */
 					if (referring) {
+						setDropInto(undefined);
 						penLayer.preview(undefined);
 						setPenDrag({ dx: 0, dy: 0 });
 						setBoardDrag(undefined);
 						props.onRefer?.(referPills(ids, boards));
 						return;
 					}
+					const into = dropInto();
+					setDropInto(undefined);
 					if (e.altKey && ids.length) {
 						penLayer.preview(undefined);
 						setPenDrag({ dx: 0, dy: 0 });
 						penCopyBy(ids, offset.dx, offset.dy);
-					} else penMoveBy(ids, offset.dx, offset.dy);
+					} else penMoveBy(ids, offset.dx, offset.dy, into);
 					moveBoards(boards, offset.dx, offset.dy);
 					setBoardDrag(undefined);
 				});
@@ -4043,6 +4102,20 @@ export function Stage(props: {
 						/>
 					)}
 				</For>
+				{/*
+				 * What a live drag would drop into: the frame under the pointer, in the same outline an
+				 * arrow's end uses to say what it would join. The one thing that makes the gesture
+				 * legible — without it, whether an item joined a frame is only knowable after letting go.
+				 */}
+				<Show when={dropBox()}>
+					{(box) => (
+						<div
+							class="pen-join"
+							data-drop="frame"
+							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--color-accent)` }}
+						/>
+					)}
+				</Show>
 				<For each={sideHint()}>
 					{(hint) => (
 						<For each={ARROW_SIDES}>

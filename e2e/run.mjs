@@ -170,6 +170,8 @@ const CHECKS = [
 	 * as a still with a badge on it, and nothing decoding until it is pressed.
 	 */
 	{ file: "media.mjs", needsAgent: false },
+	/* A frame things can be put into and taken out of, and the panel for how it holds them. */
+	{ file: "frames.mjs", needsAgent: false },
 	/* A → B → A: whether a canvas comes back where it was left. */
 	{ file: "camera-roundtrip.mjs", needsAgent: false },
 	/*
