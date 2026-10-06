@@ -40,7 +40,7 @@ import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { angleOf, applyTurn, compose, cssTurn, forBox, invertTurn, isUnturned, linearTurn, matrixAbove, matrixOf, totalAngle, turn, UNTURNED, type Matrix } from "./pen/turn.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, fitShapes, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
@@ -981,54 +981,50 @@ export function Stage(props: {
 		pageFont("Inter", 600, false);
 	});
 	/**
-	 * The corner radius being dragged (`radiusFrom`), and the drawing redrawn with it: a copy of the
-	 * document with the one item's radius changed, its outline rebuilt by `fitShapes` as the saved
-	 * edit will, drawn in place of the real one until the drag is let go. Once a frame at most.
+	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
+	 * round the item. What the *sheet* draws is told separately, as a preview the worker applies to
+	 * its own copy (`penLayer.preview`): a turn used to send the whole drawing to the worker on every
+	 * frame, which is a relayout of the whole stage sixty times a second, and that was the flicker.
+	 *
+	 * Neither is cleared when the gesture ends. The worker lets a preview go when the server's answer
+	 * arrives — "whatever a drag was previewing is now the drawing itself" — and clearing it first is
+	 * what shows the item at its old angle for a frame.
 	 */
-	const [penRadius, setPenRadius] = createSignal<{ id: string; radius: number } | undefined>();
+	const [penRadius, setPenRadius] = createSignal<{ id: string; radius: number; done?: true } | undefined>();
 	/** The item being turned, while the drag is on: its angle, and the matrix the handles are placed through. */
-	const [penRotate, setPenRotate] = createSignal<{ id: string; deg: number; m: Matrix } | undefined>();
-	/** The angle and corner being dragged (`rotateFrom`), drawn before the edit is written. */
-	const [penAngle, setPenAngle] = createSignal<{ id: string; deg: number; x: number; y: number } | undefined>();
-	const previewRotation = setPenAngle;
-	let draftFrame: number | undefined;
+	const [penRotate, setPenRotate] = createSignal<{ id: string; deg: number; m: Matrix; done?: true } | undefined>();
+	/*
+	 * Both are let go of when the drawing comes back with the change in it, not when the hand lifts.
+	 * The sheet's own preview works that way already; the outline and the handles are drawn from
+	 * these, and dropping them first shows the item upright for the frame or two the save takes.
+	 * The timeout is for an edit that is refused, which would otherwise leave the handles turned for
+	 * an item that is not.
+	 */
 	createEffect(() => {
-		const radius = penRadius();
-		const angle = penAngle();
-		const doc = props.pen?.doc;
-		if (!doc) return;
-		if (draftFrame !== undefined) cancelAnimationFrame(draftFrame);
-		if (!radius && !angle) {
-			draftFrame = undefined;
-			penLayer.setDoc(doc, props.pen?.base ?? "");
-			return;
-		}
-		draftFrame = requestAnimationFrame(() => {
-			draftFrame = undefined;
-			const copy = structuredClone(doc);
-			const index = indexOf(copy);
-			if (radius) {
-				const found = index.get(radius.id);
-				if (found) {
-					if (shapeRadius(found.node) === undefined) found.node.cornerRadius = radius.radius <= 0 ? undefined : radius.radius;
-					else found.node.metadata = { type: "", ...found.node.metadata, radius: radius.radius };
-				}
+		penDrawn();
+		const turning = penRotate();
+		const rounding = penRadius();
+		if (!turning?.done && !rounding?.done) return;
+		untrack(() => {
+			if (turning?.done && Math.round(angleOf(penNode(turning.id)) * 10) === Math.round(((turning.deg % 360) + 360) % 360 * 10)) setPenRotate(undefined);
+			if (rounding?.done) {
+				const node = penNode(rounding.id);
+				const now = node ? (shapeRadius(node) ?? (typeof node.cornerRadius === "number" ? node.cornerRadius : 0)) : undefined;
+				if (now !== undefined && Math.round(now) === Math.round(rounding.radius)) setPenRadius(undefined);
 			}
-			if (angle) {
-				const found = index.get(angle.id);
-				if (found) {
-					found.node.rotation = angle.deg;
-					found.node.x = angle.x;
-					found.node.y = angle.y;
-				}
-			}
-			fitShapes(copy);
-			penLayer.setDoc(copy, props.pen?.base ?? "");
 		});
 	});
-	onCleanup(() => {
-		if (draftFrame !== undefined) cancelAnimationFrame(draftFrame);
-	});
+	let letGo: ReturnType<typeof setTimeout> | undefined;
+	/** Hold the live angle or radius until the drawing has it, and never longer than this. */
+	const holdUntilSaved = () => {
+		clearTimeout(letGo);
+		letGo = setTimeout(() => {
+			if (penRotate()?.done) setPenRotate(undefined);
+			if (penRadius()?.done) setPenRadius(undefined);
+		}, 3000);
+	};
+	onCleanup(() => clearTimeout(letGo));
+
 		/**
 	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
 	 * a card round its title, a note round its words. A copy of the document with the one item's
@@ -1825,10 +1821,16 @@ export function Stage(props: {
 				const reach = Math.min(now.x - start.x, now.y - start.y);
 				radius = Math.max(0, Math.min(Math.round(reach), Math.floor(start.most)));
 				setPenRadius({ id: start.id, radius });
+				penLayer.preview(new Map<string, PenPreview>([[start.id, { dx: 0, dy: 0, radius }]]));
 			},
 			(moved) => {
-				setPenRadius(undefined);
-				if (!moved || radius === start.radius) return;
+				if (!moved || radius === start.radius) {
+					setPenRadius(undefined);
+					penLayer.preview(undefined);
+					return;
+				}
+				setPenRadius((was) => (was ? { ...was, done: true } : was));
+				holdUntilSaved();
 				if (!start.shape) return penEdit([{ op: "update", id: start.id, set: { cornerRadius: radius <= 0 ? null : radius } }]);
 				const node = penLayer.placed.get(start.id)?.node;
 				penEdit([{ op: "update", id: start.id, set: { metadata: { type: "", ...node?.metadata, radius } } }]);
@@ -1887,12 +1889,18 @@ export function Stage(props: {
 				const back = invertTurn(turn(above, { x: 0, y: 0 }));
 				corner = applyTurn(back, want);
 				setPenRotate({ id, deg: deg + above, m: compose(turn(above, { x: 0, y: 0 }), turn(deg, corner)) });
-				previewRotation({ id, deg, x: corner.x, y: corner.y });
+				// The sheet's own copy, as a handful of numbers (`pen/scene.ts`, `PenPreview`).
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: 0, dy: 0, deg, atX: Math.round(corner.x), atY: Math.round(corner.y) }]]));
 			},
 			(moved) => {
-				setPenRotate(undefined);
-				previewRotation(undefined);
-				if (!moved) return;
+				// The preview and the live angle both stay until the drawing comes back with the change.
+				if (!moved) {
+					setPenRotate(undefined);
+					penLayer.preview(undefined);
+					return;
+				}
+				setPenRotate((was) => (was ? { ...was, done: true } : was));
+				holdUntilSaved();
 				const r = (value: number) => Math.round(value * 10) / 10;
 				const tidy = ((deg % 360) + 360) % 360;
 				penEdit([{ op: "update", id, set: { rotation: tidy === 0 ? null : r(tidy) }, box: { x1: r(corner.x), y1: r(corner.y), x2: r(corner.x + given.w), y2: r(corner.y + given.h) } }]);
@@ -1917,6 +1925,7 @@ export function Stage(props: {
 		if (!box) return { m: UNTURNED, deg: 0 };
 		const live = penRotate();
 		if (live?.id === box.id) return { m: live.m, deg: live.deg };
+		void penRadius();
 		const placed = penLayer.placed.get(box.id);
 		const own = angleOf(placed?.node);
 		const above = matrixAbove(penLayer.placed, box.id);

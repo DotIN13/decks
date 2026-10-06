@@ -230,7 +230,26 @@ if (spot) {
 			const r = Math.hypot(grip.x - centre.x, grip.y - centre.y);
 			await page.mouse.move(centre.x + r * Math.cos(a0 + t), centre.y + r * Math.sin(a0 + t), { steps: 4 });
 		}
+		/*
+		 * What the eye sees on each frame of the turn: the outline's own transform, which is what
+		 * flickers if the live angle is dropped for a frame. Not `__decksPenTurn`, which reads the
+		 * laid-out document — the sheet is drawing from a preview the worker holds, and the main
+		 * thread is deliberately not told about it frame by frame.
+		 */
+		const sampled = await page.evaluate(async () => {
+			const read = () => {
+				const el = document.querySelector(".pen-selection:not([data-board])");
+				return el ? getComputedStyle(el).transform : "gone";
+			};
+			const seen = [];
+			for (let i = 0; i < 20; i++) {
+				await new Promise((r) => requestAnimationFrame(() => r()));
+				seen.push(read());
+			}
+			return { upright: seen.filter((t) => t === "none" || t === "gone").length, first: seen[0]?.slice(0, 24) };
+		});
 		await page.mouse.up();
+		say("…and its outline stays turned on every frame of the turn, never flicking upright", sampled.upright === 0, JSON.stringify(sampled));
 		return until(() => {
 			const deg = onDisk().children.find((n) => n.id === drawnId)?.rotation;
 			return typeof deg === "number" && deg !== 0 ? deg : undefined;
@@ -322,6 +341,22 @@ if (spot) {
 		await settle(page, 400);
 		return now && { dx: Math.round(now.x - was.x), dy: Math.round(now.y - was.y), dw: Math.round(now.w - was.w), dh: Math.round(now.h - was.h) };
 	})();
+	/*
+	 * The angle the canvas is drawing, sampled every frame from the lift until well after. A draft
+	 * dropped before the server's answer lands shows the item at its old angle for a frame or two,
+	 * which is what a flicker is.
+	 */
+	const settling = await page.evaluate(async (id) => {
+		const read = () => globalThis.__decksPenTurn?.(id)?.deg ?? 0;
+		const seen = [read()];
+		for (let i = 0; i < 48; i++) {
+			await new Promise((r) => requestAnimationFrame(() => r()));
+			seen.push(read());
+		}
+		return { first: seen[0], low: Math.min(...seen), high: Math.max(...seen), end: seen.at(-1) };
+	}, drawnId);
+	say("the angle never drops back while the edit is being saved", settling.low > 1, JSON.stringify(settling));
+
 	say("carrying a turned item moves its outline by the same amount, and never reshapes it", !!carried && Math.abs(carried.dx - 40) <= 2 && Math.abs(carried.dy - 26) <= 2 && Math.abs(carried.dw) <= 1 && Math.abs(carried.dh) <= 1, JSON.stringify(carried));
 
 	// A card is as tall as its words: two side handles, and a drag writes no height.

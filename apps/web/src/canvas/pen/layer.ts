@@ -427,7 +427,11 @@ export class PenLayer {
 	 */
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		const changes = moving?.size ? [...moving] : undefined;
-		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined);
+		/*
+		 * A carried move, which the sheet can slide as a picture rather than draw again. A turn or a
+		 * rounding changes the shape itself, so neither can take that path.
+		 */
+		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.deg === undefined && change.radius === undefined);
 		if (slide) {
 			const first = changes![0]![1];
 			this.slideCarried(first.dx, first.dy);

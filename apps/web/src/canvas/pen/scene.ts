@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, fitShapes, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
@@ -51,6 +51,19 @@ export interface PenPreview {
 	dy: number;
 	w?: number;
 	h?: number;
+	/**
+	 * An angle and a corner being dragged, and a corner radius being dragged: the whole of what a
+	 * turn or a rounding changes.
+	 *
+	 * Here rather than by sending a changed document each frame, which is what this started as and
+	 * what made both gestures flicker: a `doc` message carries the **whole drawing** to the worker,
+	 * and doing that sixty times a second is a relayout of everything on the stage per frame. A
+	 * preview is a handful of numbers, and the worker already clones the document itself to draw one.
+	 */
+	deg?: number;
+	atX?: number;
+	atY?: number;
+	radius?: number | null;
 }
 
 /** A board as the sheet draws it: a hole where its document shows, or its picture. */
@@ -1196,6 +1209,19 @@ export class StageScene {
 				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + change.dy;
 				if (change.w !== undefined) found.node.width = change.w;
 				if (change.h !== undefined && !(found.node.type === "text" && found.node.textGrowth !== "fixed-width-height")) found.node.height = change.h;
+				// An angle, and the corner it is taken about, which moves with it so the middle stays put.
+				if (change.deg !== undefined) found.node.rotation = change.deg === 0 ? undefined : change.deg;
+				if (change.atX !== undefined) found.node.x = change.atX;
+				if (change.atY !== undefined) found.node.y = change.atY;
+				/*
+				 * How round the corners are. A shape from the library keeps it in its own metadata and
+				 * has its outline rebuilt from it by `fitShapes` below; pen's rectangle and frame have a
+				 * `cornerRadius` of their own.
+				 */
+				if (change.radius !== undefined) {
+					if (shapeRadius(found.node) === undefined) found.node.cornerRadius = change.radius === null || change.radius <= 0 ? undefined : change.radius;
+					else found.node.metadata = { type: "", ...found.node.metadata, radius: Math.max(0, change.radius ?? 0) };
+				}
 				if (change.w !== undefined && found.node.type === "text" && (found.node.textGrowth ?? "auto") === "auto") found.node.textGrowth = "fixed-width";
 			}
 			// A shape being sized draws its outline at the new size, as the saved edit will (`fitShapes`).
