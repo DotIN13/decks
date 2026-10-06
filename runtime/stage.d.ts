@@ -174,8 +174,12 @@ export interface Stage {
 	 * identity as stored — tags are slugged, deduped and capped at four, and `workspace` (the
 	 * project you work in) is slugged too. Call it first in every session with all four set; until
 	 * they are, each message and each stage result reminds you.
+	 *
+	 * An avatar you draw must be one `<svg>` with a `viewBox`, and is drawn as an image, so it
+	 * needs `xmlns="http://www.w3.org/2000/svg"` — without it a browser does not read the file as
+	 * SVG and shows nothing. A missing one is added for you and `avatarChanged` says so.
 	 */
-	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
+	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string; avatarChanged?: string }>;
 	/** Every agent; `filter.workspace` narrows to one project. */
 	agents(o?: { filter?: { workspace?: string } }): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
 	/**

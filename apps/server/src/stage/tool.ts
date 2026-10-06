@@ -720,21 +720,30 @@ export function createStageTool(deps: {
 				if (taken) throw new Error(`Another agent is already called ${clean}. Pick a different name.`);
 				agent.rename(clean);
 			}
+			/*
+			 * An avatar is checked and repaired where it is written (`stage/avatar.ts`), and what it
+			 * had to repair comes back here. An agent whose drawing was changed is told so in the
+			 * result: it is the only way a model finds out, and one that is never told draws the
+			 * same broken shape next time — which is exactly how an avatar with no `xmlns` went
+			 * unnoticed, rendering as nothing while every call answered as though it had worked.
+			 */
+			let avatarChanged: string | undefined;
 			if (patch?.avatar !== undefined) {
 				const avatar = patch.avatar;
 				if ("emoji" in avatar) {
 					// An emoji becomes a data URL rather than a special case in the browser: one
 					// code path for "the agent has a picture".
 					const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><text x="32" y="44" font-size="44" text-anchor="middle">${escapeXml(String(avatar.emoji).slice(0, 4))}</text></svg>`;
-					agent.setAvatar(service.writeAvatar(agent.id, svg));
+					agent.setAvatar(service.writeAvatar(agent.id, svg).url);
 				} else {
-					if (!/^\s*<svg[\s>]/i.test(avatar.svg)) throw new Error("An SVG avatar must start with <svg>");
-					agent.setAvatar(service.writeAvatar(agent.id, avatar.svg));
+					const written = service.writeAvatar(agent.id, avatar.svg);
+					agent.setAvatar(written.url);
+					avatarChanged = written.changed;
 				}
 			}
 			if (patch?.tags !== undefined) agent.setTags(patch.tags);
 			if (patch?.workspace !== undefined) agent.setWorkspace(patch.workspace);
-			return agent.identity();
+			return avatarChanged === undefined ? agent.identity() : { ...agent.identity(), avatarChanged };
 		},
 
 		/**

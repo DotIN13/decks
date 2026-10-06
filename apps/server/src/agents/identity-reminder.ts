@@ -28,7 +28,12 @@ export function identityGaps(identity: Pick<Identity, "name" | "avatar" | "tags"
 
 const ASK: Record<Gap, string> = {
 	name: "name: a short name of your own, not a number",
-	avatar: 'avatar: { svg: "<svg viewBox=\"0 0 64 64\">…</svg>" }, a small picture you draw (or { emoji: "…" })',
+	/*
+	 * The `xmlns` is in the example because an example is what gets copied. Without it an avatar is
+	 * not read as SVG when the browser draws it as an image, and renders as nothing; `stage/avatar.ts`
+	 * adds one and says so, which is the real fix, and this is the half that stops it happening.
+	 */
+	avatar: 'avatar: { svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">…</svg>" }, a small picture you draw (or { emoji: "…" })',
 	workspace: "workspace: the project you are working on",
 	tags: "tags: up to four words for what you are doing right now",
 };

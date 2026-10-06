@@ -6,6 +6,7 @@ import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
+import { checkAvatar } from "./avatar.ts";
 import type { StageShots } from "./shots.ts";
 import type { StagePens } from "./pens.ts";
 import type { Forwards } from "../ports.ts";
@@ -335,14 +336,23 @@ export class StageService {
 		return first;
 	}
 
-	/** An agent's avatar, drawn by the agent, stored beside the deck. */
-	writeAvatar(agentId: string, svg: string): string {
+	/**
+	 * An agent's avatar, drawn by the agent, stored beside the deck.
+	 *
+	 * Checked and repaired on the way in (`avatar.ts`), which is the only place it can be: this is
+	 * what every caller writing an avatar goes through, and what is on disk here is served straight
+	 * to the browser as an image. `changed` is the sentence to hand back to the agent when its
+	 * markup needed a repair, so it learns rather than drawing the same broken shape again.
+	 */
+	writeAvatar(agentId: string, svg: string): { url: string; changed?: string } {
+		const checked = checkAvatar(svg);
 		const file = join(this.deck.path, ".decks", "avatars", `${agentId}.svg`);
 		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, svg);
+		writeFileSync(file, checked.svg);
 		// The revision is a fresh id rather than a hash: an avatar is written once per
 		// change and the only job of the query is to get past the browser's cache.
-		return `/api/avatar/${agentId}?rev=${randomUUID().slice(0, 8)}`;
+		const url = `/api/avatar/${agentId}?rev=${randomUUID().slice(0, 8)}`;
+		return checked.changed === undefined ? { url } : { url, changed: checked.changed };
 	}
 
 	// --- the browser's half ---------------------------------------------------------
