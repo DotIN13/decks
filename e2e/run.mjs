@@ -166,6 +166,11 @@ const CHECKS = [
 	 */
 	{ file: "shapes.mjs", needsAgent: false },
 	/*
+	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
+	 * as a still with a badge on it, and nothing decoding until it is pressed.
+	 */
+	{ file: "media.mjs", needsAgent: false },
+	/*
 	 * The stage manager: what stages exist, and the person's way between them. The one surface
 	 * where a deck of several stages is visible at all — the pill's name, the panel of cards, the
 	 * search, and the landing.

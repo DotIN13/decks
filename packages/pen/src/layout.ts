@@ -44,6 +44,41 @@ export type MeasureText = (text: string, style: TextStyle, maxWidth: number | un
 export const MARKDOWN = "decks.markdown";
 export const isMarkdown = (node: PenNode): boolean => node.type !== "text" && node.metadata?.type === MARKDOWN;
 
+/**
+ * A film or a sound on the stage: `metadata: { type: "decks.media", kind, file }`, on pen's own
+ * rectangle, filled with the still that stands for it.
+ *
+ * A rectangle rather than a `browser`, which is what a board is, because a board *is* a page and a
+ * film is a picture that moves: pen.dev opens this as a rectangle showing the poster, which is the
+ * right thing to show for something that is not playing. Nothing decodes until it is pressed —
+ * forty-eight films playing cost a thousand times what forty-eight stills cost.
+ */
+export const MEDIA = "decks.media";
+
+export interface MediaItem {
+	kind: "video" | "audio";
+	/** The deck path of the file itself, as the item's metadata holds it. */
+	file: string;
+	/** The deck path of the still, when there is one. */
+	poster?: string;
+	seconds?: number;
+}
+
+/** What an item says it is, when it is a film or a sound; `undefined` for everything else. */
+export function mediaOf(node: PenNode | undefined): MediaItem | undefined {
+	const data = node?.metadata;
+	if (!data || data.type !== MEDIA) return undefined;
+	const kind = data.kind === "audio" ? "audio" : "video";
+	const file = typeof data.file === "string" ? data.file : "";
+	if (!file) return undefined;
+	return {
+		kind,
+		file,
+		...(typeof data.poster === "string" && data.poster ? { poster: data.poster } : {}),
+		...(typeof data.seconds === "number" && Number.isFinite(data.seconds) ? { seconds: data.seconds } : {}),
+	};
+}
+
 export interface TextStyle {
 	fontFamily: string;
 	fontSize: number;

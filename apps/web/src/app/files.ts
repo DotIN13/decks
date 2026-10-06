@@ -3,7 +3,7 @@ import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
-import { MARKDOWN } from "@decks/pen";
+import { MARKDOWN, MEDIA } from "@decks/pen";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
@@ -41,12 +41,26 @@ const PICTURE_W = 640;
 const CARD_W = 480;
 /** The gap between items dropped together. */
 const GAP = 32;
+/** A sound has no picture, so it lands as a strip wide enough for a name and a time. */
+const SOUND_W = 420;
+const SOUND_H = 72;
+
+/**
+ * Films and sounds the server could read (`files/media.ts`).
+ *
+ * By extension and by what the browser claimed, as a picture is: a file dragged from some
+ * desktops arrives with an empty `type`, and a name is only a claim. Whether it really is one is
+ * the server's answer — the upload comes back with `media` or it does not, and a file that turns
+ * out not to be media is placed as an ordinary dropped file would be.
+ */
+const PLAYABLE = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv", "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
+const isPlayable = (file: File) => PLAYABLE.has(extensionOf(file)) || file.type.startsWith("video/") || file.type.startsWith("audio/");
 
 const extensionOf = (file: File) => (file.name.split(".").pop() ?? "").toLowerCase();
 const isRaster = (file: File) => RASTER.has(extensionOf(file)) || (file.type.startsWith("image/") && file.type !== "image/svg+xml");
 const isWords = (file: File) => file.size <= CARD_BYTES && (WORDS.has(extensionOf(file)) || file.type === "text/markdown" || file.type === "text/plain");
 /** Whether a file can be an item on the stage itself rather than something on a board. */
-export const onStage = (file: File) => isRaster(file) || isWords(file);
+export const onStage = (file: File) => isRaster(file) || isWords(file) || isPlayable(file);
 
 /** A deck-relative asset path as the stage file writes it: from `stages/<name>/`, two folders up. */
 const fromStage = (asset: string) => `../../${asset}`;
@@ -250,6 +264,37 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
 				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
+				/*
+				 * A film or a sound: pen's own rectangle, filled with the still the server wrote and
+				 * marked as media (`@decks/pen`, `MEDIA`). pen.dev opens it as the rectangle it is,
+				 * showing the poster, which is the right thing to show for something not playing.
+				 * The canvas draws the still and puts a play badge on it; nothing decodes until it is
+				 * pressed, which is what the measurement asked for.
+				 */
+				if (asset.media) {
+					const facts = asset.media;
+					const sound = facts.kind === "audio";
+					const w = sound ? SOUND_W : Math.min(PICTURE_W, facts.w ?? natural.width);
+					const h = sound ? SOUND_H : Math.round((w * (facts.h ?? natural.height)) / Math.max(1, facts.w ?? natural.width));
+					items.push({
+						node: {
+							type: "rectangle",
+							name: file.name,
+							cornerRadius: 8,
+							...(facts.poster ? { fill: { type: "image", url: fromStage(facts.poster), mode: "fill" } } : { fill: "#1f2328" }),
+							metadata: {
+								type: MEDIA,
+								kind: facts.kind,
+								file: asset.path,
+								...(facts.poster ? { poster: facts.poster } : {}),
+								...(facts.seconds === undefined ? {} : { seconds: facts.seconds }),
+							},
+						},
+						w,
+						h,
+					});
+					continue;
+				}
 				const w = Math.min(PICTURE_W, natural.width);
 				const h = Math.round((w * natural.height) / Math.max(1, natural.width));
 				items.push({ node: { type: "rectangle", name: file.name, cornerRadius: 8, fill: { type: "image", url: fromStage(asset.path), mode: "fill" } }, w, h });
