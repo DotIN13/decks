@@ -170,6 +170,8 @@ const CHECKS = [
 	 * as a still with a badge on it, and nothing decoding until it is pressed.
 	 */
 	{ file: "media.mjs", needsAgent: false },
+	/* A → B → A: whether a canvas comes back where it was left. */
+	{ file: "camera-roundtrip.mjs", needsAgent: false },
 	/*
 	 * The stage manager: what stages exist, and the person's way between them. The one surface
 	 * where a deck of several stages is visible at all — the pill's name, the panel of cards, the

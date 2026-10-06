@@ -1172,11 +1172,30 @@ export function App() {
 		if (!agent || was.agent !== agent || was.stage === undefined || was.stage === stage) return;
 		untrack(() => {
 			views().keep(agent, was.stage, viewToPark(camera(), selected()));
-			landOnStage(views().of(agent, stage));
+			landOnStage(views().of(agent, stage), stage);
 		});
 	});
 
-	const landOnStage = (view?: AgentView) => {
+	/*
+	 * The one landing in flight, if any: the canvas it was started for, and how to call it off.
+	 *
+	 * Held for the whole app rather than inside each landing, because a landing with nothing
+	 * remembered waits for boards — and a second switch inside that wait used to leave the first
+	 * one running. It then read the boards of whatever canvas was current by the time it fired and
+	 * fitted *those*, so a quick A → B → A came back to A at the arriving zoom, a screen away from
+	 * where it was left, with its selection cleared. Reported 5 October 2026 and measured at 922px
+	 * and 3.4× → 0.3× in `e2e/checks/camera-roundtrip.mjs`.
+	 */
+	let landing: { stage?: string; stop: () => void } | undefined;
+	const stopLanding = () => {
+		landing?.stop();
+		landing = undefined;
+	};
+	onCleanup(stopLanding);
+
+	const landOnStage = (view?: AgentView, forStage?: string) => {
+		// Whatever was still arriving belongs to a canvas this is leaving: it does not get to land.
+		stopLanding();
 		/*
 		 * A view this device had of the canvas is a camera, and needs nothing from the server: it is
 		 * taken at once and without a glide, so the canvas's boards are drawn there from their first
@@ -1193,19 +1212,26 @@ export function App() {
 		const asked = Date.now();
 		const stop = () => clearInterval(timer);
 		const timer = setInterval(() => {
-			if (Date.now() - asked > 6000) return stop();
+			if (Date.now() - asked > 6000) return stopLanding();
+			/*
+			 * Still the canvas this was started for? A switch calls it off, but a canvas can also
+			 * change under it — the server saying so, another browser moving this agent — and a fit
+			 * of the wrong canvas's boards is the one thing this must never do.
+			 */
+			if (forStage !== undefined && stageOf(state.focused)?.name !== forStage) return stopLanding();
 			const stage = document.querySelector(".stage");
 			if (!stage) return;
 			// The boards of the conversation on screen, which are that stage's the moment it lands.
 			const boards = stageBoards();
 			if (boards.length === 0 && Date.now() - asked < 1200) return;
-			stop();
+			stopLanding();
 			const size = { width: stage.clientWidth, height: stage.clientHeight };
 			moveCamera(middleOf(boards.map(boxOf), canvasBox(size), size, camera()));
 			setSelected(undefined);
 			switchingFor(false);
 			reportCamera(camera(), state.focused);
 		}, 200);
+		landing = { ...(forStage === undefined ? {} : { stage: forStage }), stop };
 	};
 
 	/**
