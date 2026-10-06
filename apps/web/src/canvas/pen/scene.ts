@@ -52,17 +52,13 @@ export interface PenPreview {
 	w?: number;
 	h?: number;
 	/**
-	 * An angle and a corner being dragged, and a corner radius being dragged: the whole of what a
-	 * turn or a rounding changes.
+	 * A corner radius being dragged.
 	 *
 	 * Here rather than by sending a changed document each frame, which is what this started as and
-	 * what made both gestures flicker: a `doc` message carries the **whole drawing** to the worker,
-	 * and doing that sixty times a second is a relayout of everything on the stage per frame. A
-	 * preview is a handful of numbers, and the worker already clones the document itself to draw one.
+	 * what made the gesture flicker: a `doc` message carries the **whole drawing** to the worker, and
+	 * doing that sixty times a second is a relayout of everything on the stage per frame. A preview
+	 * is a handful of numbers, and the worker already clones the document itself to draw one.
 	 */
-	deg?: number;
-	atX?: number;
-	atY?: number;
 	radius?: number | null;
 }
 
@@ -1209,10 +1205,6 @@ export class StageScene {
 				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + change.dy;
 				if (change.w !== undefined) found.node.width = change.w;
 				if (change.h !== undefined && !(found.node.type === "text" && found.node.textGrowth !== "fixed-width-height")) found.node.height = change.h;
-				// An angle, and the corner it is taken about, which moves with it so the middle stays put.
-				if (change.deg !== undefined) found.node.rotation = change.deg === 0 ? undefined : change.deg;
-				if (change.atX !== undefined) found.node.x = change.atX;
-				if (change.atY !== undefined) found.node.y = change.atY;
 				/*
 				 * How round the corners are. A shape from the library keeps it in its own metadata and
 				 * has its outline rebuilt from it by `fitShapes` below; pen's rectangle and frame have a

@@ -1,7 +1,6 @@
 import { indexOf, isShape, NOTE_PAD, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { BoxIndex, type Rect } from "../spatial.ts";
-import { applyTurn, cornersOf, invertTurn, isUnturned, matrixOf, type Matrix } from "./turn.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
 
 export type { PenPreview, SceneBoard } from "./scene.ts";
@@ -84,8 +83,6 @@ export class PenLayer {
 	/** The same items as a list, and filed by what each covers, so a press or a marquee asks only the ones near it. */
 	private placedList: Placed[] = [];
 	private placedIndex: BoxIndex = new BoxIndex([]);
-	/** For each item somebody turned, the matrix that carries a stage point back to its upright box (`turn.ts`). */
-	private turns = new Map<string, Matrix>();
 	/** The stage rectangle the click shapes are written for: the window and one window round it. */
 	private hitWindow: Rect | undefined;
 	/**
@@ -113,8 +110,6 @@ export class PenLayer {
 	private carriedBitmaps: ImageBitmapRenderingContext | null = null;
 	/** The placement of the frame the carried picture came with, before the drag's offset. */
 	private carriedAt = "";
-	/** The turn the carried picture is being shown through, while one is being turned. */
-	private carriedTurn: { deg: number; about: { x: number; y: number } } | undefined;
 	private carriedBy = { dx: 0, dy: 0 };
 	private carriedKey = "";
 	private boardsCarried = "";
@@ -193,13 +188,7 @@ export class PenLayer {
 			this.placed = new Map(message.placed);
 			this.bounds = new Map(message.bounds);
 			this.placedList = [...this.placed.values()];
-			this.turns = new Map();
-			for (const one of this.placedList) {
-				const m = matrixOf(this.placed, one.node.id);
-				if (!isUnturned(m)) this.turns.set(one.node.id, invertTurn(m));
-			}
-			// A turned item is looked for where it is drawn: the box in the index is the one that encloses it there.
-			this.placedIndex = new BoxIndex(this.placedList.map((one) => this.drawnBox(one)));
+			this.placedIndex = new BoxIndex(this.placedList.map((one) => this.bounds.get(one.node.id) ?? one.box));
 			this.hitWindow = undefined;
 			this.cards = message.cards;
 			if (this.docs.has(message.seq)) this.drawnDoc = this.docs.get(message.seq);
@@ -280,7 +269,7 @@ export class PenLayer {
 			element.style.height = `${frame.height}px`;
 			this.carriedAt = at;
 			element.hidden = false;
-			this.slideCarried(this.carriedBy.dx, this.carriedBy.dy, this.carriedTurn);
+			this.slideCarried(this.carriedBy.dx, this.carriedBy.dy);
 		} else carried.bitmap.close();
 		const boards: ReadonlySet<string> = new Set(carried?.boards ?? []);
 		if (boards.size === this.carryingNow.size && [...boards].every((path) => this.carryingNow.has(path))) return;
@@ -297,27 +286,6 @@ export class PenLayer {
 	 * double-click. Boards are not drawn here and are not found; an item inside an instance is
 	 * found as the instance, because a copy is moved and deleted whole.
 	 */
-	/**
-	 * Where an item is drawn, as an upright box that encloses it: its own box, unless it was turned,
-	 * when it is the box round the turned one. What the index searches and what a marquee compares.
-	 */
-	private drawnBox(placed: Placed): Frame {
-		const box = this.bounds.get(placed.node.id) ?? placed.box;
-		const back = this.turns.get(placed.node.id);
-		if (!back) return box;
-		const forward = invertTurn(back);
-		const points = cornersOf(box).map((corner) => applyTurn(forward, corner));
-		const x = Math.min(...points.map((p) => p.x));
-		const y = Math.min(...points.map((p) => p.y));
-		return { x, y, w: Math.max(...points.map((p) => p.x)) - x, h: Math.max(...points.map((p) => p.y)) - y };
-	}
-
-	/** A stage point in an item's own upright coordinates: itself, unless the item was turned. */
-	private turnedPoint(id: string, point: { x: number; y: number }): { x: number; y: number } {
-		const back = this.turns.get(id);
-		return back ? applyTurn(back, point) : point;
-	}
-
 	hitTest(point: { x: number; y: number }, options?: { deep?: boolean; skip?: (node: PenNode) => boolean }): PenHit | undefined {
 		let best: Placed | undefined;
 		for (const at of this.placedIndex.search({ x: point.x, y: point.y, w: 0, h: 0 })) {
@@ -327,9 +295,7 @@ export class PenLayer {
 			if (options?.skip?.(node)) continue;
 			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
 			const box = this.bounds.get(node.id) ?? placed.box;
-			// A turned item is drawn somewhere its upright box is not: the press is carried back to the box (`turn.ts`).
-			const local = this.turnedPoint(node.id, point);
-			if (local.x < box.x || local.x > box.x + box.w || local.y < box.y || local.y > box.y + box.h) continue;
+			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
 			if (!best || placed.order > best.order) best = placed;
 		}
 		if (!best) return undefined;
@@ -430,15 +396,14 @@ export class PenLayer {
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		const changes = moving?.size ? [...moving] : undefined;
 		/*
-		 * A carried move or a turn, which the sheet shows by transforming the picture it already drew
-		 * rather than drawing anything again. A rounding cannot take that path: it changes the shape,
-		 * and no transform of the old pixels is the new ones.
+		 * A carried move, which the sheet shows by sliding the picture it already drew rather than
+		 * drawing anything again. A rounding cannot take that path: it changes the shape, and no
+		 * slide of the old pixels is the new ones.
 		 */
 		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined);
 		if (slide) {
 			const first = changes![0]![1];
-			const turning = first.deg !== undefined && first.atX !== undefined && first.atY !== undefined;
-			this.slideCarried(first.dx, first.dy, turning ? { deg: first.deg!, about: { x: first.atX!, y: first.atY! } } : undefined);
+			this.slideCarried(first.dx, first.dy);
 			const key = changes!.map(([id]) => id).sort().join("|");
 			if (key === this.carriedKey) return;
 			this.carriedKey = key;
@@ -455,22 +420,9 @@ export class PenLayer {
 		this.send({ type: "carry", boards: [...boards] });
 	}
 
-	/**
-	 * Move the picture of what is being carried, and turn it.
-	 *
-	 * The sheet draws the carried items once, onto their own canvas over it; a drag then slides that
-	 * canvas rather than drawing anything again. A turn rides on the same picture: the same pixels
-	 * through an affine transform, which costs nothing and is continuous, where redrawing them per
-	 * frame meant laying out the whole stage per frame. `about` is the point it turns about, in the
-	 * stage's own units, because that is the space this transform is applied in.
-	 */
-	private slideCarried(dx: number, dy: number, turn?: { deg: number; about: { x: number; y: number } }): void {
+	private slideCarried(dx: number, dy: number): void {
 		this.carriedBy = { dx, dy };
-		this.carriedTurn = turn;
-		if (!this.carriedEl || this.carriedEl.hidden) return;
-		// Counter-clockwise, as pen states an angle, which is clockwise-negative to CSS.
-		const spin = turn?.deg ? `translate(${turn.about.x}px, ${turn.about.y}px) rotate(${-turn.deg}deg) translate(${-turn.about.x}px, ${-turn.about.y}px) ` : "";
-		this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${spin}${this.carriedAt}`;
+		if (this.carriedEl && !this.carriedEl.hidden) this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${this.carriedAt}`;
 	}
 
 	/**
@@ -626,13 +578,6 @@ export class PenLayer {
 				shape.setAttribute("y", String(bounds.y));
 				shape.setAttribute("width", String(Math.max(0, bounds.w)));
 				shape.setAttribute("height", String(Math.max(0, bounds.h)));
-			}
-			// Turned, the shape is drawn where the turn leaves it, so a press over a board lands on it there.
-			const back = this.turns.get(node.id);
-			if (back) {
-				const m = invertTurn(back);
-				const already = shape.getAttribute("transform");
-				shape.setAttribute("transform", `matrix(${m[0]} ${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]})${already ? ` ${already}` : ""}`);
 			}
 			shape.setAttribute("class", "pen-hit");
 			shape.setAttribute("fill", "none");

@@ -1139,38 +1139,6 @@
 	.world > .pen-player > audio {
 	width: 100%;
 }
-	/*
-	 * Turning an item: a reach just outside each corner handle, which shows nothing until the pointer
-	 * is on it. Bigger than a sizing handle because it is aimed at by feel rather than seen.
-	 */
-	.world > .pen-rotate {
-	position: absolute;
-	box-sizing: border-box;
-	border-radius: 50%;
-	background: transparent;
-}
-	/*
-	 * Its own cursor: a circular arrow, turned a quarter at each corner so it points the way round
-	 * that corner goes. Drawn twice, dark then light, because a cursor sits on whatever the canvas
-	 * happens to be showing and a one-colour glyph disappears into half of it.
-	 */
-	.world > .pen-rotate[data-grip="nw"] {
-	cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg transform='rotate(0 13 13)'%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 13 13, grab;
-}
-	.world > .pen-rotate[data-grip="ne"] {
-	cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg transform='rotate(90 13 13)'%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 13 13, grab;
-}
-	.world > .pen-rotate[data-grip="se"] {
-	cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg transform='rotate(180 13 13)'%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 13 13, grab;
-}
-	.world > .pen-rotate[data-grip="sw"] {
-	cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg transform='rotate(270 13 13)'%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 4a9 9 0 1 1-9 9' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M9 7.5 13 3.5 17 7.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 13 13, grab;
-}
-
-	.world > .pen-rotate:hover,
-	.world > .pen-rotate:active {
-	background: color-mix(in srgb, var(--color-accent) 22%, transparent);
-}
 	.world > .pen-draft {
 	position: absolute;
 	box-sizing: border-box;
