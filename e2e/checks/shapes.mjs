@@ -305,6 +305,59 @@ if (diagonal) {
 		await settle(page, 350);
 		const mine = await until(async () => ((await named()) === "Arrow" ? true : undefined), 3000);
 		say("…and a press on the middle of its line picks it", !!mine, JSON.stringify({ at: { x: Math.round(on.x), y: Math.round(on.y) }, panel: await named() }));
+
+		/*
+		 * How far from the line a press still reaches it, measured on the screen at two zooms a
+		 * factor of four apart. A board's edge band is a constant number of screen pixels at every
+		 * zoom (`BoardFrame`), and a line's reach is the same idea: 8 px either side, so a line is no
+		 * harder to hit zoomed out, where 8 stage pixels would be two on the screen.
+		 */
+		const normal = () => page.evaluate((one) => {
+			const box = globalThis.__decksPenBox?.("slash");
+			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+			// The line alone: the geometry's later subpaths are the head.
+			path.setAttribute("d", one.geometry.split(/(?=M)/)[0]);
+			svg.append(path);
+			document.body.append(svg);
+			const total = path.getTotalLength();
+			const at = (along) => {
+				const p = path.getPointAtLength(along);
+				return { x: box.x + p.x * m.a, y: box.y + p.y * m.a };
+			};
+			const mid = at(total / 2);
+			const before = at(total / 4);
+			const after = at((total * 3) / 4);
+			svg.remove();
+			const len = Math.hypot(after.x - before.x, after.y - before.y) || 1;
+			return { mid, nx: -(after.y - before.y) / len, ny: (after.x - before.x) / len, zoom: Math.round(m.a * 1000) / 1000 };
+		}, { geometry });
+		const reach = async (line, off) => {
+			await page.keyboard.press("Escape");
+			await settle(page, 200);
+			await page.mouse.click(line.mid.x + line.nx * off, line.mid.y + line.ny * off);
+			await settle(page, 250);
+			return (await named()) === "Arrow";
+		};
+		const far = await normal();
+		const outside = { near: await reach(far, 5), away: await reach(far, 18) };
+		say("zoomed out, a press 5 px off the line reaches it and one 18 px off does not", outside.near && !outside.away, JSON.stringify({ zoom: far.zoom, ...outside }));
+		// Zoomed in four times: the band has to be the same on the screen, not four times as wide.
+		await page.keyboard.press("Escape");
+		await page.mouse.move(far.mid.x, far.mid.y);
+		await page.keyboard.down("Control");
+		for (let i = 0; i < 40; i++) {
+			await page.mouse.wheel(0, -120);
+			await page.waitForTimeout(40);
+			const zoom = await page.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform).a);
+			if (zoom >= far.zoom * 4) break;
+		}
+		await page.keyboard.up("Control");
+		await settle(page, 900);
+		const close = await normal();
+		const inside = { near: await reach(close, 5), away: await reach(close, 18) };
+		say("…and zoomed in four times, the same 5 px reaches it and 18 px still does not", inside.near && !inside.away, JSON.stringify({ zoom: close.zoom, ...inside }));
 	}
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "slash" }] });
 	await settle(page, 300);

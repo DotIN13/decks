@@ -60,6 +60,20 @@ const PICTURE_WIDEST = coarse ? 1024 : 2048;
  * of invisible shapes, one per drawn item with its outline, which the browser tests each click
  * against. A click on a shape is the drawing's; a click beside it reaches the board underneath.
  */
+/**
+ * How far either side of a line a press still reaches it, in **screen** pixels — the same idea as
+ * the band along a board's edge (`board/BoardFrame.tsx`), and wider under a finger for the same
+ * reason.
+ *
+ * Screen rather than stage pixels, so a thin line is as easy to hit zoomed out as zoomed in: 8
+ * stage pixels of reach is two on the screen at a tenth zoom, which is no reach at all. In the hit
+ * layer that is a stroke `2 * BAND_PX / zoom` stage units wide, since a stroke straddles its path,
+ * and it is written once per zoom that moves it rather than once per zoom step: `setCamera` rewrites
+ * the shapes when the zoom has drifted by a quarter, the way it already rewrites them when the
+ * window leaves the area they cover.
+ */
+const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
+
 export class PenLayer {
 	private sheet: HTMLCanvasElement | undefined;
 	private bitmaps: ImageBitmapRenderingContext | null = null;
@@ -95,6 +109,8 @@ export class PenLayer {
 	private view = { width: 0, height: 0 };
 	/** Kept only to ask the browser whether a point is on a path (`onPath`). */
 	private penHit?: CanvasRenderingContext2D;
+	/** The zoom the hit shapes' bands were written for, so a zoom that moves them rewrites them. */
+	private bandZoom = 0;
 	/** Called after every new layout, so the stage can redraw a selection around what moved. */
 	drawn: (() => void) | undefined;
 	/** Called after every frame is on the sheet: the picture page waits for it (`shot.ts`). */
@@ -288,8 +304,8 @@ export class PenLayer {
 	 * test. The browser does the real work: the geometry becomes a `Path2D`, the context's transform
 	 * carries it from its own `viewBox` into stage coordinates, and `isPointInStroke` answers.
 	 *
-	 * The slop matches the SVG hit layer's (`writeHits`): 12 screen pixels, so what a press can
-	 * reach is the same whether the pointer landed on a hit shape or is being resolved here.
+	 * The reach is the hit layer's own band (`BAND_PX`), so a press reaches the same line whether
+	 * the pointer landed on a hit shape or is being resolved here.
 	 */
 	private onPath(placed: Placed, point: { x: number; y: number }): boolean | undefined {
 		const { node } = placed;
@@ -319,7 +335,7 @@ export class PenLayer {
 		 * the pointer landed on a hit shape or is being resolved here.
 		 */
 		const drawn = typeof node.strokeWidth === "number" ? node.strokeWidth : 0;
-		ctx.lineWidth = Math.max(drawn, 12) / Math.max(sx, sy);
+		ctx.lineWidth = Math.max(drawn, (2 * BAND_PX) / this.camera.zoom) / Math.max(sx, sy);
 		const filled = node.fill !== undefined && node.fill !== null;
 		return ctx.isPointInStroke(path, px, py) || (filled && ctx.isPointInPath(path, px, py));
 	}
@@ -550,7 +566,8 @@ export class PenLayer {
 		if (this.hitWindow && this.placedList.length > 0) {
 			const seen = this.windowRect(0);
 			const w = this.hitWindow;
-			if (seen.x < w.x || seen.y < w.y || seen.x + seen.w > w.x + w.w || seen.y + seen.h > w.y + w.h) this.writeHits();
+			const drifted = this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8);
+			if (drifted || seen.x < w.x || seen.y < w.y || seen.x + seen.w > w.x + w.w || seen.y + seen.h > w.y + w.h) this.writeHits();
 		}
 	}
 
@@ -592,6 +609,9 @@ export class PenLayer {
 		const svg = this.hits;
 		if (!svg) return;
 		const NS = "http://www.w3.org/2000/svg";
+		// A stroke that reaches `BAND_PX` either side of the line at this zoom, and the zoom it is for.
+		const band = (2 * BAND_PX) / this.camera.zoom;
+		this.bandZoom = this.camera.zoom;
 		const shapes: SVGElement[] = [];
 		const add = (placed: Placed) => {
 			const { node, box } = placed;
@@ -617,7 +637,7 @@ export class PenLayer {
 				shape.setAttribute("d", node.geometry);
 				shape.setAttribute("transform", `translate(${box.x} ${box.y}) scale(${box.w / vb[2]} ${box.h / vb[3]}) translate(${-vb[0]} ${-vb[1]})`);
 				const filled = node.fill !== undefined && node.fill !== null;
-				shape.setAttribute("stroke-width", String(Math.max(12, typeof node.strokeWidth === "number" ? node.strokeWidth : 0)));
+				shape.setAttribute("stroke-width", String(Math.max(band, typeof node.strokeWidth === "number" ? node.strokeWidth : 0)));
 				shape.setAttribute("vector-effect", "non-scaling-stroke");
 				shape.style.pointerEvents = filled ? "all" : "stroke";
 			} else {
