@@ -106,6 +106,28 @@ if (spot) {
 		say("…and nothing is decoding: there is no player on the canvas at rest", players === 0, `players ${players}`);
 	}
 
+	/*
+	 * Double-clicked, one player mounts over it — and only one, whichever was asked for last. The
+	 * item has to be close enough that a board would be live, which is the same rule.
+	 */
+	if (filmBox) {
+		await page.keyboard.press("Escape");
+		await settle(page, 200);
+		const film = await boxOf("media-film");
+		await page.mouse.dblclick(film.x + film.width / 2, film.y + film.height / 2);
+		const player = await until(() => page.evaluate(() => {
+			const one = document.querySelector(".pen-player video");
+			return one ? { players: document.querySelectorAll(".pen-player video, .pen-player audio").length, src: one.getAttribute("src") } : undefined;
+		}));
+		say("a double-click on a film mounts one player over it", !!player && player.players === 1, JSON.stringify(player));
+		say("…and it plays the file the item names", (player?.src ?? "").includes("a-film.mp4"), player?.src);
+
+		// Letting go of the item stops it: nothing decodes behind a selection you have left.
+		await page.keyboard.press("Escape");
+		const stopped = await until(() => page.evaluate(() => document.querySelectorAll(".pen-player").length === 0));
+		say("…and letting go of it stops the player", !!stopped);
+	}
+
 	const soundBox = await boxOf("media-sound");
 	say("a sound is a strip, not a black box", !!soundBox && soundBox.height < soundBox.width / 3, JSON.stringify(soundBox && { w: Math.round(soundBox.width), h: Math.round(soundBox.height) }));
 

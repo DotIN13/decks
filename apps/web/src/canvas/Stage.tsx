@@ -14,6 +14,7 @@ import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
+import { deckFileUrl } from "../lib/api.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
 import type { EditorHost, Tool } from "../board/Editor.ts";
@@ -39,7 +40,7 @@ import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { angleOf, applyTurn, compose, cssTurn, forBox, invertTurn, isUnturned, linearTurn, matrixAbove, matrixOf, totalAngle, turn, UNTURNED, type Matrix } from "./pen/turn.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, fitShapes, isShape, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, fitShapes, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
@@ -659,6 +660,15 @@ export function Stage(props: {
 	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean } | undefined>();
+	/**
+	 * The one film or sound playing, if any.
+	 *
+	 * **One at a time, on purpose.** A film at rest is paint and costs a picture; a film playing is
+	 * a decoder, and eight of those are already the edge of a frame's budget on a machine with no
+	 * graphics card — forty-eight cost a thousand times what forty-eight stills cost. So starting
+	 * one stops the last, and the canvas never holds more than a single player.
+	 */
+	const [playing, setPlaying] = createSignal<{ id: string; kind: "video" | "audio"; file: string } | undefined>();
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/**
 	 * Boards picked up with the drawing: by a marquee, or Shift and a press on a title bar. They move
@@ -1866,6 +1876,30 @@ export function Stage(props: {
 		if (!box || penResize() || penRadius() || !props.onPenEdit || widthOnly(box.id)) return false;
 		const node = penLayer.placed.get(box.id)?.node;
 		return !!node && !isArrow(node) && node.type !== "text";
+	});
+	/**
+	 * Where the player sits, while something is playing: the item's own drawn box, turned with it.
+	 *
+	 * It stops on its own in three cases, which are the board's rules rather than new ones: the item
+	 * is gone from the file, it is no longer the selection, or the camera has pulled back past the
+	 * zoom at which a board stops being live. Below that zoom a film is a picture again, and a
+	 * picture is what the sheet already has.
+	 */
+	const playingBox = createMemo(() => {
+		penDrawn();
+		const now = playing();
+		if (!now) return undefined;
+		const node = penLayer.placed.get(now.id)?.node;
+		const box = penLayer.bounds.get(now.id);
+		if (!node || !box || !mediaOf(node)) return undefined;
+		if (!penSelection().includes(now.id)) return undefined;
+		if (localCamera.zoom < INTERACT_ZOOM) return undefined;
+		const drag = penDrag();
+		return { ...now, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h };
+	});
+	// What stopped it above is still holding the file open: let it go, so nothing decodes off screen.
+	createEffect(() => {
+		if (playing() && !playingBox()) setPlaying(undefined);
 	});
 	/** Where a point of the selection's upright box is drawn. */
 	const turned = (point: { x: number; y: number }) => applyTurn(penTurn().m, point);
@@ -3266,6 +3300,13 @@ export function Stage(props: {
 			if (performance.now() - penMadeAt < 500) return;
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
 			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
+			// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
+			const media = hit ? mediaOf(hit.node) : undefined;
+			if (hit && media) {
+				setPenSelection([hit.id]);
+				setPlaying({ id: hit.id, kind: media.kind, file: media.file });
+				return;
+			}
 			// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
 			const shape = hit ? shapeOf(hit.id) : undefined;
 			if (shape && !(hit && TEXTY.has(hit.node.type))) {
@@ -4160,6 +4201,45 @@ export function Stage(props: {
 								</For>
 							</Show>
 						</>
+					)}
+				</Show>
+				{/*
+				 * The one player, laid over the item it belongs to.
+				 *
+				 * A real element because nothing else can play: the canvas draws in a worker and there
+				 * is no browser in there. It is the same bargain a board makes — a picture until you
+				 * are close and have asked — and it is one element, never a wall of them.
+				 */}
+				<Show when={playingBox()}>
+					{(now) => (
+						<div
+							class="pen-player"
+							data-kind={now().kind}
+							style={{
+								left: `${now().x}px`,
+								top: `${now().y}px`,
+								width: `${now().w}px`,
+								height: `${now().h}px`,
+								...outlineTurn(now().id, now()),
+							}}
+						>
+							{now().kind === "video" ? (
+								<video
+									src={deckFileUrl(now().file)}
+									controls
+									autoplay
+									playsinline
+									ref={(el) => el.addEventListener("ended", () => setPlaying(undefined))}
+								/>
+							) : (
+								<audio
+									src={deckFileUrl(now().file)}
+									controls
+									autoplay
+									ref={(el) => el.addEventListener("ended", () => setPlaying(undefined))}
+								/>
+							)}
+						</div>
 					)}
 				</Show>
 				<Show when={radiusHandle()}>

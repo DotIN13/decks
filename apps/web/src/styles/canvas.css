@@ -1110,6 +1110,36 @@
 	cursor: nwse-resize;
 }
 	/*
+	 * The one film or sound playing, laid over the item it belongs to (`Stage.tsx`, `playingBox`).
+	 *
+	 * Over the sheet, under the selection outline and handles, so the item can still be moved and
+	 * sized while it plays. A sound keeps the item's own paper behind its controls; a film is black,
+	 * because a letterboxed picture on anything else is a frame round a frame.
+	 */
+	.world > .pen-player {
+	position: absolute;
+	overflow: hidden;
+	border-radius: 8px;
+	transform-origin: 0 0;
+	z-index: 2;
+	background: #000;
+}
+	.world > .pen-player[data-kind="audio"] {
+	display: flex;
+	align-items: center;
+	padding: 0 12px;
+	background: var(--panel);
+}
+	.world > .pen-player > video {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+	.world > .pen-player > audio {
+	width: 100%;
+}
+	/*
 	 * Turning an item: a reach just outside each corner handle, which shows nothing until the pointer
 	 * is on it. Bigger than a sizing handle because it is aimed at by feel rather than seen.
 	 */
