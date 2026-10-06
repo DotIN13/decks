@@ -255,7 +255,12 @@ export function Properties(props: {
 	 */
 	const setHug = (field: "width" | "height", hug: boolean) =>
 		set(frames(), (node) => {
-			if (hug) return { [field]: "fit_content" };
+			/*
+			 * `fit_content(120)` is pen's own hug with a fallback, which the layout pass uses when the
+			 * frame has no children: a floor, so a frame that follows its children does not collapse to
+			 * nothing the moment it is emptied and leave nothing to drop into.
+			 */
+			if (hug) return { [field]: field === "height" ? "fit_content(120)" : "fit_content" };
 			const box = penBoxes().get(node.id);
 			const now = field === "width" ? box?.w : box?.h;
 			return { [field]: Math.max(1, Math.round(now ?? 100)) };

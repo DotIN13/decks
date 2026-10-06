@@ -1047,7 +1047,7 @@
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
 }
-	.world > :is(.pen-selection, .pen-hover, .pen-join, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	.world > :is(.pen-selection, .pen-hover, .pen-join, .pen-insert, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
 	z-index: 3;
 }
 	/*
@@ -1062,6 +1062,13 @@
 }
 	.world > .pen-join {
 	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
+	.world > .pen-insert {
+	position: absolute;
+	border-radius: 999px;
+	background: var(--color-accent);
+	pointer-events: none;
 }
 	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
 	.world > :is(.pen-hover, .pen-selection):is([data-board="true"], [data-round="true"]) {

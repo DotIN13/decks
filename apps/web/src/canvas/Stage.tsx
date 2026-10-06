@@ -1226,7 +1226,14 @@ export function Stage(props: {
 	 * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
 	 * because a group's box starts where its children do, not at its own `x` and `y`.
 	 */
-	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null) => {
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => {
+		/*
+		 * Where the next item goes in a frame that stacks its children. The op takes the item out of
+		 * the tree before putting it back, so an item that was already above its new place lands one
+		 * too far down; `was < put` is that correction. A second item of a selection goes after the
+		 * first, which is why this counts up.
+		 */
+		let put = slot;
 		penEdit(
 			idsToMove.flatMap((id): unknown[] => {
 				const node = penNode(id);
@@ -1241,11 +1248,19 @@ export function Stage(props: {
 				 * nothing is carried — and then this is the plain move it always was.
 				 */
 				const parent = penLayer.placed.get(id)?.parent ?? null;
-				if (into !== undefined && into !== parent) {
+				// A slot means the frame arranges its children, so a drag inside one reorders it: an op even where the parent is unchanged.
+				if (into !== undefined && (into !== parent || put !== undefined)) {
 					const box = penLayer.placed.get(id)?.box;
-					if (box) {
-						return [{ op: "move", id, parent: into, box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } }];
+					let index: number | undefined;
+					if (put !== undefined) {
+						const was = into && into === parent ? (penNode(into)?.children ?? []).findIndex((child) => child.id === id) : -1;
+						index = Math.max(0, put - (was >= 0 && was < put ? 1 : 0));
+						put += 1;
 					}
+					if (box) {
+						return [{ op: "move", id, parent: into, ...(index === undefined ? {} : { index }), box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } }];
+					}
+					if (index !== undefined) return [{ op: "move", id, parent: into, index }];
 				}
 				return [{ op: "update", id, set: movedBy(node, dx, dy) }];
 			}),
@@ -1468,12 +1483,51 @@ export function Stage(props: {
 	const [dropInto, setDropInto] = createSignal<string | null | undefined>();
 	/** The frame under a point that a drag could drop into: never one of the items being carried, and never inside one. */
 	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => {
-		const found = frameAt(point);
+		const found = frameAt(point, true);
 		if (!found) return null;
 		if (carrying.includes(found)) return null;
 		// Its own descendant would be a loop, which the op refuses anyway; this keeps it off the screen too.
 		for (let up = penLayer.placed.get(found)?.parent; up; up = penLayer.placed.get(up)?.parent) if (carrying.includes(up)) return null;
 		return found;
+	};
+	/**
+	 * Where in a frame that arranges its children a drop would land: the place among them nearest
+	 * the pointer, and the line drawn on that boundary. `undefined` for a frame with no layout,
+	 * where an item lands on the pixel it was let go on and there is no order to join.
+	 *
+	 * The index counts the frame's own children, carried ones included, so it is an index the `move`
+	 * op can take; a carried child is only skipped when asking which side of it the pointer is.
+	 */
+	const [dropAt, setDropAt] = createSignal<{ index: number; line: { x: number; y: number; w: number; h: number } } | undefined>();
+	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => {
+		const placed = penLayer.placed.get(frameId);
+		const flow = placed?.node.layout;
+		if (!placed || (flow !== "vertical" && flow !== "horizontal")) return undefined;
+		const down = flow === "vertical";
+		const box = penLayer.bounds.get(frameId) ?? placed.box;
+		const kids = (penNode(frameId)?.children ?? []).map((child) => ({ id: child.id, box: penLayer.bounds.get(child.id) ?? penLayer.placed.get(child.id)?.box }));
+		const along = down ? point.y : point.x;
+		let index = kids.length;
+		for (const [at, kid] of kids.entries()) {
+			if (!kid.box || carrying.includes(kid.id)) continue;
+			if (along < (down ? kid.box.y + kid.box.h / 2 : kid.box.x + kid.box.w / 2)) {
+				index = at;
+				break;
+			}
+		}
+		const real = (from: number, step: number) => {
+			for (let at = from; at >= 0 && at < kids.length; at += step) {
+				const kid = kids[at]!;
+				if (kid.box && !carrying.includes(kid.id)) return kid.box;
+			}
+			return undefined;
+		};
+		const before = real(index - 1, -1);
+		const after = real(index, 1);
+		const edge = (one: { x: number; y: number; w: number; h: number }, end: boolean) => (down ? one.y + (end ? one.h : 0) : one.x + (end ? one.w : 0));
+		const on = before && after ? (edge(before, true) + edge(after, false)) / 2 : after ? edge(after, false) - 5 : before ? edge(before, true) + 5 : down ? box.y + box.h / 2 : box.x + box.w / 2;
+		const line = down ? { x: box.x + 8, y: on, w: Math.max(8, box.w - 16), h: 0 } : { x: on, y: box.y + 8, w: 0, h: Math.max(8, box.h - 16) };
+		return { index, line };
 	};
 	/** Where the frame a drag would drop into is, for the outline that says so. */
 	const dropBox = createMemo(() => {
@@ -1520,7 +1574,9 @@ export function Stage(props: {
 				 * one place, and the pointer is the thing the hand is aiming. ⌘ or Ctrl already means
 				 * "ignore what is around me" during a drag, and keeping the parent is the same wish.
 				 */
-				setDropInto(ids.length === 0 || e.metaKey || e.ctrlKey ? undefined : frameUnder(now, ids));
+				const onto = ids.length === 0 || e.metaKey || e.ctrlKey ? undefined : frameUnder(now, ids);
+				setDropInto(onto);
+				setDropAt(onto ? dropSlot(onto, now, ids) : undefined);
 				markComposer(composerUnder(e, ids, boards));
 				pannedAt = performance.now();
 				batch(() => {
@@ -1537,6 +1593,7 @@ export function Stage(props: {
 					setGuides([]);
 					if (!moved) {
 						setDropInto(undefined);
+						setDropAt(undefined);
 						setBoardDrag(undefined);
 						onTap?.();
 						return;
@@ -1549,6 +1606,7 @@ export function Stage(props: {
 					 */
 					if (referring) {
 						setDropInto(undefined);
+						setDropAt(undefined);
 						penLayer.preview(undefined);
 						setPenDrag({ dx: 0, dy: 0 });
 						setBoardDrag(undefined);
@@ -1556,12 +1614,16 @@ export function Stage(props: {
 						return;
 					}
 					const into = dropInto();
-					setDropInto(undefined);
+					const slot = dropAt()?.index;
+					batch(() => {
+						setDropInto(undefined);
+						setDropAt(undefined);
+					});
 					if (e.altKey && ids.length) {
 						penLayer.preview(undefined);
 						setPenDrag({ dx: 0, dy: 0 });
 						penCopyBy(ids, offset.dx, offset.dy);
-					} else penMoveBy(ids, offset.dx, offset.dy, into);
+					} else penMoveBy(ids, offset.dx, offset.dy, into, slot);
 					moveBoards(boards, offset.dx, offset.dy);
 					setBoardDrag(undefined);
 				});
@@ -1945,7 +2007,12 @@ export function Stage(props: {
 	const MADE: Record<Exclude<PenTool, "select" | "arrow" | "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
 		rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
-		frame: { node: { type: "frame", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
+		/*
+		 * A frame made by hand is a column, because that is what a frame is for: things in an order,
+		 * arranged for you. Its height is a number rather than fit-content, so an empty one is a
+		 * 300 px target you can drop into, and a half-full one keeps room under its last child.
+		 */
+		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: 12, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
 		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
 		/*
 		 * A card is a note whose words are markdown (`MARKDOWN`): pen's own note, so pen.dev opens it
@@ -2075,12 +2142,17 @@ export function Stage(props: {
 		);
 	};
 
-	/** The innermost free-standing frame under a point: an item drawn inside one belongs to it. */
-	const frameAt = (point: { x: number; y: number }) => {
+	/**
+	 * The innermost frame under a point. An item drawn inside a free-standing frame belongs to it,
+	 * which is the plain call; `stacking` also takes the frames that arrange their children, which
+	 * is what a drop asks for. A library shape is a frame with a layout too, and never either.
+	 */
+	const frameAt = (point: { x: number; y: number }, stacking = false) => {
 		let best: { id: string; order: number } | undefined;
 		for (const placed of penLayer.placed.values()) {
 			const { node, box } = placed;
-			if (node.type !== "frame" || node.id.includes("/") || node.layout !== "none") continue;
+			if (node.type !== "frame" || node.id.includes("/") || isShape(node)) continue;
+			if (node.layout !== "none" && !stacking) continue;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
 			if (!best || placed.order > best.order) best = { id: node.id, order: placed.order };
 		}
@@ -3973,6 +4045,20 @@ export function Stage(props: {
 							class="pen-join"
 							data-drop="frame"
 							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--color-accent)` }}
+						/>
+					)}
+				</Show>
+				{/* And where in it: the boundary between two of its children that the drop would take. */}
+				<Show when={dropAt()}>
+					{(slot) => (
+						<div
+							class="pen-insert"
+							style={{
+								left: `${slot().line.x - (slot().line.w === 0 ? 1.5 / props.camera.zoom : 0)}px`,
+								top: `${slot().line.y - (slot().line.h === 0 ? 1.5 / props.camera.zoom : 0)}px`,
+								width: `${Math.max(slot().line.w, 3 / props.camera.zoom)}px`,
+								height: `${Math.max(slot().line.h, 3 / props.camera.zoom)}px`,
+							}}
 						/>
 					)}
 				</Show>

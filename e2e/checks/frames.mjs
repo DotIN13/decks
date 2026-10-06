@@ -171,7 +171,85 @@ if (spot) {
 			});
 			const stacked = await until(() => (onDisk().children.find((n) => n.id === "f-box")?.layout === "vertical" ? true : undefined));
 			say("…and pressing column writes pen's own vertical layout to the file", !!stacked, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.layout));
+			// A frame that follows its children keeps a floor, so emptying it leaves something to drop into.
+			await page.evaluate(() => {
+				const group = document.querySelector('[data-section="layout"] [aria-label="height"]');
+				[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
+			});
+			const floor = await until(() => (String(onDisk().children.find((n) => n.id === "f-box")?.height ?? "").startsWith("fit_content(") ? true : undefined));
+			say("…and pressing fit-content writes a hug with a floor under it", !!floor, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.height));
 		}
+	}
+
+	// --- a frame that stacks: the frame tool's own default, and a drop that takes a place in it ----
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
+	/*
+	 * Drawn with the tool, not sent over the wire: the default is the point of this act. A hand-made
+	 * frame is a column, so a drop into it is a place in an order rather than a pixel, and the line
+	 * between two children is what says which place.
+	 */
+	await page.click('.pen-tools button[data-tool="frame"]');
+	const room = await page.evaluate(() => {
+		const stage = document.querySelector(".stage");
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		for (let y = 200; y < 680; y += 40) for (let x = 420; x < 1150; x += 40) if (empty(x, y) && empty(x + 240, y + 200) && empty(x + 420, y + 60)) return { at: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a } };
+	});
+	say("the canvas has room for a column and an item beside it", !!room, JSON.stringify(room?.at));
+	if (room) {
+		await page.mouse.move(room.at.x, room.at.y);
+		await page.mouse.down();
+		await page.mouse.move(room.at.x + 240, room.at.y + 200, { steps: 8 });
+		await page.mouse.up();
+		const made = await until(() => onDisk().children.find((n) => n.type === "frame" && n.id !== "f-box"));
+		say("a frame drawn with the tool is a column", made?.layout === "vertical", JSON.stringify(made && { layout: made.layout, gap: made.gap, padding: made.padding, height: made.height }));
+		say("…with a height in pixels, so an empty one is something to drop into", typeof made?.height === "number" && made.height > 0, JSON.stringify(made?.height));
+		if (made) {
+			await page.keyboard.press("Escape");
+			await settle(page, 200);
+			link.send({
+				type: "stage.pen.edit",
+				agentId,
+				ops: [
+					{ op: "insert", parent: made.id, node: { type: "rectangle", id: "s-one", fill: "#bfdbfe" }, box: { x1: room.world.x + 20, y1: room.world.y + 20, x2: room.world.x + 160, y2: room.world.y + 70 } },
+					{ op: "insert", parent: made.id, node: { type: "rectangle", id: "s-two", fill: "#bbf7d0" }, box: { x1: room.world.x + 20, y1: room.world.y + 90, x2: room.world.x + 160, y2: room.world.y + 140 } },
+					{ op: "insert", node: { type: "rectangle", id: "s-new", fill: "#fecaca" }, box: { x1: room.world.x + 420, y1: room.world.y + 30, x2: room.world.x + 540, y2: room.world.y + 80 } },
+				],
+			});
+			const three = await until(() => (parentOf("s-two") === made.id && parentOf("s-new") === null ? true : undefined));
+			say("the column holds two children, with a third loose beside it", !!three, JSON.stringify({ one: parentOf("s-one"), two: parentOf("s-two"), loose: parentOf("s-new") }));
+			const now = await until(async () => {
+				const all = { one: await boxOf("s-one"), two: await boxOf("s-two"), carry: await boxOf("s-new") };
+				return all.one && all.two && all.carry && all.carry.width > 0 ? all : undefined;
+			});
+			say("all three are on screen", !!now, JSON.stringify(now && { one: Math.round(now.one.y), two: Math.round(now.two.y), carry: Math.round(now.carry.x) }));
+			if (now) {
+				// Aim at the gap between the two children: the drop should take the place between them.
+				const gap = { x: now.one.x + now.one.width / 2, y: (now.one.y + now.one.height + now.two.y) / 2 };
+				await page.mouse.move(now.carry.x + now.carry.width / 2, now.carry.y + now.carry.height / 2);
+				await page.mouse.down();
+				await page.mouse.move(gap.x + 40, gap.y - 20, { steps: 6 });
+				await page.mouse.move(gap.x, gap.y, { steps: 6 });
+				await settle(page, 200);
+				const line = await page.evaluate(() => {
+					const one = document.querySelector(".pen-insert");
+					if (!one) return undefined;
+					const box = one.getBoundingClientRect();
+					return { w: Math.round(box.width), h: Math.round(box.height), y: Math.round(box.y) };
+				});
+				await page.mouse.up();
+				say("a line shows which place in the column the drop would take", !!line && line.w > line.h, JSON.stringify(line));
+				const order = await until(() => {
+					const kids = (onDisk().children.find((n) => n.id === made.id)?.children ?? []).map((n) => n.id);
+					return kids.length === 3 ? kids : undefined;
+				});
+				say("the drop lands between the two, not at the end", !!order && order[1] === "s-new", JSON.stringify(order));
+			}
+			link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: made.id }] });
+		}
+		await page.keyboard.press("Escape");
+		await settle(page, 300);
 	}
 
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "f-note" }, { op: "delete", id: "f-box" }] });
