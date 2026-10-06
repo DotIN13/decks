@@ -481,7 +481,14 @@
 .stage {
 	position: absolute;
 	inset: 0;
-	overflow: hidden;
+	/*
+	 * `clip`, not `hidden`: a hidden box has no scrollbars but is still a scroll container, and the
+	 * browser scrolls the nearest one it can to show a focused caret. Opening a card taller than the
+	 * window for typing therefore slid the whole stage up by the card's height, and nothing put it
+	 * back — every board and every drawn item was off screen while the camera said it was not. A
+	 * clipped box cannot scroll at all, which is the truth here: the camera moves the canvas.
+	 */
+	overflow: clip;
 	background: var(--stage);
 	touch-action: none;
 }
