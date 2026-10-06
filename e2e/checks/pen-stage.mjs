@@ -52,7 +52,21 @@ link.send({
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
 say("an edit comes back as a stage.pen frame", !!frame);
 const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
-const onDisk = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { children: [] });
+/*
+ * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
+ * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good
+ * answer stands until the next complete one.
+ */
+let lastGood = { children: [] };
+const onDisk = () => {
+	if (!existsSync(file)) return { children: [] };
+	try {
+		lastGood = JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		/* half-written; the poll comes round again */
+	}
+	return lastGood;
+};
 say("the stage is a pen file on disk", existsSync(file), file);
 const doc = onDisk();
 say("its version is pen's", typeof doc.version === "string" && /^\d+\.\d+$/.test(doc.version), doc.version);
@@ -218,6 +232,15 @@ if (spot) {
 		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
 	}, which);
 	const grip = await gripAt("ne");
+	/*
+	 * The middle of what it covers, before the turn, in the stage's own units — the file's numbers,
+	 * not the screen's, so it can be compared against the turn matrix, which is also the stage's.
+	 */
+	const fileMiddle = () => {
+		const node = onDisk().children.find((n) => n.id === drawnId);
+		return node ? { x: (node.x ?? 0) + (node.width ?? 0) / 2, y: (node.y ?? 0) + (node.height ?? 0) / 2 } : undefined;
+	};
+	const middleBefore = fileMiddle();
 	const spun = await (async () => {
 		if (!grip) return undefined;
 		const mid = await rectBox();
@@ -256,6 +279,22 @@ if (spot) {
 		});
 	})();
 	say("dragging outside a corner turns the item, counter-clockwise in the file", !!spun && spun > 300, `rotation ${spun}`);
+	/*
+	 * And it turned on the spot. An item is turned about the middle of what it covers, so the angle
+	 * and the corner pen turns about are written together; if they disagree by even a little the
+	 * item jumps when the hand lifts.
+	 */
+	const settledMiddle = await (async () => {
+		await settle(page, 600);
+		const turn = await page.evaluate((id) => globalThis.__decksPenTurn?.(id), drawnId);
+		const now = fileMiddle();
+		if (!turn || !now || !middleBefore) return undefined;
+		// The middle of the upright box, carried through the turn the canvas applies to it.
+		const [a0, b0, c0, d0, e0, f0] = turn.m;
+		return { x: a0 * now.x + c0 * now.y + e0, y: b0 * now.x + d0 * now.y + f0, before: middleBefore };
+	})();
+
+	say("…about the middle of what it covers, so it does not jump when the hand lifts", !!settledMiddle && Math.abs(settledMiddle.x - settledMiddle.before.x) < 6 && Math.abs(settledMiddle.y - settledMiddle.before.y) < 6, JSON.stringify(settledMiddle && { moved: { x: Math.round(settledMiddle.x - settledMiddle.before.x), y: Math.round(settledMiddle.y - settledMiddle.before.y) } }));
 	// It is still selected after the drag, and its outline is turned with it rather than left upright.
 	const onItem = await page.evaluate(() => {
 		const sel = document.querySelector(".pen-selection:not([data-board])");
@@ -358,6 +397,51 @@ if (spot) {
 	say("the angle never drops back while the edit is being saved", settling.low > 1, JSON.stringify(settling));
 
 	say("carrying a turned item moves its outline by the same amount, and never reshapes it", !!carried && Math.abs(carried.dx - 40) <= 2 && Math.abs(carried.dy - 26) <= 2 && Math.abs(carried.dw) <= 1 && Math.abs(carried.dh) <= 1, JSON.stringify(carried));
+
+	/*
+	 * And the same for an item whose drawing is not its box: a path with a viewBox, where the handles
+	 * are on the drawing and the box is elsewhere. This is the shape that jumped.
+	 */
+	const petalJump = await (async () => {
+		const id = "e2e-petal";
+		link.send({
+			type: "stage.pen.edit",
+			agentId,
+			ops: [{ op: "insert", node: { type: "path", id, viewBox: [0, 0, 100, 100], geometry: "M6 6L40 6L40 40L6 40Z", fill: "#c7ddf7", stroke: "#1f2328", strokeWidth: 1.5 }, box: { x1: spot.x, y1: spot.y + 420, x2: spot.x + 240, y2: spot.y + 660 } }],
+		});
+		const made = await until(() => onDisk().children.find((n) => n.id === id));
+		if (!made) return undefined;
+		const fileMid = () => {
+			const n = onDisk().children.find((one) => one.id === id);
+			return n ? { x: (n.x ?? 0) + (n.width ?? 0) / 2, y: (n.y ?? 0) + (n.height ?? 0) / 2 } : undefined;
+		};
+		const was = fileMid();
+		await page.keyboard.press("Escape");
+		await settle(page, 500);
+		const drawn = await page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+		if (!drawn || !was) return undefined;
+		await page.mouse.click(drawn.x + drawn.width / 2, drawn.y + drawn.height / 2);
+		const gripped = await until(() => page.evaluate(() => {
+			const h = document.querySelector('.pen-rotate[data-grip="ne"]')?.getBoundingClientRect();
+			return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
+		}));
+		if (!gripped) return undefined;
+		const centre = { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 };
+		const r = Math.hypot(gripped.x - centre.x, gripped.y - centre.y);
+		const a0 = Math.atan2(gripped.y - centre.y, gripped.x - centre.x);
+		await page.mouse.move(gripped.x, gripped.y);
+		await page.mouse.down();
+		for (const t of [0.1, 0.22, 0.35]) await page.mouse.move(centre.x + r * Math.cos(a0 + t), centre.y + r * Math.sin(a0 + t), { steps: 4 });
+		await page.mouse.up();
+		await until(() => (onDisk().children.find((one) => one.id === id)?.rotation ? true : undefined));
+		await settle(page, 600);
+		const turn = await page.evaluate((one) => globalThis.__decksPenTurn?.(one), id);
+		const now = fileMid();
+		if (!turn || !now) return undefined;
+		const [a1, b1, c1, d1, e1, f1] = turn.m;
+		return { dx: Math.round(a1 * now.x + c1 * now.y + e1 - was.x), dy: Math.round(b1 * now.x + d1 * now.y + f1 - was.y), deg: Math.round(turn.deg) };
+	})();
+	say("…and a path whose drawing is not its box turns on the spot too", !!petalJump && Math.abs(petalJump.dx) < 6 && Math.abs(petalJump.dy) < 6 && petalJump.deg !== 0, JSON.stringify(petalJump));
 
 	// A card is as tall as its words: two side handles, and a drag writes no height.
 	await page.keyboard.press("Escape");

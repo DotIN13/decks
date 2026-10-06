@@ -1863,8 +1863,15 @@ export function Stage(props: {
 		// Above this item: the turns it inherits, which the drag does not change.
 		const above = was - own;
 		const m0 = matrixOf(penLayer.placed, id);
-		// The middle of what it covers, held still: in the drawn place, which is where the pointer is.
-		const middle = applyTurn(m0, { x: start.x + start.w / 2, y: start.y + start.h / 2 });
+		/*
+		 * The point held still is the middle of the item's **own box**, not of what it covers.
+		 *
+		 * They are the same thing for nearly every item, and not for a path drawn in a corner of its
+		 * viewBox: there the handles are on the drawing and the box is elsewhere. Turning about the
+		 * drawn middle while writing a corner derived from the box made those two disagree, and the
+		 * item jumped by the difference the moment the hand lifted.
+		 */
+		const middle = applyTurn(m0, { x: given.x + given.w / 2, y: given.y + given.h / 2 });
 		const from = worldAt(event);
 		const angleAt = (point: { x: number; y: number }) => (Math.atan2(point.y - middle.y, point.x - middle.x) * 180) / Math.PI;
 		const first = angleAt(from);
@@ -1890,7 +1897,7 @@ export function Stage(props: {
 				corner = applyTurn(back, want);
 				setPenRotate({ id, deg: deg + above, m: compose(turn(above, { x: 0, y: 0 }), turn(deg, corner)) });
 				// The sheet's own copy, as a handful of numbers (`pen/scene.ts`, `PenPreview`).
-				penLayer.preview(new Map<string, PenPreview>([[id, { dx: 0, dy: 0, deg, atX: Math.round(corner.x), atY: Math.round(corner.y) }]]));
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: corner.x - given.x, dy: corner.y - given.y, deg, atX: corner.x, atY: corner.y }]]));
 			},
 			(moved) => {
 				// The preview and the live angle both stay until the drawing comes back with the change.

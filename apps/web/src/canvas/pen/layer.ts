@@ -113,6 +113,8 @@ export class PenLayer {
 	private carriedBitmaps: ImageBitmapRenderingContext | null = null;
 	/** The placement of the frame the carried picture came with, before the drag's offset. */
 	private carriedAt = "";
+	/** The turn the carried picture is being shown through, while one is being turned. */
+	private carriedTurn: { deg: number; about: { x: number; y: number } } | undefined;
 	private carriedBy = { dx: 0, dy: 0 };
 	private carriedKey = "";
 	private boardsCarried = "";
@@ -278,7 +280,7 @@ export class PenLayer {
 			element.style.height = `${frame.height}px`;
 			this.carriedAt = at;
 			element.hidden = false;
-			this.slideCarried(this.carriedBy.dx, this.carriedBy.dy);
+			this.slideCarried(this.carriedBy.dx, this.carriedBy.dy, this.carriedTurn);
 		} else carried.bitmap.close();
 		const boards: ReadonlySet<string> = new Set(carried?.boards ?? []);
 		if (boards.size === this.carryingNow.size && [...boards].every((path) => this.carryingNow.has(path))) return;
@@ -428,13 +430,15 @@ export class PenLayer {
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		const changes = moving?.size ? [...moving] : undefined;
 		/*
-		 * A carried move, which the sheet can slide as a picture rather than draw again. A turn or a
-		 * rounding changes the shape itself, so neither can take that path.
+		 * A carried move or a turn, which the sheet shows by transforming the picture it already drew
+		 * rather than drawing anything again. A rounding cannot take that path: it changes the shape,
+		 * and no transform of the old pixels is the new ones.
 		 */
-		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.deg === undefined && change.radius === undefined);
+		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined);
 		if (slide) {
 			const first = changes![0]![1];
-			this.slideCarried(first.dx, first.dy);
+			const turning = first.deg !== undefined && first.atX !== undefined && first.atY !== undefined;
+			this.slideCarried(first.dx, first.dy, turning ? { deg: first.deg!, about: { x: first.atX!, y: first.atY! } } : undefined);
 			const key = changes!.map(([id]) => id).sort().join("|");
 			if (key === this.carriedKey) return;
 			this.carriedKey = key;
@@ -451,9 +455,22 @@ export class PenLayer {
 		this.send({ type: "carry", boards: [...boards] });
 	}
 
-	private slideCarried(dx: number, dy: number): void {
+	/**
+	 * Move the picture of what is being carried, and turn it.
+	 *
+	 * The sheet draws the carried items once, onto their own canvas over it; a drag then slides that
+	 * canvas rather than drawing anything again. A turn rides on the same picture: the same pixels
+	 * through an affine transform, which costs nothing and is continuous, where redrawing them per
+	 * frame meant laying out the whole stage per frame. `about` is the point it turns about, in the
+	 * stage's own units, because that is the space this transform is applied in.
+	 */
+	private slideCarried(dx: number, dy: number, turn?: { deg: number; about: { x: number; y: number } }): void {
 		this.carriedBy = { dx, dy };
-		if (this.carriedEl && !this.carriedEl.hidden) this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${this.carriedAt}`;
+		this.carriedTurn = turn;
+		if (!this.carriedEl || this.carriedEl.hidden) return;
+		// Counter-clockwise, as pen states an angle, which is clockwise-negative to CSS.
+		const spin = turn?.deg ? `translate(${turn.about.x}px, ${turn.about.y}px) rotate(${-turn.deg}deg) translate(${-turn.about.x}px, ${-turn.about.y}px) ` : "";
+		this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${spin}${this.carriedAt}`;
 	}
 
 	/**
