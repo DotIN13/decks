@@ -132,6 +132,25 @@ test("path bounds come from the geometry when there is no viewBox", () => {
 	assert.deepEqual(boxes(doc).p, [5, 5, 40, 20]);
 });
 
+test("an arc is measured where it is drawn, not out to its radii", () => {
+	// A circle drawn as two half-circles: bounded by its radii around both ends it came out 100 by 200.
+	assert.deepEqual(pathBounds("M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z"), { x: 0, y: 0, w: 100, h: 100 });
+	// The cylinder, whose flat 50 by 14 arcs used to make it 200 wide.
+	assert.deepEqual(pathBounds("M0 14A50 14 0 0 1 100 14V86A50 14 0 0 1 0 86Z"), { x: 0, y: 0, w: 100, h: 100 });
+	assert.deepEqual(pathBounds("M0 0A10 10 0 0 1 10 10"), { x: 0, y: 0, w: 10, h: 10 });
+	// A quarter arc passes no extreme of its own ellipse, so it is just its two ends.
+	const quarter = pathBounds("M0 10A10 10 0 0 1 10 0")!;
+	assert.ok(Math.abs(quarter.w - 10) < 1e-9 && Math.abs(quarter.h - 10) < 1e-9 && quarter.x === 0, JSON.stringify(quarter));
+	// A rotated ellipse's extremes are not its quadrant points. Checked against a browser's getBBox.
+	const turned = pathBounds("M0 0A10 5 90 0 1 10 10")!;
+	assert.ok(Math.abs(turned.y + 6.1803) < 0.01 && Math.abs(turned.h - 16.1803) < 0.01, JSON.stringify(turned));
+	// A radius of zero is a straight line, which is what SVG draws.
+	assert.deepEqual(pathBounds("M10 10A0 20 0 0 1 40 40"), { x: 10, y: 10, w: 30, h: 30 });
+	// Radii too small to reach both ends are grown until they just do, so this is a half-circle of radius 10.
+	const grown = pathBounds("M0 0A2 2 0 0 1 20 0")!;
+	assert.ok(grown.x === 0 && Math.abs(grown.y + 10) < 1e-9 && Math.abs(grown.w - 20) < 1e-9 && Math.abs(grown.h - 10) < 1e-9, JSON.stringify(grown));
+});
+
 test("edits: insert with a stage box inside a free frame writes pen's relative numbers", () => {
 	const doc: PenDocument = { ...emptyDocument(), children: [{ type: "frame", id: "sec", x: -40, y: -120, width: 1340, height: 1320, layout: "none", children: [] }] };
 	const { doc: next, results } = apply(doc, [{ op: "insert", parent: "sec", node: { type: "note", id: "restart", content: "Restart first" }, box: { x1: 620, y1: 0, x2: 860, y2: 90 } }], light);
@@ -314,4 +333,16 @@ test("a slot frame takes its children from the instance, and refs among them are
 	const p1 = expand(doc)[2]!;
 	const body = p1.children![0]!;
 	assert.deepEqual(body.children!.map((c) => [c.id, c.type]), [["p1/c1", "rectangle"], ["p1/t", "text"]]);
+});
+
+test("a curve is measured where it goes, not out to its control points", () => {
+	// Both control points sit 50 above the ends, and the curve itself reaches 37.5 of that.
+	const arch = pathBounds("M0 50C0 0 100 0 100 50")!;
+	assert.ok(Math.abs(arch.y - 12.5) < 1e-9 && Math.abs(arch.h - 37.5) < 1e-9, JSON.stringify(arch));
+	// A quadratic, the curve the rounded corners are drawn with.
+	const hump = pathBounds("M0 0Q50 100 100 0")!;
+	assert.ok(Math.abs(hump.h - 50) < 1e-9, JSON.stringify(hump));
+	// S and T mirror the last control point, so their curve is not measured as a straight line.
+	const smooth = pathBounds("M0 0Q50 100 100 0T200 0")!;
+	assert.ok(Math.abs(smooth.y + 50) < 1e-9 && Math.abs(smooth.h - 100) < 1e-9, JSON.stringify(smooth));
 });

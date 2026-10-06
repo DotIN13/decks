@@ -158,6 +158,74 @@ if (first && target) {
 	}
 } else say("both shapes are on screen", false, JSON.stringify({ first, target, ids: [made?.id, second?.id], boxes: await page.evaluate((ids) => ids.map((id) => !!window.__decksPenBox?.(id)), [made?.id, second?.id]) }));
 
+
+// --- a shape covers what it draws, and nothing beside it --------------------------------------------
+/*
+ * What a shape covers is measured from its geometry, and the pointer is tested against that. Every
+ * arc used to be measured out to its radii, so an ellipse covered a box twice its own height,
+ * reaching half a shape above and below itself: a click near the bottom of whatever sat above an
+ * ellipse selected the ellipse. Two stacked ellipses and one click are the whole case.
+ */
+const room = await page.evaluate(() => {
+	const stage = document.querySelector(".stage");
+	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+	for (let y = 170; y < 800; y += 40) {
+		for (let x = 380; x < 1300; x += 40) {
+			if ([0, 60, 120, 180, 240].every((dy) => [0, 100, 200].every((dx) => empty(x + dx, y + dy)))) return { world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, zoom: m.a };
+		}
+	}
+});
+say("the canvas has room for two stacked ellipses", !!room, JSON.stringify(room));
+if (room) {
+	const size = { w: 200, h: 120 };
+	link.send({
+		type: "stage.pen.edit",
+		agentId,
+		ops: ["top", "under"].map((which, i) => ({
+			op: "insert",
+			node: {
+				type: "frame",
+				id: `oval-${which}`,
+				name: "Ellipse",
+				width: size.w,
+				height: size.h,
+				layout: "vertical",
+				justifyContent: "center",
+				alignItems: "center",
+				padding: 10,
+				clip: false,
+				metadata: { type: "decks.shape", kind: "Ellipse" },
+				children: [{ type: "path", id: `oval-${which}-out`, layoutPosition: "absolute", x: 0, y: 0, width: size.w, height: size.h, viewBox: [0, 0, 100, 100], geometry: "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z", fill: "#ffffff", stroke: "#1f2328", strokeWidth: 1.5 }],
+			},
+			box: { x1: room.world.x, y1: room.world.y + i * (size.h + 20), x2: room.world.x + size.w, y2: room.world.y + i * (size.h + 20) + size.h },
+		})),
+	});
+	const boxOf = (id) => page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const drawn = await until(async () => {
+		const all = { top: await boxOf("oval-top"), out: await boxOf("oval-top-out"), under: await boxOf("oval-under") };
+		return all.top && all.out && all.under && all.top.height > 0 ? all : undefined;
+	});
+	say("both ellipses are drawn", !!drawn, JSON.stringify(drawn && Object.fromEntries(Object.entries(drawn).map(([k, b]) => [k, { y: Math.round(b.y), h: Math.round(b.height) }]))));
+	if (drawn) {
+		const off = Math.max(Math.abs(drawn.out.y - drawn.top.y), Math.abs(drawn.out.height - drawn.top.height));
+		say("an ellipse covers its own box, not twice its height", off <= 2, JSON.stringify({ shape: { y: Math.round(drawn.top.y), h: Math.round(drawn.top.height) }, outline: { y: Math.round(drawn.out.y), h: Math.round(drawn.out.height) }, off: Math.round(off) }));
+		await page.keyboard.press("Escape");
+		await settle(page, 200);
+		await page.mouse.click(drawn.top.x + drawn.top.width / 2, drawn.top.y + drawn.top.height * 0.85);
+		await settle(page, 400);
+		const picked = await until(() => page.evaluate(() => {
+			const one = document.querySelector(".pen-selection:not([data-board])");
+			if (!one) return undefined;
+			const box = one.getBoundingClientRect();
+			return { y: Math.round(box.y), h: Math.round(box.height) };
+		}));
+		say("clicking near the bottom of the upper one selects the upper one", !!picked && Math.abs(picked.y - drawn.top.y) <= 4, JSON.stringify({ picked, top: Math.round(drawn.top.y), under: Math.round(drawn.under.y) }));
+	}
+	link.send({ type: "stage.pen.edit", agentId, ops: ["oval-top", "oval-under"].map((id) => ({ op: "delete", id })) });
+	await settle(page, 300);
+}
+
 say("no errors in the page", errors.length === 0, errors.join(" | "));
 link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.metadata?.type === "decks.shape" || n.metadata?.type === "decks.arrow" || n.id === "shapes-anchor").map((n) => ({ op: "delete", id: n.id })) });
 await settle(page, 400);

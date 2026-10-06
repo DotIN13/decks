@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, reroute, shapeKind, shapeOutline, sidedRoute, type PenDocument } from "./index.ts";
+import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, pathBounds, reroute, shapeKind, shapeOutline, SHAPES, sidedRoute, type PenDocument } from "./index.ts";
 
 const theme = baseTheme(emptyDocument(), "light");
 const diamond = shapeKind("Decision")!;
@@ -71,4 +71,17 @@ test("the cylinder's cap winds with its body, so its top is filled", () => {
 	// Both arcs sweep the same way: a nonzero fill cancelled them when they did not, leaving a hole.
 	assert.match(String(body), /A50 14 0 0 1 100 14/);
 	assert.match(String(cap), /^M100 14A50 14 0 0 1 0 14$/);
+});
+
+test("every library shape is drawn inside its own viewBox", () => {
+	/*
+	 * What a shape covers is measured from its geometry, and that measurement is what the pointer is
+	 * tested against. A shape measuring larger than the 100 by 100 box it is drawn in reaches outside
+	 * itself: the ellipse, the ring and the cylinder each did, by a whole radius.
+	 */
+	for (const kind of SHAPES) {
+		const box = pathBounds(kind.geometry)!;
+		assert.ok(box, kind.name);
+		assert.ok(box.x >= -0.01 && box.y >= -0.01 && box.x + box.w <= 100.01 && box.y + box.h <= 100.01, `${kind.name} covers ${JSON.stringify(box)}`);
+	}
 });
