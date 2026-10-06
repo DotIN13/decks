@@ -2003,6 +2003,15 @@ export function Stage(props: {
 		if (board.x === held.x && board.y === held.y && board.w === held.w && (slides || board.h >= held.h)) setBoardResize(undefined);
 	});
 
+	/*
+	 * What a frame starts with. The padding is what makes a frame readable as a container rather
+	 * than an outline round its contents, and the radius is that padding plus a card's own corner:
+	 * nested corners look right when the gap between the two curves is the same all the way round,
+	 * so a card dropped into a frame sits concentric with it instead of inside a tighter arc.
+	 */
+	const FRAME_PAD = 18;
+	const FRAME_RADIUS = NOTE_RADIUS + FRAME_PAD;
+
 	/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
 	const MADE: Record<Exclude<PenTool, "select" | "arrow" | "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
 		rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
@@ -2012,7 +2021,7 @@ export function Stage(props: {
 		 * arranged for you. Its height is a number rather than fit-content, so an empty one is a
 		 * 300 px target you can drop into, and a half-full one keeps room under its last child.
 		 */
-		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: 12, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
+		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 300 },
 		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
 		/*
 		 * A card is a note whose words are markdown (`MARKDOWN`): pen's own note, so pen.dev opens it

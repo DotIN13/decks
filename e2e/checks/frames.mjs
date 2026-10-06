@@ -203,7 +203,9 @@ if (spot) {
 		await page.mouse.move(room.at.x + 240, room.at.y + 200, { steps: 8 });
 		await page.mouse.up();
 		const made = await until(() => onDisk().children.find((n) => n.type === "frame" && n.id !== "f-box"));
-		say("a frame drawn with the tool is a column", made?.layout === "vertical", JSON.stringify(made && { layout: made.layout, gap: made.gap, padding: made.padding, height: made.height }));
+		say("a frame drawn with the tool is a column", made?.layout === "vertical", JSON.stringify(made && { layout: made.layout, gap: made.gap, padding: made.padding, radius: made.cornerRadius, height: made.height }));
+		// Its corner is a card's 12 plus its own padding, so a card dropped in sits concentric with it.
+		say("…padded 18, with a corner that nests a card's inside it", made?.padding === 18 && made?.cornerRadius === 30, JSON.stringify({ padding: made?.padding, radius: made?.cornerRadius }));
 		say("…with a height in pixels, so an empty one is something to drop into", typeof made?.height === "number" && made.height > 0, JSON.stringify(made?.height));
 		if (made) {
 			await page.keyboard.press("Escape");
