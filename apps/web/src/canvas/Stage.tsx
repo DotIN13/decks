@@ -1761,8 +1761,15 @@ export function Stage(props: {
 		event.stopPropagation();
 		const { id } = box;
 		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
-		// A card's height is its words': the drag sets its width, and its height is left to the layout.
-		const width = widthOnly(id);
+		/*
+		 * A card that is as tall as its words keeps being that while only its sides are dragged: the
+		 * width goes in the file and the layout measures the words again. The top and bottom handles
+		 * are what pin a height on it, and a corner pins one too, since it drags an edge of each.
+		 */
+		const words = hugsWords(id) && !handle.includes("n") && !handle.includes("s");
+		const node = penLayer.placed.get(id)?.node;
+		// Nothing smaller than a card's own padding, which would be a card with no room for a word in it.
+		const floor = node && isMarkdown(node) ? NOTE_PAD * 2 : 4;
 		/*
 		 * The handles are on what the item draws; the file sizes the box it was given. For most items
 		 * they are the same box. For a path drawn in a corner of its viewBox they are not, and the
@@ -1809,19 +1816,19 @@ export function Stage(props: {
 					if (handle.includes("n")) y1 = y2 - start.h * scale;
 					else y2 = y1 + start.h * scale;
 				}
-				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(4, Math.round(Math.abs(y2 - y1))) };
+				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(floor, Math.round(Math.abs(y2 - y1))) };
 				const box = givenFor(next);
 				setPenResize({ id, ...next, given: { x: box.x, y: box.y } });
 				// A card's height is left out, so the drawing re-measures its words at the new width.
-				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(width ? {} : { h: box.h }) }]]));
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(words ? {} : { h: box.h }) }]]));
 			},
 			(moved) => {
 				setGuides([]);
 				if (!moved) return;
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
-				// A card: the width alone, and any height an older drag pinned on it taken off again.
-				if (width) return penEdit([{ op: "update", id, set: { height: null }, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w) } }]);
+				// A card still following its words: its width alone, and no height written.
+				if (words) return penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w) } }]);
 				penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w), y2: r(box.y + box.h) } }]);
 			},
 		);
@@ -1867,12 +1874,16 @@ export function Stage(props: {
 	};
 
 
-	const widthOnly = (id: string | undefined) => {
+	/**
+	 * A markdown card as tall as its words, which is how one starts: no `height` of its own, so the
+	 * layout measures what it says at whatever width it has. Dragging its top or bottom handle pins a
+	 * height on it, and from then on it is an ordinary box — the properties panel is how it gets its
+	 * words' height back.
+	 */
+	const hugsWords = (id: string | undefined) => {
 		const node = id ? penLayer.placed.get(id)?.node : undefined;
-		return !!node && isMarkdown(node);
+		return !!node && isMarkdown(node) && typeof node.height !== "number";
 	};
-	/** The handles an item shows: every edge and corner, or the two sides for something as tall as its words. */
-	const penHandleSet = createMemo(() => (widthOnly(penHandles()?.id) ? (["e", "w"] as const) : HANDLES));
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
 	 *
@@ -4173,7 +4184,7 @@ export function Stage(props: {
 				</Show>
 				<Show when={penHandles()}>
 					{(box) => (
-						<For each={penHandleSet()}>
+						<For each={HANDLES}>
 								{(handle) => {
 									const size = () => HANDLE_PX / props.camera.zoom;
 									return (

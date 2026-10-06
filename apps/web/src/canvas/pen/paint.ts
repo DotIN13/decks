@@ -593,8 +593,17 @@ function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: 
 	const content = String(resolve(ctx.doc, node.content, withTheme(theme, node)) ?? "");
 	if (!content) return;
 	const style = textStyleOf(ctx.doc, node, theme);
-	const { x, y, w } = placed.box;
+	const { x, y, w, h } = placed.box;
+	/*
+	 * Inside the card, always. A card is as tall as its words until someone drags its top or bottom
+	 * handle, and from then on it is a height they chose: words past it are cut off at the paper's
+	 * own corner rather than running on over the canvas.
+	 */
+	const { ck } = ctx;
+	canvas.save();
+	canvas.clipRRect(ck.RRectXY(ck.LTRBRect(x, y, x + w, y + h), NOTE_RADIUS, NOTE_RADIUS), ck.ClipOp.Intersect, true);
 	ctx.fonts.markdown(content, style, { width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" }).draw(canvas, x + NOTE_PAD, y + NOTE_PAD, (index) => ctx.scroll?.(node.id, index) ?? 0);
+	canvas.restore();
 }
 
 // --- icons -------------------------------------------------------------------------------------

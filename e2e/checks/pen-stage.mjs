@@ -223,16 +223,19 @@ if (spot) {
 	});
 	say("dragging the radius handle rounds the corners in the file", !!round, `cornerRadius ${round}`);
 
-	// A card is as tall as its words: two side handles, and a drag writes no height.
+	/*
+	 * A card is as tall as its words until its own top or bottom handle says otherwise: it has all
+	 * eight, its sides set its width and leave the height to the words, and the bottom pins one.
+	 */
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
 	const cardBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
 	await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 8);
-	const two = await until(() => page.evaluate(() => {
+	const eight = await until(() => page.evaluate(() => {
 		const all = [...document.querySelectorAll('.pen-handle:not([data-handle="radius"])')].map((h) => h.dataset.handle).sort();
-		return all.length === 2 && all.join(",") === "e,w" ? all : undefined;
+		return all.length === 8 ? all : undefined;
 	}));
-	say("a card shows its two side handles alone, because its height is its words'", !!two, JSON.stringify(two));
+	say("a card has all eight handles, so its height can be set by hand", !!eight, JSON.stringify(eight));
 	const wasCard = onDisk().children.find((n) => n.id === cardId);
 	const east = await page.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="e"]').getBoundingClientRect();
@@ -247,7 +250,38 @@ if (spot) {
 		const card = onDisk().children.find((n) => n.id === cardId);
 		return card && card.width !== wasCard?.width ? card : undefined;
 	});
-	say("dragging its side sets its width, and pins no height on it", !!widened && widened.height === undefined, JSON.stringify({ width: widened?.width, height: widened?.height }));
+	say("dragging its side sets its width, and leaves its height to its words", !!widened && widened.height === undefined, JSON.stringify({ width: widened?.width, height: widened?.height }));
+	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
+	const tall = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const south = await page.evaluate(() => {
+		const h = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect();
+		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
+	});
+	say("its bottom handle is there to drag", !!south, JSON.stringify(south));
+	if (south && tall) {
+		await page.mouse.move(south.x, south.y);
+		await page.mouse.down();
+		await page.mouse.move(south.x, south.y + 60, { steps: 4 });
+		await page.mouse.move(south.x, south.y + 120, { steps: 4 });
+		await page.mouse.up();
+		const pinned = await until(() => {
+			const card = onDisk().children.find((n) => n.id === cardId);
+			return typeof card?.height === "number" ? card : undefined;
+		});
+		say("dragging its bottom pins a height on it, in pixels", !!pinned && pinned.height > tall.height, JSON.stringify({ height: pinned?.height, was: Math.round(tall.height) }));
+		// And the panel gives the words their say back, with the same two words the frame's height uses.
+		const back = await until(() => page.evaluate(() => {
+			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
+			return group ? [...group.querySelectorAll("button")].map((b) => b.textContent?.trim()) : undefined;
+		}));
+		say("a card's own height control is in the panel", JSON.stringify(back) === JSON.stringify(["fit-content", "px"]), JSON.stringify(back));
+		await page.evaluate(() => {
+			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
+			[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
+		});
+		const hugging = await until(() => (onDisk().children.find((n) => n.id === cardId)?.height === undefined ? true : undefined));
+		say("…and pressing fit-content takes the pinned height off again", !!hugging, JSON.stringify(onDisk().children.find((n) => n.id === cardId)?.height));
+	}
 }
 // --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
 const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);
