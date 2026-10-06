@@ -267,6 +267,63 @@ if (spot) {
 	})();
 	say("…and a click in the middle of where it is drawn selects it, not the board under it", !!stillThere?.got, JSON.stringify(stillThere));
 
+	/*
+	 * Everything the canvas draws round a turned item has to be on the item, not on the upright box
+	 * the layout gave it: the eight sizing handles, the radius handle, the four reaches to turn by,
+	 * and the anchors an arrow leaves from. Each was its own oversight once.
+	 */
+	const around = await page.evaluate(() => {
+		const sel = document.querySelector(".pen-selection:not([data-board])")?.getBoundingClientRect();
+		if (!sel) return undefined;
+		const spread = (list) => {
+			const mid = [...list].map((el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+			// How far the set reaches beyond the upright box, which is what being left behind looks like.
+			return mid.length === 0 ? undefined : Math.max(...mid.map((p) => Math.max(sel.x - p.x, p.x - (sel.x + sel.width), sel.y - p.y, p.y - (sel.y + sel.height))));
+		};
+		return {
+			sizers: document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length,
+			radius: document.querySelectorAll('.pen-handle[data-handle="radius"]').length,
+			grips: document.querySelectorAll(".pen-rotate").length,
+			anchors: document.querySelectorAll(".pen-anchor").length,
+			/* The turned corners stick out of the upright box; nothing may sit wholly inside it unmoved. */
+			out: spread(document.querySelectorAll('.pen-handle, .pen-rotate, .pen-anchor')),
+			cursor: getComputedStyle(document.querySelector('.pen-rotate[data-grip="nw"]')).cursor.slice(0, 22),
+		};
+	});
+	say("a turned item has its radius handle and its arrow anchors too", !!around && around.radius === 1 && around.anchors === 4 && around.grips === 4, JSON.stringify(around && { ...around, out: Math.round(around.out) }));
+	// Every one of them turned with it: on an upright item they would all sit inside the box.
+	say("…and they are placed on the item, not on the upright box it was laid out in", !!around && around.out > 2, `reaches ${Math.round(around?.out ?? 0)}px past the upright box`);
+	say("…and the reaches to turn it have a cursor of their own", (around?.cursor ?? "").startsWith("url("), String(around?.cursor));
+
+	/*
+	 * And carrying a turned item takes its outline with it exactly. The turn is taken about the
+	 * item's own corner, so while it is being dragged that corner has to move too — otherwise it
+	 * rotates about where it used to be and the outline slides off the item as the drag goes on.
+	 */
+	const carried = await (async () => {
+		const rect = () => page.evaluate(() => {
+			const el = document.querySelector(".pen-selection:not([data-board])");
+			const r = el?.getBoundingClientRect();
+			return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : undefined;
+		});
+		const was = await rect();
+		const inside = await page.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
+		if (!was || !inside) return undefined;
+		await page.mouse.move(inside.x + inside.width / 2, inside.y + inside.height / 2);
+		await page.mouse.down();
+		// ⌘ off, Control on: snapping would add a few pixels of its own and this is about the turn.
+		await page.keyboard.down("Control");
+		await page.mouse.move(inside.x + inside.width / 2 + 20, inside.y + inside.height / 2 + 13, { steps: 4 });
+		await page.mouse.move(inside.x + inside.width / 2 + 40, inside.y + inside.height / 2 + 26, { steps: 4 });
+		await settle(page, 150);
+		const now = await rect();
+		await page.mouse.up();
+		await page.keyboard.up("Control");
+		await settle(page, 400);
+		return now && { dx: Math.round(now.x - was.x), dy: Math.round(now.y - was.y), dw: Math.round(now.w - was.w), dh: Math.round(now.h - was.h) };
+	})();
+	say("carrying a turned item moves its outline by the same amount, and never reshapes it", !!carried && Math.abs(carried.dx - 40) <= 2 && Math.abs(carried.dy - 26) <= 2 && Math.abs(carried.dw) <= 1 && Math.abs(carried.dh) <= 1, JSON.stringify(carried));
+
 	// A card is as tall as its words: two side handles, and a drag writes no height.
 	await page.keyboard.press("Escape");
 	await settle(page, 200);

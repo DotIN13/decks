@@ -1817,7 +1817,10 @@ export function Stage(props: {
 		follow(
 			event,
 			(e) => {
-				const now = worldAt(e);
+				const world = worldAt(e);
+				// Turned, the corner's diagonal is turned too: the pointer is carried back into the item's own frame first.
+				const back = invertTurn(matrixOf(penLayer.placed, start.id));
+				const now = isUnturned(back) ? world : applyTurn(back, world);
 				// Along the diagonal from the corner: the nearer of the two reaches, so a pull across rounds as much as a pull down.
 				const reach = Math.min(now.x - start.x, now.y - start.y);
 				radius = Math.max(0, Math.min(Math.round(reach), Math.floor(start.most)));
@@ -1922,7 +1925,13 @@ export function Stage(props: {
 		 * the box a resize in progress is writing, so the handles stay on the item as it is dragged.
 		 */
 		const sized = penResize();
-		const about = sized?.id === box.id && sized.given ? sized.given : (placed?.box ?? box);
+		/*
+		 * And it follows a drag. `penOutlines` already carries the outline's box by the drag, so the
+		 * corner the turn is taken about has to move by the same amount — otherwise a turned item
+		 * being moved rotates about where it used to be, and its outline slides off it as it goes.
+		 */
+		const drag = penDrag();
+		const about = sized?.id === box.id && sized.given ? sized.given : { x: (placed?.box.x ?? box.x) + drag.dx, y: (placed?.box.y ?? box.y) + drag.dy };
 		return { m: compose(above, turn(own, { x: about.x, y: about.y })), deg: totalAngle(penLayer.placed, box.id) };
 	});
 	/**
@@ -4137,10 +4146,17 @@ export function Stage(props: {
 							{(side) => {
 								const gap = () => 14 / props.camera.zoom;
 								const size = () => (coarse ? 16 : 10) / props.camera.zoom;
+								/*
+								 * On the item as it is drawn. The side and the way out of it both turn with
+								 * it, so a turned item's anchors sit off its real edges rather than off the
+								 * upright box the layout gave it, which is nowhere the eye can see.
+								 */
 								const at = () => {
 									const [x, y] = sidePoint(box(), side);
 									const [nx, ny] = side === "top" ? [0, -1] : side === "bottom" ? [0, 1] : side === "left" ? [-1, 0] : [1, 0];
-									return { x: x + nx * gap(), y: y + ny * gap() };
+									const out = linearTurn(penTurn().m, { x: nx * gap(), y: ny * gap() });
+									const on = turned({ x, y });
+									return { x: on.x + out.x, y: on.y + out.y };
 								};
 								return (
 									<div
@@ -4152,8 +4168,9 @@ export function Stage(props: {
 											if (event.button !== 0) return;
 											event.preventDefault();
 											event.stopPropagation();
-											const start = sidePoint(box(), side);
-											penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box().id, box: { x: box().x, y: box().y, w: box().w, h: box().h }, side });
+											const [sx, sy] = sidePoint(box(), side);
+											const start = turned({ x: sx, y: sy });
+											penCreate(event, "arrow", start, { name: box().id, box: { x: box().x, y: box().y, w: box().w, h: box().h }, side });
 										}}
 									/>
 								);
@@ -4330,8 +4347,8 @@ export function Stage(props: {
 								data-handle="radius"
 								title="Drag to round the corners"
 								style={{
-									left: `${box().x + inset() - size() / 2}px`,
-									top: `${box().y + inset() - size() / 2}px`,
+									left: `${turned({ x: box().x + inset(), y: box().y + inset() }).x - size() / 2}px`,
+									top: `${turned({ x: box().x + inset(), y: box().y + inset() }).y - size() / 2}px`,
 									width: `${size()}px`,
 									height: `${size()}px`,
 									"border-width": `${1.5 / props.camera.zoom}px`,
