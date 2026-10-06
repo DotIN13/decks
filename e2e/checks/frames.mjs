@@ -164,13 +164,13 @@ if (spot) {
 		}));
 		say("a selected frame has a Layout section", !!panel, JSON.stringify(panel?.buttons?.slice(0, 6)));
 		if (panel) {
-			say("…with a direction, a size that can hug, and clipping", ["Free", "Down", "Across", "Hug wide", "Clip"].every((word) => panel.buttons.includes(word)), JSON.stringify(panel.buttons));
+			say("…whose words are CSS: a direction, a size that can fit its content, and overflow", ["none", "column", "row", "fit-content", "hidden"].every((word) => panel.buttons.includes(word)), JSON.stringify(panel.buttons));
 			await page.evaluate(() => {
 				const section = document.querySelector('[data-section="layout"]');
-				[...section.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Down")?.click();
+				[...section.querySelectorAll("button")].find((b) => b.textContent?.trim() === "column")?.click();
 			});
 			const stacked = await until(() => (onDisk().children.find((n) => n.id === "f-box")?.layout === "vertical" ? true : undefined));
-			say("…and pressing Down writes pen's own vertical layout to the file", !!stacked, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.layout));
+			say("…and pressing column writes pen's own vertical layout to the file", !!stacked, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.layout));
 		}
 	}
 

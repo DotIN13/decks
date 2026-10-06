@@ -473,8 +473,14 @@ export function Properties(props: {
 					 */}
 					<Show when={frames().length > 0}>
 						<Section key="layout" title="Layout">
-							<div class="seg-set" role="group" aria-label="Direction">
-								<For each={[["none", "Free"], ["vertical", "Down"], ["horizontal", "Across"]] as const}>
+							{/*
+							 * Named in CSS, not in our own words: pen's layout pass is flexbox, and every field
+							 * here has a CSS property that means exactly it. Someone who knows flexbox needs no
+							 * translation, and `fit-content` and `overflow` are the words they would search for.
+							 */}
+							<span class="props-prop">flex-direction</span>
+							<div class="seg-set" role="group" aria-label="flex-direction">
+								<For each={[["none", "none"], ["vertical", "column"], ["horizontal", "row"]] as const}>
 									{([value, label]) => (
 										<button type="button" data-on={frameFlow() === value ? "true" : undefined} aria-pressed={frameFlow() === value} onClick={() => set(frames(), () => ({ layout: value }))}>
 											{label}
@@ -489,8 +495,10 @@ export function Properties(props: {
 								</Show>
 							</div>
 							<Show when={frameFlow() !== "none"}>
-								<div class="seg-set" role="group" aria-label={frameFlow() === "horizontal" ? "Along the row" : "Down the column"}>
-									<For each={[["start", "Start"], ["center", "Middle"], ["end", "End"], ["space_between", "Spread"]] as const}>
+								<span class="props-prop">justify-content</span>
+								{/* Four values do not fit one row at 276 px, so this set wraps; the other sets do not. */}
+								<div class="seg-set wrap" role="group" aria-label="justify-content">
+									<For each={[["start", "start"], ["center", "center"], ["end", "end"], ["space_between", "space-between"]] as const}>
 										{([value, label]) => (
 											<button type="button" data-on={frameAlong() === value ? "true" : undefined} aria-pressed={frameAlong() === value} onClick={() => set(frames(), () => ({ justifyContent: value }))}>
 												{label}
@@ -498,35 +506,38 @@ export function Properties(props: {
 										)}
 									</For>
 								</div>
-								<div class="seg-set" role="group" aria-label={frameFlow() === "horizontal" ? "Down the row" : "Across the column"}>
-									<For each={[["start", "Start"], ["center", "Middle"], ["end", "End"]] as const}>
-										{([value, label]) => (
+								<span class="props-prop">align-items</span>
+								<div class="seg-set" role="group" aria-label="align-items">
+									<For each={["start", "center", "end"] as const}>
+										{(value) => (
 											<button type="button" data-on={frameAcross() === value ? "true" : undefined} aria-pressed={frameAcross() === value} onClick={() => set(frames(), () => ({ alignItems: value }))}>
-												{label}
+												{value}
 											</button>
 										)}
 									</For>
 								</div>
 							</Show>
 							{/*
-							 * Hugging is what makes dropping something into a frame visible: a frame that
+							 * `fit-content` is what makes dropping something into a frame visible: a frame that
 							 * follows its children grows round what you put in it, where a fixed one just
-							 * swallows it. One toggle per side, because a column that hugs its height and
-							 * keeps its width is the common shape.
+							 * swallows it. One row per side, because a column that fits its height and keeps its
+							 * width is the common shape. The other value is a length, so the button says px.
 							 */}
-							<div class="props-row">
-								<div class="seg-set" role="group" aria-label="Width">
-									<button type="button" data-on={frameHugs("width") === true ? "true" : undefined} aria-pressed={frameHugs("width") === true} onClick={() => setHug("width", true)}>Hug wide</button>
-									<button type="button" data-on={frameHugs("width") === false ? "true" : undefined} aria-pressed={frameHugs("width") === false} onClick={() => setHug("width", false)}>Fixed</button>
-								</div>
-								<div class="seg-set" role="group" aria-label="Height">
-									<button type="button" data-on={frameHugs("height") === true ? "true" : undefined} aria-pressed={frameHugs("height") === true} onClick={() => setHug("height", true)}>Hug tall</button>
-									<button type="button" data-on={frameHugs("height") === false ? "true" : undefined} aria-pressed={frameHugs("height") === false} onClick={() => setHug("height", false)}>Fixed</button>
-								</div>
-							</div>
-							<div class="seg-set" role="group" aria-label="What sticks out">
-								<button type="button" data-on={frameClips() === true ? "true" : undefined} aria-pressed={frameClips() === true} onClick={() => set(frames(), () => ({ clip: true }))}>Clip</button>
-								<button type="button" data-on={frameClips() === false ? "true" : undefined} aria-pressed={frameClips() === false} onClick={() => set(frames(), () => ({ clip: false }))}>Show all</button>
+							<For each={["width", "height"] as const}>
+								{(field) => (
+									<>
+										<span class="props-prop">{field}</span>
+										<div class="seg-set" role="group" aria-label={field}>
+											<button type="button" data-on={frameHugs(field) === true ? "true" : undefined} aria-pressed={frameHugs(field) === true} onClick={() => setHug(field, true)}>fit-content</button>
+											<button type="button" data-on={frameHugs(field) === false ? "true" : undefined} aria-pressed={frameHugs(field) === false} onClick={() => setHug(field, false)}>px</button>
+										</div>
+									</>
+								)}
+							</For>
+							<span class="props-prop">overflow</span>
+							<div class="seg-set" role="group" aria-label="overflow">
+								<button type="button" data-on={frameClips() === true ? "true" : undefined} aria-pressed={frameClips() === true} onClick={() => set(frames(), () => ({ clip: true }))}>hidden</button>
+								<button type="button" data-on={frameClips() === false ? "true" : undefined} aria-pressed={frameClips() === false} onClick={() => set(frames(), () => ({ clip: false }))}>visible</button>
 							</div>
 						</Section>
 					</Show>

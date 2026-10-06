@@ -396,6 +396,20 @@
 		box-shadow: var(--shadow-row, 0 1px 2px rgb(0 0 0 / 10%));
 		color: var(--fg);
 	}
+	/* A set whose values are too long for one row, such as justify-content's four. */
+	.seg-set.wrap {
+		flex-wrap: wrap;
+	}
+	.seg-set.wrap > button {
+		flex: 1 0 auto;
+	}
+	/* The CSS property a set of values belongs to, over it: the frame's Layout section names them. */
+	.props-prop {
+		margin-bottom: -2px;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: var(--type-note, 12px);
+	}
 
 	/* A tool in the column that opens a panel says so, with a tick in its corner. */
 	.pen-tools .pen-more {
