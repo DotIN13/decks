@@ -93,6 +93,8 @@ export class PenLayer {
 	private boardIndex: BoxIndex = new BoxIndex([]);
 	private boardBoxes = "";
 	private view = { width: 0, height: 0 };
+	/** Kept only to ask the browser whether a point is on a path (`onPath`). */
+	private penHit?: CanvasRenderingContext2D;
 	/** Called after every new layout, so the stage can redraw a selection around what moved. */
 	drawn: (() => void) | undefined;
 	/** Called after every frame is on the sheet: the picture page waits for it (`shot.ts`). */
@@ -278,6 +280,51 @@ export class PenLayer {
 	}
 
 	/**
+	 * Whether a stage point is on what a path draws: its line, with the slop the hit layer gives it,
+	 * or inside it when it has a fill. `undefined` when there is no geometry to ask about.
+	 *
+	 * An arrow's box is the rectangle between its two ends, which for a long diagonal is most of the
+	 * screen and almost all of it empty. Pressing there used to pick the arrow — the box was the
+	 * test. The browser does the real work: the geometry becomes a `Path2D`, the context's transform
+	 * carries it from its own `viewBox` into stage coordinates, and `isPointInStroke` answers.
+	 *
+	 * The slop matches the SVG hit layer's (`writeHits`): 12 screen pixels, so what a press can
+	 * reach is the same whether the pointer landed on a hit shape or is being resolved here.
+	 */
+	private onPath(placed: Placed, point: { x: number; y: number }): boolean | undefined {
+		const { node } = placed;
+		if (typeof node.geometry !== "string" || !node.geometry) return undefined;
+		const vb = node.viewBox ?? (() => {
+			const b = pathBounds(node.geometry as string);
+			return b ? ([b.x, b.y, b.w, b.h] as const) : undefined;
+		})();
+		if (!vb || vb[2] <= 0 || vb[3] <= 0) return undefined;
+		const ctx = (this.penHit ??= document.createElement("canvas").getContext("2d") ?? undefined);
+		if (!ctx) return undefined;
+		const path = new Path2D(node.geometry);
+		const box = placed.box;
+		const sx = box.w / vb[2];
+		const sy = box.h / vb[3];
+		if (!(sx > 0) || !(sy > 0)) return undefined;
+		/*
+		 * The point goes into the path's own units rather than the path into the stage's: a transform
+		 * on the context would leave it to the browser which space the point is in, and the two
+		 * answers differ.
+		 */
+		const px = (point.x - box.x) / sx + vb[0];
+		const py = (point.y - box.y) / sy + vb[1];
+		/*
+		 * The line's own width, or 12 stage pixels of reach, whichever is wider, in the path's units.
+		 * 12 is the hit layer's own number (`writeHits`), so what a press can reach is the same whether
+		 * the pointer landed on a hit shape or is being resolved here.
+		 */
+		const drawn = typeof node.strokeWidth === "number" ? node.strokeWidth : 0;
+		ctx.lineWidth = Math.max(drawn, 12) / Math.max(sx, sy);
+		const filled = node.fill !== undefined && node.fill !== null;
+		return ctx.isPointInStroke(path, px, py) || (filled && ctx.isPointInPath(path, px, py));
+	}
+
+	/**
 	 * The item under a stage point: the one drawn last, since that is the one on top.
 	 *
 	 * Tested against what an item draws (`bounds`), not the box it was given: a petal drawn in a
@@ -296,6 +343,8 @@ export class PenLayer {
 			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
 			const box = this.bounds.get(node.id) ?? placed.box;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
+			// Inside the box is only where the test starts: a path is hit on its line, not in its corner.
+			if (node.type === "path" && this.onPath(placed, point) === false) continue;
 			if (!best || placed.order > best.order) best = placed;
 		}
 		if (!best) return undefined;

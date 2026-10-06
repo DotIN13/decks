@@ -37,6 +37,8 @@ const shapesNow = () => onDisk().children.filter((n) => n.metadata?.type === "de
 say("the stage has a file to draw in", existsSync(file), file);
 
 await editMode(page, true);
+/** The arrow drawn between the two shapes, so the act below can clear it out of its way. */
+let arrowDrawn;
 const spots = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
@@ -148,6 +150,7 @@ if (first && target) {
 		await page.mouse.move(target.x, target.y, { steps: 6 });
 		await page.mouse.up();
 		const arrow = await until(() => onDisk().children.find((n) => n.metadata?.type === "decks.arrow" && n.metadata.from?.item === made?.id));
+		arrowDrawn = arrow?.id;
 		say("an arrow drawn from a side keeps to it in the file", arrow?.metadata.from?.side === "bottom" && (arrow?.metadata.to === second?.id || arrow?.metadata.to?.item === second?.id), JSON.stringify(arrow?.metadata));
 		if (arrow) {
 			await page.locator('.props-panel input[placeholder="On the middle of the line"]').fill("yes");
@@ -223,6 +226,87 @@ if (room) {
 		say("clicking near the bottom of the upper one selects the upper one", !!picked && Math.abs(picked.y - drawn.top.y) <= 4, JSON.stringify({ picked, top: Math.round(drawn.top.y), under: Math.round(drawn.under.y) }));
 	}
 	link.send({ type: "stage.pen.edit", agentId, ops: ["oval-top", "oval-under"].map((id) => ({ op: "delete", id })) });
+	await settle(page, 300);
+}
+
+
+// --- an arrow is hit on its line, not in its box ----------------------------------------------------
+// The arrow from the act above is cleared first: it crosses this part of the canvas, and a press
+// near its line is a press on it, which is the very thing being asserted about the new one.
+if (arrowDrawn) {
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: arrowDrawn }] });
+	await settle(page, 400);
+}
+/*
+ * An arrow's box is the rectangle between its two ends, and for a diagonal that is mostly empty
+ * canvas. A press in an empty corner of it used to pick the arrow, because the box was the whole
+ * test; now the browser is asked whether the point is on what the path draws.
+ */
+const diagonal = await page.evaluate(() => {
+	const stage = document.querySelector(".stage");
+	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+	for (let y = 170; y < 700; y += 40) {
+		for (let x = 380; x < 1300; x += 40) {
+			if ([0, 60, 120, 180].every((dy) => [0, 80, 160, 240].every((dx) => empty(x + dx, y + dy)))) return { world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, zoom: m.a };
+		}
+	}
+});
+say("the canvas has room for a diagonal arrow", !!diagonal, JSON.stringify(diagonal?.world));
+if (diagonal) {
+	const a = { x: Math.round(diagonal.world.x), y: Math.round(diagonal.world.y) };
+	const b = { x: a.x + 700, y: a.y + 500 };
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "slash", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: "decks.arrow", from: [a.x, a.y], to: [b.x, b.y], route: "straight" } } }] });
+	const drawn = await until(async () => {
+		const box = await page.evaluate(() => globalThis.__decksPenBox?.("slash"));
+		return box && box.width > 40 && box.height > 40 ? box : undefined;
+	});
+	say("the arrow is drawn, with a box of real area", !!drawn, JSON.stringify(drawn && { w: Math.round(drawn.width), h: Math.round(drawn.height) }));
+	if (drawn) {
+		const geometry = onDisk().children.find((n) => n.id === "slash")?.geometry ?? "";
+		await page.keyboard.press("Escape");
+		await settle(page, 250);
+		// A point inside the arrow's box that the hit layer itself calls empty: no hit shape there.
+		const corner = await page.evaluate((box) => {
+			const inside = [];
+			for (let dy = 10; dy < box.height - 10; dy += 8) {
+				for (let dx = 10; dx < box.width - 10; dx += 8) {
+					const el = document.elementFromPoint(box.x + dx, box.y + dy);
+					if (!el?.closest?.(".pen-hits") && !el?.closest?.(".board-node")) inside.push({ x: box.x + dx, y: box.y + dy, tag: el?.tagName, cls: el?.getAttribute?.("class") });
+				}
+			}
+			// The one furthest from the line, which is the diagonal of the box.
+			return inside.sort((a, b) => Math.abs(b.x - box.x - ((b.y - box.y) * box.width) / box.height) - Math.abs(a.x - box.x - ((a.y - box.y) * box.width) / box.height))[0];
+		}, { x: drawn.x, y: drawn.y, width: drawn.width, height: drawn.height });
+		say("its box has room in it the hit layer calls empty", !!corner, JSON.stringify(corner));
+		/*
+		 * Read from the properties panel, not from the selection outline: an arrow has no outline, so
+		 * counting outlines would call a selected arrow "nothing selected".
+		 */
+		const named = () => page.evaluate(() => document.querySelector(".props-panel .props-title")?.value ?? "");
+		await page.mouse.click(corner.x, corner.y);
+		await settle(page, 400);
+		const nothing = await named();
+		say("a press in the empty part of its box picks nothing", nothing === "", JSON.stringify({ corner: { x: Math.round(corner.x), y: Math.round(corner.y) }, panel: nothing }));
+		// And the middle of its own line still picks it.
+		const on = await page.evaluate((one) => {
+			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+			path.setAttribute("d", one.geometry);
+			svg.append(path);
+			document.body.append(svg);
+			const at = path.getPointAtLength(path.getTotalLength() / 2);
+			svg.remove();
+			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			const box = globalThis.__decksPenBox?.("slash");
+			return { x: box.x + at.x * m.a, y: box.y + at.y * m.a };
+		}, { geometry });
+		await page.mouse.click(on.x, on.y);
+		await settle(page, 350);
+		const mine = await until(async () => ((await named()) === "Arrow" ? true : undefined), 3000);
+		say("…and a press on the middle of its line picks it", !!mine, JSON.stringify({ at: { x: Math.round(on.x), y: Math.round(on.y) }, panel: await named() }));
+	}
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "slash" }] });
 	await settle(page, 300);
 }
 
