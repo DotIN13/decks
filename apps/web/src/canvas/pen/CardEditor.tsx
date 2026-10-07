@@ -1,6 +1,26 @@
-import { onCleanup, onMount, type JSX } from "solid-js";
+import { For, onCleanup, onMount, type JSX } from "solid-js";
+import Baseline from "lucide-solid/icons/baseline";
+import Bold from "lucide-solid/icons/bold";
+import ChevronDown from "lucide-solid/icons/chevron-down";
+import Code from "lucide-solid/icons/code";
+import Highlighter from "lucide-solid/icons/highlighter";
+import Italic from "lucide-solid/icons/italic";
+import Link from "lucide-solid/icons/link";
+import List from "lucide-solid/icons/list";
+import ListChecks from "lucide-solid/icons/list-checks";
+import ListOrdered from "lucide-solid/icons/list-ordered";
+import Minus from "lucide-solid/icons/minus";
+import Redo2 from "lucide-solid/icons/redo-2";
+import RemoveFormatting from "lucide-solid/icons/remove-formatting";
+import SquareCode from "lucide-solid/icons/square-code";
+import Strikethrough from "lucide-solid/icons/strikethrough";
+import Table from "lucide-solid/icons/table";
+import TextQuote from "lucide-solid/icons/text-quote";
+import Underline from "lucide-solid/icons/underline";
+import Undo2 from "lucide-solid/icons/undo-2";
+import { pageFont } from "./fonts.ts";
 import type { Token, Tokens } from "marked";
-import { CALLOUTS, cardMarked, EMOJI_OF, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
+import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
 
 /**
  * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
@@ -45,11 +65,23 @@ const atom = (raw: string, shown: string, cls = "pce-atom", tag: "span" | "div" 
 	return el;
 };
 
+/** Words in a font of their own: the family in the file, and the page's copy of it on screen. */
+const fontSpan = (family: string) => {
+	const el = h("span", { "data-font": family });
+	el.style.fontFamily = pageFont(family, 400, false);
+	pageFont(family, 700, false);
+	return el;
+};
+const BLOCK_MENU: ReadonlyArray<[string, string]> = [["p", "Body text"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"], ["quote", "Quote"], ["code", "Code block"]];
+const SIZE_MENU: ReadonlyArray<[string, string]> = [["small", "Small"], ["normal", "Normal"], ["large", "Large"], ["huge", "Huge"]];
+const SIX = ["yellow", "orange", "red", "green", "blue", "purple"] as const;
+
 export function CardEditor(props: CardEditorProps) {
 	let wrap!: HTMLDivElement;
 	let ed!: HTMLDivElement;
 	let bar!: HTMLDivElement;
 	let caret!: HTMLDivElement;
+	let tools!: HTMLDivElement;
 	let line!: HTMLDivElement;
 	/** Whitespace before the first block, kept as it was. */
 	let lead = "";
@@ -136,7 +168,7 @@ export function CardEditor(props: CardEditorProps) {
 					if (c.size) kinds.push(["data-size", c.size]);
 					if (c.face) kinds.push(["data-font", c.face]);
 					let into: Node = parent;
-					for (const [attr, value] of kinds) into = into.appendChild(h("span", { [attr]: value }));
+					for (const [attr, value] of kinds) into = into.appendChild(attr === "data-font" ? fontSpan(value) : h("span", { [attr]: value }));
 					inline(into, c.tokens as Token[]);
 					break;
 				}
@@ -378,7 +410,9 @@ export function CardEditor(props: CardEditorProps) {
 							break;
 						}
 						const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!;
-						s += `${lead}[${core}]{${[...classes.values()].map((c) => `.${c}`).join(" ")}}${trail}`;
+						// A font is an attribute, `font="Lora"`; a colour and a size are classes.
+						const attributes = [...classes].map(([kind, value]) => (kind === "font" ? (Object.entries(FACE_ALIAS).find(([, family]) => family === value)?.[0] ? `.${Object.entries(FACE_ALIAS).find(([, family]) => family === value)![0]}` : `font="${value}"`) : `.${value}`));
+						s += `${lead}[${core}]{${attributes.join(" ")}}${trail}`;
 						break;
 					}
 					case "U":
@@ -583,11 +617,38 @@ export function CardEditor(props: CardEditorProps) {
 		changed();
 	}
 	let frame: number | undefined;
+	/** What the card said after each change, for undo; what was undone, for redo. */
+	const past: string[] = [];
+	const future: string[] = [];
 	function changed() {
 		frame ??= requestAnimationFrame(() => {
 			frame = undefined;
-			if (!done) props.onInput(serialise());
+			if (done) return;
+			const now = serialise();
+			if (past.at(-1) !== now) {
+				past.push(now);
+				if (past.length > 200) past.shift();
+				future.length = 0;
+			}
+			props.onInput(now);
 		});
+		showBar();
+	}
+	function travel(back: boolean) {
+		const from = back ? past : future;
+		const to = back ? future : past;
+		if (back ? from.length < 2 : !from.length) return;
+		const moved = from.pop()!;
+		to.push(moved);
+		const md = back ? past.at(-1)! : moved;
+		build(md);
+		let end: Node = ed;
+		while (end.lastChild && end.lastChild.nodeType === 1 && (end.lastChild as HTMLElement).getAttribute("contenteditable") !== "false") end = end.lastChild;
+		caretInto(end as Element, false);
+		const r = sel().getRangeAt(0);
+		r.selectNodeContents(end);
+		r.collapse(false);
+		props.onInput(md);
 		showBar();
 	}
 	function onPaste(event: ClipboardEvent) {
@@ -622,36 +683,84 @@ export function CardEditor(props: CardEditorProps) {
 
 	/* ---------- the style bar ---------- */
 
+	/*
+	 * The toolbar: docked over the card while it is open, at the screen's size whatever the zoom, in one
+	 * row that scrolls sideways when the screen is narrower than it. Above the card, or pinned under the
+	 * app's own bars when the card's top is out of sight, and never past the screen's edges.
+	 */
+	function placeBar() {
+		if (!bar.isConnected) return;
+		const w = wrap.getBoundingClientRect();
+		const z = props.zoom;
+		bar.style.transform = `scale(${1 / z})`;
+		const bw = bar.offsetWidth;
+		const bh = bar.offsetHeight;
+		const ceiling = Math.max(8, ...[...document.querySelectorAll('[data-inset="top"]')].map((el) => el.getBoundingClientRect().bottom + 6));
+		const top = Math.max(ceiling, Math.min(innerHeight - bh - 8, w.top - bh - 10));
+		const left = Math.max(8, Math.min(innerWidth - bw - 8, w.left));
+		bar.style.left = `${(left - w.left) / z}px`;
+		bar.style.top = `${(top - w.top) / z}px`;
+	}
+	/** The toolbar says what the words under the caret are: their block, font and size, and which styles are on. */
 	function showBar() {
 		const s = sel();
-		if (dragging || !s.rangeCount || s.isCollapsed || !ed.contains(s.anchorNode)) {
-			bar.style.display = "none";
-			bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
-			return;
-		}
-		// The menus say what the words under the caret are now.
+		if (!s.rangeCount || !ed.contains(s.anchorNode)) return;
 		const at = s.anchorNode?.nodeType === 1 ? (s.anchorNode as Element) : s.anchorNode?.parentElement;
 		const label = (name: string, text: string) => {
 			const el = bar.querySelector(`[data-label="${name}"]`);
 			if (el) el.textContent = text;
 		};
-		label("block", BLOCK_NAMES[blockKind()] ?? "Text");
-		label("font", { serif: "Serif", mono: "Mono" }[(at?.closest("span[data-font]") as HTMLElement | null)?.dataset.font ?? ""] ?? "Sans");
-		label("size", { small: "Small", large: "Large", huge: "Huge" }[(at?.closest("span[data-size]") as HTMLElement | null)?.dataset.size ?? ""] ?? "Normal");
-		const r = s.getRangeAt(0).getBoundingClientRect();
-		const w = wrap.getBoundingClientRect();
-		const z = props.zoom;
-		bar.style.display = "flex";
-		bar.style.transform = `scale(${1 / z})`;
-		// On the screen whatever the zoom: above the words, or under them when there is no room above.
-		const bw = bar.offsetWidth;
-		const bh = bar.offsetHeight;
-		const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left));
-		// Never under the app's own bars along the top of the screen, which sit over the canvas.
-		const ceiling = Math.max(8, ...[...document.querySelectorAll('[data-inset="top"]')].map((el) => el.getBoundingClientRect().bottom + 6));
-		const top = r.top - bh - 8 >= ceiling ? r.top - bh - 8 : r.bottom + 8;
-		bar.style.left = `${(left - w.left) / z}px`;
-		bar.style.top = `${(top - w.top) / z}px`;
+		const kind = blockKind();
+		label("block", BLOCK_MENU.find(([k]) => k === kind)?.[1] ?? "Body text");
+		const face = (at?.closest("span[data-font]") as HTMLElement | null)?.dataset.font;
+		label("font", face ?? "Inter");
+		label("size", SIZE_MENU.find(([k]) => k === ((at?.closest("span[data-size]") as HTMLElement | null)?.dataset.size ?? "normal"))?.[1] ?? "Normal");
+		const on: Record<string, boolean> = {
+			bold: !!at?.closest("strong, b"),
+			italic: !!at?.closest("em, i"),
+			underline: !!at?.closest("u"),
+			strikeThrough: !!at?.closest("s, strike, del"),
+			code: !!at?.closest("code"),
+			link: !!at?.closest("a[data-href]"),
+			ul: kind === "ul",
+			ol: kind === "ol",
+			check: kind === "check",
+			quote: kind === "quote",
+			codeblock: kind === "code",
+		};
+		for (const button of bar.querySelectorAll<HTMLElement>("[data-cmd], [data-block-button]")) {
+			const key = button.dataset.cmd ?? button.dataset.blockButton ?? "";
+			if (key in on) button.setAttribute("aria-pressed", String(on[key]));
+		}
+	}
+	/** Open one of the toolbar's menus under its button, or close it; one at a time. */
+	function toggleMenu(name: string, button: HTMLElement) {
+		const menu = bar.querySelector<HTMLElement>(`.pce-menu[data-for="${name}"]`);
+		const open = menu?.hasAttribute("data-open");
+		closeMenus();
+		if (!menu || open) return;
+		// The font menu fetches its faces the first time it opens, each name shown in its own.
+		if (name === "font") for (const el of menu.querySelectorAll<HTMLElement>("[data-font]")) if (!el.style.fontFamily && el.dataset.font !== "default") el.style.fontFamily = pageFont(el.dataset.font!, 400, false);
+		menu.style.left = `${button.offsetLeft - tools.scrollLeft}px`;
+		menu.setAttribute("data-open", "");
+	}
+	const closeMenus = () => bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
+	/** A table of two columns and one row, or a rule, under the block the caret is in. */
+	function insertBlock(kind: "table" | "rule") {
+		const node = sel().anchorNode;
+		const after = topOf(node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null) ?? (ed.lastElementChild as HTMLElement | null);
+		let made: HTMLElement;
+		if (kind === "table") {
+			made = h("table", { class: "pce-table", "data-align": "," });
+			const head = made.appendChild(h("thead")).appendChild(h("tr"));
+			head.append(h("th", {}, "Column"), h("th", {}, "Column"));
+			made.appendChild(h("tbody")).appendChild(h("tr")).append(h("td"), h("td"));
+		} else made = atom("---", "", "pce-atom pce-rule", "div");
+		const next = h("p");
+		next.append(document.createTextNode(ZW));
+		if (after) after.after(made, next);
+		else ed.append(made, next);
+		caretInto(kind === "table" ? made.querySelector("td")! : next, false);
 	}
 	const unwrap = (n: Element) => n.replaceWith(...n.childNodes);
 	/*
@@ -672,7 +781,7 @@ export function CardEditor(props: CardEditorProps) {
 		fg: { selector: "span[data-fg]", make: (v: string) => h("span", { "data-fg": v }), toggles: false },
 		underline: { selector: "u", make: () => h("u"), toggles: true },
 		size: { selector: "span[data-size]", make: (v: string) => h("span", { "data-size": v }), toggles: false },
-		font: { selector: "span[data-font]", make: (v: string) => h("span", { "data-font": v }), toggles: false },
+		font: { selector: "span[data-font]", make: (v: string) => fontSpan(v), toggles: false },
 		link: { selector: "a[data-href]", make: (v: string) => h("a", { "data-href": v }), toggles: false },
 	};
 	type Style = keyof typeof STYLES;
@@ -767,21 +876,17 @@ export function CardEditor(props: CardEditorProps) {
 		const b = (event.target as Element).closest("button");
 		if (!b) return;
 		const d = b.dataset;
-		// A menu's own button opens it, or closes it again; one menu at a time.
-		if (d.menu) {
-			const open = bar.querySelector(`.pce-menu[data-for="${d.menu}"]`);
-			const was = open?.hasAttribute("data-open");
-			bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
-			if (!was) open?.setAttribute("data-open", "");
-			return;
-		}
-		bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
+		if (d.menu) return toggleMenu(d.menu, b);
+		closeMenus();
 		const commands: Record<string, Style> = { bold: "bold", italic: "italic", underline: "underline", strikeThrough: "strike", code: "code" };
 		if (d.block) setBlock(d.block);
+		else if (d.blockButton) setBlock(d.blockButton === "codeblock" ? "code" : blockKind() === d.blockButton ? "p" : d.blockButton);
 		else if (d.hl) restyle(["hl"], d.hl === "none" ? null : d.hl);
 		else if (d.fg) restyle(["fg"], d.fg === "none" ? null : d.fg);
 		else if (d.size) restyle(["size"], d.size === "normal" ? null : d.size);
-		else if (d.font) restyle(["font"], d.font === "sans" ? null : d.font);
+		else if (d.font) restyle(["font"], d.font === "default" ? null : d.font);
+		else if (d.insert) insertBlock(d.insert as "table" | "rule");
+		else if (d.cmd === "undo" || d.cmd === "redo") return travel(d.cmd === "undo");
 		else if (d.cmd === "link") {
 			const here = (sel().anchorNode?.parentElement?.closest("a[data-href]") as HTMLElement | null)?.dataset.href ?? "";
 			const href = window.prompt("Link to (empty takes the link off)", here || "https://");
@@ -951,7 +1056,7 @@ export function CardEditor(props: CardEditorProps) {
 			ghost.className += " pce-ghost";
 			wrap.append(ghost);
 			dragging.classList.add("pce-dragging");
-			bar.style.display = "none";
+			closeMenus();
 			sel().removeAllRanges();
 		}
 		const p = local(event.clientX, event.clientY);
@@ -1056,8 +1161,17 @@ export function CardEditor(props: CardEditorProps) {
 			if (target) caretInto(target, true);
 			return changed();
 		}
-		// ⌘B, ⌘I and ⌘⇧X go through the card's own styles, as the style bar's buttons do.
 		const mod = event.metaKey || event.ctrlKey;
+		// The card keeps its own history, since the browser's cannot follow what the toolbar does.
+		if (mod && event.key.toLowerCase() === "z") {
+			event.preventDefault();
+			return travel(!event.shiftKey);
+		}
+		if (mod && event.key.toLowerCase() === "y") {
+			event.preventDefault();
+			return travel(false);
+		}
+		// ⌘B, ⌘I, ⌘U, ⌘E and ⌘⇧X go through the card's own styles, as the toolbar's buttons do.
 		const keyed: Record<string, Style> = { b: "bold", i: "italic", u: "underline", x: "strike", e: "code" };
 		const want = mod && keyed[event.key.toLowerCase()];
 		if (want && (want !== "strike" || event.shiftKey) && !sel().isCollapsed) {
@@ -1094,6 +1208,15 @@ export function CardEditor(props: CardEditorProps) {
 			}
 		});
 		watch.observe(ed, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-on"] });
+		past.push(serialise());
+		// The toolbar follows the card as the camera moves, once a frame.
+		let placing = 0;
+		const keep = () => {
+			placeBar();
+			placing = requestAnimationFrame(keep);
+		};
+		placing = requestAnimationFrame(keep);
+		onCleanup(() => cancelAnimationFrame(placing));
 		const move = (event: PointerEvent) => onPointerMove(event);
 		const up = () => endDrag(false);
 		const cancel = () => endDrag(true);
@@ -1149,56 +1272,67 @@ export function CardEditor(props: CardEditorProps) {
 				}}
 			/>
 			<div ref={bar} class="pce-bar" onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
-				<span class="pce-drop">
-					<button type="button" class="pce-pick" data-menu="block" title="What the block is" data-label="block">Text</button>
-					<span class="pce-menu" data-for="block">
-						{Object.entries({ p: "Text", h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", quote: "Quote", code: "Code", ul: "Bullets", ol: "Numbers", check: "Checklist" }).map(([kind, name]) => (
-							<button type="button" data-block={kind} class={`pce-opt pce-opt-${kind}`}>{name}</button>
-						))}
-					</span>
-				</span>
-				<span class="pce-drop">
-					<button type="button" class="pce-pick" data-menu="font" title="Font" data-label="font">Sans</button>
-					<span class="pce-menu" data-for="font">
-						<button type="button" data-font="sans" class="pce-opt" style={{ "font-family": "var(--font-sans, system-ui)" }}>Sans</button>
-						<button type="button" data-font="serif" class="pce-opt" style={{ "font-family": "var(--card-serif, Georgia, serif)" }}>Serif</button>
-						<button type="button" data-font="mono" class="pce-opt" style={{ "font-family": "var(--font-mono)" }}>Mono</button>
-					</span>
-				</span>
-				<span class="pce-drop">
-					<button type="button" class="pce-pick" data-menu="size" title="Size" data-label="size">Normal</button>
-					<span class="pce-menu" data-for="size">
-						<button type="button" data-size="small" class="pce-opt" style={{ "font-size": "12px" }}>Small</button>
-						<button type="button" data-size="normal" class="pce-opt">Normal</button>
-						<button type="button" data-size="large" class="pce-opt" style={{ "font-size": "17px" }}>Large</button>
-						<button type="button" data-size="huge" class="pce-opt" style={{ "font-size": "21px" }}>Huge</button>
-					</span>
-				</span>
-				<span class="pce-sep" />
-				<button type="button" data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
-				<button type="button" data-cmd="italic" title="Italic (⌘I)"><i>I</i></button>
-				<button type="button" data-cmd="underline" title="Underline (⌘U)"><u>U</u></button>
-				<button type="button" data-cmd="strikeThrough" title="Strike (⌘⇧X)"><s>S</s></button>
-				<button type="button" data-cmd="code" title="Code (⌘E)" class="pce-mono">{"</>"}</button>
-				<button type="button" data-cmd="link" title="Link">🔗</button>
-				<span class="pce-sep" />
-				<span class="pce-drop">
-					<button type="button" class="pce-pick pce-hl" data-menu="hl" title="Highlight">
-						<span class="pce-hl-mark">ab</span>
+				<div ref={tools} class="pce-tools" onScroll={closeMenus}>
+					<button type="button" class="pce-pick pce-pick-block" data-menu="block" title="What the block is">
+						<span data-label="block">Body text</span>
+						<ChevronDown size={16} />
 					</button>
-					<span class="pce-menu pce-swatches" data-for="hl">
-						{(["yellow", "orange", "red", "green", "blue", "purple"] as const).map((c) => <button type="button" class="pce-sw" data-hl={c} title={`${c} highlight`} />)}
-						<button type="button" class="pce-opt" data-hl="none">No highlight</button>
-					</span>
-				</span>
-				<span class="pce-drop">
-					<button type="button" class="pce-pick pce-fgpick" data-menu="fg" title="Text colour">A</button>
-					<span class="pce-menu pce-swatches" data-for="fg">
-						{(["red", "orange", "yellow", "green", "blue", "purple"] as const).map((c) => <button type="button" class="pce-fg" data-fg={c} title={`${c} text`}>A</button>)}
-						<button type="button" class="pce-opt" data-fg="none">No colour</button>
-					</span>
-				</span>
-				<button type="button" data-cmd="clear" title="Clear styling">⌫</button>
+					<button type="button" class="pce-pick pce-pick-font" data-menu="font" title="Font">
+						<span data-label="font">Inter</span>
+						<ChevronDown size={16} />
+					</button>
+					<button type="button" class="pce-pick pce-pick-size" data-menu="size" title="Size">
+						<span data-label="size">Normal</span>
+						<ChevronDown size={16} />
+					</button>
+					<span class="pce-sep" />
+					<button type="button" class="pce-icon" data-cmd="bold" title="Bold (⌘B)"><Bold size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="italic" title="Italic (⌘I)"><Italic size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="underline" title="Underline (⌘U)"><Underline size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="strikeThrough" title="Strike (⌘⇧X)"><Strikethrough size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="code" title="Code (⌘E)"><Code size={18} /></button>
+					<button type="button" class="pce-icon" data-menu="hl" title="Highlight"><Highlighter size={18} /></button>
+					<button type="button" class="pce-icon" data-menu="fg" title="Text colour"><Baseline size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="link" title="Link"><Link size={18} /></button>
+					<span class="pce-sep" />
+					<button type="button" class="pce-icon" data-block-button="ul" title="Bulleted list"><List size={18} /></button>
+					<button type="button" class="pce-icon" data-block-button="ol" title="Numbered list"><ListOrdered size={18} /></button>
+					<button type="button" class="pce-icon" data-block-button="check" title="Checklist"><ListChecks size={18} /></button>
+					<button type="button" class="pce-icon" data-block-button="quote" title="Quote"><TextQuote size={18} /></button>
+					<button type="button" class="pce-icon" data-block-button="codeblock" title="Code block"><SquareCode size={18} /></button>
+					<span class="pce-sep" />
+					<button type="button" class="pce-icon" data-insert="table" title="Table"><Table size={18} /></button>
+					<button type="button" class="pce-icon" data-insert="rule" title="Rule"><Minus size={18} /></button>
+					<span class="pce-sep" />
+					<button type="button" class="pce-icon" data-cmd="undo" title="Undo (⌘Z)"><Undo2 size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="redo" title="Redo (⌘⇧Z)"><Redo2 size={18} /></button>
+					<button type="button" class="pce-icon" data-cmd="clear" title="Clear styling"><RemoveFormatting size={18} /></button>
+				</div>
+				<div class="pce-menu" data-for="block">
+					<For each={BLOCK_MENU}>{([kind, name]) => <button type="button" class={`pce-opt pce-opt-${kind}`} data-block={kind}>{name}</button>}</For>
+				</div>
+				<div class="pce-menu pce-fonts" data-for="font">
+					<button type="button" class="pce-opt" data-font="default">Inter <small>the card's own</small></button>
+					<For each={FONT_GROUPS}>
+						{(group) => (
+							<>
+								<span class="pce-group">{group.group}</span>
+								<For each={group.fonts.filter((font) => font !== "Inter")}>{(font) => <button type="button" class="pce-opt" data-font={font}>{font}</button>}</For>
+							</>
+						)}
+					</For>
+				</div>
+				<div class="pce-menu" data-for="size">
+					<For each={SIZE_MENU}>{([size, name]) => <button type="button" class={`pce-opt pce-size-${size}`} data-size={size}>{name}</button>}</For>
+				</div>
+				<div class="pce-menu pce-swatches" data-for="hl">
+					<For each={SIX}>{(c) => <button type="button" class="pce-sw" data-hl={c} title={`${c} highlight`} />}</For>
+					<button type="button" class="pce-opt" data-hl="none">No highlight</button>
+				</div>
+				<div class="pce-menu pce-swatches" data-for="fg">
+					<For each={SIX}>{(c) => <button type="button" class="pce-swatch-fg" data-fg={c} title={`${c} text`}>A</button>}</For>
+					<button type="button" class="pce-opt" data-fg="none">No colour</button>
+				</div>
 			</div>
 			<div ref={caret} class="pce-caret" />
 			<div ref={line} class="pce-line" />

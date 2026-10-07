@@ -1,5 +1,5 @@
 import type { Token, Tokens } from "marked";
-import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Face, type Size, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
+import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Size, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
 
 /**
  * The markdown a card on the stage is written in: Obsidian's, with coloured words and an agent's
@@ -31,10 +31,11 @@ export interface Run {
 	image?: { url: string; alt: string; width?: number };
 	/** `==highlighted==`: "default" for Obsidian's own colour, or one of its six. */
 	mark?: Colour | "default";
-	/** `[styled]{.red .large .serif}` words: a colour, a size, a face. */
+	/** `[styled]{.red .large font="Lora"}` words: a colour, a size, a font. */
 	colour?: Colour;
 	size?: Size;
-	face?: Face;
+	/** The font family the words are set in. */
+	face?: string;
 	/** `<u>underlined</u>`, which Obsidian draws too. */
 	underline?: true;
 	/** A `[[link]]` to a note: its target. Drawn as a link, but it goes nowhere on the canvas. */

@@ -1,7 +1,7 @@
 import type { Canvas, CanvasKit, Image, Paint, Paragraph, TypefaceFontProvider } from "canvaskit-wasm";
 import type { TextStyle } from "@decks/pen";
 import { highlight } from "./highlight.ts";
-import type { Colour } from "./card-syntax.ts";
+import { FACE_ALIAS, type Colour } from "./card-syntax.ts";
 import type { Align, Alert, Block, Run } from "./markdown.ts";
 
 /**
@@ -78,8 +78,8 @@ const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0
 const HEADING_SIZE = [1.6, 1.3, 1.12, 1, 0.9, 0.85];
 /** A span's size, `[words]{.large}`, against the words round it. */
 const SIZE_SCALE = { small: 0.85, large: 1.25, huge: 1.6 } as const;
-/** A span's serif face, `[words]{.serif}`; its mono face is the code's. */
-export const SERIF_FAMILY = "Source Serif 4";
+/** The serif a page font is fetched in for the editor (`card-syntax.ts`, `FACE_ALIAS`). */
+export const SERIF_FAMILY = FACE_ALIAS.serif!;
 
 type Op =
 	| { kind: "text"; p: Paragraph; x: number; y: number }
@@ -140,7 +140,7 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 				new ck.TextStyle({
 					...base,
 					color: paint(ink),
-					fontFamilies: env.chain(run.code || run.face === "mono" ? env.mono : run.face === "serif" ? SERIF_FAMILY : style.fontFamily),
+					fontFamilies: env.chain(run.code ? env.mono : (run.face ?? style.fontFamily)),
 					fontSize: (run.sup ? size * 0.75 : run.code ? size * 0.88 : size) * (run.size ? SIZE_SCALE[run.size] : 1),
 					fontStyle: { weight: { value: run.bold ? Math.max(600, weight + 200) : weight }, slant: run.italic ? ck.FontSlant.Italic : ck.FontSlant.Upright },
 					...(run.strike || run.removed ? { decoration: ck.LineThroughDecoration, decorationColor: paint(run.removed ? S.removed : f.colour) } : {}),

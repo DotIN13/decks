@@ -83,11 +83,13 @@ test("a card goes to Obsidian without its colours and with open suggestions as t
 });
 
 test("styled words carry a size and a face as well as a colour, underline is <u>, and Obsidian gets the words alone", async () => {
-	const [p] = parseMarkdown("A [big serif]{.large .serif} word, [nested [inside]{.red}]{.mono}, and <u>under</u> it.");
+	const [p] = parseMarkdown("A [big serif]{.large .serif} word, [nested [inside]{.red}]{.mono}, [lora]{font=\"Lora\" .blue}, [x]{nonsense} and <u>under</u> it.");
 	const runs = (p as Extract<Block, { kind: "paragraph" }>).runs;
-	assert.deepEqual(runs.find((run) => run.text === "big serif"), { text: "big serif", size: "large", face: "serif" });
-	assert.deepEqual(runs.find((run) => run.text === "inside"), { text: "inside", face: "mono", colour: "red" });
+	assert.deepEqual(runs.find((run) => run.text === "big serif"), { text: "big serif", size: "large", face: "Source Serif 4" });
+	assert.deepEqual(runs.find((run) => run.text === "inside"), { text: "inside", face: "JetBrains Mono", colour: "red" });
+	assert.deepEqual(runs.find((run) => run.text === "lora"), { text: "lora", face: "Lora", colour: "blue" });
+	assert.ok(runs.some((run) => run.text.includes("{nonsense}")));
 	assert.deepEqual(runs.find((run) => run.text === "under"), { text: "under", underline: true });
 	const { toObsidian } = await import("./card-syntax.ts");
-	assert.equal(toObsidian("A [big serif]{.large .serif} word, [nested [inside]{.red}]{.mono}."), "A big serif word, nested inside.");
+	assert.equal(toObsidian("A [big serif]{.large .serif} word, [nested [inside]{.red}]{font=\"Fira Code\"}, [x]{nonsense}."), "A big serif word, nested inside, [x]{nonsense}.");
 });

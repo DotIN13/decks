@@ -1468,8 +1468,6 @@
 	.pen-card-editor [data-size="small"] { font-size: 0.85em; }
 	.pen-card-editor [data-size="large"] { font-size: 1.25em; }
 	.pen-card-editor [data-size="huge"] { font-size: 1.6em; }
-	.pen-card-editor [data-font="serif"] { font-family: var(--card-serif, Georgia, serif); }
-	.pen-card-editor [data-font="mono"] { font-family: var(--font-mono); font-size: 0.88em; }
 	.pen-card-editor [data-fg="red"] { color: #d92e3c; }
 	.pen-card-editor [data-fg="orange"] { color: #c2410c; }
 	.pen-card-editor [data-fg="yellow"] { color: #a16207; }
@@ -1628,97 +1626,107 @@
 	background: var(--color-accent);
 	border-radius: 2px;
 }
-	/* The style bar, at the screen's size whatever the zoom (`CardEditor.tsx` scales it back). */
+	/*
+	 * The card's toolbar (`CardEditor.tsx`): a quiet bar docked over the open card, at the screen's
+	 * size whatever the zoom, one row of line icons that scrolls sideways on a narrow screen. The
+	 * document editor's look: the app's panel, a hairline, one button style, a pressed state in the
+	 * accent's tint, menus that drop below their button.
+	 */
 	.pen-card-editor .pce-bar {
 	position: absolute;
-	display: none;
 	z-index: 6;
-	flex-wrap: wrap;
-	align-items: center;
-	max-width: min(720px, calc(100vw - 16px));
-	gap: 2px;
-	padding: 4px;
 	transform-origin: 0 0;
-	background: var(--fg);
-	border-radius: 9px;
-	box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-	font: 15px/1 var(--font-sans, system-ui);
-	white-space: nowrap;
+	font: 14px/1 var(--font-sans, system-ui);
+	color: var(--fg);
+	cursor: default;
 }
+	.pen-card-editor .pce-tools {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	width: max-content;
+	max-width: calc(100vw - 16px);
+	overflow-x: auto;
+	scrollbar-width: none;
+	padding: 5px 6px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 6px 18px rgb(0 0 0 / 8%);
+}
+	.pen-card-editor .pce-tools::-webkit-scrollbar { display: none; }
 	.pen-card-editor .pce-bar button {
 	all: unset;
 	box-sizing: border-box;
-	min-width: 30px;
-	height: 30px;
-	padding: 0 6px;
-	border-radius: 6px;
-	color: var(--bg);
-	text-align: center;
-	line-height: 30px;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 32px;
+	border-radius: 8px;
+	color: var(--fg);
 	cursor: pointer;
+	white-space: nowrap;
 }
-	.pen-card-editor .pce-bar button:hover { background: rgb(255 255 255 / 16%); }
-	.pen-card-editor .pce-bar .pce-mono { font-family: var(--font-mono); font-size: 13px; }
-	.pen-card-editor .pce-bar .pce-sep { width: 1px; margin: 4px 3px; background: rgb(255 255 255 / 25%); }
-	.pen-card-editor .pce-bar .pce-sw {
-	min-width: 22px;
-	width: 22px;
-	height: 22px;
-	margin: 4px 2px;
-	padding: 0;
-	border-radius: 50%;
-	border: 2px solid rgb(255 255 255 / 50%);
+	.pen-card-editor .pce-bar .pce-icon { width: 32px; color: color-mix(in srgb, var(--fg) 82%, transparent); }
+	.pen-card-editor .pce-bar button:hover { background: var(--line); }
+	.pen-card-editor .pce-bar button[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent); }
+	.pen-card-editor .pce-bar .pce-pick {
+	padding: 0 8px 0 10px;
+	border: 1px solid var(--line-strong);
+	justify-content: space-between;
+	margin-right: 4px;
 }
+	.pen-card-editor .pce-bar .pce-pick svg { opacity: 0.6; }
+	.pen-card-editor .pce-bar .pce-pick-block { min-width: 128px; }
+	.pen-card-editor .pce-bar .pce-pick-font { min-width: 128px; max-width: 160px; }
+	.pen-card-editor .pce-bar .pce-pick-font span { overflow: hidden; text-overflow: ellipsis; }
+	.pen-card-editor .pce-bar .pce-pick-size { min-width: 92px; }
+	.pen-card-editor .pce-bar .pce-sep { flex: none; width: 1px; height: 20px; margin: 0 6px; background: var(--line-strong); }
+	/* The menus: under their button, on the app's panel, outside the row so its scroll does not cut them. */
+	.pen-card-editor .pce-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	display: none;
+	flex-direction: column;
+	min-width: 180px;
+	padding: 6px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	box-shadow: 0 10px 30px rgb(0 0 0 / 14%);
+}
+	.pen-card-editor .pce-menu[data-open] { display: flex; }
+	.pen-card-editor .pce-bar .pce-opt { justify-content: flex-start; padding: 0 10px; font-size: 14px; }
+	.pen-card-editor .pce-bar .pce-opt small { color: var(--muted); font-size: 12px; }
+	.pen-card-editor .pce-bar .pce-opt-h1 { height: 40px; font-size: 22px; font-weight: 600; }
+	.pen-card-editor .pce-bar .pce-opt-h2 { height: 36px; font-size: 18px; font-weight: 600; }
+	.pen-card-editor .pce-bar .pce-opt-h3 { font-size: 16px; font-weight: 600; }
+	.pen-card-editor .pce-bar .pce-opt-quote { color: var(--muted); }
+	.pen-card-editor .pce-bar .pce-opt-code { font-family: var(--font-mono); font-size: 13px; }
+	.pen-card-editor .pce-bar .pce-size-small { font-size: 12px; }
+	.pen-card-editor .pce-bar .pce-size-large { font-size: 17px; }
+	.pen-card-editor .pce-bar .pce-size-huge { font-size: 21px; }
+	.pen-card-editor .pce-menu.pce-fonts { max-height: 340px; overflow-y: auto; min-width: 220px; }
+	.pen-card-editor .pce-menu.pce-fonts .pce-opt { font-size: 15px; }
+	.pen-card-editor .pce-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+	.pen-card-editor .pce-menu.pce-swatches[data-open] { flex-flow: row wrap; gap: 4px; width: 172px; min-width: 0; }
+	.pen-card-editor .pce-menu.pce-swatches .pce-opt { flex-basis: 100%; }
+	.pen-card-editor .pce-bar .pce-sw { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="yellow"] { background: #facc15; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="orange"] { background: #fb923c; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="red"] { background: #f87171; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="green"] { background: #4ade80; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="blue"] { background: #38bdf8; }
 	.pen-card-editor .pce-bar .pce-sw[data-hl="purple"] { background: #c084fc; }
-	.pen-card-editor .pce-bar .pce-fg { font-weight: 700; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="red"] { color: #f87171; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="orange"] { color: #fb923c; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="yellow"] { color: #facc15; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="green"] { color: #4ade80; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="blue"] { color: #60a5fa; }
-	.pen-card-editor .pce-bar .pce-fg[data-fg="purple"] { color: #c084fc; }
-	/* The bar's menus: what the block is, the font, the size, the highlight and the colour. */
-	.pen-card-editor .pce-drop { position: relative; display: inline-flex; }
-	.pen-card-editor .pce-bar .pce-pick { padding: 0 18px 0 8px; position: relative; text-align: left; }
-	.pen-card-editor .pce-bar .pce-pick::after {
-	content: "";
-	position: absolute;
-	right: 7px;
-	top: 13px;
-	border: 4px solid transparent;
-	border-top-color: currentColor;
-	opacity: 0.7;
-}
-	.pen-card-editor .pce-bar .pce-pick[data-menu="block"] { min-width: 96px; }
-	.pen-card-editor .pce-bar .pce-pick[data-menu="font"] { min-width: 62px; }
-	.pen-card-editor .pce-bar .pce-pick[data-menu="size"] { min-width: 72px; }
-	.pen-card-editor .pce-hl-mark { background: #facc15; color: #161616; border-radius: 3px; padding: 0 4px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-fgpick { font-weight: 700; text-decoration: underline; text-decoration-color: #f87171; text-decoration-thickness: 3px; }
-	.pen-card-editor .pce-menu {
-	position: absolute;
-	top: calc(100% + 6px);
-	left: 0;
-	display: none;
-	flex-direction: column;
-	min-width: 140px;
-	padding: 4px;
-	background: var(--fg);
-	border-radius: 9px;
-	box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
-	z-index: 1;
-}
-	.pen-card-editor .pce-menu[data-open] { display: flex; }
-	.pen-card-editor .pce-menu.pce-swatches[data-open] { flex-flow: row wrap; width: 176px; min-width: 0; }
-	.pen-card-editor .pce-bar .pce-opt { text-align: left; padding: 0 10px; white-space: nowrap; }
-	.pen-card-editor .pce-menu.pce-swatches .pce-opt { flex-basis: 100%; }
-	.pen-card-editor .pce-bar .pce-opt-h1 { font-size: 20px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-h2 { font-size: 17px; font-weight: 600; }
-	.pen-card-editor .pce-bar .pce-opt-h3 { font-size: 15px; font-weight: 600; }
+	.pen-card-editor .pce-bar .pce-swatch-fg { width: 24px; height: 24px; font-weight: 700; font-size: 15px; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="red"] { color: #d92e3c; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="orange"] { color: #c2410c; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="yellow"] { color: #a16207; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="green"] { color: #15803d; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="blue"] { color: #2563eb; }
+	.pen-card-editor .pce-bar .pce-swatch-fg[data-fg="purple"] { color: #7c3aed; }
 	.board-node .placeholder {
 	display: flex;
 	align-items: center;

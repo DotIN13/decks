@@ -41,10 +41,11 @@ import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, p
 import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
+import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
-import { CARD_PALETTE, SERIF_FAMILY } from "./pen/markdown-layout.ts";
+import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
@@ -998,7 +999,8 @@ export function Stage(props: {
 		window.open(new URL(file.metadata.path, new URL(props.pen?.base || "/", location.origin)).href, "_blank", "noopener");
 		return true;
 	};
-	createEffect(() => setPenTyping(!!penText()));
+	// While a card is typed into its toolbar is the panel, so the properties stand aside; on a phone, for any words.
+	createEffect(() => setPenTyping(!!penText() && (!!penText()!.card || isPhone())));
 	// A new selection starts with a phone's sheet put away; a second tap on it brings the sheet (`touchOnDrawing`).
 	createEffect(on(penSelection, () => setPenSheet(false)));
 	onCleanup(() => setPenTyping(false));
@@ -4528,7 +4530,6 @@ export function Stage(props: {
 										"font-family": look.font,
 										"font-size": `${look.size}px`,
 										"--card-size": `${look.size}px`,
-										"--card-serif": pageFont(SERIF_FAMILY, 400, false),
 										"font-weight": String(look.weight),
 										"letter-spacing": `${look.spacing}px`,
 										"line-height": look.line === undefined ? "1.5" : String(look.line),

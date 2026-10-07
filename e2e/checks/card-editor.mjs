@@ -301,7 +301,7 @@ await page.evaluate(() => {
 	getSelection().removeAllRanges();
 	getSelection().addRange(range);
 });
-await choose("font", '[data-font="serif"]');
+await choose("font", '[data-font="Source Serif 4"]');
 await page.click('.pce-bar [data-cmd="underline"]');
 await page.keyboard.press("Control+Enter");
 const menus = await until(() => {

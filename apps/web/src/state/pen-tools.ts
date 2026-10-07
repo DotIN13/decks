@@ -19,7 +19,7 @@ export const PEN_TOOL_KEYS: Record<string, PenTool> = { n: "note", s: "note", c:
 const [penTool, setPenTool] = createSignal<PenTool>("select");
 /** Ids of the selected items, in the order they were picked. */
 const [penSelection, setPenSelection] = createSignal<readonly string[]>([]);
-/** Whether an item's words are open for typing (`Stage.tsx`): a phone's properties sheet stands aside. */
+/** Whether a card is open for typing, or on a phone any words (`Stage.tsx`): the properties panel stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
 /**
  * Whether a phone's properties sheet has been asked for: by a second tap on the item already selected.

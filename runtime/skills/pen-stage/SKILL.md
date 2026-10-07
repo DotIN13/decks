@@ -133,7 +133,8 @@ on the canvas.
 Two things Obsidian has no word for are ours; Obsidian shows them as the words typed, and an export to Obsidian takes the styles out:
 
 - **Styled words**: `[not flexible]{.red}`, in `red`, `orange`, `yellow`, `green`, `blue` or `purple`;
-  a size, `.small`, `.large` or `.huge`; a face, `.serif` or `.mono`; several at once, `[words]{.serif .large}`.
+  a size, `.small`, `.large` or `.huge`; a font, `font="Lora"` (any family on Fontsource; `.serif` and `.mono`
+  for short); several at once, `[words]{.large font="EB Garamond"}`.
   Underline is `<u>words</u>`, which Obsidian draws too.
 - **Suggestions**, in CriticMarkup. To propose a change to a card the person wrote, write it as a
   suggestion rather than overwriting their words: `{~~old words~>new words~~}` to replace,

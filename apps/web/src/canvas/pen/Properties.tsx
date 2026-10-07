@@ -424,10 +424,10 @@ export function Properties(props: {
 	/*
 	 * On a phone the sheet covers most of the screen, so it opens only when asked for, with a second tap
 	 * on what is selected (`penSheet`): the first tap selects, and leaves the canvas to the finger that
-	 * carries it. It stands aside while words are typed, which it would cover.
+	 * carries it. It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`).
 	 */
 	return (
-		<Show when={selected().length > 0 && !(isPhone() && (penTyping() || !penSheet()))}>
+		<Show when={selected().length > 0 && !penTyping() && !(isPhone() && !penSheet())}>
 			<aside class="panel-float props-panel" data-sheet={isPhone() ? "true" : undefined} aria-label="Properties" data-props>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">

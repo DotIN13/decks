@@ -1173,8 +1173,10 @@ export class StageScene {
 				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: `${wordsOf(parseMarkdown(node.content))}◦▪${pictured ? "🖼" : ""}` });
 				needs.push({ family: style.fontFamily, weight: 700, italic: false, text: node.content }, { family: style.fontFamily, weight: 600, italic: false, text: node.content }, { family: style.fontFamily, weight: style.fontWeight, italic: true, text: node.content });
 				if (/`|^( {4}|\t)|<code|<pre|\.mono\b/m.test(node.content)) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content }, { family: MONO_FAMILY, weight: 700, italic: false, text: node.content });
-				// Words in the serif face, `[words]{.serif}`, in its upright, bold and italic.
-				if (/\.serif\b/.test(node.content)) needs.push({ family: SERIF_FAMILY, weight: 400, italic: false, text: node.content }, { family: SERIF_FAMILY, weight: 700, italic: false, text: node.content }, { family: SERIF_FAMILY, weight: 400, italic: true, text: node.content });
+				// Words in a font of their own, `[words]{font="Lora"}` or `.serif`, in its upright, bold and italic.
+				const faces = new Set([...node.content.matchAll(/font=(?:"([^"]+)"|([\w-]+))/g)].map((m) => (m[1] ?? m[2])!));
+				if (/\.serif\b/.test(node.content)) faces.add(SERIF_FAMILY);
+				for (const family of faces) needs.push({ family, weight: 400, italic: false, text: node.content }, { family, weight: 700, italic: false, text: node.content }, { family, weight: 400, italic: true, text: node.content });
 			}
 		}
 		return needs;

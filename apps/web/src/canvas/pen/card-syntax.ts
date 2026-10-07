@@ -9,7 +9,8 @@ import { Marked, type TokenizerExtension, type Tokens } from "marked";
  * comments%%`. A card adds:
  *
  * - styled words, `[words]{.red}`, `[words]{.serif .large}`, written the way Pandoc and Djot write a
- *   span with classes: a colour, a size (`small`, `large`, `huge`) and a face (`serif`, `mono`);
+ *   span with attributes: a colour, a size (`small`, `large`, `huge`) and a font, `font="Lora"`
+ *   (`.serif` and `.mono` for short);
  * - an agent's suggestions in CriticMarkup: `{~~old~>new~~}`, `{++added++}`, `{--removed--}`, and
  *   `{>>why<<}` after one of them for the reason.
  *
@@ -29,13 +30,45 @@ export const EMOJI_OF: Record<Colour, string> = Object.fromEntries(Object.entrie
 export interface HighlightToken extends Tokens.Generic { type: "highlight"; colour?: Colour; tokens: Tokens.Generic[] }
 export const SIZES = ["small", "large", "huge"] as const;
 export type Size = (typeof SIZES)[number];
-export const FACES = ["serif", "mono"] as const;
-export type Face = (typeof FACES)[number];
-/** Every class a span may carry: a colour, a size, a face. */
-const CLASSES = [...COLOURS, ...SIZES, ...FACES] as string[];
-export interface ColourToken extends Tokens.Generic { type: "colour"; colour?: Colour; size?: Size; face?: Face; tokens: Tokens.Generic[] }
-/** `{.red .large}`, as one pattern: one or more of the classes a span may carry. */
-const CLASS_LIST = `\\{((?:\\.(?:${CLASSES.join("|")})\\s*)+)\\}`;
+/** `.serif` and `.mono`, short for the two faces a card reaches for most. */
+export const FACE_ALIAS: Record<string, string> = { serif: "Source Serif 4", mono: "JetBrains Mono" };
+/**
+ * The fonts a card's words can be set in, by group: any family the font CDN has would do
+ * (`font="…"`), and these are the ones the style bar offers.
+ */
+export const FONT_GROUPS: ReadonlyArray<{ group: string; fonts: readonly string[] }> = [
+	{ group: "Sans", fonts: ["Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Nunito", "Work Sans", "DM Sans", "IBM Plex Sans", "Space Grotesk"] },
+	{ group: "Serif", fonts: ["Source Serif 4", "Merriweather", "Lora", "Playfair Display", "EB Garamond", "Libre Baskerville", "Crimson Pro", "IBM Plex Serif"] },
+	{ group: "Mono", fonts: ["JetBrains Mono", "Fira Code", "IBM Plex Mono", "Source Code Pro"] },
+	{ group: "Hand and display", fonts: ["Caveat", "Patrick Hand", "Kalam", "Bebas Neue", "Pacifico"] },
+];
+/** Every class a span may carry: a colour, a size, a face's short name. */
+const CLASSES = new Set<string>([...COLOURS, ...SIZES, ...Object.keys(FACE_ALIAS)]);
+export interface ColourToken extends Tokens.Generic { type: "colour"; colour?: Colour; size?: Size; face?: string; tokens: Tokens.Generic[] }
+/**
+ * A span's attributes, Pandoc's way: `{.red .large font="Lora"}`. Undefined when any of them is not
+ * one a card knows, so `[words]{anything}` stays the words it was typed as.
+ */
+export function spanAttributes(text: string): { colour?: Colour; size?: Size; face?: string } | undefined {
+	const out: { colour?: Colour; size?: Size; face?: string } = {};
+	const parts = text.match(/\.[\w-]+|font=(?:"[^"]*"|[\w-]+)|\S+/g) ?? [];
+	if (!parts.length) return undefined;
+	for (const part of parts) {
+		if (part.startsWith(".")) {
+			const name = part.slice(1);
+			if (!CLASSES.has(name)) return undefined;
+			if ((COLOURS as readonly string[]).includes(name)) out.colour = name as Colour;
+			else if ((SIZES as readonly string[]).includes(name)) out.size = name as Size;
+			else out.face = FACE_ALIAS[name];
+		} else if (part.startsWith("font=")) {
+			const family = part.slice(5).replace(/^"|"$/g, "").trim();
+			if (!family) return undefined;
+			out.face = family;
+		} else return undefined;
+	}
+	return out;
+}
+const SPAN = `\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]\\{([^{}\\n]+)\\}`;
 export interface WikiToken extends Tokens.Generic { type: "wiki"; target: string; alias?: string; embed: boolean; width?: number }
 export interface CriticToken extends Tokens.Generic { type: "critic"; op: "replace" | "add" | "remove" | "comment" | "highlight"; old: string; new: string }
 export interface HiddenToken extends Tokens.Generic { type: "hidden"; text: string }
@@ -59,15 +92,10 @@ const colour: TokenizerExtension = {
 	level: "inline",
 	start: (src) => src.indexOf("["),
 	tokenizer(src) {
-		const m = new RegExp(`^\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]${CLASS_LIST}`).exec(src);
-		if (!m) return undefined;
-		const classes = m[2]!.split(/[\s.]+/).filter(Boolean);
-		const token: ColourToken = { type: "colour", raw: m[0], text: m[1]!, tokens: [] };
-		for (const name of classes) {
-			if ((COLOURS as readonly string[]).includes(name)) token.colour = name as Colour;
-			else if ((SIZES as readonly string[]).includes(name)) token.size = name as Size;
-			else if ((FACES as readonly string[]).includes(name)) token.face = name as Face;
-		}
+		const m = new RegExp(`^${SPAN}`).exec(src);
+		const attributes = m ? spanAttributes(m[2]!) : undefined;
+		if (!m || !attributes) return undefined;
+		const token: ColourToken = { type: "colour", raw: m[0], text: m[1]!, tokens: [], ...attributes };
 		this.lexer.inlineTokens(m[1]!, token.tokens);
 		return token;
 	},
@@ -173,7 +201,7 @@ export function toObsidian(md: string): string {
 
 /** Styled words, `[words]{.red .large}`, as the words alone; a span inside a span too. */
 function plainSpans(md: string): string {
-	const span = new RegExp(`\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]${CLASS_LIST}`, "g");
-	for (let was = ""; was !== md; ) (was = md), (md = md.replace(span, "$1"));
+	const span = new RegExp(SPAN, "g");
+	for (let was = ""; was !== md; ) (was = md), (md = md.replace(span, (whole, words: string, attributes: string) => (spanAttributes(attributes) ? words : whole)));
 	return md;
 }
