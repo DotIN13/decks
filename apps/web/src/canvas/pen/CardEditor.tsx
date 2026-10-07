@@ -684,27 +684,38 @@ export function CardEditor(props: CardEditorProps) {
 	/* ---------- the style bar ---------- */
 
 	/*
-	 * The toolbar: docked over the card while it is open, at the screen's size whatever the zoom, in one
-	 * row that scrolls sideways when the screen is narrower than it. Above the card, or pinned under the
-	 * app's own bars when the card's top is out of sight, and never past the screen's edges.
+	 * The toolbar: over the words selected, as a selection's bar is, at the screen's size whatever the
+	 * zoom, in two rows that scroll sideways when the screen is narrower than them. Above the words, or
+	 * under them when the app's own bars or the screen's top are in the way, and never past an edge.
+	 * It goes the moment the camera moves and comes back with a fade where the words came to rest, as
+	 * the board pill does (`placing`).
 	 */
+	let wanted = false;
 	function placeBar() {
-		if (!bar.isConnected) return;
+		if (!bar.isConnected || !wanted || !sel().rangeCount) return;
+		const r = sel().getRangeAt(0).getBoundingClientRect();
 		const w = wrap.getBoundingClientRect();
 		const z = props.zoom;
 		bar.style.transform = `scale(${1 / z})`;
 		const bw = bar.offsetWidth;
 		const bh = bar.offsetHeight;
 		const ceiling = Math.max(8, ...[...document.querySelectorAll('[data-inset="top"]')].map((el) => el.getBoundingClientRect().bottom + 6));
-		const top = Math.max(ceiling, Math.min(innerHeight - bh - 8, w.top - bh - 10));
-		const left = Math.max(8, Math.min(innerWidth - bw - 8, w.left));
+		const above = r.top - bh - 10;
+		const top = above >= ceiling ? above : Math.min(innerHeight - bh - 8, r.bottom + 10);
+		const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left));
 		bar.style.left = `${(left - w.left) / z}px`;
 		bar.style.top = `${(top - w.top) / z}px`;
 	}
 	/** The toolbar says what the words under the caret are: their block, font and size, and which styles are on. */
 	function showBar() {
 		const s = sel();
-		if (!s.rangeCount || !ed.contains(s.anchorNode)) return;
+		const was = wanted;
+		// Shown while words are selected, as before; a press inside the bar keeps the selection, so it stays.
+		wanted = !dragging && s.rangeCount > 0 && !s.isCollapsed && ed.contains(s.anchorNode);
+		bar.toggleAttribute("data-off", !wanted);
+		if (!wanted) closeMenus();
+		if (!wanted) return;
+		if (!was || !bar.hasAttribute("data-hidden")) placeBar();
 		const at = s.anchorNode?.nodeType === 1 ? (s.anchorNode as Element) : s.anchorNode?.parentElement;
 		const label = (name: string, text: string) => {
 			const el = bar.querySelector(`[data-label="${name}"]`);
@@ -1209,10 +1220,28 @@ export function CardEditor(props: CardEditorProps) {
 		});
 		watch.observe(ed, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-on"] });
 		past.push(serialise());
-		// The toolbar follows the card as the camera moves, once a frame.
+		// Watched once a frame: while the card moves on screen, a pan or a zoom, the bar is gone; once it
+		// has rested a moment the bar is put back over the words and fades in.
 		let placing = 0;
+		let seen = "";
+		let movedAt = 0;
 		const keep = () => {
-			placeBar();
+			const w = wrap.getBoundingClientRect();
+			const now = `${Math.round(w.left)},${Math.round(w.top)},${Math.round(w.width)}`;
+			if (now !== seen) {
+				const first = !seen;
+				seen = now;
+				if (!first) {
+					movedAt = performance.now();
+					if (!bar.hasAttribute("data-hidden")) {
+						bar.setAttribute("data-hidden", "");
+						closeMenus();
+					}
+				}
+			} else if (bar.hasAttribute("data-hidden") && performance.now() - movedAt > 140) {
+				placeBar();
+				bar.removeAttribute("data-hidden");
+			}
 			placing = requestAnimationFrame(keep);
 		};
 		placing = requestAnimationFrame(keep);
@@ -1271,7 +1300,7 @@ export function CardEditor(props: CardEditorProps) {
 					if ((event.target as Element).closest(".pce-sug button, .pce-check")) event.preventDefault();
 				}}
 			/>
-			<div ref={bar} class="pce-bar" onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
+			<div ref={bar} class="pce-bar" data-off onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
 				<div ref={tools} class="pce-tools" onScroll={closeMenus}>
 					{/* Two rows: what the words are set in, and what is done to them. */}
 					<div class="pce-row">

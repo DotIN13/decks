@@ -151,6 +151,23 @@ await page.evaluate(() => {
 });
 const bar = await until(() => page.evaluate(() => getComputedStyle(document.querySelector(".pce-bar")).display !== "none"), 2000);
 say("a selection gets the style bar", !!bar);
+// It goes while the camera moves, and comes back over the words once the camera rests, as the board pill does.
+await page.mouse.move(1100, 700);
+await page.mouse.wheel(0, 60);
+await page.waitForTimeout(30);
+const gone = await page.evaluate(() => document.querySelector(".pce-bar").hasAttribute("data-hidden"));
+const back = await until(() => page.evaluate(() => {
+	const tools = document.querySelector(".pce-bar:not([data-hidden]) .pce-tools")?.getBoundingClientRect();
+	const words = getSelection().rangeCount ? getSelection().getRangeAt(0).getBoundingClientRect() : undefined;
+	if (!tools || !words) return undefined;
+	// Just over the words, or just under them where the app's bars leave no room above.
+	const near = (tools.bottom <= words.top + 1 && words.top - tools.bottom < 40) || (tools.top >= words.bottom - 1 && tools.top - words.bottom < 40);
+	return tools && words && near ? true : undefined;
+}), 3000);
+// The camera back where the rest of this check expects the card.
+await page.mouse.wheel(0, -60);
+await settle(page, 500);
+say("…which goes while the camera moves and comes back just over the words when it rests", gone && !!back, JSON.stringify({ gone, back }));
 // Colours are in the bar's colour menu.
 await page.click('.pce-bar [data-menu="fg"]');
 await page.click('.pce-bar .pce-menu[data-open] [data-fg="blue"]');
