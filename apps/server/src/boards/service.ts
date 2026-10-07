@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { relink } from "../deck/stage-boards.ts";
-import { dirname, join } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
 import { applyPatches, mintId, PatchRefused } from "./patch.ts";
 import { Revisions } from "./snapshots.ts";
@@ -12,6 +12,7 @@ import {
 	renderSlides,
 	renderMirror,
 	renderWebBoard,
+	renderDocBoard,
 	slugFor,
 	WEB_BOARD_SIZE,
 	type BoardFormat,
@@ -387,6 +388,33 @@ export class BoardService {
 		const board = this.deck.refresh(path);
 		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		return path;
+	}
+
+	/**
+	 * A board that opens a document as a page you type into (`renderDocBoard`), in
+	 * `boards/documents/`. `file` is the document, absolute; inside the deck the board names it
+	 * relative to itself, so the deck can move. Asking again for the same file hands back the
+	 * board that already opens it.
+	 */
+	newDocBoard(file: string): string {
+		const name = slugFor(basename(file, extname(file)), "document");
+		const inDeck = !relative(this.deck.path, file).startsWith("..") && !isAbsolute(relative(this.deck.path, file));
+		for (let n = 1; ; n++) {
+			const path = `boards/documents/${name}${n === 1 ? "" : `-${n}`}.html`;
+			const target = this.deck.fileOf(path);
+			const dataPath = inDeck ? relative(dirname(target), file).split("\\").join("/") : file;
+			if (existsSync(target)) {
+				if (readFileSync(target, "utf8").includes(`data-path="${dataPath}"`)) return path;
+				continue;
+			}
+			const html = renderDocBoard(basename(file), dataPath);
+			mkdirSync(dirname(target), { recursive: true });
+			writeFileSync(target, html);
+			this.revisions.record(path, html);
+			const board = this.deck.refresh(path);
+			if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+			return path;
+		}
 	}
 
 	/**

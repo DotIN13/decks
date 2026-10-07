@@ -9,6 +9,7 @@ import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
 import { can } from "../connections/backend.ts";
 import FilePlus from "lucide-solid/icons/file-plus";
+import FileText from "lucide-solid/icons/file-text";
 import Presentation from "lucide-solid/icons/presentation";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
@@ -185,6 +186,8 @@ export function Stage(props: {
 	 */
 	/** A board where the canvas menu was opened, in stage pixels: an ordinary board or a slide deck. */
 	onCreateBoard?: (at: { x: number; y: number }, format?: "board" | "slides") => void;
+	/** Open a file as a document page, centred at a point (the Add menu's Document…). */
+	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
 	/** Per-board reload counters, from `stage.reload`. */
 	nonces?: Record<string, number>;
@@ -2506,6 +2509,11 @@ export function Stage(props: {
 		setCanvasMenu(undefined);
 		if (menu) props.onCreateBoard?.(menu.stage, format);
 	};
+	const documentFromMenu = () => {
+		const menu = canvasMenu();
+		setCanvasMenu(undefined);
+		if (menu) props.onOpenDocument?.(menu.stage);
+	};
 	let lastBareTap: { x: number; y: number; at: number } | undefined;
 	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
 		const menu = canvasMenu();
@@ -4769,6 +4777,15 @@ export function Stage(props: {
 								<span class="row-label">Slides</span>
 								<span class="row-note">.slides.html</span>
 							</button>
+							<Show when={props.onOpenDocument}>
+								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="document" onClick={documentFromMenu}>
+									<span class="row-icon">
+										<Icon of={FileText} size={15} />
+									</span>
+									<span class="row-label">Document…</span>
+									<span class="row-note">.md .tex .docx</span>
+								</button>
+							</Show>
 							<Show when={props.onPenEdit}>
 								<div class="rule" aria-hidden="true" />
 							</Show>

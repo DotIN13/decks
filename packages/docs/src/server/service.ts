@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { basename, dirname, extname } from "node:path";
 import { applySplice, transformSplices, type DocAuthor, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "../index.ts";
 import { invert, land, spliceDiff } from "../merge.ts";
@@ -243,6 +243,14 @@ export class DocService {
 		this.commit(doc, target, splices);
 		doc.versions.record(doc.vkey, target);
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: "person" });
+	}
+
+	/** The file a page asking for `path` would open, or a sentence saying why it cannot: for a host making a page. */
+	openable(path: string): string {
+		const { file } = this.keyOf(path);
+		this.formatOf(file);
+		if (!existsSync(file)) throw new Error(`${path} does not exist`);
+		return file;
 	}
 
 	/** Every open document closed, for a deck switch or a shutdown. */

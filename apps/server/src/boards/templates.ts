@@ -325,6 +325,36 @@ export function renderMirror(name: string, agentId: string, size?: { w?: number;
 /** The default size of the shared-browser card: a short, wide status card. */
 export const WEB_BOARD_SIZE = { w: 560, h: 420 };
 
+/** A document board's size when it is made: a page and its bar, with room for the panel. */
+export const DOC_BOARD_SIZE = { w: 1000, h: 1100 };
+
+const escapeAttr = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+/**
+ * A document board: one `data-live="doc"` box filling the board, naming its file (`lib/live-doc.js`).
+ *
+ * `dataPath` is as an embed's: relative to the board, or absolute for a file outside the deck.
+ */
+export function renderDocBoard(title: string, dataPath: string, size?: { w?: number; h?: number }): string {
+	const w = Math.round(size?.w ?? DOC_BOARD_SIZE.w);
+	const h = Math.round(size?.h ?? DOC_BOARD_SIZE.h);
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeAttr(title)}</title>
+		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
+		<link rel="stylesheet" href="../../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="live" data-id="doc" data-live="doc" data-path="${escapeAttr(dataPath)}" style="left: 0; top: 0; right: 0; bottom: 0"></div>
+
+		<script src="../../lib/board.js"></script>
+	</body>
+</html>
+`;
+}
+
 /**
  * The status board for the user's shared Chrome.
  *

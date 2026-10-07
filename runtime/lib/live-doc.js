@@ -287,6 +287,531 @@ function spliceBetween(from, to, caret) {
   return { at: head, before: from.slice(head, from.length - tail), text: to.slice(head, to.length - tail) };
 }
 
+// packages/docs/src/page/blocks.ts
+function blocks(source, format, tex = false) {
+  if (format === "docx") return docxBlocks(source);
+  return tex ? texBlocks(source) : markdownBlocks(source);
+}
+function lines(source) {
+  const out = [];
+  let at = 0;
+  while (at < source.length) {
+    const next = source.indexOf("\n", at);
+    const end = next === -1 ? source.length : next + 1;
+    out.push({ start: at, text: source.slice(at, end) });
+    at = end;
+  }
+  return out;
+}
+function byBlankLines(source, inside) {
+  const out = [];
+  let start = 0;
+  let open = false;
+  let content = false;
+  for (const line of lines(source)) {
+    const blank = line.text.trim() === "";
+    if (blank && !open && content) {
+      out.push({ start, end: line.start + line.text.length, kind: "text" });
+      start = line.start + line.text.length;
+      content = false;
+      continue;
+    }
+    if (!blank) content = true;
+    open = inside(line.text, open);
+  }
+  if (start < source.length) out.push({ start, end: source.length, kind: "text" });
+  const merged = [];
+  for (const block of out) {
+    if (merged.length && source.slice(block.start, block.end).trim() === "") merged[merged.length - 1].end = block.end;
+    else merged.push(block);
+  }
+  return merged.length ? merged : [{ start: 0, end: source.length, kind: "text" }];
+}
+function markdownBlocks(source) {
+  let fence = "";
+  return byBlankLines(source, (line, open) => {
+    const t = line.trim();
+    if (fence) {
+      if (t.startsWith(fence)) fence = "";
+      return fence !== "";
+    }
+    const opened = /^(```+|~~~+)/.exec(t);
+    if (opened) {
+      fence = opened[1];
+      return true;
+    }
+    if (t === "$$") return !open;
+    return open && t !== "$$";
+  });
+}
+function texBlocks(source) {
+  const begin = source.indexOf("\\begin{document}");
+  const head = [];
+  let body = source;
+  let offset = 0;
+  if (begin !== -1) {
+    const after = source.indexOf("\n", begin);
+    offset = after === -1 ? source.length : after + 1;
+    head.push({ start: 0, end: offset, kind: "preamble" });
+    body = source.slice(offset);
+  }
+  let depth = 0;
+  const inner = byBlankLines(body, (line) => {
+    const code = line.replace(/(^|[^\\])%.*$/, "$1");
+    depth += (code.match(/\\begin\{/g) ?? []).length - (code.match(/\\end\{/g) ?? []).length;
+    if (depth < 0) depth = 0;
+    return depth > 0;
+  });
+  return [...head, ...inner.map((b) => ({ ...b, start: b.start + offset, end: b.end + offset }))];
+}
+var PARAGRAPH = /<w:p(?=[\s>/])[^>]*?(\/>|>)/g;
+function docxBlocks(xml) {
+  const out = [];
+  let at = 0;
+  PARAGRAPH.lastIndex = 0;
+  for (let m = PARAGRAPH.exec(xml); m; m = PARAGRAPH.exec(xml)) {
+    const start = m.index;
+    let end;
+    if (m[1] === "/>") end = start + m[0].length;
+    else {
+      const close = xml.indexOf("</w:p>", PARAGRAPH.lastIndex);
+      if (close === -1) break;
+      end = close + "</w:p>".length;
+    }
+    if (start > at) out.push({ start: at, end: start, kind: "hidden" });
+    out.push({ start, end, kind: "text" });
+    at = end;
+    PARAGRAPH.lastIndex = end;
+  }
+  if (at < xml.length) out.push({ start: at, end: xml.length, kind: "hidden" });
+  return out;
+}
+var ENTITY = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+var escapeXml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function readParagraph(xml) {
+  const out = { text: "", xml: [], width: [], tag: [], runs: [], style: /<w:pStyle w:val="([^"]+)"/.exec(xml)?.[1] ?? "" };
+  const run = /<w:r(?=[\s>])[^>]*>([\s\S]*?)<\/w:r>/g;
+  let lastEnd = -1;
+  for (let r = run.exec(xml); r; r = run.exec(xml)) {
+    const body = r[1];
+    const bodyAt = r.index + r[0].indexOf(">") + 1;
+    const props = /<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(body)?.[1] ?? "";
+    const on = (tag) => new RegExp(`<w:${tag}(?:\\s+w:val="(?!0|false|none)[^"]*")?\\s*/>`).test(props);
+    const style = { bold: on("b"), italic: on("i"), underline: /<w:u\s+w:val="(?!none)/.test(props) };
+    let text = "";
+    const piece = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\s*\/>|<w:br\s*\/>|<w:cr\s*\/>/g;
+    for (let p = piece.exec(body); p; p = piece.exec(body)) {
+      const pieceAt = bodyAt + p.index;
+      if (p[0].startsWith("<w:tab")) {
+        out.text += "	";
+        text += "	";
+        out.xml.push(pieceAt);
+        out.width.push(p[0].length);
+        out.tag.push(-1);
+        continue;
+      }
+      if (!p[0].startsWith("<w:t")) {
+        out.text += "\n";
+        text += "\n";
+        out.xml.push(pieceAt);
+        out.width.push(p[0].length);
+        out.tag.push(-1);
+        continue;
+      }
+      const open = p[0].indexOf(">") + 1;
+      const content = p[1];
+      let i = 0;
+      while (i < content.length) {
+        let char = content[i];
+        let width = 1;
+        if (char === "&") {
+          const semi = content.indexOf(";", i);
+          const name = semi === -1 ? "" : content.slice(i + 1, semi);
+          const decoded = ENTITY[name] ?? (name.startsWith("#x") ? String.fromCodePoint(parseInt(name.slice(2), 16)) : name.startsWith("#") ? String.fromCodePoint(parseInt(name.slice(1), 10)) : void 0);
+          if (decoded !== void 0) {
+            char = decoded;
+            width = semi - i + 1;
+          }
+        }
+        out.text += char;
+        text += char;
+        out.xml.push(pieceAt + open + i);
+        out.width.push(width);
+        out.tag.push(pieceAt);
+        i += width;
+      }
+      lastEnd = pieceAt + open + content.length;
+    }
+    if (text) out.runs.push({ text, ...style });
+  }
+  out.xml.push(out.xml.length ? out.xml.at(-1) + out.width.at(-1) : lastEnd);
+  return out;
+}
+function paragraphSplices(xml, para, edit) {
+  const out = [];
+  const cuts = [];
+  for (let i = edit.at; i < edit.at + edit.before.length; i++) {
+    const at = para.xml[i];
+    const len = para.width[i];
+    const last = cuts.at(-1);
+    if (last && last.at + last.len === at) last.len += len;
+    else cuts.push({ at, len });
+  }
+  let shift = 0;
+  for (const cut of cuts) {
+    out.push({ at: cut.at - shift, before: xml.slice(cut.at, cut.at + cut.len), text: "" });
+    shift += cut.len;
+  }
+  if (edit.text) {
+    const parts = edit.text.split("\n").map(escapeXml);
+    const inner = parts.join('</w:t><w:br/><w:t xml:space="preserve">');
+    const anchor = edit.at > 0 ? edit.at - 1 : 0;
+    let at;
+    let tag = para.tag[anchor] ?? -1;
+    if (para.text.length === 0 || tag === -1) {
+      const close = xml.lastIndexOf("</w:p>");
+      const where = close === -1 ? xml.length : close;
+      at = where - removedBefore(cuts, where);
+      out.push({ at, before: "", text: `<w:r><w:t xml:space="preserve">${inner}</w:t></w:r>` });
+      return out;
+    }
+    at = edit.at > 0 ? para.xml[anchor] + para.width[anchor] : para.xml[0];
+    at -= removedBefore(cuts, at);
+    out.push({ at, before: "", text: inner });
+    const open = xml.slice(tag, xml.indexOf(">", tag) + 1);
+    if (!/xml:space="preserve"/.test(open)) {
+      const tagAt = tag - removedBefore(cuts, tag);
+      const fixed = { at: tagAt, before: open, text: open.replace(/^<w:t/, '<w:t xml:space="preserve"') };
+      const last = out.pop();
+      out.push(fixed, { ...last, at: last.at + fixed.text.length - fixed.before.length });
+    }
+  }
+  return out;
+}
+function removedBefore(cuts, at) {
+  return cuts.reduce((sum, cut) => cut.at + cut.len <= at ? sum + cut.len : sum, 0);
+}
+
+// packages/docs/src/page/render.ts
+var escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function command(text, names, wrap) {
+  const re = new RegExp(`\\\\(${names})\\*?\\s*(\\[[^\\]]*\\])?\\{`, "g");
+  let out = "";
+  let at = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    let depth = 1;
+    let i = re.lastIndex;
+    for (; i < text.length && depth > 0; i++) {
+      if (text[i] === "\\") i++;
+      else if (text[i] === "{") depth++;
+      else if (text[i] === "}") depth--;
+    }
+    if (depth !== 0) break;
+    out += text.slice(at, m.index) + wrap(text.slice(re.lastIndex, i - 1), m[1]);
+    at = i;
+    re.lastIndex = i;
+  }
+  return out + text.slice(at);
+}
+function texInline(source) {
+  const maths = [];
+  let text = source.replace(/(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+\$)/g, (m) => `\0${maths.push(m) - 1}\0`);
+  text = text.replace(/(^|[^\\])%.*$/gm, "$1");
+  text = escapeHtml(text);
+  text = command(text, "textbf", (x) => `<b>${x}</b>`);
+  text = command(text, "emph|textit", (x) => `<i>${x}</i>`);
+  text = command(text, "texttt", (x) => `<code>${x}</code>`);
+  text = command(text, "underline", (x) => `<u>${x}</u>`);
+  text = command(text, "cite|citep|citet|parencite|textcite", (x) => `<span class="dp-cite">[${x}]</span>`);
+  text = command(text, "ref|eqref|autoref|cref|Cref", (x) => `<span class="dp-cite">(${x})</span>`);
+  text = command(text, "url", (x) => `<span class="dp-link">${x}</span>`);
+  text = command(text, "href", (x) => `<span class="dp-link">${x}</span>`);
+  text = command(text, "footnote", (x) => `<sup class="dp-note" title="${x.replace(/"/g, "&quot;")}">*</sup>`);
+  text = command(text, "label|vspace|hspace|index", () => "");
+  text = command(text, "[a-zA-Z]+", (x) => x);
+  text = text.replace(/``/g, "\u201C").replace(/''/g, "\u201D").replace(/---/g, "\u2014").replace(/--/g, "\u2013").replace(/~/g, " ").replace(/\\([%&$#_{}])/g, "$1").replace(/\\\\/g, "<br>").replace(/\\[a-zA-Z]+\s?/g, "");
+  return text.replace(/\u0000(\d+)\u0000/g, (_m, n) => escapeHtml(maths[Number(n)]));
+}
+var SECTION = { part: "h1", chapter: "h1", section: "h2", subsection: "h3", subsubsection: "h4", paragraph: "h5" };
+var DISPLAY = /\\begin\{(equation|align|gather|multline|eqnarray)(\*?)\}([\s\S]*?)\\end\{\1\2\}/g;
+function texToHtml(block) {
+  let text = block.trim();
+  if (!text) return "";
+  text = text.replace(DISPLAY, (_m, env2, _star, body) => {
+    const clean2 = body.replace(/\\label\{[^}]*\}/g, "").replace(/\\nonumber/g, "").trim();
+    return env2 === "equation" ? `\\[${clean2}\\]` : `\\[\\begin{aligned}${clean2}\\end{aligned}\\]`;
+  });
+  const heading = /^\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\{([\s\S]*?)\}\s*([\s\S]*)$/.exec(text);
+  if (heading) {
+    const tag = SECTION[heading[1]];
+    return `<${tag}>${texInline(heading[2])}</${tag}>${heading[3] ? texToHtml(heading[3]) : ""}`;
+  }
+  const list = /^\\begin\{(itemize|enumerate|description)\}([\s\S]*?)\\end\{\1\}$/.exec(text);
+  if (list) {
+    const tag = list[1] === "enumerate" ? "ol" : "ul";
+    const items = list[2].split(/\\item\b(?:\[[^\]]*\])?/).slice(1);
+    return `<${tag}>${items.map((item) => `<li>${texInline(item.trim())}</li>`).join("")}</${tag}>`;
+  }
+  const env = /^\\begin\{(figure|table)\*?\}([\s\S]*?)\\end\{\1\*?\}$/.exec(text);
+  if (env) {
+    const caption = /\\caption\{([\s\S]*?)\}\s*(\\label|\\end|$)/.exec(env[2])?.[1] ?? "";
+    return `<div class="dp-box">${env[1] === "figure" ? "Figure" : "Table"}${caption ? `: ${texInline(caption)}` : ""}</div>`;
+  }
+  if (/^\\begin\{abstract\}/.test(text)) {
+    return `<div class="dp-abstract"><b>Abstract.</b> ${texInline(text.replace(/\\(begin|end)\{abstract\}/g, ""))}</div>`;
+  }
+  if (/^\\(maketitle|tableofcontents|bibliography|bibliographystyle|newpage|clearpage|end\{document\})/.test(text)) {
+    return `<div class="dp-chip">${escapeHtml(text.split("\n")[0])}</div>`;
+  }
+  return `<p>${texInline(text)}</p>`;
+}
+var HEADING = { Title: "h1", Heading1: "h2", Heading2: "h3", Heading3: "h4", Subtitle: "h3" };
+function paragraphToHtml(para) {
+  const tag = HEADING[para.style] ?? (/^Heading(\d)/.exec(para.style) ? "h4" : "p");
+  const inner = para.runs.map((run) => {
+    let html = escapeHtml(run.text).replace(/\n/g, "<br>").replace(/\t/g, "&emsp;");
+    if (run.bold) html = `<b>${html}</b>`;
+    if (run.italic) html = `<i>${html}</i>`;
+    if (run.underline) html = `<u>${html}</u>`;
+    return html;
+  }).join("");
+  return `<${tag}>${inner || "<br>"}</${tag}>`;
+}
+
+// packages/docs/src/page/reading.ts
+var escapeHtml2 = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var Reading = class {
+  constructor(sync, host) {
+    this.sync = sync;
+    this.host = host;
+    this.root = document.createElement("div");
+    this.root.className = "dp-page";
+    this.root.addEventListener("mousedown", (event) => this.pressed(event));
+    this.root.addEventListener("compositionstart", () => this.composing = true);
+    this.root.addEventListener("compositionend", () => {
+      this.composing = false;
+      this.typed();
+    });
+    this.root.addEventListener("input", () => {
+      if (!this.composing) this.typed();
+    });
+    this.root.addEventListener("focusout", (event) => {
+      if (this.editing && event.target === this.editing.el) this.leave();
+    });
+    this.root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && this.editing) this.editing.el.blur();
+    });
+  }
+  root;
+  editing;
+  composing = false;
+  /** Drawn blocks by their source, so a redraw after someone else's keystroke reuses the rest. */
+  drawn = /* @__PURE__ */ new Map();
+  get tex() {
+    return /\.(tex|sty|cls|ltx)$/i.test(this.sync.source ?? this.sync.path);
+  }
+  /** Draw every block, keeping the one being typed into as it is. */
+  render() {
+    const all = blocks(this.sync.text, this.sync.format, this.tex);
+    const children = [];
+    const editing = this.editing;
+    let placed = false;
+    const marks = this.host.marks().filter((m) => m.kind === "ins");
+    for (const block of all) {
+      if (editing && block.end > editing.start && block.start < editing.end) {
+        if (!placed) children.push(editing.el);
+        placed = true;
+        continue;
+      }
+      if (editing && !placed && block.start >= editing.end) {
+        children.push(editing.el);
+        placed = true;
+      }
+      if (block.kind === "hidden") continue;
+      children.push(this.blockEl(block, marks.some((m) => m.end > block.start && m.start < block.end)));
+    }
+    if (editing && !placed) children.push(editing.el);
+    if (children.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "dp-block dp-empty-doc";
+      empty.dataset.start = "0";
+      empty.dataset.end = "0";
+      empty.textContent = this.sync.readOnly ? "This document is empty." : "Empty. Click to write.";
+      children.push(empty);
+    }
+    if (editing && editing.el.parentNode === this.root) {
+      for (const child of [...this.root.childNodes]) if (child !== editing.el) child.remove();
+      const at = children.indexOf(editing.el);
+      for (const node of children.slice(0, at)) this.root.insertBefore(node, editing.el);
+      for (const node of children.slice(at + 1)) this.root.append(node);
+    } else this.root.replaceChildren(...children);
+  }
+  /** Someone else's splices landed: move the block being typed into, and redraw the rest. */
+  update(applied) {
+    const editing = this.editing;
+    if (editing && applied) {
+      for (const s of applied) {
+        const delta = s.text.length - s.before.length;
+        if (s.at + s.before.length <= editing.start) {
+          editing.start += delta;
+          editing.end += delta;
+        } else if (s.at < editing.end) editing.end = Math.max(editing.start, editing.end + delta);
+      }
+      const source = this.sync.text.slice(editing.start, editing.end);
+      const para = this.sync.format === "docx" ? readParagraph(source) : void 0;
+      const now = para ? para.text : source;
+      if (now !== editing.text) {
+        const at = this.caretIn(editing.el);
+        editing.text = now;
+        editing.para = para;
+        editing.el.textContent = now;
+        this.placeIn(editing.el, Math.min(at ?? now.length, now.length));
+      }
+    } else if (editing && !applied) {
+      this.editing = void 0;
+    }
+    this.render();
+  }
+  blockEl(block, changed) {
+    const source = this.sync.text.slice(block.start, block.end);
+    const el2 = document.createElement("div");
+    el2.className = `dp-block${changed ? " dp-changed" : ""}${block.kind === "preamble" ? " dp-preamble" : ""}`;
+    el2.dataset.start = String(block.start);
+    el2.dataset.end = String(block.end);
+    if (block.kind === "preamble") {
+      const lines2 = source.split("\n").length - 1;
+      el2.textContent = `Preamble \xB7 ${lines2} lines`;
+      return el2;
+    }
+    const key = `${this.sync.format}:${this.tex ? "tex" : ""}:${source}`;
+    const known = this.drawn.get(key);
+    if (known !== void 0) {
+      el2.innerHTML = known;
+      return el2;
+    }
+    if (this.sync.format === "docx") {
+      el2.innerHTML = paragraphToHtml(readParagraph(source));
+      this.drawn.set(key, el2.innerHTML);
+    } else if (this.tex) {
+      el2.innerHTML = texToHtml(source);
+      void Promise.resolve(this.host.math?.(el2)).then(() => this.drawn.set(key, el2.innerHTML));
+    } else if (this.host.markdown) {
+      el2.innerHTML = `<p>${escapeHtml2(source)}</p>`;
+      void Promise.resolve(this.host.markdown(el2, source)).then(() => this.drawn.set(key, el2.innerHTML));
+    } else {
+      el2.innerHTML = `<p style="white-space: pre-wrap">${escapeHtml2(source)}</p>`;
+    }
+    return el2;
+  }
+  // --- editing one block ------------------------------------------------------------------
+  pressed(event) {
+    if (this.sync.readOnly || !this.sync.ready || event.button !== 0) return;
+    const target = event.target.closest(".dp-block");
+    if (!target || target === this.editing?.el || !this.root.contains(target)) return;
+    const start = Number(target.dataset.start);
+    const end = Number(target.dataset.end);
+    const shown = target.textContent ?? "";
+    const near = this.shownOffset(target, event.clientX, event.clientY);
+    event.preventDefault();
+    const source = this.sync.text.slice(start, end);
+    const para = this.sync.format === "docx" ? readParagraph(source) : void 0;
+    const text = para ? para.text : source;
+    const el2 = document.createElement("div");
+    el2.className = "dp-block dp-editing";
+    el2.setAttribute("contenteditable", "plaintext-only");
+    el2.spellcheck = false;
+    el2.textContent = text;
+    el2.dataset.start = String(start);
+    this.editing = { start, end, el: el2, text, ...para ? { para } : {} };
+    target.replaceWith(el2);
+    this.render();
+    el2.focus();
+    this.placeIn(el2, this.caretFor(text, shown, near));
+  }
+  typed() {
+    const editing = this.editing;
+    if (!editing) return;
+    const now = editing.el.textContent ?? "";
+    const local = spliceBetween(editing.text, now, this.caretIn(editing.el) ?? now.length);
+    if (!local) return;
+    if (!editing.para) {
+      editing.text = now;
+      editing.end += local.text.length - local.before.length;
+      this.sync.edit({ at: editing.start + local.at, before: local.before, text: local.text });
+      return;
+    }
+    const xml = this.sync.text.slice(editing.start, editing.end);
+    for (const splice of paragraphSplices(xml, editing.para, local)) {
+      editing.end += splice.text.length - splice.before.length;
+      this.sync.edit({ at: editing.start + splice.at, before: splice.before, text: splice.text });
+    }
+    editing.para = readParagraph(this.sync.text.slice(editing.start, editing.end));
+    editing.text = editing.para.text;
+    if (editing.text !== now) {
+      const at = this.caretIn(editing.el);
+      editing.el.textContent = editing.text;
+      this.placeIn(editing.el, Math.min(at ?? editing.text.length, editing.text.length));
+    }
+  }
+  leave(draw = true) {
+    this.editing = void 0;
+    if (draw) this.render();
+  }
+  // --- carets -------------------------------------------------------------------------------
+  shownOffset(el2, x, y) {
+    const doc = el2.ownerDocument;
+    let node;
+    let offset = 0;
+    const pos = doc.caretPositionFromPoint?.(x, y);
+    if (pos) {
+      node = pos.offsetNode;
+      offset = pos.offset;
+    } else {
+      const range2 = doc.caretRangeFromPoint?.(x, y);
+      if (range2) {
+        node = range2.startContainer;
+        offset = range2.startOffset;
+      }
+    }
+    if (!node || !el2.contains(node)) return (el2.textContent ?? "").length;
+    const range = doc.createRange();
+    range.setStart(el2, 0);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  }
+  /** The caret in the block's text for a press at `near` in its drawn words. */
+  caretFor(text, shown, near) {
+    if (this.sync.format === "docx") return Math.min(near, text.length);
+    for (const width of [16, 8, 4]) {
+      const cue = shown.slice(Math.max(0, near - width), near);
+      if (cue.trim().length < 2) continue;
+      const at = text.indexOf(cue);
+      if (at !== -1 && text.indexOf(cue, at + 1) === -1) return at + cue.length;
+    }
+    return Math.round(near / Math.max(1, shown.length) * text.length);
+  }
+  caretIn(el2) {
+    const selection = el2.ownerDocument.getSelection();
+    if (!selection || selection.rangeCount === 0 || !el2.contains(selection.focusNode)) return void 0;
+    const range = el2.ownerDocument.createRange();
+    range.setStart(el2, 0);
+    range.setEnd(selection.focusNode, selection.focusOffset);
+    return range.toString().length;
+  }
+  placeIn(el2, offset) {
+    const walker = el2.ownerDocument.createTreeWalker(el2, NodeFilter.SHOW_TEXT);
+    let left = offset;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (left <= node.data.length) {
+        el2.ownerDocument.getSelection()?.collapse(node, left);
+        return;
+      }
+      left -= node.data.length;
+    }
+    el2.ownerDocument.getSelection()?.collapse(el2, el2.childNodes.length);
+  }
+};
+
 // packages/docs/src/page/page.ts
 var STYLE = `
 .dp { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--b-bg, #fff); color: var(--b-fg, #111); font-family: var(--b-font, system-ui, sans-serif); }
@@ -316,6 +841,27 @@ var STYLE = `
 .dp-item .dp-snip del { color: var(--b-danger, #b91c1c); }
 .dp-item button { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--b-border-strong, #ccc); background: var(--b-bg, #fff); color: var(--b-fg, #111); cursor: pointer; margin-right: 6px; }
 .dp-empty { color: var(--b-muted, #666); }
+.dp-page { box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 28px 40px 80px; font-size: 17px; line-height: 1.6; }
+.dp-page[hidden], .dp-text[hidden] { display: none; }
+.dp-block { position: relative; border-radius: 6px; padding: 2px 10px; margin: 0 -10px 8px; cursor: text; }
+.dp-block:hover { background: color-mix(in srgb, var(--b-fg, #111) 4%, transparent); }
+.dp-block > :first-child { margin-top: 0; }
+.dp-block > :last-child { margin-bottom: 0; }
+.dp-block p, .dp-block ul, .dp-block ol, .dp-block pre, .dp-block blockquote, .dp-block table { margin: 0 0 14px; }
+.dp-block h1 { font-size: 28px; line-height: 1.25; margin: 6px 0 14px; }
+.dp-block h2 { font-size: 22px; line-height: 1.3; margin: 14px 0 10px; }
+.dp-block h3 { font-size: 18px; margin: 12px 0 8px; }
+.dp-block h4, .dp-block h5 { font-size: 16px; margin: 10px 0 6px; }
+.dp-block code { font-family: var(--b-mono, ui-monospace, monospace); font-size: .9em; background: var(--b-bg-layer, #f3f3f3); padding: 0 4px; border-radius: 4px; }
+.dp-block .katex-display { margin: 8px 0 14px; }
+.dp-changed { box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); background: color-mix(in srgb, var(--b-accent, #2563eb) 6%, transparent); }
+.dp-editing { white-space: pre-wrap; overflow-wrap: anywhere; outline: none; background: var(--b-bg-deep, #fafafa); box-shadow: inset 0 0 0 1px var(--b-border-strong, #ccc); padding: 8px 10px; margin: 0 -10px 14px; font-size: 15px; line-height: 1.55; }
+.dp-page[data-format="text"] .dp-editing { font-family: var(--b-mono, ui-monospace, monospace); }
+.dp-preamble, .dp-chip { display: inline-block; font-size: 13px; color: var(--b-muted, #666); border: 1px dashed var(--b-border-strong, #ccc); border-radius: 6px; padding: 2px 8px; margin: 0 0 14px; }
+.dp-box, .dp-abstract { border: 1px solid var(--b-border, #e5e5e5); border-radius: 8px; padding: 8px 12px; margin: 0 0 14px; }
+.dp-box { color: var(--b-muted, #666); font-size: 15px; }
+.dp-cite, .dp-link { color: var(--b-accent, #2563eb); }
+.dp-empty-doc { color: var(--b-muted, #666); }
 `;
 function el(tag, attrs = {}, text) {
   const node = document.createElement(tag);
@@ -333,10 +879,11 @@ function mountDocPage(host, options) {
   const name = el("span", { class: "dp-name" }, base(options.path));
   const from = el("span", { class: "dp-from" });
   const status = el("span", { class: "dp-status" }, "Opening\u2026");
+  const sourceButton = el("button", { type: "button", "aria-pressed": "false", title: "Show the file as its source" }, "Source");
   const suggestionsButton = el("button", { type: "button", "aria-pressed": "false" }, "Suggestions");
   const historyButton = el("button", { type: "button", "aria-pressed": "false" }, "History");
   const writeButton = el("button", { type: "button", hidden: "" }, "Write back");
-  bar.append(name, from, status, suggestionsButton, historyButton, writeButton);
+  bar.append(name, from, status, sourceButton, suggestionsButton, historyButton, writeButton);
   const main = el("div", { class: "dp-main" });
   const scroll = el("div", { class: "dp-scroll" });
   const text = el("div", { class: "dp-text", spellcheck: "false" });
@@ -349,11 +896,27 @@ function mountDocPage(host, options) {
   let view = "none";
   let versions = [];
   let written = "";
+  let mode = "page";
   const sync = new DocSync({
     path: options.path,
     send: options.send,
     onUpdate: (_sync, why, applied) => updated(why, applied)
   });
+  const reading = new Reading(sync, {
+    ...options.markdown ? { markdown: options.markdown } : {},
+    ...options.math ? { math: options.math } : {},
+    marks: () => marks
+  });
+  scroll.append(reading.root);
+  text.hidden = true;
+  function setMode(next) {
+    mode = next;
+    sourceButton.setAttribute("aria-pressed", String(mode === "source"));
+    text.hidden = mode !== "source";
+    reading.root.hidden = mode !== "page";
+    if (mode === "source") draw(false);
+    else reading.render();
+  }
   function texts() {
     const out = [];
     const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
@@ -420,11 +983,13 @@ function mountDocPage(host, options) {
       name.textContent = base(sync.source ?? sync.path);
       from.textContent = sync.source ? `copy in ${sync.path.replace(/\/[^/]*$/, "/")}` : "";
       writeButton.hidden = !sync.source;
-      draw(false);
+      reading.root.dataset.format = sync.format;
+      if (mode === "source") draw(false);
+      else reading.update(void 0);
     } else if (why === "local") {
       const before = marks.length;
       for (const splice of applied ?? []) marks = shiftMarks(marks, splice);
-      if (before > 0) draw();
+      if (before > 0 && mode === "source") draw();
     } else {
       const where = caret();
       const known = new Set(marks.map((m) => m.change));
@@ -432,8 +997,11 @@ function mountDocPage(host, options) {
       const live = new Set(sync.changes.map((c) => c.id));
       marks = marks.filter((m) => live.has(m.change));
       for (const change of sync.changes) if (!known.has(change.id)) marks.push(...marksOf(change.id, applied ?? []));
-      draw(false);
-      if (where) place(shiftCaret(where, applied ?? []));
+      if (mode === "page") reading.update(applied ?? []);
+      else {
+        draw(false);
+        if (where) place(shiftCaret(where, applied ?? []));
+      }
     }
     refresh();
   }
@@ -499,7 +1067,11 @@ function mountDocPage(host, options) {
       item.append(el("b", {}, change.by === "outside" ? "Another program" : change.by), document.createTextNode(` \xB7 ${new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`), snip, accept, reject);
       item.onmouseenter = () => hot(change.id, true);
       item.onmouseleave = () => hot(change.id, false);
-      item.onclick = () => text.querySelector(`[data-change="${change.id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      item.onclick = () => {
+        const mark = marks.find((m) => m.change === change.id && m.kind === "ins");
+        const target = mode === "source" ? text.querySelector(`[data-change="${change.id}"]`) : [...reading.root.querySelectorAll(".dp-block")].find((b) => mark && Number(b.dataset.start) <= mark.start && mark.start < Number(b.dataset.end));
+        target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      };
       panel.append(item);
     }
   }
@@ -517,6 +1089,7 @@ function mountDocPage(host, options) {
       panel.append(item);
     }
   }
+  sourceButton.onclick = () => setMode(mode === "source" ? "page" : "source");
   suggestionsButton.onclick = () => show("suggestions");
   historyButton.onclick = () => show("history");
   writeButton.onclick = () => {
@@ -556,13 +1129,14 @@ function mountDocPage(host, options) {
 }
 
 // runtime/live-doc.ts
-function mountLiveDoc(host, board) {
+function mountLiveDoc(host, board, renderers = {}) {
   const raw = host.dataset.path?.trim();
   if (!raw) {
     host.textContent = "This document box names no file: give it a data-path.";
     return;
   }
   const page = mountDocPage(host, {
+    ...renderers,
     path: resolvePath(raw, board),
     send: (message) => window.parent.postMessage({ decks: "doc", message }, "*"),
     listen: (listener) => {

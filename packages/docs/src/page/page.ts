@@ -1,6 +1,7 @@
 import type { DocClientMessage, DocServerMessage, DocVersion, Splice } from "../index.ts";
 import { DocSync } from "../client.ts";
 import { findMarks, marksOf, segments, shiftMarks, spliceBetween, type Mark } from "./marks.ts";
+import { Reading } from "./reading.ts";
 
 /**
  * `@decks/docs/page`: a document drawn as a page you type into, in plain DOM.
@@ -20,6 +21,10 @@ export interface DocPageOptions {
 	send(message: DocClientMessage): void;
 	/** Call `listener` with every message from the server; answers what stops it. */
 	listen(listener: (message: DocServerMessage) => void): () => void;
+	/** Draw markdown into an element; without it a markdown page reads as its plain source. */
+	markdown?(into: HTMLElement, source: string): Promise<void> | void;
+	/** Set the maths in an element, for LaTeX and markdown pages (KaTeX's auto-render). */
+	math?(into: HTMLElement): Promise<void> | void;
 }
 
 export interface DocPage {
@@ -55,6 +60,27 @@ const STYLE = `
 .dp-item .dp-snip del { color: var(--b-danger, #b91c1c); }
 .dp-item button { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--b-border-strong, #ccc); background: var(--b-bg, #fff); color: var(--b-fg, #111); cursor: pointer; margin-right: 6px; }
 .dp-empty { color: var(--b-muted, #666); }
+.dp-page { box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 28px 40px 80px; font-size: 17px; line-height: 1.6; }
+.dp-page[hidden], .dp-text[hidden] { display: none; }
+.dp-block { position: relative; border-radius: 6px; padding: 2px 10px; margin: 0 -10px 8px; cursor: text; }
+.dp-block:hover { background: color-mix(in srgb, var(--b-fg, #111) 4%, transparent); }
+.dp-block > :first-child { margin-top: 0; }
+.dp-block > :last-child { margin-bottom: 0; }
+.dp-block p, .dp-block ul, .dp-block ol, .dp-block pre, .dp-block blockquote, .dp-block table { margin: 0 0 14px; }
+.dp-block h1 { font-size: 28px; line-height: 1.25; margin: 6px 0 14px; }
+.dp-block h2 { font-size: 22px; line-height: 1.3; margin: 14px 0 10px; }
+.dp-block h3 { font-size: 18px; margin: 12px 0 8px; }
+.dp-block h4, .dp-block h5 { font-size: 16px; margin: 10px 0 6px; }
+.dp-block code { font-family: var(--b-mono, ui-monospace, monospace); font-size: .9em; background: var(--b-bg-layer, #f3f3f3); padding: 0 4px; border-radius: 4px; }
+.dp-block .katex-display { margin: 8px 0 14px; }
+.dp-changed { box-shadow: inset 3px 0 0 var(--b-accent, #2563eb); background: color-mix(in srgb, var(--b-accent, #2563eb) 6%, transparent); }
+.dp-editing { white-space: pre-wrap; overflow-wrap: anywhere; outline: none; background: var(--b-bg-deep, #fafafa); box-shadow: inset 0 0 0 1px var(--b-border-strong, #ccc); padding: 8px 10px; margin: 0 -10px 14px; font-size: 15px; line-height: 1.55; }
+.dp-page[data-format="text"] .dp-editing { font-family: var(--b-mono, ui-monospace, monospace); }
+.dp-preamble, .dp-chip { display: inline-block; font-size: 13px; color: var(--b-muted, #666); border: 1px dashed var(--b-border-strong, #ccc); border-radius: 6px; padding: 2px 8px; margin: 0 0 14px; }
+.dp-box, .dp-abstract { border: 1px solid var(--b-border, #e5e5e5); border-radius: 8px; padding: 8px 12px; margin: 0 0 14px; }
+.dp-box { color: var(--b-muted, #666); font-size: 15px; }
+.dp-cite, .dp-link { color: var(--b-accent, #2563eb); }
+.dp-empty-doc { color: var(--b-muted, #666); }
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, text?: string): HTMLElementTagNameMap[K] {
@@ -75,10 +101,11 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const name = el("span", { class: "dp-name" }, base(options.path));
 	const from = el("span", { class: "dp-from" });
 	const status = el("span", { class: "dp-status" }, "Opening…");
+	const sourceButton = el("button", { type: "button", "aria-pressed": "false", title: "Show the file as its source" }, "Source");
 	const suggestionsButton = el("button", { type: "button", "aria-pressed": "false" }, "Suggestions");
 	const historyButton = el("button", { type: "button", "aria-pressed": "false" }, "History");
 	const writeButton = el("button", { type: "button", hidden: "" }, "Write back");
-	bar.append(name, from, status, suggestionsButton, historyButton, writeButton);
+	bar.append(name, from, status, sourceButton, suggestionsButton, historyButton, writeButton);
 	const main = el("div", { class: "dp-main" });
 	const scroll = el("div", { class: "dp-scroll" });
 	const text = el("div", { class: "dp-text", spellcheck: "false" });
@@ -92,12 +119,29 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	let view: "none" | "suggestions" | "history" = "none";
 	let versions: DocVersion[] = [];
 	let written = "";
+	let mode: "page" | "source" = "page";
 
 	const sync = new DocSync({
 		path: options.path,
 		send: options.send,
 		onUpdate: (_sync, why, applied) => updated(why, applied),
 	});
+	const reading = new Reading(sync, {
+		...(options.markdown ? { markdown: options.markdown } : {}),
+		...(options.math ? { math: options.math } : {}),
+		marks: () => marks,
+	});
+	scroll.append(reading.root);
+	text.hidden = true;
+
+	function setMode(next: typeof mode): void {
+		mode = next;
+		sourceButton.setAttribute("aria-pressed", String(mode === "source"));
+		text.hidden = mode !== "source";
+		reading.root.hidden = mode !== "page";
+		if (mode === "source") draw(false);
+		else reading.render();
+	}
 
 	// --- the text, and the caret in it ----------------------------------------------------
 
@@ -178,12 +222,14 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			name.textContent = base(sync.source ?? sync.path);
 			from.textContent = sync.source ? `copy in ${sync.path.replace(/\/[^/]*$/, "/")}` : "";
 			writeButton.hidden = !sync.source;
-			draw(false);
+			reading.root.dataset.format = sync.format;
+			if (mode === "source") draw(false);
+			else reading.update(undefined);
 		} else if (why === "local") {
 			const before = marks.length;
 			for (const splice of applied ?? []) marks = shiftMarks(marks, splice);
 			// The browser already shows the keystroke; redraw only when a mark had to move.
-			if (before > 0) draw();
+			if (before > 0 && mode === "source") draw();
 		} else {
 			const where = caret();
 			const known = new Set(marks.map((m) => m.change));
@@ -191,8 +237,11 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			const live = new Set(sync.changes.map((c) => c.id));
 			marks = marks.filter((m) => live.has(m.change));
 			for (const change of sync.changes) if (!known.has(change.id)) marks.push(...marksOf(change.id, applied ?? []));
-			draw(false);
-			if (where) place(shiftCaret(where, applied ?? []));
+			if (mode === "page") reading.update(applied ?? []);
+			else {
+				draw(false);
+				if (where) place(shiftCaret(where, applied ?? []));
+			}
 		}
 		refresh();
 	}
@@ -265,7 +314,14 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 			item.append(el("b", {}, change.by === "outside" ? "Another program" : change.by), document.createTextNode(` · ${new Date(change.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`), snip, accept, reject);
 			item.onmouseenter = () => hot(change.id, true);
 			item.onmouseleave = () => hot(change.id, false);
-			item.onclick = () => text.querySelector(`[data-change="${change.id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+			item.onclick = () => {
+				const mark = marks.find((m) => m.change === change.id && m.kind === "ins") as Extract<Mark, { kind: "ins" }> | undefined;
+				const target =
+					mode === "source"
+						? text.querySelector(`[data-change="${change.id}"]`)
+						: [...reading.root.querySelectorAll<HTMLElement>(".dp-block")].find((b) => mark && Number(b.dataset.start) <= mark.start && mark.start < Number(b.dataset.end));
+				target?.scrollIntoView({ block: "center", behavior: "smooth" });
+			};
 			panel.append(item);
 		}
 	}
@@ -286,6 +342,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		}
 	}
 
+	sourceButton.onclick = () => setMode(mode === "source" ? "page" : "source");
 	suggestionsButton.onclick = () => show("suggestions");
 	historyButton.onclick = () => show("history");
 	writeButton.onclick = () => {

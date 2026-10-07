@@ -1438,6 +1438,13 @@ export function App() {
 								setComponent(undefined);
 							})
 						}
+						onOpenDocument={(at) =>
+							void files.documentAt(at).then((path) => {
+								if (!path) return;
+								setSelected(path);
+								setComponent(undefined);
+							})
+						}
 						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}

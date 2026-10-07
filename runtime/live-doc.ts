@@ -11,13 +11,18 @@ import { mountDocPage } from "@decks/docs/page";
  *
  *     npm run build:live-doc
  */
-export function mountLiveDoc(host: HTMLElement, board: string | null): void {
+export function mountLiveDoc(
+	host: HTMLElement,
+	board: string | null,
+	renderers: { markdown?: (into: HTMLElement, source: string) => Promise<void> | void; math?: (into: HTMLElement) => Promise<void> | void } = {},
+): void {
 	const raw = host.dataset.path?.trim();
 	if (!raw) {
 		host.textContent = "This document box names no file: give it a data-path.";
 		return;
 	}
 	const page = mountDocPage(host, {
+		...renderers,
 		path: resolvePath(raw, board),
 		send: (message) => window.parent.postMessage({ decks: "doc", message }, "*"),
 		listen: (listener) => {

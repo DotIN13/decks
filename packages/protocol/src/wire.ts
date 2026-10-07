@@ -155,7 +155,8 @@ export type ClientMessage =
 	 * A new board. `title`, `size` and `at` are for a board made to hold something — a file
 	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
 	 */
-	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string }
+	/** `document` names a file to open as a page you type into; the board made for it opens it. */
+	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *

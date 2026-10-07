@@ -10,7 +10,7 @@ import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
 import { selected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
-import { setDraft } from "../state/ui.ts";
+import { setDraft, setPicking } from "../state/ui.ts";
 import { embedPath, mayUpload, uploadAsset } from "./upload.ts";
 import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
@@ -457,6 +457,37 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		);
 	};
 
+	/**
+	 * A document opened as a page you type into, centred where the Add menu was opened.
+	 *
+	 * The file comes from the picker the app already has: anything in the deck or a root it
+	 * declares, or a file from the computer copied into the deck first. The server makes the
+	 * board (`newDocBoard`), and opening it copies the document into `docs/` to be worked on.
+	 */
+	const documentAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
+		const stage = document.querySelector(".stage");
+		if (!stage) return undefined;
+		const picked = await new Promise<string | undefined>((resolve) =>
+			setPicking({
+				resolve: (path) => {
+					setPicking(undefined);
+					resolve(path);
+				},
+			}),
+		);
+		if (!picked) return undefined;
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		const size = { w: 1000, h: 1100 };
+		return askForBoard((request) =>
+			send({
+				type: "board.create",
+				document: picked,
+				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
+				request,
+			}),
+		);
+	};
+
 	/** A board asked for by a drop heard its path — see `board.created` in the frame switch. */
 	const hearBoard = (request: string, path: string): boolean => {
 		const waiting = created.get(request);
@@ -526,5 +557,5 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		});
 	};
 
-	return { drops, addFile, intoComposer, paste, boardAt, askForBoard, hearBoard, install };
+	return { drops, addFile, intoComposer, paste, boardAt, documentAt, askForBoard, hearBoard, install };
 }

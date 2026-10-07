@@ -183,7 +183,16 @@ export const boards = {
 		const w = bounded(message.size?.w, 320, 2400);
 		const h = bounded(message.size?.h, 240, 4000);
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-		const path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
+		let path: string;
+		if (typeof message.document === "string" && message.document.trim()) {
+			// A document: refused here, in a sentence, for a file a document page could not open.
+			try {
+				path = wire.boards.newDocBoard(wire.docs.openable(message.document.trim()));
+			} catch (error) {
+				reply({ type: "notice", level: "warn", text: (error as Error).message });
+				return;
+			}
+		} else path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
 		const agent = wire.target();
 		/*
 		 * The place first, then the canvas. A drop and a double-click name the point themselves, and

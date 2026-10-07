@@ -1256,7 +1256,8 @@
 	async function mountLiveDoc(host) {
 		try {
 			const module = await needModule("live-doc.js");
-			module.mountLiveDoc(host, BOARD_PATH);
+			// The board's own renderers, so a document reads like every other markdown and maths here.
+			module.mountLiveDoc(host, BOARD_PATH, { markdown: renderMarkdown, math: renderMath });
 		} catch (error) {
 			host.textContent = `Cannot open this document: ${error.message}`;
 			host.dataset.state = "broken";
