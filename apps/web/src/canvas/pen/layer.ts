@@ -1,4 +1,4 @@
-import { indexOf, isShape, NOTE_PAD, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
@@ -366,8 +366,9 @@ export class PenLayer {
 		if (!best) return undefined;
 		if (!options?.deep) {
 			// A group is picked whole, and so is a shape (`@decks/pen`, `shapes.ts`): its outline and words are parts of it.
+			// So is a card where its words are: a picture in it is picked on its own, and carried out of it.
 			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
-				if (up.node.type === "group" || isShape(up.node)) best = up;
+				if (up.node.type === "group" || isShape(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
 			}
 		}
 		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };
@@ -386,7 +387,7 @@ export class PenLayer {
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
 			found = card;
 		}
-		return found ? { card: found, x: point.x - found.box.x - NOTE_PAD, y: point.y - found.box.y - NOTE_PAD } : undefined;
+		return found ? { card: found, x: point.x - found.box.x - found.pad, y: point.y - found.box.y - found.pad } : undefined;
 	}
 
 	/**

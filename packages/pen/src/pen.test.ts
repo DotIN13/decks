@@ -406,3 +406,11 @@ test("a colour is stored in pen's own hex, whatever it was written as", () => {
 	assert.deepEqual(stored({ effect: { type: "shadow", color: "rgba(0,0,0,0.2)", blur: 4 } }).effect, { type: "shadow", color: "#00000033", blur: 4 });
 	assert.deepEqual(stored({ fill: { type: "gradient", colors: [{ color: "white", position: 0 }] } }).fill, { type: "gradient", colors: [{ color: "#ffffff", position: 0 }] });
 });
+
+test("a replace frees the ids of what it replaces, so a frame saved again keeps its children's ids", () => {
+	const light = { theme: baseTheme(emptyDocument(), "light") };
+	const doc: PenDocument = { version: "2.14", children: [{ type: "frame", id: "card", layout: "vertical", children: [{ type: "text", id: "a", content: "one" }, { type: "text", id: "b", content: "two" }] }, { type: "note", id: "other", content: "x" }] } as PenDocument;
+	const { doc: next } = apply(doc, [{ op: "replace", id: "card", node: { type: "frame", id: "card", layout: "vertical", children: [{ type: "text", id: "b", content: "two" }, { type: "text", id: "a", content: "one, changed" }] } }], light);
+	assert.deepEqual(next.children[0]!.children!.map((n) => [n.id, n.content]), [["b", "two"], ["a", "one, changed"]]);
+	assert.throws(() => apply(doc, [{ op: "replace", id: "card", node: { type: "frame", children: [{ type: "text", id: "other" }] } }], light), /already used/);
+});

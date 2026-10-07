@@ -1,5 +1,5 @@
 import type { CanvasKit, Image, Paragraph, TypefaceFontProvider } from "canvaskit-wasm";
-import { isMarkdown, type MeasureText, type TextStyle } from "@decks/pen";
+import { isMarkdown, isMarkdownText, type MeasureText, type TextStyle } from "@decks/pen";
 import { parseMarkdown } from "./markdown.ts";
 import { layoutMarkdown, type MarkdownLayout } from "./markdown-layout.ts";
 
@@ -179,7 +179,7 @@ export class PenFonts {
 
 	/** The measure `@decks/pen`'s layout takes, with this browser's fonts. A card's markdown is measured as it is drawn. */
 	readonly measure: MeasureText = (text, style, maxWidth, node) => {
-		if (node && isMarkdown(node)) return { w: maxWidth ?? 240, h: this.markdown(text, style, { width: maxWidth ?? 240, align: node.textAlign ?? "left" }).height };
+		if (node && (isMarkdown(node) || isMarkdownText(node))) return { w: maxWidth ?? 240, h: this.markdown(text, style, { width: maxWidth ?? 240, align: node.textAlign ?? "left" }).height };
 		const paragraph = this.paragraph(text || " ", style, { width: maxWidth ?? 1e6 });
 		const w = maxWidth === undefined ? Math.ceil(paragraph.getMaxIntrinsicWidth()) : Math.min(maxWidth, Math.ceil(paragraph.getLongestLine()));
 		const h = paragraph.getHeight();

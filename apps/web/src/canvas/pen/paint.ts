@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
-import { arrowLabel, arrowStyle, bool, color, fillsOf, isArrow, isMarkdown, mediaOf, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
+import { arrowLabel, arrowStyle, bool, color, fillsOf, isArrow, isCard, isMarkdown, isMarkdownText, mediaOf, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
 import { CARD_PALETTE } from "./markdown-layout.ts";
 import type { IconShape } from "./icons.ts";
@@ -84,6 +84,9 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		case "frame":
 		case "rectangle": {
 			const rrect = rrectOf(ck, placed, doc);
+			// A card with no fill of its own is on the card's paper, as a note card is (`CARD`).
+			const paper = isCard(node) && !fillsOf(node.fill).length;
+			if (paper) paintCardPaper(canvas, ctx, rrect, CARD_PALETTE[ctx.scheme].paper);
 			paintShadows(canvas, ctx, node, theme, (paint) => canvas.drawRRect(rrect, paint));
 			paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawRRect(rrect, paint));
 			if (node.type === "frame" && Array.isArray(node.children) && node.children.length) {
@@ -94,6 +97,7 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 				canvas.restore();
 			}
 			paintStroke(canvas, ctx, node, theme, placed, (paint) => canvas.drawRRect(rrect, paint), (op) => canvas.clipRRect(rrect, op, true));
+			if (paper) paintCardEdge(canvas, ctx, placed, radiiOf(doc, node, theme)[0] ?? NOTE_RADIUS);
 			// A film or a sound (`@decks/pen`, `MEDIA`): the still is its fill, and this is the badge on it.
 			paintMedia(canvas, ctx, node, placed);
 			break;
@@ -158,7 +162,9 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			break;
 		}
 		case "text":
-			paintText(canvas, ctx, node, theme, placed, 0);
+			// One block of a card, or markdown words on their own: drawn as a card draws them, without paper.
+			if (isMarkdownText(node)) paintMarkdown(canvas, ctx, node, theme, placed, 0);
+			else paintText(canvas, ctx, node, theme, placed, 0);
 			break;
 		case "note":
 		case "prompt":
@@ -588,7 +594,41 @@ function textShadows(ctx: PaintContext, node: PenNode, theme: ThemeState): Array
 }
 
 /** A markdown card's words, set as markdown inside its padding (`fonts.markdown`). */
-function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: ThemeState, placed: Placed): void {
+/** A card's paper: the app's two-layer shadow for the scheme, then the panel colour, as a note card has. */
+function paintCardPaper(canvas: Canvas, ctx: PaintContext, rrect: Float32Array, colour: string): void {
+	const { ck } = ctx;
+	for (const layer of SHADOWS[ctx.scheme]) {
+		const shadow = new ck.Paint();
+		shadow.setAntiAlias(true);
+		shadow.setColor(ck.Color4f(0, 0, 0, layer.alpha));
+		shadow.setMaskFilter(ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, layer.blur / 2, true));
+		canvas.save();
+		canvas.translate(0, layer.y);
+		canvas.drawRRect(rrect, shadow);
+		canvas.restore();
+		shadow.delete();
+	}
+	const paint = new ck.Paint();
+	paint.setAntiAlias(true);
+	paint.setColor(colorOf(ck, colour));
+	canvas.drawRRect(rrect, paint);
+	paint.delete();
+}
+
+/** A card's hairline edge, outside its box as a CSS outline is. */
+function paintCardEdge(canvas: Canvas, ctx: PaintContext, placed: Placed, radius: number): void {
+	const { ck } = ctx;
+	const { x, y, w, h } = placed.box;
+	const edge = new ck.Paint();
+	edge.setAntiAlias(true);
+	edge.setStyle(ck.PaintStyle.Stroke);
+	edge.setStrokeWidth(1);
+	edge.setColor(ctx.scheme === "dark" ? ck.Color4f(1, 1, 1, 0.12) : ck.Color4f(0, 0, 0, 0.1));
+	canvas.drawRRect(ck.RRectXY(ck.LTRBRect(x - 0.5, y - 0.5, x + w + 0.5, y + h + 0.5), radius + 0.5, radius + 0.5), edge);
+	edge.delete();
+}
+
+function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: ThemeState, placed: Placed, pad = NOTE_PAD): void {
 	if (ctx.mute?.has(node.id)) return;
 	const content = String(resolve(ctx.doc, node.content, withTheme(theme, node)) ?? "");
 	if (!content) return;
@@ -601,8 +641,8 @@ function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: 
 	 */
 	const { ck } = ctx;
 	canvas.save();
-	canvas.clipRRect(ck.RRectXY(ck.LTRBRect(x, y, x + w, y + h), NOTE_RADIUS, NOTE_RADIUS), ck.ClipOp.Intersect, true);
-	ctx.fonts.markdown(content, style, { width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" }).draw(canvas, x + NOTE_PAD, y + NOTE_PAD, (index) => ctx.scroll?.(node.id, index) ?? 0);
+	if (pad) canvas.clipRRect(ck.RRectXY(ck.LTRBRect(x, y, x + w, y + h), NOTE_RADIUS, NOTE_RADIUS), ck.ClipOp.Intersect, true);
+	ctx.fonts.markdown(content, style, { width: w - pad * 2, align: node.textAlign ?? "left" }).draw(canvas, x + pad, y + pad, (index) => ctx.scroll?.(node.id, index) ?? 0);
 	canvas.restore();
 }
 

@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
@@ -91,6 +91,8 @@ export interface CardGeometry {
 	id: string;
 	order: number;
 	box: Frame;
+	/** Between the box's edge and the words: a note card's padding, none for a card's own block. */
+	pad: number;
 	links: MarkdownLayout["links"];
 	scrollers: MarkdownLayout["scrollers"];
 }
@@ -1164,7 +1166,7 @@ export class StageScene {
 			const style = textStyleOf(doc, node, theme);
 			needs.push({ family: style.fontFamily, weight: style.fontWeight, italic: style.fontStyle === "italic", text: node.content });
 			// A markdown card sets headings and bold heavier, emphasis in italic and code in a monospace face.
-			if (isMarkdown(node)) {
+			if (isMarkdown(node) || isMarkdownText(node)) {
 				// The picture sign only for a card that has a picture: it is an emoji, and the emoji font is 25MB
 				// of a phone's memory for a card that never shows it.
 				const pictured = /!\[|<img\b/i.test(node.content);
@@ -1255,10 +1257,12 @@ export class StageScene {
 		const cards: CardGeometry[] = [];
 		for (const one of placed.values()) {
 			const { node, box } = one;
-			if (!isMarkdown(node)) continue;
+			const text = isMarkdownText(node);
+			if (!isMarkdown(node) && !text) continue;
 			const content = String(resolve(doc, node.content, withTheme(one.theme, node)) ?? "");
-			const laid = fonts.markdown(content, textStyleOf(doc, node, one.theme), { width: box.w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
-			cards.push({ id: node.id, order: one.order, box, links: laid.links, scrollers: laid.scrollers });
+			const pad = text ? 0 : NOTE_PAD;
+			const laid = fonts.markdown(content, textStyleOf(doc, node, one.theme), { width: box.w - pad * 2, align: node.textAlign ?? "left" });
+			cards.push({ id: node.id, order: one.order, box, pad, links: laid.links, scrollers: laid.scrollers });
 		}
 		this.sendLayout(cards);
 	}

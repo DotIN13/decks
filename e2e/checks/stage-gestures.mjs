@@ -495,7 +495,7 @@ let ITEM_WASH = "";
 	});
 	await page.keyboard.press("c");
 	await page.mouse.click(at.x, at.y);
-	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.markdown"));
+	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.card"));
 	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
 	const height = () => page.evaluate((id) => window.__decksPenBox?.(id)?.height ?? 0, card?.id);
 	const before = await until(height, 3000);

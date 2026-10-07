@@ -1488,6 +1488,14 @@
 	cursor: text;
 	outline: 1px dashed var(--line-strong);
 }
+	.pen-card-editor div.pce-held {
+	display: block;
+	width: fit-content;
+	padding: 0.4em 0.75em;
+	border: 1px dashed var(--line-strong);
+	border-radius: 8px;
+	font-size: 0.9em;
+}
 	.pen-card-editor .pce-rule {
 	height: 1px;
 	background: var(--line);

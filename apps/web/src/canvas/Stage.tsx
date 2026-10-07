@@ -39,9 +39,10 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
+import { cardChildren, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -663,7 +664,11 @@ export function Stage(props: {
 	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number; given?: { x: number; y: number } } | undefined>();
 	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
-	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean } | undefined>();
+	/*
+	 * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
+	 * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
+	 */
+	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; card?: true; legacy?: true; held?: Record<string, string> } | undefined>();
 	/**
 	 * The one film or sound playing, if any.
 	 *
@@ -772,7 +777,7 @@ export function Stage(props: {
 		setOnSheet(paths);
 	};
 	penLayer.drawn = () => {
-		if (unmute && penLayer.placed.get(unmute.id)?.node.content === unmute.value) unmuteNow();
+		if (unmute && wordsOf(penLayer.placed.get(unmute.id)?.node) === unmute.value) unmuteNow();
 		/*
 		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
 		 * goes. Not when the answer *arrives* — the layout is only redone on the next frame, and for
@@ -972,11 +977,37 @@ export function Stage(props: {
 		openPenText({ id: labelId, node, box: { x: box.x + 10, y: box.y + box.h / 2 - 10, w: Math.max(20, box.w - 20), h: 20 } }, true);
 	};
 	const openPenText = (hit: PenHit, fresh?: boolean) => {
+		// A card, or one of its blocks: the whole card is typed into, as one piece of markdown.
+		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
+		if (card) return openCard(card, hit.box, fresh);
 		const node = hit.node;
 		const placed = penLayer.placed.get(hit.id);
 		const box = placed?.box ?? hit.box;
 		penLayer.muteText(new Set([hit.id]));
-		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}) });
+		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
+	};
+	/** The card an item is a block of, if it is one. */
+	const cardOf = (id: string): PenNode | undefined => {
+		const parent = props.pen ? indexOf(props.pen.doc).get(id)?.parent : undefined;
+		return parent && isCard(parent) ? parent : undefined;
+	};
+	/** A card's words, its padding and its paper, for the editor laid over it. */
+	const cardLook = (card: PenNode): TextLook => {
+		const block = (card.children ?? []).find((child) => child.type === "text");
+		const look = textLookOf(block ?? ({ type: "text", id: "", content: "" } as PenNode), undefined);
+		const palette = CARD_PALETTE[scheme()];
+		const doc = props.pen?.doc ?? { version: "", children: [] };
+		const firstColour = fillsOf(card.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
+		const rgba = firstColour ? color(doc, firstColour, baseTheme(doc, scheme())) : undefined;
+		const paper = rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : palette.paper;
+		return { ...look, pad: typeof card.padding === "number" ? card.padding : NOTE_PAD, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
+	};
+	const openCard = (card: PenNode, at: { x: number; y: number; w: number; h: number }, fresh?: boolean) => {
+		const placed = penLayer.placed.get(card.id);
+		const kids = card.children ?? [];
+		setPenSelection([card.id]);
+		penLayer.muteText(new Set(kids.filter((child) => child.type === "text").map((child) => child.id)));
+		setPenText({ id: card.id, box: { ...(placed?.box ?? at) }, value: cardMarkdown(kids), style: cardLook(card), card: true, held: heldLabels(kids), ...(fresh ? { fresh } : {}) });
 	};
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
@@ -1051,7 +1082,11 @@ export function Stage(props: {
 			const copy = structuredClone(doc);
 			const found = indexOf(copy).get(typedValue.id);
 			if (!found) return;
-			found.node.content = typedValue.value;
+			if (isCard(found.node)) {
+				// The card grows as its blocks are typed: stand-in ids, swapped for real ones when it is saved.
+				let n = 0;
+				found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
+			} else found.node.content = typedValue.value;
 			penLayer.setDoc(copy, props.pen?.base ?? "");
 		});
 	};
@@ -1092,15 +1127,65 @@ export function Stage(props: {
 			return props.onPenEdit([{ op: "delete", id: open.id }]);
 		}
 		// Against the document the server has: the one drawn already has the typed words in it.
-		const was = props.pen ? indexOf(props.pen.doc).get(open.id)?.node.content : undefined;
+		const node = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
+		const was = node ? (open.card ? cardMarkdown(node.children ?? []) : node.content) : undefined;
 		if (value === was) {
 			unmuteNow();
 			return dropTyped();
 		}
 		if (unmute) clearTimeout(unmute.timer);
-		unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
-		props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
+		if (!open.card && !open.legacy) {
+			unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
+			props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
+			return;
+		}
+		// A card is saved as its blocks: the frame again, each untouched block the same item. A note card
+		// from before becomes a card frame here, in its place. Pictures are measured first, for their shape.
+		const save = props.onPenEdit;
+		void measurePictures(value).then(() => {
+			const current = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
+			const base = current ?? node;
+			if (!base) return unmuteNow();
+			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
+			const children = cardChildren(value, card.children ?? [], { fresh: freshIds(), inner: cardInner(card), size: pictureSize });
+			unmute = { id: open.id, value: cardMarkdown(children), timer: setTimeout(unmuteNow, 3000) };
+			save([{ op: "replace", id: open.id, node: { ...card, children } }]);
+		});
 	};
+	/** How wide a card's words are: its width less its padding. */
+	const cardInner = (card: PenNode) => {
+		const width = penLayer.placed.get(card.id)?.box.w ?? (typeof card.width === "number" ? card.width : 320);
+		const pad = typeof card.padding === "number" ? card.padding : NOTE_PAD;
+		return Math.max(40, width - pad * 2);
+	};
+	/** Pictures' own sizes, as they arrive, so a picture put in a card keeps its shape. */
+	const pictureSizes = new Map<string, { w: number; h: number } | null>();
+	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
+	const measurePictures = async (markdown: string) => {
+		const urls = [...markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)|!\[\[([^\]|]+\.(?:png|jpe?g|gif|webp|svg|avif|bmp))(?:\|[^\]]*)?\]\]/gi)].map((m) => (m[1] ?? m[2])!).filter((url) => !pictureSizes.has(url));
+		await Promise.all(
+			urls.map(
+				(url) =>
+					new Promise<void>((done) => {
+						const image = new Image();
+						const finish = (size: { w: number; h: number } | null) => {
+							pictureSizes.set(url, size);
+							done();
+						};
+						image.onload = () => finish(image.naturalWidth ? { w: image.naturalWidth, h: image.naturalHeight } : null);
+						image.onerror = () => finish(null);
+						setTimeout(() => finish(null), 1500);
+						try {
+							image.src = new URL(url, new URL(props.pen?.base || "/", location.origin)).href;
+						} catch {
+							finish(null);
+						}
+					}),
+			),
+		);
+	};
+	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
+	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
 	 * the press from the board's page; on bare canvas the press is the stage's and `hitTest` finds the item.
@@ -1151,6 +1236,15 @@ export function Stage(props: {
 	};
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(localCamera, view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
+	/** Ids for several new items at once, none the same as another or as any on the stage. */
+	const freshIds = () => {
+		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
+		return () => {
+			const id = newId(taken);
+			taken.add(id);
+			return id;
+		};
+	};
 
 	/**
 	 * The board whose picture is under a point and that has no node of its own to take the press
@@ -1592,6 +1686,15 @@ export function Stage(props: {
 				const onto = ids.length === 0 || e.metaKey || e.ctrlKey ? undefined : frameUnder(now, ids);
 				setDropInto(onto);
 				setDropAt(onto ? dropSlot(onto, now, ids) : undefined);
+				/*
+				 * Over a card, what is carried rides below and right of the pointer, a ghost of itself, so
+				 * the line where it will land between the card's blocks stays in view under the hand.
+				 */
+				if (onto && start && isCard(penNode(onto))) {
+					const gap = 12 / localCamera.zoom;
+					offset = { dx: now.x + gap - start.x, dy: now.y + gap - start.y };
+					lines = [];
+				}
 				markComposer(composerUnder(e, ids, boards));
 				pannedAt = performance.now();
 				batch(() => {
@@ -1784,7 +1887,7 @@ export function Stage(props: {
 		const words = hugsWords(id) && !handle.includes("n") && !handle.includes("s");
 		const node = penLayer.placed.get(id)?.node;
 		// Nothing smaller than a card's own padding, which would be a card with no room for a word in it.
-		const floor = node && isMarkdown(node) ? NOTE_PAD * 2 : 4;
+		const floor = node && (isMarkdown(node) || isCard(node)) ? NOTE_PAD * 2 : 4;
 		/*
 		 * The handles are on what the item draws; the file sizes the box it was given. For most items
 		 * they are the same box. For a path drawn in a corner of its viewBox they are not, and the
@@ -1897,7 +2000,7 @@ export function Stage(props: {
 	 */
 	const hugsWords = (id: string | undefined) => {
 		const node = id ? penLayer.placed.get(id)?.node : undefined;
-		return !!node && isMarkdown(node) && typeof node.height !== "number";
+		return !!node && (isMarkdown(node) || isCard(node)) && typeof node.height !== "number";
 	};
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
@@ -2050,10 +2153,10 @@ export function Stage(props: {
 		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 300 },
 		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
 		/*
-		 * A card is a note whose words are markdown (`MARKDOWN`): pen's own note, so pen.dev opens it
-		 * as one, with a mark in pen's extension field that Decks reads its words by.
+		 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
+		 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
 		 */
-		card: { node: { type: "note", name: "Card", content: "", metadata: { type: MARKDOWN } }, w: 320, h: 0 },
+		card: { node: { type: "frame", name: "Card" }, w: 320, h: 0 },
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
@@ -2076,6 +2179,8 @@ export function Stage(props: {
 			const icon = penIcon();
 			return { type: "icon", id, name: icon.name, library: icon.library, icon: icon.name, fill: "#1f2328", weight: 400 } as PenNode;
 		}
+		// A card is a column frame of blocks (`pen/card-frame.ts`), starting with one empty one.
+		if (tool === "card") return newCard(id, freshIds()());
 		return { ...MADE[tool].node, id } as PenNode;
 	};
 
@@ -4349,6 +4454,7 @@ export function Stage(props: {
 								<CardEditor
 									class="pen-text"
 									value={open.value}
+									{...(open.held ? { held: open.held } : {})}
 									base={props.pen?.base ?? ""}
 									zoom={props.camera.zoom}
 									style={{

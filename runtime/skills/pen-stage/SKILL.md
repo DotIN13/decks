@@ -96,7 +96,8 @@ no field for: `{ type: "…", … }`).
 | type | what it is | its own fields |
 |---|---|---|
 | `note` | a sticky note | `content`; `fill` for its colour; `width` (240 when left out); height follows the words |
-| `note` + `metadata: { type: "decks.markdown" }` | a **card**: white, with an edge, its words markdown | `content` in markdown; `width` (320 reads well); height follows what the markdown draws |
+| `frame` + `metadata: { type: "decks.card" }` | a **card**: white, with an edge, a column of markdown blocks and pictures (see Cards) | `layout: "vertical"`, `width` (320 reads well), `children`; height follows what it holds |
+| `text` + `metadata: { type: "decks.markdown" }` | one block of a card: its words markdown | `content`, `textGrowth: "fixed-width"`, `width: "fill_container"` |
 | `text` | words on the stage | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
 | `rectangle` | a box | `fill`, `stroke`, `strokeWidth`, `cornerRadius` |
 | `ellipse` | a circle or oval, in its box | `fill`, `stroke`; `innerRadius` 0–1 for a ring; `startAngle`, `sweepAngle` for an arc |
@@ -138,18 +139,28 @@ Two things Obsidian has no word for are ours; Obsidian shows them as the words t
   reason. The card draws it struck through and in blue, and the person accepts or rejects it with
   ✓ or ✕ when they open the card. Your own card you can simply edit.
 
-A person follows a card's link with a click, and types into a card as it reads. Decks draws it;
-pen.dev, which has no rich text, opens the same note with the markdown as typed.
+**A card is a frame**, a column whose children are its blocks: each heading, paragraph, list,
+callout or table a `text` holding that block's markdown, and each picture pen's own rectangle filled
+with the image. So a picture dragged onto a card drops between two lines, a picture dragged off it
+leaves, and pen.dev opens the card as a column with its pictures in it. Write one block per text;
+one text holding several blocks also works, and is split into blocks the first time someone edits it.
 
 ```ts
-{ op: "insert", node: { type: "note", id: "plan", metadata: { type: "decks.markdown" },
-  content: "## Next\n\n- Cut the **pilot** to 20 questions\n- Ask [Verasight](https://verasight.io) for a quote" },
+const block = (id, content) => ({ type: "text", id, content, textGrowth: "fixed-width", width: "fill_container", metadata: { type: "decks.markdown" } });
+{ op: "insert", node: { type: "frame", id: "plan", name: "Next", layout: "vertical", gap: 14, padding: 16, cornerRadius: 12,
+  metadata: { type: "decks.card" }, children: [
+    block("plan-h", "## Next"),
+    block("plan-l", "- Cut the **pilot** to 20 questions\n- Ask [Verasight](https://verasight.io) for a quote"),
+    { type: "rectangle", id: "plan-p", name: "Gate", width: 288, height: 162, cornerRadius: 6, fill: { type: "image", url: "./gate.jpg", mode: "fill" } },
+  ] },
   box: { x1: 1060, y1: 0, x2: 1380 } }
 ```
 
-A card is still a note: move it, colour it with `fill`, point arrows at it. Use a plain `note` for
-one line; a card when there is a heading or a list. Keep it short: a card is read on the canvas,
-and a long document is a board.
+To change one block, `update` that text's `content`; to add one, `insert` with `parent: "plan"` and
+an `index`. A person follows a card's link with a click, and types into the whole card as it reads.
+A note with `metadata: { type: "decks.markdown" }` is a card from before: it is still drawn, and
+becomes a frame when someone edits it. Use a plain `note` for one line; a card when there is a
+heading or a list. Keep it short: a card is read on the canvas, and a long document is a board.
 
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",

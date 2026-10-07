@@ -187,15 +187,17 @@ if (spot) {
 	const before = new Set(onDisk().children.map((n) => n.id));
 	await page.keyboard.press("c");
 	await page.mouse.click(spot.x + 10, spot.y + 150);
-	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "note"));
+	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "frame"));
 	cardId = card?.id;
-	say("C then a click makes a card: a note marked as markdown", card?.metadata?.type === "decks.markdown", JSON.stringify(card));
+	// A card is a column frame whose blocks are markdown texts (`pen/card-frame.ts`).
+	say("C then a click makes a card: a column frame holding a markdown block", card?.metadata?.type === "decks.card" && card?.layout === "vertical" && card?.children?.[0]?.metadata?.type === "decks.markdown", JSON.stringify(card));
 	const typing = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")));
 	say("…and it opens for typing", !!typing);
 	await page.keyboard.type("## Plan\n\n- **one**\n- two");
 	await page.keyboard.press("Control+Enter");
-	const titled = await until(() => onDisk().children.find((n) => n.id === cardId)?.content === "## Plan\n\n- **one**\n- two");
-	say("…and what is typed is its markdown in the file, as typed", !!titled, JSON.stringify(onDisk().children.find((n) => n.id === cardId)?.content));
+	const blocks = () => (onDisk().children.find((n) => n.id === cardId)?.children ?? []).map((n) => n.content);
+	const titled = await until(() => JSON.stringify(blocks()) === JSON.stringify(["## Plan", "- **one**\n- two"]));
+	say("…and what is typed is its markdown in the file, one block per item, as typed", !!titled, JSON.stringify(blocks()));
 	// --- the corner radius, and a card sized by its width alone ------------------------------------
 	// The rectangle again: it has corners to round, where a card has none.
 	await page.keyboard.press("Escape");

@@ -43,6 +43,19 @@ export type MeasureText = (text: string, style: TextStyle, maxWidth: number | un
  */
 export const MARKDOWN = "decks.markdown";
 export const isMarkdown = (node: PenNode): boolean => node.type !== "text" && node.metadata?.type === MARKDOWN;
+/**
+ * A text item whose words are markdown, `metadata: { type: "decks.markdown" }`: one block of a card
+ * (`CARD`), drawn as the card draws it, with no paper of its own. pen.dev shows it as the words typed.
+ */
+export const isMarkdownText = (node: PenNode): boolean => node.type === "text" && node.metadata?.type === MARKDOWN;
+/**
+ * A card: pen's own frame, a column, marked `metadata: { type: "decks.card" }`. Each block of its
+ * markdown is a child of its own (a markdown text, a picture as an image-filled rectangle), so the
+ * frame's drop slots are the gaps between lines and pen.dev opens it as a column with its pictures.
+ * Decks draws it on the card's paper when it has no fill of its own.
+ */
+export const CARD = "decks.card";
+export const isCard = (node: PenNode | undefined): boolean => node?.type === "frame" && node.metadata?.type === CARD;
 
 /**
  * A film or a sound on the stage: `metadata: { type: "decks.media", kind, file }`, on pen's own
@@ -237,7 +250,7 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 		if (growth === "fixed-width") {
 			const ws = sizing(doc, node.width, t, { kind: "fixed", value: 100 });
 			const w = forcedW ?? fixedOr(ws, 100);
-			return { w, h: forcedH ?? measure(content, style, w).h };
+			return { w, h: forcedH ?? measure(content, style, w, node).h };
 		}
 		const size = measure(content, style, undefined);
 		return { w: forcedW ?? size.w, h: forcedH ?? size.h };

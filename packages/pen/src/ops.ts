@@ -1,4 +1,4 @@
-import { check, clone, ids, indexOf, newId, PenError } from "./doc.ts";
+import { check, clone, ids, indexOf, newId, PenError, walk } from "./doc.ts";
 import { layout, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
 import { fitShapes } from "./shapes.ts";
@@ -161,7 +161,8 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 			if (!op.node || typeof op.node.type !== "string") throw new PenError("replace needs a node with a type.");
 			const found = located(doc, op.id);
 			const taken = ids(doc);
-			taken.delete(op.id);
+			// What is replaced frees its own ids, its children's too: a card saved again keeps its blocks' ids.
+			for (const inside of walk([found.node])) taken.delete(inside.id);
 			const node = clone(op.node) as PenNode;
 			node.id = typeof node.id === "string" && node.id ? node.id : op.id;
 			canonicalFills(node);

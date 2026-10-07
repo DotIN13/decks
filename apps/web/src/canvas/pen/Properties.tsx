@@ -1,4 +1,4 @@
-import { arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
+import { arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isCard, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
 import type { LucideIcon } from "lucide-solid";
 import AlignCenterHorizontal from "lucide-solid/icons/align-center-horizontal";
 import AlignCenterVertical from "lucide-solid/icons/align-center-vertical";
@@ -838,7 +838,7 @@ export function Properties(props: {
 							 * bottom handle pins a height on it. This is the way back: the same two words the
 							 * frame's own height uses, so one control means one thing across the panel.
 							 */}
-							<Show when={isMarkdown(single()!)}>
+							<Show when={isMarkdown(single()!) || isCard(single()!)}>
 								<span class="props-prop">height</span>
 								<div class="seg-set" role="group" aria-label="height">
 									<button type="button" data-on={typeof single()!.height !== "number" ? "true" : undefined} aria-pressed={typeof single()!.height !== "number"} onClick={() => set([single()!], () => ({ height: null }))}>fit-content</button>

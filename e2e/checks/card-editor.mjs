@@ -51,7 +51,8 @@ const onDisk = () => {
 		try {
 			const doc = JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8"));
 			const card = (doc.children ?? []).find((n) => n.id === "card-editor");
-			if (card) return card.content;
+			// A note card from before is saved as a card frame, its blocks one item each.
+			if (card) return card.type === "frame" ? (card.children ?? []).map((n) => n.content).join("\n\n") : card.content;
 		} catch {
 			/* a stage being written */
 		}
@@ -125,6 +126,17 @@ await page.click(".pce-sug [data-accept]");
 await page.keyboard.press("Control+Enter");
 const accepted = await until(() => onDisk() === SOURCE.replace("{~~Arashiyama~>Ohara~~}{>>quieter in November<<}", "Ohara"));
 say("accepting a suggestion changes those words and leaves every other byte as it was", !!accepted, JSON.stringify(onDisk()?.split("\n").slice(4, 7)));
+const frame = (() => {
+	for (const stage of readdirSync(`${deck.path}/stages`)) {
+		try {
+			const card = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
+			if (card) return card;
+		} catch {
+			/* being written */
+		}
+	}
+})();
+say("…and the note card from before is now a card frame, one markdown item per block", frame?.type === "frame" && frame?.metadata?.type === "decks.card" && frame.children?.length === 8, JSON.stringify(frame?.children?.map((n) => n.type)));
 
 await settle(page, 400);
 await openCard();
@@ -168,7 +180,58 @@ const saved = await until(() => {
 });
 say("…and the file says so, with the untouched table, hidden note and code as they were", !!saved, JSON.stringify(onDisk()));
 
+// A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
+const where = (id) => {
+	for (const stage of readdirSync(`${deck.path}/stages`)) {
+		try {
+			const doc = JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8"));
+			const card = (doc.children ?? []).find((n) => n.id === "card-editor");
+			if (card) return { inCard: (card.children ?? []).map((n) => n.id).indexOf(id), top: doc.children.some((n) => n.id === id), kids: (card.children ?? []).map((n) => n.id) };
+		} catch {
+			/* being written */
+		}
+	}
+};
+await page.keyboard.press("Escape");
+await settle(page, 300);
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });
+await settle(page, 300);
+const beside = { x1: Math.round((880 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "card-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...beside, x2: beside.x1 + 160, y2: beside.y1 + 90 } }] });
+const picture = await until(() => page.evaluate(() => globalThis.__decksPenBox?.("card-picture")));
+const kids = where("card-picture")?.kids ?? [];
+const second = await page.evaluate((id) => globalThis.__decksPenBox?.(id), kids[1]);
+await page.mouse.click(picture.x + 30, picture.y + 30);
+await settle(page, 200);
+await page.mouse.move(picture.x + 30, picture.y + 30);
+await page.mouse.down();
+await page.mouse.move(picture.x + 10, picture.y + 30, { steps: 4 });
+const aim = { x: second.x + 60, y: second.y + second.height + 6 };
+await page.mouse.move(aim.x, aim.y, { steps: 14 });
+await settle(page, 200);
+// The selection's outline is drawn where the carried item is drawn.
+const carried = await page.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+await page.mouse.up();
+const dropped = await until(() => (where("card-picture")?.inCard === 2 ? where("card-picture") : undefined));
+say("a picture dragged onto a card drops between two of its blocks, as the frame's own drop", !!dropped, JSON.stringify(where("card-picture")));
+say("…and while it is carried over the card it rides below and right of the pointer", !!carried && carried.x > aim.x && carried.y > aim.y, JSON.stringify({ aim, at: carried && { x: Math.round(carried.x), y: Math.round(carried.y) } }));
+// Once the card has laid it out among its blocks.
+const inside = await until(async () => {
+	const now = await page.evaluate(() => globalThis.__decksPenBox?.("card-picture"));
+	return now && Math.abs(now.x - picture.x) > 40 ? now : undefined;
+});
+await page.mouse.click(inside.x + 20, inside.y + 20);
+await settle(page, 200);
+await page.mouse.move(inside.x + 20, inside.y + 20);
+await page.mouse.down();
+await page.mouse.move(inside.x + 40, inside.y + 20, { steps: 4 });
+await page.mouse.move(inside.x + 480, inside.y + 60, { steps: 14 });
+await page.mouse.up();
+const out = await until(() => (where("card-picture")?.top ? where("card-picture") : undefined));
+say("…and dragged off the card it leaves it", !!out && out.inCard === -1, JSON.stringify(where("card-picture")));
+
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });
 await settle(page, 300);
 say("no page errors", !errors.length, errors.slice(0, 3).join(" | "));
 await editMode(page, false);

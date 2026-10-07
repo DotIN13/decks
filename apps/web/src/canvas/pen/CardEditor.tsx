@@ -21,6 +21,8 @@ export interface CardEditorProps {
 	value: string;
 	/** Where the deck's files are, for the card's pictures. */
 	base: string;
+	/** Items in the card the editor keeps but cannot type into, by id: what to call each (`card-frame.ts`). */
+	held?: Record<string, string>;
 	/** The camera's zoom: the editor is drawn in the stage's units, its style bar in the screen's. */
 	zoom: number;
 	class?: string;
@@ -248,6 +250,12 @@ export function CardEditor(props: CardEditorProps) {
 			}
 			case "hr":
 				return atom(raw, "", "pce-atom pce-rule", "div");
+			case "html": {
+				// An item of the card that is not words (a sticky note, a shape): kept in its place.
+				const held = /^<!--decks:item (\S+)-->$/.exec(raw);
+				if (held) return atom(raw, `▢ ${props.held?.[held[1]!] ?? "item"}`, "pce-atom pce-held", "div");
+				break;
+			}
 		}
 		return atom(raw, raw, "pce-atom pce-raw", "div");
 	}
