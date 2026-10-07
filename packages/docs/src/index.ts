@@ -148,7 +148,7 @@ export type DocServerMessage =
 	 * `path` is what to call it from now on, which is its working copy when the server keeps one;
 	 * `asked` is the path the page sent, and `source` the original a working copy was copied from.
 	 */
-	| { type: "doc.state"; path: string; asked: string; source?: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
+	| { type: "doc.state"; path: string; asked: string; client?: string; source?: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
 	/**
 	 * To the page that sent `batch`: the revision it made, and which of its splices did not land.
 	 * When any did not, `text` is the whole document at `rev`, so the page resyncs without asking.

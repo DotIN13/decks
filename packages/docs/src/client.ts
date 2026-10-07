@@ -20,7 +20,11 @@ export const BATCH_MS = 50;
 export interface DocSyncOptions {
 	path: string;
 	send: (message: DocClientMessage) => void;
-	onUpdate: (sync: DocSync, why: "open" | "remote" | "local" | "review") => void;
+	/**
+	 * After every change to `text`. `applied` are the splices that made it, in order, so a page
+	 * can move its caret and its marks; absent when the text was replaced whole (`"open"`).
+	 */
+	onUpdate: (sync: DocSync, why: "open" | "remote" | "local" | "review", applied?: readonly Splice[]) => void;
 	/** A name for this page; random by default. */
 	client?: string;
 	/** For tests: how a batch is scheduled. */
@@ -71,7 +75,7 @@ export class DocSync {
 		if (!this.ready || this.readOnly) return;
 		this.text = applySplice(this.text, splice);
 		this.pending.push(splice);
-		this.options.onUpdate(this, "local");
+		this.options.onUpdate(this, "local", [splice]);
 		if (this.timer === undefined) {
 			const schedule = this.options.schedule ?? ((run, ms) => setTimeout(run, ms));
 			this.timer = schedule(() => {
@@ -121,6 +125,8 @@ export class DocSync {
 		switch (message.type) {
 			case "doc.state":
 				if (message.asked !== this.path && message.path !== this.path) return;
+				// Another page on this document, in the same browser, asked: its answer is not ours.
+				if (message.client !== undefined && message.client !== this.client) return;
 				this.path = message.path;
 				this.source = message.source;
 				this.text = message.text;
@@ -159,11 +165,12 @@ export class DocSync {
 					return;
 				}
 				if (message.base !== this.rev) return this.open();
-				if (!this.take(message.splices)) return this.open();
+				const applied = this.take(message.splices);
+				if (!applied) return this.open();
 				this.rev = message.rev;
 				if (message.change) this.changes = [...this.changes, message.change];
 				if (message.settled) this.changes = this.changes.filter((c) => c.id !== message.settled);
-				this.options.onUpdate(this, message.change || message.settled ? "review" : "remote");
+				this.options.onUpdate(this, message.change || message.settled ? "review" : "remote", applied);
 				return;
 		}
 	}
@@ -179,21 +186,26 @@ export class DocSync {
 	/**
 	 * Apply others' splices past ours, and move ours past theirs, by the rule the server landed
 	 * ours by. In flight and waiting are moved one after the other, so each stays its own list.
-	 * False only when what they say they replaced is not in this page's text, which means the two
-	 * have already drifted and the page must start again.
+	 * Answers the splices applied here, or undefined when what they say they replaced is not in
+	 * this page's text, which means the two have already drifted and the page must start again.
 	 */
-	private take(theirs: readonly Splice[]): boolean {
+	private take(theirs: readonly Splice[]): Splice[] | undefined {
 		const flying = transformSplices(theirs, this.inflight?.splices ?? [], false);
 		const waiting = transformSplices(flying.a, this.pending, false);
 		let text = this.text;
 		for (const splice of waiting.a) {
-			if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) return false;
+			if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) return undefined;
 			text = applySplice(text, splice);
 		}
 		if (this.inflight) this.inflight = { ...this.inflight, splices: flying.b };
 		this.pending = waiting.b;
 		this.text = text;
-		return true;
+		return waiting.a;
+	}
+
+	/** Nothing typed here is still on its way to the server. */
+	get settled(): boolean {
+		return !this.inflight && this.pending.length === 0;
 	}
 }
 

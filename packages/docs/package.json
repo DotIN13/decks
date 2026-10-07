@@ -8,6 +8,7 @@
 		".": "./src/index.ts",
 		"./merge": "./src/merge.ts",
 		"./client": "./src/client.ts",
+		"./page": "./src/page/page.ts",
 		"./server": "./src/server/index.ts"
 	},
 	"scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test --test-force-exit \"src/**/*.test.ts\"" },

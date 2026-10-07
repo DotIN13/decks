@@ -137,6 +137,7 @@ test("one changed word is one splice of that word, in prose and in XML", () => {
 	const to = from.replace("small", "tiny");
 	const splices = spliceDiff(from, to);
 	assert.equal(splices.length, 1);
-	assert.equal(splices[0]!.before, "small.");
+	assert.deepEqual(splices[0], { at: from.indexOf("small"), before: "small", text: "tiny" });
+	assert.deepEqual(spliceDiff("The effect is small.\n", "The effect is small but reliable.\n"), [{ at: 19, before: "", text: " but reliable" }]);
 	assert.equal(applySplices(from, splices), to);
 });

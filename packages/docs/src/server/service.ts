@@ -135,13 +135,14 @@ export class DocService {
 		try {
 			doc = this.load(this.adopt(path));
 		} catch (error) {
-			return { type: "doc.state", path, asked: path, rev: 0, format: "text", text: "", changes: [], error: (error as Error).message };
+			return { type: "doc.state", path, asked: path, client, rev: 0, format: "text", text: "", changes: [], error: (error as Error).message };
 		}
 		doc.clients.add(client);
 		return {
 			type: "doc.state",
 			path: doc.key,
 			asked: path,
+			client,
 			rev: doc.rev,
 			format: doc.format,
 			text: doc.text,

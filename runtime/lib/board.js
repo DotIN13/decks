@@ -1252,6 +1252,17 @@
 		}
 	}
 
+	/** A document page, typed into and kept in step with its file — `lib/live-doc.js`, relayed by the app. */
+	async function mountLiveDoc(host) {
+		try {
+			const module = await needModule("live-doc.js");
+			module.mountLiveDoc(host, BOARD_PATH);
+		} catch (error) {
+			host.textContent = `Cannot open this document: ${error.message}`;
+			host.dataset.state = "broken";
+		}
+	}
+
 	/** The status card for the user's shared Chrome — `lib/live-web.js`, fed by the app. */
 	async function mountLiveWeb(host) {
 		try {
@@ -1289,6 +1300,9 @@
 		}
 		for (const element of document.querySelectorAll('[data-live="web"]')) {
 			work.push(mountLiveWeb(element));
+		}
+		for (const element of document.querySelectorAll('[data-live="doc"]')) {
+			work.push(mountLiveDoc(element));
 		}
 		/*
 		 * A slide deck, which is neither a document nor live.

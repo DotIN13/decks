@@ -24,6 +24,7 @@ import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
+import { attachLiveDoc } from "./live-doc.ts";
 import { attachBoardOpen } from "./board-links.ts";
 import { attachBoardEval } from "./board-eval.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
@@ -310,6 +311,7 @@ export function BoardFrame(props: {
 	let detachDrop: (() => void) | undefined;
 	let detachLive: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
+	let detachDoc: (() => void) | undefined;
 	let detachEval: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
@@ -766,6 +768,7 @@ export function BoardFrame(props: {
 		detachDrop?.();
 		detachLive?.();
 		detachLinks?.();
+		detachDoc?.();
 		detachEval?.();
 		detachSelect?.();
 		frames?.detach();
@@ -848,6 +851,8 @@ export function BoardFrame(props: {
 		 * anywhere else at all, was opened in a tab by the board itself, in the click, which is
 		 * the only moment a browser will let a tab be opened.
 		 */
+		// A document page on the board talks to the server through the app's socket (`live-doc.ts`).
+		detachDoc = attachLiveDoc(frame);
 		detachLinks = attachBoardOpen(frame, (path) => {
 			props.onOpenBoard?.(path, props.board.path);
 		});
@@ -881,8 +886,9 @@ export function BoardFrame(props: {
 		detachDrop?.();
 		detachLive?.();
 		detachLinks?.();
+		detachDoc?.();
 		detachEval?.();
-		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachEval = undefined;
+		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = detachEval = undefined;
 		frames?.detach();
 		frames = undefined;
 		clearTimeout(measuring);

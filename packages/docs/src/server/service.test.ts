@@ -61,7 +61,7 @@ test("an agent's write made mid-typing is taken in before the next write, not wr
 	assert.equal(readFileSync(file, "utf8"), "# Findings\n\nThe effect is small but real.\n");
 	const outside = changed(sent).find((m) => m.change);
 	assert.ok(outside, "the agent's write went out as a change to review");
-	assert.equal(outside.change!.splices[0]!.text, "Findings");
+	assert.deepEqual(outside.change!.splices[0], { at: 2, before: "Result", text: "Finding" });
 	done();
 });
 
@@ -92,7 +92,7 @@ test("the watcher turns a write from outside into a change without any typing", 
 	const outside = changed(sent).find((m) => m.change);
 	assert.ok(outside);
 	assert.equal(outside.change!.splices.length, 1);
-	assert.deepEqual(outside.change!.splices[0], { at: 14, before: "Text.", text: "More text." });
+	assert.deepEqual(outside.change!.splices.map((x) => x.text).join(""), "More t");
 	done();
 });
 

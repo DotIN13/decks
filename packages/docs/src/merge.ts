@@ -113,7 +113,14 @@ export function spliceDiff(from: string, to: string): Splice[] {
 	let before = "";
 	let text = "";
 	const flush = () => {
-		if (before || text) out.push({ at, before, text });
+		if (before || text) {
+			// A changed word keeps its unchanged letters: "small." to "small but reliable." is an insertion.
+			let lead = 0;
+			while (lead < before.length && lead < text.length && before[lead] === text[lead]) lead++;
+			let end = 0;
+			while (end < before.length - lead && end < text.length - lead && before[before.length - 1 - end] === text[text.length - 1 - end]) end++;
+			out.push({ at: at + lead, before: before.slice(lead, before.length - end), text: text.slice(lead, text.length - end) });
+		}
 		at += text.length;
 		before = "";
 		text = "";

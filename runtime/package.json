@@ -11,6 +11,9 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"paths.test.ts\""
 	},
+	"dependencies": {
+		"@decks/docs": "*"
+	},
 	"devDependencies": {
 		"tsx": "^4.20.7",
 		"typescript": "^5.9.3"

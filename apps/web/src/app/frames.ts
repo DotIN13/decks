@@ -26,6 +26,7 @@ import { releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from ".
 import { watchedBeingNamed } from "./watching.ts";
 import { forgetPen, receivePen } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
+import { receiveDoc } from "../board/live-doc.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -430,6 +431,15 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "timeline.preview":
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
+					return;
+
+				// A document page's answers and news, for the boards that hold one (`board/live-doc.ts`).
+				case "doc.state":
+				case "doc.patched":
+				case "doc.changed":
+				case "doc.versions":
+				case "doc.written":
+					receiveDoc(message);
 					return;
 
 				case "stage.pen":

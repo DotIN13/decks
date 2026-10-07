@@ -1,10 +1,11 @@
 {
 	"extends": "../tsconfig.base.json",
-	"compilerOptions": { "noEmit": true, "types": ["node"] },
+	"compilerOptions": { "noEmit": true, "types": ["node"], "lib": ["ES2023", "DOM", "DOM.Iterable"] },
 	/*
 	 * The assets are not TypeScript. What *is* here is the path resolver and the two shims
 	 * another program loads, and those are what this checks — `opencode/` resolves its own
-	 * dependency from its own `node_modules`, which is not this workspace's business.
+	 * dependency from its own `node_modules`, which is not this workspace's business. And the
+	 * source of `lib/live-doc.js`, which esbuild bundles but does not check.
 	 */
-	"include": ["paths.ts", "paths.test.ts"]
+	"include": ["paths.ts", "paths.test.ts", "live-doc.ts"]
 }
