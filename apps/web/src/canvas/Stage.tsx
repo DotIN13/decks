@@ -46,7 +46,8 @@ import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
-import { CARD_PALETTE } from "./pen/markdown-layout.ts";
+import { CARD_PALETTE, firstLine } from "./pen/markdown-layout.ts";
+import { parseMarkdown } from "./pen/markdown.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
@@ -3404,7 +3405,12 @@ export function Stage(props: {
 		const id = blockHover();
 		if (!id || boardDrag() || panning()) return undefined;
 		const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
-		return box ? { id, x: box.x, y: box.y } : undefined;
+		const node = penNode(id);
+		if (!box || !node) return undefined;
+		// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
+		const look = textLookOf(node, penLayer.placed.get(id));
+		const line = firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
+		return { id, x: box.x, y: box.y + line.top + line.height / 2 };
 	});
 	/** A press on a block's grip picks the block up and carries it, into another place in the card or out of it. */
 	const dragBlock = (event: PointerEvent, id: string) => {
@@ -4345,14 +4351,14 @@ export function Stage(props: {
 							class="pen-grip"
 							title="Drag to move this block"
 							style={{
-								left: `${grip().x - 18 / props.camera.zoom}px`,
-								top: `${grip().y + 1 / props.camera.zoom}px`,
-								width: `${16 / props.camera.zoom}px`,
-								height: `${22 / props.camera.zoom}px`,
+								// Drawn at screen size and scaled to the world, so the dots stay centred on their background at any zoom.
+								left: `${grip().x - 19 / props.camera.zoom}px`,
+								top: `${grip().y - 12 / props.camera.zoom}px`,
+								transform: `scale(${1 / props.camera.zoom})`,
 							}}
 							onPointerDown={(event) => dragBlock(event, grip().id)}
 						>
-							<GripVertical size={16} style={{ transform: `scale(${1 / props.camera.zoom})`, "transform-origin": "0 0" }} />
+							<GripVertical size={16} />
 						</div>
 					)}
 				</Show>

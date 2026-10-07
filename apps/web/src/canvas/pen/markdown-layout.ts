@@ -76,6 +76,34 @@ const MARK: Record<Colour | "default", { light: string; dark: string }> = {
 /** An agent's suggestion: what it adds in its blue, what it takes out struck through in red. */
 const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0262d" }, dark: { added: "#7aa2ff", addedBg: "#7aa2ff26", removed: "#f06a74" } };
 const HEADING_SIZE = [1.6, 1.3, 1.12, 1, 0.9, 0.85];
+
+/**
+ * Where a block's first line sits, from the block's top, by the same sizes `layoutMarkdown` sets it
+ * with: what a grip beside the block lines up on. Words sized by a span are not counted.
+ */
+export function firstLine(block: Block | undefined, size: number, lineHeight?: number): { top: number; height: number } {
+	const line = (s: number, multiplier = 1.5) => s * (lineHeight ?? multiplier);
+	switch (block?.kind) {
+		case "heading":
+			return { top: 0, height: line(size * HEADING_SIZE[block.level - 1]!, 1.3) };
+		case "list":
+			return firstLine(block.items[0]?.blocks[0], size, lineHeight);
+		case "quote":
+			if (block.alert) return { top: size * 0.4, height: line(size) };
+			return firstLine(block.blocks[0], size, lineHeight);
+		case "code":
+			return { top: size * 0.85, height: size * 0.88 * 1.5 };
+		case "table":
+			return { top: 0, height: size * 0.45 * 2 + line(size * 0.9) };
+		case "rule":
+			return { top: 0, height: size + 1 };
+		case "image":
+		case "embed":
+			return { top: 0, height: size * 3 };
+		default:
+			return { top: 0, height: line(size) };
+	}
+}
 /** A span's size, `[words]{.large}`, against the words round it. */
 const SIZE_SCALE = { small: 0.85, large: 1.25, huge: 1.6 } as const;
 /** The serif a page font is fetched in for the editor (`card-syntax.ts`, `FACE_ALIAS`). */

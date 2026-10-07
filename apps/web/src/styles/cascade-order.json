@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "df9fefd11a23e46b0b88f60131772f4839ea3e6dd08a46c31adccf54f285a5ce",
+	"hash": "d88035e86ef3dcf51d55c99e6405c3640bffa3d51e0bd16b65c0fd9dd6a12e15",
 	"rules": 1152,
 	"sheets": 19,
 	"ties": 0,
@@ -600,7 +600,7 @@
 		["styles/canvas.css","@layer components ▸ .world > :is(.pen-selection,.pen-hover,.pen-join,.pen-insert,.pen-guides,.pen-handle,.pen-text,.pen-draft,.pen-draft-line){z-index:3}"],
 		["styles/canvas.css","@layer components ▸ .world > :is(.pen-hover,.pen-join){position:absolute;border-radius:4px;pointer-events:none}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-join{background:color-mix(in srgb, var(--color-accent) 10%, transparent)}"],
-		["styles/canvas.css","@layer components ▸ .world > .pen-grip{position:absolute;z-index:3;display:flex;align-items:flex-start;justify-content:flex-start;color:var(--faint);border-radius:4px;cursor:grab;touch-action:none}"],
+		["styles/canvas.css","@layer components ▸ .world > .pen-grip{position:absolute;z-index:3;width:16px;height:24px;transform-origin:0 0;display:flex;align-items:center;justify-content:center;color:var(--faint);border-radius:4px;cursor:grab;touch-action:none}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-grip:hover{color:var(--fg);background:var(--line)}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-grip:active{cursor:grabbing}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-grip svg{stroke-width:1.75;flex:none}"],
