@@ -36,7 +36,8 @@ const highlight: TokenizerExtension = {
 	level: "inline",
 	start: (src) => src.indexOf("=="),
 	tokenizer(src) {
-		const m = /^==(🔴|🟠|🟡|🟢|🔵|🟣)?(?=\S)([^\n]*?\S)==(?!=)/u.exec(src);
+		// Closed at the first `==`, so two highlights side by side, `==a====b==`, are two.
+		const m = /^==(🔴|🟠|🟡|🟢|🔵|🟣)?(?=\S)([^\n]*?\S)==/u.exec(src);
 		if (!m) return undefined;
 		const token: HighlightToken = { type: "highlight", raw: m[0], text: m[2]!, tokens: [], ...(m[1] ? { colour: HIGHLIGHT_EMOJI[m[1]] } : {}) };
 		this.lexer.inlineTokens(m[2]!, token.tokens);

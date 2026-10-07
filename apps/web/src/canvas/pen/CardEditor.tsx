@@ -305,9 +305,12 @@ export function CardEditor(props: CardEditorProps) {
 			}
 			if (!(n instanceof HTMLElement)) continue;
 			const inner = () => out(n);
+			// Spaces at either end go outside the marks: `** bold**` is not bold, in Obsidian or anywhere.
 			const wrapIn = (open: string, close = open) => {
 				const text = inner();
-				return text.trim() ? open + text + close : text;
+				if (!text.trim()) return text;
+				const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!;
+				return lead + open + core + close + trail;
 			};
 			if (n.dataset.raw !== undefined && n.getAttribute("contenteditable") === "false") s += n.dataset.raw;
 			else
@@ -593,29 +596,120 @@ export function CardEditor(props: CardEditorProps) {
 		bar.style.top = `${(r.top - w.top) / z - (bar.offsetHeight + 8) / z}px`;
 	}
 	const unwrap = (n: Element) => n.replaceWith(...n.childNodes);
-	function wrapSelection(el: HTMLElement, strip: string) {
-		const r = sel().getRangeAt(0);
-		el.append(r.extractContents());
-		el.querySelectorAll(strip).forEach(unwrap);
-		r.insertNode(el);
-		const nr = document.createRange();
-		nr.selectNodeContents(el);
-		sel().removeAllRanges();
-		sel().addRange(nr);
+	/*
+	 * A style over a selection, or taken off it: bold, italic, struck, code, a highlight, a colour.
+	 *
+	 * The browser cuts the selection into runs (`cut`): its highlight command splits a selection that
+	 * runs over several blocks, a heading and the paragraph under it, into one run per block, where
+	 * wrapping the range in one element put a heading inside a highlight. Each run is marked with a
+	 * colour no one would pick and then given the card's own element, so the browser's own bold, which
+	 * takes a heading for bold already and unbolds it, is never asked.
+	 */
+	const STYLES = {
+		bold: { selector: "strong, b", make: () => h("strong"), toggles: true },
+		italic: { selector: "em, i", make: () => h("em"), toggles: true },
+		strike: { selector: "s, strike, del", make: () => h("s"), toggles: true },
+		code: { selector: "code", make: () => h("code"), toggles: true },
+		hl: { selector: "mark", make: (v: string) => h("mark", v === "default" ? {} : { "data-c": v }), toggles: false },
+		fg: { selector: "span[data-fg]", make: (v: string) => h("span", { "data-fg": v }), toggles: false },
+	};
+	type Style = keyof typeof STYLES;
+	const CUT = "rgb(1, 2, 3)";
+	const BLOCK = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|TD|TH|PRE|UL|OL)$/;
+	/** Take `inner` out of `outer`, splitting `outer` round it: what was before and after it keeps `outer`. */
+	function splitAround(inner: Node, outer: HTMLElement) {
+		const before = document.createRange();
+		before.setStart(outer, 0);
+		before.setEndBefore(inner);
+		const after = document.createRange();
+		after.setStartAfter(inner);
+		after.setEnd(outer, outer.childNodes.length);
+		const head = before.extractContents();
+		const tail = after.extractContents();
+		if (head.textContent) {
+			const piece = outer.cloneNode(false) as HTMLElement;
+			piece.append(head);
+			outer.before(piece);
+		}
+		if (tail.textContent) {
+			const piece = outer.cloneNode(false) as HTMLElement;
+			piece.append(tail);
+			outer.after(piece);
+		}
+		unwrap(outer);
+	}
+	/** The selection as runs: plain spans, none of them across a block's edge. */
+	function cut(): HTMLElement[] {
+		document.execCommand("styleWithCSS", false, "true");
+		document.execCommand("hiliteColor", false, CUT);
+		document.execCommand("styleWithCSS", false, "false");
+		return ([...ed.querySelectorAll("*")] as HTMLElement[])
+			.filter((el) => el.style.backgroundColor === CUT)
+			.map((el) => {
+				el.style.removeProperty("background-color");
+				if (!el.getAttribute("style")) el.removeAttribute("style");
+				// The colour landed on a block, or on one of the card's own elements: the run is inside it.
+				if (el.tagName === "SPAN" && !el.attributes.length) return el;
+				const run = document.createElement("span");
+				run.append(...el.childNodes);
+				el.append(run);
+				return run;
+			})
+			.filter((run) => run.textContent);
+	}
+	function restyle(styles: Style[], value: string | null) {
+		const runs = cut();
+		if (!runs.length) return;
+		const texts = runs.flatMap((run) => {
+			const walk = document.createTreeWalker(run, NodeFilter.SHOW_TEXT);
+			const out: Text[] = [];
+			for (let n = walk.nextNode(); n; n = walk.nextNode()) out.push(n as Text);
+			return out;
+		});
+		for (const name of styles) {
+			const style = STYLES[name];
+			// Bold on what is all bold already takes it off, as everywhere.
+			const off = value === null || (style.toggles && runs.every((run) => run.closest(style.selector) || run.querySelector(style.selector)?.textContent === run.textContent));
+			for (const run of runs) {
+				for (let outer = run.parentElement?.closest(style.selector) as HTMLElement | null; outer && ed.contains(outer); outer = run.parentElement?.closest(style.selector) as HTMLElement | null) splitAround(run, outer);
+				run.querySelectorAll(style.selector).forEach(unwrap);
+				if (off) continue;
+				const made = style.make(value ?? "");
+				made.append(...run.childNodes);
+				run.append(made);
+			}
+			// Runs side by side in the same style are one.
+			for (const el of [...ed.querySelectorAll(style.selector)] as HTMLElement[]) {
+				let next = el.nextSibling;
+				while (next instanceof HTMLElement && next.matches(style.selector) && next.tagName === el.tagName && next.dataset.c === el.dataset.c && next.dataset.fg === el.dataset.fg) {
+					el.append(...next.childNodes);
+					next.remove();
+					next = el.nextSibling;
+				}
+			}
+		}
+		runs.forEach(unwrap);
+		ed.normalize();
+		// The words stay selected, for the next style.
+		const first = texts.find((t) => t.isConnected);
+		const last = [...texts].reverse().find((t) => t.isConnected);
+		if (first && last) {
+			const r = document.createRange();
+			r.setStart(first, 0);
+			r.setEnd(last, last.length);
+			sel().removeAllRanges();
+			sel().addRange(r);
+		}
 	}
 	function style(event: MouseEvent) {
 		const b = (event.target as Element).closest("button");
 		if (!b) return;
-		document.execCommand("styleWithCSS", false, "false");
 		const d = b.dataset;
-		if (d.hl) wrapSelection(h("mark", d.hl === "default" ? {} : { "data-c": d.hl }), "mark");
-		else if (d.fg) wrapSelection(h("span", { "data-fg": d.fg }), "span[data-fg]");
-		else if (d.cmd === "code") wrapSelection(h("code"), "code");
-		else if (d.cmd === "clear") {
-			const r = sel().getRangeAt(0);
-			document.execCommand("removeFormat");
-			[...ed.querySelectorAll("mark, span[data-fg], code")].filter((n) => r.intersectsNode(n)).forEach(unwrap);
-		} else if (d.cmd) document.execCommand(d.cmd);
+		const commands: Record<string, Style> = { bold: "bold", italic: "italic", strikeThrough: "strike", code: "code" };
+		if (d.hl) restyle(["hl"], d.hl);
+		else if (d.fg) restyle(["fg"], d.fg);
+		else if (d.cmd === "clear") restyle(["bold", "italic", "strike", "code", "hl", "fg"], null);
+		else if (d.cmd && commands[d.cmd]) restyle([commands[d.cmd]!], "on");
 		changed();
 	}
 
@@ -817,6 +911,15 @@ export function CardEditor(props: CardEditorProps) {
 				target = rows[r + 1]!.children[c];
 			}
 			if (target) caretInto(target, true);
+			return changed();
+		}
+		// ⌘B, ⌘I and ⌘⇧X go through the card's own styles, as the style bar's buttons do.
+		const mod = event.metaKey || event.ctrlKey;
+		const keyed: Record<string, Style> = { b: "bold", i: "italic", x: "strike", e: "code" };
+		const want = mod && keyed[event.key.toLowerCase()];
+		if (want && (want !== "strike" || event.shiftKey) && !sel().isCollapsed) {
+			event.preventDefault();
+			restyle([want], "on");
 			return changed();
 		}
 		if (event.key === "Escape") {

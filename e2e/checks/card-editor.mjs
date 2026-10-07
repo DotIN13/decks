@@ -235,6 +235,39 @@ const [download] = await Promise.all([page.waitForEvent("download", { timeout: 5
 const note = download ? readFileSync(await download.path(), "utf8") : "";
 say("a card's panel exports it as an Obsidian note: no coloured spans, no suggestion marks", !!note && note.startsWith("# Kyoto, three days") && !/\]\{\.(red|blue)\}|\{~~|\{>>/.test(note) && note.includes("| Sat | Kyoto |"), JSON.stringify({ file: download?.suggestedFilename(), start: note.slice(0, 80) }));
 
+// A highlight and bold over a heading and the paragraph under it: one run in each block, the heading still bold.
+await page.keyboard.press("Escape");
+await settle(page, 300);
+await openCard();
+await settle(page, 300);
+const across = (button) =>
+	page.evaluate(() => {
+		const ed = document.querySelector(".pce-body");
+		const at = (el, off) => {
+			const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+			for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+				const len = n.textContent.replace(/\u200b/g, "").length;
+				if (off <= len) return [n, off];
+				off -= len;
+			}
+		};
+		const range = document.createRange();
+		range.setStart(...at(ed.querySelector("h1"), 7));
+		range.setEnd(...at(ed.querySelector(":scope > p"), 3));
+		getSelection().removeAllRanges();
+		getSelection().addRange(range);
+	}).then(() => page.click(`.pce-bar ${button}`));
+await across('[data-hl="green"]');
+await across('[data-cmd="bold"]');
+await page.keyboard.press("Control+Enter");
+const styled = await until(() => {
+	const kids = (cardNode()?.children ?? []).map((n) => n.content ?? "");
+	const head = kids.find((k) => k.startsWith("# "));
+	const para = kids.find((k) => /Thursday night/.test(k));
+	return head === "# Kyoto, ==🟢**three days**==" && /^\[==🟢\*\*Arr\*\*==ive\]\{\.blue\}/.test(para ?? "") ? { head, para } : undefined;
+});
+say("a highlight and bold over a heading and the paragraph under it become one run in each block", !!styled, JSON.stringify((cardNode()?.children ?? []).slice(0, 3).map((n) => n.content)));
+
 // A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
 const where = (id) => {
 	for (const stage of readdirSync(`${deck.path}/stages`)) {
