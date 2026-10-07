@@ -1683,7 +1683,11 @@ export function Stage(props: {
 		const after = real(index, 1);
 		const edge = (one: { x: number; y: number; w: number; h: number }, end: boolean) => (down ? one.y + (end ? one.h : 0) : one.x + (end ? one.w : 0));
 		const on = before && after ? (edge(before, true) + edge(after, false)) / 2 : after ? edge(after, false) - 5 : before ? edge(before, true) + 5 : down ? box.y + box.h / 2 : box.x + box.w / 2;
-		const line = down ? { x: box.x + 8, y: on, w: Math.max(8, box.w - 16), h: 0 } : { x: on, y: box.y + 8, w: 0, h: Math.max(8, box.h - 16) };
+		// As long as the frame's content is wide: inside its padding, so the line spans the words, not the paper.
+		const pad = placed.node.padding;
+		const [pt, pr, pb, pl] = typeof pad === "number" ? [pad, pad, pad, pad] : Array.isArray(pad) ? (pad.length === 2 ? [pad[0], pad[1], pad[0], pad[1]] : pad.length === 4 ? pad : [8, 8, 8, 8]) : [8, 8, 8, 8];
+		const inset = (value: unknown) => Math.max(8, typeof value === "number" ? value : 8);
+		const line = down ? { x: box.x + inset(pl), y: on, w: Math.max(8, box.w - inset(pl) - inset(pr)), h: 0 } : { x: on, y: box.y + inset(pt), w: 0, h: Math.max(8, box.h - inset(pt) - inset(pb)) };
 		return { index, line };
 	};
 	/** Where the frame a drag would drop into is, for the outline that says so. */
