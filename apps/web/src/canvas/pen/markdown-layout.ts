@@ -76,6 +76,10 @@ const MARK: Record<Colour | "default", { light: string; dark: string }> = {
 /** An agent's suggestion: what it adds in its blue, what it takes out struck through in red. */
 const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0262d" }, dark: { added: "#7aa2ff", addedBg: "#7aa2ff26", removed: "#f06a74" } };
 const HEADING_SIZE = [1.6, 1.3, 1.12, 1, 0.9, 0.85];
+/** A span's size, `[words]{.large}`, against the words round it. */
+const SIZE_SCALE = { small: 0.85, large: 1.25, huge: 1.6 } as const;
+/** A span's serif face, `[words]{.serif}`; its mono face is the code's. */
+export const SERIF_FAMILY = "Source Serif 4";
 
 type Op =
 	| { kind: "text"; p: Paragraph; x: number; y: number }
@@ -136,12 +140,13 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 				new ck.TextStyle({
 					...base,
 					color: paint(ink),
-					fontFamilies: env.chain(run.code ? env.mono : style.fontFamily),
-					fontSize: run.sup ? size * 0.75 : run.code ? size * 0.88 : size,
+					fontFamilies: env.chain(run.code || run.face === "mono" ? env.mono : run.face === "serif" ? SERIF_FAMILY : style.fontFamily),
+					fontSize: (run.sup ? size * 0.75 : run.code ? size * 0.88 : size) * (run.size ? SIZE_SCALE[run.size] : 1),
 					fontStyle: { weight: { value: run.bold ? Math.max(600, weight + 200) : weight }, slant: run.italic ? ck.FontSlant.Italic : ck.FontSlant.Upright },
 					...(run.strike || run.removed ? { decoration: ck.LineThroughDecoration, decorationColor: paint(run.removed ? S.removed : f.colour) } : {}),
 					...(run.link || run.wiki ? { decoration: ck.UnderlineDecoration, decorationColor: paint(`${C.accent}66`) } : {}),
 					...(run.added ? { decoration: ck.UnderlineDecoration, decorationColor: paint(S.added) } : {}),
+					...(run.underline ? { decoration: ck.UnderlineDecoration | (run.strike ? ck.LineThroughDecoration : 0), decorationColor: paint(ink) } : {}),
 					...(back ? { backgroundColor: paint(back) } : {}),
 				}),
 			);

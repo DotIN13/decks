@@ -151,7 +151,9 @@ await page.evaluate(() => {
 });
 const bar = await until(() => page.evaluate(() => getComputedStyle(document.querySelector(".pce-bar")).display !== "none"), 2000);
 say("a selection gets the style bar", !!bar);
-await page.click('.pce-bar [data-fg="blue"]');
+// Colours are in the bar's colour menu.
+await page.click('.pce-bar [data-menu="fg"]');
+await page.click('.pce-bar .pce-menu[data-open] [data-fg="blue"]');
 
 const drag = async (from, to) => {
 	const f = await page.locator(from).first().boundingBox();
@@ -256,7 +258,10 @@ const across = (button) =>
 		range.setEnd(...at(ed.querySelector(":scope > p"), 3));
 		getSelection().removeAllRanges();
 		getSelection().addRange(range);
-	}).then(() => page.click(`.pce-bar ${button}`));
+	}).then(async () => {
+		if (button.startsWith("[data-hl")) await page.click('.pce-bar [data-menu="hl"]');
+		await page.click(`.pce-bar ${button.startsWith("[data-hl") ? ".pce-menu[data-open] " : ""}${button}`);
+	});
 await across('[data-hl="green"]');
 await across('[data-cmd="bold"]');
 await page.keyboard.press("Control+Enter");
@@ -267,6 +272,43 @@ const styled = await until(() => {
 	return head === "# Kyoto, ==🟢**three days**==" && /^\[==🟢\*\*Arr\*\*==ive\]\{\.blue\}/.test(para ?? "") ? { head, para } : undefined;
 });
 say("a highlight and bold over a heading and the paragraph under it become one run in each block", !!styled, JSON.stringify((cardNode()?.children ?? []).slice(0, 3).map((n) => n.content)));
+
+// The bar's menus: a block made a heading, words set in serif and underlined.
+await page.keyboard.press("Escape");
+await settle(page, 400);
+await openCard();
+await settle(page, 300);
+const choose = async (menu, option) => {
+	await page.click(`.pce-bar [data-menu="${menu}"]`);
+	await page.click(`.pce-bar .pce-menu[data-open] ${option}`);
+};
+await page.evaluate(() => {
+	const words = document.querySelector(".pce-body h1");
+	const range = document.createRange();
+	range.selectNodeContents(words);
+	getSelection().removeAllRanges();
+	getSelection().addRange(range);
+});
+await choose("block", '[data-block="h2"]');
+await page.evaluate(() => {
+	const cell = [...document.querySelectorAll(".pce-body > p")].find((p) => p.textContent.includes("Thursday"));
+	const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+	const text = [...(function* () { for (let n = walk.nextNode(); n; n = walk.nextNode()) yield n; })()].find((n) => n.textContent.includes("Budget"));
+	const at = text.textContent.indexOf("Budget");
+	const range = document.createRange();
+	range.setStart(text, at);
+	range.setEnd(text, at + 6);
+	getSelection().removeAllRanges();
+	getSelection().addRange(range);
+});
+await choose("font", '[data-font="serif"]');
+await page.click('.pce-bar [data-cmd="underline"]');
+await page.keyboard.press("Control+Enter");
+const menus = await until(() => {
+	const kids = (cardNode()?.children ?? []).map((n) => n.content ?? "");
+	return kids.some((k) => k.startsWith("## Kyoto")) && kids.some((k) => k.includes("<u>[Budget]{.serif}</u>") || k.includes("[<u>Budget</u>]{.serif}")) ? kids : undefined;
+});
+say("the bar's menus make a block a heading, and set words in serif and underlined", !!menus, JSON.stringify((cardNode()?.children ?? []).map((n) => n.content).filter((k) => /Kyoto|Budget/.test(k ?? ""))));
 
 // A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
 const where = (id) => {

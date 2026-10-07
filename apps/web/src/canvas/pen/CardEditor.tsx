@@ -129,10 +129,15 @@ export function CardEditor(props: CardEditorProps) {
 					break;
 				}
 				case "colour": {
+					// One span per kind, nested, so a style can be taken off one kind without the others.
 					const c = t as ColourToken;
-					const el = h("span", { "data-fg": c.colour });
-					inline(el, c.tokens as Token[]);
-					parent.appendChild(el);
+					const kinds: Array<[string, string]> = [];
+					if (c.colour) kinds.push(["data-fg", c.colour]);
+					if (c.size) kinds.push(["data-size", c.size]);
+					if (c.face) kinds.push(["data-font", c.face]);
+					let into: Node = parent;
+					for (const [attr, value] of kinds) into = into.appendChild(h("span", { [attr]: value }));
+					inline(into, c.tokens as Token[]);
 					break;
 				}
 				case "wiki": {
@@ -156,6 +161,17 @@ export function CardEditor(props: CardEditorProps) {
 				case "hidden":
 					parent.appendChild(atom(t.raw, t.raw, "pce-atom pce-faint"));
 					break;
+				case "html": {
+					// <u>…</u>: underlined words, typed into like any other.
+					const close = /^<u>$/i.test(t.raw) ? list.findIndex((x, j) => j > i && /^<\/u>$/i.test(x.raw)) : -1;
+					if (close > i) {
+						const u = h("u");
+						inline(u, list.slice(i + 1, close));
+						parent.appendChild(u);
+						i = close;
+					} else parent.appendChild(atom(t.raw, t.raw));
+					break;
+				}
 				default:
 					parent.appendChild(atom(t.raw, "text" in t && typeof t.text === "string" ? t.text : t.raw));
 			}
@@ -340,8 +356,33 @@ export function CardEditor(props: CardEditorProps) {
 					case "BR":
 						s += "  \n";
 						break;
-					case "SPAN":
-						s += n.dataset.fg ? wrapIn("[", `]{.${n.dataset.fg}}`) : inner();
+					case "SPAN": {
+						// A chain of styled spans, one inside the next, is one span with all their classes.
+						const classes = new Map<string, string>();
+						let at: HTMLElement = n;
+						for (;;) {
+							if (at.dataset.fg) classes.set("fg", at.dataset.fg);
+							if (at.dataset.size) classes.set("size", at.dataset.size);
+							if (at.dataset.font) classes.set("font", at.dataset.font);
+							const only = at.childNodes.length === 1 ? at.firstChild : null;
+							if (only instanceof HTMLElement && only.tagName === "SPAN" && (only.dataset.fg || only.dataset.size || only.dataset.font)) at = only;
+							else break;
+						}
+						if (!classes.size) {
+							s += inner();
+							break;
+						}
+						const text = out(at);
+						if (!text.trim()) {
+							s += text;
+							break;
+						}
+						const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!;
+						s += `${lead}[${core}]{${[...classes.values()].map((c) => `.${c}`).join(" ")}}${trail}`;
+						break;
+					}
+					case "U":
+						s += wrapIn("<u>", "</u>");
 						break;
 					default:
 						s += inner();
@@ -585,15 +626,32 @@ export function CardEditor(props: CardEditorProps) {
 		const s = sel();
 		if (dragging || !s.rangeCount || s.isCollapsed || !ed.contains(s.anchorNode)) {
 			bar.style.display = "none";
+			bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
 			return;
 		}
+		// The menus say what the words under the caret are now.
+		const at = s.anchorNode?.nodeType === 1 ? (s.anchorNode as Element) : s.anchorNode?.parentElement;
+		const label = (name: string, text: string) => {
+			const el = bar.querySelector(`[data-label="${name}"]`);
+			if (el) el.textContent = text;
+		};
+		label("block", BLOCK_NAMES[blockKind()] ?? "Text");
+		label("font", { serif: "Serif", mono: "Mono" }[(at?.closest("span[data-font]") as HTMLElement | null)?.dataset.font ?? ""] ?? "Sans");
+		label("size", { small: "Small", large: "Large", huge: "Huge" }[(at?.closest("span[data-size]") as HTMLElement | null)?.dataset.size ?? ""] ?? "Normal");
 		const r = s.getRangeAt(0).getBoundingClientRect();
 		const w = wrap.getBoundingClientRect();
 		const z = props.zoom;
 		bar.style.display = "flex";
 		bar.style.transform = `scale(${1 / z})`;
-		bar.style.left = `${(r.left - w.left) / z}px`;
-		bar.style.top = `${(r.top - w.top) / z - (bar.offsetHeight + 8) / z}px`;
+		// On the screen whatever the zoom: above the words, or under them when there is no room above.
+		const bw = bar.offsetWidth;
+		const bh = bar.offsetHeight;
+		const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left));
+		// Never under the app's own bars along the top of the screen, which sit over the canvas.
+		const ceiling = Math.max(8, ...[...document.querySelectorAll('[data-inset="top"]')].map((el) => el.getBoundingClientRect().bottom + 6));
+		const top = r.top - bh - 8 >= ceiling ? r.top - bh - 8 : r.bottom + 8;
+		bar.style.left = `${(left - w.left) / z}px`;
+		bar.style.top = `${(top - w.top) / z}px`;
 	}
 	const unwrap = (n: Element) => n.replaceWith(...n.childNodes);
 	/*
@@ -612,6 +670,10 @@ export function CardEditor(props: CardEditorProps) {
 		code: { selector: "code", make: () => h("code"), toggles: true },
 		hl: { selector: "mark", make: (v: string) => h("mark", v === "default" ? {} : { "data-c": v }), toggles: false },
 		fg: { selector: "span[data-fg]", make: (v: string) => h("span", { "data-fg": v }), toggles: false },
+		underline: { selector: "u", make: () => h("u"), toggles: true },
+		size: { selector: "span[data-size]", make: (v: string) => h("span", { "data-size": v }), toggles: false },
+		font: { selector: "span[data-font]", make: (v: string) => h("span", { "data-font": v }), toggles: false },
+		link: { selector: "a[data-href]", make: (v: string) => h("a", { "data-href": v }), toggles: false },
 	};
 	type Style = keyof typeof STYLES;
 	const CUT = "rgb(1, 2, 3)";
@@ -681,7 +743,7 @@ export function CardEditor(props: CardEditorProps) {
 			// Runs side by side in the same style are one.
 			for (const el of [...ed.querySelectorAll(style.selector)] as HTMLElement[]) {
 				let next = el.nextSibling;
-				while (next instanceof HTMLElement && next.matches(style.selector) && next.tagName === el.tagName && next.dataset.c === el.dataset.c && next.dataset.fg === el.dataset.fg) {
+				while (next instanceof HTMLElement && next.matches(style.selector) && next.tagName === el.tagName && next.dataset.c === el.dataset.c && next.dataset.fg === el.dataset.fg && next.dataset.size === el.dataset.size && next.dataset.font === el.dataset.font && next.dataset.href === el.dataset.href) {
 					el.append(...next.childNodes);
 					next.remove();
 					next = el.nextSibling;
@@ -705,12 +767,93 @@ export function CardEditor(props: CardEditorProps) {
 		const b = (event.target as Element).closest("button");
 		if (!b) return;
 		const d = b.dataset;
-		const commands: Record<string, Style> = { bold: "bold", italic: "italic", strikeThrough: "strike", code: "code" };
-		if (d.hl) restyle(["hl"], d.hl);
-		else if (d.fg) restyle(["fg"], d.fg);
-		else if (d.cmd === "clear") restyle(["bold", "italic", "strike", "code", "hl", "fg"], null);
+		// A menu's own button opens it, or closes it again; one menu at a time.
+		if (d.menu) {
+			const open = bar.querySelector(`.pce-menu[data-for="${d.menu}"]`);
+			const was = open?.hasAttribute("data-open");
+			bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
+			if (!was) open?.setAttribute("data-open", "");
+			return;
+		}
+		bar.querySelectorAll(".pce-menu").forEach((m) => m.removeAttribute("data-open"));
+		const commands: Record<string, Style> = { bold: "bold", italic: "italic", underline: "underline", strikeThrough: "strike", code: "code" };
+		if (d.block) setBlock(d.block);
+		else if (d.hl) restyle(["hl"], d.hl === "none" ? null : d.hl);
+		else if (d.fg) restyle(["fg"], d.fg === "none" ? null : d.fg);
+		else if (d.size) restyle(["size"], d.size === "normal" ? null : d.size);
+		else if (d.font) restyle(["font"], d.font === "sans" ? null : d.font);
+		else if (d.cmd === "link") {
+			const here = (sel().anchorNode?.parentElement?.closest("a[data-href]") as HTMLElement | null)?.dataset.href ?? "";
+			const href = window.prompt("Link to (empty takes the link off)", here || "https://");
+			if (href === null) return;
+			restyle(["link"], href.trim() && href.trim() !== "https://" ? href.trim() : null);
+		} else if (d.cmd === "clear") restyle(["bold", "italic", "underline", "strike", "code", "hl", "fg", "size", "font"], null);
 		else if (d.cmd && commands[d.cmd]) restyle([commands[d.cmd]!], "on");
 		changed();
+	}
+
+	/* ---------- what a block is: text, a heading, a quote, code, a list ---------- */
+
+	const BLOCK_NAMES: Record<string, string> = { p: "Text", h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", quote: "Quote", code: "Code", ul: "Bullets", ol: "Numbers", check: "Checklist" };
+	/** What the block the caret is in is, by the names the block menu uses. */
+	function blockKind(): string {
+		const node = sel().anchorNode;
+		const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+		const top = topOf(el);
+		if (!top) return "p";
+		if (/^H[1-3]$/.test(top.tagName)) return top.tagName.toLowerCase();
+		if (top.tagName === "BLOCKQUOTE") return "quote";
+		if (top.tagName === "PRE") return "code";
+		if (top.tagName === "OL") return "ol";
+		if (top.tagName === "UL") return el?.closest("li")?.querySelector(":scope > .pce-check") ? "check" : "ul";
+		return "p";
+	}
+	/** Every block the selection touches becomes `kind`: its lines kept, its words' styles with them. */
+	function setBlock(kind: string) {
+		if (!sel().rangeCount) return;
+		const range = sel().getRangeAt(0);
+		const touched = ([...ed.children] as HTMLElement[]).filter((block) => range.intersectsNode(block) && !block.classList.contains("pce-piece") && !block.classList.contains("pce-atom"));
+		if (!touched.length) return;
+		// Each block as lines of inline words.
+		const lines: Node[][] = [];
+		const inlineOf = (el: Element) => [...el.childNodes].filter((n) => !(n instanceof HTMLElement && (n.classList.contains("pce-check") || n.tagName === "UL" || n.tagName === "OL")));
+		for (const block of touched) {
+			if (block.tagName === "UL" || block.tagName === "OL") {
+				for (const li of block.querySelectorAll("li")) lines.push(inlineOf(li).flatMap((n) => (n instanceof HTMLElement && n.tagName === "P" ? [...n.childNodes] : [n])));
+			} else if (block.tagName === "BLOCKQUOTE") {
+				for (const p of block.querySelectorAll(":scope > p")) lines.push([...p.childNodes]);
+			} else if (block.tagName === "PRE") {
+				for (const text of (block.textContent ?? "").split("\n")) lines.push([document.createTextNode(text)]);
+			} else if (block.tagName === "TABLE") continue;
+			else lines.push([...block.childNodes]);
+		}
+		const made: HTMLElement[] = [];
+		const filled = (el: HTMLElement, nodes: Node[]) => {
+			el.append(...(nodes.length ? nodes : [document.createTextNode(ZW)]));
+			return el;
+		};
+		if (kind === "quote") {
+			const quote = h("blockquote");
+			for (const nodes of lines) quote.append(filled(h("p"), nodes));
+			made.push(quote);
+		} else if (kind === "code") made.push(h("pre", { class: "pce-code", "data-lang": "" }, lines.map((nodes) => nodes.map((n) => n.textContent).join("")).join("\n")));
+		else if (kind === "ul" || kind === "ol" || kind === "check") {
+			const list = h(kind === "ol" ? "ol" : "ul");
+			for (const nodes of lines) {
+				const li = filled(h("li"), nodes);
+				if (kind === "check") li.prepend(h("span", { class: "pce-check", contenteditable: "false" }));
+				list.append(li);
+			}
+			made.push(list);
+		} else for (const nodes of lines) made.push(filled(h(kind as "p"), nodes));
+		touched[0]!.before(...made);
+		touched.forEach((block) => block.remove());
+		const last = made.at(-1)!;
+		const r = document.createRange();
+		r.selectNodeContents(last.querySelector("li:last-child, p:last-child") ?? last);
+		r.collapse(false);
+		sel().removeAllRanges();
+		sel().addRange(r);
 	}
 
 	/* ---------- presses inside: checks, suggestions, raw boxes ---------- */
@@ -915,7 +1058,7 @@ export function CardEditor(props: CardEditorProps) {
 		}
 		// ⌘B, ⌘I and ⌘⇧X go through the card's own styles, as the style bar's buttons do.
 		const mod = event.metaKey || event.ctrlKey;
-		const keyed: Record<string, Style> = { b: "bold", i: "italic", x: "strike", e: "code" };
+		const keyed: Record<string, Style> = { b: "bold", i: "italic", u: "underline", x: "strike", e: "code" };
 		const want = mod && keyed[event.key.toLowerCase()];
 		if (want && (want !== "strike" || event.shiftKey) && !sel().isCollapsed) {
 			event.preventDefault();
@@ -1006,14 +1149,55 @@ export function CardEditor(props: CardEditorProps) {
 				}}
 			/>
 			<div ref={bar} class="pce-bar" onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
-				<button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
-				<button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
-				<button type="button" data-cmd="strikeThrough" title="Strike"><s>S</s></button>
-				<button type="button" data-cmd="code" title="Code" class="pce-mono">{"</>"}</button>
+				<span class="pce-drop">
+					<button type="button" class="pce-pick" data-menu="block" title="What the block is" data-label="block">Text</button>
+					<span class="pce-menu" data-for="block">
+						{Object.entries({ p: "Text", h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", quote: "Quote", code: "Code", ul: "Bullets", ol: "Numbers", check: "Checklist" }).map(([kind, name]) => (
+							<button type="button" data-block={kind} class={`pce-opt pce-opt-${kind}`}>{name}</button>
+						))}
+					</span>
+				</span>
+				<span class="pce-drop">
+					<button type="button" class="pce-pick" data-menu="font" title="Font" data-label="font">Sans</button>
+					<span class="pce-menu" data-for="font">
+						<button type="button" data-font="sans" class="pce-opt" style={{ "font-family": "var(--font-sans, system-ui)" }}>Sans</button>
+						<button type="button" data-font="serif" class="pce-opt" style={{ "font-family": "var(--card-serif, Georgia, serif)" }}>Serif</button>
+						<button type="button" data-font="mono" class="pce-opt" style={{ "font-family": "var(--font-mono)" }}>Mono</button>
+					</span>
+				</span>
+				<span class="pce-drop">
+					<button type="button" class="pce-pick" data-menu="size" title="Size" data-label="size">Normal</button>
+					<span class="pce-menu" data-for="size">
+						<button type="button" data-size="small" class="pce-opt" style={{ "font-size": "12px" }}>Small</button>
+						<button type="button" data-size="normal" class="pce-opt">Normal</button>
+						<button type="button" data-size="large" class="pce-opt" style={{ "font-size": "17px" }}>Large</button>
+						<button type="button" data-size="huge" class="pce-opt" style={{ "font-size": "21px" }}>Huge</button>
+					</span>
+				</span>
 				<span class="pce-sep" />
-				{(["yellow", "green", "blue"] as const).map((c) => <button type="button" class="pce-sw" data-hl={c} title={`${c} highlight`} />)}
+				<button type="button" data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
+				<button type="button" data-cmd="italic" title="Italic (⌘I)"><i>I</i></button>
+				<button type="button" data-cmd="underline" title="Underline (⌘U)"><u>U</u></button>
+				<button type="button" data-cmd="strikeThrough" title="Strike (⌘⇧X)"><s>S</s></button>
+				<button type="button" data-cmd="code" title="Code (⌘E)" class="pce-mono">{"</>"}</button>
+				<button type="button" data-cmd="link" title="Link">🔗</button>
 				<span class="pce-sep" />
-				{(["red", "blue"] as const).map((c) => <button type="button" class="pce-fg" data-fg={c} title={`${c} text`}>A</button>)}
+				<span class="pce-drop">
+					<button type="button" class="pce-pick pce-hl" data-menu="hl" title="Highlight">
+						<span class="pce-hl-mark">ab</span>
+					</button>
+					<span class="pce-menu pce-swatches" data-for="hl">
+						{(["yellow", "orange", "red", "green", "blue", "purple"] as const).map((c) => <button type="button" class="pce-sw" data-hl={c} title={`${c} highlight`} />)}
+						<button type="button" class="pce-opt" data-hl="none">No highlight</button>
+					</span>
+				</span>
+				<span class="pce-drop">
+					<button type="button" class="pce-pick pce-fgpick" data-menu="fg" title="Text colour">A</button>
+					<span class="pce-menu pce-swatches" data-for="fg">
+						{(["red", "orange", "yellow", "green", "blue", "purple"] as const).map((c) => <button type="button" class="pce-fg" data-fg={c} title={`${c} text`}>A</button>)}
+						<button type="button" class="pce-opt" data-fg="none">No colour</button>
+					</span>
+				</span>
 				<button type="button" data-cmd="clear" title="Clear styling">⌫</button>
 			</div>
 			<div ref={caret} class="pce-caret" />

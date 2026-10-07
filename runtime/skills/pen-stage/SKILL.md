@@ -130,9 +130,11 @@ footnotes (`[^1]` and `[^1]: …`), and inside a line `**bold**`, `*italic*`, `~
 file shown where it sits is `![[name.pdf]]` on its own line. `%%hidden%%` is a comment nobody sees
 on the canvas.
 
-Two things Obsidian has no word for are ours; Obsidian shows them as the words typed:
+Two things Obsidian has no word for are ours; Obsidian shows them as the words typed, and an export to Obsidian takes the styles out:
 
-- **Coloured words**: `[not flexible]{.red}`, in `red`, `orange`, `yellow`, `green`, `blue` or `purple`.
+- **Styled words**: `[not flexible]{.red}`, in `red`, `orange`, `yellow`, `green`, `blue` or `purple`;
+  a size, `.small`, `.large` or `.huge`; a face, `.serif` or `.mono`; several at once, `[words]{.serif .large}`.
+  Underline is `<u>words</u>`, which Obsidian draws too.
 - **Suggestions**, in CriticMarkup. To propose a change to a card the person wrote, write it as a
   suggestion rather than overwriting their words: `{~~old words~>new words~~}` to replace,
   `{++added++}` to add, `{--removed--}` to take out, each followed by `{>>why<<}` if there is a

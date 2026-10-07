@@ -1,5 +1,5 @@
 import type { Token, Tokens } from "marked";
-import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
+import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Face, type Size, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
 
 /**
  * The markdown a card on the stage is written in: Obsidian's, with coloured words and an agent's
@@ -31,8 +31,12 @@ export interface Run {
 	image?: { url: string; alt: string; width?: number };
 	/** `==highlighted==`: "default" for Obsidian's own colour, or one of its six. */
 	mark?: Colour | "default";
-	/** `[coloured]{.red}` words. */
+	/** `[styled]{.red .large .serif}` words: a colour, a size, a face. */
 	colour?: Colour;
+	size?: Size;
+	face?: Face;
+	/** `<u>underlined</u>`, which Obsidian draws too. */
+	underline?: true;
 	/** A `[[link]]` to a note: its target. Drawn as a link, but it goes nowhere on the canvas. */
 	wiki?: string;
 	/** Words an agent suggests adding, or taking out (CriticMarkup), and the reason it gave. */
@@ -250,7 +254,7 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 			}
 			case "colour": {
 				const t = token as ColourToken;
-				out.push(...runsOf(t.tokens as Token[], notes, { ...style, colour: t.colour }));
+				out.push(...runsOf(t.tokens as Token[], notes, { ...style, ...(t.colour ? { colour: t.colour } : {}), ...(t.size ? { size: t.size } : {}), ...(t.face ? { face: t.face } : {}) }));
 				break;
 			}
 			case "wiki": {
@@ -275,6 +279,16 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 				break;
 			case "html": {
 				const raw = token.raw;
+				// <u> and </u> open and close an underline over what is between them.
+				if (/^<u>$/i.test(raw)) {
+					style = { ...style, underline: true };
+					break;
+				}
+				if (/^<\/u>$/i.test(raw)) {
+					const { underline: _, ...rest } = style;
+					style = rest;
+					break;
+				}
 				if (/^<br\s*\/?>$/i.test(raw)) out.push({ text: "\n", ...style });
 				else if (!/^<\/?[a-z][^>]*>$/i.test(raw)) out.push(...textRuns(raw.replace(/<[^>]+>/g, ""), style, notes));
 				break;
@@ -295,7 +309,7 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 
 const sameStyle = (a: Run, b: Run) =>
 	!!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code && !!a.sup === !!b.sup && a.link === b.link &&
-	a.mark === b.mark && a.colour === b.colour && a.wiki === b.wiki && !!a.added === !!b.added && !!a.removed === !!b.removed && a.reason === b.reason;
+	a.mark === b.mark && a.colour === b.colour && a.size === b.size && a.face === b.face && !!a.underline === !!b.underline && a.wiki === b.wiki && !!a.added === !!b.added && !!a.removed === !!b.removed && a.reason === b.reason;
 
 /** `![[file]]`, alone on its line: the file, or, for a picture, the picture at the width it gives. */
 function embedOf(tokens: readonly Token[] | undefined): Block | undefined {

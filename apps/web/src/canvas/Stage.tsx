@@ -44,7 +44,7 @@ import { pageFont } from "./pen/fonts.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
-import { CARD_PALETTE } from "./pen/markdown-layout.ts";
+import { CARD_PALETTE, SERIF_FAMILY } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
@@ -4528,6 +4528,7 @@ export function Stage(props: {
 										"font-family": look.font,
 										"font-size": `${look.size}px`,
 										"--card-size": `${look.size}px`,
+										"--card-serif": pageFont(SERIF_FAMILY, 400, false),
 										"font-weight": String(look.weight),
 										"letter-spacing": `${look.spacing}px`,
 										"line-height": look.line === undefined ? "1.5" : String(look.line),

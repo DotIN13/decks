@@ -3,7 +3,7 @@ import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
-import { CARD_PALETTE, type MarkdownLayout } from "./markdown-layout.ts";
+import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
 import { parseMarkdown, wordsOf } from "./markdown.ts";
 import { PenIcons } from "./icons.ts";
 import { NOTE_RADIUS, paintDocument } from "./paint.ts";
@@ -1172,7 +1172,9 @@ export class StageScene {
 				const pictured = /!\[|<img\b/i.test(node.content);
 				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: `${wordsOf(parseMarkdown(node.content))}◦▪${pictured ? "🖼" : ""}` });
 				needs.push({ family: style.fontFamily, weight: 700, italic: false, text: node.content }, { family: style.fontFamily, weight: 600, italic: false, text: node.content }, { family: style.fontFamily, weight: style.fontWeight, italic: true, text: node.content });
-				if (/`|^( {4}|\t)|<code|<pre/m.test(node.content)) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content }, { family: MONO_FAMILY, weight: 700, italic: false, text: node.content });
+				if (/`|^( {4}|\t)|<code|<pre|\.mono\b/m.test(node.content)) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content }, { family: MONO_FAMILY, weight: 700, italic: false, text: node.content });
+				// Words in the serif face, `[words]{.serif}`, in its upright, bold and italic.
+				if (/\.serif\b/.test(node.content)) needs.push({ family: SERIF_FAMILY, weight: 400, italic: false, text: node.content }, { family: SERIF_FAMILY, weight: 700, italic: false, text: node.content }, { family: SERIF_FAMILY, weight: 400, italic: true, text: node.content });
 			}
 		}
 		return needs;

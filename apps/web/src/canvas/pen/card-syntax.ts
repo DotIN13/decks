@@ -8,7 +8,8 @@ import { Marked, type TokenizerExtension, type Tokens } from "marked";
  * `![[embeds]]`, `![alt|240](url)` for an image's width, `> [!type] Title` callouts and `%%hidden
  * comments%%`. A card adds:
  *
- * - coloured words, `[words]{.red}`, written the way Pandoc and Djot write a span with a class;
+ * - styled words, `[words]{.red}`, `[words]{.serif .large}`, written the way Pandoc and Djot write a
+ *   span with classes: a colour, a size (`small`, `large`, `huge`) and a face (`serif`, `mono`);
  * - an agent's suggestions in CriticMarkup: `{~~old~>new~~}`, `{++added++}`, `{--removed--}`, and
  *   `{>>why<<}` after one of them for the reason.
  *
@@ -26,7 +27,15 @@ export const HIGHLIGHT_EMOJI: Record<string, Colour> = { "🔴": "red", "🟠": 
 export const EMOJI_OF: Record<Colour, string> = Object.fromEntries(Object.entries(HIGHLIGHT_EMOJI).map(([emoji, colour]) => [colour, emoji])) as Record<Colour, string>;
 
 export interface HighlightToken extends Tokens.Generic { type: "highlight"; colour?: Colour; tokens: Tokens.Generic[] }
-export interface ColourToken extends Tokens.Generic { type: "colour"; colour: Colour; tokens: Tokens.Generic[] }
+export const SIZES = ["small", "large", "huge"] as const;
+export type Size = (typeof SIZES)[number];
+export const FACES = ["serif", "mono"] as const;
+export type Face = (typeof FACES)[number];
+/** Every class a span may carry: a colour, a size, a face. */
+const CLASSES = [...COLOURS, ...SIZES, ...FACES] as string[];
+export interface ColourToken extends Tokens.Generic { type: "colour"; colour?: Colour; size?: Size; face?: Face; tokens: Tokens.Generic[] }
+/** `{.red .large}`, as one pattern: one or more of the classes a span may carry. */
+const CLASS_LIST = `\\{((?:\\.(?:${CLASSES.join("|")})\\s*)+)\\}`;
 export interface WikiToken extends Tokens.Generic { type: "wiki"; target: string; alias?: string; embed: boolean; width?: number }
 export interface CriticToken extends Tokens.Generic { type: "critic"; op: "replace" | "add" | "remove" | "comment" | "highlight"; old: string; new: string }
 export interface HiddenToken extends Tokens.Generic { type: "hidden"; text: string }
@@ -50,9 +59,15 @@ const colour: TokenizerExtension = {
 	level: "inline",
 	start: (src) => src.indexOf("["),
 	tokenizer(src) {
-		const m = new RegExp(`^\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]\\{\\.(${COLOURS.join("|")})\\}`).exec(src);
+		const m = new RegExp(`^\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]${CLASS_LIST}`).exec(src);
 		if (!m) return undefined;
-		const token: ColourToken = { type: "colour", raw: m[0], text: m[1]!, colour: m[2] as Colour, tokens: [] };
+		const classes = m[2]!.split(/[\s.]+/).filter(Boolean);
+		const token: ColourToken = { type: "colour", raw: m[0], text: m[1]!, tokens: [] };
+		for (const name of classes) {
+			if ((COLOURS as readonly string[]).includes(name)) token.colour = name as Colour;
+			else if ((SIZES as readonly string[]).includes(name)) token.size = name as Size;
+			else if ((FACES as readonly string[]).includes(name)) token.face = name as Face;
+		}
 		this.lexer.inlineTokens(m[1]!, token.tokens);
 		return token;
 	},
@@ -147,11 +162,18 @@ export const CALLOUTS: Record<string, string> = {
  * goes out as the words it would replace, and its reason as a hidden `%%comment%%`.
  */
 export function toObsidian(md: string): string {
-	return md
+	return plainSpans(md)
 		.replace(/\{~~([\s\S]*?)~>([\s\S]*?)~~\}/g, "$1")
 		.replace(/\{\+\+([\s\S]+?)\+\+\}/g, "")
 		.replace(/\{--([\s\S]+?)--\}/g, "$1")
 		.replace(/\{==([\s\S]+?)==\}/g, "==$1==")
 		.replace(/\s*\{>>([\s\S]+?)<<\}/g, " %%$1%%")
-		.replace(new RegExp(`\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]\\{\\.(?:${COLOURS.join("|")})\\}`, "g"), "$1");
+;
+}
+
+/** Styled words, `[words]{.red .large}`, as the words alone; a span inside a span too. */
+function plainSpans(md: string): string {
+	const span = new RegExp(`\\[((?:[^\\[\\]\\n]|\\[[^\\]\\n]*\\])+)\\]${CLASS_LIST}`, "g");
+	for (let was = ""; was !== md; ) (was = md), (md = md.replace(span, "$1"));
+	return md;
 }

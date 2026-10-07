@@ -81,3 +81,13 @@ test("a card goes to Obsidian without its colours and with open suggestions as t
 	const { toObsidian } = await import("./card-syntax.ts");
 	assert.equal(toObsidian("It is [not flexible]{.red}, ask about {~~Arashiyama~>Ohara~~}{>>quieter<<} {++new ++}and {--old --}==🟡x=="), "It is not flexible, ask about Arashiyama %%quieter%% and old ==🟡x==");
 });
+
+test("styled words carry a size and a face as well as a colour, underline is <u>, and Obsidian gets the words alone", async () => {
+	const [p] = parseMarkdown("A [big serif]{.large .serif} word, [nested [inside]{.red}]{.mono}, and <u>under</u> it.");
+	const runs = (p as Extract<Block, { kind: "paragraph" }>).runs;
+	assert.deepEqual(runs.find((run) => run.text === "big serif"), { text: "big serif", size: "large", face: "serif" });
+	assert.deepEqual(runs.find((run) => run.text === "inside"), { text: "inside", face: "mono", colour: "red" });
+	assert.deepEqual(runs.find((run) => run.text === "under"), { text: "under", underline: true });
+	const { toObsidian } = await import("./card-syntax.ts");
+	assert.equal(toObsidian("A [big serif]{.large .serif} word, [nested [inside]{.red}]{.mono}."), "A big serif word, nested inside.");
+});
