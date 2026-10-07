@@ -1,7 +1,10 @@
 import type { WirePart } from "./context.ts";
 
 /**
- * Document pages (`@decks/docs`): open, type, review, go back.
+ * Document pages (`@decks/docs`): open, type, review, go back, write back.
+ *
+ * Opening a file copies it into the deck's `docs/<name>/` (`app.ts`, `DocLibrary`), so its history
+ * and suggestions live in the deck; the original changes only on `doc.writeback`.
  *
  * Every frame goes to the service as it came. A page's own answers (`doc.state`, `doc.patched`,
  * `doc.versions`) go to that page alone; what changed goes to every browser as `doc.changed`,
@@ -15,4 +18,5 @@ export const docs = {
 	"doc.review": (message, reply, wire) => wire.docs.handle(message, reply),
 	"doc.versions": (message, reply, wire) => wire.docs.handle(message, reply),
 	"doc.restore": (message, reply, wire) => wire.docs.handle(message, reply),
+	"doc.writeback": (message, reply, wire) => wire.docs.handle(message, reply),
 } satisfies WirePart;

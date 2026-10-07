@@ -3,12 +3,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { crc32 } from "node:zlib";
 import type { DocServerMessage as ServerMessage } from "../index.ts";
 import { DocService, QUIET_MS } from "./service.ts";
 import { DirectoryVersions } from "./versions.ts";
 import { readEntry, replaceEntry } from "./zip.ts";
-import { inside } from "./fixtures.ts";
+import { inside, storedZip } from "./fixtures.ts";
 
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "decks-docs-"));
@@ -24,44 +23,6 @@ function setup() {
 
 const changed = (sent: ServerMessage[]) => sent.filter((m): m is Extract<ServerMessage, { type: "doc.changed" }> => m.type === "doc.changed");
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** A zip of stored entries, built by hand, so the reader is tested against bytes it did not write. */
-function storedZip(files: Record<string, string>): Buffer {
-	const locals: Buffer[] = [];
-	const centrals: Buffer[] = [];
-	let offset = 0;
-	for (const [name, body] of Object.entries(files)) {
-		const n = Buffer.from(name);
-		const data = Buffer.from(body);
-		const crc = crc32(data) >>> 0;
-		const local = Buffer.alloc(30);
-		local.writeUInt32LE(0x04034b50, 0);
-		local.writeUInt16LE(10, 4);
-		local.writeUInt32LE(crc, 14);
-		local.writeUInt32LE(data.length, 18);
-		local.writeUInt32LE(data.length, 22);
-		local.writeUInt16LE(n.length, 26);
-		locals.push(local, n, data);
-		const central = Buffer.alloc(46);
-		central.writeUInt32LE(0x02014b50, 0);
-		central.writeUInt16LE(10, 6);
-		central.writeUInt32LE(crc, 16);
-		central.writeUInt32LE(data.length, 20);
-		central.writeUInt32LE(data.length, 24);
-		central.writeUInt16LE(n.length, 28);
-		central.writeUInt32LE(offset, 42);
-		centrals.push(central, n);
-		offset += 30 + n.length + data.length;
-	}
-	const dir = Buffer.concat(centrals);
-	const end = Buffer.alloc(22);
-	end.writeUInt32LE(0x06054b50, 0);
-	end.writeUInt16LE(Object.keys(files).length, 8);
-	end.writeUInt16LE(Object.keys(files).length, 10);
-	end.writeUInt32LE(dir.length, 12);
-	end.writeUInt32LE(offset, 16);
-	return Buffer.concat([...locals, dir, end]);
-}
 
 test("a zip entry is replaced and every other entry is left as it was", () => {
 	const zip = storedZip({ "[Content_Types].xml": "<Types/>", "word/document.xml": "<w:t>old</w:t>" });

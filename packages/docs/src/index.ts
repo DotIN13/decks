@@ -137,12 +137,18 @@ export type DocClientMessage =
 	| { type: "doc.review"; path: string; client: string; change: string; accept: boolean }
 	| { type: "doc.versions"; path: string }
 	/** Put the text back as it was in one kept version, as one edit like any other. */
-	| { type: "doc.restore"; path: string; client: string; sha: string };
+	| { type: "doc.restore"; path: string; client: string; sha: string }
+	/** Write a working copy back over the file it was copied from. */
+	| { type: "doc.writeback"; path: string; client: string };
 
 /** What the service sends: to the page that asked, or to every page. */
 export type DocServerMessage =
-	/** A document as it is now, for the page that opened it; `changes` are those still to review. */
-	| { type: "doc.state"; path: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
+	/**
+	 * A document as it is now, for the page that opened it; `changes` are those still to review.
+	 * `path` is what to call it from now on, which is its working copy when the server keeps one;
+	 * `asked` is the path the page sent, and `source` the original a working copy was copied from.
+	 */
+	| { type: "doc.state"; path: string; asked: string; source?: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
 	/**
 	 * To the page that sent `batch`: the revision it made, and which of its splices did not land.
 	 * When any did not, `text` is the whole document at `rev`, so the page resyncs without asking.
@@ -157,5 +163,7 @@ export type DocServerMessage =
 	 */
 	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; by: DocAuthor; client?: string; batch?: string; change?: DocChange; settled?: string }
 	| { type: "doc.versions"; path: string; versions: DocVersion[] }
+	/** A working copy written back to `source`, or why not. */
+	| { type: "doc.written"; path: string; source?: string; error?: string }
 	/** Something a person should be told, in a sentence. */
 	| { type: "notice"; level: "info" | "warn" | "error"; text: string };

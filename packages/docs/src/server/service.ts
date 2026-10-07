@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { basename, dirname, extname } from "node:path";
-import type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, Splice } from "../index.ts";
+import { applySplice, transformSplices, type DocAuthor, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "../index.ts";
 import { invert, land, spliceDiff } from "../merge.ts";
+import type { DocLibrary } from "./library.ts";
 import type { VersionStore } from "./versions.ts";
 import { readEntry, replaceEntry } from "./zip.ts";
 
@@ -33,6 +34,11 @@ const DOCX_PART = "word/document.xml";
 interface Open {
 	key: string;
 	file: string;
+	/** Where its versions go, and the name they are kept under there. */
+	versions: VersionStore;
+	vkey: string;
+	/** For a working copy in a library: the original, which it is written back to. */
+	source?: { file: string; writable: boolean; watcher?: FSWatcher; quiet?: ReturnType<typeof setTimeout> };
 	format: DocFormat;
 	text: string;
 	rev: number;
@@ -65,6 +71,11 @@ export interface DocServiceOptions {
 	 */
 	resolve(path: string): Resolved;
 	versions: VersionStore;
+	/**
+	 * Where documents are copied to be worked on (`library.ts`). When there is one, opening a file
+	 * outside it opens a copy inside it instead, and its history and suggestions are kept there.
+	 */
+	library?: () => DocLibrary | undefined;
 	/** To every page. */
 	send(message: DocServerMessage): void;
 	/** Who most likely wrote the file just now, when the host can tell (an agent's name). */
@@ -106,30 +117,53 @@ export class DocService {
 					return reply(this.versions(message.path));
 				case "doc.restore":
 					return this.restore(message.path, message.sha);
+				case "doc.writeback":
+					return reply(this.writeBack(message.path));
 			}
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 		}
 	}
 
-	/** Open a document for a page, or join the pages already on it. */
+	/**
+	 * Open a document for a page, or join the pages already on it. With a library, a file from
+	 * anywhere else opens as its working copy, and the answer names the copy as `path`, the path
+	 * the page asked for as `asked`, and the original as `source`.
+	 */
 	opened(path: string, client: string): Extract<DocServerMessage, { type: "doc.state" }> {
 		let doc: Open;
 		try {
-			doc = this.load(path);
+			doc = this.load(this.adopt(path));
 		} catch (error) {
-			return { type: "doc.state", path, rev: 0, format: "text", text: "", changes: [], error: (error as Error).message };
+			return { type: "doc.state", path, asked: path, rev: 0, format: "text", text: "", changes: [], error: (error as Error).message };
 		}
 		doc.clients.add(client);
 		return {
 			type: "doc.state",
-			path,
+			path: doc.key,
+			asked: path,
 			rev: doc.rev,
 			format: doc.format,
 			text: doc.text,
 			changes: [...doc.changes.values()].map((entry) => entry.change),
+			...(doc.source ? { source: doc.source.file } : {}),
 			...(doc.writable ? {} : { error: `${path} opens read-only: it is not somewhere this server may write.` }),
 		};
+	}
+
+	/**
+	 * Write the working copy back to its original. A write to the original since the copy last
+	 * saw it is merged into the copy first, so writing back never undoes it.
+	 */
+	writeBack(path: string): Extract<DocServerMessage, { type: "doc.written" }> {
+		const doc = this.find(path);
+		if (!doc?.source) return { type: "doc.written", path, error: `${path} is not a copy of another file, so there is nothing to write it back to.` };
+		if (!doc.source.writable) return { type: "doc.written", path, source: doc.source.file, error: `${doc.source.file} is not somewhere this server may write.` };
+		this.absorb(doc);
+		this.pull(doc);
+		writeSource(doc.source.file, doc.format, doc.text);
+		this.context.library?.()?.wroteBack(doc.file, doc.text);
+		return { type: "doc.written", path: doc.key, source: doc.source.file };
 	}
 
 	closed(path: string, client: string): void {
@@ -168,6 +202,7 @@ export class DocService {
 		const entry = doc?.changes.get(change);
 		if (!doc || !entry) return;
 		doc.changes.delete(change);
+		this.saveChanges(doc);
 		if (accept) {
 			this.context.send({ type: "doc.changed", path: doc.key, base: doc.rev, rev: doc.rev, splices: [], by: "person", settled: change });
 			return;
@@ -178,7 +213,7 @@ export class DocService {
 		const base = doc.rev;
 		if (landed.applied.length > 0) {
 			this.commit(doc, landed.text, landed.applied);
-			this.context.versions.record(doc.key, doc.text);
+			doc.versions.record(doc.vkey, doc.text);
 		}
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", settled: change });
 		if (landed.refused.length > 0) {
@@ -187,9 +222,11 @@ export class DocService {
 	}
 
 	versions(path: string): Extract<DocServerMessage, { type: "doc.versions" }> {
-		const doc = this.find(path);
-		const key = doc?.key ?? this.keyOf(path).key;
-		return { type: "doc.versions", path, versions: [...this.context.versions.entries(key)] };
+		const open = this.find(path);
+		const doc = open ?? this.load(this.adopt(path));
+		const versions = [...doc.versions.entries(doc.vkey)];
+		if (!open) this.dispose(doc);
+		return { type: "doc.versions", path, versions };
 	}
 
 	/** Put one kept version back, as one edit every page applies. */
@@ -197,13 +234,13 @@ export class DocService {
 		const doc = this.find(path);
 		if (!doc || !doc.writable) return;
 		this.absorb(doc);
-		const target = this.context.versions.read(sha);
+		const target = doc.versions.read(sha);
 		const splices = spliceDiff(doc.text, target);
 		if (splices.length === 0) return;
 		this.flushVersion(doc);
 		const base = doc.rev;
 		this.commit(doc, target, splices);
-		this.context.versions.record(doc.key, target);
+		doc.versions.record(doc.vkey, target);
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: "person" });
 	}
 
@@ -220,23 +257,43 @@ export class DocService {
 
 	private find(path: string): Open | undefined {
 		try {
-			return this.open.get(this.keyOf(path).key);
+			return this.open.get(this.keyOf(path).key) ?? [...this.open.values()].find((doc) => doc.source?.file === this.keyOf(path).file);
 		} catch {
 			return undefined;
 		}
+	}
+
+	/** The path to open for one a page asked for: its working copy, when there is a library. */
+	private adopt(path: string): string {
+		const library = this.context.library?.();
+		if (!library) return path;
+		const { file } = this.keyOf(path);
+		if (library.contains(file)) return path;
+		const format = this.formatOf(file);
+		return library.working(file, format, readSource(file, format)).file;
+	}
+
+	private formatOf(file: string): DocFormat {
+		const ext = extname(file).toLowerCase();
+		if (!this.editable.has(ext)) throw new Error(`${basename(file)} is not a document this page edits (${[...this.editable].join(" ")})`);
+		return ext === ".docx" ? "docx" : "text";
 	}
 
 	private load(path: string): Open {
 		const { file, key, writable } = this.keyOf(path);
 		const known = this.open.get(key);
 		if (known) return known;
-		const ext = extname(file).toLowerCase();
-		if (!this.editable.has(ext)) throw new Error(`${basename(file)} is not a document this page edits (${[...this.editable].join(" ")})`);
-		const format: DocFormat = ext === ".docx" ? "docx" : "text";
+		const format = this.formatOf(file);
 		const text = readSource(file, format);
+		const library = this.context.library?.();
+		const kept = library?.contains(file) ? library : undefined;
+		const meta = kept?.meta(file);
 		const doc: Open = {
 			key,
 			file,
+			versions: kept ? kept.versions(file) : this.context.versions,
+			vkey: kept ? basename(file) : key,
+			...(meta ? { source: { file: meta.source, writable: this.writableSource(meta.source) } } : {}),
 			format,
 			text,
 			// Dated, so a page holding a revision from before a restart can never match a new one.
@@ -248,9 +305,13 @@ export class DocService {
 			writable,
 		};
 		doc.seen = stamp(file);
-		this.context.versions.record(key, text);
+		// Suggestions still waiting from before: history to move them by is gone, so a rejection finds their words.
+		for (const change of kept?.changes(file) ?? []) doc.changes.set(change.id, { change, rev: doc.rev });
+		doc.versions.record(doc.vkey, text);
 		this.watch(doc);
 		this.open.set(key, doc);
+		// The original may have moved on while nobody had the copy open.
+		this.pull(doc);
 		return doc;
 	}
 
@@ -283,7 +344,7 @@ export class DocService {
 		doc.pause = undefined;
 		if (!doc.unversioned) return;
 		doc.unversioned = false;
-		this.context.versions.record(doc.key, doc.text);
+		doc.versions.record(doc.vkey, doc.text);
 	}
 
 	/**
@@ -302,6 +363,18 @@ export class DocService {
 			});
 			// A watcher never keeps the process alive on its own: the server's socket does that.
 			doc.watcher.unref();
+			if (doc.source) {
+				const source = doc.source;
+				const original = basename(source.file);
+				source.watcher = watch(dirname(source.file), (_event, changed) => {
+					if (changed && String(changed) !== original) return;
+					clearTimeout(source.quiet);
+					source.quiet = setTimeout(() => {
+						if (this.open.has(doc.key)) this.pull(doc);
+					}, this.quietMs);
+				});
+				source.watcher.unref();
+			}
 		} catch {
 			// No watching on this platform: a write from outside shows when the page opens it again.
 		}
@@ -328,23 +401,83 @@ export class DocService {
 		// Our own write coming back.
 		if (text === doc.text) return;
 		this.flushVersion(doc);
-		const from = this.context.versions.record(doc.key, doc.text);
+		const from = doc.versions.record(doc.vkey, doc.text);
 		const splices = spliceDiff(doc.text, text);
 		const base = doc.rev;
 		doc.text = text;
 		doc.rev = Math.max(doc.rev + 1, Date.now());
 		doc.log.push({ base, rev: doc.rev, splices });
 		if (doc.log.length > LOG) doc.log.splice(0, doc.log.length - LOG);
-		const to = this.context.versions.record(doc.key, text);
+		const to = doc.versions.record(doc.vkey, text);
 		const change: DocChange = { id: randomUUID(), by: (this.context.writer?.(doc.file) ?? "outside") as DocAuthor, at: Date.now(), from, to, splices };
 		doc.changes.set(change.id, { change, rev: doc.rev });
+		this.saveChanges(doc);
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: change.by, change });
+	}
+
+	/**
+	 * A write to the original of a working copy, merged into the copy as a change to review.
+	 *
+	 * Three ways: the original's edits since the base, and the copy's since the same base, are
+	 * both splices of the base, so the original's are moved past the copy's (`transformSplices`)
+	 * and land on the copy exactly, with the copy's own text kept where both touched. The original's
+	 * text becomes the new base, so the same edit is never taken in twice.
+	 */
+	private pull(doc: Open): void {
+		const library = this.context.library?.();
+		if (!library || !doc.source) return;
+		let theirs: string;
+		try {
+			theirs = readSource(doc.source.file, doc.format);
+		} catch {
+			// The original is gone or mid-write: the copy carries on, and the next event tries again.
+			return;
+		}
+		const base = library.base(doc.file);
+		if (base === undefined || theirs === base) return;
+		this.absorb(doc);
+		const moved = transformSplices(spliceDiff(base, theirs), spliceDiff(base, doc.text), false).a;
+		library.setBase(doc.file, theirs);
+		if (moved.length === 0) return;
+		let text = doc.text;
+		for (const splice of moved) {
+			if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) {
+				this.context.send({ type: "notice", level: "warn", text: `${basename(doc.source.file)} changed in a way that could not be merged into its copy; its text is kept as a version.` });
+				doc.versions.record(doc.vkey, theirs);
+				return;
+			}
+			text = applySplice(text, splice);
+		}
+		this.flushVersion(doc);
+		const from = doc.versions.record(doc.vkey, doc.text);
+		const rev = doc.rev;
+		this.commit(doc, text, moved);
+		const to = doc.versions.record(doc.vkey, text);
+		const change: DocChange = { id: randomUUID(), by: (this.context.writer?.(doc.source.file) ?? "outside") as DocAuthor, at: Date.now(), from, to, splices: moved };
+		doc.changes.set(change.id, { change, rev: doc.rev });
+		this.saveChanges(doc);
+		this.context.send({ type: "doc.changed", path: doc.key, base: rev, rev: doc.rev, splices: moved, by: change.by, change });
+	}
+
+	private saveChanges(doc: Open): void {
+		const library = this.context.library?.();
+		if (library?.contains(doc.file)) library.saveChanges(doc.file, [...doc.changes.values()].map((entry) => entry.change));
+	}
+
+	private writableSource(file: string): boolean {
+		try {
+			return this.keyOf(file).writable;
+		} catch {
+			return false;
+		}
 	}
 
 	private dispose(doc: Open): void {
 		this.flushVersion(doc);
 		clearTimeout(doc.quiet);
 		doc.watcher?.close();
+		clearTimeout(doc.source?.quiet);
+		doc.source?.watcher?.close();
 		this.open.delete(doc.key);
 	}
 }

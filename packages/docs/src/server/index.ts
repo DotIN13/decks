@@ -6,3 +6,4 @@
 export { DocService, EDITABLE, PAUSE_MS, QUIET_MS, readSource, writeSource, type DocServiceOptions, type Resolved } from "./service.ts";
 export { DirectoryVersions, MemoryVersions, type VersionStore } from "./versions.ts";
 export { readEntry, replaceEntry } from "./zip.ts";
+export { DocLibrary, type DocMeta } from "./library.ts";

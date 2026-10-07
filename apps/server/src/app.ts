@@ -31,7 +31,7 @@ import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
-import { DocService } from "@decks/docs/server";
+import { DocLibrary, DocService } from "@decks/docs/server";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
 
@@ -68,6 +68,13 @@ export class App {
 	readonly boards: BoardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
+	/** The deck's `docs/` library, made once per deck, so each folder has one version store. */
+	private library: DocLibrary | undefined;
+	private docLibrary(): DocLibrary {
+		const dir = join(this.deck.path, "docs");
+		if (this.library?.dir !== dir) this.library = new DocLibrary(dir);
+		return this.library;
+	}
 	/** Which agent's tool call explains a write to a file, for a document's change (`docs/writers.ts`). */
 	private readonly writers = new Writers({
 		name: (agentId) => this.agents.get(agentId)?.who()?.name,
@@ -190,6 +197,8 @@ export class App {
 			versions: this.boards.revisions,
 			send: (message) => this.send(message),
 			writer: (file) => this.writers.who(file),
+			// Opening a file copies it into the deck's docs/, where its history and suggestions live.
+			library: () => this.docLibrary(),
 		});
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).

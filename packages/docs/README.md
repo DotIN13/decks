@@ -52,6 +52,27 @@ new WebSocketServer({ port: 8080 }).on("connection", (socket) => {
 Pass your own `VersionStore` if you already keep versions of these files, and `writer(file)` to
 credit an outside write to an agent by name.
 
+### A library of working copies
+
+Pass `library: () => new DocLibrary(dir)` and opening a file copies it into a folder of its own
+under `dir`; from then on pages and agents edit the copy, and the original is left alone until a
+page sends `doc.writeback`. Each folder keeps what that document's work needs, so it survives a
+restart and travels with the folder:
+
+```
+<dir>/paper/
+    paper.tex      the working copy
+    doc.json       where it came from, when it was copied and last written back
+    base           the original's text as last taken in or written back
+    changes.json   suggestions still waiting for a yes or a no
+    versions/      every version
+```
+
+A write to the original while the copy is open (an agent that edited the original instead of the
+copy) is merged three ways, base to original against base to copy, and arrives as a change to
+review. Writing back takes in any such write first, so it never undoes one. A read-only original
+can still be copied and edited; only writing back is refused.
+
 ## Page
 
 ```ts
@@ -75,8 +96,9 @@ business: keep a map from each block to its span of source, and turn a keystroke
 - An outside write is credited to `"outside"` unless the host supplies `writer`.
 - A page older than the kept history (200 batches) lands its splices by searching for their old
   text, and a short one that is not found is refused; the page then resyncs from the server's text.
-- Pending changes live in memory: a server restart forgets which writes were still to review,
-  though the versions on both sides of them remain.
+- Without a library, pending changes live in memory, and a restart forgets which writes were
+  still to review. With one, they are in each folder's `changes.json`; a restart keeps them, but a
+  rejection of one made before the restart finds its words by search rather than by history.
 
 ## Tests
 

@@ -28,7 +28,10 @@ export interface DocSyncOptions {
 }
 
 export class DocSync {
-	readonly path: string;
+	/** What the server calls the document: the path asked for, until it names a working copy. */
+	path: string;
+	/** For a working copy, the original it was copied from and is written back to. */
+	source: string | undefined;
 	readonly client: string;
 	text = "";
 	format: DocFormat = "text";
@@ -90,6 +93,12 @@ export class DocSync {
 		this.options.send({ type: "doc.restore", path: this.path, client: this.client, sha });
 	}
 
+	/** Write the working copy back over its original. */
+	writeBack(): void {
+		this.flush();
+		this.options.send({ type: "doc.writeback", path: this.path, client: this.client });
+	}
+
 	versions(): void {
 		this.options.send({ type: "doc.versions", path: this.path });
 	}
@@ -111,7 +120,9 @@ export class DocSync {
 		if (!("path" in message)) return;
 		switch (message.type) {
 			case "doc.state":
-				if (message.path !== this.path) return;
+				if (message.asked !== this.path && message.path !== this.path) return;
+				this.path = message.path;
+				this.source = message.source;
 				this.text = message.text;
 				this.format = message.format;
 				this.rev = message.rev;
