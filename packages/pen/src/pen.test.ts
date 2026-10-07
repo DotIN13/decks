@@ -384,3 +384,25 @@ test("a colour nobody can read is said, not drawn as nothing", () => {
 	const vars = apply(emptyDocument(), [{ op: "variables", set: { paper: { type: "color", value: "#bfdbfe" } } }, { op: "insert", node: { type: "note", id: "a", content: "x", fill: "$paper" } }], { theme });
 	assert.equal(vars.results[1]!.note, undefined);
 });
+
+test("a colour is stored in pen's own hex, whatever it was written as", () => {
+	/*
+	 * pen's format gives a colour as #RGB, #RRGGBB or #RRGGBBAA, or as a $variable. Reading a name
+	 * or an rgb() is ours; writing one into the file would not be, since pen.dev would draw no fill
+	 * at all — the same silence, moved to another app.
+	 */
+	const theme = baseTheme(emptyDocument(), "light");
+	const stored = (node: Record<string, unknown>) => apply(emptyDocument(), [{ op: "insert", node: { type: "note", id: "a", content: "x", ...node } }], { theme }).doc.children[0]!;
+	assert.equal(stored({ fill: "lightblue" }).fill, "#add8e6");
+	// Hex in any of pen's four lengths is already pen's own, and is left exactly as written.
+	for (const hex of ["#f00", "#f00a", "#ff0000", "#ff0000aa"]) assert.equal(stored({ fill: hex }).fill, hex);
+	assert.equal(stored({ fill: "rgba(191,219,254,0.5)" }).fill, "#bfdbfe80");
+	assert.deepEqual(stored({ fill: { type: "solid", color: "hsl(140 60% 80%)" } }).fill, { type: "color", color: "#adebc2" });
+	// A variable stays a variable, and a colour nobody can read stays as written, with its note.
+	assert.equal(stored({ fill: "$paper" }).fill, "$paper");
+	assert.equal(stored({ fill: "periwinkleish" }).fill, "periwinkleish");
+	// And wherever else pen puts a colour: inside the older one-object stroke, a shadow, a gradient.
+	assert.deepEqual(stored({ stroke: { align: "center", thickness: 2, fill: "red" } }).stroke, { align: "center", thickness: 2, fill: "#ff0000" });
+	assert.deepEqual(stored({ effect: { type: "shadow", color: "rgba(0,0,0,0.2)", blur: 4 } }).effect, { type: "shadow", color: "#00000033", blur: 4 });
+	assert.deepEqual(stored({ fill: { type: "gradient", colors: [{ color: "white", position: 0 }] } }).fill, { type: "gradient", colors: [{ color: "#ffffff", position: 0 }] });
+});

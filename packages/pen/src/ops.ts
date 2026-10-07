@@ -87,13 +87,47 @@ function unreadableColour(node: PenNode): string | undefined {
 	return `${bad.join(" and ")} is not a colour and draws nothing: write #rrggbb, a name such as "lightblue", rgb(…) or hsl(…).`;
 }
 
-/** pen's own word for a plain fill is `color`; `solid` is what everyone writes, and is stored as `color`. */
+/**
+ * A fill written in pen.dev's own spelling, so the file stays a file pen.dev draws.
+ *
+ * pen's format gives a colour as `#RGB`, `#RRGGBB` or `#RRGGBBAA`, or as a `$variable`; its plain
+ * fill is `{ type: "color" }`. A name or an `rgb()` is read here (`parseColor`) but would be no
+ * colour at all to pen.dev, and `solid` would be no fill it knows — so both are turned into pen's
+ * own words on the way in. The tolerance is for reading; the file keeps the standard.
+ */
 function canonicalFills(node: PenNode): void {
+	const hex = (one: unknown): unknown => {
+		if (typeof one === "string") {
+			// Already pen's own: a variable, or hex in any of the four lengths the format gives.
+			if (one.startsWith("$") || /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(one)) return one;
+			const rgba = parseColor(one);
+			if (!rgba) return one;
+			const two = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0");
+			return `#${two(rgba[0])}${two(rgba[1])}${two(rgba[2])}${rgba[3] < 1 ? two(rgba[3]) : ""}`;
+		}
+		if (!one || typeof one !== "object") return one;
+		const fill = one as { type?: string; color?: unknown; colors?: unknown };
+		const out: Record<string, unknown> = { ...(one as object) };
+		if (fill.type === "solid") out.type = "color";
+		if (typeof fill.color === "string") out.color = hex(fill.color);
+		if (Array.isArray(fill.colors)) out.colors = fill.colors.map((stop) => (stop && typeof stop === "object" && typeof (stop as { color?: unknown }).color === "string" ? { ...(stop as object), color: hex((stop as { color: string }).color) } : stop));
+		return out;
+	};
 	for (const field of ["fill", "stroke"] as const) {
 		const value = node[field];
 		if (!value) continue;
-		const fix = (one: unknown) => (one && typeof one === "object" && (one as { type?: string }).type === "solid" ? { ...(one as object), type: "color" } : one);
-		(node as Record<string, unknown>)[field] = Array.isArray(value) ? value.map(fix) : fix(value);
+		// An older one-object stroke keeps its own shape; only the fill inside it is a colour.
+		if (field === "stroke" && typeof value === "object" && !Array.isArray(value) && !("type" in value) && "fill" in value) {
+			(node as Record<string, unknown>).stroke = { ...(value as object), fill: Array.isArray((value as { fill: unknown }).fill) ? ((value as { fill: unknown[] }).fill).map(hex) : hex((value as { fill: unknown }).fill) };
+			continue;
+		}
+		(node as Record<string, unknown>)[field] = Array.isArray(value) ? value.map(hex) : hex(value);
+	}
+	// A shadow's colour is a colour too (`Effect`).
+	const effects = node.effect;
+	if (effects) {
+		const fix = (one: unknown) => (one && typeof one === "object" && typeof (one as { color?: unknown }).color === "string" ? { ...(one as object), color: hex((one as { color: string }).color) } : one);
+		(node as Record<string, unknown>).effect = Array.isArray(effects) ? effects.map(fix) : fix(effects);
 	}
 }
 
