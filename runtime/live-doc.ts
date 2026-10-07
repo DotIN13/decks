@@ -14,7 +14,11 @@ import { mountDocPage } from "@decks/docs/page";
 export function mountLiveDoc(
 	host: HTMLElement,
 	board: string | null,
-	renderers: { markdown?: (into: HTMLElement, source: string) => Promise<void> | void; math?: (into: HTMLElement) => Promise<void> | void } = {},
+	renderers: {
+		markdown?: (into: HTMLElement, source: string) => Promise<void> | void;
+		math?: (into: HTMLElement) => Promise<void> | void;
+		file?: (path: string) => Promise<ArrayBuffer>;
+	} = {},
 ): void {
 	const raw = host.dataset.path?.trim();
 	if (!raw) {

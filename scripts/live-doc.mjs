@@ -16,6 +16,7 @@ await build({
 	platform: "browser",
 	target: ["es2022"],
 	outfile: join(root, "runtime", "lib", "live-doc.js"),
+	minify: true,
 	legalComments: "none",
 	logLevel: "error",
 });

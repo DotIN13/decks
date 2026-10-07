@@ -25,6 +25,8 @@ export interface DocPageOptions {
 	markdown?(into: HTMLElement, source: string): Promise<void> | void;
 	/** Set the maths in an element, for LaTeX and markdown pages (KaTeX's auto-render). */
 	math?(into: HTMLElement): Promise<void> | void;
+	/** The bytes of a file by the path the server calls it: a Word page is drawn from the whole `.docx`. */
+	file?(path: string): Promise<ArrayBuffer>;
 }
 
 export interface DocPage {
@@ -81,6 +83,9 @@ const STYLE = `
 .dp-box { color: var(--b-muted, #666); font-size: 15px; }
 .dp-cite, .dp-link { color: var(--b-accent, #2563eb); }
 .dp-empty-doc { color: var(--b-muted, #666); }
+.dp-word section.docx { padding: 0 !important; margin: 0 !important; width: auto !important; min-height: 0 !important; background: transparent !important; box-shadow: none !important; }
+.dp-word .dp-para { margin-left: 0; margin-right: 0; cursor: text; border-radius: 4px; }
+.dp-word .dp-para:hover { background: color-mix(in srgb, var(--b-fg, #111) 4%, transparent); }
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, text?: string): HTMLElementTagNameMap[K] {
@@ -129,6 +134,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	const reading = new Reading(sync, {
 		...(options.markdown ? { markdown: options.markdown } : {}),
 		...(options.math ? { math: options.math } : {}),
+		...(options.file ? { file: options.file } : {}),
 		marks: () => marks,
 	});
 	scroll.append(reading.root);
@@ -381,6 +387,7 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 		sync,
 		destroy() {
 			clearInterval(ticker);
+			reading.destroy();
 			sync.close();
 			stop();
 		},

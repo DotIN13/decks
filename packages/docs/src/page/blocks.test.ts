@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { applySplice } from "../index.ts";
 import { docxBlocks, markdownBlocks, paragraphSplices, readParagraph, texBlocks } from "./blocks.ts";
-import { paragraphToHtml, texToHtml } from "./render.ts";
+import { texToHtml } from "./render.ts";
 
 const tiles = (source: string, list: Array<{ start: number; end: number }>) => {
 	assert.equal(list[0]!.start, 0);
@@ -39,7 +39,7 @@ test("a .docx is cut at its paragraphs, and a paragraph reads as the words Word 
 	const shown = list.filter((b) => b.kind === "text").map((b) => readParagraph(DOC.slice(b.start, b.end)));
 	assert.deepEqual(shown.map((p) => p.text), ["Results", "The effect is small & real.", ""]);
 	assert.equal(shown[0]!.style, "Heading1");
-	assert.equal(paragraphToHtml(shown[1]!), "<p>The effect <b>is small</b> &amp; real.</p>");
+	assert.deepEqual(shown[1]!.runs.map((r) => [r.text, r.bold]), [["The effect ", false], ["is small", true], [" & real.", false]]);
 });
 
 test("typing in a Word paragraph becomes splices of its XML that keep the runs", () => {

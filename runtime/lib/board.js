@@ -1257,7 +1257,16 @@
 		try {
 			const module = await needModule("live-doc.js");
 			// The board's own renderers, so a document reads like every other markdown and maths here.
-			module.mountLiveDoc(host, BOARD_PATH, { markdown: renderMarkdown, math: renderMath });
+			module.mountLiveDoc(host, BOARD_PATH, {
+				markdown: renderMarkdown,
+				math: renderMath,
+				// A Word page is drawn from the whole file, read fresh from this server each time it is asked for.
+				file: async (path) => {
+					const response = await fetch(`${API}/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+					if (!response.ok) throw new Error(`${response.status}`);
+					return response.arrayBuffer();
+				},
+			});
 		} catch (error) {
 			host.textContent = `Cannot open this document: ${error.message}`;
 			host.dataset.state = "broken";

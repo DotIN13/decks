@@ -1,8 +1,6 @@
-import type { Paragraph } from "./blocks.ts";
-
 /**
  * How a block reads: LaTeX turned into HTML for the commands a paper mostly uses, with the maths
- * left in its delimiters for KaTeX, and a Word paragraph drawn from its runs. Markdown is drawn
+ * left in its delimiters for KaTeX. Markdown is drawn
  * by the host's own renderer (`DocPageOptions.markdown`), so a document reads like every other
  * markdown in the app.
  */
@@ -96,21 +94,4 @@ export function texToHtml(block: string): string {
 		return `<div class="dp-chip">${escapeHtml(text.split("\n")[0]!)}</div>`;
 	}
 	return `<p>${texInline(text)}</p>`;
-}
-
-const HEADING: Record<string, string> = { Title: "h1", Heading1: "h2", Heading2: "h3", Heading3: "h4", Subtitle: "h3" };
-
-/** One Word paragraph as HTML, from its runs and its style. */
-export function paragraphToHtml(para: Paragraph): string {
-	const tag = HEADING[para.style] ?? (/^Heading(\d)/.exec(para.style) ? "h4" : "p");
-	const inner = para.runs
-		.map((run) => {
-			let html = escapeHtml(run.text).replace(/\n/g, "<br>").replace(/\t/g, "&emsp;");
-			if (run.bold) html = `<b>${html}</b>`;
-			if (run.italic) html = `<i>${html}</i>`;
-			if (run.underline) html = `<u>${html}</u>`;
-			return html;
-		})
-		.join("");
-	return `<${tag}>${inner || "<br>"}</${tag}>`;
 }

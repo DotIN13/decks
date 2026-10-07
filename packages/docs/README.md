@@ -15,8 +15,10 @@ other programs keep writing the same files with their own tools.
 - **Every pause is a version.** A version is kept when typing stops for a second and on both
   sides of every outside write; any version can be put back as one ordinary edit.
 
-`.docx` is edited through its `word/document.xml`: the page's text is that XML, and the zip is
-rewritten with every other part copied byte for byte.
+`.docx` is edited through its `word/document.xml`, and the zip is rewritten with every other part
+copied byte for byte. The page draws it with [docx-preview](https://github.com/VolodymyrBaydalka/docxjs),
+which reads it as Word lays it out, and matches each drawn paragraph to the file's in order, so a
+click edits that paragraph's words.
 
 ## Entry points
 
