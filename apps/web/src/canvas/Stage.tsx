@@ -3,6 +3,7 @@ import { touchedCanvas } from "../camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
+import GripVertical from "lucide-solid/icons/grip-vertical";
 import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
@@ -39,7 +40,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -760,6 +761,8 @@ export function Stage(props: {
 	const [guides, setGuides] = createSignal<readonly Guide[]>([]);
 	/** The item under the pointer, outlined the way a design tool does before anything is pressed. */
 	const [hoverId, setHoverId] = createSignal<string | undefined>();
+	/** The block of a card under the pointer: its grip shows in the card's margin, to drag it by. */
+	const [blockHover, setBlockHover] = createSignal<string | undefined>();
 	/** The board under the pointer, outlined the same way in edit mode. */
 	const [hoverBoard, setHoverBoard] = createSignal<string | undefined>();
 	/** What an arrow's end would join if it were let go now: an item or a board, lit up. */
@@ -944,7 +947,7 @@ export function Stage(props: {
 			ink,
 			...(paper ? { paper } : {}),
 			grows: node.type === "text" ? ((node.textGrowth ?? "auto") === "auto" ? "wide" : "tall") : "tall",
-			...(isMarkdown(node) ? { markdown: true } : {}),
+			...(isMarkdown(node) || isMarkdownText(node) ? { markdown: true } : {}),
 		};
 	};
 	/** The shape an item is, or is part of (its outline or its words): the frame, by id. */
@@ -1415,7 +1418,10 @@ export function Stage(props: {
 						put += 1;
 					}
 					if (box) {
-						return [{ op: "move", id, parent: into, ...(index === undefined ? {} : { index }), box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } }];
+						const move = { op: "move", id, parent: into, ...(index === undefined ? {} : { index }), box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } };
+						// Markdown words in a card are as wide as it; out of one, they keep the width they had.
+						if (into && isMarkdownText(node) && isCard(penNode(into))) return [move, { op: "update", id, set: { width: "fill_container", textGrowth: "fixed-width" } }];
+						return [move];
 					}
 					if (index !== undefined) return [{ op: "move", id, parent: into, index }];
 				}
@@ -2255,7 +2261,8 @@ export function Stage(props: {
 		 * 300 px target you can drop into, and a half-full one keeps room under its last child.
 		 */
 		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 300 },
-		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
+		// A text's words are markdown, as a card's blocks are, typed into with the card's toolbar.
+		text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 		/*
 		 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
 		 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
@@ -2452,7 +2459,7 @@ export function Stage(props: {
 				// A text grows with its words unless a width was drawn for it; its height is always its words'.
 				// A card is as tall as its words, so only its width is taken, drawn or not.
 				const box =
-					tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
+					tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				const node = madeNode(tool, id, { w, h });
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 				selectMade([id]);
@@ -2473,7 +2480,7 @@ export function Stage(props: {
 		const x1 = Math.round(centred ? at.x - made.w / 2 : at.x);
 		const y1 = Math.round(centred ? at.y - made.h / 2 : at.y);
 		const parent = frameAt(at);
-		const box = tool === "text" || tool === "note" ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
+		const box = tool === "note" ? { x1, y1 } : tool === "card" || tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
 		const node = madeNode(tool, id, made);
 		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 		selectMade([id]);
@@ -3348,8 +3355,11 @@ export function Stage(props: {
 	const [pictureHover, setPictureHover] = createSignal<string | undefined>();
 	const onHover = (event: PointerEvent) => {
 		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
+		// The pointer on a block's grip keeps the grip, and the block it belongs to.
+		if ((event.target as Element | null)?.closest?.(".pen-grip")) return;
 		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
 			hoverAt = undefined;
+			if (blockHover() && event.buttons === 0) setBlockHover(undefined);
 			if (hoverId()) setHoverId(undefined);
 			if (pictureHover()) setPictureHover(undefined);
 			if (overLink()) setOverLink(false);
@@ -3361,6 +3371,7 @@ export function Stage(props: {
 			hoverFrame = undefined;
 			const href = hoverAt ? penLayer.linkAt(hoverAt) : undefined;
 			setOverLink(!!href && props.mode === "browse");
+			setBlockHover(hoverAt ? blockUnder(hoverAt) : undefined);
 			// The outline is edit mode's; browsing shows only the hand over a link.
 			if (props.mode !== "edit") return;
 			const hit = hoverAt ? penLayer.hitTest(hoverAt) : undefined;
@@ -3372,6 +3383,39 @@ export function Stage(props: {
 	onCleanup(() => {
 		if (hoverFrame !== undefined) cancelAnimationFrame(hoverFrame);
 	});
+	/**
+	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
+	 * level with it. Not while the card is open for typing, which has its own way of moving things.
+	 */
+	const blockUnder = (at: { x: number; y: number }): string | undefined => {
+		const deep = penLayer.hitTest(at, { deep: true });
+		if (!deep) return undefined;
+		const card = isCard(deep.node) ? deep.node : cardOf(deep.id);
+		if (!card || penText()?.id === card.id) return undefined;
+		if (deep.node.id !== card.id) return isMarkdownText(deep.node) ? deep.id : undefined;
+		return (card.children ?? []).find((child) => {
+			const box = isMarkdownText(child) ? (penLayer.bounds.get(child.id) ?? penLayer.placed.get(child.id)?.box) : undefined;
+			return box && at.y >= box.y - 4 && at.y <= box.y + box.h + 4;
+		})?.id;
+	};
+	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
+	const gripBox = createMemo(() => {
+		penDrawn();
+		const id = blockHover();
+		if (!id || boardDrag() || panning()) return undefined;
+		const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
+		return box ? { id, x: box.x, y: box.y } : undefined;
+	});
+	/** A press on a block's grip picks the block up and carries it, into another place in the card or out of it. */
+	const dragBlock = (event: PointerEvent, id: string) => {
+		event.preventDefault();
+		event.stopPropagation();
+		props.onSelect(undefined);
+		setBoardPicks([]);
+		setPenSelection([id]);
+		dragSelection(event, [id], [], event.currentTarget as HTMLElement);
+	};
+
 	/** The hovered item's box as it is drawn now. */
 	const hoverBox = createMemo(() => {
 		penDrawn();
@@ -4295,6 +4339,23 @@ export function Stage(props: {
 						/>
 					)}
 				</Index>
+				<Show when={gripBox()}>
+					{(grip) => (
+						<div
+							class="pen-grip"
+							title="Drag to move this block"
+							style={{
+								left: `${grip().x - 18 / props.camera.zoom}px`,
+								top: `${grip().y + 1 / props.camera.zoom}px`,
+								width: `${16 / props.camera.zoom}px`,
+								height: `${22 / props.camera.zoom}px`,
+							}}
+							onPointerDown={(event) => dragBlock(event, grip().id)}
+						>
+							<GripVertical size={16} style={{ transform: `scale(${1 / props.camera.zoom})`, "transform-origin": "0 0" }} />
+						</div>
+					)}
+				</Show>
 				<Show when={hoverBox()}>
 					{(box) => (
 						<div

@@ -1071,6 +1071,21 @@
 	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 	/* Where in a frame that stacks its children a drop would land: a line on that boundary. */
+	/* A card's block's grip, in the card's margin, to drag the block by (`Stage.tsx`, `gripBox`). */
+	.world > .pen-grip {
+	position: absolute;
+	z-index: 3;
+	display: flex;
+	align-items: flex-start;
+	justify-content: flex-start;
+	color: var(--faint);
+	border-radius: 4px;
+	cursor: grab;
+	touch-action: none;
+}
+	.world > .pen-grip:hover { color: var(--fg); background: var(--line); }
+	.world > .pen-grip:active { cursor: grabbing; }
+	.world > .pen-grip svg { stroke-width: 1.75; flex: none; }
 	.world > .pen-insert {
 	position: absolute;
 	border-radius: 999px;

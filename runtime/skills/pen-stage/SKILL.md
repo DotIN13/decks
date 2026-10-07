@@ -97,7 +97,7 @@ no field for: `{ type: "…", … }`).
 |---|---|---|
 | `note` | a sticky note | `content`; `fill` for its colour; `width` (240 when left out); height follows the words |
 | `frame` + `metadata: { type: "decks.card" }` | a **card**: white, with an edge, a column of markdown blocks and pictures (see Cards) | `layout: "vertical"`, `gap: 16`, `padding: 20`, `width` (320 reads well), `children`; height follows what it holds |
-| `text` + `metadata: { type: "decks.markdown" }` | one block of a card: its words markdown | `content`, `fontSize: 16`, `textGrowth: "fixed-width"`, `width: "fill_container"` |
+| `text` + `metadata: { type: "decks.markdown" }` | words in markdown: a block of a card, or on their own as the text tool makes them | `content`, `fontSize`, `textGrowth: "fixed-width"`, `width` (`"fill_container"` in a card) |
 | `text` | words on the stage | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
 | `rectangle` | a box | `fill`, `stroke`, `strokeWidth`, `cornerRadius` |
 | `ellipse` | a circle or oval, in its box | `fill`, `stroke`; `innerRadius` 0–1 for a ring; `startAngle`, `sweepAngle` for an arc |

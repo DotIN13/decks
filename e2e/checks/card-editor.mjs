@@ -431,6 +431,65 @@ if (chip) await page.mouse.dblclick(chip.x + chip.width / 2, chip.y + chip.heigh
 const opened = await until(() => page.evaluate(() => globalThis.__opened?.[0]), 3000);
 say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test(opened ?? ""), opened);
 
+// A block's grip, in the card's margin, drags the block out of the card, and a drag puts it back.
+await page.keyboard.press("Escape");
+await settle(page, 400);
+const blockId = (cardNode()?.children ?? []).find((n) => n.type === "text" && (n.content ?? "").startsWith("Look:"))?.id;
+const blockBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockId);
+await page.mouse.move(blockBox.x + 40, blockBox.y + 6);
+const grip = await until(() => page.evaluate(() => document.querySelector(".pen-grip")?.getBoundingClientRect().toJSON()), 2000);
+say("hovering a card's block shows its grip in the card's margin", !!grip && grip.right <= blockBox.x + 2 && Math.abs(grip.top - blockBox.y) < 12, JSON.stringify({ grip: grip && Math.round(grip.x), block: Math.round(blockBox.x) }));
+if (grip) {
+	await page.mouse.move(grip.x + 6, grip.y + 8);
+	await page.mouse.down();
+	await page.mouse.move(grip.x + 30, grip.y + 30, { steps: 4 });
+	await page.mouse.move(grip.x + 520, grip.y + 60, { steps: 14 });
+	await page.mouse.up();
+}
+const outside = await until(() => {
+	for (const stage of readdirSync(`${deck.path}/stages`)) {
+		try {
+			const top = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === blockId);
+			if (top) return top;
+		} catch {
+			/* being written */
+		}
+	}
+});
+say("…and dragging the grip takes the block out of the card, keeping its width", !!outside && typeof outside.width === "number" && !(cardNode()?.children ?? []).some((n) => n.id === blockId), JSON.stringify(outside && { width: outside.width }));
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: blockId }] });
+await settle(page, 300);
+
+// The text tool makes markdown words, typed into with the card's toolbar.
+// Off to clear canvas first, as at the start: by now the boards fill the screen round the card.
+for (let i = 0; i < 12 && !(await clear()); i++) {
+	await page.mouse.move(700, 400);
+	await page.mouse.wheel(1500, 0);
+	await settle(page, 300);
+}
+await settle(page, 800);
+const freeAt = (await clear()) ? { x: 520, y: 200 } : undefined;
+if (freeAt) {
+	await page.mouse.click(freeAt.x, freeAt.y);
+	await page.keyboard.press("t");
+	await page.mouse.click(freeAt.x, freeAt.y);
+	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+	await page.keyboard.type("A **bold** idea");
+	await page.keyboard.press("Control+Enter");
+}
+const words = await until(() => {
+	for (const stage of readdirSync(`${deck.path}/stages`)) {
+		try {
+			const made = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.type === "text" && n.content === "A **bold** idea");
+			if (made) return made;
+		} catch {
+			/* being written */
+		}
+	}
+});
+say("the text tool makes markdown words, typed into with the card's editor", !!words && words.metadata?.type === "decks.markdown", JSON.stringify({ freeAt, made: words && { type: words.metadata?.type, width: words.width } }));
+if (words) link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: words.id }] });
+
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });
 await settle(page, 300);
