@@ -41,6 +41,10 @@ export interface CardEditorProps {
 	value: string;
 	/** Where the deck's files are, for the card's pictures. */
 	base: string;
+	/** A new empty line before this block, the caret in it: a double-click in a gap of the card. */
+	insertAt?: number;
+	/** Where the caret goes, a screen point: a double-click on the card's words. */
+	caretAt?: { x: number; y: number };
 	/** Items in the card the editor keeps but cannot type into, by id: what to call each (`card-frame.ts`). */
 	held?: Record<string, string>;
 	/** The camera's zoom: the editor is drawn in the stage's units, its style bar in the screen's. */
@@ -1273,6 +1277,30 @@ export function CardEditor(props: CardEditorProps) {
 		});
 		requestAnimationFrame(() => {
 			ed.focus();
+			// A double-click in a gap: a new line there, empty until something is typed in it.
+			if (props.insertAt !== undefined) {
+				const line = h("p");
+				line.append(document.createTextNode(ZW));
+				const before = ed.children[Math.max(0, Math.min(props.insertAt, ed.children.length))] ?? null;
+				const lone = ed.children.length === 1 && !ed.firstElementChild!.textContent!.replace(/\u200b/g, "").trim() ? (ed.firstElementChild as HTMLElement) : undefined;
+				if (lone) caretInto(lone, false);
+				else {
+					ed.insertBefore(line, before);
+					caretInto(line, false);
+					const r = sel().getRangeAt(0);
+					r.setStart(line.firstChild!, 1);
+					r.collapse(true);
+				}
+				return;
+			}
+			// A double-click on the words: the caret where it landed.
+			const point = props.caretAt;
+			const there = point ? (document as Document & { caretRangeFromPoint?(x: number, y: number): Range | null }).caretRangeFromPoint?.(point.x, point.y) : null;
+			if (there && ed.contains(there.startContainer) && !(there.startContainer.parentElement?.closest("[contenteditable=false]"))) {
+				sel().removeAllRanges();
+				sel().addRange(there);
+				return;
+			}
 			// The caret at the end of the last block's words, inside it, so typing continues that block.
 			let end: Node = ed;
 			while (end.lastChild && end.lastChild.nodeType === 1 && (end.lastChild as HTMLElement).getAttribute("contenteditable") !== "false") end = end.lastChild;

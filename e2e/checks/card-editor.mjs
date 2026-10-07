@@ -327,6 +327,33 @@ const menus = await until(() => {
 });
 say("the bar's menus make a block a heading, and set words in serif and underlined", !!menus, JSON.stringify((cardNode()?.children ?? []).map((n) => n.content).filter((k) => /Kyoto|Budget/.test(k ?? ""))));
 
+// A double-click in a gap of the card makes a new line there; on its words, the caret lands where it was.
+await page.keyboard.press("Escape");
+await settle(page, 400);
+const blockIds = (cardNode()?.children ?? []).map((n) => n.id);
+const firstBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[0]);
+const secondBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[1]);
+await page.mouse.dblclick(firstBox.x + 40, (firstBox.y + firstBox.height + secondBox.y) / 2);
+const lineOpen = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor") && !document.querySelector(".canvas-menu")), 3000);
+await page.keyboard.type("A new line in the gap");
+await page.keyboard.press("Control+Enter");
+const lined = await until(() => ((cardNode()?.children ?? [])[1]?.content === "A new line in the gap" ? true : undefined));
+say("a double-click in a gap of the card opens it with a new line there, and no canvas menu", !!lineOpen && !!lined, JSON.stringify((cardNode()?.children ?? []).slice(0, 3).map((n) => n.content ?? n.type)));
+await page.keyboard.press("Escape");
+await settle(page, 400);
+const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").startsWith("A new line"))?.id;
+const wordsBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId);
+await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
+await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+await page.keyboard.press("Home");
+await page.keyboard.type("Look: ");
+await page.keyboard.press("Control+Enter");
+const caretAt = await until(() => ((cardNode()?.children ?? []).some((n) => n.content === "Look: A new line in the gap") ? true : undefined));
+say("…and on its words the caret lands on that line", !!caretAt, JSON.stringify((cardNode()?.children ?? []).slice(0, 3).map((n) => n.content ?? n.type)));
+await page.keyboard.press("Escape");
+await settle(page, 400);
+
+
 // A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
 const where = (id) => {
 	for (const stage of readdirSync(`${deck.path}/stages`)) {

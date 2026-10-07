@@ -669,7 +669,7 @@ export function Stage(props: {
 	 * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
 	 * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
 	 */
-	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; card?: true; legacy?: true; held?: Record<string, string> } | undefined>();
+	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; card?: true; legacy?: true; held?: Record<string, string>; insertAt?: number; caretAt?: { x: number; y: number } } | undefined>();
 	/**
 	 * The one film or sound playing, if any.
 	 *
@@ -1020,12 +1020,26 @@ export function Stage(props: {
 		const paper = rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : palette.paper;
 		return { ...look, pad: typeof card.padding === "number" ? card.padding : CARD_PAD, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
 	};
-	const openCard = (card: PenNode, at: { x: number; y: number; w: number; h: number }, fresh?: boolean) => {
+	const openCard = (card: PenNode, at: { x: number; y: number; w: number; h: number }, fresh?: boolean, where?: { insertAt?: number; caretAt?: { x: number; y: number } }) => {
 		const placed = penLayer.placed.get(card.id);
 		const kids = card.children ?? [];
 		setPenSelection([card.id]);
 		penLayer.muteText(new Set(kids.filter((child) => child.type === "text").map((child) => child.id)));
-		setPenText({ id: card.id, box: { ...(placed?.box ?? at) }, value: cardMarkdown(kids), style: cardLook(card), card: true, held: heldLabels(kids), ...(fresh ? { fresh } : {}) });
+		setPenText({ id: card.id, box: { ...(placed?.box ?? at) }, value: cardMarkdown(kids), style: cardLook(card), card: true, held: heldLabels(kids), ...(fresh ? { fresh } : {}), ...where });
+	};
+	/**
+	 * A double-click or a double tap on a card: on its words, the card opens with the caret there; in a
+	 * gap, between blocks or in its padding, a new empty line is made there to type into. Answers
+	 * whether it was a card. The canvas menu is for empty canvas only.
+	 */
+	const openCardAt = (hit: PenHit, at: { x: number; y: number }, client: { x: number; y: number }): boolean => {
+		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
+		if (!card) return false;
+		const current = (props.pen ? indexOf(props.pen.doc).get(card.id)?.node : undefined) ?? card;
+		const box = penLayer.placed.get(card.id)?.box ?? hit.box;
+		if (hit.node.id === card.id) openCard(current, box, false, { insertAt: dropSlot(card.id, at, [])?.index ?? (current.children ?? []).length });
+		else openCard(current, box, false, { caretAt: client });
+		return true;
 	};
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
@@ -3446,6 +3460,10 @@ export function Stage(props: {
 				lastTap = undefined;
 				return;
 			}
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (deep.node.type !== "rectangle" || !cardOf(deep.id)) && openCardAt(deep, at, { x: e.clientX, y: e.clientY })) {
+				lastTap = undefined;
+				return;
+			}
 			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (TEXTY.has(deep.node.type) || shapeOf(deep.id))) {
 				lastTap = undefined;
 				const shape = shapeOf(deep.id);
@@ -3505,6 +3523,8 @@ export function Stage(props: {
 			}
 			// A file's chip opens the file, in a tab of its own.
 			if (hit && openFileOf(hit.id)) return;
+			// A card opens for typing: at the words, or with a new line in the gap that was double-clicked.
+			if (hit && (hit.node.type !== "rectangle" || !cardOf(hit.id)) && openCardAt(hit, toWorld(localCamera, view(), stagePoint(event)), { x: event.clientX, y: event.clientY })) return;
 			// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
 			const shape = hit ? shapeOf(hit.id) : undefined;
 			if (shape && !(hit && TEXTY.has(hit.node.type))) {
@@ -4518,6 +4538,8 @@ export function Stage(props: {
 								<CardEditor
 									class="pen-text"
 									value={open.value}
+									{...(open.insertAt !== undefined ? { insertAt: open.insertAt } : {})}
+									{...(open.caretAt ? { caretAt: open.caretAt } : {})}
 									{...(open.held ? { held: open.held } : {})}
 									base={props.pen?.base ?? ""}
 									zoom={props.camera.zoom}
