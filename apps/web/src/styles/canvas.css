@@ -1685,6 +1685,8 @@
 	white-space: nowrap;
 }
 	.pen-card-editor .pce-bar .pce-icon { width: 32px; color: color-mix(in srgb, var(--fg) 82%, transparent); }
+	/* Line icons at a hairline's weight beside the words, not lucide's default 2. */
+	.pen-card-editor .pce-bar svg { stroke-width: 1.5; }
 	.pen-card-editor .pce-bar button:hover { background: var(--line); }
 	.pen-card-editor .pce-bar button[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent); }
 	.pen-card-editor .pce-bar .pce-pick {
@@ -1723,7 +1725,7 @@
 	.pen-card-editor .pce-bar .pce-size-small { font-size: 12px; }
 	.pen-card-editor .pce-bar .pce-size-large { font-size: 17px; }
 	.pen-card-editor .pce-bar .pce-size-huge { font-size: 21px; }
-	.pen-card-editor .pce-menu.pce-fonts { max-height: 340px; overflow-y: auto; min-width: 220px; }
+	.pen-card-editor .pce-menu.pce-fonts { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; min-width: 220px; }
 	.pen-card-editor .pce-menu.pce-fonts .pce-opt { font-size: 15px; }
 	.pen-card-editor .pce-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 	.pen-card-editor .pce-menu.pce-swatches[data-open] { flex-flow: row wrap; gap: 4px; width: 172px; min-width: 0; }

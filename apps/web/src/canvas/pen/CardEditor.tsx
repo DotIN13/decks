@@ -702,7 +702,9 @@ export function CardEditor(props: CardEditorProps) {
 		const ceiling = Math.max(8, ...[...document.querySelectorAll('[data-inset="top"]')].map((el) => el.getBoundingClientRect().bottom + 6));
 		const above = r.top - bh - 10;
 		const top = above >= ceiling ? above : Math.min(innerHeight - bh - 8, r.bottom + 10);
-		const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left));
+		// Centred on the words selected, kept on the screen and clear of the app's tool column at its side.
+		const floor = Math.max(8, ...[...document.querySelectorAll(".pen-tools")].map((el) => el.getBoundingClientRect()).filter((t) => t.width && t.top < top + bh && t.bottom > top && t.left < innerWidth / 3).map((t) => t.right + 6));
+		const left = Math.max(floor, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
 		bar.style.left = `${(left - w.left) / z}px`;
 		bar.style.top = `${(top - w.top) / z}px`;
 	}
@@ -1220,6 +1222,13 @@ export function CardEditor(props: CardEditorProps) {
 		});
 		watch.observe(ed, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-on"] });
 		past.push(serialise());
+		// A wheel over the toolbar or its menus scrolls them; the canvas, which takes every other wheel
+		// for its camera, never hears of it.
+		const ownWheel = (event: WheelEvent) => {
+			if ((event.target as Element).closest(".pce-menu, .pce-tools")) event.stopPropagation();
+		};
+		bar.addEventListener("wheel", ownWheel, { passive: true });
+		onCleanup(() => bar.removeEventListener("wheel", ownWheel));
 		// Watched once a frame: while the card moves on screen, a pan or a zoom, the bar is gone; once it
 		// has rested a moment the bar is put back over the words and fades in.
 		let placing = 0;
