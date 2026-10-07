@@ -8,6 +8,7 @@
  *
  * Icons are left out: their names come from a CDN, and a check should not depend on the network.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deckState, editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
@@ -107,15 +108,33 @@ await page.locator('.props-panel [aria-label="Pick any fill colour"]').click();
 const sv = await until(() => page.locator(".color-picker .color-sv").boundingBox());
 say("a colour field's swatch opens a colour picker", !!sv);
 if (sv) {
+	/**
+	 * What the shape looks like on screen, as a digest of the pixels inside its selection outline.
+	 *
+	 * A screenshot, not the sheet's own pixels: the sheet is drawn in a worker through an offscreen
+	 * canvas, which the page cannot read back.
+	 */
+	const drawn = async () => {
+		const box = await page.locator(".pen-selection").first().boundingBox();
+		if (!box) return "";
+		const clip = { x: box.x + 4, y: box.y + 4, width: Math.max(8, box.width - 8), height: Math.max(8, box.height - 8) };
+		return createHash("sha1").update(await page.screenshot({ clip })).digest("hex");
+	};
+	const fillOf = () => onDisk().children.find((n) => n.id === made?.id)?.children?.find((n) => n.type === "path")?.fill;
+	const before = { drawn: await drawn(), fill: fillOf() };
 	await page.mouse.move(sv.x + sv.width * 0.2, sv.y + sv.height * 0.2);
 	await page.mouse.down();
 	await page.mouse.move(sv.x + sv.width * 0.8, sv.y + sv.height * 0.1, { steps: 8 });
+	await settle(page, 700);
+	const mid = { drawn: await drawn(), fill: fillOf() };
+	say("…and a drag in it draws the colour while the hand is still down", !!before.drawn && !!mid.drawn && mid.drawn !== before.drawn, `${before.drawn.slice(0, 12)} -> ${mid.drawn.slice(0, 12)}`);
+	say("…saving nothing until it lifts", mid.fill === before.fill, `${before.fill} -> ${mid.fill}`);
 	await page.mouse.up();
 	const picked = await until(() => {
-		const fill = onDisk().children.find((n) => n.id === made?.id)?.children?.find((n) => n.type === "path")?.fill;
+		const fill = fillOf();
 		return typeof fill === "string" && fill !== "#ffffff" ? fill : undefined;
 	});
-	say("…and a drag in it sets the fill once, when it is let go", !!picked, String(picked));
+	say("…and sets the fill once, when it is let go", !!picked, String(picked));
 	await page.keyboard.press("Escape");
 	say("Escape closes the picker and keeps the selection", (await page.locator(".color-picker").count()) === 0 && (await page.locator(".props-panel").count()) === 1);
 }

@@ -37,7 +37,7 @@ import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { insertPanel, PEN_TOOL_KEYS, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
+import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
@@ -602,7 +602,11 @@ export function Stage(props: {
 	onCleanup(() => penLayer.dispose());
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
-	createEffect(() => penLayer.setDoc(props.pen?.doc, props.pen?.base ?? ""));
+	createEffect(() => {
+		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
+		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
+		if (untrack(penLive)) setPenLive(undefined);
+	});
 
 	/**
 	 * No board has a title bar: a board is picked by pressing it, and the selected one gets the
@@ -973,6 +977,16 @@ export function Stage(props: {
 		penLayer.muteText(new Set([hit.id]));
 		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}) });
 	};
+	/*
+	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
+	 * (`state/pen-tools.ts`, `penLive`). The same preview a drag of an item uses, so the sheet draws
+	 * the item once per frame with the new colour in it, and the file takes one edit when the hand
+	 * lifts. The worker lets it go when the saved drawing arrives.
+	 */
+	createEffect(() => {
+		const live = penLive();
+		penLayer.preview(live?.length ? new Map(live.map((change) => [change.id, { dx: 0, dy: 0, set: change.set }])) : undefined);
+	});
 	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
 	createEffect(() => {
 		if (!props.pen) return;

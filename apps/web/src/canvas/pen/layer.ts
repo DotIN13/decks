@@ -456,7 +456,7 @@ export class PenLayer {
 	/**
 	 * Draw items moved or resized by a gesture that has not been saved yet; nothing to stop (`scene.ts`).
 	 * A move is told to the worker once, when it picks the items up; every step after that slides the
-	 * carried picture here.
+	 * carried picture here. A change of fields — a colour being dragged — cannot: it is drawn again.
 	 */
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		const changes = moving?.size ? [...moving] : undefined;
@@ -465,7 +465,7 @@ export class PenLayer {
 		 * drawing anything again. A rounding cannot take that path: it changes the shape, and no
 		 * slide of the old pixels is the new ones.
 		 */
-		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined);
+		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
 		if (slide) {
 			const first = changes![0]![1];
 			this.slideCarried(first.dx, first.dy);

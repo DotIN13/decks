@@ -11,8 +11,9 @@ import { Icon } from "../../ui/icons.tsx";
  * not where the rest of the panel is. This one opens under the swatch that asked for it, in the
  * page (`Portal`, so the panel's scrolling does not clip it), and keeps to the screen.
  *
- * A drag in the square or the strip changes only what the picker shows; the colour is sent when the
- * pointer is let go, so a drag is one edit to the drawing and not sixty.
+ * A drag in the square or the strip draws the colour on the stage at every step (`onLive`) and saves
+ * it when the pointer is let go, so the item changes under the pointer and the drawing still takes
+ * one edit and not sixty.
  */
 type Hsv = { h: number; s: number; v: number };
 
@@ -47,7 +48,15 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 
 const PALETTE = ["#ffffff", "#f3f4f6", "#9ca3af", "#57606a", "#1f2328", "#fecaca", "#fde68a", "#bbf7d0", "#bfdbfe", "#e9d5ff", "#dc2626", "#d97706", "#16a34a", "#2563eb", "#7c3aed"];
 
-export function ColorPicker(props: { value: string | undefined; anchor: HTMLElement; label: string; onCommit: (hex: string) => void; onClose: () => void }) {
+export function ColorPicker(props: {
+	value: string | undefined;
+	anchor: HTMLElement;
+	label: string;
+	onCommit: (hex: string) => void;
+	/** The colour under the pointer, drawn and not saved; nothing means the drawing as it is saved. */
+	onLive?: (hex?: string) => void;
+	onClose: () => void;
+}) {
 	const [hsv, setHsv] = createSignal<Hsv>(hexToHsv(props.value ?? "#ffffff"));
 	const hex = () => hsvToHex(hsv());
 	const [place, setPlace] = createSignal({ left: 0, top: 0 });
@@ -65,6 +74,8 @@ export function ColorPicker(props: { value: string | undefined; anchor: HTMLElem
 	};
 	const commit = (value = hex()) => {
 		if (value !== props.value) props.onCommit(value);
+		// Let go on the colour it already was: nothing is saved, so the live one has to be dropped here.
+		else props.onLive?.();
 	};
 	onMount(() => {
 		position();
@@ -90,13 +101,14 @@ export function ColorPicker(props: { value: string | undefined; anchor: HTMLElem
 		});
 	});
 
-	/** A drag across an element, as fractions of it, sent on release. */
+	/** A drag across an element, as fractions of it: drawn at every step, saved on release. */
 	const dragOver = (event: PointerEvent, el: HTMLElement, move: (fx: number, fy: number) => void) => {
 		event.preventDefault();
 		el.setPointerCapture(event.pointerId);
 		const at = (e: PointerEvent) => {
 			const r = el.getBoundingClientRect();
 			move(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)));
+			props.onLive?.(hex());
 		};
 		at(event);
 		const moved = (e: PointerEvent) => at(e);

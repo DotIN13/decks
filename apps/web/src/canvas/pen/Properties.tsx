@@ -39,7 +39,7 @@ import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../camera/camera.ts";
-import { penBoxes, penSelection, setInsertPanel, setPenSelection } from "../../state/pen-tools.ts";
+import { penBoxes, penSelection, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { ICON_LIBRARIES } from "./icon-index.ts";
@@ -163,6 +163,8 @@ export function Properties(props: {
 			return kind === "group" || kind === "arrow" ? [] : [node];
 		}),
 	);
+	const setTextColor = (color: string, drawOnly?: boolean) => writer(drawOnly)(wordTargets().filter((node) => node.type === "text"), () => ({ fill: color }));
+	const setIconColor = (color: string, drawOnly?: boolean) => writer(drawOnly)(icons(), () => ({ fill: color }));
 	const arrows = createMemo(() => selected().filter(isArrow));
 	const icons = createMemo(() => selected().filter((node) => kindOf(node) === "icon"));
 	const shapes = createMemo(() => selected().filter(isShape));
@@ -171,6 +173,16 @@ export function Properties(props: {
 		if (ops.length) props.onEdit(ops);
 	};
 	const set = (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) => edit(nodes.map((node) => ({ op: "update", id: node.id, set: fields(node) })));
+	/**
+	 * The same change, drawn on the stage and not saved: what a colour picker sends while the hand is
+	 * still down, so the colour follows the pointer and the file takes one edit when it lifts
+	 * (`state/pen-tools.ts`, `penLive`).
+	 */
+	const show = (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) =>
+		setPenLive(nodes.length ? nodes.map((node) => ({ id: node.id, set: fields(node) })) : undefined);
+	const writer = (live?: boolean) => (live ? show : set);
+	/** A colour control's live drag: each step drawn, nothing saved, and nothing is the drawing itself again. */
+	const live = (apply: (color: string) => void) => (color?: string) => (color === undefined ? setPenLive(undefined) : apply(color));
 
 	// --- fill ------------------------------------------------------------------------------------
 	const fillMode = () => shared(fillTargets(), fillModeOf);
@@ -183,8 +195,8 @@ export function Properties(props: {
 			const end = gradientOf(node.fill)?.colors?.[1]?.color ?? "#ffffff";
 			return { fill: { type: "gradient", gradientType: mode, rotation: numberOf(gradientOf(node.fill)?.rotation, 90), colors: [{ color: base, position: 0 }, { color: end, position: 1 }] } };
 		});
-	const setFillColor = (color: string, stop = 0) =>
-		set(fillTargets(), (node) => {
+	const setFillColor = (color: string, stop = 0, drawOnly?: boolean) =>
+		writer(drawOnly)(fillTargets(), (node) => {
 			const gradient = gradientOf(node.fill);
 			if (!gradient) return { fill: color };
 			const colors = [...(gradient.colors ?? [{ color, position: 0 }, { color: "#ffffff", position: 1 }])];
@@ -197,8 +209,8 @@ export function Properties(props: {
 	// --- line ------------------------------------------------------------------------------------
 	const lineColor = () => shared(lineTargets(), (node) => lineColorOf(node));
 	const lineWidth = () => shared(lineTargets(), lineWidthOf);
-	const setLineColor = (color: string) =>
-		set(lineTargets(), (node) => {
+	const setLineColor = (color: string, drawOnly?: boolean) =>
+		writer(drawOnly)(lineTargets(), (node) => {
 			const legacy = legacyStroke(node);
 			return legacy ? { stroke: { ...legacy, fill: color } } : { stroke: color, ...(node.strokeWidth === undefined ? { strokeWidth: 1.5 } : {}) };
 		});
@@ -580,12 +592,12 @@ export function Properties(props: {
 								<Swatches colors={SWATCHES} value={fillHex()} onPick={(color) => setFillColor(color)} label="Fill" />
 								<div class="props-row">
 									<span class="props-label">{fillMode() === "linear" || fillMode() === "radial" ? "From" : "Colour"}</span>
-									<ColorField value={fillHex()} onCommit={(color) => setFillColor(color)} label="Fill colour" />
+									<ColorField value={fillHex()} onCommit={(color) => setFillColor(color)} onLive={live((color) => setFillColor(color, 0, true))} label="Fill colour" />
 								</div>
 								<Show when={fillMode() === "linear" || fillMode() === "radial"}>
 									<div class="props-row">
 										<span class="props-label">To</span>
-										<ColorField value={gradientEnd()} onCommit={(color) => setFillColor(color, 1)} label="Second colour" />
+										<ColorField value={gradientEnd()} onCommit={(color) => setFillColor(color, 1)} onLive={live((color) => setFillColor(color, 1, true))} label="Second colour" />
 									</div>
 									<Show when={fillMode() === "linear"}>
 										<div class="props-row">
@@ -603,7 +615,7 @@ export function Properties(props: {
 							<Swatches colors={LINES} value={lineColor()} onPick={setLineColor} label="Line" />
 							<div class="props-row">
 								<span class="props-label">Colour</span>
-								<ColorField value={lineColor()} onCommit={setLineColor} label="Line colour" />
+								<ColorField value={lineColor()} onCommit={setLineColor} onLive={live((color) => setLineColor(color, true))} label="Line colour" />
 							</div>
 							<div class="props-row">
 								<span class="props-label">Width</span>
@@ -772,10 +784,10 @@ export function Properties(props: {
 								<NumField label="space" value={spacing()} step={0.1} onCommit={(v) => set(words(), () => ({ letterSpacing: v === 0 ? null : v }))} />
 							</div>
 							<Show when={words().some((node) => node.type === "text")}>
-								<Swatches colors={LINES} value={textColor()} onPick={(color) => set(words().filter((node) => node.type === "text"), () => ({ fill: color }))} label="Text colour" />
+								<Swatches colors={LINES} value={textColor()} onPick={(color) => setTextColor(color)} label="Text colour" />
 								<div class="props-row">
 									<span class="props-label">Colour</span>
-									<ColorField value={textColor()} onCommit={(color) => set(words().filter((node) => node.type === "text"), () => ({ fill: color }))} label="Text colour" />
+									<ColorField value={textColor()} onCommit={(color) => setTextColor(color)} onLive={live((color) => setTextColor(color, true))} label="Text colour" />
 								</div>
 							</Show>
 						</Section>
@@ -811,10 +823,10 @@ export function Properties(props: {
 									onChange={(event) => set(icons(), () => ({ weight: Number(event.currentTarget.value) }))}
 								/>
 							</div>
-							<Swatches colors={LINES} value={shared(icons(), (node) => hexOf(node.fill))} onPick={(color) => set(icons(), () => ({ fill: color }))} label="Icon colour" />
+							<Swatches colors={LINES} value={shared(icons(), (node) => hexOf(node.fill))} onPick={(color) => setIconColor(color)} label="Icon colour" />
 							<div class="props-row">
 								<span class="props-label">Colour</span>
-								<ColorField value={shared(icons(), (node) => hexOf(node.fill))} onCommit={(color) => set(icons(), () => ({ fill: color }))} label="Icon colour" />
+								<ColorField value={shared(icons(), (node) => hexOf(node.fill))} onCommit={(color) => setIconColor(color)} onLive={live((color) => setIconColor(color, true))} label="Icon colour" />
 							</div>
 						</Section>
 					</Show>
@@ -859,7 +871,7 @@ export function Properties(props: {
 
 					<Show when={effectTargets().length > 0}>
 						<Section key="effects" title="Shadow and blur">
-							<Effects targets={effectTargets()} set={set} />
+							<Effects targets={effectTargets()} set={set} show={show} onLive={live} />
 						</Section>
 					</Show>
 
@@ -893,7 +905,13 @@ export function Properties(props: {
 }
 
 /** Shadow and blur: pen's `effect`, a drop shadow and a layer blur. */
-function Effects(props: { targets: readonly PenNode[]; set: (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) => void }) {
+function Effects(props: {
+	targets: readonly PenNode[];
+	set: (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) => void;
+	/** The same change, drawn and not saved: the shadow's colour while it is being dragged. */
+	show: (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) => void;
+	onLive: (apply: (color: string) => void) => (color?: string) => void;
+}) {
 	type Shadow = { type: "shadow"; shadowType?: string; offset?: { x: number; y: number }; blur?: number; spread?: number; color?: string };
 	const effects = (node: PenNode) => (node.effect === undefined ? [] : Array.isArray(node.effect) ? node.effect : [node.effect]) as Array<Record<string, unknown>>;
 	const shadowOf = (node: PenNode) => effects(node).find((effect) => effect.type === "shadow") as Shadow | undefined;
@@ -907,8 +925,10 @@ function Effects(props: { targets: readonly PenNode[]; set: (nodes: readonly Pen
 		const all = [...kept, ...(s ? [s] : []), ...(b > 0 ? [{ type: "blur", radius: b }] : [])];
 		return { effect: all.length === 0 ? null : all.length === 1 ? all[0] : all };
 	};
-	const setShadow = (patch: Partial<Shadow> | null) =>
-		props.set(props.targets, (node) => write(node, { shadow: patch === null ? null : { type: "shadow", shadowType: "outer", offset: { x: 0, y: 4 }, blur: 12, spread: 0, color: "#00000033", ...(shadowOf(node) ?? {}), ...patch } }));
+	const setShadow = (patch: Partial<Shadow> | null, drawOnly?: boolean) =>
+		(drawOnly ? props.show : props.set)(props.targets, (node) => write(node, { shadow: patch === null ? null : { type: "shadow", shadowType: "outer", offset: { x: 0, y: 4 }, blur: 12, spread: 0, color: "#00000033", ...(shadowOf(node) ?? {}), ...patch } }));
+	/** A shadow colour keeps the alpha it already had, written as the last two digits of the hex. */
+	const shadowColor = (color: string) => `${color}${(shadow()?.color ?? "#00000033").slice(7) || "33"}`;
 	return (
 		<>
 			<div class="props-row">
@@ -926,7 +946,7 @@ function Effects(props: { targets: readonly PenNode[]; set: (nodes: readonly Pen
 						</div>
 						<div class="props-row">
 							<span class="props-label">Colour</span>
-							<ColorField value={hexOf(s().color)} onCommit={(color) => setShadow({ color: `${color}${(s().color ?? "#00000033").slice(7) || "33"}` })} label="Shadow colour" />
+							<ColorField value={hexOf(s().color)} onCommit={(color) => setShadow({ color: shadowColor(color) })} onLive={props.onLive((color) => setShadow({ color: shadowColor(color) }, true))} label="Shadow colour" />
 						</div>
 					</>
 				)}
@@ -1012,7 +1032,13 @@ function NumField(props: { label: string; value: number | typeof MIXED | undefin
 }
 
 /** A hex colour: typed, or picked in the colour picker that its swatch opens (`ColorPicker.tsx`). */
-function ColorField(props: { value: string | typeof MIXED | undefined; onCommit: (color: string) => void; label: string }) {
+function ColorField(props: {
+	value: string | typeof MIXED | undefined;
+	onCommit: (color: string) => void;
+	/** Every step of a drag in the picker, drawn and not saved; nothing puts the drawing back (`ColorPicker`). */
+	onLive?: (color?: string) => void;
+	label: string;
+}) {
 	const hex = () => (props.value && props.value !== MIXED ? props.value : "");
 	const [picking, setPicking] = createSignal(false);
 	let swatch: HTMLButtonElement | undefined;
@@ -1036,7 +1062,7 @@ function ColorField(props: { value: string | typeof MIXED | undefined; onCommit:
 				onClick={() => setPicking(!picking())}
 			/>
 			<Show when={picking() && swatch}>
-				<ColorPicker value={hex() || undefined} anchor={swatch!} label={props.label} onCommit={props.onCommit} onClose={() => setPicking(false)} />
+				<ColorPicker value={hex() || undefined} anchor={swatch!} label={props.label} onCommit={props.onCommit} {...(props.onLive ? { onLive: props.onLive } : {})} onClose={() => setPicking(false)} />
 			</Show>
 			<label class="field props-num props-hex">
 				<input

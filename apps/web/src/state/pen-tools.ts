@@ -47,4 +47,14 @@ export interface InsertPanel {
 }
 const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
 
-export { insertPanel, penBoxes, penIcon, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenIcon, setPenSelection, setPenShape, setPenTool };
+/**
+ * A change the properties panel is making with a drag, as the update it will save when the hand
+ * lifts: the colour under the pointer in the colour picker.
+ *
+ * The stage draws it without saving it (`canvas/Stage.tsx`, `penLayer.preview`), so the colour
+ * changes under the pointer while the drag is still one edit to the file and not sixty. Cleared by
+ * the stage when the drawing comes back with the change in it.
+ */
+const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
+
+export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool };

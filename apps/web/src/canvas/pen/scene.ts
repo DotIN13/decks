@@ -60,6 +60,11 @@ export interface PenPreview {
 	 * is a handful of numbers, and the worker already clones the document itself to draw one.
 	 */
 	radius?: number | null;
+	/**
+	 * Fields changed on the item, as an `update` op's `set`: a colour being dragged in the panel's
+	 * colour picker. `null` takes a field off, as the op does.
+	 */
+	set?: Record<string, unknown>;
 }
 
 /** A board as the sheet draws it: a hole where its document shows, or its picture. */
@@ -1091,7 +1096,7 @@ export class StageScene {
 	 * is laid out and recorded again. Returns whether anything is to be drawn again.
 	 */
 	private preview(moving: ReadonlyMap<string, PenPreview> | undefined): boolean {
-		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined);
+		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.set === undefined);
 		if (slide) {
 			const key = [...moving!.keys()].sort().join("|");
 			if (this.slide?.key === key) return false;
@@ -1215,6 +1220,8 @@ export class StageScene {
 					else found.node.metadata = { type: "", ...found.node.metadata, radius: Math.max(0, change.radius ?? 0) };
 				}
 				if (change.w !== undefined && found.node.type === "text" && (found.node.textGrowth ?? "auto") === "auto") found.node.textGrowth = "fixed-width";
+				// A field being changed in the properties panel, drawn before it is saved.
+				for (const [field, value] of Object.entries(change.set ?? {})) (found.node as unknown as Record<string, unknown>)[field] = value === null ? undefined : value;
 			}
 			// A shape being sized draws its outline at the new size, as the saved edit will (`fitShapes`).
 			fitShapes(copy);
