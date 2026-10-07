@@ -693,6 +693,12 @@ export function CardEditor(props: CardEditorProps) {
 		target = { kind: "text", range: r };
 	}
 	function onPointerDown(event: PointerEvent) {
+		// A press on a suggestion's buttons or a check keeps the caret where it is, a finger's too: a
+		// finger's press would otherwise take the focus away, and that saves the card and closes it.
+		if ((event.target as Element).closest(".pce-sug button, .pce-check")) {
+			event.preventDefault();
+			return;
+		}
 		const it = (event.target as Element).closest(".pce-piece") as HTMLElement | null;
 		if (!it || event.button !== 0 || !ed.contains(it)) return;
 		event.preventDefault();
@@ -872,7 +878,15 @@ export function CardEditor(props: CardEditorProps) {
 	});
 
 	return (
-		<div ref={wrap} class={`pen-card-editor ${props.class ?? ""}`} style={props.style} onKeyDown={onKeyDown} onFocusOut={onFocusOut}>
+		<div
+			ref={wrap}
+			class={`pen-card-editor ${props.class ?? ""}`}
+			style={props.style}
+			onKeyDown={onKeyDown}
+			onFocusOut={onFocusOut}
+			// A press in the card is the card's: not the start of a pan or a tap on the canvas behind it.
+			onPointerDown={(event) => event.stopPropagation()}
+		>
 			<div
 				ref={ed}
 				class="pce-body"
@@ -888,7 +902,7 @@ export function CardEditor(props: CardEditorProps) {
 					if ((event.target as Element).closest(".pce-sug button, .pce-check")) event.preventDefault();
 				}}
 			/>
-			<div ref={bar} class="pce-bar" onMouseDown={(event) => event.preventDefault()} onClick={style}>
+			<div ref={bar} class="pce-bar" onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
 				<button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
 				<button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
 				<button type="button" data-cmd="strikeThrough" title="Strike"><s>S</s></button>

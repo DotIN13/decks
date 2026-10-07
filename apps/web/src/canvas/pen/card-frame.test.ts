@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
-import { cardChildren, cardEdits, cardMarkdown, markdownText, newCard, obsidianNote } from "./card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, fileItem, markdownText, newCard, obsidianNote } from "./card-frame.ts";
 
 let n = 0;
 const options = { fresh: () => `new-${++n}`, inner: 288, size: (url: string) => (url === "wide.png" ? { w: 600, h: 300 } : undefined) };
@@ -59,4 +59,17 @@ test("a save is one edit per item that changed: delete, insert, move and update,
 test("a card goes to Obsidian as one note: colour and open suggestions out, pictures kept, other items left out", () => {
 	const card = { type: "frame", id: "c", metadata: { type: "decks.card" }, children: [markdownText("a", "# Plan"), markdownText("b", "It is [firm]{.red}, ask about {~~Arashiyama~>Ohara~~}{>>quieter<<}."), { type: "rectangle", id: "p", name: "Gate", width: 200, height: 100, fill: { type: "image", url: "gate.png", mode: "fill" } }, { type: "note", id: "n", content: "x" }] } as PenNode;
 	assert.equal(obsidianNote(card), "# Plan\n\nIt is firm, ask about Arashiyama %%quieter%%.\n\n![Gate|200](gate.png)\n");
+});
+
+test("a file is a piece of its own: ![[name]] alone on its line is a file chip, and the chip is ![[name]] again", () => {
+	n = 0;
+	const kids = cardChildren("# Plan\n\n![[assets/itinerary.pdf]]\n\nWords with ![[inline.pdf]] in them.", [], options);
+	assert.deepEqual(kids.map((k) => [k.type, k.metadata?.type]), [["text", "decks.markdown"], ["frame", "decks.file"], ["text", "decks.markdown"]]);
+	assert.deepEqual([kids[1]!.name, kids[1]!.metadata?.path, kids[1]!.children?.map((c) => c.type)], ["itinerary.pdf", "assets/itinerary.pdf", ["icon", "text"]]);
+	assert.equal(cardMarkdown(kids), "# Plan\n\n![[assets/itinerary.pdf]]\n\nWords with ![[inline.pdf]] in them.");
+	// Saved again unchanged, the chip is the same item.
+	assert.equal(cardChildren(cardMarkdown(kids), kids, options)[1], kids[1]);
+	const film = { type: "rectangle", id: "f", metadata: { type: "decks.media", kind: "video", file: "assets/walk.mp4" } } as PenNode;
+	assert.equal(cardMarkdown([film]), "![[assets/walk.mp4]]");
+	assert.equal(fileItem("a/b.mp3", () => "x").children?.[0]?.icon, "file-video");
 });

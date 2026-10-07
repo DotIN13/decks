@@ -1,4 +1,5 @@
 import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { isFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
@@ -367,8 +368,9 @@ export class PenLayer {
 		if (!options?.deep) {
 			// A group is picked whole, and so is a shape (`@decks/pen`, `shapes.ts`): its outline and words are parts of it.
 			// So is a card where its words are: a picture in it is picked on its own, and carried out of it.
+			// A file's chip is one piece, its icon and name parts of it.
 			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
-				if (up.node.type === "group" || isShape(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
+				if (up.node.type === "group" || isShape(up.node) || isFile(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
 			}
 		}
 		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };

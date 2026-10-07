@@ -159,6 +159,8 @@ const CHECKS = [
 	{ file: "stage-scroll.mjs", needsAgent: false },
 	/* A card typed into as it reads: suggestions, the style bar, pieces that drag, untouched blocks kept. */
 	{ file: "card-editor.mjs", needsAgent: false },
+	/* The same card on a phone, by touch: a double tap opens it, taps accept, the sheet stands aside. */
+	{ file: "card-phone.mjs", needsAgent: false },
 	/*
 	 * The stage's gestures against a design tool's and a notes app's: tools and a marquee in browse
 	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.

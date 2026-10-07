@@ -3,7 +3,8 @@ import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
-import { MARKDOWN, MEDIA } from "@decks/pen";
+import { CARD, MEDIA, NOTE_PAD } from "@decks/pen";
+import { cardChildren, CARD_GAP, CARD_RADIUS, fileItem, markdownText } from "../canvas/pen/card-frame.ts";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
@@ -235,11 +236,48 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const files: File[] = [];
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
 		if (files.length === 0) return;
+		// Over a card, every file goes into it, between the blocks where it lands.
+		const card = (globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt?.(at.x, at.y);
+		if (card) return intoCard(files, card);
 		const direct = files.filter(onStage);
 		const rest = files.filter((file) => !onStage(file));
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		if (direct.length > 0) await ontoStage(direct, middle);
 		if (rest.length > 0) await onNewBoard(rest, at);
+	};
+
+	/**
+	 * Files dropped on a card, each copied into the deck and put among its blocks where it landed: a
+	 * picture as a picture as wide as the card's words at most, a text file's words as a block, and any
+	 * other file (a PDF, a film) as a file's chip, which the card writes as `![[path]]`. The server
+	 * gives the new items their ids.
+	 */
+	const intoCard = async (files: File[], into: { card: string; index: number; inner: number }) => {
+		const agentId = state.focused;
+		if (!agentId) return;
+		const report = working(files.length > 1 ? `Adding ${files.length} files to the card…` : `Adding ${files[0]?.name ?? "file"} to the card…`);
+		const ops: Array<Record<string, unknown>> = [];
+		const failures: string[] = [];
+		const none = () => "";
+		for (const file of files) {
+			try {
+				if (isWords(file)) {
+					ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: markdownText("", (await file.text()).trim()) });
+					continue;
+				}
+				const natural = isRaster(file) ? await naturalSize(file) : undefined;
+				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
+				if (isRaster(file)) {
+					const w = Math.round(Math.min(into.inner, natural?.width ?? into.inner));
+					const h = Math.round(natural ? (w * natural.height) / Math.max(1, natural.width) : w * 0.5625);
+					ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: { type: "rectangle", name: file.name, cornerRadius: 6, width: w, height: h, fill: { type: "image", url: fromStage(asset.path), mode: "fill" } } });
+				} else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromStage(asset.path), none) });
+			} catch (error) {
+				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+		if (ops.length) send({ type: "stage.pen.edit", agentId, ops });
+		report.done([ops.length ? `${ops.length === 1 ? files[0]?.name : `${ops.length} files`} put in the card` : "", ...failures].filter(Boolean).join(" · ") || undefined, failures.length ? "warn" : "info");
 	};
 
 	/**
@@ -259,7 +297,9 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 			try {
 				if (isWords(file)) {
 					const words = await file.text();
-					items.push({ node: { type: "note", name: file.name, content: words, metadata: { type: MARKDOWN, file: file.name } }, w: CARD_W });
+					// A card: a column of its blocks (`canvas/pen/card-frame.ts`), each given its id by the server.
+					const children = cardChildren(words, [], { fresh: () => "", inner: CARD_W - NOTE_PAD * 2 });
+					items.push({ node: { type: "frame", name: file.name, layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD, file: file.name }, children }, w: CARD_W });
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };

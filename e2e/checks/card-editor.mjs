@@ -52,7 +52,7 @@ const onDisk = () => {
 			const doc = JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8"));
 			const card = (doc.children ?? []).find((n) => n.id === "card-editor");
 			// A note card from before is saved as a card frame, its blocks one item each.
-			if (card) return card.type === "frame" ? (card.children ?? []).map((n) => n.content).join("\n\n") : card.content;
+			if (card) return card.type === "frame" ? (card.children ?? []).map((n) => (n.metadata?.type === "decks.file" ? `![[${n.metadata.path}]]` : n.content)).join("\n\n") : card.content;
 		} catch {
 			/* a stage being written */
 		}
@@ -284,6 +284,27 @@ await page.mouse.move(inside.x + 480, inside.y + 60, { steps: 14 });
 await page.mouse.up();
 const out = await until(() => (where("card-picture")?.top ? where("card-picture") : undefined));
 say("…and dragged off the card it leaves it", !!out && out.inCard === -1, JSON.stringify(where("card-picture")));
+
+// A file dropped from the desktop onto the card goes into it as a file's chip, which is ![[path]] in its markdown.
+const before = (cardNode()?.children ?? []).length;
+const onCard = await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+await page.evaluate(({ x, y }) => {
+	const data = new DataTransfer();
+	data.items.add(new File(["%PDF-1.4 plan"], "itinerary-2.pdf", { type: "application/pdf" }));
+	const target = document.elementFromPoint(x, y) ?? document.body;
+	for (const type of ["dragenter", "dragover", "drop"]) target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: data }));
+}, { x: onCard.x + onCard.width / 2, y: onCard.y + 40 });
+const filed = await until(() => (cardNode()?.children ?? []).find((n) => n.metadata?.type === "decks.file" && /itinerary-2\.pdf$/.test(n.metadata.path)), 12000);
+say("a file dropped on a card goes into it as a file's chip", !!filed && (cardNode()?.children ?? []).length === before + 1, JSON.stringify(filed && { name: filed.name, path: filed.metadata.path, kids: filed.children?.map((c) => c.type) }));
+// What the page asks to open, rather than a real tab: a headless browser need not show one.
+await page.evaluate(() => {
+	globalThis.__opened = [];
+	window.open = (url) => (globalThis.__opened.push(String(url)), null);
+});
+const chip = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), filed?.id));
+if (chip) await page.mouse.dblclick(chip.x + chip.width / 2, chip.y + chip.height / 2);
+const opened = await until(() => page.evaluate(() => globalThis.__opened?.[0]), 3000);
+say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test(opened ?? ""), opened);
 
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-picture" }] });

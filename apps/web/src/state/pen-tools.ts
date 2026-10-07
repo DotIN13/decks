@@ -19,6 +19,8 @@ export const PEN_TOOL_KEYS: Record<string, PenTool> = { n: "note", s: "note", c:
 const [penTool, setPenTool] = createSignal<PenTool>("select");
 /** Ids of the selected items, in the order they were picked. */
 const [penSelection, setPenSelection] = createSignal<readonly string[]>([]);
+/** Whether an item's words are open for typing (`Stage.tsx`): a phone's properties sheet stands aside. */
+const [penTyping, setPenTyping] = createSignal(false);
 
 /**
  * What the `shape` and `icon` tools make: the shape picked in the insert panel (`canvas/pen/Insert.tsx`,
@@ -57,4 +59,4 @@ const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
  */
 const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
 
-export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool };
+export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping };

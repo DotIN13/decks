@@ -1,4 +1,4 @@
-import { CARD, isCard, MARKDOWN, NOTE_PAD, type Op, type PenNode } from "@decks/pen";
+import { CARD, isCard, MARKDOWN, MEDIA, NOTE_PAD, type Op, type PenNode } from "@decks/pen";
 import type { Tokens } from "marked";
 import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.ts";
 
@@ -30,12 +30,33 @@ export function markdownText(id: string, content: string): PenNode {
 	return { type: "text", id, content, textGrowth: "fixed-width", width: "fill_container", metadata: { type: MARKDOWN } } as PenNode;
 }
 
+/**
+ * A file in the deck, as a piece: pen's own frame holding an icon and the file's name, marked
+ * `metadata: { type: "decks.file", path }`, so pen.dev shows a chip and a card writes `![[path]]`.
+ */
+export const FILE = "decks.file";
+export const isFile = (node: PenNode | undefined) => node?.type === "frame" && node.metadata?.type === FILE;
+export function fileItem(path: string, fresh: () => string): PenNode {
+	const name = path.split("/").pop() || path;
+	return {
+		type: "frame", id: fresh(), name, layout: "horizontal", gap: 8, padding: [8, 12], alignItems: "center", cornerRadius: 8, fill: "#8080801f",
+		metadata: { type: FILE, path },
+		children: [
+			{ type: "icon", id: fresh(), library: "lucide", icon: /\.(mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ? "file-video" : "file-text", width: 16, height: 16, fill: "#808080" },
+			{ type: "text", id: fresh(), content: name, fontSize: 14, fill: "#808080" },
+		],
+	} as PenNode;
+}
+
 const PLACEHOLDER = /^<!--decks:item (\S+)-->$/;
 const placeholder = (id: string) => `<!--decks:item ${id}-->`;
 
 /** A child's markdown: its words, a picture as Obsidian writes one, anything else as a placeholder. */
 export function childMarkdown(node: PenNode): string {
 	if (node.type === "text" && typeof node.content === "string") return node.content;
+	// A file, or a film or a sound, is embedded as Obsidian embeds one.
+	if (isFile(node) && typeof node.metadata?.path === "string") return `![[${node.metadata.path}]]`;
+	if (node.metadata?.type === MEDIA && typeof node.metadata.file === "string") return `![[${node.metadata.file}]]`;
 	const fill = node.type === "rectangle" ? (node.fill as { type?: string; url?: string } | undefined) : undefined;
 	if (fill?.type === "image" && fill.url) {
 		const width = typeof node.width === "number" ? `|${Math.round(node.width)}` : "";
@@ -94,6 +115,8 @@ export function cardChildren(markdown: string, previous: readonly PenNode[], opt
 	return blocks.flatMap((block, i) => {
 		if (kept[i]) return [kept[i]!];
 		if (PLACEHOLDER.test(block.raw)) return []; // an item that is no longer on the stage
+		const file = fileOf(block.token as Tokens.Paragraph);
+		if (file) return [fileItem(file, options.fresh)];
 		const picture = pictureOf(block.token as Tokens.Paragraph);
 		if (picture) {
 			const natural = options.size?.(picture.url);
@@ -105,6 +128,14 @@ export function cardChildren(markdown: string, previous: readonly PenNode[], opt
 		if (reuse) used.add(reuse.id);
 		return [reuse ? { ...reuse, content: block.raw } : markdownText(options.fresh(), block.raw)];
 	});
+}
+
+/** A paragraph that is only `![[a file]]` that is not a picture: the file's path. */
+function fileOf(token: Tokens.Paragraph): string | undefined {
+	if (token.type !== "paragraph") return undefined;
+	const real = (token.tokens ?? []).filter((t) => !(t.type === "text" && !t.raw.trim()));
+	const only = real.length === 1 && real[0]!.type === "wiki" ? (real[0] as WikiToken) : undefined;
+	return only?.embed && !/\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(only.target) ? only.target : undefined;
 }
 
 /** A paragraph that is only a picture: `![alt|240](url)`, or `![[photo.png|240]]`. */

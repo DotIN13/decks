@@ -41,7 +41,7 @@ import X from "lucide-solid/icons/x";
 import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../camera/camera.ts";
-import { penBoxes, penSelection, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
+import { penBoxes, penSelection, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { ICON_LIBRARIES } from "./icon-index.ts";
@@ -421,8 +421,9 @@ export function Properties(props: {
 		</details>
 	);
 
+	// On a phone the sheet would cover the words being typed: it stands aside until the typing ends.
 	return (
-		<Show when={selected().length > 0}>
+		<Show when={selected().length > 0 && !(isPhone() && penTyping())}>
 			<aside class="panel-float props-panel" data-sheet={isPhone() ? "true" : undefined} aria-label="Properties" data-props>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">

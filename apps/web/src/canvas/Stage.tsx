@@ -37,12 +37,12 @@ import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
+import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, newCard } from "./pen/card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -989,6 +989,17 @@ export function Stage(props: {
 		penLayer.muteText(new Set([hit.id]));
 		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
 	};
+	/** A file's chip, or its icon or name: the file opens in a tab of its own. Answers whether it was one. */
+	const openFileOf = (id: string): boolean => {
+		const located = props.pen ? indexOf(props.pen.doc).get(id) : undefined;
+		const file = located ? (isFile(located.node) ? located.node : isFile(located.parent) ? located.parent : undefined) : undefined;
+		if (!file || typeof file.metadata?.path !== "string") return false;
+		setPenSelection([file.id]);
+		window.open(new URL(file.metadata.path, new URL(props.pen?.base || "/", location.origin)).href, "_blank", "noopener");
+		return true;
+	};
+	createEffect(() => setPenTyping(!!penText()));
+	onCleanup(() => setPenTyping(false));
 	/** The card an item is a block of, if it is one. */
 	const cardOf = (id: string): PenNode | undefined => {
 		const parent = props.pen ? indexOf(props.pen.doc).get(id)?.parent : undefined;
@@ -1269,6 +1280,19 @@ export function Stage(props: {
 	};
 	/** For the file drop (`app/files.ts`): whether a board's picture, with no node to find, is under a point on screen. */
 	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? pictureUnder({ clientX: x, clientY: y }) : undefined);
+	/*
+	 * The card under a screen point and the slot between its blocks there, for files dropped from the
+	 * desktop (`app/files.ts`): they go into the card where they land, as a picture or a file dragged
+	 * from the canvas does.
+	 */
+	(globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt = (x, y) => {
+		if (!element) return undefined;
+		const at = toWorld(localCamera, view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
+		const id = frameUnder(at, []);
+		const card = id ? penNode(id) : undefined;
+		if (!id || !card || !isCard(card)) return undefined;
+		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: cardInner(card) };
+	};
 	/** A board selected by a press on it, as `BoardFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
 	const selectBoard = (path: string) => {
 		if (!untrack(boardPicks).includes(path) && (untrack(boardPicks).length || untrack(penSelection).length)) {
@@ -3395,6 +3419,10 @@ export function Stage(props: {
 			}
 			if (performance.now() - since > 600) return;
 			const deep = penLayer.hitTest(at, { deep: true });
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && openFileOf(deep.id)) {
+				lastTap = undefined;
+				return;
+			}
 			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (TEXTY.has(deep.node.type) || shapeOf(deep.id))) {
 				lastTap = undefined;
 				const shape = shapeOf(deep.id);
@@ -3447,6 +3475,8 @@ export function Stage(props: {
 				setPlaying({ id: hit.id, kind: media.kind, file: media.file });
 				return;
 			}
+			// A file's chip opens the file, in a tab of its own.
+			if (hit && openFileOf(hit.id)) return;
 			// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
 			const shape = hit ? shapeOf(hit.id) : undefined;
 			if (shape && !(hit && TEXTY.has(hit.node.type))) {
