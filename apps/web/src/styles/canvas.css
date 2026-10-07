@@ -1088,6 +1088,7 @@
 }
 	.world > .pen-grip:hover { color: var(--fg); background: var(--line); }
 	.world > .pen-grip:active { cursor: grabbing; }
+	.world > .pen-grip[data-hidden] { visibility: hidden; }
 	.world > .pen-grip svg { stroke-width: 1.75; flex: none; }
 	.world > .pen-insert {
 	position: absolute;

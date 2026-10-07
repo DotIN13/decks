@@ -4350,6 +4350,8 @@ export function Stage(props: {
 						<div
 							class="pen-grip"
 							title="Drag to move this block"
+							// Hidden, not unmounted, while anything is carried or sized: a drag begun on the grip keeps the element it captured the pointer on.
+							data-hidden={penDrag().dx || penDrag().dy || penResize() ? "true" : undefined}
 							style={{
 								// Drawn at screen size and scaled to the world, so the dots stay centred on their background at any zoom.
 								left: `${grip().x - 19 / props.camera.zoom}px`,
