@@ -153,7 +153,7 @@ export class PenFonts {
 	private readonly cards = new Map<string, MarkdownLayout>();
 
 	/**
-	 * A card's words read as GitHub-flavoured markdown (`markdown.ts`) and set as GitHub sets them
+	 * A card's words read as Obsidian's markdown (`markdown.ts`) and set as GitHub sets them
 	 * (`markdown-layout.ts`). Kept, since the same card is measured, drawn and asked where its links
 	 * are, and laid out again only when its words, its width, a font or an image changes. The caller
 	 * does not delete what it is given.

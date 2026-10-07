@@ -1,12 +1,13 @@
 import type { Canvas, CanvasKit, Image, Paint, Paragraph, TypefaceFontProvider } from "canvaskit-wasm";
 import type { TextStyle } from "@decks/pen";
 import { highlight } from "./highlight.ts";
+import type { Colour } from "./card-syntax.ts";
 import type { Align, Alert, Block, Run } from "./markdown.ts";
 
 /**
  * A card's markdown set on the canvas in the app's own hand (`markdown.ts` reads it).
  *
- * GitHub-flavoured in what it draws, Decks in how: the app's greys, hairlines and accent, light or
+ * Obsidian's markdown in what it draws (`card-syntax.ts`), Decks in how: the app's greys, hairlines and accent, light or
  * dark with the app (`index.css`), headings in Inter's semibold with no rules under them, a quote
  * behind a hairline bar, code on the app's tint in its monospace face, tables across the whole card
  * with a line under the header and between rows and nothing up the sides. Sizes are in units of the
@@ -43,13 +44,37 @@ export const CARD_PALETTE = {
 	light: { paper: "#ffffff", fg: "#161616", muted: "#5c5c5c", faint: "#808080", line: "#0000001a", strong: "#00000033", subtle: "#f2f2f2", code: "#0000000f", accent: "#3b5cf6", box: "#ffffff" },
 	dark: { paper: "#242424", fg: "#fafafa", muted: "#aeaeae", faint: "#808080", line: "#ffffff1f", strong: "#ffffff3d", subtle: "#2e2e2e", code: "#ffffff14", accent: "#6f8bff", box: "#242424" },
 } as const;
-const ALERTS: Record<Alert, { light: string; dark: string; title: string }> = {
-	note: { light: "#3b5cf6", dark: "#6f8bff", title: "Note" },
-	tip: { light: "#2a9d52", dark: "#4cc97a", title: "Tip" },
-	important: { light: "#7c4ddb", dark: "#a88bf0", title: "Important" },
-	warning: { light: "#b7811b", dark: "#e7af36", title: "Warning" },
-	caution: { light: "#d92e3c", dark: "#f06a74", title: "Caution" },
+/** A callout's colour, by the colour Obsidian gives its type (`CALLOUTS`). */
+const ALERTS: Record<Alert, { light: string; dark: string }> = {
+	blue: { light: "#3b5cf6", dark: "#6f8bff" },
+	cyan: { light: "#0e8a9e", dark: "#3cc3d6" },
+	green: { light: "#2a9d52", dark: "#4cc97a" },
+	orange: { light: "#c26a12", dark: "#f0a050" },
+	red: { light: "#d92e3c", dark: "#f06a74" },
+	purple: { light: "#7c4ddb", dark: "#a88bf0" },
+	gray: { light: "#6b6b6b", dark: "#a0a0a0" },
 };
+/** Coloured words, `[words]{.red}`, readable on the card's paper in either scheme. */
+const INK: Record<Colour, { light: string; dark: string }> = {
+	red: { light: "#d92e3c", dark: "#f06a74" },
+	orange: { light: "#c2410c", dark: "#fb923c" },
+	yellow: { light: "#a16207", dark: "#facc15" },
+	green: { light: "#15803d", dark: "#4ade80" },
+	blue: { light: "#2563eb", dark: "#60a5fa" },
+	purple: { light: "#7c3aed", dark: "#c084fc" },
+};
+/** Highlights behind words, Obsidian's six and its own (the yellow). */
+const MARK: Record<Colour | "default", { light: string; dark: string }> = {
+	default: { light: "#facc1573", dark: "#facc1547" },
+	yellow: { light: "#facc1573", dark: "#facc1547" },
+	red: { light: "#f8717159", dark: "#f871714d" },
+	orange: { light: "#fb923c59", dark: "#fb923c4d" },
+	green: { light: "#4ade8059", dark: "#4ade804d" },
+	blue: { light: "#38bdf859", dark: "#38bdf84d" },
+	purple: { light: "#c084fc59", dark: "#c084fc4d" },
+};
+/** An agent's suggestion: what it adds in its blue, what it takes out struck through in red. */
+const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0262d" }, dark: { added: "#7aa2ff", addedBg: "#7aa2ff26", removed: "#f06a74" } };
 const HEADING_SIZE = [1.6, 1.3, 1.12, 1, 0.9, 0.85];
 
 type Op =
@@ -100,25 +125,31 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, env.provider);
 		const ranges: Array<{ start: number; end: number; href: string }> = [];
 		let at = 0;
-		for (const run of runs.length ? runs : [{ text: " " }]) {
-			const text = run.image ? `🖼 ${run.image.alt || "image"}` : run.text;
+		const S = SUGGEST[env.scheme];
+		const list = (runs.length ? runs : [{ text: " " }]) as Run[];
+		list.forEach((run, i) => {
+			// A suggestion's reason is a 💬 after it; the words are in the card's markdown for anyone who opens it.
+			const text = run.image ? `🖼 ${run.image.alt || "image"}` : run.text + (run.reason && list[i + 1]?.reason !== run.reason ? " 💬" : "");
+			const ink = run.added ? S.added : run.removed ? S.removed : run.link || run.wiki || run.sup ? C.accent : run.image ? C.muted : run.colour ? INK[run.colour][env.scheme] : f.colour;
+			const back = run.added ? S.addedBg : run.mark ? MARK[run.mark][env.scheme] : run.code ? C.code : undefined;
 			builder.pushStyle(
 				new ck.TextStyle({
 					...base,
-					color: paint(run.link || run.sup ? C.accent : run.image ? C.muted : f.colour),
+					color: paint(ink),
 					fontFamilies: env.chain(run.code ? env.mono : style.fontFamily),
 					fontSize: run.sup ? size * 0.75 : run.code ? size * 0.88 : size,
 					fontStyle: { weight: { value: run.bold ? Math.max(600, weight + 200) : weight }, slant: run.italic ? ck.FontSlant.Italic : ck.FontSlant.Upright },
-					...(run.strike ? { decoration: ck.LineThroughDecoration, decorationColor: paint(f.colour) } : {}),
-					...(run.link ? { decoration: ck.UnderlineDecoration, decorationColor: paint(`${C.accent}66`) } : {}),
-					...(run.code ? { backgroundColor: paint(C.code) } : {}),
+					...(run.strike || run.removed ? { decoration: ck.LineThroughDecoration, decorationColor: paint(run.removed ? S.removed : f.colour) } : {}),
+					...(run.link || run.wiki ? { decoration: ck.UnderlineDecoration, decorationColor: paint(`${C.accent}66`) } : {}),
+					...(run.added ? { decoration: ck.UnderlineDecoration, decorationColor: paint(S.added) } : {}),
+					...(back ? { backgroundColor: paint(back) } : {}),
 				}),
 			);
 			builder.addText(text);
 			builder.pop();
 			if (run.link) ranges.push({ start: at, end: at + text.length, href: run.link });
 			at += text.length;
-		}
+		});
 		const p = builder.build();
 		builder.delete();
 		p.layout(Math.max(1, w));
@@ -168,7 +199,7 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 			case "image": {
 				const image = env.image?.(block.url);
 				if (image && image.width() > 0) {
-					const iw = Math.min(w, image.width());
+					const iw = Math.min(w, block.width ?? image.width());
 					const ih = (iw * image.height()) / image.width();
 					ops.push({ kind: "image", image, x, y, w: iw, h: ih });
 					return y + ih;
@@ -178,6 +209,15 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 				ops.push({ kind: "box", x, y, w, h, colour: C.subtle, r: 8 });
 				const words = para([{ text: `🖼 ${block.alt || block.url}` }], { ...f, colour: C.muted }, w - f.size * 2, { align: "center", size: f.size * 0.875 });
 				words.place(x + f.size, y + (h - words.p.getHeight()) / 2);
+				return y + h;
+			}
+			case "embed": {
+				// A file shown where it sits: its name on the app's tint, as Obsidian shows one it cannot open.
+				const pad = f.size * 0.75;
+				const words = para([{ text: `📄 ${block.target}` }], f, w - pad * 2, { size: f.size * 0.94 });
+				const h = words.p.getHeight() + pad * 2;
+				ops.push({ kind: "box", x, y, w, h, colour: C.subtle, r: 8 });
+				words.place(x + pad, y + pad);
 				return y + h;
 			}
 			case "list": {
@@ -204,7 +244,7 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 				const top = y;
 				y += pad;
 				if (alert) {
-					y += para([{ text: alert.title }], { ...f, colour: accent! }, w - inset, { weight: 600 }).place(x + inset, y);
+					y += para([{ text: block.title ?? "Note" }], { ...f, colour: accent! }, w - inset, { weight: 600 }).place(x + inset, y);
 					if (block.blocks.length) y += f.size * 0.3;
 				}
 				y = stack(block.blocks, x + inset, y, w - inset, { ...f, colour: alert ? f.colour : C.muted }, f.size);

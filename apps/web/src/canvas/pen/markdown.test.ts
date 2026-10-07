@@ -28,7 +28,8 @@ test("task lists, autolinks, images, alerts, footnotes and emoji", () => {
 	assert.ok(wordsOf([blocks[1]!]).includes("🎉"));
 	assert.deepEqual(blocks[2], { kind: "image", url: "chart.png", alt: "a chart" });
 	const alert = blocks[3] as Extract<Block, { kind: "quote" }>;
-	assert.equal(alert.alert, "warning");
+	assert.equal(alert.alert, "orange");
+	assert.equal(alert.title, "Warning");
 	assert.equal(wordsOf(alert.blocks), "Mind the gap");
 	assert.deepEqual((blocks[4] as Extract<Block, { kind: "paragraph" }>).runs.at(-2), { text: "1", sup: true });
 	assert.equal(wordsOf([blocks[5]!]), "The source.");
@@ -48,4 +49,35 @@ test("code in a known language is coloured as GitHub colours it, and an unknown 
 	assert.equal(runs.find((run) => run.text.includes("// why"))?.colour, "#59636e");
 	assert.deepEqual(highlight("a < b", "klingon"), [{ text: "a < b" }]);
 	assert.equal(highlight("const x = 1", "js", "dark").find((run) => run.text === "const")?.colour, "#ff7b72");
+});
+
+test("Obsidian's own: highlights in six colours, [[links]], embeds, image widths, callouts and hidden comments", () => {
+	const blocks = parseMarkdown("Budget ==🟡¥90,000== and ==plain== for [[Mei Tanaka]] and [[Kyoto plan|the plan]]. %%not shown%%\n\n![Kinkaku-ji|240](kinkaku.jpg)\n\n![[itinerary.pdf]]\n\n![[map.png|300]]\n\n> [!tip]- Go early\n> the gates are empty\n\n%%\na hidden block\n%%\n\nend");
+	assert.deepEqual(kinds(blocks), ["paragraph", "image", "embed", "image", "quote", "paragraph"]);
+	const runs = (blocks[0] as Extract<Block, { kind: "paragraph" }>).runs;
+	assert.deepEqual(runs.find((run) => run.text === "¥90,000"), { text: "¥90,000", mark: "yellow" });
+	assert.deepEqual(runs.find((run) => run.text === "plain"), { text: "plain", mark: "default" });
+	assert.deepEqual(runs.find((run) => run.wiki === "Kyoto plan"), { text: "the plan", wiki: "Kyoto plan" });
+	assert.ok(!wordsOf([blocks[0]!]).includes("not shown"));
+	assert.deepEqual(blocks[1], { kind: "image", url: "kinkaku.jpg", alt: "Kinkaku-ji", width: 240 });
+	assert.deepEqual(blocks[2], { kind: "embed", target: "itinerary.pdf" });
+	assert.deepEqual(blocks[3], { kind: "image", url: "map.png", alt: "map.png", width: 300 });
+	const callout = blocks[4] as Extract<Block, { kind: "quote" }>;
+	assert.deepEqual([callout.alert, callout.title, wordsOf(callout.blocks)], ["cyan", "Go early", "the gates are empty"]);
+	assert.equal(wordsOf([blocks[5]!]), "end");
+});
+
+test("ours on top: coloured words and an agent's suggestions with their reason", () => {
+	const [p] = parseMarkdown("It is [not flexible]{.red}, ask about {~~Arashiyama~>Ohara~~}{>>quieter in November<<}, {++really ++}and {--very --}soon.");
+	const runs = (p as Extract<Block, { kind: "paragraph" }>).runs;
+	assert.deepEqual(runs.find((run) => run.colour), { text: "not flexible", colour: "red" });
+	assert.deepEqual(runs.filter((run) => run.reason), [{ text: "Arashiyama", removed: true, reason: "quieter in November" }, { text: "Ohara", added: true, reason: "quieter in November" }]);
+	assert.deepEqual(runs.find((run) => run.text === "really "), { text: "really ", added: true });
+	assert.deepEqual(runs.find((run) => run.text === "very "), { text: "very ", removed: true });
+	assert.equal(wordsOf([p!]).includes("{"), false);
+});
+
+test("a card goes to Obsidian without its colours and with open suggestions as the words they would replace", async () => {
+	const { toObsidian } = await import("./card-syntax.ts");
+	assert.equal(toObsidian("It is [not flexible]{.red}, ask about {~~Arashiyama~>Ohara~~}{>>quieter<<} {++new ++}and {--old --}==🟡x=="), "It is not flexible, ask about Arashiyama %%quieter%% and old ==🟡x==");
 });

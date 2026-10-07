@@ -467,7 +467,7 @@ let ITEM_WASH = "";
 	}), 3000);
 	say("double-clicking a note opens an editor exactly on it, with no handles over it", !!fit && fit.dx < 2 && fit.dy < 2 && fit.dw < 2 && fit.handles === 0, JSON.stringify(fit));
 	// The editor takes the caret a frame after it opens.
-	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 2000);
+	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 2000);
 	await page.keyboard.press("End");
 	await page.keyboard.type(" and more");
 	// A double-click inside the editor picks a word; it is not a double-click on the canvas.
@@ -496,7 +496,7 @@ let ITEM_WASH = "";
 	await page.keyboard.press("c");
 	await page.mouse.click(at.x, at.y);
 	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.markdown"));
-	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 3000);
+	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
 	const height = () => page.evaluate((id) => window.__decksPenBox?.(id)?.height ?? 0, card?.id);
 	const before = await until(height, 3000);
 	await page.keyboard.type("# A heading\n\nA paragraph long enough to wrap onto a second and then a third line of the card\n\n- a point\n- another");

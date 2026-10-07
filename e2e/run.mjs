@@ -157,6 +157,8 @@ const CHECKS = [
 	{ file: "pen-stage.mjs", needsAgent: false },
 	/* The stage is not a scroll container: a tall card opened for typing used to slide it off screen. */
 	{ file: "stage-scroll.mjs", needsAgent: false },
+	/* A card typed into as it reads: suggestions, the style bar, pieces that drag, untouched blocks kept. */
+	{ file: "card-editor.mjs", needsAgent: false },
 	/*
 	 * The stage's gestures against a design tool's and a notes app's: tools and a marquee in browse
 	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.

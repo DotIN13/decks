@@ -41,6 +41,7 @@ import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, p
 import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
+import { CardEditor } from "./pen/CardEditor.tsx";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -4335,11 +4336,47 @@ export function Stage(props: {
 					{(open) => {
 						const look = open.style;
 						const box = () => penTextBox() ?? open.box;
+						const cancel = () => {
+							const open = penText();
+							setPenText(undefined);
+							unmuteNow();
+							dropTyped();
+							if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
+						};
+						// A card is typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words.
+						if (look.markdown)
+							return (
+								<CardEditor
+									class="pen-text"
+									value={open.value}
+									base={props.pen?.base ?? ""}
+									zoom={props.camera.zoom}
+									style={{
+										left: `${box().x}px`,
+										top: `${box().y}px`,
+										width: `${box().w}px`,
+										"min-height": `${box().h}px`,
+										padding: `${look.pad}px`,
+										"font-family": look.font,
+										"font-size": `${look.size}px`,
+										"--card-size": `${look.size}px`,
+										"font-weight": String(look.weight),
+										"letter-spacing": `${look.spacing}px`,
+										"line-height": look.line === undefined ? "1.5" : String(look.line),
+										color: look.ink,
+										background: look.paper ?? "transparent",
+										"border-radius": `${NOTE_RADIUS}px`,
+										"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
+									}}
+									onInput={(value) => previewTyped(open.id, value)}
+									onCommit={commitPenText}
+									onCancel={cancel}
+								/>
+							);
 						return (
 							<textarea
 								class="pen-text"
 								data-grows={look.grows}
-								placeholder={look.markdown ? "# A heading\n\nWords, **bold**, *italic*, `code`\n- a list\n[a link](https://…)" : undefined}
 								spellcheck={false}
 								style={{
 									left: `${box().x}px`,
@@ -4369,11 +4406,7 @@ export function Stage(props: {
 								onKeyDown={(event) => {
 									if (event.key === "Escape") {
 										event.preventDefault();
-										const open = penText();
-										setPenText(undefined);
-										unmuteNow();
-										dropTyped();
-										if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
+										cancel();
 									} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 										event.preventDefault();
 										event.currentTarget.blur();

@@ -190,7 +190,7 @@ if (spot) {
 	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "note"));
 	cardId = card?.id;
 	say("C then a click makes a card: a note marked as markdown", card?.metadata?.type === "decks.markdown", JSON.stringify(card));
-	const typing = await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")));
+	const typing = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")));
 	say("…and it opens for typing", !!typing);
 	await page.keyboard.type("## Plan\n\n- **one**\n- two");
 	await page.keyboard.press("Control+Enter");

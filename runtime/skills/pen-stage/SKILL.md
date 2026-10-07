@@ -118,14 +118,28 @@ box you give it. A text given a box with a width is switched to `"fixed-width"` 
 text at 18 or larger: the stage is read zoomed out.
 
 **Cards.** A card is the drawing's way to say something with structure: a heading, a few points,
-a table, a link. Its words are **GitHub-flavoured markdown**, drawn the way GitHub draws it:
-headings `#` to `######`, lists (nested, numbered, `- [ ]` / `- [x]` tasks), `>` quotes and GitHub's
-alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`), fenced code with its
-language coloured (` ```ts `), tables with `:--:` alignment, `---` rules, images (`![alt](url)`, a
-path beside the stage file or a web address), footnotes (`[^1]` and `[^1]: …`), and inside a line
-`**bold**`, `*italic*`, `~~struck~~`, `` `code` ``, `[words](url)`, bare `https://` links and
-`:emoji:` shortcodes. Raw HTML shows the words inside it. A person follows a card's link with a
-click. Decks draws it; pen.dev, which has no rich text, opens the same note with the markdown as typed.
+a table, a link. Its words are **Obsidian's markdown**, so a card opens as it is in Obsidian:
+headings `#` to `######`, lists (nested, numbered, `- [ ]` / `- [x]` tasks), `>` quotes, callouts
+(`> [!note] A title`, and Obsidian's other types: `tip`, `warning`, `danger`, `example`, `quote`…),
+fenced code with its language coloured (` ```ts `), tables with `:--:` alignment, `---` rules,
+footnotes (`[^1]` and `[^1]: …`), and inside a line `**bold**`, `*italic*`, `~~struck~~`,
+`` `code` ``, `==highlighted==` (or in a colour: `==🔴…==` `==🟠…==` `==🟡…==` `==🟢…==` `==🔵…==`
+`==🟣…==`), `[words](url)`, `[[a note]]`, bare `https://` links and `:emoji:` shortcodes. A picture is
+`![alt](url)` or `![alt|240](url)` for its width (a path beside the stage file or a web address); a
+file shown where it sits is `![[name.pdf]]` on its own line. `%%hidden%%` is a comment nobody sees
+on the canvas.
+
+Two things Obsidian has no word for are ours; Obsidian shows them as the words typed:
+
+- **Coloured words**: `[not flexible]{.red}`, in `red`, `orange`, `yellow`, `green`, `blue` or `purple`.
+- **Suggestions**, in CriticMarkup. To propose a change to a card the person wrote, write it as a
+  suggestion rather than overwriting their words: `{~~old words~>new words~~}` to replace,
+  `{++added++}` to add, `{--removed--}` to take out, each followed by `{>>why<<}` if there is a
+  reason. The card draws it struck through and in blue, and the person accepts or rejects it with
+  ✓ or ✕ when they open the card. Your own card you can simply edit.
+
+A person follows a card's link with a click, and types into a card as it reads. Decks draws it;
+pen.dev, which has no rich text, opens the same note with the markdown as typed.
 
 ```ts
 { op: "insert", node: { type: "note", id: "plan", metadata: { type: "decks.markdown" },

@@ -1325,6 +1325,318 @@
 	.world > .pen-text[data-grows="wide"] {
 	white-space: pre;
 }
+	/*
+	 * A card typed into as it reads (`pen/CardEditor.tsx`): the canvas's markdown look
+	 * (`pen/markdown-layout.ts`) in CSS, so the words barely move when it opens. Sizes are in ems of the
+	 * card's font size, as there. Its style bar and the ghost of a dragged piece stand outside its box.
+	 */
+	.world > .pen-card-editor {
+	overflow: visible;
+	white-space: normal;
+	cursor: text;
+}
+	.pen-card-editor .pce-body {
+	outline: none;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	min-height: 1.5em;
+}
+	.pen-card-editor .pce-body > * {
+	margin: 0 0 var(--card-size, 1em);
+}
+	.pen-card-editor .pce-body > :last-child {
+	margin-bottom: 0;
+}
+	.pen-card-editor .pce-body > * + :is(h1, h2, h3, h4, h5, h6) {
+	margin-top: calc(var(--card-size, 1em) * 0.25);
+}
+	.pen-card-editor :is(h1, h2, h3, h4, h5, h6) {
+	font-weight: 600;
+	line-height: 1.3;
+}
+	.pen-card-editor h1 { font-size: 1.6em; }
+	.pen-card-editor h2 { font-size: 1.3em; }
+	.pen-card-editor h3 { font-size: 1.12em; }
+	.pen-card-editor h4 { font-size: 1em; }
+	.pen-card-editor h5 { font-size: 0.9em; color: var(--muted); }
+	.pen-card-editor h6 { font-size: 0.85em; color: var(--muted); }
+	.pen-card-editor :is(ul, ol) {
+	padding-left: 1.6em;
+	list-style: disc outside;
+}
+	.pen-card-editor ol { list-style-type: decimal; }
+	.pen-card-editor :is(ul, ol) ul { list-style-type: circle; }
+	.pen-card-editor li::marker { color: var(--muted); }
+	.pen-card-editor li + li { margin-top: 0.2em; }
+	.pen-card-editor li > :is(ul, ol, p) {
+	margin: 0;
+}
+	.pen-card-editor ul[data-loose] > li + li,
+	.pen-card-editor ol[data-loose] > li + li {
+	margin-top: 1em;
+}
+	.pen-card-editor li:has(> .pce-check) {
+	list-style: none;
+	margin-left: -1.3em;
+}
+	.pen-card-editor .pce-check {
+	display: inline-block;
+	width: 0.85em;
+	height: 0.85em;
+	margin-right: 0.45em;
+	vertical-align: -0.08em;
+	border: 1px solid var(--line-strong);
+	border-radius: 0.21em;
+	cursor: pointer;
+}
+	.pen-card-editor .pce-check[data-on] {
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+}
+	.pen-card-editor blockquote {
+	padding-left: calc(2px + 0.9em);
+	border-left: 2px solid var(--line-strong);
+	color: var(--muted);
+}
+	.pen-card-editor blockquote > p { margin: 0; }
+	.pen-card-editor blockquote > p + p { margin-top: 1em; }
+	.pen-card-editor blockquote[data-callout] {
+	--callout: #3b5cf6;
+	padding-block: 0.4em;
+	color: inherit;
+	border-left-color: var(--callout);
+}
+	.pen-card-editor blockquote[data-tone="cyan"] { --callout: #0e8a9e; }
+	.pen-card-editor blockquote[data-tone="green"] { --callout: #2a9d52; }
+	.pen-card-editor blockquote[data-tone="orange"] { --callout: #c26a12; }
+	.pen-card-editor blockquote[data-tone="red"] { --callout: #d92e3c; }
+	.pen-card-editor blockquote[data-tone="purple"] { --callout: #7c4ddb; }
+	.pen-card-editor blockquote[data-tone="gray"] { --callout: #6b6b6b; }
+	.pen-card-editor .pce-chead {
+	font-weight: 600;
+	color: var(--callout);
+	margin-bottom: 0.3em;
+}
+	.pen-card-editor code {
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	background: var(--line);
+	border-radius: 3px;
+	padding: 0 0.2em;
+}
+	.pen-card-editor pre.pce-code {
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	background: var(--bg-deep);
+	border-radius: 8px;
+	padding: 0.85em;
+	white-space: pre-wrap;
+}
+	.pen-card-editor a[data-href] {
+	color: var(--color-accent);
+	text-decoration: underline;
+	text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+	.pen-card-editor mark { background: #facc1573; color: inherit; border-radius: 2px; }
+	.pen-card-editor mark[data-c="red"] { background: #f8717159; }
+	.pen-card-editor mark[data-c="orange"] { background: #fb923c59; }
+	.pen-card-editor mark[data-c="green"] { background: #4ade8059; }
+	.pen-card-editor mark[data-c="blue"] { background: #38bdf859; }
+	.pen-card-editor mark[data-c="purple"] { background: #c084fc59; }
+	.pen-card-editor [data-fg="red"] { color: #d92e3c; }
+	.pen-card-editor [data-fg="orange"] { color: #c2410c; }
+	.pen-card-editor [data-fg="yellow"] { color: #a16207; }
+	.pen-card-editor [data-fg="green"] { color: #15803d; }
+	.pen-card-editor [data-fg="blue"] { color: #2563eb; }
+	.pen-card-editor [data-fg="purple"] { color: #7c3aed; }
+	/* The same colours as the canvas draws them in the dark (`pen/markdown-layout.ts`). */
+	[data-color-scheme="dark"] .pen-card-editor mark { background: #facc1547; }
+	[data-color-scheme="dark"] .pen-card-editor mark[data-c="red"] { background: #f871714d; }
+	[data-color-scheme="dark"] .pen-card-editor mark[data-c="orange"] { background: #fb923c4d; }
+	[data-color-scheme="dark"] .pen-card-editor mark[data-c="green"] { background: #4ade804d; }
+	[data-color-scheme="dark"] .pen-card-editor mark[data-c="blue"] { background: #38bdf84d; }
+	[data-color-scheme="dark"] .pen-card-editor mark[data-c="purple"] { background: #c084fc4d; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="red"] { color: #f06a74; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="orange"] { color: #fb923c; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="yellow"] { color: #facc15; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="green"] { color: #4ade80; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="blue"] { color: #60a5fa; }
+	[data-color-scheme="dark"] .pen-card-editor [data-fg="purple"] { color: #c084fc; }
+	[data-color-scheme="dark"] .pen-card-editor .pce-sug del { color: #f06a74; }
+	[data-color-scheme="dark"] .pen-card-editor .pce-sug ins { color: #7aa2ff; background: #7aa2ff26; }
+	/* What the editor keeps as markdown, and shows rather than types into. */
+	.pen-card-editor .pce-atom {
+	color: var(--muted);
+}
+	.pen-card-editor .pce-faint {
+	color: var(--faint);
+	font-size: 0.85em;
+}
+	.pen-card-editor div.pce-raw,
+	.pen-card-editor pre.pce-rawedit {
+	display: block;
+	font-family: var(--font-mono);
+	font-size: 0.8em;
+	white-space: pre-wrap;
+	background: var(--bg-deep);
+	border-radius: 8px;
+	padding: 0.6em 0.75em;
+	cursor: default;
+}
+	.pen-card-editor pre.pce-rawedit {
+	color: var(--fg);
+	cursor: text;
+	outline: 1px dashed var(--line-strong);
+}
+	.pen-card-editor .pce-rule {
+	height: 1px;
+	background: var(--line);
+	margin-block: 0.5em 1em;
+}
+	/* An agent's suggestion: what it adds in blue, what it takes out struck through in red. */
+	.pen-card-editor .pce-sug del { color: #c0262d; text-decoration: line-through; }
+	.pen-card-editor .pce-sug ins {
+	color: #2563eb;
+	text-decoration: underline;
+	background: #2563eb1f;
+}
+	.pen-card-editor .pce-sug button {
+	font: 600 0.75em var(--font-sans, inherit);
+	width: 1.5em;
+	height: 1.5em;
+	margin-left: 0.2em;
+	padding: 0;
+	vertical-align: 0.1em;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	background: var(--panel);
+	color: var(--fg);
+	cursor: pointer;
+}
+	.pen-card-editor .pce-why { font-size: 0.8em; margin-left: 0.15em; }
+	/* Pieces: a picture, a file, a [[link]]. Whole-line ones are lines of their own. */
+	.pen-card-editor .pce-piece {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	padding: 0.1em 0.45em;
+	border: 1px solid var(--line-strong);
+	border-radius: 6px;
+	cursor: grab;
+	user-select: none;
+	-webkit-user-select: none;
+	touch-action: none;
+	font-size: 0.9em;
+	white-space: nowrap;
+	vertical-align: baseline;
+}
+	/* A [[link]] reads as the canvas draws it, a link; it is still a piece that drags. */
+	.pen-card-editor .pce-piece[data-kind="wiki"] {
+	padding: 0;
+	border: none;
+	font-size: 1em;
+	color: var(--color-accent);
+	text-decoration: underline;
+	text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+	.pen-card-editor .pce-piece[data-kind="wiki"] > .pce-ic { display: none; }
+	.pen-card-editor .pce-piece.pce-block {
+	display: flex;
+	width: fit-content;
+	max-width: 100%;
+	padding: 0.6em 0.75em;
+	background: var(--bg-deep);
+	border-color: transparent;
+	border-radius: 8px;
+}
+	.pen-card-editor .pce-piece[data-kind="img"] {
+	flex-direction: column;
+	align-items: stretch;
+	padding: 0;
+	background: none;
+	white-space: normal;
+}
+	.pen-card-editor .pce-piece[data-kind="img"] img {
+	display: block;
+	width: 100%;
+	border-radius: 6px;
+}
+	.pen-card-editor .pce-piece[data-kind="img"]:has(img) > span { display: none; }
+	/* A picture not here, or not reachable: its words where it will be, as the canvas shows it. */
+	.pen-card-editor .pce-piece[data-kind="img"]:not(:has(img)) {
+	width: 100% !important;
+	min-height: 3em;
+	justify-content: center;
+	align-items: center;
+	background: var(--bg-deep);
+	color: var(--muted);
+	font-size: 0.875em;
+}
+	.pen-card-editor .pce-piece[data-kind="img"]:not(:has(img)) > span::before { content: "🖼 "; }
+	.pen-card-editor .pce-piece.pce-dragging { opacity: 0.3; }
+	.pen-card-editor .pce-ghost {
+	position: absolute;
+	z-index: 5;
+	pointer-events: none;
+	margin: 0;
+	max-width: 190px;
+	opacity: 0.9;
+	background: var(--panel);
+	box-shadow: 0 10px 28px rgb(0 0 0 / 22%);
+	rotate: 2deg;
+}
+	.pen-card-editor :is(.pce-caret, .pce-line) {
+	position: absolute;
+	display: none;
+	z-index: 4;
+	pointer-events: none;
+	background: var(--color-accent);
+	border-radius: 2px;
+}
+	/* The style bar, at the screen's size whatever the zoom (`CardEditor.tsx` scales it back). */
+	.pen-card-editor .pce-bar {
+	position: absolute;
+	display: none;
+	z-index: 6;
+	gap: 2px;
+	padding: 4px;
+	transform-origin: 0 0;
+	background: var(--fg);
+	border-radius: 9px;
+	box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+	font: 15px/1 var(--font-sans, system-ui);
+	white-space: nowrap;
+}
+	.pen-card-editor .pce-bar button {
+	all: unset;
+	box-sizing: border-box;
+	min-width: 30px;
+	height: 30px;
+	padding: 0 6px;
+	border-radius: 6px;
+	color: var(--bg);
+	text-align: center;
+	line-height: 30px;
+	cursor: pointer;
+}
+	.pen-card-editor .pce-bar button:hover { background: rgb(255 255 255 / 16%); }
+	.pen-card-editor .pce-bar .pce-mono { font-family: var(--font-mono); font-size: 13px; }
+	.pen-card-editor .pce-bar .pce-sep { width: 1px; margin: 4px 3px; background: rgb(255 255 255 / 25%); }
+	.pen-card-editor .pce-bar .pce-sw {
+	min-width: 22px;
+	width: 22px;
+	height: 22px;
+	margin: 4px 2px;
+	padding: 0;
+	border-radius: 50%;
+	border: 2px solid rgb(255 255 255 / 50%);
+}
+	.pen-card-editor .pce-bar .pce-sw[data-hl="yellow"] { background: #facc15; }
+	.pen-card-editor .pce-bar .pce-sw[data-hl="green"] { background: #4ade80; }
+	.pen-card-editor .pce-bar .pce-sw[data-hl="blue"] { background: #38bdf8; }
+	.pen-card-editor .pce-bar .pce-fg { font-weight: 700; }
+	.pen-card-editor .pce-bar .pce-fg[data-fg="red"] { color: #f87171; }
+	.pen-card-editor .pce-bar .pce-fg[data-fg="blue"] { color: #60a5fa; }
 	.board-node .placeholder {
 	display: flex;
 	align-items: center;

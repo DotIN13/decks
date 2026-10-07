@@ -1,17 +1,20 @@
-import { Lexer, type Token, type Tokens } from "marked";
+import type { Token, Tokens } from "marked";
+import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
 
 /**
- * The markdown a card on the stage is written in, read the way GitHub reads it.
+ * The markdown a card on the stage is written in: Obsidian's, with coloured words and an agent's
+ * suggestions on top (`card-syntax.ts` says what each adds).
  *
  * pen has no rich text: a note's `content` is a plain string. A card is a note whose metadata says
- * `{ "type": "decks.markdown" }`, and Decks reads its words as GitHub-flavoured markdown; pen.dev,
+ * `{ "type": "decks.markdown" }`, and Decks reads its words as Obsidian reads them; pen.dev,
  * which knows nothing of the mark, shows the same words as they were typed.
  *
  * `marked`'s lexer does the reading — CommonMark and GFM: tables, task lists, strikethrough,
  * autolinks, reference links, nested blocks — and this file turns its tokens into the handful of
- * blocks and styled runs the canvas lays out (`markdown-layout.ts`). What GitHub adds on top of
- * GFM is done here: footnotes, the `> [!NOTE]` alerts and `:emoji:` shortcodes. Raw HTML is shown
- * as the words inside it, with `<br>` as a break.
+ * blocks and styled runs the canvas lays out (`markdown-layout.ts`). Obsidian's own inline syntax
+ * and ours are `marked` extensions (`card-syntax.ts`); footnotes, callouts, embeds on a line of their
+ * own and `:emoji:` shortcodes are done here. Raw HTML is shown as the words inside it, with `<br>`
+ * as a break.
  */
 
 export interface Run {
@@ -25,18 +28,31 @@ export interface Run {
 	/** A footnote's number, set small. */
 	sup?: boolean;
 	/** An image in a line, shown by its words. */
-	image?: { url: string; alt: string };
+	image?: { url: string; alt: string; width?: number };
+	/** `==highlighted==`: "default" for Obsidian's own colour, or one of its six. */
+	mark?: Colour | "default";
+	/** `[coloured]{.red}` words. */
+	colour?: Colour;
+	/** A `[[link]]` to a note: its target. Drawn as a link, but it goes nowhere on the canvas. */
+	wiki?: string;
+	/** Words an agent suggests adding, or taking out (CriticMarkup), and the reason it gave. */
+	added?: true;
+	removed?: true;
+	reason?: string;
 }
 
-export type Alert = "note" | "tip" | "important" | "warning" | "caution";
+/** A callout's colour (`CALLOUTS`): Obsidian folds its two dozen types onto these. */
+export type Alert = "blue" | "cyan" | "green" | "orange" | "red" | "purple" | "gray";
 export type Align = "left" | "center" | "right" | null;
 
 export type Block =
 	| { kind: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; runs: Run[] }
 	| { kind: "paragraph"; runs: Run[] }
-	| { kind: "image"; url: string; alt: string }
+	| { kind: "image"; url: string; alt: string; width?: number }
+	/** `![[file]]` on a line of its own: a file shown where it sits. */
+	| { kind: "embed"; target: string }
 	| { kind: "list"; ordered: boolean; start: number; loose: boolean; items: Array<{ checked?: boolean; blocks: Block[] }> }
-	| { kind: "quote"; alert?: Alert; blocks: Block[] }
+	| { kind: "quote"; alert?: Alert; title?: string; blocks: Block[] }
 	| { kind: "code"; lang: string; text: string }
 	| { kind: "table"; align: Align[]; header: Run[][]; rows: Run[][][] }
 	| { kind: "rule" }
@@ -65,12 +81,12 @@ const emojify = (text: string) => text.replace(/:([a-z0-9_+-]+):/g, (whole, name
 export function parseMarkdown(source: string): Block[] {
 	const { body, notes } = footnotesOf(source.replace(/\r\n?/g, "\n"));
 	const numbers = new Map<string, number>();
-	const tokens = new Lexer({ gfm: true, breaks: false }).lex(body);
+	const tokens = cardMarked().lexer(body);
 	const blocks = blocksOf(tokens, numbers);
 	// GitHub lists footnotes in the order they are first cited, and leaves out the ones never cited.
 	const items = [...numbers].flatMap(([label, number]) => {
 		const text = notes.get(label);
-		return text === undefined ? [] : [{ number, blocks: blocksOf(new Lexer({ gfm: true }).lex(text), numbers) }];
+		return text === undefined ? [] : [{ number, blocks: blocksOf(cardMarked().lexer(text), numbers) }];
 	});
 	if (items.length) blocks.push({ kind: "footnotes", items });
 	return blocks;
@@ -107,10 +123,14 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 			case "text": {
 				const t = token as Tokens.Paragraph | Tokens.Text;
 				const runs = t.tokens ? runsOf(t.tokens, notes) : textRuns(t.text, {}, notes);
-				// An image on a line of its own is drawn as the picture.
+				// An image or an embed on a line of its own is drawn as the picture, or the file.
 				const only = runs.filter((run) => run.image || run.text.trim());
-				if (only.length === 1 && only[0]!.image) out.push({ kind: "image", url: only[0]!.image.url, alt: only[0]!.image.alt });
-				else if (runs.length) out.push({ kind: "paragraph", runs });
+				const embed = embedOf(t.tokens);
+				if (embed) out.push(embed);
+				else if (only.length === 1 && only[0]!.image) {
+					const { url, alt, width } = only[0]!.image;
+					out.push({ kind: "image", url, alt, ...(width ? { width } : {}) });
+				} else if (runs.some((run) => run.image || run.text.trim())) out.push({ kind: "paragraph", runs });
 				break;
 			}
 			case "list": {
@@ -127,14 +147,17 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 			case "blockquote": {
 				const t = token as Tokens.Blockquote;
 				const inner = blocksOf(t.tokens, notes);
-				// GitHub's alerts: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION].
+				// Obsidian's callouts: a quote whose first line is [!type], maybe folded (+ or -), maybe titled.
+				// GitHub's five alerts are among them.
 				const first = inner[0];
-				const mark = first?.kind === "paragraph" ? /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i.exec(first.runs[0]?.text ?? "") : null;
+				const mark = first?.kind === "paragraph" ? /^\[!([a-z-]+)\][+-]?[ \t]*([^\n]*)\n?/i.exec(first.runs[0]?.text ?? "") : null;
 				if (mark && first?.kind === "paragraph") {
+					const type = mark[1]!.toLowerCase();
 					first.runs[0] = { ...first.runs[0]!, text: first.runs[0]!.text.slice(mark[0].length) };
 					if (!first.runs[0].text) first.runs.shift();
 					if (!first.runs.some((run) => run.text.trim() || run.image)) inner.shift();
-					out.push({ kind: "quote", alert: mark[1]!.toLowerCase() as Alert, blocks: inner });
+					const title = mark[2]!.trim() || type.charAt(0).toUpperCase() + type.slice(1);
+					out.push({ kind: "quote", alert: (CALLOUTS[type] ?? "blue") as Alert, title, blocks: inner });
 				} else out.push({ kind: "quote", blocks: inner });
 				break;
 			}
@@ -151,6 +174,8 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 			case "hr":
 				out.push({ kind: "rule" });
 				break;
+			case "hidden":
+				break; // %% a hidden comment %%
 			case "html": {
 				// Raw HTML is shown as the words in it, a <br> as a break and a block tag as a new paragraph.
 				const text = decodeEntities(token.raw.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d|tr|summary|details)>/gi, "\n").replace(/<[^>]+>/g, "")).trim();
@@ -214,9 +239,40 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 			}
 			case "image": {
 				const t = token as Tokens.Image;
-				out.push({ text: t.text || "image", ...style, image: { url: t.href, alt: t.text } });
+				const { alt, width } = sizedAlt(t.text);
+				out.push({ text: alt || "image", ...style, image: { url: t.href, alt, ...(width ? { width } : {}) } });
 				break;
 			}
+			case "highlight": {
+				const t = token as HighlightToken;
+				out.push(...runsOf(t.tokens as Token[], notes, { ...style, mark: t.colour ?? "default" }));
+				break;
+			}
+			case "colour": {
+				const t = token as ColourToken;
+				out.push(...runsOf(t.tokens as Token[], notes, { ...style, colour: t.colour }));
+				break;
+			}
+			case "wiki": {
+				const t = token as WikiToken;
+				out.push(t.embed ? { text: `📄 ${t.alias ?? t.target}`, ...style } : { text: t.alias ?? t.target, ...style, wiki: t.target });
+				break;
+			}
+			case "critic": {
+				const t = token as CriticToken;
+				if (t.op === "comment") {
+					// The reason belongs to the suggestion just before it.
+					const last = out.at(-1);
+					if (last && (last.added || last.removed)) for (let i = out.length - 1; i >= 0 && (out[i]!.added || out[i]!.removed); i--) out[i]!.reason = t.new;
+				} else if (t.op === "highlight") out.push(...textRuns(t.old, { ...style, mark: "default" }, notes));
+				else {
+					if (t.old) out.push(...textRuns(t.old, { ...style, removed: true }, notes));
+					if (t.new) out.push(...textRuns(t.new, { ...style, added: true }, notes));
+				}
+				break;
+			}
+			case "hidden":
+				break;
 			case "html": {
 				const raw = token.raw;
 				if (/^<br\s*\/?>$/i.test(raw)) out.push({ text: "\n", ...style });
@@ -237,7 +293,18 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 	return merged;
 }
 
-const sameStyle = (a: Run, b: Run) => !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code && !!a.sup === !!b.sup && a.link === b.link;
+const sameStyle = (a: Run, b: Run) =>
+	!!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code && !!a.sup === !!b.sup && a.link === b.link &&
+	a.mark === b.mark && a.colour === b.colour && a.wiki === b.wiki && !!a.added === !!b.added && !!a.removed === !!b.removed && a.reason === b.reason;
+
+/** `![[file]]`, alone on its line: the file, or, for a picture, the picture at the width it gives. */
+function embedOf(tokens: readonly Token[] | undefined): Block | undefined {
+	const real = (tokens ?? []).filter((token) => !(token.type === "text" && !token.raw.trim()));
+	const only = real.length === 1 && real[0]!.type === "wiki" ? (real[0] as WikiToken) : undefined;
+	if (!only?.embed) return undefined;
+	if (/\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(only.target)) return { kind: "image", url: only.target, alt: only.alias ?? only.target, ...(only.width ? { width: only.width } : {}) };
+	return { kind: "embed", target: only.target };
+}
 
 /** Every word a card will draw, for fetching the fonts it needs before it is laid out. */
 export function wordsOf(blocks: readonly Block[]): string {
@@ -250,6 +317,8 @@ export function wordsOf(blocks: readonly Block[]): string {
 					return runs(block.runs);
 				case "image":
 					return block.alt;
+				case "embed":
+					return `📄 ${block.target}`;
 				case "list":
 					return block.items.map((item) => wordsOf(item.blocks)).join("\n");
 				case "quote":
