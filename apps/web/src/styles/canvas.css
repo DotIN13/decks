@@ -1628,7 +1628,7 @@
 }
 	/*
 	 * The card's toolbar (`CardEditor.tsx`): a quiet bar docked over the open card, at the screen's
-	 * size whatever the zoom, one row of line icons that scrolls sideways on a narrow screen. The
+	 * size whatever the zoom, two rows of line icons that scroll sideways on a narrow screen. The
 	 * document editor's look: the app's panel, a hairline, one button style, a pressed state in the
 	 * accent's tint, menus that drop below their button.
 	 */
@@ -1642,8 +1642,9 @@
 }
 	.pen-card-editor .pce-tools {
 	display: flex;
-	align-items: center;
-	gap: 2px;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
 	width: max-content;
 	max-width: calc(100vw - 16px);
 	overflow-x: auto;
@@ -1655,6 +1656,7 @@
 	box-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 6px 18px rgb(0 0 0 / 8%);
 }
 	.pen-card-editor .pce-tools::-webkit-scrollbar { display: none; }
+	.pen-card-editor .pce-row { display: flex; align-items: center; gap: 2px; }
 	.pen-card-editor .pce-bar button {
 	all: unset;
 	box-sizing: border-box;

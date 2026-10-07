@@ -1273,40 +1273,44 @@ export function CardEditor(props: CardEditorProps) {
 			/>
 			<div ref={bar} class="pce-bar" onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={style}>
 				<div ref={tools} class="pce-tools" onScroll={closeMenus}>
-					<button type="button" class="pce-pick pce-pick-block" data-menu="block" title="What the block is">
-						<span data-label="block">Body text</span>
-						<ChevronDown size={16} />
-					</button>
-					<button type="button" class="pce-pick pce-pick-font" data-menu="font" title="Font">
-						<span data-label="font">Inter</span>
-						<ChevronDown size={16} />
-					</button>
-					<button type="button" class="pce-pick pce-pick-size" data-menu="size" title="Size">
-						<span data-label="size">Normal</span>
-						<ChevronDown size={16} />
-					</button>
-					<span class="pce-sep" />
-					<button type="button" class="pce-icon" data-cmd="bold" title="Bold (⌘B)"><Bold size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="italic" title="Italic (⌘I)"><Italic size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="underline" title="Underline (⌘U)"><Underline size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="strikeThrough" title="Strike (⌘⇧X)"><Strikethrough size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="code" title="Code (⌘E)"><Code size={18} /></button>
-					<button type="button" class="pce-icon" data-menu="hl" title="Highlight"><Highlighter size={18} /></button>
-					<button type="button" class="pce-icon" data-menu="fg" title="Text colour"><Baseline size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="link" title="Link"><Link size={18} /></button>
-					<span class="pce-sep" />
-					<button type="button" class="pce-icon" data-block-button="ul" title="Bulleted list"><List size={18} /></button>
-					<button type="button" class="pce-icon" data-block-button="ol" title="Numbered list"><ListOrdered size={18} /></button>
-					<button type="button" class="pce-icon" data-block-button="check" title="Checklist"><ListChecks size={18} /></button>
-					<button type="button" class="pce-icon" data-block-button="quote" title="Quote"><TextQuote size={18} /></button>
-					<button type="button" class="pce-icon" data-block-button="codeblock" title="Code block"><SquareCode size={18} /></button>
-					<span class="pce-sep" />
-					<button type="button" class="pce-icon" data-insert="table" title="Table"><Table size={18} /></button>
-					<button type="button" class="pce-icon" data-insert="rule" title="Rule"><Minus size={18} /></button>
-					<span class="pce-sep" />
-					<button type="button" class="pce-icon" data-cmd="undo" title="Undo (⌘Z)"><Undo2 size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="redo" title="Redo (⌘⇧Z)"><Redo2 size={18} /></button>
-					<button type="button" class="pce-icon" data-cmd="clear" title="Clear styling"><RemoveFormatting size={18} /></button>
+					{/* Two rows: what the words are set in, and what is done to them. */}
+					<div class="pce-row">
+						<button type="button" class="pce-pick pce-pick-block" data-menu="block" title="What the block is">
+							<span data-label="block">Body text</span>
+							<ChevronDown size={16} />
+						</button>
+						<button type="button" class="pce-pick pce-pick-font" data-menu="font" title="Font">
+							<span data-label="font">Inter</span>
+							<ChevronDown size={16} />
+						</button>
+						<button type="button" class="pce-pick pce-pick-size" data-menu="size" title="Size">
+							<span data-label="size">Normal</span>
+							<ChevronDown size={16} />
+						</button>
+						<span class="pce-sep" />
+						<button type="button" class="pce-icon" data-cmd="undo" title="Undo (⌘Z)"><Undo2 size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="redo" title="Redo (⌘⇧Z)"><Redo2 size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="clear" title="Clear styling"><RemoveFormatting size={18} /></button>
+					</div>
+					<div class="pce-row">
+						<button type="button" class="pce-icon" data-cmd="bold" title="Bold (⌘B)"><Bold size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="italic" title="Italic (⌘I)"><Italic size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="underline" title="Underline (⌘U)"><Underline size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="strikeThrough" title="Strike (⌘⇧X)"><Strikethrough size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="code" title="Code (⌘E)"><Code size={18} /></button>
+						<button type="button" class="pce-icon" data-menu="hl" title="Highlight"><Highlighter size={18} /></button>
+						<button type="button" class="pce-icon" data-menu="fg" title="Text colour"><Baseline size={18} /></button>
+						<button type="button" class="pce-icon" data-cmd="link" title="Link"><Link size={18} /></button>
+						<span class="pce-sep" />
+						<button type="button" class="pce-icon" data-block-button="ul" title="Bulleted list"><List size={18} /></button>
+						<button type="button" class="pce-icon" data-block-button="ol" title="Numbered list"><ListOrdered size={18} /></button>
+						<button type="button" class="pce-icon" data-block-button="check" title="Checklist"><ListChecks size={18} /></button>
+						<button type="button" class="pce-icon" data-block-button="quote" title="Quote"><TextQuote size={18} /></button>
+						<button type="button" class="pce-icon" data-block-button="codeblock" title="Code block"><SquareCode size={18} /></button>
+						<span class="pce-sep" />
+						<button type="button" class="pce-icon" data-insert="table" title="Table"><Table size={18} /></button>
+						<button type="button" class="pce-icon" data-insert="rule" title="Rule"><Minus size={18} /></button>
+					</div>
 				</div>
 				<div class="pce-menu" data-for="block">
 					<For each={BLOCK_MENU}>{([kind, name]) => <button type="button" class={`pce-opt pce-opt-${kind}`} data-block={kind}>{name}</button>}</For>
