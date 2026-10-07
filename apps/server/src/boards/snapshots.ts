@@ -172,6 +172,11 @@ export class Revisions {
 		return (this.order.get(path) ?? []).map((revision) => revision.sha);
 	}
 
+	/** Every version of one path with when it was stored, oldest first: a document's time machine. */
+	entries(path: string): ReadonlyArray<{ sha: string; at: number }> {
+		return (this.order.get(path) ?? []).map((revision) => ({ ...revision }));
+	}
+
 	read(sha: string): string {
 		if (!/^[0-9a-f]{6,64}$/.test(sha)) throw new Error(`Not a revision id: ${sha}`);
 		return readFileSync(join(this.dir, `${sha}.html`), "utf8");

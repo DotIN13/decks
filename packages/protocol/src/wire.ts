@@ -1,6 +1,7 @@
 /** The frames. Everything that changes state is one of these, and nothing else crosses. */
 
 import type { BoardPatch } from "./boards.ts";
+import type { DocChange, DocFormat, DocVersion, Splice } from "./docs.ts";
 import type {
 	AgentChat,
 	AgentKind,
@@ -311,6 +312,19 @@ export type ClientMessage =
 	/** A fresh code another Decks can pair with. Answered with `pairing`. */
 	| { type: "pair.code" }
 	/** Take a token back: that front end can no longer reach this server. */
+	/*
+	 * A document page (`docs.ts`). `client` names the page, so it can tell its own splices from
+	 * everyone else's when `doc.changed` comes back to every browser.
+	 */
+	| { type: "doc.open"; path: string; client: string }
+	| { type: "doc.close"; path: string; client: string }
+	/** Splices made on revision `rev`, at most one batch every 50 ms; `batch` is echoed in the answer. */
+	| { type: "doc.patch"; path: string; client: string; rev: number; batch: string; splices: Splice[] }
+	/** Keep a change made from outside (`accept`), or undo it with the reverse splices. */
+	| { type: "doc.review"; path: string; client: string; change: string; accept: boolean }
+	| { type: "doc.versions"; path: string }
+	/** Put the text back as it was in one kept version, as one edit like any other. */
+	| { type: "doc.restore"; path: string; client: string; sha: string }
 	| { type: "pair.revoke"; id: string };
 
 export type ServerMessage =
@@ -477,5 +491,18 @@ export type ServerMessage =
 	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[] }
 	/** Who is answering, and what it can do: the first frame of every greeting. */
 	| { type: "backend"; backend: BackendInfo }
+	/** A document as it is now, for the page that opened it; `changes` are those still to review. */
+	| { type: "doc.state"; path: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
+	/** To the page that sent `batch`: the revision it made, and which of its splices did not land. */
+	| { type: "doc.patched"; path: string; batch: string; rev: number; refused: number[] }
+	/**
+	 * To every browser: revision `base` became `rev` by these splices, in the server's text. A page
+	 * on `base` applies them; a page on anything else opens the document again. `client` is the page
+	 * that typed them, with the `batch` they came in, absent for a write from outside, which carries
+	 * the `change` to review instead. A page that no longer holds that batch (it opened the document
+	 * again while the batch was on its way) applies it like anyone else's.
+	 */
+	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; client?: string; batch?: string; change?: DocChange; settled?: string }
+	| { type: "doc.versions"; path: string; versions: DocVersion[] }
 	| { type: "error"; text: string };
 

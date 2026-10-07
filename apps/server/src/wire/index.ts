@@ -3,6 +3,7 @@ import { accounts } from "./accounts.ts";
 import { agents } from "./agents.ts";
 import { boards } from "./boards.ts";
 import { deck } from "./deck.ts";
+import { docs } from "./docs.ts";
 import type { Reply, WireContext, WireTable } from "./context.ts";
 import { web } from "./web.ts";
 import { pen } from "./pen.ts";
@@ -30,6 +31,7 @@ const WIRE: WireTable = {
 	...web,
 	...pen,
 	...share,
+	...docs,
 };
 
 /**

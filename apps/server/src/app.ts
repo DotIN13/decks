@@ -31,6 +31,7 @@ import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
+import { DocService } from "./docs/service.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -63,6 +64,8 @@ export class App {
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
+	/** Documents open as pages (`docs/service.ts`). */
+	readonly docs: DocService;
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
 	/** Other Decks front ends allowed to use this server (`share/pairing.ts`). */
@@ -174,6 +177,12 @@ export class App {
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
 		this.pens.watch();
+		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
+		this.docs = new DocService({
+			roots: () => this.deck.roots,
+			revisions: this.boards.revisions,
+			send: (message) => this.send(message),
+		});
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
 		 *
@@ -706,6 +715,7 @@ export class App {
 		this.pens.setDeck(this.deck.path);
 		this.forwards.setDeck(this.deck.path);
 		this.boards.setDeck(this.deck);
+		this.docs.closeAll();
 		this.settings.setDeck(this.deck.path);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
 		// another deck starts again rather than re-pointing what is running.
