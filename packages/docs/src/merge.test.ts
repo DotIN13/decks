@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { transformSplice as transform } from "./index.ts";
+import { applySplice, transformSplice as transform, transformSplices } from "./index.ts";
 import { applySplices, invert, land, spliceDiff } from "./merge.ts";
 
 test("a batch made on the current text lands as it was sent", () => {
@@ -36,21 +36,83 @@ test("each splice of a batch is moved in the text the earlier ones left", () => 
 	assert.equal(landed.text, ">> one!? two three");
 });
 
-test("a short collision is refused; a long one is found by its old text", () => {
+test("typing inside words an agent rewrote is kept, just after the agent's words", () => {
 	const base = "The effect is really quite small in size overall.";
 	const agent = [{ at: 4, before: "effect is really quite small in size overall", text: "effect is small" }];
 	const after = applySplices(base, agent);
-	const short = land(after, [{ at: 4, before: "eff", text: "EFF" }], agent);
-	assert.deepEqual(short.refused, [0]);
-	assert.equal(short.text, after);
-	const long = land("Keep this sentence here. " + after, [{ at: 0, before: "Keep this sentence", text: "Kept" }], undefined);
+	// A key typed inside "really", which the agent's rewrite removed.
+	const at = base.indexOf("really") + 3;
+	const landed = land(after, [{ at, before: "", text: "!" }], agent);
+	assert.deepEqual(landed.refused, []);
+	assert.equal(landed.text, "The effect is small!.");
+});
+
+test("overlapping deletions remove each character once", () => {
+	const base = "abcdefgh";
+	const mine = { at: 2, before: "cde", text: "X" };
+	const theirs = { at: 3, before: "def", text: "Y" };
+	const one = applySplices(applySplices(base, [theirs]), transform(mine, theirs, true));
+	const two = applySplices(applySplices(base, [mine]), transform(theirs, mine, false));
+	assert.equal(one, two);
+	assert.equal(one, "abXYgh");
+});
+
+test("a page's batch made on an old text lands without history by its old words", () => {
+	const text = "Keep this sentence here. The rest.";
+	const long = land(text, [{ at: 0, before: "Keep this sentence", text: "Kept" }], undefined);
 	assert.deepEqual(long.refused, []);
 	assert.ok(long.text.startsWith("Kept here."));
+	const short = land(text, [{ at: 0, before: "Kee", text: "K" }], undefined);
+	assert.deepEqual(short.refused, [0]);
+});
+
+test("any two edits of one text, applied in either order, give the same text", () => {
+	let seed = 7;
+	const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+	const words = ["", "x", "yy", "zzz"];
+	for (let n = 0; n < 20000; n++) {
+		const base = "0123456789".slice(0, 3 + Math.floor(rnd() * 8));
+		const make = () => {
+			const at = Math.floor(rnd() * (base.length + 1));
+			const len = Math.floor(rnd() * Math.min(4, base.length - at + 1));
+			return { at, before: base.slice(at, at + len), text: words[Math.floor(rnd() * 4)]! };
+		};
+		const a = make();
+		const b = make();
+		const first = rnd() < 0.5;
+		const ab = transform(a, b, first).reduce(applySplice, applySplice(base, b));
+		const ba = transform(b, a, !first).reduce(applySplice, applySplice(base, a));
+		assert.equal(ab, ba, `${base} a=${JSON.stringify(a)} b=${JSON.stringify(b)} aFirst=${first}`);
+	}
+});
+
+test("sequences of edits converge the same way", () => {
+	let seed = 11;
+	const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+	for (let n = 0; n < 3000; n++) {
+		const base = "abcdefghijkl";
+		const seq = () => {
+			let text = base;
+			const out = [];
+			for (let k = 0; k < 1 + Math.floor(rnd() * 3); k++) {
+				const at = Math.floor(rnd() * (text.length + 1));
+				const len = Math.floor(rnd() * Math.min(3, text.length - at + 1));
+				const splice = { at, before: text.slice(at, at + len), text: rnd() < 0.5 ? "" : "Q".repeat(1 + Math.floor(rnd() * 2)) };
+				text = applySplice(text, splice);
+				out.push(splice);
+			}
+			return out;
+		};
+		const a = seq();
+		const b = seq();
+		const moved = transformSplices(a, b, true);
+		assert.equal(moved.a.reduce(applySplice, b.reduce(applySplice, base)), moved.b.reduce(applySplice, a.reduce(applySplice, base)));
+	}
 });
 
 test("two insertions at one point keep the page's first", () => {
-	assert.deepEqual(transform({ at: 3, before: "", text: "A" }, { at: 3, before: "", text: "B" }, true), { at: 3, before: "", text: "A" });
-	assert.deepEqual(transform({ at: 3, before: "", text: "B" }, { at: 3, before: "", text: "A" }, false), { at: 4, before: "", text: "B" });
+	assert.deepEqual(transform({ at: 3, before: "", text: "A" }, { at: 3, before: "", text: "B" }, true), [{ at: 3, before: "", text: "A" }]);
+	assert.deepEqual(transform({ at: 3, before: "", text: "B" }, { at: 3, before: "", text: "A" }, false), [{ at: 4, before: "", text: "B" }]);
 });
 
 test("a diff's splices turn one text into the other, and their inverse turns it back", () => {

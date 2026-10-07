@@ -1,4 +1,4 @@
-import { applySplice, transformSplice, type Splice } from "./index.ts";
+import { applySplice, transformSplices, type Splice } from "./index.ts";
 import { diffArrays } from "diff";
 
 /**
@@ -18,9 +18,7 @@ export function applySplices(text: string, splices: readonly Splice[]): string {
 	return out;
 }
 
-const transform = transformSplice;
-
-/** Old text no shorter than this may be looked for elsewhere when its splice collides. */
+/** Old text no shorter than this may be looked for when the history to move a splice was not kept. */
 export const SEARCH_MIN = 8;
 
 /** The occurrence of `needle` nearest to `near`, or -1. */
@@ -44,12 +42,11 @@ export interface Landed {
 /**
  * Land a page's batch, made on a text that has since had `concurrent` applied to it.
  *
- * Each splice is moved past the concurrent ones (`transform`), and the concurrent ones past it,
- * so the next splice of the batch is moved through them in its own text. A splice whose old
- * characters are not where it is moved to — because it collided, or because the history it
- * would need was not kept — is looked for by its old text near where it should be, and refused
- * when that is too short to be sure of or not there. From the first such splice on the map is
- * no longer exact, so the rest of the batch is found the same way.
+ * Each splice is moved past the concurrent ones (`transformSplices`), and they past it, so the
+ * next splice of the batch is moved through them in its own text. Overlaps merge, so with the
+ * history kept nothing is refused. Without it (`concurrent` undefined: the page is older than
+ * the kept log) a splice is looked for by its old text near where it was made, and refused when
+ * that is too short to be sure of, or not there.
  */
 export function land(text: string, batch: readonly Splice[], concurrent: readonly Splice[] | undefined): Landed {
 	let current = text;
@@ -57,48 +54,39 @@ export function land(text: string, batch: readonly Splice[], concurrent: readonl
 	const applied: Splice[] = [];
 	const refused: number[] = [];
 	batch.forEach((splice, index) => {
-		let moved: Splice | undefined = splice;
-		let approx = splice.at;
+		let pieces: Splice[] | undefined;
 		if (others) {
-			const next: Splice[] = [];
-			for (const other of others) {
-				approx = shiftPoint(approx, other);
-				if (!moved) continue;
-				const mine = transform(moved, other, true);
-				const theirs = transform(other, moved, false);
-				if (!mine || !theirs) {
-					moved = undefined;
-					continue;
-				}
-				moved = mine;
-				next.push(theirs);
-			}
-			others = moved ? next : undefined;
-		} else moved = undefined;
-		let at = moved && current.slice(moved.at, moved.at + splice.before.length) === splice.before ? moved.at : -1;
-		if (at === -1 && splice.before.length >= SEARCH_MIN) {
-			at = nearest(current, splice.before, Math.max(0, Math.min(current.length, approx)));
-			// A splice found by search leaves the concurrent list unmapped for the rest of the batch.
-			others = undefined;
+			const moved = transformSplices([splice], others, true);
+			pieces = moved.a;
+			others = moved.b;
+		} else if (splice.before.length >= SEARCH_MIN) {
+			const at = nearest(current, splice.before, Math.min(current.length, splice.at));
+			if (at !== -1) pieces = [{ at, before: splice.before, text: splice.text }];
+		} else if (splice.before.length === 0 && splice.at <= current.length) {
+			// A plain insertion with no history: where it was typed is the best there is.
+			pieces = [splice];
 		}
-		if (at === -1 || at > current.length) {
+		if (!pieces || !pieces.every((piece, i) => matches(applyAll(current, pieces!.slice(0, i)), piece))) {
 			refused.push(index);
 			others = undefined;
 			return;
 		}
-		const landed = { at, before: splice.before, text: splice.text };
-		current = applySplice(current, landed);
-		applied.push(landed);
+		for (const piece of pieces) {
+			current = applySplice(current, piece);
+			applied.push(piece);
+		}
 	});
 	return { text: current, applied, refused };
 }
 
-/** A point moved past one splice, staying before an insertion made exactly at it. */
-function shiftPoint(point: number, splice: Splice): number {
-	if (point <= splice.at) return point;
-	if (point >= splice.at + splice.before.length) return point + splice.text.length - splice.before.length;
-	return splice.at + splice.text.length;
+function matches(text: string, splice: Splice): boolean {
+	return splice.at <= text.length && text.slice(splice.at, splice.at + splice.before.length) === splice.before;
 }
+
+function applyAll(text: string, splices: readonly Splice[]): string {
+	return splices.reduce(applySplice, text);
+}
+
 
 /**
  * The splices that turn `from` into `to`, sequential and in source order.

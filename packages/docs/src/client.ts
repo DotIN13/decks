@@ -1,4 +1,4 @@
-import { applySplice, transformSplice as transform, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "./index.ts";
+import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "./index.ts";
 
 /**
  * `@decks/docs/client`: one page's copy of a document, kept in step with the file through the
@@ -165,28 +165,22 @@ export class DocSync {
 		return clean(path) === clean(this.path);
 	}
 
-	/** Apply others' splices past ours, and move ours past theirs. False on a collision. */
+	/**
+	 * Apply others' splices past ours, and move ours past theirs, by the rule the server landed
+	 * ours by. In flight and waiting are moved one after the other, so each stays its own list.
+	 * False only when what they say they replaced is not in this page's text, which means the two
+	 * have already drifted and the page must start again.
+	 */
 	private take(theirs: readonly Splice[]): boolean {
-		let mine = [...(this.inflight?.splices ?? []), ...this.pending];
+		const flying = transformSplices(theirs, this.inflight?.splices ?? [], false);
+		const waiting = transformSplices(flying.a, this.pending, false);
 		let text = this.text;
-		// Each of theirs is moved past every one of ours in order, as the server moved ours past them.
-		for (const splice of theirs) {
-			let moved: Splice | undefined = splice;
-			const next: Splice[] = [];
-			for (const own of mine) {
-				const a = transform(moved!, own, false);
-				const b = transform(own, moved!, true);
-				if (!a || !b) return false;
-				moved = a;
-				next.push(b);
-			}
-			if (text.slice(moved.at, moved.at + moved.before.length) !== moved.before) return false;
-			text = applySplice(text, moved);
-			mine = next;
+		for (const splice of waiting.a) {
+			if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) return false;
+			text = applySplice(text, splice);
 		}
-		const inflightCount = this.inflight?.splices.length ?? 0;
-		if (this.inflight) this.inflight = { ...this.inflight, splices: mine.slice(0, inflightCount) };
-		this.pending = mine.slice(inflightCount);
+		if (this.inflight) this.inflight = { ...this.inflight, splices: flying.b };
+		this.pending = waiting.b;
 		this.text = text;
 		return true;
 	}

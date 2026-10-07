@@ -47,24 +47,59 @@ export function applySplice(text: string, splice: Splice): string {
 }
 
 /**
- * `a` as it reads after `b`, when both were made on the same text, or `undefined` when they touch
- * the same characters. The one rule both ends land splices by, which is why it lives here: the
- * server moving a page's batch past an agent's write, and the page moving that write past its own
- * unconfirmed typing, must agree to the character or the two texts drift apart.
+ * `a` as it reads after `b`, when both were made on the same text: zero, one or two splices.
  *
- * Two insertions at one point are ordered by `aFirst`; an insertion at the start of a replaced
- * range goes before it, and at its end after it.
+ * The one rule both ends land splices by, which is why it lives here: the server moving a
+ * page's batch past an agent's write, and the page moving that write past its own unconfirmed
+ * typing, must agree to the character or the two texts drift apart.
+ *
+ * **Overlaps merge rather than collide.** Whichever splice starts first (`aFirst` breaks a tie)
+ * puts its new text first. Each removes only the old characters the other did not, and neither
+ * removes the other's new text, so a key typed inside a word an agent just rewrote lands just
+ * after the agent's word instead of being lost. A splice whose old characters straddle the
+ * other's comes back as two: the part before, which carries its new text, and the part after.
  */
-export function transformSplice(a: Splice, b: Splice, aFirst: boolean): Splice | undefined {
+export function transformSplice(a: Splice, b: Splice, aFirst: boolean): Splice[] {
 	const aEnd = a.at + a.before.length;
 	const bEnd = b.at + b.before.length;
-	const shifted = { ...a, at: a.at + b.text.length - b.before.length };
-	const aInserts = a.before.length === 0;
-	const bInserts = b.before.length === 0;
-	if (aInserts && bInserts) return a.at < b.at || (a.at === b.at && aFirst) ? a : shifted;
-	if (aInserts) return a.at <= b.at ? a : a.at >= bEnd ? shifted : undefined;
-	if (bInserts) return b.at <= a.at ? shifted : b.at >= aEnd ? a : undefined;
-	return aEnd <= b.at ? a : a.at >= bEnd ? shifted : undefined;
+	const first = a.at < b.at || (a.at === b.at && aFirst);
+	/** Where a position at or after the end of `b` sits once `b` is applied. */
+	const past = (at: number) => b.at + b.text.length + (at - bEnd);
+	const out: Splice[] = [];
+	if (first) {
+		// Before b: a's own start, its new text, and the old characters left of b.
+		const leftEnd = Math.min(aEnd, b.at);
+		out.push({ at: a.at, before: a.before.slice(0, leftEnd - a.at), text: a.text });
+		// After b: the old characters of a that b did not touch, if a reaches past it.
+		const rightStart = Math.max(a.at, bEnd);
+		if (aEnd > rightStart) {
+			const left = out[0]!;
+			out.push({ at: past(rightStart) + left.text.length - left.before.length, before: a.before.slice(rightStart - a.at), text: "" });
+		}
+	} else {
+		// After b's new text, with whatever of a's old characters lie beyond b.
+		const start = Math.max(a.at, bEnd);
+		out.push({ at: past(start), before: aEnd > start ? a.before.slice(start - a.at) : "", text: a.text });
+	}
+	return out.filter((splice) => splice.before.length > 0 || splice.text.length > 0);
+}
+
+/**
+ * Two sequences of splices made on the same text, each moved past the other: `a` as it reads
+ * after all of `b`, and `b` after all of `a`. Applying `a` then the moved `b`, or `b` then the
+ * moved `a`, gives the same text.
+ */
+export function transformSplices(a: readonly Splice[], b: readonly Splice[], aFirst: boolean): { a: Splice[]; b: Splice[] } {
+	if (a.length === 0 || b.length === 0) return { a: [...a], b: [...b] };
+	if (a.length === 1 && b.length === 1) return { a: transformSplice(a[0]!, b[0]!, aFirst), b: transformSplice(b[0]!, a[0]!, !aFirst) };
+	if (a.length > 1) {
+		const head = transformSplices(a.slice(0, 1), b, aFirst);
+		const rest = transformSplices(a.slice(1), head.b, aFirst);
+		return { a: [...head.a, ...rest.a], b: rest.b };
+	}
+	const head = transformSplices(a, b.slice(0, 1), aFirst);
+	const rest = transformSplices(head.a, b.slice(1), aFirst);
+	return { a: rest.a, b: [...head.b, ...rest.b] };
 }
 
 /**

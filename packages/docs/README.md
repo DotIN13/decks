@@ -5,8 +5,9 @@ other programs keep writing the same files with their own tools.
 
 - **Every keystroke reaches the file.** A page sends splices of the source (`at`, the old
   characters, the new ones) at most every 50 ms; the server writes each batch as it lands.
-- **Nothing is refused for being late, only for colliding.** A splice lands where its old
-  characters still stand, moved past whatever landed since it was made. Page and server move
+- **Nothing is refused for being late, and overlaps merge.** A splice is moved past whatever
+  landed since it was made; where two edits touch the same characters, each removes only what
+  the other did not, and the one that starts first puts its new text first. Page and server move
   splices by one shared rule (`transformSplice`), so they end on the same text.
 - **Other writers come back as changes to review.** A write to the file from outside (an agent's
   Edit, a script, git) is diffed by word into splices, sent to every page as a `DocChange`, and
@@ -71,9 +72,9 @@ business: keep a map from each block to its span of source, and turn a keystroke
 
 ## Limits
 
-- Typing into the very characters another edit just changed re-opens the page from the server's
-  text, dropping its unsent splices (up to about 100 ms of typing).
 - An outside write is credited to `"outside"` unless the host supplies `writer`.
+- A page older than the kept history (200 batches) lands its splices by searching for their old
+  text, and a short one that is not found is refused; the page then resyncs from the server's text.
 - Pending changes live in memory: a server restart forgets which writes were still to review,
   though the versions on both sides of them remain.
 

@@ -33,6 +33,7 @@ import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
 import { DocService } from "@decks/docs/server";
 import { resolveDoc } from "./docs/resolve.ts";
+import { Writers } from "./docs/writers.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -67,6 +68,11 @@ export class App {
 	readonly boards: BoardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
+	/** Which agent's tool call explains a write to a file, for a document's change (`docs/writers.ts`). */
+	private readonly writers = new Writers({
+		name: (agentId) => this.agents.get(agentId)?.who()?.name,
+		cwd: () => this.deck.path,
+	});
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
 	/** Other Decks front ends allowed to use this server (`share/pairing.ts`). */
@@ -183,6 +189,7 @@ export class App {
 			resolve: (path) => resolveDoc(this.deck.roots, path),
 			versions: this.boards.revisions,
 			send: (message) => this.send(message),
+			writer: (file) => this.writers.who(file),
 		});
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
@@ -277,7 +284,10 @@ export class App {
 			this.stage,
 			{
 				port: config.port,
-				act: (agentId, act) => this.acts.act(agentId, act),
+				act: (agentId, act) => {
+					if (act.kind === "tool") this.writers.tool(agentId, act.event);
+					this.acts.act(agentId, act);
+				},
 				defaultKind: config.backend,
 				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
 				/*
