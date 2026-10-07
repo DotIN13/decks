@@ -16,12 +16,12 @@ import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.
  */
 
 /**
- * A card's words, gap and padding. The words are 18 px, set on each block so pen.dev shows them at
+ * A card's words, gap and padding. The words are 16 px, set on each block so pen.dev shows them at
  * that size too; the gap between blocks is one size of them, as between paragraphs within a block, so
  * the card and its editor space the blocks alike.
  */
-export const CARD_FONT = 18;
-export const CARD_GAP = 18;
+export const CARD_FONT = 16;
+export const CARD_GAP = 16;
 export const CARD_PAD = 20;
 export const CARD_WIDTH = 320;
 export const CARD_RADIUS = 12;

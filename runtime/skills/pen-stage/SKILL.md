@@ -96,8 +96,8 @@ no field for: `{ type: "…", … }`).
 | type | what it is | its own fields |
 |---|---|---|
 | `note` | a sticky note | `content`; `fill` for its colour; `width` (240 when left out); height follows the words |
-| `frame` + `metadata: { type: "decks.card" }` | a **card**: white, with an edge, a column of markdown blocks and pictures (see Cards) | `layout: "vertical"`, `gap: 18`, `padding: 20`, `width` (320 reads well), `children`; height follows what it holds |
-| `text` + `metadata: { type: "decks.markdown" }` | one block of a card: its words markdown | `content`, `fontSize: 18`, `textGrowth: "fixed-width"`, `width: "fill_container"` |
+| `frame` + `metadata: { type: "decks.card" }` | a **card**: white, with an edge, a column of markdown blocks and pictures (see Cards) | `layout: "vertical"`, `gap: 16`, `padding: 20`, `width` (320 reads well), `children`; height follows what it holds |
+| `text` + `metadata: { type: "decks.markdown" }` | one block of a card: its words markdown | `content`, `fontSize: 16`, `textGrowth: "fixed-width"`, `width: "fill_container"` |
 | `text` | words on the stage | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
 | `rectangle` | a box | `fill`, `stroke`, `strokeWidth`, `cornerRadius` |
 | `ellipse` | a circle or oval, in its box | `fill`, `stroke`; `innerRadius` 0–1 for a ring; `startAngle`, `sweepAngle` for an arc |
@@ -146,8 +146,8 @@ leaves, and pen.dev opens the card as a column with its pictures in it. Write on
 one text holding several blocks also works, and is split into blocks the first time someone edits it.
 
 ```ts
-const block = (id, content) => ({ type: "text", id, content, fontSize: 18, textGrowth: "fixed-width", width: "fill_container", metadata: { type: "decks.markdown" } });
-{ op: "insert", node: { type: "frame", id: "plan", name: "Next", layout: "vertical", gap: 18, padding: 20, cornerRadius: 12,
+const block = (id, content) => ({ type: "text", id, content, fontSize: 16, textGrowth: "fixed-width", width: "fill_container", metadata: { type: "decks.markdown" } });
+{ op: "insert", node: { type: "frame", id: "plan", name: "Next", layout: "vertical", gap: 16, padding: 20, cornerRadius: 12,
   metadata: { type: "decks.card" }, children: [
     block("plan-h", "## Next"),
     block("plan-l", "- Cut the **pilot** to 20 questions\n- Ask [Verasight](https://verasight.io) for a quote"),
