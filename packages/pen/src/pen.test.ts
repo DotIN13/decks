@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, baseTheme, color, emptyDocument, expand, layout, arrowRoute, arrowShape, arrowStyle, moveArrowEnds, parse, pathBounds, read, reroute, serialize, strokeOf, variable, type PenDocument, type TextStyle } from "./index.ts";
+import { apply, baseTheme, color, emptyDocument, expand, layout, arrowRoute, arrowShape, arrowStyle, fillsOf, moveArrowEnds, parse, parseColor, pathBounds, read, reroute, serialize, strokeOf, toHex, variable, type PenDocument, type TextStyle } from "./index.ts";
 
 /** A fixed-width font, so text boxes are exact: every character is half its size wide. */
 const mono = (text: string, style: TextStyle, maxWidth: number | undefined) => {
@@ -345,4 +345,42 @@ test("a curve is measured where it goes, not out to its control points", () => {
 	// S and T mirror the last control point, so their curve is not measured as a straight line.
 	const smooth = pathBounds("M0 0Q50 100 100 0T200 0")!;
 	assert.ok(Math.abs(smooth.y + 50) < 1e-9 && Math.abs(smooth.h - 100) < 1e-9, JSON.stringify(smooth));
+});
+
+test("a colour is read in any notation somebody is likely to write", () => {
+	/*
+	 * Hex alone is what pen.dev writes, and hex alone was all this read — so a card filled
+	 * "lightblue" drew its default paper with nothing said, which reads as "fill is ignored here".
+	 */
+	assert.equal(toHex(parseColor("#bfdbfe")), "#bfdbfe");
+	assert.equal(toHex(parseColor("#abf")), "#aabbff");
+	assert.equal(toHex(parseColor("#bfdbfeff")), "#bfdbfe");
+	assert.equal(toHex(parseColor("LightBlue")), "#add8e6");
+	assert.equal(toHex(parseColor(" white ")), "#ffffff");
+	assert.equal(toHex(parseColor("rgb(191, 219, 254)")), "#bfdbfe");
+	assert.equal(toHex(parseColor("hsl(210, 100%, 87%)")), "#bddeff");
+	assert.equal(parseColor("rgba(191,219,254,0.5)")?.[3], 0.5);
+	assert.equal(parseColor("hsla(210 100% 87% / 0.4)")?.[3], 0.4);
+	assert.deepEqual(parseColor("transparent"), [0, 0, 0, 0]);
+	// And nothing is read as a colour that is not one, so the note below can be trusted.
+	for (const junk of ["periwinkleish", "", "#12345", "rgb(1, 2)", "url(x.png)", 12]) assert.equal(parseColor(junk), undefined, String(junk));
+});
+
+test("a fill written as solid is pen's own colour fill", () => {
+	// Nobody writes `{ type: "color" }` first time; it is read as that, and stored as that.
+	assert.deepEqual(fillsOf({ type: "solid", color: "#bfdbfe" }), [{ type: "color", color: "#bfdbfe" }]);
+	const theme = baseTheme(emptyDocument(), "light");
+	const { doc } = apply(emptyDocument(), [{ op: "insert", node: { type: "note", id: "a", content: "x", fill: { type: "solid", color: "#bfdbfe" } } }], { theme });
+	assert.deepEqual(doc.children[0]!.fill, { type: "color", color: "#bfdbfe" });
+});
+
+test("a colour nobody can read is said, not drawn as nothing", () => {
+	const theme = baseTheme(emptyDocument(), "light");
+	const bad = apply(emptyDocument(), [{ op: "insert", node: { type: "note", id: "a", content: "x", fill: "periwinkleish" } }], { theme });
+	assert.match(bad.results[0]!.note ?? "", /is not a colour and draws nothing/);
+	const fine = apply(emptyDocument(), [{ op: "insert", node: { type: "note", id: "a", content: "x", fill: "lightblue" } }], { theme });
+	assert.equal(fine.results[0]!.note, undefined);
+	// A variable is resolved against the document, not parsed here.
+	const vars = apply(emptyDocument(), [{ op: "variables", set: { paper: { type: "color", value: "#bfdbfe" } } }, { op: "insert", node: { type: "note", id: "a", content: "x", fill: "$paper" } }], { theme });
+	assert.equal(vars.results[1]!.note, undefined);
 });

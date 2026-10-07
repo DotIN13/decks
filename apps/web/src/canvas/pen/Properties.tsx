@@ -1,4 +1,4 @@
-import { arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isMarkdown, isPointEnd, isShape, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
+import { arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
 import type { LucideIcon } from "lucide-solid";
 import AlignCenterHorizontal from "lucide-solid/icons/align-center-horizontal";
 import AlignCenterVertical from "lucide-solid/icons/align-center-vertical";
@@ -80,8 +80,10 @@ const KIND_ICON: Record<Kind, LucideIcon> = { shape: Shapes, arrow: ArrowUpRight
 /** The colour a value names, for the colour input: a hex colour, or undefined for a variable or a gradient. */
 export const hexOf = (value: unknown): string | undefined => {
 	const first = Array.isArray(value) ? value[0] : value;
-	const text = typeof first === "string" ? first : first && typeof first === "object" && (first as { type?: string }).type === "color" ? (first as { color?: unknown }).color : undefined;
-	return typeof text === "string" && /^#[0-9a-f]{6}/i.test(text) ? text.slice(0, 7).toLowerCase() : undefined;
+	const type = first && typeof first === "object" ? (first as { type?: string }).type : undefined;
+	const text = typeof first === "string" ? first : type === "color" || type === "solid" ? (first as { color?: unknown }).color : undefined;
+	// Whatever notation it is written in: the swatches and the field speak hex (`@decks/pen`).
+	return typeof text === "string" ? toHex(parseColor(text)) : undefined;
 };
 type FillMode = "none" | "solid" | "linear" | "radial";
 const gradientOf = (value: unknown): { type: "gradient"; gradientType?: string; rotation?: unknown; colors?: Array<{ color: string; position: number }> } | undefined => {

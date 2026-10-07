@@ -3,7 +3,7 @@ import { layout, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
 import { fitShapes } from "./shapes.ts";
 import type { Box, PenDocument, PenNode, PenVariable } from "./types.ts";
-import type { ThemeState } from "./values.ts";
+import { fillsOf, parseColor, type ThemeState } from "./values.ts";
 
 /**
  * Edits to a `.pen` document, applied together or not at all.
@@ -61,16 +61,53 @@ export function apply(doc: PenDocument, ops: readonly Op[], options: ApplyOption
 	return { doc: next, results };
 }
 
+
+/**
+ * A colour nobody can read, said rather than drawn as nothing.
+ *
+ * A fill whose colour cannot be parsed paints nothing at all, so the item keeps whatever default it
+ * has: a markdown card filled `"lightblue"` drew its usual white paper, and the only way to learn
+ * that was to look. This is why that was worked around — a mat of coloured frame behind a white
+ * card — instead of reported. Names, `rgb()` and `hsl()` are read now; this is for the rest.
+ */
+function unreadableColour(node: PenNode): string | undefined {
+	const bad: string[] = [];
+	for (const [field, value] of [
+		["fill", node.fill],
+		["stroke", node.stroke],
+	] as const) {
+		if (!value || (typeof value === "object" && !Array.isArray(value) && !("type" in value) && !("color" in value))) continue;
+		for (const fill of fillsOf(value as Parameters<typeof fillsOf>[0])) {
+			const text = typeof fill === "string" ? fill : fill && typeof fill === "object" && (fill as { type?: string }).type === "color" ? (fill as { color?: unknown }).color : undefined;
+			// `$name` is a variable, resolved against the document's own; anything else has to parse.
+			if (typeof text === "string" && !text.startsWith("$") && !parseColor(text)) bad.push(`${field} "${text}"`);
+		}
+	}
+	if (bad.length === 0) return undefined;
+	return `${bad.join(" and ")} is not a colour and draws nothing: write #rrggbb, a name such as "lightblue", rgb(…) or hsl(…).`;
+}
+
+/** pen's own word for a plain fill is `color`; `solid` is what everyone writes, and is stored as `color`. */
+function canonicalFills(node: PenNode): void {
+	for (const field of ["fill", "stroke"] as const) {
+		const value = node[field];
+		if (!value) continue;
+		const fix = (one: unknown) => (one && typeof one === "object" && (one as { type?: string }).type === "solid" ? { ...(one as object), type: "color" } : one);
+		(node as Record<string, unknown>)[field] = Array.isArray(value) ? value.map(fix) : fix(value);
+	}
+}
+
 function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 	if (!op || typeof op !== "object" || typeof (op as { op?: unknown }).op !== "string") throw new PenError('each edit is an object with an "op": insert, update, replace, delete, move, copy or variables.');
 	switch (op.op) {
 		case "insert": {
 			if (!op.node || typeof op.node !== "object" || typeof op.node.type !== "string") throw new PenError('insert needs a node with a type, as in { op: "insert", node: { type: "note", content: "…" } }.');
 			const node = withIds(clone(op.node) as PenNode, ids(doc));
+			canonicalFills(node);
 			const siblings = childrenOf(doc, op.parent);
 			const at = clampIndex(op.index, siblings.length);
 			siblings.splice(at, 0, node);
-			const note = op.box ? placeBox(doc, node.id, op.box, options) : undefined;
+			const note = [op.box ? placeBox(doc, node.id, op.box, options) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
 			return { op: "insert", id: node.id, ...(note ? { note } : {}) };
 		}
 		case "update": {
@@ -82,7 +119,8 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 				if (value === null) delete found.node[key];
 				else found.node[key] = clone(value);
 			}
-			const note = op.box ? placeBox(doc, op.id, op.box, options) : undefined;
+			canonicalFills(found.node);
+			const note = [op.box ? placeBox(doc, op.id, op.box, options) : undefined, unreadableColour(found.node)].filter(Boolean).join(" ");
 			return { op: "update", id: op.id, ...(note ? { note } : {}) };
 		}
 		case "replace": {
@@ -92,8 +130,10 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 			taken.delete(op.id);
 			const node = clone(op.node) as PenNode;
 			node.id = typeof node.id === "string" && node.id ? node.id : op.id;
+			canonicalFills(node);
 			found.siblings[found.index] = withIds(node, taken);
-			return { op: "replace", id: node.id };
+			const note = unreadableColour(node);
+			return { op: "replace", id: node.id, ...(note ? { note } : {}) };
 		}
 		case "delete": {
 			const found = located(doc, op.id);
