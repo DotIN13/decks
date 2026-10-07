@@ -129,6 +129,8 @@ export class PenLayer {
 	private carriedBitmaps: ImageBitmapRenderingContext | null = null;
 	/** The placement of the frame the carried picture came with, before the drag's offset. */
 	private carriedAt = "";
+	/** The carried picture as pixels the page can read, until the drag ends. */
+	private carriedCopy: OffscreenCanvas | undefined;
 	private carriedBy = { dx: 0, dy: 0 };
 	private carriedKey = "";
 	private boardsCarried = "";
@@ -264,6 +266,7 @@ export class PenLayer {
 	private showCarried(frame: Extract<SceneOutput, { type: "frame" }>, at: string): void {
 		const carried = frame.carried;
 		if (!carried) {
+			this.carriedCopy = undefined;
 			if (this.carriedEl && !this.carriedEl.hidden) {
 				this.carriedEl.hidden = true;
 				// The picture is let go between drags: it is as large as the sheet, which on a phone is memory to keep for nothing.
@@ -282,6 +285,10 @@ export class PenLayer {
 			const element = this.carriedEl;
 			if (element.previousElementSibling !== this.sheet) this.sheet.after(element);
 			this.carriedBitmaps ??= element.getContext("bitmaprenderer");
+			// A copy the page can read, for the ghost a drag over a card is cut from (`cutFromCarried`).
+			const copy = new OffscreenCanvas(carried.bitmap.width, carried.bitmap.height);
+			copy.getContext("2d")?.drawImage(carried.bitmap, 0, 0);
+			this.carriedCopy = copy;
 			if (this.carriedBitmaps) this.carriedBitmaps.transferFromImageBitmap(carried.bitmap);
 			else carried.bitmap.close();
 			element.style.width = `${frame.width}px`;
@@ -486,6 +493,33 @@ export class PenLayer {
 		if (key === this.boardsCarried) return;
 		this.boardsCarried = key;
 		this.send({ type: "carry", boards: [...boards] });
+	}
+
+	/**
+	 * A picture of what a drag carries inside a screen rectangle, cut from the carried picture: the ghost
+	 * a drag over a card shows (`Stage.tsx`). The rectangle is where the items lay before the drag; the
+	 * picture is read through its placement without the drag's offset, which is where they are in it.
+	 */
+	cutFromCarried(rect: { left: number; top: number; width: number; height: number }): HTMLCanvasElement | undefined {
+		const carried = this.carriedEl;
+		const pixels = this.carriedCopy;
+		if (!carried || !pixels || carried.hidden || rect.width < 1 || rect.height < 1) return undefined;
+		const slid = carried.style.transform;
+		carried.style.transform = this.carriedAt;
+		const at = carried.getBoundingClientRect();
+		carried.style.transform = slid;
+		if (!at.width || !at.height) return undefined;
+		const sx = pixels.width / at.width;
+		const sy = pixels.height / at.height;
+		const out = document.createElement("canvas");
+		out.width = Math.max(1, Math.round(rect.width * sx));
+		out.height = Math.max(1, Math.round(rect.height * sy));
+		out.getContext("2d")?.drawImage(pixels, (rect.left - at.left) * sx, (rect.top - at.top) * sy, rect.width * sx, rect.height * sy, 0, 0, out.width, out.height);
+		return out;
+	}
+	/** The carried picture shown or not, while a ghost of it stands in (`Stage.tsx`). */
+	showCarriedLayer(on: boolean): void {
+		if (this.carriedEl) this.carriedEl.style.visibility = on ? "" : "hidden";
 	}
 
 	private slideCarried(dx: number, dy: number): void {

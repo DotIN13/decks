@@ -1703,11 +1703,60 @@ export function Stage(props: {
 		if (element) element.dataset.refer = "true";
 	};
 
+	/*
+	 * The ghost of what a drag carries over a card: a picture of the items cut from the sheet as the
+	 * drag starts, laid beside the pointer with a shadow and a slight tilt, as the card's own pieces are
+	 * (`pen/CardEditor.tsx`), while the carried picture and the selection's handles stand aside.
+	 */
+	let ghost: { el?: HTMLCanvasElement; rect: { left: number; top: number; width: number; height: number } } | undefined;
+	/** Where the carried items lie on screen as the drag starts: the ghost is cut from there. */
+	const ghostTake = (ids: readonly string[]) => {
+		ghostDrop();
+		if (!element || !ids.length) return;
+		const r = element.getBoundingClientRect();
+		const boxes = ids.map((id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box).filter((b): b is NonNullable<typeof b> => !!b);
+		if (!boxes.length) return;
+		const a = toScreen(localCamera, view(), { x: Math.min(...boxes.map((b) => b.x)), y: Math.min(...boxes.map((b) => b.y)) });
+		const b = toScreen(localCamera, view(), { x: Math.max(...boxes.map((b) => b.x + b.w)), y: Math.max(...boxes.map((b) => b.y + b.h)) });
+		ghost = { rect: { left: r.left + a.x, top: r.top + a.y, width: b.x - a.x, height: b.y - a.y } };
+	};
+	/** Over a card, the ghost beside the pointer `gap` px off; elsewhere, the carried picture as before. */
+	const ghostShow = (over: boolean, client?: { x: number; y: number }, gap = 12) => {
+		if (over && ghost && !ghost.el) {
+			const el = penLayer.cutFromCarried(ghost.rect);
+			if (el) {
+				el.className = "pen-drag-ghost";
+				// A large item rides at most about a card's width, so the slot it is aimed at stays in view.
+				const scale = Math.min(1, 220 / Math.max(ghost.rect.width, 1));
+				el.style.width = `${ghost.rect.width * scale}px`;
+				el.style.height = `${ghost.rect.height * scale}px`;
+				document.body.append(el);
+				ghost.el = el;
+			}
+		}
+		const showing = over && !!ghost?.el;
+		element?.toggleAttribute("data-ghosting", showing);
+		penLayer.showCarriedLayer(!showing);
+		if (!ghost?.el) return;
+		ghost.el.hidden = !over;
+		if (over && client) {
+			ghost.el.style.left = `${client.x + gap}px`;
+			ghost.el.style.top = `${client.y + gap}px`;
+		}
+	};
+	const ghostDrop = () => {
+		ghost?.el?.remove();
+		ghost = undefined;
+		element?.removeAttribute("data-ghosting");
+		penLayer.showCarriedLayer(true);
+	};
+
 	const dragSelection = (event: PointerEvent, ids: readonly string[], boards: readonly string[], on?: HTMLElement, onTap?: () => void) => {
 		const start = selectionBox(ids, boards);
 		const targets = snapTargets(ids, boards);
 		let offset = { dx: 0, dy: 0 };
 		const from = worldAt(event);
+		ghostTake(ids);
 		follow(
 			event,
 			(e) => {
@@ -1738,11 +1787,13 @@ export function Stage(props: {
 				 * Over a card, what is carried rides below and right of the pointer, a ghost of itself, so
 				 * the line where it will land between the card's blocks stays in view under the hand.
 				 */
-				if (onto && start && isCard(penNode(onto))) {
+				const overCard = !!onto && !!start && isCard(penNode(onto));
+				if (overCard) {
 					const gap = 12 / localCamera.zoom;
-					offset = { dx: now.x + gap - start.x, dy: now.y + gap - start.y };
+					offset = { dx: now.x + gap - start!.x, dy: now.y + gap - start!.y };
 					lines = [];
 				}
+				ghostShow(overCard, { x: e.clientX, y: e.clientY });
 				markComposer(composerUnder(e, ids, boards));
 				pannedAt = performance.now();
 				batch(() => {
@@ -1753,6 +1804,7 @@ export function Stage(props: {
 				if (ids.length) penLayer.preview(new Map(ids.map((id) => [id, offset])));
 			},
 			(moved, e) => {
+				ghostDrop();
 				const referring = moved && composerUnder(e, ids, boards) !== undefined;
 				markComposer(undefined);
 				batch(() => {
@@ -3403,6 +3455,7 @@ export function Stage(props: {
 		};
 		const abandon = () => {
 			done();
+			ghostDrop();
 			setDropInto(undefined);
 			setDropAt(undefined);
 			if (moved && carrying) {
@@ -3416,6 +3469,8 @@ export function Stage(props: {
 			// A second finger: this was the start of a pinch, and whatever it carried goes back.
 			if (touches.count() > 1) return abandon();
 			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 10) return;
+			// The ghost's picture is cut as the finger picks the items up, before they leave the sheet.
+			if (!moved && carrying) ghostTake(selected);
 			moved = true;
 			if (!carrying) return;
 			offset = { dx: (e.clientX - from.x) / localCamera.zoom, dy: (e.clientY - from.y) / localCamera.zoom };
@@ -3430,6 +3485,7 @@ export function Stage(props: {
 				const gap = 28 / localCamera.zoom;
 				offset = { dx: now.x + gap - start.x, dy: now.y + gap - start.y };
 			}
+			ghostShow(!!start, { x: e.clientX, y: e.clientY }, 28);
 			batch(() => {
 				setPenDrag(offset);
 				if (boardPicks().length) setBoardDrag({ paths: boardPicks(), ...offset });
@@ -3440,6 +3496,7 @@ export function Stage(props: {
 			if (e.pointerId !== pointer) return;
 			done();
 			if (moved) {
+				ghostDrop();
 				const into = dropInto();
 				const slot = dropAt()?.index;
 				batch(() => {

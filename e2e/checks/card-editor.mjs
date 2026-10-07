@@ -385,9 +385,15 @@ await page.mouse.move(aim.x, aim.y, { steps: 14 });
 await settle(page, 200);
 // The selection's outline is drawn where the carried item is drawn.
 const carried = await page.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+const looks = await page.evaluate(() => {
+	const ghost = document.querySelector(".pen-drag-ghost:not([hidden])");
+	const style = ghost && getComputedStyle(ghost);
+	return { ghost: !!ghost, tilted: style?.rotate === "2deg", shadow: !!style?.filter.includes("drop-shadow"), handles: [...document.querySelectorAll(".pen-handle, .pen-anchor")].filter((h) => getComputedStyle(h).visibility !== "hidden").length };
+});
 await page.mouse.up();
 const dropped = await until(() => (where("card-picture")?.inCard === 2 ? where("card-picture") : undefined));
 say("a picture dragged onto a card drops between two of its blocks, as the frame's own drop", !!dropped, JSON.stringify(where("card-picture")));
+say("…as a ghost of itself, tilted and lifted on a shadow, with no handles round it", looks.ghost && looks.tilted && looks.shadow && looks.handles === 0, JSON.stringify(looks));
 say("…and while it is carried over the card it rides below and right of the pointer", !!carried && carried.x > aim.x && carried.y > aim.y, JSON.stringify({ aim, at: carried && { x: Math.round(carried.x), y: Math.round(carried.y) } }));
 // Once the card has laid it out among its blocks.
 const inside = await until(async () => {

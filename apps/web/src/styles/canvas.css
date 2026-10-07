@@ -1607,6 +1607,21 @@
 }
 	.pen-card-editor .pce-piece[data-kind="img"]:not(:has(img)) > span::before { content: "🖼 "; }
 	.pen-card-editor .pce-piece.pce-dragging { opacity: 0.3; }
+	/*
+	 * What a drag carries, over a card (`Stage.tsx`, `ghostShow`): a picture of it beside the pointer,
+	 * tilted, with the shadow a lifted thing has, as the card's own pieces ride (`.pce-ghost`). While it
+	 * shows, the selection's outline and handles stand aside.
+	 */
+	.pen-drag-ghost {
+	position: fixed;
+	z-index: var(--z-float, 30);
+	pointer-events: none;
+	opacity: 0.92;
+	rotate: 2deg;
+	border-radius: 8px;
+	filter: drop-shadow(0 10px 14px rgb(0 0 0 / 22%));
+}
+	.stage[data-ghosting] :is(.pen-selection, .pen-handle, .pen-anchor) { visibility: hidden; }
 	.pen-card-editor .pce-ghost {
 	position: absolute;
 	z-index: 5;
