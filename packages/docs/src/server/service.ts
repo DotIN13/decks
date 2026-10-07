@@ -1,20 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
-import { basename, dirname, extname, relative } from "node:path";
-import type { DocChange, DocFormat, ServerMessage, Splice } from "@decks/protocol";
-import type { Revisions } from "../boards/snapshots.ts";
-import { containedIn, resolveFileRequest, type ResolvedRoots } from "../deck/roots.ts";
-import { invert, land, spliceDiff } from "./splice.ts";
+import { basename, dirname, extname } from "node:path";
+import type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, Splice } from "../index.ts";
+import { invert, land, spliceDiff } from "../merge.ts";
+import type { VersionStore } from "./versions.ts";
 import { readEntry, replaceEntry } from "./zip.ts";
 
 /**
- * Documents open as pages: the server side of `@decks/protocol`'s `docs.ts`.
+ * `@decks/docs/server`: the service that owns the documents pages have open.
  *
  * **The file on disk is written within a frame of every keystroke**, because a page sends its
  * splices at most every 50 ms and each batch is written as it lands. The time machine is the
- * version store boards already use (`boards/snapshots.ts`): a version is kept when typing pauses
- * for a second, and on both sides of every write from outside, so going back steps over
- * sentences rather than letters.
+ * `VersionStore` it is given: a version is kept when typing pauses for a second, and on both sides
+ * of every write from outside, so going back steps over sentences rather than letters.
  *
  * **An agent edits a document with its own tools**, not through this. Its write reaches the file,
  * the watcher here sees it, and the difference goes to every page as splices marked as a change
@@ -23,12 +21,13 @@ import { readEntry, replaceEntry } from "./zip.ts";
 
 /** Typing that stops for this long becomes a version. */
 export const PAUSE_MS = 1000;
-/** A write from outside is read after this much quiet, as the deck watcher waits. */
+/** A write from outside is read after this much quiet on the file. */
 export const QUIET_MS = 80;
 /** How many revisions of splices are kept, to move a late batch past what landed before it. */
 const LOG = 200;
 
-const EDITABLE = new Set([".md", ".markdown", ".txt", ".tex", ".bib", ".sty", ".cls", ".rst", ".org", ".docx"]);
+/** What opens by default: text formats people write in, and Word. */
+export const EDITABLE = [".md", ".markdown", ".txt", ".tex", ".bib", ".sty", ".cls", ".rst", ".org", ".docx"] as const;
 const DOCX_PART = "word/document.xml";
 
 interface Open {
@@ -51,22 +50,70 @@ interface Open {
 	seen?: { size: number; mtime: number };
 }
 
-export interface DocContext {
-	roots(): ResolvedRoots;
-	revisions: Revisions;
-	/** To every browser. */
-	send(message: ServerMessage): void;
-	/** Who most likely wrote the file just now, when the server can say. */
+/** Where a page's path points: the file, the name versions are kept under, and whether it may be written. */
+export interface Resolved {
+	file: string;
+	key: string;
+	writable: boolean;
+}
+
+export interface DocServiceOptions {
+	/**
+	 * A page's path -> the file it means. **This is the security boundary**: throw for anything a
+	 * page must not open. `key` names the document in `doc.changed` and in the version store, so it
+	 * should be the same for every spelling of one file.
+	 */
+	resolve(path: string): Resolved;
+	versions: VersionStore;
+	/** To every page. */
+	send(message: DocServerMessage): void;
+	/** Who most likely wrote the file just now, when the host can tell (an agent's name). */
 	writer?(file: string): string | undefined;
+	/** File extensions that open, with the dot; `EDITABLE` by default. */
+	editable?: readonly string[];
+	pauseMs?: number;
+	quietMs?: number;
 }
 
 export class DocService {
 	private readonly open = new Map<string, Open>();
+	private readonly editable: ReadonlySet<string>;
+	private readonly pauseMs: number;
+	private readonly quietMs: number;
 
-	constructor(private readonly context: DocContext) {}
+	constructor(private readonly context: DocServiceOptions) {
+		this.editable = new Set((context.editable ?? EDITABLE).map((ext) => ext.toLowerCase()));
+		this.pauseMs = context.pauseMs ?? PAUSE_MS;
+		this.quietMs = context.quietMs ?? QUIET_MS;
+	}
+
+	/**
+	 * One message from a page, answered on `reply` (that page alone); what changed goes to every
+	 * page through `send`. The whole of the protocol for a host that has a socket and nothing else.
+	 */
+	handle(message: DocClientMessage, reply: (message: DocServerMessage) => void): void {
+		try {
+			switch (message.type) {
+				case "doc.open":
+					return reply(this.opened(message.path, message.client));
+				case "doc.close":
+					return this.closed(message.path, message.client);
+				case "doc.patch":
+					return reply(this.patch(message.path, message.client, message.rev, message.batch, message.splices));
+				case "doc.review":
+					return this.review(message.path, message.change, message.accept);
+				case "doc.versions":
+					return reply(this.versions(message.path));
+				case "doc.restore":
+					return this.restore(message.path, message.sha);
+			}
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+		}
+	}
 
 	/** Open a document for a page, or join the pages already on it. */
-	opened(path: string, client: string): Extract<ServerMessage, { type: "doc.state" }> {
+	opened(path: string, client: string): Extract<DocServerMessage, { type: "doc.state" }> {
 		let doc: Open;
 		try {
 			doc = this.load(path);
@@ -81,7 +128,7 @@ export class DocService {
 			format: doc.format,
 			text: doc.text,
 			changes: [...doc.changes.values()].map((entry) => entry.change),
-			...(doc.writable ? {} : { error: `${path} is in a root that is not writable, so it opens read-only.` }),
+			...(doc.writable ? {} : { error: `${path} opens read-only: it is not somewhere this server may write.` }),
 		};
 	}
 
@@ -93,7 +140,7 @@ export class DocService {
 	}
 
 	/** Land a page's batch, write the file, and tell every page. */
-	patch(path: string, client: string, rev: number, batch: string, splices: Splice[]): Extract<ServerMessage, { type: "doc.patched" }> {
+	patch(path: string, client: string, rev: number, batch: string, splices: Splice[]): Extract<DocServerMessage, { type: "doc.patched" }> {
 		const doc = this.find(path);
 		const all = splices.map((_, index) => index);
 		if (!doc || !doc.writable || !Array.isArray(splices)) return { type: "doc.patched", path, batch, rev: doc?.rev ?? 0, refused: all };
@@ -131,7 +178,7 @@ export class DocService {
 		const base = doc.rev;
 		if (landed.applied.length > 0) {
 			this.commit(doc, landed.text, landed.applied);
-			this.context.revisions.record(doc.key, doc.text);
+			this.context.versions.record(doc.key, doc.text);
 		}
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", settled: change });
 		if (landed.refused.length > 0) {
@@ -139,10 +186,10 @@ export class DocService {
 		}
 	}
 
-	versions(path: string): Extract<ServerMessage, { type: "doc.versions" }> {
+	versions(path: string): Extract<DocServerMessage, { type: "doc.versions" }> {
 		const doc = this.find(path);
 		const key = doc?.key ?? this.keyOf(path).key;
-		return { type: "doc.versions", path, versions: [...this.context.revisions.entries(key)] };
+		return { type: "doc.versions", path, versions: [...this.context.versions.entries(key)] };
 	}
 
 	/** Put one kept version back, as one edit every page applies. */
@@ -150,13 +197,13 @@ export class DocService {
 		const doc = this.find(path);
 		if (!doc || !doc.writable) return;
 		this.absorb(doc);
-		const target = this.context.revisions.read(sha);
+		const target = this.context.versions.read(sha);
 		const splices = spliceDiff(doc.text, target);
 		if (splices.length === 0) return;
 		this.flushVersion(doc);
 		const base = doc.rev;
 		this.commit(doc, target, splices);
-		this.context.revisions.record(doc.key, target);
+		this.context.versions.record(doc.key, target);
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: "person" });
 	}
 
@@ -167,16 +214,8 @@ export class DocService {
 
 	// -- inside --------------------------------------------------------------------------------
 
-	private keyOf(path: string): { file: string; key: string; writable: boolean } {
-		const roots = this.context.roots();
-		const file = resolveFileRequest(roots, { path });
-		if (containedIn(roots.deck, file)) {
-			const key = relative(roots.deck, file).split("\\").join("/");
-			if (key.startsWith(".decks/")) throw new Error(`${path} is the app's own record, not a document`);
-			return { file, key, writable: true };
-		}
-		const root = roots.roots.find((r) => r.exists && containedIn(r.path, file));
-		return { file, key: file, writable: !!root?.writable };
+	private keyOf(path: string): Resolved {
+		return this.context.resolve(path);
 	}
 
 	private find(path: string): Open | undefined {
@@ -192,7 +231,7 @@ export class DocService {
 		const known = this.open.get(key);
 		if (known) return known;
 		const ext = extname(file).toLowerCase();
-		if (!EDITABLE.has(ext)) throw new Error(`${basename(file)} is not a document this page edits (${[...EDITABLE].join(" ")})`);
+		if (!this.editable.has(ext)) throw new Error(`${basename(file)} is not a document this page edits (${[...this.editable].join(" ")})`);
 		const format: DocFormat = ext === ".docx" ? "docx" : "text";
 		const text = readSource(file, format);
 		const doc: Open = {
@@ -209,7 +248,7 @@ export class DocService {
 			writable,
 		};
 		doc.seen = stamp(file);
-		this.context.revisions.record(key, text);
+		this.context.versions.record(key, text);
 		this.watch(doc);
 		this.open.set(key, doc);
 		return doc;
@@ -235,7 +274,7 @@ export class DocService {
 
 	private schedulePause(doc: Open): void {
 		clearTimeout(doc.pause);
-		doc.pause = setTimeout(() => this.flushVersion(doc), PAUSE_MS);
+		doc.pause = setTimeout(() => this.flushVersion(doc), this.pauseMs);
 	}
 
 	/** The typing so far as a version, now rather than at the pause. */
@@ -244,7 +283,7 @@ export class DocService {
 		doc.pause = undefined;
 		if (!doc.unversioned) return;
 		doc.unversioned = false;
-		this.context.revisions.record(doc.key, doc.text);
+		this.context.versions.record(doc.key, doc.text);
 	}
 
 	/**
@@ -259,7 +298,7 @@ export class DocService {
 				clearTimeout(doc.quiet);
 				doc.quiet = setTimeout(() => {
 					if (this.open.has(doc.key)) this.absorb(doc);
-				}, QUIET_MS);
+				}, this.quietMs);
 			});
 			// A watcher never keeps the process alive on its own: the server's socket does that.
 			doc.watcher.unref();
@@ -289,15 +328,15 @@ export class DocService {
 		// Our own write coming back.
 		if (text === doc.text) return;
 		this.flushVersion(doc);
-		const from = this.context.revisions.record(doc.key, doc.text);
+		const from = this.context.versions.record(doc.key, doc.text);
 		const splices = spliceDiff(doc.text, text);
 		const base = doc.rev;
 		doc.text = text;
 		doc.rev = Math.max(doc.rev + 1, Date.now());
 		doc.log.push({ base, rev: doc.rev, splices });
 		if (doc.log.length > LOG) doc.log.splice(0, doc.log.length - LOG);
-		const to = this.context.revisions.record(doc.key, text);
-		const change: DocChange = { id: randomUUID(), by: this.context.writer?.(doc.file) ?? "outside", at: Date.now(), from, to, splices };
+		const to = this.context.versions.record(doc.key, text);
+		const change: DocChange = { id: randomUUID(), by: (this.context.writer?.(doc.file) ?? "outside") as DocAuthor, at: Date.now(), from, to, splices };
 		doc.changes.set(change.id, { change, rev: doc.rev });
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: change.by, change });
 	}

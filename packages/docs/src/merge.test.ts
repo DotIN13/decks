@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applySplices, invert, land, spliceDiff, transform } from "./splice.ts";
+import { transformSplice as transform } from "./index.ts";
+import { applySplices, invert, land, spliceDiff } from "./merge.ts";
 
 test("a batch made on the current text lands as it was sent", () => {
 	const text = "Hello world";

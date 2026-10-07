@@ -1,7 +1,8 @@
-import { applySplice, transformSplice as transform, type ClientMessage, type DocChange, type DocFormat, type ServerMessage, type Splice } from "@decks/protocol";
+import { applySplice, transformSplice as transform, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "./index.ts";
 
 /**
- * One page's copy of a document, kept in step with the file (`apps/server/src/docs/service.ts`).
+ * `@decks/docs/client`: one page's copy of a document, kept in step with the file through the
+ * service in `@decks/docs/server`, over whatever carries messages between them.
  *
  * The page edits its own text at once and hands each change here as a splice. Splices go out
  * at most every `BATCH_MS`, one batch in flight at a time, made on the last revision the server
@@ -18,7 +19,7 @@ export const BATCH_MS = 50;
 
 export interface DocSyncOptions {
 	path: string;
-	send: (message: ClientMessage) => void;
+	send: (message: DocClientMessage) => void;
 	onUpdate: (sync: DocSync, why: "open" | "remote" | "local" | "review") => void;
 	/** A name for this page; random by default. */
 	client?: string;
@@ -101,8 +102,12 @@ export class DocSync {
 		this.options.send({ type: "doc.patch", path: this.path, client: this.client, rev: this.rev, batch: this.inflight.batch, splices: this.inflight.splices });
 	}
 
-	/** Every message from the server; those about other documents are ignored. */
-	receive(message: ServerMessage): void {
+	/**
+	 * Every message from the server; those about other documents, and any that are not about
+	 * documents at all, are ignored, so a host can pass its whole stream through.
+	 */
+	receive(incoming: DocServerMessage | { type: string }): void {
+		const message = incoming as DocServerMessage;
 		if (!("path" in message)) return;
 		switch (message.type) {
 			case "doc.state":

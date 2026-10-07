@@ -4,17 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { crc32 } from "node:zlib";
-import type { ServerMessage } from "@decks/protocol";
-import type { Deck } from "../deck/loader.ts";
-import { Revisions } from "../boards/snapshots.ts";
+import type { DocServerMessage as ServerMessage } from "../index.ts";
 import { DocService, QUIET_MS } from "./service.ts";
+import { DirectoryVersions } from "./versions.ts";
 import { readEntry, replaceEntry } from "./zip.ts";
+import { inside } from "./fixtures.ts";
 
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "decks-docs-"));
 	const sent: ServerMessage[] = [];
-	const revisions = new Revisions({ path: root, boards: [] } as unknown as Deck);
-	const docs = new DocService({ roots: () => ({ deck: root, roots: [] }), revisions, send: (m) => sent.push(m) });
+	const revisions = new DirectoryVersions(join(root, ".versions"));
+	const docs = new DocService({ resolve: inside(root), versions: revisions, send: (m) => sent.push(m) });
 	const done = () => {
 		docs.closeAll();
 		rmSync(root, { recursive: true, force: true });
@@ -167,12 +167,25 @@ test("a .docx is edited through its document.xml and stays a zip", () => {
 	done();
 });
 
-test("the app's own records and other file types are refused", () => {
+test("other file types, and paths the resolver refuses, do not open", () => {
 	const { root, docs, done } = setup();
 	writeFileSync(join(root, "script.sh"), "echo hi\n");
 	assert.match(docs.opened("script.sh", "p").error ?? "", /not a document/);
-	assert.match(docs.opened(".decks/settings.json", "p").error ?? "", /own record/);
-	assert.match(docs.opened("../outside.md", "p").error ?? "", /outside the deck/);
+	assert.match(docs.opened("../outside.md", "p").error ?? "", /outside the folder/);
+	done();
+});
+
+test("a host with only a socket answers every message through handle", () => {
+	const { root, sent, docs, done } = setup();
+	writeFileSync(join(root, "a.md"), "one\n");
+	const replies: ServerMessage[] = [];
+	docs.handle({ type: "doc.open", path: "a.md", client: "p" }, (m) => replies.push(m));
+	const state = replies[0] as Extract<ServerMessage, { type: "doc.state" }>;
+	docs.handle({ type: "doc.patch", path: "a.md", client: "p", rev: state.rev, batch: "b", splices: [{ at: 3, before: "", text: "!" }] }, (m) => replies.push(m));
+	docs.handle({ type: "doc.restore", path: "a.md", client: "p", sha: "zzz" }, (m) => replies.push(m));
+	assert.deepEqual(replies.map((m) => m.type), ["doc.state", "doc.patched", "notice"]);
+	assert.equal(readFileSync(join(root, "a.md"), "utf8"), "one!\n");
+	assert.equal(changed(sent).length, 1);
 	done();
 });
 

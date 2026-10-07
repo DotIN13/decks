@@ -11,7 +11,7 @@ import type { WebBridge } from "../browser/bridge.ts";
 import type { Pairing } from "../share/pairing.ts";
 import type { View } from "../ws.ts";
 import type { DeckAgent } from "../agents/session.ts";
-import type { DocService } from "../docs/service.ts";
+import type { DocService } from "@decks/docs/server";
 
 /** How a frame answers the socket it came from — and only that socket. */
 export type Reply = (message: ServerMessage) => void;
@@ -71,7 +71,7 @@ export interface WireContext {
 	readonly deck: Deck;
 	/** Writing, editing and deleting boards — `boards/service.ts`. */
 	readonly boards: BoardService;
-	/** Documents open as pages, typed into and kept in step with their files (`docs/service.ts`). */
+	/** Documents open as pages, typed into and kept in step with their files (`@decks/docs`). */
 	readonly docs: DocService;
 	readonly agents: Registry;
 	/** What each agent is doing to which board, for the cursors the canvas draws (`agents/acts.ts`). */

@@ -3,11 +3,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { ClientMessage, ServerMessage } from "@decks/protocol";
-import type { Deck } from "../deck/loader.ts";
-import { Revisions } from "../boards/snapshots.ts";
-import { DocSync } from "../../../web/src/docs/doc-sync.ts";
-import { DocService } from "./service.ts";
+import type { DocClientMessage as ClientMessage, DocServerMessage as ServerMessage } from "./index.ts";
+import { DocSync } from "./client.ts";
+import { DocService, MemoryVersions } from "./server/index.ts";
+import { inside } from "./server/fixtures.ts";
 
 /**
  * Two pages and an agent on one file, with the network in between: every message waits in a
@@ -29,12 +28,12 @@ function run(seed: number, steps: number) {
 	const root = mkdtempSync(join(tmpdir(), "decks-converge-"));
 	const file = join(root, "paper.md");
 	writeFileSync(file, "# Title\n\nFirst paragraph of the paper.\n\nSecond paragraph, longer than the first one.\n\nThird.\n");
-	const revisions = new Revisions({ path: root, boards: [] } as unknown as Deck);
+	const revisions = new MemoryVersions();
 
 	// Server -> browsers, one queue per page; browsers -> server, one queue in all.
 	const toServer: Array<{ from: number; message: ClientMessage }> = [];
 	const inbox: ServerMessage[][] = [[], []];
-	const service = new DocService({ roots: () => ({ deck: root, roots: [] }), revisions, send: (m) => inbox.forEach((q) => q.push(m)) });
+	const service = new DocService({ resolve: inside(root), versions: revisions, send: (m) => inbox.forEach((q) => q.push(m)) });
 	const timers: Array<() => void> = [];
 	const pages = [0, 1].map(
 		(i) =>

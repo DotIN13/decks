@@ -14,7 +14,9 @@
  * The direction runs left to right — `wire.ts` is the only one that depends on the rest,
  * because a frame names a board, an agent and a patch:
  *
- *     deck · chat · usage · transcript · boards · stage · extension-ui · web · files · docs → wire
+ *     deck · chat · usage · transcript · boards · stage · extension-ui · web · files → wire
+ *
+ * Documents are their own package, `@decks/docs`, whose message types this one carries.
  */
 
 export * from "./deck.ts";
@@ -27,4 +29,4 @@ export * from "./extension-ui.ts";
 export * from "./web.ts";
 export * from "./wire.ts";
 export * from "./files.ts";
-export * from "./docs.ts";
+export type { DocAuthor, DocChange, DocClientMessage, DocFormat, DocServerMessage, DocVersion, Splice } from "@decks/docs";

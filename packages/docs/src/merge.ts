@@ -1,11 +1,9 @@
-import { applySplice, transformSplice, type Splice } from "@decks/protocol";
-
-export { applySplice };
+import { applySplice, transformSplice, type Splice } from "./index.ts";
 import { diffArrays } from "diff";
 
 /**
- * Splices: landing a page's edits on a text that may have moved since the page saw it, and
- * turning one text into another as splices.
+ * `@decks/docs/merge`: landing a page's edits on a text that may have moved since the page saw
+ * it, and turning one text into another as splices.
  *
  * Pure functions over strings, so the whole of the merge rule can be tested without a file.
  */
@@ -20,8 +18,7 @@ export function applySplices(text: string, splices: readonly Splice[]): string {
 	return out;
 }
 
-/** The shared rule (`@decks/protocol`), named here as the tests and `land` know it. */
-export const transform = transformSplice;
+const transform = transformSplice;
 
 /** Old text no shorter than this may be looked for elsewhere when its splice collides. */
 export const SEARCH_MIN = 8;

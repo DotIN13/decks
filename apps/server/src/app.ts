@@ -31,7 +31,8 @@ import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
-import { DocService } from "./docs/service.ts";
+import { DocService } from "@decks/docs/server";
+import { resolveDoc } from "./docs/resolve.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -64,7 +65,7 @@ export class App {
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
-	/** Documents open as pages (`docs/service.ts`). */
+	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
@@ -179,8 +180,8 @@ export class App {
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
 		this.docs = new DocService({
-			roots: () => this.deck.roots,
-			revisions: this.boards.revisions,
+			resolve: (path) => resolveDoc(this.deck.roots, path),
+			versions: this.boards.revisions,
 			send: (message) => this.send(message),
 		});
 		/*

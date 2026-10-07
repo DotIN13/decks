@@ -1,0 +1,16 @@
+{
+	"name": "@decks/docs",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Real .md, .tex and .docx files opened as pages: keystrokes reach the file as splices, other writers' edits come back as changes to review, and every pause is a version",
+	"exports": {
+		".": "./src/index.ts",
+		"./merge": "./src/merge.ts",
+		"./client": "./src/client.ts",
+		"./server": "./src/server/index.ts"
+	},
+	"scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test --test-force-exit \"src/**/*.test.ts\"" },
+	"dependencies": { "diff": "^8.0.4" },
+	"devDependencies": { "@types/node": "^22.19.0", "tsx": "^4.20.7", "typescript": "^5.9.3" }
+}
