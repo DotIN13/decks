@@ -3,8 +3,9 @@
  *
  * The same card a desk sees, held in a finger: a double tap opens it as it reads, inside the screen;
  * a tap accepts an agent's suggestion; words typed go into it and a tap on the canvas saves them;
- * and a selection gets the style bar on the screen. While a card is open the properties sheet stands
- * aside, since on a phone it would cover the words being typed.
+ * a selection gets the style bar on the screen; and a finger carries a picture into the card. The
+ * properties sheet opens only on a second tap on what is selected, and stands aside while a card is
+ * open: on a phone it covers most of the screen.
  *
  * Needs no model: the card goes in over the wire.
  */
@@ -141,11 +142,51 @@ const saved = await until(() => cardNode()?.children?.find((n) => n.id === "p-a"
 say("words typed by the phone's keyboard go in, and a tap on the canvas saves them", !!saved, JSON.stringify(cardNode()?.children?.map((n) => n.content)));
 say("…as one edit to that block: the others keep their ids", JSON.stringify(cardNode()?.children?.map((n) => n.id)) === JSON.stringify(["p-h", "p-a", "p-l"]), JSON.stringify(cardNode()?.children?.map((n) => n.id)));
 
-/*
- * Not checked here: a picture carried into a card by a finger. Tapping an item to select it opens the
- * phone's properties sheet over most of the screen, so the finger cannot reach the card; that is the
- * sheet's behaviour for every item, and waits on a decision about the sheet.
- */
+// A finger picks a picture with a tap, with no sheet over the canvas, and carries it into the card.
+await settle(page, 600);
+const drawn = await page.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
+const spot = world(view.w / 2 - 60, Math.min(view.h - 300, drawn.y + drawn.height + 40));
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }] });
+const picture = await until(() => page.evaluate(() => globalThis.__decksPenBox?.("phone-picture")));
+const first = await page.evaluate(() => globalThis.__decksPenBox?.("p-h"));
+const sheet = () => page.evaluate(() => !!document.querySelector(".props-panel"));
+await page.touchscreen.tap(picture.x + picture.width / 2, picture.y + picture.height / 2);
+await settle(page, 400);
+say("a tap on a picture selects it and leaves the canvas clear: no properties sheet", !(await sheet()));
+const cdp = await page.context().newCDPSession(page);
+const point = (x, y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
+const from = { x: picture.x + picture.width / 2, y: picture.y + picture.height / 2 };
+const to = { x: first.x + 80, y: first.y + first.height + 6 };
+await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
+let ghost;
+for (let i = 1; i <= 16; i++) {
+	await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 16, from.y + ((to.y - from.y) * i) / 16) });
+	await page.waitForTimeout(16);
+}
+await settle(page, 150);
+ghost = await page.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+const placed = await until(() => {
+	const kids = cardNode()?.children?.map((n) => n.id) ?? [];
+	return kids.indexOf("phone-picture") === 1 ? kids : undefined;
+});
+say("a picture carried by a finger drops between two of the card's blocks", !!placed, JSON.stringify(cardNode()?.children?.map((n) => n.id)));
+say("…riding below and right of the finger over the card, clear of it", !!ghost && ghost.x > to.x + 10 && ghost.y > to.y + 10, JSON.stringify({ finger: to, at: ghost && { x: Math.round(ghost.x), y: Math.round(ghost.y) } }));
+
+// A second tap on what is selected asks for its properties: the sheet.
+const inCard = await until(async () => {
+	const now = await page.evaluate(() => globalThis.__decksPenBox?.("phone-picture"));
+	return now && Math.abs(now.y - picture.y) > 20 ? now : undefined;
+});
+await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);
+await settle(page, 600);
+const selectedNow = await sheet();
+if (!selectedNow) {
+	await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);
+	await settle(page, 400);
+}
+say("a second tap on the selected picture opens its properties sheet", await until(sheet, 2000));
+
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-card" }] });
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-picture" }] });
 await settle(page, 300);

@@ -41,7 +41,7 @@ import X from "lucide-solid/icons/x";
 import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../camera/camera.ts";
-import { penBoxes, penSelection, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
+import { penBoxes, penSelection, penSheet, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { ICON_LIBRARIES } from "./icon-index.ts";
@@ -421,9 +421,13 @@ export function Properties(props: {
 		</details>
 	);
 
-	// On a phone the sheet would cover the words being typed: it stands aside until the typing ends.
+	/*
+	 * On a phone the sheet covers most of the screen, so it opens only when asked for, with a second tap
+	 * on what is selected (`penSheet`): the first tap selects, and leaves the canvas to the finger that
+	 * carries it. It stands aside while words are typed, which it would cover.
+	 */
 	return (
-		<Show when={selected().length > 0 && !(isPhone() && penTyping())}>
+		<Show when={selected().length > 0 && !(isPhone() && (penTyping() || !penSheet()))}>
 			<aside class="panel-float props-panel" data-sheet={isPhone() ? "true" : undefined} aria-label="Properties" data-props>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">

@@ -21,6 +21,11 @@ const [penTool, setPenTool] = createSignal<PenTool>("select");
 const [penSelection, setPenSelection] = createSignal<readonly string[]>([]);
 /** Whether an item's words are open for typing (`Stage.tsx`): a phone's properties sheet stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
+/**
+ * Whether a phone's properties sheet has been asked for: by a second tap on the item already selected.
+ * The first tap only selects, so a finger can carry what it picked without the sheet over the canvas.
+ */
+const [penSheet, setPenSheet] = createSignal(false);
 
 /**
  * What the `shape` and `icon` tools make: the shape picked in the insert panel (`canvas/pen/Insert.tsx`,
@@ -59,4 +64,4 @@ const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
  */
 const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
 
-export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping };
+export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penSheet, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenSheet, setPenTool, setPenTyping };

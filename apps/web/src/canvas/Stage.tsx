@@ -37,7 +37,7 @@ import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
+import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
@@ -999,6 +999,8 @@ export function Stage(props: {
 		return true;
 	};
 	createEffect(() => setPenTyping(!!penText()));
+	// A new selection starts with a phone's sheet put away; a second tap on it brings the sheet (`touchOnDrawing`).
+	createEffect(on(penSelection, () => setPenSheet(false)));
 	onCleanup(() => setPenTyping(false));
 	/** The card an item is a block of, if it is one. */
 	const cardOf = (id: string): PenNode | undefined => {
@@ -3385,6 +3387,8 @@ export function Stage(props: {
 		};
 		const abandon = () => {
 			done();
+			setDropInto(undefined);
+			setDropAt(undefined);
 			if (moved && carrying) {
 				penLayer.preview(undefined);
 				setPenDrag({ dx: 0, dy: 0 });
@@ -3399,6 +3403,17 @@ export function Stage(props: {
 			moved = true;
 			if (!carrying) return;
 			offset = { dx: (e.clientX - from.x) / localCamera.zoom, dy: (e.clientY - from.y) / localCamera.zoom };
+			// What it would drop into, as a mouse's drag asks (`dragSelection`): over a card, a ghost beside the finger.
+			const now = worldAt(e);
+			const onto = frameUnder(now, selected);
+			setDropInto(onto);
+			setDropAt(onto ? dropSlot(onto, now, selected) : undefined);
+			const start = onto && isCard(penNode(onto)) ? selectionBox(selected, []) : undefined;
+			if (start) {
+				// A finger hides what is under it, so the ghost goes further from it than a pointer's does.
+				const gap = 28 / localCamera.zoom;
+				offset = { dx: now.x + gap - start.x, dy: now.y + gap - start.y };
+			}
 			batch(() => {
 				setPenDrag(offset);
 				if (boardPicks().length) setBoardDrag({ paths: boardPicks(), ...offset });
@@ -3409,9 +3424,15 @@ export function Stage(props: {
 			if (e.pointerId !== pointer) return;
 			done();
 			if (moved) {
+				const into = dropInto();
+				const slot = dropAt()?.index;
+				batch(() => {
+					setDropInto(undefined);
+					setDropAt(undefined);
+				});
 				if (carrying)
 					batch(() => {
-						penMoveBy(selected, offset.dx, offset.dy);
+						penMoveBy(selected, offset.dx, offset.dy, into, slot);
 						moveBoards(boardPicks(), offset.dx, offset.dy);
 						setBoardDrag(undefined);
 					});
@@ -3433,6 +3454,11 @@ export function Stage(props: {
 			const href = props.mode === "browse" ? penLayer.linkAt(at) : undefined;
 			if (href) return openLink(href);
 			lastTap = { id: hit.id, at: performance.now() };
+			// A second tap on the one thing selected asks for its properties: on a phone, the sheet.
+			if (selected.length === 1 && selected[0] === hit.id) {
+				setPenSheet(true);
+				return;
+			}
 			props.onSelect(undefined);
 			setBoardPicks([]);
 			setPenSelection([hit.id]);
