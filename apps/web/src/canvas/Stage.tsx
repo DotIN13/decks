@@ -42,7 +42,7 @@ import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -1016,7 +1016,7 @@ export function Stage(props: {
 		const firstColour = fillsOf(card.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
 		const rgba = firstColour ? color(doc, firstColour, baseTheme(doc, scheme())) : undefined;
 		const paper = rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : palette.paper;
-		return { ...look, pad: typeof card.padding === "number" ? card.padding : NOTE_PAD, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
+		return { ...look, pad: typeof card.padding === "number" ? card.padding : CARD_PAD, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
 	};
 	const openCard = (card: PenNode, at: { x: number; y: number; w: number; h: number }, fresh?: boolean) => {
 		const placed = penLayer.placed.get(card.id);
@@ -1162,7 +1162,7 @@ export function Stage(props: {
 			const current = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
 			const base = current ?? node;
 			if (!base) return unmuteNow();
-			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
+			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
 			const children = cardChildren(value, card.children ?? [], { fresh: freshIds(), inner: cardInner(card), size: pictureSize });
 			unmute = { id: open.id, value: cardMarkdown(children), timer: setTimeout(unmuteNow, 3000) };
 			// A card's blocks are edited one by one, and only the ones that changed; a note card becomes a frame.
@@ -1174,7 +1174,7 @@ export function Stage(props: {
 	/** How wide a card's words are: its width less its padding. */
 	const cardInner = (card: PenNode) => {
 		const width = penLayer.placed.get(card.id)?.box.w ?? (typeof card.width === "number" ? card.width : 320);
-		const pad = typeof card.padding === "number" ? card.padding : NOTE_PAD;
+		const pad = typeof card.padding === "number" ? card.padding : CARD_PAD;
 		return Math.max(40, width - pad * 2);
 	};
 	/** Pictures' own sizes, as they arrive, so a picture put in a card keeps its shape. */

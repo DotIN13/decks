@@ -1,4 +1,4 @@
-import { CARD, isCard, MARKDOWN, MEDIA, NOTE_PAD, type Op, type PenNode } from "@decks/pen";
+import { CARD, isCard, MARKDOWN, MEDIA, type Op, type PenNode } from "@decks/pen";
 import type { Tokens } from "marked";
 import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.ts";
 
@@ -15,19 +15,25 @@ import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.
  * keeps its id, so an edit to one line writes one item.
  */
 
-/** A card's paper, gap and padding: the note card's look, as a column. */
-export const CARD_GAP = 14;
+/**
+ * A card's words, gap and padding. The words are 20 px, set on each block so pen.dev shows them at
+ * that size too; the gap between blocks is one size of them, as between paragraphs within a block, so
+ * the card and its editor space the blocks alike.
+ */
+export const CARD_FONT = 20;
+export const CARD_GAP = 20;
+export const CARD_PAD = 20;
 export const CARD_WIDTH = 320;
 export const CARD_RADIUS = 12;
 
 /** A new card, as the card tool makes it: a column holding one empty block. */
 export function newCard(id: string, child: string): PenNode {
-	return { type: "frame", id, name: "Card", layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD }, children: [markdownText(child, "")] } as PenNode;
+	return { type: "frame", id, name: "Card", layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD }, children: [markdownText(child, "")] } as PenNode;
 }
 
 /** One block of a card: pen's text, as wide as the card, its words markdown. */
 export function markdownText(id: string, content: string): PenNode {
-	return { type: "text", id, content, textGrowth: "fixed-width", width: "fill_container", metadata: { type: MARKDOWN } } as PenNode;
+	return { type: "text", id, content, fontSize: CARD_FONT, textGrowth: "fixed-width", width: "fill_container", metadata: { type: MARKDOWN } } as PenNode;
 }
 
 /**

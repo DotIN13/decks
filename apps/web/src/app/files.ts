@@ -3,8 +3,8 @@ import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
-import { CARD, MEDIA, NOTE_PAD } from "@decks/pen";
-import { cardChildren, CARD_GAP, CARD_RADIUS, fileItem, markdownText } from "../canvas/pen/card-frame.ts";
+import { CARD, MEDIA } from "@decks/pen";
+import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileItem, markdownText } from "../canvas/pen/card-frame.ts";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
@@ -298,8 +298,8 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				if (isWords(file)) {
 					const words = await file.text();
 					// A card: a column of its blocks (`canvas/pen/card-frame.ts`), each given its id by the server.
-					const children = cardChildren(words, [], { fresh: () => "", inner: CARD_W - NOTE_PAD * 2 });
-					items.push({ node: { type: "frame", name: file.name, layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD, file: file.name }, children }, w: CARD_W });
+					const children = cardChildren(words, [], { fresh: () => "", inner: CARD_W - CARD_PAD * 2 });
+					items.push({ node: { type: "frame", name: file.name, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD, file: file.name }, children }, w: CARD_W });
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
