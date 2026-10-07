@@ -1416,7 +1416,28 @@
 	font-weight: 600;
 	color: var(--callout);
 	margin-bottom: 0.3em;
+	cursor: text;
 }
+	/* A table typed into cell by cell: across the card, a line under the header, hairlines between rows. */
+	.pen-card-editor table.pce-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+	.pen-card-editor .pce-table :is(th, td) {
+	padding: 0.45em 0.75em;
+	text-align: left;
+	vertical-align: top;
+	border-bottom: 1px solid var(--line);
+}
+	.pen-card-editor .pce-table :is(th, td):first-child { padding-left: 0; }
+	.pen-card-editor .pce-table :is(th, td):last-child { padding-right: 0; }
+	.pen-card-editor .pce-table th {
+	font-size: 0.9em;
+	font-weight: 600;
+	color: var(--muted);
+	border-bottom-color: var(--line-strong);
+}
+	.pen-card-editor .pce-table tr:last-child td { border-bottom: none; }
 	.pen-card-editor code {
 	font-family: var(--font-mono);
 	font-size: 0.88em;

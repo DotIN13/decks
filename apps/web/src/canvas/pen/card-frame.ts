@@ -1,6 +1,6 @@
-import { CARD, MARKDOWN, NOTE_PAD, type PenNode } from "@decks/pen";
+import { CARD, isCard, MARKDOWN, NOTE_PAD, type Op, type PenNode } from "@decks/pen";
 import type { Tokens } from "marked";
-import { cardMarked, sizedAlt, type WikiToken } from "./card-syntax.ts";
+import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.ts";
 
 /**
  * A card as a frame of items (`@decks/pen`, `CARD`), and as the one piece of markdown it reads as.
@@ -130,4 +130,47 @@ export function heldLabels(children: readonly PenNode[]): Record<string, string>
 	const out: Record<string, string> = {};
 	for (const node of children) if (PLACEHOLDER.test(childMarkdown(node))) out[node.id] = String(node.name ?? node.type);
 	return out;
+}
+
+/**
+ * The edits that take a card's children from `before` to `after`, one item at a time: what went is
+ * deleted, what is new is inserted where it goes, what moved is moved, and a block whose words
+ * changed is updated. A block that did not change is not named at all.
+ */
+export function cardEdits(card: string, before: readonly PenNode[], after: readonly PenNode[]): Op[] {
+	const kept = new Set(after.map((node) => node.id));
+	const ops: Op[] = before.filter((node) => !kept.has(node.id)).map((node) => ({ op: "delete", id: node.id }));
+	const order = before.filter((node) => kept.has(node.id)).map((node) => node.id);
+	const was = new Map(before.map((node) => [node.id, node]));
+	after.forEach((node, index) => {
+		if (order[index] === node.id) return;
+		const at = order.indexOf(node.id);
+		if (at >= 0) {
+			order.splice(at, 1);
+			ops.push({ op: "move", id: node.id, parent: card, index });
+		} else ops.push({ op: "insert", parent: card, index, node });
+		order.splice(index, 0, node.id);
+	});
+	for (const node of after) {
+		const old = was.get(node.id);
+		if (old && old !== node && old.content !== node.content) ops.push({ op: "update", id: node.id, set: { content: node.content } });
+	}
+	return ops;
+}
+
+/**
+ * A card as an Obsidian note: its blocks as one .md, with our two additions taken out (`toObsidian`):
+ * coloured words lose their colour, an open suggestion goes out as the words it would replace. An item
+ * that is not words or a picture has nothing to be in a note, and is left out.
+ */
+export function obsidianNote(node: PenNode): string {
+	const md = isCard(node)
+		? (node.children ?? [])
+				.map(childMarkdown)
+				.filter((text) => text.trim() && !PLACEHOLDER.test(text))
+				.join("\n\n")
+		: typeof node.content === "string"
+			? node.content
+			: "";
+	return `${toObsidian(md).trim()}\n`;
 }

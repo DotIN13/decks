@@ -180,6 +180,61 @@ const saved = await until(() => {
 });
 say("…and the file says so, with the untouched table, hidden note and code as they were", !!saved, JSON.stringify(onDisk()));
 
+// A table is typed into cell by cell and a callout's title in place; the save touches only those two items.
+const cardNode = () => {
+	for (const stage of readdirSync(`${deck.path}/stages`)) {
+		try {
+			const card = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
+			if (card) return card;
+		} catch {
+			/* being written */
+		}
+	}
+};
+const idsBefore = (cardNode()?.children ?? []).map((n) => n.id);
+await settle(page, 400);
+await openCard();
+await settle(page, 300);
+await page.evaluate(() => {
+	const cell = [...document.querySelectorAll(".pce-table td")].find((td) => td.textContent.trim() === "Fushimi");
+	const range = document.createRange();
+	range.selectNodeContents(cell);
+	getSelection().removeAllRanges();
+	getSelection().addRange(range);
+});
+await page.keyboard.type("Arashiyama");
+await page.keyboard.press("Enter");
+await page.keyboard.press("Shift+Tab");
+await page.keyboard.type("Sat");
+await page.keyboard.press("Tab");
+await page.keyboard.type("Kyoto");
+await page.evaluate(() => {
+	const title = document.querySelector(".pce-chead");
+	const range = document.createRange();
+	range.selectNodeContents(title);
+	getSelection().removeAllRanges();
+	getSelection().addRange(range);
+});
+await page.keyboard.type("Leave early");
+await page.keyboard.press("Enter");
+await page.keyboard.press("Control+Enter");
+const blocks = () => (cardNode()?.children ?? []).map((n) => n.content);
+const typed = await until(() => blocks().includes("| day | plan |\n| :-- | --: |\n| Fri | Arashiyama |\n| Sat | Kyoto |") && blocks().includes("> [!tip] Leave early\n> The gates are empty before 7."));
+say("a table is typed into cell by cell, Enter adding a row, and a callout's title in place", !!typed, JSON.stringify(blocks().filter((b) => /^\||^>/.test(b ?? ""))));
+const idsAfter = (cardNode()?.children ?? []).map((n) => n.id);
+say("…and the save is edits to those two items: every block keeps its id", JSON.stringify(idsAfter) === JSON.stringify(idsBefore), JSON.stringify({ idsBefore, idsAfter }));
+
+// The card goes to Obsidian as a .md file, without its colours and with the suggestion's original words.
+await page.keyboard.press("Escape");
+await settle(page, 300);
+const cardBox = await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 6);
+const exportButton = page.locator('[title="Export to Obsidian (.md)"]');
+await exportButton.waitFor({ timeout: 3000 }).catch(() => {});
+const [download] = await Promise.all([page.waitForEvent("download", { timeout: 5000 }).catch(() => undefined), exportButton.click().catch(() => {})]);
+const note = download ? readFileSync(await download.path(), "utf8") : "";
+say("a card's panel exports it as an Obsidian note: no coloured spans, no suggestion marks", !!note && note.startsWith("# Kyoto, three days") && !/\]\{\.(red|blue)\}|\{~~|\{>>/.test(note) && note.includes("| Sat | Kyoto |"), JSON.stringify({ file: download?.suggestedFilename(), start: note.slice(0, 80) }));
+
 // A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
 const where = (id) => {
 	for (const stage of readdirSync(`${deck.path}/stages`)) {

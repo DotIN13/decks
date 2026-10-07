@@ -223,15 +223,16 @@ export function CardEditor(props: CardEditorProps) {
 				if (!q.tokens.every((x) => x.type === "paragraph" || x.type === "space")) break;
 				const el = h("blockquote");
 				const paras = q.tokens.filter((x) => x.type === "paragraph") as Tokens.Paragraph[];
-				// A callout's first line, [!type] and its title, is its header: kept as written.
-				const head = /^\[![a-z-]+\][+-]?[^\n]*/i.exec(paras[0]?.raw ?? "");
+				// A callout's first line is its type, how it folds, and a title typed into in place.
+				const head = /^\[!([a-z-]+)\]([+-]?)[ \t]*([^\n]*)/i.exec(paras[0]?.raw ?? "");
 				if (head) {
-					el.setAttribute("data-head", head[0]);
-					const type = /^\[!([a-z-]+)\]/i.exec(head[0])![1]!.toLowerCase();
+					const type = head[1]!.toLowerCase();
 					el.setAttribute("data-callout", type);
+					el.setAttribute("data-mark", `[!${head[1]}]${head[2]}`);
 					el.setAttribute("data-tone", CALLOUTS[type] ?? "blue");
-					const title = head[0].replace(/^\[![a-z-]+\][+-]?\s*/i, "") || type.charAt(0).toUpperCase() + type.slice(1);
-					el.append(h("div", { class: "pce-chead", contenteditable: "false" }, title));
+					if (head[3]!.trim()) el.setAttribute("data-titled", "");
+					const title = head[3]!.trim() || type.charAt(0).toUpperCase() + type.slice(1);
+					el.append(h("div", { class: "pce-chead" }, title));
 					const rest = paras[0]!.raw.slice(head[0].length).replace(/^\n/, "");
 					paras[0] = rest.trim() ? (cardMarked().lexer(rest)[0] as Tokens.Paragraph) : (undefined as unknown as Tokens.Paragraph);
 				}
@@ -240,6 +241,19 @@ export function CardEditor(props: CardEditorProps) {
 					const el2 = h("p");
 					inline(el2, p.tokens);
 					el.append(el2);
+				}
+				return el;
+			}
+			case "table": {
+				// Typed into cell by cell; Enter goes down a column, and past the last row adds one.
+				const tb = t as Tokens.Table;
+				const el = h("table", { class: "pce-table", "data-align": tb.align.map((a) => a ?? "").join(",") });
+				const head = el.appendChild(h("thead")).appendChild(h("tr"));
+				for (const cell of tb.header) inline(head.appendChild(h("th")), cell.tokens);
+				const body = el.appendChild(h("tbody"));
+				for (const row of tb.rows) {
+					const tr = body.appendChild(h("tr"));
+					for (const cell of row) inline(tr.appendChild(h("td")), cell.tokens);
 				}
 				return el;
 			}
@@ -385,7 +399,21 @@ export function CardEditor(props: CardEditorProps) {
 			case "BLOCKQUOTE": {
 				const body = [...el.children].filter((c) => !c.classList.contains("pce-chead")).map((c) => outBlock(c as HTMLElement)).join("\n\n");
 				const lines = body ? body.split("\n").map((l) => (l ? `> ${l}` : ">")) : [];
-				return [...(el.dataset.head ? [`> ${el.dataset.head}`] : []), ...lines].join("\n") || ">";
+				// The title is written only when it says something the type does not: Obsidian shows the type's name.
+				const chead = el.querySelector(":scope > .pce-chead");
+				const type = el.dataset.callout ?? "";
+				const title = chead ? out(chead).replace(/\s+/g, " ").trim() : "";
+				const named = title && (el.hasAttribute("data-titled") || title !== type.charAt(0).toUpperCase() + type.slice(1));
+				const head = el.dataset.mark ? [`> ${el.dataset.mark}${named ? ` ${title}` : ""}`] : [];
+				return [...head, ...lines].join("\n") || ">";
+			}
+			case "TABLE": {
+				const rows = [...el.querySelectorAll("tr")];
+				const cells = (row: Element) => [...row.children].map((cell) => out(cell).replace(/\n/g, " ").replace(/\|/g, "\\|").trim());
+				const header = cells(rows[0] ?? el);
+				const align = (el.dataset.align ?? "").split(",");
+				const rule = header.map((_, i) => ({ left: ":--", right: "--:", center: ":-:" })[align[i] as "left"] ?? "---");
+				return [header, rule, ...rows.slice(1).map(cells)].map((row) => `| ${row.join(" | ")} |`).join("\n");
 			}
 			case "PRE":
 				return "```" + (el.dataset.lang ?? "") + "\n" + (el.textContent ?? "").replace(/\n$/, "") + "\n```";
@@ -733,6 +761,15 @@ export function CardEditor(props: CardEditorProps) {
 		changed();
 	}
 
+	/** The caret in an element: at its start, or with all of its words selected. */
+	function caretInto(el: Element, all: boolean) {
+		const r = document.createRange();
+		r.selectNodeContents(el);
+		if (!all) r.collapse(true);
+		sel().removeAllRanges();
+		sel().addRange(r);
+	}
+
 	/* ---------- in and out ---------- */
 
 	function commit() {
@@ -741,6 +778,41 @@ export function CardEditor(props: CardEditorProps) {
 		props.onCommit(serialise());
 	}
 	function onKeyDown(event: KeyboardEvent) {
+		const at = sel().anchorNode;
+		const here = at ? (at.nodeType === 1 ? (at as Element) : at.parentElement) : null;
+		// In a callout's title, Enter goes on to its first line.
+		const chead = here?.closest(".pce-chead");
+		if (event.key === "Enter" && chead && ed.contains(chead)) {
+			event.preventDefault();
+			const next = chead.nextElementSibling ?? chead.parentElement!.appendChild(h("p"));
+			caretInto(next, false);
+			return;
+		}
+		// In a table, Enter goes down a column (adding a row past the last), Tab across the cells.
+		const cell = here?.closest("td, th") as HTMLTableCellElement | null;
+		if (cell && ed.contains(cell) && ((event.key === "Enter" && !event.metaKey && !event.ctrlKey) || event.key === "Tab")) {
+			event.preventDefault();
+			const table = cell.closest("table")!;
+			const rows = [...table.querySelectorAll("tr")];
+			const row = cell.parentElement as HTMLTableRowElement;
+			const r = rows.indexOf(row);
+			const c = [...row.children].indexOf(cell);
+			let target: Element | undefined;
+			if (event.key === "Tab") {
+				const flat = rows.flatMap((one) => [...one.children]);
+				target = flat[flat.indexOf(cell) + (event.shiftKey ? -1 : 1)];
+			} else {
+				if (r === rows.length - 1) {
+					const fresh = h("tr");
+					for (let i = 0; i < row.children.length; i++) fresh.append(h("td"));
+					table.querySelector("tbody")!.append(fresh);
+					rows.push(fresh);
+				}
+				target = rows[r + 1]!.children[c];
+			}
+			if (target) caretInto(target, true);
+			return changed();
+		}
 		if (event.key === "Escape") {
 			event.preventDefault();
 			if (dragging) return endDrag(true);

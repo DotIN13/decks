@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
-import { cardChildren, cardMarkdown, markdownText, newCard } from "./card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, markdownText, newCard, obsidianNote } from "./card-frame.ts";
 
 let n = 0;
 const options = { fresh: () => `new-${++n}`, inner: 288, size: (url: string) => (url === "wide.png" ? { w: 600, h: 300 } : undefined) };
@@ -41,4 +41,22 @@ test("the markdown and the items go round: a picture written back with its width
 test("a new card is a column frame with one empty block", () => {
 	const card = newCard("c", "t");
 	assert.deepEqual([card.type, card.layout, card.metadata?.type, card.children?.length, card.children?.[0]?.metadata?.type], ["frame", "vertical", "decks.card", 1, "decks.markdown"]);
+});
+
+test("a save is one edit per item that changed: delete, insert, move and update, and nothing for the rest", () => {
+	n = 0;
+	const before = cardChildren("# Plan\n\nFirst.\n\nSecond.\n\nThird.", [], options);
+	const [h, a, b, c] = before.map((k) => k.id);
+	assert.deepEqual(cardEdits("card", before, cardChildren("# Plan\n\nFirst.\n\nSecond.\n\nThird.", before, options)), []);
+	assert.deepEqual(cardEdits("card", before, cardChildren("# Plan\n\nFirst, changed.\n\nSecond.\n\nThird.", before, options)), [{ op: "update", id: a, set: { content: "First, changed." } }]);
+	assert.deepEqual(cardEdits("card", before, cardChildren("# Plan\n\nSecond.\n\nThird.", before, options)), [{ op: "delete", id: a }]);
+	const added = cardChildren("# Plan\n\nFirst.\n\nNew.\n\nSecond.\n\nThird.", before, options);
+	assert.deepEqual(cardEdits("card", before, added), [{ op: "insert", parent: "card", index: 2, node: added[2] }]);
+	assert.deepEqual(cardEdits("card", before, cardChildren("# Plan\n\nThird.\n\nFirst.\n\nSecond.", before, options)), [{ op: "move", id: c, parent: "card", index: 1 }]);
+	void h; void b;
+});
+
+test("a card goes to Obsidian as one note: colour and open suggestions out, pictures kept, other items left out", () => {
+	const card = { type: "frame", id: "c", metadata: { type: "decks.card" }, children: [markdownText("a", "# Plan"), markdownText("b", "It is [firm]{.red}, ask about {~~Arashiyama~>Ohara~~}{>>quieter<<}."), { type: "rectangle", id: "p", name: "Gate", width: 200, height: 100, fill: { type: "image", url: "gate.png", mode: "fill" } }, { type: "note", id: "n", content: "x" }] } as PenNode;
+	assert.equal(obsidianNote(card), "# Plan\n\nIt is firm, ask about Arashiyama %%quieter%%.\n\n![Gate|200](gate.png)\n");
 });

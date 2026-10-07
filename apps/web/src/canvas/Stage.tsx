@@ -42,7 +42,7 @@ import { scheme } from "../lib/theme.ts";
 import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
-import { cardChildren, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, newCard } from "./pen/card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_RADIUS, heldLabels, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -976,7 +976,10 @@ export function Stage(props: {
 		penEdit([{ op: "insert", parent: id, node }]);
 		openPenText({ id: labelId, node, box: { x: box.x + 10, y: box.y + box.h / 2 - 10, w: Math.max(20, box.w - 20), h: 20 } }, true);
 	};
-	const openPenText = (hit: PenHit, fresh?: boolean) => {
+	const openPenText = (given: PenHit, fresh?: boolean) => {
+		// The item as the server has it now: what the canvas last drew can be a save behind.
+		const now = props.pen ? indexOf(props.pen.doc).get(given.id)?.node : undefined;
+		const hit = now ? { ...given, node: now } : given;
 		// A card, or one of its blocks: the whole card is typed into, as one piece of markdown.
 		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
 		if (card) return openCard(card, hit.box, fresh);
@@ -1139,8 +1142,8 @@ export function Stage(props: {
 			props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 			return;
 		}
-		// A card is saved as its blocks: the frame again, each untouched block the same item. A note card
-		// from before becomes a card frame here, in its place. Pictures are measured first, for their shape.
+		// A card is saved as edits to its blocks, each untouched block left alone. A note card from before
+		// becomes a card frame here, in its place. Pictures are measured first, for their shape.
 		const save = props.onPenEdit;
 		void measurePictures(value).then(() => {
 			const current = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
@@ -1149,7 +1152,10 @@ export function Stage(props: {
 			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: NOTE_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
 			const children = cardChildren(value, card.children ?? [], { fresh: freshIds(), inner: cardInner(card), size: pictureSize });
 			unmute = { id: open.id, value: cardMarkdown(children), timer: setTimeout(unmuteNow, 3000) };
-			save([{ op: "replace", id: open.id, node: { ...card, children } }]);
+			// A card's blocks are edited one by one, and only the ones that changed; a note card becomes a frame.
+			const ops = isCard(base) ? cardEdits(base.id, base.children ?? [], children) : [{ op: "replace" as const, id: open.id, node: { ...card, children } }];
+			if (!ops.length) return unmuteNow();
+			save(ops);
 		});
 	};
 	/** How wide a card's words are: its width less its padding. */

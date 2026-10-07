@@ -15,6 +15,7 @@ import Bold from "lucide-solid/icons/bold";
 import BringToFront from "lucide-solid/icons/bring-to-front";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
+import FileDown from "lucide-solid/icons/file-down";
 import FlipHorizontal2 from "lucide-solid/icons/flip-horizontal-2";
 import FlipVertical2 from "lucide-solid/icons/flip-vertical-2";
 import FrameIcon from "lucide-solid/icons/frame";
@@ -37,6 +38,7 @@ import TextAlignStart from "lucide-solid/icons/text-align-start";
 import Trash2 from "lucide-solid/icons/trash-2";
 import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
+import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../camera/camera.ts";
 import { penBoxes, penSelection, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
@@ -402,6 +404,16 @@ export function Properties(props: {
 			else next.add(key);
 			return next;
 		});
+	/** A card downloaded as an Obsidian note (`card-frame.ts`, `obsidianNote`), named for the card. */
+	const exportNote = (node: PenNode) => {
+		const name = (String(node.name ?? "") || "Card").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Card";
+		const url = URL.createObjectURL(new Blob([obsidianNote(node)], { type: "text/markdown;charset=utf-8" }));
+		const link = Object.assign(document.createElement("a"), { href: url, download: `${name}.md` });
+		document.body.append(link);
+		link.click();
+		link.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	};
 	const Section = (p: { key: string; title: string; children: JSX.Element }) => (
 		<details class="props-sec" open={!shut().has(p.key)} onToggle={(event) => toggle(p.key, event.currentTarget.open)} data-section={p.key}>
 			<summary>{p.title}</summary>
@@ -895,6 +907,9 @@ export function Properties(props: {
 							<IconToggle title="Send to the back" onClick={() => order("back")}><Icon of={SendToBack} size={14} /></IconToggle>
 							<IconToggle title="Duplicate (⌘D)" onClick={duplicate}><Icon of={Copy} size={14} /></IconToggle>
 							<IconToggle title="Export as a picture (PNG)" onClick={() => props.onExport(selected().map((node) => node.id))}><Icon of={ImageDown} size={14} /></IconToggle>
+							<Show when={single() && (isCard(single()!) || isMarkdown(single()!))}>
+								<IconToggle title="Export to Obsidian (.md)" onClick={() => exportNote(single()!)}><Icon of={FileDown} size={14} /></IconToggle>
+							</Show>
 							<IconToggle title="Delete (Delete)" danger onClick={remove}><Icon of={Trash2} size={14} /></IconToggle>
 						</div>
 					</Section>
