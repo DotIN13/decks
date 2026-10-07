@@ -1,7 +1,7 @@
 /** The frames. Everything that changes state is one of these, and nothing else crosses. */
 
 import type { BoardPatch } from "./boards.ts";
-import type { DocChange, DocFormat, DocVersion, Splice } from "./docs.ts";
+import type { DocAuthor, DocChange, DocFormat, DocVersion, Splice } from "./docs.ts";
 import type {
 	AgentChat,
 	AgentKind,
@@ -493,8 +493,11 @@ export type ServerMessage =
 	| { type: "backend"; backend: BackendInfo }
 	/** A document as it is now, for the page that opened it; `changes` are those still to review. */
 	| { type: "doc.state"; path: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
-	/** To the page that sent `batch`: the revision it made, and which of its splices did not land. */
-	| { type: "doc.patched"; path: string; batch: string; rev: number; refused: number[] }
+	/**
+	 * To the page that sent `batch`: the revision it made, and which of its splices did not land.
+	 * When any did not, `text` is the whole document at `rev`, so the page resyncs without asking.
+	 */
+	| { type: "doc.patched"; path: string; batch: string; rev: number; refused: number[]; text?: string }
 	/**
 	 * To every browser: revision `base` became `rev` by these splices, in the server's text. A page
 	 * on `base` applies them; a page on anything else opens the document again. `client` is the page
@@ -502,7 +505,7 @@ export type ServerMessage =
 	 * the `change` to review instead. A page that no longer holds that batch (it opened the document
 	 * again while the batch was on its way) applies it like anyone else's.
 	 */
-	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; client?: string; batch?: string; change?: DocChange; settled?: string }
+	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; by: DocAuthor; client?: string; batch?: string; change?: DocChange; settled?: string }
 	| { type: "doc.versions"; path: string; versions: DocVersion[] }
 	| { type: "error"; text: string };
 

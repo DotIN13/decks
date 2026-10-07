@@ -25,6 +25,12 @@ export interface Splice {
 
 export type DocFormat = "text" | "docx";
 
+/**
+ * Who made a `doc.changed`: `"person"` for typing on a page (and an accept, reject or restore,
+ * which a person pressed), an agent's name when the server can tell, and `"outside"` otherwise.
+ */
+export type DocAuthor = "person" | "outside" | (string & {});
+
 /** Apply one splice whose `before` is known to stand at `at`. */
 export function applySplice(text: string, splice: Splice): string {
 	return text.slice(0, splice.at) + splice.text + text.slice(splice.at + splice.before.length);
@@ -56,11 +62,11 @@ export function transformSplice(a: Splice, b: Splice, aFirst: boolean): Splice |
  * program. Kept until a person accepts or rejects it, and drawn on the page as a tracked change.
  *
  * `from` and `to` are the versions either side of it (`.decks/revisions`), and `splices` turn
- * `from` into `to`. `by` is who the server believes wrote it, which is `"file"` when it cannot say.
+ * `from` into `to`. `by` is who the server believes wrote it, which is `"outside"` when it cannot say.
  */
 export interface DocChange {
 	id: string;
-	by: string;
+	by: DocAuthor;
 	at: number;
 	from: string;
 	to: string;

@@ -121,7 +121,16 @@ export class DocSync {
 				return;
 			case "doc.patched":
 				if (!this.matches(message.path) || message.batch !== this.inflight?.batch) return;
-				if (message.refused.length > 0) return this.open();
+				if (message.refused.length > 0) {
+					// The server sent the text as it stands, so the page starts again from it without asking.
+					if (message.text === undefined) return this.open();
+					this.text = message.text;
+					this.rev = message.rev;
+					this.inflight = undefined;
+					this.pending = [];
+					this.options.onUpdate(this, "open");
+					return;
+				}
 				this.rev = message.rev;
 				this.inflight = undefined;
 				this.flush();

@@ -183,5 +183,6 @@ test("a page from before a restart is told to open again", () => {
 	const answer = docs.patch("a.md", "p", state.rev + 10_000, "b", [{ at: 0, before: "", text: "y" }]);
 	assert.deepEqual(answer.refused, [0]);
 	assert.equal(readFileSync(join(root, "a.md"), "utf8"), "x\n");
+	assert.equal(answer.text, "x\n", "the refusal carries the text, so the page resyncs without asking");
 	done();
 });

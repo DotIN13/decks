@@ -98,7 +98,7 @@ export class DocService {
 		const all = splices.map((_, index) => index);
 		if (!doc || !doc.writable || !Array.isArray(splices)) return { type: "doc.patched", path, batch, rev: doc?.rev ?? 0, refused: all };
 		// A revision from the future is a page from before a restart: it reopens.
-		if (rev > doc.rev) return { type: "doc.patched", path, batch, rev: doc.rev, refused: all };
+		if (rev > doc.rev) return { type: "doc.patched", path, batch, rev: doc.rev, refused: all, text: doc.text };
 		const clean = splices.filter(isSplice);
 		if (clean.length !== splices.length) return { type: "doc.patched", path, batch, rev: doc.rev, refused: all };
 		// A write from outside that the watcher has not read yet is taken in first, or this write would undo it.
@@ -109,9 +109,10 @@ export class DocService {
 			this.commit(doc, landed.text, landed.applied);
 			doc.unversioned = true;
 			this.schedulePause(doc);
-			this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, client, batch });
+			this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", client, batch });
 		}
-		return { type: "doc.patched", path, batch, rev: doc.rev, refused: landed.refused };
+		const answer = { type: "doc.patched" as const, path, batch, rev: doc.rev, refused: landed.refused };
+		return landed.refused.length > 0 ? { ...answer, text: doc.text } : answer;
 	}
 
 	/** Keep a change from outside, or take it back with its reverse splices. */
@@ -121,7 +122,7 @@ export class DocService {
 		if (!doc || !entry) return;
 		doc.changes.delete(change);
 		if (accept) {
-			this.context.send({ type: "doc.changed", path: doc.key, base: doc.rev, rev: doc.rev, splices: [], settled: change });
+			this.context.send({ type: "doc.changed", path: doc.key, base: doc.rev, rev: doc.rev, splices: [], by: "person", settled: change });
 			return;
 		}
 		this.absorb(doc);
@@ -132,7 +133,7 @@ export class DocService {
 			this.commit(doc, landed.text, landed.applied);
 			this.context.revisions.record(doc.key, doc.text);
 		}
-		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, settled: change });
+		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", settled: change });
 		if (landed.refused.length > 0) {
 			this.context.send({ type: "notice", level: "warn", text: `Part of that change was typed over since, so ${landed.refused.length} of its pieces were left as they are.` });
 		}
@@ -156,7 +157,7 @@ export class DocService {
 		const base = doc.rev;
 		this.commit(doc, target, splices);
 		this.context.revisions.record(doc.key, target);
-		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices });
+		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: "person" });
 	}
 
 	/** Every open document closed, for a deck switch or a shutdown. */
@@ -296,9 +297,9 @@ export class DocService {
 		doc.log.push({ base, rev: doc.rev, splices });
 		if (doc.log.length > LOG) doc.log.splice(0, doc.log.length - LOG);
 		const to = this.context.revisions.record(doc.key, text);
-		const change: DocChange = { id: randomUUID(), by: this.context.writer?.(doc.file) ?? "file", at: Date.now(), from, to, splices };
+		const change: DocChange = { id: randomUUID(), by: this.context.writer?.(doc.file) ?? "outside", at: Date.now(), from, to, splices };
 		doc.changes.set(change.id, { change, rev: doc.rev });
-		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, change });
+		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: change.by, change });
 	}
 
 	private dispose(doc: Open): void {
