@@ -206,6 +206,52 @@ if (spot) {
 	const extras = await page.evaluate(() => ({ radius: document.querySelectorAll('.pen-handle[data-handle="radius"]').length }));
 	say("a selected rectangle has one radius handle", extras.radius === 1, JSON.stringify(extras));
 
+	/*
+	 * Move it first, then round it: a rounding used to be taken for a move by the sheet, which slid
+	 * a picture of the item by however far the *last* drag went, so the item jumped away the moment
+	 * the radius handle was pressed and jumped back when it was let go.
+	 */
+	const moveFrom = await rectBox();
+	const wasAt = onDisk().children.find((n) => n.id === drawnId)?.x ?? 0;
+	await page.mouse.move(moveFrom.x + moveFrom.width / 2, moveFrom.y + moveFrom.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(moveFrom.x + moveFrom.width / 2 + 90, moveFrom.y + moveFrom.height / 2 + 60, { steps: 8 });
+	await page.mouse.up();
+	await until(() => {
+		const now = onDisk().children.find((n) => n.id === drawnId);
+		return now && Math.abs(now.x - wasAt) > 40 ? now : undefined;
+	});
+	await settle(page, 400);
+	/** Where the rectangle's own fill is drawn on screen, found in a screenshot of the window around it. */
+	const paintedAt = async (area) => {
+		const shot = (await page.screenshot({ type: "png" })).toString("base64");
+		return page.evaluate(async ([data, win, hex]) => {
+			const img = new Image();
+			img.src = "data:image/png;base64," + data;
+			await img.decode();
+			const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
+			const ctx = c.getContext("2d", { willReadFrequently: true });
+			ctx.drawImage(img, 0, 0);
+			const { data: px, width } = ctx.getImageData(0, 0, img.width, img.height);
+			const want = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+			let x1 = 1e9, y1 = 1e9, n = 0;
+			for (let y = Math.max(0, win.y); y < Math.min(img.height, win.y + win.h); y++)
+				for (let x = Math.max(0, win.x); x < Math.min(width, win.x + win.w); x++) {
+					const i = (y * width + x) * 4;
+					if (px[i] !== want[0] || px[i + 1] !== want[1] || px[i + 2] !== want[2]) continue;
+					n++;
+					if (x < x1) x1 = x;
+					if (y < y1) y1 = y;
+				}
+			return n ? { x: x1, y: y1, n } : null;
+		}, [shot, area, hex]);
+	};
+	const hex = String(onDisk().children.find((n) => n.id === drawnId)?.fill ?? "#dbe4f0");
+	const home = await rectBox();
+	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
+	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
+	const parked = await paintedAt(area);
+
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
 	const radiusAt = () => page.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="radius"]').getBoundingClientRect();
@@ -216,6 +262,13 @@ if (spot) {
 	await page.mouse.down();
 	await page.mouse.move(grabRadius.x + 12, grabRadius.y + 12, { steps: 4 });
 	await page.mouse.move(grabRadius.x + 24, grabRadius.y + 24, { steps: 4 });
+	await settle(page, 500);
+	const rounding = await paintedAt(area);
+	say(
+		"a rounding leaves the item where it is, after a move",
+		!!parked && !!rounding && Math.abs(rounding.x - parked.x) <= 2 && Math.abs(rounding.y - parked.y) <= 2,
+		`${JSON.stringify(parked)} -> ${JSON.stringify(rounding)}`,
+	);
 	await page.mouse.up();
 	const round = await until(() => {
 		const r = onDisk().children.find((n) => n.id === drawnId)?.cornerRadius;

@@ -1096,7 +1096,7 @@ export class StageScene {
 	 * is laid out and recorded again. Returns whether anything is to be drawn again.
 	 */
 	private preview(moving: ReadonlyMap<string, PenPreview> | undefined): boolean {
-		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.set === undefined);
+		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
 		if (slide) {
 			const key = [...moving!.keys()].sort().join("|");
 			if (this.slide?.key === key) return false;
