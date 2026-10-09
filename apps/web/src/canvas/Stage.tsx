@@ -52,6 +52,7 @@ import { CARD_PALETTE, firstLine } from "./pen/markdown-layout.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
+import { untilReleased } from "./held.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -3910,15 +3911,14 @@ export function Stage(props: {
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
 			pannedAt = performance.now();
 		};
+		// Ended on any sign the button is up, not only its release (`held.ts`).
+		const stop = untilReleased({ docs: [document], held: middle ? 4 : 1, capture: element, end: () => finish() });
 		const finish = () => {
+			stop();
 			element.removeEventListener("pointermove", move);
-			element.removeEventListener("pointerup", finish);
-			element.removeEventListener("pointercancel", finish);
 			setPanning(false);
 		};
 		element.addEventListener("pointermove", move);
-		element.addEventListener("pointerup", finish);
-		element.addEventListener("pointercancel", finish);
 	};
 
 	/**

@@ -988,7 +988,7 @@
 				const sy = Number(message.sy);
 				if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
 				// A pan, in screen pixels, which only `frame-gestures.ts` reads (`decks:embed-pan`).
-				frame.dispatchEvent(new CustomEvent("decks:embed-pan", { bubbles: true, detail: { phase, sx, sy } }));
+				frame.dispatchEvent(new CustomEvent("decks:embed-pan", { bubbles: true, detail: { phase, sx, sy, button: Number(message.button) || 0 } }));
 				return;
 			}
 			if (message.t !== "decks:wheel") return;

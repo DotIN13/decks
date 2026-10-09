@@ -4,6 +4,7 @@ import { type ZoomKey, zoomKey } from "../canvas/zoom-keys.ts";
 import { type SlideAction, slideKey } from "../present/slide-keys.ts";
 import { noteCameraMove } from "./pan-signal.ts";
 import type { Finger, TouchStep } from "../canvas/touch.ts";
+import { untilReleased } from "../canvas/held.ts";
 
 /**
  * Canvas gestures that begin inside a board.
@@ -328,15 +329,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 			host.pan(at.x - last.x, at.y - last.y);
 			last = at;
 		};
+		/*
+		 * Ended on any sign the button is up (`held.ts`), from this board or from the app: the pan moves
+		 * the board under the pointer, so the release can land over the app, and this document's next
+		 * move, with no button held, used to carry on panning.
+		 */
+		const stop = untilReleased({ docs: [doc, frame.ownerDocument], held: event.button === 1 ? 4 : 1, capture: target, end: () => finish() });
 		const finish = () => {
+			stop();
 			doc.documentElement.style.removeProperty("cursor");
 			doc.removeEventListener("pointermove", move, true);
-			doc.removeEventListener("pointerup", finish, true);
-			doc.removeEventListener("pointercancel", finish, true);
 		};
 		doc.addEventListener("pointermove", move, true);
-		doc.addEventListener("pointerup", finish, true);
-		doc.addEventListener("pointercancel", finish, true);
 	};
 
 	/**
@@ -638,36 +642,25 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 */
 	let embedPan: { sx: number; sy: number } | undefined;
 	/*
-	 * Ended on any sign the button is up, not only on the page's word for it: the page can lose the
-	 * release (the pointer left it, it reloaded), and a pan nobody ends follows the mouse forever. So a
-	 * move in this board or in the app with no button held ends it, and so does a release there or a
-	 * window that loses focus.
+	 * Ended on any sign the button is up, not only on the page's word for it (`held.ts`): the page can
+	 * lose the release (the pointer left it, it reloaded), and a pan nobody ends follows the mouse
+	 * forever. Its moves are the page's and never reach this document or the app's, so a move with no
+	 * button held there is the pointer back out of the page without it.
 	 */
-	const app = frame.ownerDocument;
+	let stopEmbedPan: (() => void) | undefined;
 	const endEmbedPan = () => {
-		if (!embedPan) return;
+		stopEmbedPan?.();
+		stopEmbedPan = undefined;
 		embedPan = undefined;
-		for (const where of [doc, app]) {
-			where.removeEventListener("pointermove", embedPanMoved, true);
-			where.removeEventListener("pointerup", endEmbedPan, true);
-		}
-		app.defaultView?.removeEventListener("blur", endEmbedPan);
-	};
-	const embedPanMoved = (event: PointerEvent) => {
-		if (event.isTrusted && event.buttons === 0) endEmbedPan();
 	};
 	const onEmbedPan = (event: Event) => {
-		const detail = (event as CustomEvent).detail as { phase?: string; sx?: number; sy?: number } | null;
+		const detail = (event as CustomEvent).detail as { phase?: string; sx?: number; sy?: number; button?: number } | null;
 		if (!detail || !Number.isFinite(detail.sx) || !Number.isFinite(detail.sy)) return;
 		const at = { sx: detail.sx as number, sy: detail.sy as number };
 		if (detail.phase === "down") {
 			endEmbedPan();
 			embedPan = at;
-			for (const where of [doc, app]) {
-				where.addEventListener("pointermove", embedPanMoved, true);
-				where.addEventListener("pointerup", endEmbedPan, true);
-			}
-			app.defaultView?.addEventListener("blur", endEmbedPan);
+			stopEmbedPan = untilReleased({ docs: [doc, frame.ownerDocument], held: detail.button === 0 ? 1 : 4, end: () => endEmbedPan() });
 			return;
 		}
 		if (!embedPan) return;
