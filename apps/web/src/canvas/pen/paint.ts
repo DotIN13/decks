@@ -390,7 +390,14 @@ function fillPaint(ctx: PaintContext, fill: Fill, theme: ThemeState, box: Placed
 		const contain = Math.min(scaleX, scaleY);
 		const [sx, sy] = mode === "stretch" ? [scaleX, scaleY] : mode === "fit" ? [contain, contain] : [cover, cover];
 		const matrix = [sx, 0, box.x + (box.w - iw * sx) / 2, 0, sy, box.y + (box.h - ih * sy) / 2, 0, 0, 1];
-		const shader = image.makeShaderOptions(ck.TileMode.Decal, ck.TileMode.Decal, ck.FilterMode.Linear, ck.MipmapMode.Linear, matrix);
+		/*
+		 * Past its edge a picture that fills its box repeats its last row and column. Read as transparent
+		 * there (Decal), every scaled step blended the edge with nothing, and the item wore a faint grey
+		 * rim on all four sides whenever it was drawn smaller than the picture, as it is through a zoom.
+		 * A picture fitted inside its box keeps Decal, so the margin round it stays empty.
+		 */
+		const tile = mode === "fit" ? ck.TileMode.Decal : ck.TileMode.Clamp;
+		const shader = image.makeShaderOptions(tile, tile, ck.FilterMode.Linear, ck.MipmapMode.Linear, matrix);
 		paint.setShader(shader);
 		shader.delete();
 		const alpha = num(doc, (fill as { opacity?: unknown }).opacity, theme, 1);
