@@ -93,8 +93,7 @@ test("the handshake lists the one tool, in Decks' words", { skip: false }, async
 		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
 
 		const listed = (await client.call("tools/list", {})) as { tools?: Array<{ name?: string; inputSchema?: Record<string, unknown> }> };
-		assert.equal(listed.tools?.length, 1);
-		assert.equal(listed.tools![0]!.name, "stage_eval");
+		assert.deepEqual(listed.tools?.map((t) => t.name), ["stage_eval", "gdocs_read", "gdocs_edit"]);
 		assert.equal((listed.tools![0]!.inputSchema?.required as string[])?.join(","), "code");
 	} finally {
 		client.close();

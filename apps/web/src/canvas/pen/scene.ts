@@ -121,6 +121,8 @@ export type SceneInput =
 	| { type: "carry"; boards: string[] }
 	| { type: "hide"; ids: string[] }
 	| { type: "mute"; ids: string[] }
+	/** File items shown live by an element under the sheet: drawn as holes (`paint.ts`, `holes`). */
+	| { type: "holes"; ids: string[] }
 	| { type: "scroll"; scrolls: Array<[string, number]> }
 	/** The ink not yet in the drawing. An empty list with `warm` loads CanvasKit ahead of the first stroke. */
 	| { type: "ink"; strokes: LiveInk[]; warm?: boolean }
@@ -147,6 +149,8 @@ export type SceneOutput =
 			 * nothing is carried. `boards` are the boards drawn in it, whose pages hide while it shows.
 			 */
 			carried?: { bitmap: ImageBitmap; boards: string[] };
+			/** How many of the page's messages the frame was painted after, so the page knows which change it shows (`layer.ts`, `seen`). */
+			seen?: number;
 			/** Drawn by CanvasKit, with the drawing in it; false while it loads, when only boards are drawn. */
 			gpu?: boolean;
 	  }
@@ -302,6 +306,7 @@ export class StageScene {
 	private moving: ReadonlyMap<string, PenPreview> | undefined;
 	private hidden: ReadonlySet<string> = new Set();
 	private muted: ReadonlySet<string> = new Set();
+	private holes: ReadonlySet<string> = new Set();
 	private scrolls = new Map<string, number>();
 	private ink: LiveInk[] = [];
 	private readonly scrollOf = (id: string, index: number): number => this.scrolls.get(`${id}:${index}`) ?? 0;
@@ -362,8 +367,12 @@ export class StageScene {
 		return out;
 	}
 
+	/** Messages taken in, counted as the page counts them sent. */
+	private seen = 0;
+
 	receive(message: SceneInput): void {
 		if (this.disposed) return;
+		this.seen++;
 		switch (message.type) {
 			case "doc": {
 				// The server's answer has arrived, so whatever a drag was previewing is now the drawing itself.
@@ -424,6 +433,12 @@ export class StageScene {
 			case "hide": {
 				if (message.ids.length === 0 && this.hidden.size === 0) return;
 				this.hidden = new Set(message.ids);
+				this.dirty = true;
+				break;
+			}
+			case "holes": {
+				if (message.ids.length === 0 && this.holes.size === 0) return;
+				this.holes = new Set(message.ids);
 				this.dirty = true;
 				break;
 			}
@@ -544,7 +559,7 @@ export class StageScene {
 			// Nothing to draw: the page hides the sheet rather than showing an empty one.
 			if (!this.emptySent) {
 				this.emptySent = true;
-				this.host.post({ type: "frame", bitmap: undefined, camera: this.camera, width: cssW, height: cssH });
+				this.host.post({ type: "frame", bitmap: undefined, camera: this.camera, width: cssW, height: cssH, seen: this.seen });
 				this.shown = undefined;
 			}
 			return;
@@ -575,7 +590,7 @@ export class StageScene {
 			carried?.bitmap.close();
 			return;
 		}
-		this.host.post({ type: "frame", bitmap, camera, width: cssW, height: cssH, gpu: useGpu, ...(carried ? { carried } : {}) }, carried ? [bitmap, carried.bitmap] : [bitmap]);
+		this.host.post({ type: "frame", bitmap, camera, width: cssW, height: cssH, gpu: useGpu, seen: this.seen, ...(carried ? { carried } : {}) }, carried ? [bitmap, carried.bitmap] : [bitmap]);
 		this.shown = { camera, rect: covered, headroom: band };
 	}
 
@@ -1141,7 +1156,8 @@ export class StageScene {
 	private recordSlide(): void {
 		const { ck, fonts, slide, painted } = this;
 		if (!ck || !fonts || !slide || !painted) return;
-		const ctx = this.paintContext(painted.doc, painted.placed);
+		// A live file being carried is carried as its hole: its element goes with the drag under the sheet.
+		const ctx = { ...this.paintContext(painted.doc, painted.placed), holes: this.holes };
 		slide.replaced = new Map();
 		for (const node of painted.nodes) {
 			if (slide.ids.has(node.id)) continue;
@@ -1247,7 +1263,7 @@ export class StageScene {
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
 		this.painted = { nodes, doc, placed };
-		const ctx = { ...this.paintContext(doc, placed), skip: this.hidden, mute: this.muted };
+		const ctx = { ...this.paintContext(doc, placed), skip: this.hidden, mute: this.muted, holes: this.holes };
 		const covers: Rect[] = [];
 		for (const node of nodes) {
 			if (this.hidden.has(node.id)) continue;

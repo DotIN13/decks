@@ -29,7 +29,8 @@ import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { isTransientAuthFailure, MAX_TRANSIENT_RETRIES, retryDelayMs } from "./transient.ts";
 import { isStaleSession } from "./stale-session.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
-import { qualifiedToolName, stageMcpServer } from "./tools.ts";
+import { gdocsToolNames, qualifiedToolName, stageMcpServer } from "./tools.ts";
+import { gdocsCaller } from "../../google/agent-tools.ts";
 import { eventPercent, toUsageReport } from "./usage.ts";
 
 /**
@@ -246,10 +247,10 @@ export class ClaudeBackend implements AgentBackend {
 			 * `commands/`, `agents/` or `hooks/` beside them to pick up.
 			 */
 			plugins: [{ type: "local", path: runtimeDir() }],
-			mcpServers: { [stageServerName()]: stageMcpServer(this.context.tool) },
+			mcpServers: { [stageServerName()]: stageMcpServer(this.context.tool, gdocsCaller(this.context.port, this.context.canvasToken)) },
 			// Pre-approved: the canvas tool is how the agent answers, and a confirm in
 			// front of it would be a confirm in front of every reply.
-			allowedTools: [qualifiedToolName(this.context.tool)],
+			allowedTools: [qualifiedToolName(this.context.tool), ...gdocsToolNames()],
 			permissionMode: CLI_MODE[this.currentMode],
 			includePartialMessages: true,
 			canUseTool: (toolName, input) => this.ask(toolName, input),

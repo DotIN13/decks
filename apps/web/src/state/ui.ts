@@ -111,7 +111,8 @@ function createUi() {
 	 * the way that board's document would address it (`embedPath`), so "add a photo from
 	 * this phone" cannot be answered without knowing where the answer is going.
 	 */
-	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
+	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
+	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
 
 	/**
 	 * Whether the boards panel is there. One signal where the module it came from had two, because

@@ -13,6 +13,7 @@ import {
 	renderMirror,
 	renderWebBoard,
 	renderDocBoard,
+	renderFileBoard,
 	slugFor,
 	WEB_BOARD_SIZE,
 	type BoardFormat,
@@ -396,8 +397,8 @@ export class BoardService {
 	 * relative to itself, so the deck can move. Asking again for the same file hands back the
 	 * board that already opens it.
 	 */
-	newDocBoard(file: string): string {
-		const name = slugFor(basename(file, extname(file)), "document");
+	newDocBoard(file: string, title?: string): string {
+		const name = slugFor(title ?? basename(file, extname(file)), "document");
 		const inDeck = !relative(this.deck.path, file).startsWith("..") && !isAbsolute(relative(this.deck.path, file));
 		for (let n = 1; ; n++) {
 			const path = `boards/documents/${name}${n === 1 ? "" : `-${n}`}.html`;
@@ -407,7 +408,34 @@ export class BoardService {
 				if (readFileSync(target, "utf8").includes(`data-path="${dataPath}"`)) return path;
 				continue;
 			}
-			const html = renderDocBoard(basename(file), dataPath);
+			const html = renderDocBoard(title ?? basename(file), dataPath);
+			mkdirSync(dirname(target), { recursive: true });
+			writeFileSync(target, html);
+			this.revisions.record(path, html);
+			const board = this.deck.refresh(path);
+			if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+			return path;
+		}
+	}
+
+	/**
+	 * A board that is one file, edge to edge (`renderFileBoard`): a PDF or a web page put on the
+	 * canvas. In `boards/files/`, named for the file; the file is referred to where it is, from the
+	 * board's folder when it is in the deck. The same file asked for again is the board it already has.
+	 */
+	newFileBoard(file: string, size: { w: number; h: number }, title?: string): string {
+		const full = isAbsolute(file) ? file : join(this.deck.path, file);
+		const name = slugFor(basename(full).replace(/\./g, "-"), "file");
+		const inDeck = !relative(this.deck.path, full).startsWith("..") && !isAbsolute(relative(this.deck.path, full));
+		for (let n = 1; ; n++) {
+			const path = `boards/files/${name}${n === 1 ? "" : `-${n}`}.html`;
+			const target = this.deck.fileOf(path);
+			const src = inDeck ? relative(dirname(target), full).split("\\").join("/") : full;
+			if (existsSync(target)) {
+				if (readFileSync(target, "utf8").includes(`data-embed="${src}"`)) return path;
+				continue;
+			}
+			const html = renderFileBoard(title ?? basename(full), src, size);
 			mkdirSync(dirname(target), { recursive: true });
 			writeFileSync(target, html);
 			this.revisions.record(path, html);

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { DocServerMessage as ServerMessage } from "../index.ts";
 import { DocService, QUIET_MS } from "./service.ts";
-import { DirectoryVersions } from "./versions.ts";
+import { DirectoryVersions, MemoryVersions } from "./versions.ts";
 import { readEntry, replaceEntry } from "./zip.ts";
 import { inside, storedZip } from "./fixtures.ts";
 
@@ -60,7 +60,7 @@ test("an agent's write made mid-typing is taken in before the next write, not wr
 	assert.deepEqual(answer.refused, []);
 	assert.equal(readFileSync(file, "utf8"), "# Findings\n\nThe effect is small but real.\n");
 	const outside = changed(sent).find((m) => m.change);
-	assert.ok(outside, "the agent's write went out as a change to review");
+	assert.ok(outside, "the agent's write went out as a change to highlight");
 	assert.deepEqual(outside.change!.splices[0], { at: 2, before: "Result", text: "Finding" });
 	done();
 });
@@ -76,8 +76,42 @@ test("rejecting a change puts the old words back and keeps what was typed since"
 	const change = changed(sent).find((m) => m.change)!.change!;
 	docs.review("paper.md", change.id, false);
 	assert.equal(readFileSync(file, "utf8"), "# Results\n\nThe effect is small but real.\n");
-	assert.equal(changed(sent).at(-1)!.settled, change.id);
+	assert.deepEqual(changed(sent).at(-1)!.settled, [change.id]);
 	assert.equal(docs.opened("paper.md", "page-b").changes.length, 0);
+	done();
+});
+
+test("accept all keeps every change, reject all takes every one back, newest first", () => {
+	const { root, sent, docs, done } = setup();
+	const file = join(root, "paper.md");
+	writeFileSync(file, "one two three\n");
+	const state = docs.opened("paper.md", "page-a");
+	writeFileSync(file, "one 2 three\n");
+	docs.patch("paper.md", "page-a", state.rev, "b1", []);
+	writeFileSync(file, "one 2 three four\n");
+	docs.patch("paper.md", "page-a", state.rev, "b2", []);
+	assert.equal(docs.opened("paper.md", "page-b").changes.length, 2);
+	docs.review("paper.md", "*", false);
+	assert.equal(readFileSync(file, "utf8"), "one two three\n");
+	assert.equal(docs.opened("paper.md", "page-c").changes.length, 0);
+	writeFileSync(file, "one two three!\n");
+	docs.patch("paper.md", "page-a", docs.opened("paper.md", "page-a").rev, "b3", []);
+	docs.review("paper.md", "*", true);
+	assert.equal(readFileSync(file, "utf8"), "one two three!\n");
+	assert.equal(docs.opened("paper.md", "page-d").changes.length, 0);
+	assert.ok(changed(sent).some((m) => m.settled?.length === 1));
+	done();
+});
+
+test("a kept version can be read back to look at", () => {
+	const { root, docs, done } = setup();
+	writeFileSync(join(root, "paper.md"), "first\n");
+	const state = docs.opened("paper.md", "page-a");
+	docs.patch("paper.md", "page-a", state.rev, "b1", [{ at: 5, before: "", text: " draft" }]);
+	const first = docs.versions("paper.md").versions[0]!;
+	const shown = docs.version("paper.md", first.sha);
+	assert.equal(shown.text, "first\n");
+	assert.match(docs.version("paper.md", "nope").error ?? "", /version/i);
 	done();
 });
 
@@ -159,4 +193,64 @@ test("a page from before a restart is told to open again", () => {
 	assert.equal(readFileSync(join(root, "a.md"), "utf8"), "x\n");
 	assert.equal(answer.text, "x\n", "the refusal carries the text, so the page resyncs without asking");
 	done();
+});
+
+test("typesetting runs one at a time per document, and says where the PDF is", async () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "decks-compile-")));
+	writeFileSync(join(root, "paper.tex"), "\\documentclass{article}\n");
+	let running = 0;
+	let most = 0;
+	const docs = new DocService({
+		resolve: (path) => ({ file: join(root, path), key: path, writable: true }),
+		versions: new MemoryVersions(),
+		send: () => {},
+		compile: async (job) => {
+			running++;
+			most = Math.max(most, running);
+			await new Promise((r) => setTimeout(r, 30));
+			running--;
+			return { ok: true, pdf: join(job.out, "paper.pdf"), errors: [] };
+		},
+	});
+	docs.opened("paper.tex", "page-a");
+	const [a, b] = await Promise.all([docs.compile("paper.tex"), docs.compile("paper.tex")]);
+	assert.equal(most, 1);
+	assert.equal(a.pdf, "build/paper.pdf");
+	assert.ok(b.ok);
+	assert.match((await docs.compile("nope.tex")).error ?? "", /not open/);
+	docs.closeAll();
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("what a git pull writes is taken in as a change credited to the remote, and typing reaches the file before it", async () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "decks-git-service-")));
+	writeFileSync(join(root, "paper.tex"), "one\n\ntwo\n");
+	const sent: ServerMessage[] = [];
+	let seenByPull = "";
+	const docs = new DocService({
+		resolve: (path) => ({ file: join(root, path), key: path, writable: true }),
+		versions: new MemoryVersions(),
+		send: (m) => sent.push(m),
+		writer: () => "some agent",
+		git: {
+			status: async () => ({ branch: "master", upstream: "origin/master", label: "Overleaf", ahead: 0, behind: 0, changed: 0 }),
+			pull: async (file) => {
+				seenByPull = readFileSync(file, "utf8");
+				writeFileSync(file, readFileSync(file, "utf8").replace("two", "two, from Overleaf"));
+				return { ok: true, message: "Pulled 1 commit from Overleaf." };
+			},
+			push: async () => ({ ok: true, message: "Pushed." }),
+		},
+	});
+	const state = docs.opened("paper.tex", "p");
+	docs.patch("paper.tex", "p", state.rev, "b1", [{ at: 3, before: "", text: " typed" }]);
+	assert.deepEqual(await docs.git("paper.tex", "status"), { type: "doc.repo", path: "paper.tex", action: "status", ok: true, status: { branch: "master", upstream: "origin/master", label: "Overleaf", ahead: 0, behind: 0, changed: 0 } });
+	const pulled = await docs.git("paper.tex", "pull");
+	assert.equal(pulled.ok, true);
+	assert.equal(seenByPull, "one typed\n\ntwo\n", "the typing was in the file when git ran");
+	const change = changed(sent).find((m) => m.change)?.change;
+	assert.equal(change?.by, "Overleaf");
+	assert.equal(change?.splices.map((s) => s.text).join(""), ", from Overleaf");
+	docs.closeAll();
+	rmSync(root, { recursive: true, force: true });
 });

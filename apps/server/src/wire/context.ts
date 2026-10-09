@@ -1,4 +1,5 @@
 import type { ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { GoogleDocs } from "../google/docs.ts";
 import type { Cameras } from "../deck/cameras.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
@@ -73,6 +74,8 @@ export interface WireContext {
 	readonly boards: BoardService;
 	/** Documents open as pages, typed into and kept in step with their files (`@decks/docs`). */
 	readonly docs: DocService;
+	/** Google Docs linked as document pages (`google/docs.ts`). */
+	readonly google: GoogleDocs;
 	readonly agents: Registry;
 	/** What each agent is doing to which board, for the cursors the canvas draws (`agents/acts.ts`). */
 	readonly acts: Acts;

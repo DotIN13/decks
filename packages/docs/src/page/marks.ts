@@ -57,14 +57,20 @@ export function marksOf(change: string, applied: readonly Splice[]): Mark[] {
 }
 
 /**
- * The marks of a change the page was not there to see arrive (it opened afterwards): each run of
- * new words looked for near where it was put. A run that is not found is not shown; the change
- * is still listed and can still be accepted or rejected.
+ * The marks of a change the page was not there to see arrive (it opened afterwards). Each run of
+ * new words is where the change put it when it is still there, which it is unless the text moved
+ * since; otherwise a run long enough to be told apart is looked for near where it was put, and a
+ * short one is not shown rather than shown on the wrong word.
  */
 export function findMarks(change: DocChange, text: string): Mark[] {
 	const marks: Mark[] = [];
 	for (const splice of change.splices) {
-		if (!splice.text) continue;
+		if (!splice.text.trim()) continue;
+		if (text.slice(splice.at, splice.at + splice.text.length) === splice.text) {
+			marks.push({ change: change.id, kind: "ins", start: splice.at, end: splice.at + splice.text.length });
+			continue;
+		}
+		if (splice.text.trim().length < 6) continue;
 		let best = -1;
 		for (let i = text.indexOf(splice.text); i !== -1; i = text.indexOf(splice.text, i + 1)) {
 			if (best === -1 || Math.abs(i - splice.at) < Math.abs(best - splice.at)) best = i;

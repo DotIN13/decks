@@ -427,6 +427,62 @@ table.table,
 	box-shadow: var(--b-shadow);
 }
 
+/*
+ * A board that is the file (`data-bare`): no frame round it, the file edge to edge under a bar
+ * of its own — the name, what it is, and the reload button (`board.js`, `chrome`).
+ */
+.embed[data-bare] {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.embed[data-bare] > .embed-head {
+	height: 40px;
+	box-sizing: border-box;
+	padding: 0 6px 0 14px;
+	gap: 10px;
+	justify-content: flex-start;
+	background: var(--b-bg);
+	font-family: var(--b-font);
+}
+
+.embed[data-bare] > .embed-head .name {
+	flex: 0 1 auto;
+	font-family: var(--b-font);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.embed[data-bare] > .embed-head .note {
+	flex: 1 1 auto;
+	font-family: var(--b-font);
+	overflow: hidden;
+	color: var(--b-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.embed-reload {
+	display: grid;
+	flex: none;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--b-muted);
+	cursor: pointer;
+	place-items: center;
+}
+
+.embed-reload:hover {
+	background: var(--b-bg-deep);
+	color: var(--b-fg);
+}
+
 .embed > .embed-head {
 	display: flex;
 	flex: 0 0 auto;

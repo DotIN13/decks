@@ -684,6 +684,8 @@ export function App() {
 			new Promise<string | undefined>((resolve) => {
 				setPicking({
 					board,
+					// Without a board it is the composer's paperclip: the file goes into the message.
+					purpose: board ? "embed" : "attach",
 					resolve: (picked: string | undefined) => {
 						setPicking(undefined);
 						resolve(picked);
@@ -1089,6 +1091,23 @@ export function App() {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
+	/* A new board from the tools column or the phone's ⋯ menu. Asked for by name, so the camera can
+	   arrive on it: the server places a new board in the middle of this stage's view and clear of
+	   what is there, which is near but not always on screen when the middle is taken. */
+	const newBoard = (format?: "board" | "slides") => {
+		if (!state.focused) {
+			notice("info", "Make an agent first: a board is made on an agent's stage.");
+			return;
+		}
+		void files
+			.askForBoard((request) => send({ type: "board.create", ...(format ? { format } : {}), request }))
+			.then((path) => {
+				if (!path) return;
+				setSelected(path);
+				setComponent(undefined);
+				frameWhenPlaced(path);
+			});
+	};
 	const playAndFrame = (path: string) => {
 		send({ type: "board.play", path });
 		frameWhenPlaced(path);
@@ -1439,7 +1458,7 @@ export function App() {
 							})
 						}
 						onOpenDocument={(at) =>
-							void files.documentAt(at).then((path) => {
+							void files.fileAt(at).then((path) => {
 								if (!path) return;
 								setSelected(path);
 								setComponent(undefined);
@@ -1623,23 +1642,7 @@ export function App() {
 					 * it is what "where am I" means.
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
-					onNewBoard={(format) => {
-						if (!state.focused) {
-							notice("info", "Make an agent first: a board is made on an agent's stage.");
-							return;
-						}
-						/* Asked for by name, so the camera can arrive on it: the server places a new
-						   board in the middle of this stage's view and clear of what is there, which
-						   is near but not always on screen when the middle is taken. */
-						void files
-							.askForBoard((request) => send({ type: "board.create", ...(format ? { format } : {}), request }))
-							.then((path) => {
-								if (!path) return;
-								setSelected(path);
-								setComponent(undefined);
-								frameWhenPlaced(path);
-							});
-					}}
+					onNewBoard={newBoard}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and
@@ -1750,6 +1753,17 @@ export function App() {
 							onArm={(next) => {
 								if (next !== "select") setTool("select");
 							}}
+							onNewBoard={newBoard}
+							onOpenFile={() => {
+								const stage = document.querySelector(".stage");
+								if (!stage) return;
+								void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
+									if (!path) return;
+									setSelected(path);
+									setComponent(undefined);
+									frameWhenPlaced(path);
+								});
+							}}
 							onExport={(ids) => {
 								const agentId = state.focused;
 								if (!agentId) return;
@@ -1776,6 +1790,8 @@ export function App() {
 							onPick={(path) => request().resolve(path)}
 							onCancel={() => request().resolve(undefined)}
 							onAdd={(file) => addFile(request().board, file)}
+							purpose={request().purpose ?? "embed"}
+							{...(request().google ? { onGoogle: (url: string) => request().resolve(`google:${url}`) } : {})}
 						/>
 					)}
 				</Show>

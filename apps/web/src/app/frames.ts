@@ -438,7 +438,12 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "doc.patched":
 				case "doc.changed":
 				case "doc.versions":
-				case "doc.written":
+				case "doc.version":
+				case "doc.compiled":
+				case "doc.repo":
+				case "doc.remote":
+				case "doc.gdoc":
+				case "doc.gcomments":
 					receiveDoc(message);
 					return;
 

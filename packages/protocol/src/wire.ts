@@ -156,7 +156,7 @@ export type ClientMessage =
 	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
 	 */
 	/** `document` names a file to open as a page you type into; the board made for it opens it. */
-	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string }
+	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *

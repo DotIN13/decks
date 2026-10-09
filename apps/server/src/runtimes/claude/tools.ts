@@ -1,6 +1,7 @@
 import { createSdkMcpServer, type McpSdkServerConfigWithInstance, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import type { StageTool } from "../../stage/tool.ts";
+import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**
  * The canvas tool, for Claude (DESIGN §6.3).
@@ -23,7 +24,10 @@ export function qualifiedToolName(stage: StageTool): string {
 	return `mcp__${STAGE_SERVER}__${stage.name}`;
 }
 
-export function stageMcpServer(stage: StageTool): McpSdkServerConfigWithInstance {
+/** The Google Docs tools' names as the model sees them, pre-approved like the canvas tool. */
+export const gdocsToolNames = () => GDOCS_TOOLS.map((t) => `mcp__${STAGE_SERVER}__${t.name}`);
+
+export function stageMcpServer(stage: StageTool, gdocs?: GdocsCall): McpSdkServerConfigWithInstance {
 	return createSdkMcpServer({
 		name: STAGE_SERVER,
 		version: "0.1.0",
@@ -61,6 +65,20 @@ export function stageMcpServer(stage: StageTool): McpSdkServerConfigWithInstance
 					};
 				},
 			),
+			// Google Docs, read and edited as markdown (`google/docs.ts`).
+			...(gdocs
+				? GDOCS_TOOLS.map((t) =>
+						tool(
+							t.name,
+							t.description,
+							Object.fromEntries(Object.entries(t.parameters).map(([key, about]) => [key, z.string().describe(about)])),
+							async (args) => {
+								const outcome = await gdocs(t.name, args as Record<string, unknown>);
+								return { content: [{ type: "text" as const, text: outcome.text }], ...(outcome.isError ? { isError: true } : {}) };
+							},
+						),
+					)
+				: []),
 		],
 	});
 }

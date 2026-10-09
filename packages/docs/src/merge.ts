@@ -119,7 +119,8 @@ export function spliceDiff(from: string, to: string): Splice[] {
 			while (lead < before.length && lead < text.length && before[lead] === text[lead]) lead++;
 			let end = 0;
 			while (end < before.length - lead && end < text.length - lead && before[before.length - 1 - end] === text[text.length - 1 - end]) end++;
-			out.push({ at: at + lead, before: before.slice(lead, before.length - end), text: text.slice(lead, text.length - end) });
+			// A word that came back exactly as it was is no change at all.
+			if (lead < before.length - end || lead < text.length - end) out.push({ at: at + lead, before: before.slice(lead, before.length - end), text: text.slice(lead, text.length - end) });
 		}
 		at += text.length;
 		before = "";
@@ -148,4 +149,44 @@ function tokens(text: string): string[] {
 /** The splices that undo `splices`: each turned round, last first. */
 export function invert(splices: readonly Splice[]): Splice[] {
 	return [...splices].reverse().map((splice) => ({ at: splice.at, before: splice.text, text: splice.before }));
+}
+
+/**
+ * Another writer's edits brought into a text that has its own: `theirs` and `ours` both came from
+ * `base`, and what `theirs` changed is moved past what `ours` changed and applied to `ours`, with
+ * `ours` kept where both touched the same words. An edit both made is taken once. `applied` is what
+ * changed in `ours`, sequential, for a page to highlight.
+ */
+export function merge3(base: string, theirs: string, ours: string): { text: string; applied: Splice[] } {
+	if (theirs === base) return { text: ours, applied: [] };
+	if (ours === base) return { text: theirs, applied: spliceDiff(ours, theirs) };
+	if (ours === theirs) return { text: ours, applied: [] };
+	const placed = (splices: readonly Splice[]) => {
+		let shift = 0;
+		return splices.map((s) => {
+			const out = { ...s, at: s.at - shift };
+			shift += s.text.length - s.before.length;
+			return out;
+		});
+	};
+	const sequential = (splices: readonly Splice[]) => {
+		let shift = 0;
+		return splices.map((s) => {
+			const out = { ...s, at: s.at + shift };
+			shift += s.text.length - s.before.length;
+			return out;
+		});
+	};
+	const mine = spliceDiff(base, ours);
+	const mineAt = new Set(placed(mine).map((s) => `${s.at}|${s.before}|${s.text}`));
+	const theirsOnly = sequential(placed(spliceDiff(base, theirs)).filter((s) => !mineAt.has(`${s.at}|${s.before}|${s.text}`)));
+	const moved = transformSplices(theirsOnly, mine, false).a;
+	let text = ours;
+	const applied: Splice[] = [];
+	for (const splice of moved) {
+		if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) continue;
+		text = applySplice(text, splice);
+		applied.push(splice);
+	}
+	return { text, applied };
 }

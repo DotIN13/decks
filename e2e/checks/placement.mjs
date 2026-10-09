@@ -83,14 +83,14 @@ say(
 	`${back ? Math.round(nearest(back, others)) : "?"} px to the nearest, on a board ${back?.w} wide`,
 );
 
-// --- the ＋ in the corner ---------------------------------------------------------------
+// --- the new-board button, first in the tools column ----------------------------------
 
 await openPanel(page);
 await settle(page, 300);
 const before = new Set((await onScreen()).map((board) => board.path));
-await page.locator('button[aria-label="A new board, on the canvas"]').click();
+await page.locator("button[data-new-board-button]").click();
 await settle(page, 300);
-await page.locator(".popover [data-row]").first().click();
+await page.locator('.popover [data-new-board="board"]').click();
 await settle(page, 2500);
 
 const made = (await onScreen()).find((board) => !before.has(board.path));

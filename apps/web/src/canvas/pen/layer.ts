@@ -1,5 +1,5 @@
 import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import { isFile } from "./card-frame.ts";
+import { isFile, isLiveFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
@@ -169,6 +169,9 @@ export class PenLayer {
 			if (this.disposed) return;
 			this.port = this.local();
 			for (const message of this.state.values()) this.port.post(message);
+			// The page's scene has seen only what was told it again: counted from there.
+			this.sent = this.state.size;
+			this.shownSeen = 0;
 		};
 		worker.postMessage({ type: "init", origin: location.href });
 		// Reported in development, and in a build opened through the crash recorder, which sets the cookie.
@@ -191,6 +194,18 @@ export class PenLayer {
 		if (this.disposed || debugOff.has("sheet")) return;
 		if (message.type !== "ack") this.state.set(key, message);
 		this.port.post(message);
+		this.sent++;
+	}
+
+	/** Messages sent to the scene, and how many of them the frame on screen was painted after. */
+	private sent = 0;
+	private shownSeen = 0;
+	/** A mark for what has been sent so far: `shows(mark)` is true once a frame painted after all of it is on screen. */
+	mark(): number {
+		return this.sent;
+	}
+	shows(mark: number): boolean {
+		return this.shownSeen >= mark;
 	}
 
 	private receive(message: SceneOutput): void {
@@ -206,6 +221,26 @@ export class PenLayer {
 		else if (message.type === "pictured") this.picturedNext = new Set(message.paths);
 		else if (message.type === "stats") Object.assign(sheetStats(), message.stats);
 		else {
+			/*
+			 * Taken in with the frame that paints it, not before: the stage draws outlines, handles and
+			 * editors from the layout, and a layout taken in a frame or two before its picture showed a
+			 * deleted item without its outline, or an outline already where the item was not yet drawn.
+			 */
+			this.layoutNext = message;
+			clearTimeout(this.layoutTimer);
+			// A layout no frame follows (nothing on screen changed) is taken in anyway, a moment later.
+			this.layoutTimer = setTimeout(() => this.takeLayout(), 120);
+		}
+	}
+
+	private layoutNext: Extract<SceneOutput, { type: "layout" }> | undefined;
+	private layoutTimer: ReturnType<typeof setTimeout> | undefined;
+	private takeLayout(): void {
+		const message = this.layoutNext;
+		clearTimeout(this.layoutTimer);
+		this.layoutNext = undefined;
+		if (!message || this.disposed) return;
+		{
 			this.placed = new Map(message.placed);
 			this.bounds = new Map(message.bounds);
 			this.placedList = [...this.placed.values()];
@@ -222,6 +257,8 @@ export class PenLayer {
 	/** Show a frame, placed back over the window by the camera it was drawn under. */
 	private present(frame: Extract<SceneOutput, { type: "frame" }>): void {
 		const sheet = this.sheet;
+		if (frame.seen !== undefined) this.shownSeen = frame.seen;
+		this.takeLayout();
 		if (!frame.bitmap) {
 			if (sheet) sheet.hidden = true;
 			this.showCarried(frame, "");
@@ -242,6 +279,7 @@ export class PenLayer {
 			return;
 		}
 		this.bitmaps.transferFromImageBitmap(frame.bitmap);
+		if (frame.seen !== undefined) this.shownSeen = frame.seen;
 		this.drewDrawing = frame.gpu === true;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
 		const { x, y, zoom } = frame.camera;
@@ -296,6 +334,7 @@ export class PenLayer {
 			this.carriedAt = at;
 			element.hidden = false;
 			this.slideCarried(this.carriedBy.dx, this.carriedBy.dy);
+			this.pendCarry(false);
 		} else carried.bitmap.close();
 		const boards: ReadonlySet<string> = new Set(carried?.boards ?? []);
 		if (boards.size === this.carryingNow.size && [...boards].every((path) => this.carryingNow.has(path))) return;
@@ -377,7 +416,7 @@ export class PenLayer {
 			// So is a card where its words are: a picture in it is picked on its own, and carried out of it.
 			// A file's chip is one piece, its icon and name parts of it.
 			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
-				if (up.node.type === "group" || isShape(up.node) || isFile(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
+				if (up.node.type === "group" || isShape(up.node) || isFile(up.node) || isLiveFile(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
 			}
 		}
 		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };
@@ -482,7 +521,11 @@ export class PenLayer {
 			const key = changes!.map(([id]) => id).sort().join("|");
 			if (key === this.carriedKey) return;
 			this.carriedKey = key;
-		} else this.carriedKey = "";
+			this.pendCarry(true);
+		} else {
+			this.carriedKey = "";
+			this.pendCarry(false);
+		}
 		this.send({ type: "preview", moving: changes });
 	}
 
@@ -522,6 +565,19 @@ export class PenLayer {
 		if (this.carriedEl) this.carriedEl.style.visibility = on ? "" : "hidden";
 	}
 
+	/**
+	 * Whether a drag has picked things up and the carried picture of them is not on screen yet. Till
+	 * it is, the sheet still draws them where they were, so the stage holds their outline there too
+	 * rather than letting it run ahead of them (`Stage.tsx`).
+	 */
+	onCarryPending: ((pending: boolean) => void) | undefined;
+	private carryPending = false;
+	private pendCarry(on: boolean): void {
+		if (on === this.carryPending) return;
+		this.carryPending = on;
+		this.onCarryPending?.(on);
+	}
+
 	private slideCarried(dx: number, dy: number): void {
 		this.carriedBy = { dx, dy };
 		if (this.carriedEl && !this.carriedEl.hidden) this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${this.carriedAt}`;
@@ -543,6 +599,11 @@ export class PenLayer {
 
 	muteText(ids: ReadonlySet<string> | undefined): void {
 		this.send({ type: "mute", ids: [...(ids ?? [])] });
+	}
+
+	/** File items shown live by elements under the sheet, which it draws as holes (`paint.ts`). */
+	holes(ids: ReadonlySet<string>): void {
+		this.send({ type: "holes", ids: [...ids] });
 	}
 
 	hide(ids: ReadonlySet<string> | undefined): void {

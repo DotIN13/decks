@@ -1,6 +1,7 @@
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { StageAgentHooks, StageTool } from "../../stage/tool.ts";
+import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**
  * `decks-stage`: Pi's adapter for the canvas tool.
@@ -16,12 +17,26 @@ import type { StageAgentHooks, StageTool } from "../../stage/tool.ts";
  * into the session tree.
  */
 
-export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks }): InlineExtension {
-	const { tool, agent } = deps;
+export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks; gdocs?: GdocsCall }): InlineExtension {
+	const { tool, agent, gdocs } = deps;
 
 	return {
 		name: "decks-stage",
 		factory: (pi: ExtensionAPI) => {
+			// Google Docs, read and edited as markdown (`google/docs.ts`); a failure is thrown, as the canvas tool's is.
+			for (const t of gdocs ? GDOCS_TOOLS : []) {
+				pi.registerTool({
+					name: t.name,
+					label: t.name === "gdocs_read" ? "Read Google Doc" : "Edit Google Doc",
+					description: t.description,
+					parameters: Type.Object(Object.fromEntries(Object.entries(t.parameters).map(([key, about]) => [key, Type.String({ description: about })]))),
+					async execute(_toolCallId, params) {
+						const outcome = await gdocs!(t.name, params as Record<string, unknown>);
+						if (outcome.isError) throw new Error(outcome.text);
+						return { content: [{ type: "text", text: outcome.text }], details: {} };
+					},
+				});
+			}
 			pi.registerTool({
 				name: tool.name,
 				label: tool.label,

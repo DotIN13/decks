@@ -716,6 +716,33 @@
 		return `${doc.numPages} page${doc.numPages === 1 ? "" : "s"}`;
 	}
 
+	/** Every page of a PDF given as bytes, drawn into `into` as pictures at `width`; answers the page count. */
+	async function renderPdfPages(into, bytes, width) {
+		if (!pdfjsReady) {
+			pdfjsReady = needModule("pdf.min.mjs").then((pdfjs) => {
+				pdfjs.GlobalWorkerOptions.workerSrc = lib("pdf.worker.min.mjs");
+				return pdfjs;
+			});
+		}
+		const pdfjs = await pdfjsReady;
+		const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), standardFontDataUrl: lib("standard_fonts/"), wasmUrl: lib("wasm/"), isEvalSupported: false }).promise;
+		for (let number = 1; number <= doc.numPages; number++) {
+			const page = await doc.getPage(number);
+			const base = page.getViewport({ scale: 1 });
+			const scale = Math.min(4, ((width || base.width) / base.width) * Math.min(2, devicePixelRatio || 1));
+			const viewport = page.getViewport({ scale });
+			const canvas = document.createElement("canvas");
+			canvas.className = "page";
+			canvas.width = Math.ceil(viewport.width);
+			canvas.height = Math.ceil(viewport.height);
+			canvas.dataset.page = String(number);
+			into.appendChild(canvas);
+			await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+			await stillPicture(canvas);
+		}
+		return doc.numPages;
+	}
+
 	/**
 	 * A rendered page is kept as an image, not left on the canvas it was drawn on.
 	 *
@@ -759,6 +786,24 @@
 		right.className = "note";
 		right.textContent = note ?? "";
 		head.append(name, right);
+		/*
+		 * A board that is one file (`data-bare`) has a bar of its own over it: the file's name, what
+		 * it is, and a button that loads it again, for a PDF rewritten or a page that changed.
+		 */
+		if (host.hasAttribute("data-bare")) {
+			const reload = document.createElement("button");
+			reload.type = "button";
+			reload.className = "embed-reload";
+			reload.title = "Load the file again";
+			reload.setAttribute("aria-label", "Reload");
+			reload.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>';
+			reload.addEventListener("click", (event) => {
+				event.stopPropagation();
+				host.dataset.reloaded = String(Date.now());
+				void mountEmbed(host);
+			});
+			head.append(reload);
+		}
 		const body = document.createElement("div");
 		body.className = "embed-body";
 		host.append(head, body);
@@ -815,6 +860,30 @@
 	 * An embed is quarantined content; a postMessage channel into the app's document is
 	 * exactly the sort of thing that must not quietly become a remote control.
 	 */
+	/**
+	 * A web page that is its board (`data-bare`), drawn whole: the frame as tall and as wide as the page
+	 * says it is, never smaller than the board, so the body round it scrolls the way a PDF's pages do.
+	 *
+	 * A page sized by the window (`100vh` plus a margin) grows by the same step every time it is made
+	 * taller; the second such step is the sign, and the frame stops there. Capped either way.
+	 */
+	const PAGE_MOST = 30000;
+	function fitPage(frame, w, h) {
+		if (!Number.isFinite(w) || !Number.isFinite(h)) return;
+		const body = frame.parentElement;
+		if (!body) return;
+		const was = { w: frame.offsetWidth, h: frame.offsetHeight };
+		const room = { w: body.clientWidth, h: body.clientHeight };
+		const want = { w: Math.min(PAGE_MOST, Math.max(room.w, w)), h: Math.min(PAGE_MOST, Math.max(room.h, h)) };
+		const grew = { w: want.w - was.w, h: want.h - was.h };
+		const last = frame.decksGrew ?? { w: 0, h: 0 };
+		if (grew.h > 0 && grew.h === last.h) want.h = was.h;
+		if (grew.w > 0 && grew.w === last.w) want.w = was.w;
+		frame.decksGrew = grew;
+		frame.style.width = `${want.w}px`;
+		frame.style.height = `${want.h}px`;
+	}
+
 	function guardEmbed(host, body, frame) {
 		/** This embed's own finger ids -> the ones the stage is told about. */
 		const fingers = new Map();
@@ -859,6 +928,13 @@
 				host.classList.remove("embed-live");
 				veil.remove();
 				hint.remove();
+				// A board that is the page holds it whole, as it holds a PDF's pages: the page is told, and says its size.
+				if (host.hasAttribute("data-bare")) frame.contentWindow?.postMessage({ t: "decks:hosted" }, "*");
+				return;
+			}
+			if (message.t === "decks:size") {
+				if (!host.hasAttribute("data-bare")) return;
+				fitPage(frame, Number(message.w), Number(message.h));
 				return;
 			}
 			if (message.t === "decks:touch") {
@@ -885,12 +961,34 @@
 				 * `frame-gestures.ts` listens for this event and nothing else does.
 				 */
 				const rect = frame.getBoundingClientRect();
-				document.dispatchEvent(
+				// From the frame, so the board knows the finger is over the page and can scroll what holds it.
+				frame.dispatchEvent(
 					new CustomEvent("decks:embed-finger", {
+						bubbles: true,
 						detail: { phase, id, x: rect.left + x, y: rect.top + y },
 					}),
 				);
 				if (phase === "up") fingers.delete(raw);
+				return;
+			}
+			if (message.t === "decks:scroll-ask") {
+				// The distance in the page's pixels at the canvas's zoom, which `frame-gestures.ts` says (`decksScale`).
+				const scale = typeof window.decksScale === "function" ? Number(window.decksScale()) || 1 : 1;
+				frame.contentWindow?.postMessage({ t: "decks:scroll", id: message.id, dx: (Number(message.dx) || 0) / scale, dy: (Number(message.dy) || 0) / scale }, "*");
+				return;
+			}
+			if (message.t === "decks:space") {
+				document.dispatchEvent(new KeyboardEvent(message.held === true ? "keydown" : "keyup", { code: "Space", key: " ", bubbles: true, cancelable: true }));
+				return;
+			}
+			if (message.t === "decks:pointer") {
+				const phase = message.phase;
+				if (phase !== "down" && phase !== "move" && phase !== "up") return;
+				const sx = Number(message.sx);
+				const sy = Number(message.sy);
+				if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+				// A pan, in screen pixels, which only `frame-gestures.ts` reads (`decks:embed-pan`).
+				frame.dispatchEvent(new CustomEvent("decks:embed-pan", { bubbles: true, detail: { phase, sx, sy } }));
 				return;
 			}
 			if (message.t !== "decks:wheel") return;
@@ -993,7 +1091,9 @@
 
 	async function mountEmbed(host) {
 		const raw = host.dataset.embed;
-		const url = urlFor(raw);
+		const resolved = urlFor(raw);
+		// Loaded again from the bar's button: past any copy the browser kept.
+		const url = resolved && host.dataset.reloaded ? `${resolved}${resolved.includes("?") ? "&" : "?"}reload=${host.dataset.reloaded}` : resolved;
 		const label = nameOf(raw);
 		if (!url) {
 			chrome(host, "missing", String(raw), "no path");
@@ -1071,7 +1171,8 @@
 			if (family === "pdf") {
 				const { body, note } = chrome(host, "pdf", label, "loading…");
 				const pages = await renderPdf(body, url, host.dataset.pages, host.clientWidth - 2);
-				note.textContent = host.dataset.pages ? `pages ${host.dataset.pages} of ${pages}` : pages;
+				// A board that is the PDF says so in words; an embed among other things, in the short form it always has.
+				note.textContent = host.hasAttribute("data-bare") ? `PDF, ${pages}` : host.dataset.pages ? `pages ${host.dataset.pages} of ${pages}` : pages;
 				return;
 			}
 
@@ -1131,12 +1232,13 @@
 				 * nothing else — no same-origin, no forms, no top-level navigation.
 				 */
 				const frame = document.createElement("iframe");
-				frame.src = url;
+				// A board that is the page asks for it with the guest bridge in it, so it needs no click (`guardEmbed`).
+				frame.src = host.hasAttribute("data-bare") ? `${url}${url.includes("?") ? "&" : "?"}guest=1` : url;
 				frame.setAttribute("sandbox", "allow-scripts");
 				frame.setAttribute("referrerpolicy", "no-referrer");
 				frame.title = label;
 				body.appendChild(frame);
-				note.textContent = mode === "snapshot" ? "snapshot" : "sandboxed";
+				note.textContent = host.hasAttribute("data-bare") ? "Web page" : mode === "snapshot" ? "snapshot" : "sandboxed";
 				// A thumbnail has no pointer, and a veil in one would only be furniture.
 				if (mode !== "snapshot") guardEmbed(host, body, frame);
 				return;
@@ -1266,6 +1368,10 @@
 					if (!response.ok) throw new Error(`${response.status}`);
 					return response.arrayBuffer();
 				},
+				// A LaTeX page's PDF preview, drawn by the same pdf.js the embeds use.
+				pdf: (into, bytes, width) => renderPdfPages(into, bytes, width),
+				// This server's API, for a Google Doc's sign-in.
+				api: API,
 			});
 		} catch (error) {
 			host.textContent = `Cannot open this document: ${error.message}`;

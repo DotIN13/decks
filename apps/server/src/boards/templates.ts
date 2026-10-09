@@ -356,6 +356,29 @@ export function renderDocBoard(title: string, dataPath: string, size?: { w?: num
 }
 
 /**
+ * A board that is one file, edge to edge: a PDF's pages, or a web page live, with nothing round it
+ * — no heading, no frame, no name strip (`data-bare`, `lib/board.css`). The board is the file's own
+ * shape: a PDF's first page, a laptop's screen for a page; a PDF's further pages scroll inside it.
+ */
+export function renderFileBoard(title: string, src: string, size: { w: number; h: number }): string {
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeAttr(title)}</title>
+		<meta name="board" content='{"w":${Math.round(size.w)},"h":${Math.round(size.h)},"bg":"plain"}' />
+		<link rel="stylesheet" href="../../lib/board.css" />
+	</head>
+	<body class="board">
+		<div data-id="file" data-embed="${escapeAttr(src)}" data-bare style="left: 0; top: 0; right: 0; bottom: 0"></div>
+
+		<script src="../../lib/board.js"></script>
+	</body>
+</html>
+`;
+}
+
+/**
  * The status board for the user's shared Chrome.
  *
  * A stub, like a mirror: the component carries `data-live="web"` and draws itself from the

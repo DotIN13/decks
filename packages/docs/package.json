@@ -9,9 +9,21 @@
 		"./merge": "./src/merge.ts",
 		"./client": "./src/client.ts",
 		"./page": "./src/page/page.ts",
-		"./server": "./src/server/index.ts"
+		"./server": "./src/server/index.ts",
+		"./gdoc": "./src/gdoc/index.ts"
 	},
-	"scripts": { "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --import tsx --test --test-force-exit \"src/**/*.test.ts\"" },
-	"dependencies": { "diff": "^8.0.4", "docx-preview": "^0.4.1", "jszip": "^3.10.1" },
-	"devDependencies": { "@types/node": "^22.19.0", "tsx": "^4.20.7", "typescript": "^5.9.3" }
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test --test-force-exit \"src/**/*.test.ts\""
+	},
+	"dependencies": {
+		"diff": "^8.0.4",
+		"docx-preview": "^0.4.1",
+		"jszip": "^3.10.1"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.0",
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3"
+	}
 }

@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
-import { basename, dirname, extname } from "node:path";
-import { applySplice, transformSplices, type DocAuthor, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "../index.ts";
+import { existsSync, mkdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { basename, dirname, extname, join, posix } from "node:path";
+
+const posixJoin = posix.join;
+import { applySplice, type CompileResult, type DocRemote, type GitResult, type GitStatus, type DocAuthor, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "../index.ts";
 import { invert, land, spliceDiff } from "../merge.ts";
 import type { DocLibrary } from "./library.ts";
 import type { VersionStore } from "./versions.ts";
@@ -16,9 +18,17 @@ import { readEntry, replaceEntry } from "./zip.ts";
  * of every write from outside, so going back steps over sentences rather than letters.
  *
  * **An agent edits a document with its own tools**, not through this. Its write reaches the file,
- * the watcher here sees it, and the difference goes to every page as splices marked as a change
- * to accept or reject. Rejecting is the reverse splices, landed like anyone's typing.
+ * the watcher here sees it, and the difference goes to every page as splices marked as a change,
+ * which the page highlights until a person accepts it or rejects it. Rejecting is the reverse
+ * splices, landed like anyone's typing.
+ *
+ * **The file is edited where it is.** A paper in its repository stays there and is written in
+ * place; what is kept about it (its versions, the changes waiting for review, its PDF) goes in a
+ * folder of its own in the library (`library.ts`), so the repository gets no new files.
  */
+
+/** How many writes from outside wait for review at most; the oldest is taken as accepted past it. */
+const KEEP_CHANGES = 200;
 
 /** Typing that stops for this long becomes a version. */
 export const PAUSE_MS = 1000;
@@ -37,13 +47,14 @@ interface Open {
 	/** Where its versions go, and the name they are kept under there. */
 	versions: VersionStore;
 	vkey: string;
-	/** For a working copy in a library: the original, which it is written back to. */
-	source?: { file: string; writable: boolean; watcher?: FSWatcher; quiet?: ReturnType<typeof setTimeout> };
+	/** The library folder its records are kept in, when there is a library. */
+	folder?: string;
 	format: DocFormat;
 	text: string;
 	rev: number;
 	/** Each landed batch: the revision it was made on, the one it made, and its splices. */
 	log: Array<{ base: number; rev: number; splices: Splice[] }>;
+	/** Writes from outside waiting to be accepted or rejected. */
 	changes: Map<string, { change: DocChange; rev: number }>;
 	clients: Set<string>;
 	watcher?: FSWatcher;
@@ -52,6 +63,12 @@ interface Open {
 	/** Typing has moved the text past the last kept version. */
 	unversioned: boolean;
 	writable: boolean;
+	/** The git pull or push running now, which the next one waits for. */
+	syncing?: Promise<unknown>;
+	/** Who a write from outside is credited to while a pull runs: the remote, not the watcher's guess. */
+	pulling?: DocAuthor;
+	/** The typesetting running now, which the next one waits for. */
+	compiling?: Promise<unknown>;
 	/** The file's size and time as this service last wrote or read it, to notice a write from outside. */
 	seen?: { size: number; mtime: number };
 }
@@ -72,14 +89,39 @@ export interface DocServiceOptions {
 	resolve(path: string): Resolved;
 	versions: VersionStore;
 	/**
-	 * Where documents are copied to be worked on (`library.ts`). When there is one, opening a file
-	 * outside it opens a copy inside it instead, and its history and suggestions are kept there.
+	 * Where each document's records are kept (`library.ts`): its versions, the changes waiting for
+	 * review, and its PDF. Without one, versions go to `versions` and nothing else is kept.
 	 */
 	library?: () => DocLibrary | undefined;
 	/** To every page. */
 	send(message: DocServerMessage): void;
 	/** Who most likely wrote the file just now, when the host can tell (an agent's name). */
 	writer?(file: string): string | undefined;
+	/**
+	 * Typeset a LaTeX file: `file` is the document, `inputs` the folder its pictures and
+	 * bibliographies are found in (its own), `out` where the PDF goes (its record folder). Without it, a page
+	 * asking for a PDF is told there is no typesetter.
+	 */
+	compile?(job: { file: string; inputs: string; out: string }): Promise<CompileResult>;
+	/**
+	 * The git repository a file is in, for syncing with a remote such as Overleaf (`apps/server`'s
+	 * `docs/git.ts`). `status` is `undefined` for a file in no repository. `pull` commits what is
+	 * not committed and merges the remote's commits; `push` does that and sends them. Each writes
+	 * the file only through git, and what that changed in an open document becomes a change to review.
+	 */
+	git?: {
+		status(file: string): Promise<GitStatus | undefined>;
+		pull(file: string): Promise<GitResult>;
+		push(file: string): Promise<GitResult>;
+	};
+	/** A page has opened a file (after its `doc.state` is on its way): for a host that has more to tell it. */
+	opened?(file: string): void;
+	/** Styles a page set on a Google Doc's mirror, as Docs requests at its indices, for the host to send to Google. */
+	style?(file: string, requests: unknown[], text?: string): Promise<void>;
+	/** A comment a page made on a Google Doc's mirror, for the host to send to Google. */
+	comment?(file: string, message: { action: "create" | "reply" | "resolve"; comment?: string; content?: string; quote?: string }): Promise<void>;
+	/** What stands behind a file, for the page to show: a Google Doc's address and title. */
+	remote?(file: string): DocRemote | undefined;
 	/** File extensions that open, with the dot; `EDITABLE` by default. */
 	editable?: readonly string[];
 	pauseMs?: number;
@@ -115,10 +157,25 @@ export class DocService {
 					return this.review(message.path, message.change, message.accept);
 				case "doc.versions":
 					return reply(this.versions(message.path));
+				case "doc.version":
+					return reply(this.version(message.path, message.sha));
+				case "doc.compile":
+					return void this.compile(message.path).then(reply, (error: Error) => reply({ type: "doc.compiled", path: message.path, ok: false, errors: [], at: Date.now(), ms: 0, error: error.message }));
 				case "doc.restore":
 					return this.restore(message.path, message.sha);
-				case "doc.writeback":
-					return reply(this.writeBack(message.path));
+				case "doc.gstyle": {
+					// Styles for a Google Doc: the typing before them has landed, since this page waited for it.
+					const doc = this.find(message.path);
+					if (doc && this.context.style) void this.context.style(doc.file, message.requests, typeof message.text === "string" ? message.text : undefined).catch((error: Error) => reply({ type: "notice", level: "warn", text: error.message }));
+					return;
+				}
+				case "doc.gcomment": {
+					const doc = this.find(message.path);
+					if (doc && this.context.comment) void this.context.comment(doc.file, message).catch((error: Error) => reply({ type: "notice", level: "warn", text: error.message }));
+					return;
+				}
+				case "doc.git":
+					return void this.git(message.path, message.action).then(reply, (error: Error) => reply({ type: "doc.repo", path: message.path, action: message.action, ok: false, message: error.message }));
 			}
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
@@ -126,9 +183,9 @@ export class DocService {
 	}
 
 	/**
-	 * Open a document for a page, or join the pages already on it. With a library, a file from
-	 * anywhere else opens as its working copy, and the answer names the copy as `path`, the path
-	 * the page asked for as `asked`, and the original as `source`.
+	 * Open a document for a page, or join the pages already on it. The answer names the document
+	 * as `path` and what the page sent as `asked`, which differ for a page naming a copy from
+	 * before documents were edited in place: it opens the file the copy was made from.
 	 */
 	opened(path: string, client: string): Extract<DocServerMessage, { type: "doc.state" }> {
 		let doc: Open;
@@ -138,6 +195,7 @@ export class DocService {
 			return { type: "doc.state", path, asked: path, client, rev: 0, format: "text", text: "", changes: [], error: (error as Error).message };
 		}
 		doc.clients.add(client);
+		if (this.context.opened) setTimeout(() => this.context.opened?.(doc.file), 0);
 		return {
 			type: "doc.state",
 			path: doc.key,
@@ -147,24 +205,9 @@ export class DocService {
 			format: doc.format,
 			text: doc.text,
 			changes: [...doc.changes.values()].map((entry) => entry.change),
-			...(doc.source ? { source: doc.source.file } : {}),
+			...((remote) => (remote ? { remote } : {}))(this.context.remote?.(doc.file)),
 			...(doc.writable ? {} : { error: `${path} opens read-only: it is not somewhere this server may write.` }),
 		};
-	}
-
-	/**
-	 * Write the working copy back to its original. A write to the original since the copy last
-	 * saw it is merged into the copy first, so writing back never undoes it.
-	 */
-	writeBack(path: string): Extract<DocServerMessage, { type: "doc.written" }> {
-		const doc = this.find(path);
-		if (!doc?.source) return { type: "doc.written", path, error: `${path} is not a copy of another file, so there is nothing to write it back to.` };
-		if (!doc.source.writable) return { type: "doc.written", path, source: doc.source.file, error: `${doc.source.file} is not somewhere this server may write.` };
-		this.absorb(doc);
-		this.pull(doc);
-		writeSource(doc.source.file, doc.format, doc.text);
-		this.context.library?.()?.wroteBack(doc.file, doc.text);
-		return { type: "doc.written", path: doc.key, source: doc.source.file };
 	}
 
 	closed(path: string, client: string): void {
@@ -197,29 +240,118 @@ export class DocService {
 		return landed.refused.length > 0 ? { ...answer, text: doc.text } : answer;
 	}
 
-	/** Keep a change from outside, or take it back with its reverse splices. */
+	/**
+	 * Keep a change from outside, or take it back with its reverse splices; `"*"` is every change
+	 * waiting, rejected newest first so each one's words are still where it left them.
+	 */
 	review(path: string, change: string, accept: boolean): void {
 		const doc = this.find(path);
-		const entry = doc?.changes.get(change);
-		if (!doc || !entry) return;
-		doc.changes.delete(change);
-		this.saveChanges(doc);
+		if (!doc) return;
+		const ids = change === "*" ? [...doc.changes.keys()].reverse() : doc.changes.has(change) ? [change] : [];
+		if (ids.length === 0) return;
 		if (accept) {
-			this.context.send({ type: "doc.changed", path: doc.key, base: doc.rev, rev: doc.rev, splices: [], by: "person", settled: change });
+			for (const id of ids) doc.changes.delete(id);
+			this.saveChanges(doc);
+			this.context.send({ type: "doc.changed", path: doc.key, base: doc.rev, rev: doc.rev, splices: [], by: "person", settled: ids });
 			return;
 		}
 		this.absorb(doc);
 		this.flushVersion(doc);
-		const landed = land(doc.text, invert(entry.change.splices), this.since(doc, entry.rev));
-		const base = doc.rev;
-		if (landed.applied.length > 0) {
-			this.commit(doc, landed.text, landed.applied);
-			doc.versions.record(doc.vkey, doc.text);
+		let refused = 0;
+		for (const id of ids) {
+			const entry = doc.changes.get(id)!;
+			doc.changes.delete(id);
+			const back = invert(entry.change.splices);
+			let since = this.since(doc, entry.rev);
+			// History from before a restart is gone; the words are often still exactly where the change left them.
+			if (!since && fits(doc.text, back)) since = [];
+			const landed = land(doc.text, back, since);
+			const base = doc.rev;
+			if (landed.applied.length > 0) this.commit(doc, landed.text, landed.applied);
+			refused += landed.refused.length;
+			this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", settled: [id] });
 		}
-		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices: landed.applied, by: "person", settled: change });
-		if (landed.refused.length > 0) {
-			this.context.send({ type: "notice", level: "warn", text: `Part of that change was typed over since, so ${landed.refused.length} of its pieces were left as they are.` });
+		this.saveChanges(doc);
+		doc.versions.record(doc.vkey, doc.text);
+		if (refused > 0) this.context.send({ type: "notice", level: "warn", text: `Part of that was typed over since, so ${refused} of its pieces were left as they are.` });
+	}
+
+	/** One kept version's text, for a page to show. */
+	version(path: string, sha: string): Extract<DocServerMessage, { type: "doc.version" }> {
+		const open = this.find(path);
+		const doc = open ?? this.load(this.adopt(path));
+		try {
+			const at = [...doc.versions.entries(doc.vkey)].find((v) => v.sha === sha)?.at;
+			return { type: "doc.version", path, sha, text: doc.versions.read(sha), ...(at ? { at } : {}) };
+		} catch (error) {
+			return { type: "doc.version", path, sha, error: (error as Error).message };
+		} finally {
+			if (!open) this.dispose(doc);
 		}
+	}
+
+	/**
+	 * Typeset a document as it stands. One typesetting at a time per document: asked again while
+	 * one runs, the next waits for it and then typesets the text as it is by then, so a burst of
+	 * typing costs at most one run behind.
+	 */
+	async compile(path: string): Promise<Extract<DocServerMessage, { type: "doc.compiled" }>> {
+		const started = Date.now();
+		const answer = (fields: Partial<Extract<DocServerMessage, { type: "doc.compiled" }>>) => ({ type: "doc.compiled" as const, path, ok: false, errors: [], at: Date.now(), ms: Date.now() - started, ...fields });
+		const doc = this.find(path);
+		if (!doc) return answer({ error: `${path} is not open.` });
+		if (!this.context.compile) return answer({ error: "This server has no LaTeX typesetter." });
+		if (!/\.(tex|ltx)$/i.test(doc.file)) return answer({ error: "Only a LaTeX file typesets to a PDF." });
+		const run = async () => {
+			this.absorb(doc);
+			const library = this.context.library?.();
+			const out = join(doc.folder ?? dirname(doc.file), "build");
+			mkdirSync(out, { recursive: true });
+			const result = await this.context.compile!({ file: doc.file, inputs: dirname(doc.file), out });
+			const at = doc.folder && library ? posixJoin(library.path, library.name(doc.folder)) : dirname(doc.key);
+			const pdf = result.pdf ? posixJoin(at, "build", basename(result.pdf)) : undefined;
+			return answer({ ok: result.ok, errors: result.errors, ...(pdf ? { pdf } : {}), ...(result.error ? { error: result.error } : {}) });
+		};
+		const previous = doc.compiling ?? Promise.resolve(undefined);
+		const next = previous.then(run, run);
+		doc.compiling = next.then(() => undefined);
+		return next;
+	}
+
+	/**
+	 * The document's repository, or a pull or push of it. Everything typed is in the file first,
+	 * and what the pull wrote is taken in at once as a change credited to the remote, so a
+	 * collaborator's edit on Overleaf is highlighted like an agent's. One at a time per document.
+	 */
+	async git(path: string, action: "status" | "pull" | "push"): Promise<Extract<DocServerMessage, { type: "doc.repo" }>> {
+		const doc = this.find(path);
+		const answer = (fields: Partial<Extract<DocServerMessage, { type: "doc.repo" }>>) => ({ type: "doc.repo" as const, path, action, ok: false, ...fields });
+		const host = this.context.git;
+		if (!doc) return answer({ message: `${path} is not open.` });
+		if (!host) return answer({ message: "This server does not sync with git." });
+		if (action === "status") {
+			const status = await host.status(doc.file);
+			return answer({ ok: true, ...(status ? { status } : {}) });
+		}
+		if (!doc.writable) return answer({ message: `${basename(doc.file)} is read-only here, so it cannot be pulled into.` });
+		const run = async () => {
+			this.absorb(doc);
+			this.flushVersion(doc);
+			const before = await host.status(doc.file);
+			// What the merge writes is credited to where it came from, rather than to whoever the watcher would guess.
+			doc.pulling = before?.label ?? "git pull";
+			try {
+				const result = await (action === "pull" ? host.pull(doc.file) : host.push(doc.file));
+				if (this.open.has(doc.key)) this.absorb(doc);
+					return answer({ ok: result.ok, message: result.message, ...(result.status ? { status: result.status } : {}) });
+			} finally {
+				doc.pulling = undefined;
+			}
+		};
+		const previous = doc.syncing ?? Promise.resolve(undefined);
+		const next = previous.then(run, run);
+		doc.syncing = next.then(() => undefined);
+		return next;
 	}
 
 	versions(path: string): Extract<DocServerMessage, { type: "doc.versions" }> {
@@ -253,6 +385,33 @@ export class DocService {
 		return file;
 	}
 
+	/**
+	 * The file's text set to `text` as the person's own edit, not a change to review: for a host that
+	 * made the change itself on the person's behalf (a Google Doc's table row, added in Google).
+	 */
+	rewrite(file: string, text: string): void {
+		const doc = [...this.open.values()].find((d) => d.file === file);
+		if (!doc) return;
+		this.absorb(doc);
+		const splices = spliceDiff(doc.text, text);
+		if (splices.length === 0) return;
+		this.flushVersion(doc);
+		const base = doc.rev;
+		this.commit(doc, text, splices);
+		doc.versions.record(doc.vkey, text);
+		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: "person" });
+	}
+
+	/** The files pages have open now. */
+	openFiles(): string[] {
+		return [...this.open.values()].filter((doc) => doc.clients.size > 0).map((doc) => doc.file);
+	}
+
+	/** What a page calls a file it has open, for a message about it. */
+	keyOfFile(file: string): string | undefined {
+		return [...this.open.values()].find((doc) => doc.file === file)?.key;
+	}
+
 	/** Every open document closed, for a deck switch or a shutdown. */
 	closeAll(): void {
 		for (const doc of [...this.open.values()]) this.dispose(doc);
@@ -266,20 +425,18 @@ export class DocService {
 
 	private find(path: string): Open | undefined {
 		try {
-			return this.open.get(this.keyOf(path).key) ?? [...this.open.values()].find((doc) => doc.source?.file === this.keyOf(path).file);
+			return this.open.get(this.keyOf(this.adopt(path)).key);
 		} catch {
 			return undefined;
 		}
 	}
 
-	/** The path to open for one a page asked for: its working copy, when there is a library. */
+	/** The path to open for one a page asked for: the original, for a copy from before documents were edited in place. */
 	private adopt(path: string): string {
 		const library = this.context.library?.();
 		if (!library) return path;
 		const { file } = this.keyOf(path);
-		if (library.contains(file)) return path;
-		const format = this.formatOf(file);
-		return library.working(file, format, readSource(file, format)).file;
+		return library.meta(file)?.source ?? path;
 	}
 
 	private formatOf(file: string): DocFormat {
@@ -295,14 +452,14 @@ export class DocService {
 		const format = this.formatOf(file);
 		const text = readSource(file, format);
 		const library = this.context.library?.();
-		const kept = library?.contains(file) ? library : undefined;
-		const meta = kept?.meta(file);
+		// A file in the library is a mirror (a Google Doc's) when its folder's record names it, and keeps its records there.
+		const folder = !library ? undefined : !library.contains(file) ? library.folder(file, format) : library.meta(file)?.source === file ? library.folderOf(file) : undefined;
 		const doc: Open = {
 			key,
 			file,
-			versions: kept ? kept.versions(file) : this.context.versions,
-			vkey: kept ? basename(file) : key,
-			...(meta ? { source: { file: meta.source, writable: this.writableSource(meta.source) } } : {}),
+			versions: folder ? library!.versions(folder) : this.context.versions,
+			vkey: folder ? basename(file) : key,
+			...(folder ? { folder } : {}),
 			format,
 			text,
 			// Dated, so a page holding a revision from before a restart can never match a new one.
@@ -314,13 +471,11 @@ export class DocService {
 			writable,
 		};
 		doc.seen = stamp(file);
-		// Suggestions still waiting from before: history to move them by is gone, so a rejection finds their words.
-		for (const change of kept?.changes(file) ?? []) doc.changes.set(change.id, { change, rev: doc.rev });
+		// Recent writes from outside, so a page opened later still sees what an agent just did.
+		for (const change of folder ? library!.changes(folder) : []) doc.changes.set(change.id, { change, rev: doc.rev });
 		doc.versions.record(doc.vkey, text);
 		this.watch(doc);
 		this.open.set(key, doc);
-		// The original may have moved on while nobody had the copy open.
-		this.pull(doc);
 		return doc;
 	}
 
@@ -372,25 +527,13 @@ export class DocService {
 			});
 			// A watcher never keeps the process alive on its own: the server's socket does that.
 			doc.watcher.unref();
-			if (doc.source) {
-				const source = doc.source;
-				const original = basename(source.file);
-				source.watcher = watch(dirname(source.file), (_event, changed) => {
-					if (changed && String(changed) !== original) return;
-					clearTimeout(source.quiet);
-					source.quiet = setTimeout(() => {
-						if (this.open.has(doc.key)) this.pull(doc);
-					}, this.quietMs);
-				});
-				source.watcher.unref();
-			}
 		} catch {
 			// No watching on this platform: a write from outside shows when the page opens it again.
 		}
 	}
 
 	/**
-	 * A write from outside, if there was one: the difference becomes a change to review.
+	 * A write from outside, if there was one: the difference becomes a change pages highlight.
 	 *
 	 * Asked before every write as well as by the watcher. Typing writes every 50 ms, and each of
 	 * those writes restarts the watcher's quiet, so an agent's write made mid-typing would be read
@@ -418,75 +561,23 @@ export class DocService {
 		doc.log.push({ base, rev: doc.rev, splices });
 		if (doc.log.length > LOG) doc.log.splice(0, doc.log.length - LOG);
 		const to = doc.versions.record(doc.vkey, text);
-		const change: DocChange = { id: randomUUID(), by: (this.context.writer?.(doc.file) ?? "outside") as DocAuthor, at: Date.now(), from, to, splices };
+		const change: DocChange = { id: randomUUID(), by: doc.pulling ?? ((this.context.writer?.(doc.file) ?? "outside") as DocAuthor), at: Date.now(), from, to, splices };
 		doc.changes.set(change.id, { change, rev: doc.rev });
 		this.saveChanges(doc);
 		this.context.send({ type: "doc.changed", path: doc.key, base, rev: doc.rev, splices, by: change.by, change });
 	}
 
-	/**
-	 * A write to the original of a working copy, merged into the copy as a change to review.
-	 *
-	 * Three ways: the original's edits since the base, and the copy's since the same base, are
-	 * both splices of the base, so the original's are moved past the copy's (`transformSplices`)
-	 * and land on the copy exactly, with the copy's own text kept where both touched. The original's
-	 * text becomes the new base, so the same edit is never taken in twice.
-	 */
-	private pull(doc: Open): void {
-		const library = this.context.library?.();
-		if (!library || !doc.source) return;
-		let theirs: string;
-		try {
-			theirs = readSource(doc.source.file, doc.format);
-		} catch {
-			// The original is gone or mid-write: the copy carries on, and the next event tries again.
-			return;
-		}
-		const base = library.base(doc.file);
-		if (base === undefined || theirs === base) return;
-		this.absorb(doc);
-		const moved = transformSplices(spliceDiff(base, theirs), spliceDiff(base, doc.text), false).a;
-		library.setBase(doc.file, theirs);
-		if (moved.length === 0) return;
-		let text = doc.text;
-		for (const splice of moved) {
-			if (text.slice(splice.at, splice.at + splice.before.length) !== splice.before) {
-				this.context.send({ type: "notice", level: "warn", text: `${basename(doc.source.file)} changed in a way that could not be merged into its copy; its text is kept as a version.` });
-				doc.versions.record(doc.vkey, theirs);
-				return;
-			}
-			text = applySplice(text, splice);
-		}
-		this.flushVersion(doc);
-		const from = doc.versions.record(doc.vkey, doc.text);
-		const rev = doc.rev;
-		this.commit(doc, text, moved);
-		const to = doc.versions.record(doc.vkey, text);
-		const change: DocChange = { id: randomUUID(), by: (this.context.writer?.(doc.source.file) ?? "outside") as DocAuthor, at: Date.now(), from, to, splices: moved };
-		doc.changes.set(change.id, { change, rev: doc.rev });
-		this.saveChanges(doc);
-		this.context.send({ type: "doc.changed", path: doc.key, base: rev, rev: doc.rev, splices: moved, by: change.by, change });
-	}
 
 	private saveChanges(doc: Open): void {
-		const library = this.context.library?.();
-		if (library?.contains(doc.file)) library.saveChanges(doc.file, [...doc.changes.values()].map((entry) => entry.change));
+		while (doc.changes.size > KEEP_CHANGES) doc.changes.delete(doc.changes.keys().next().value!);
+		if (doc.folder) this.context.library?.()?.saveChanges(doc.folder, [...doc.changes.values()].map((entry) => entry.change));
 	}
 
-	private writableSource(file: string): boolean {
-		try {
-			return this.keyOf(file).writable;
-		} catch {
-			return false;
-		}
-	}
 
 	private dispose(doc: Open): void {
 		this.flushVersion(doc);
 		clearTimeout(doc.quiet);
 		doc.watcher?.close();
-		clearTimeout(doc.source?.quiet);
-		doc.source?.watcher?.close();
 		this.open.delete(doc.key);
 	}
 }
@@ -498,6 +589,17 @@ function stamp(file: string): { size: number; mtime: number } | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+
+/** Sequential splices that each find their old text exactly where they say. */
+function fits(text: string, splices: readonly Splice[]): boolean {
+	let out = text;
+	for (const s of splices) {
+		if (out.slice(s.at, s.at + s.before.length) !== s.before) return false;
+		out = applySplice(out, s);
+	}
+	return true;
 }
 
 function isSplice(value: unknown): value is Splice {

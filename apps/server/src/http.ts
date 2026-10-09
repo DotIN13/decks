@@ -4,7 +4,7 @@ import { renderShell } from "./boards/shell.ts";
 import { LIB_FOREVER, libVersion, splitLibVersion, versionLibRefs } from "./deck/lib-version.ts";
 import { normalizeBoardPath } from "./deck/schema.ts";
 import { readMeta } from "./deck/meta.ts";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
 import { forwardRequest } from "./ports.ts";
@@ -12,8 +12,9 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
 import { browse } from "./files/browse.ts";
+import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
-import { refuseCrossSite, storeAssetStream, UploadRefused } from "./files/upload.ts";
+import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -241,6 +242,16 @@ export function createHttpApp(app: App): Express {
 			// and `?raw=1` (its text, for the editor) is the file as it is.
 			if (req.query.raw === undefined && isBoardPath(requested) && /\.html?$/i.test(requested)) {
 				res.type("html").send(versionLibRefs(await readFile(target, "utf8"), libVersion(app.deck.path)));
+				return;
+			}
+			/*
+			 * `?guest=1` is a board that is this web page (`data-bare`, `renderFileBoard`) asking for it
+			 * with `lib/embed-guest.js` in it: the page then takes the scrolls it can use and hands the
+			 * rest, and every pinch, to the canvas, as a board's own page does, with no click first.
+			 * Still the asset's headers, so still sandboxed; the script is ours and reads nothing back.
+			 */
+			if (req.query.guest !== undefined && !isBoardPath(requested) && /\.html?$/i.test(requested)) {
+				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}lib/embed-guest.js`));
 				return;
 			}
 			await sendFile(res, target);
@@ -488,8 +499,8 @@ export function createHttpApp(app: App): Express {
 		const target = resolveFileRequest(app.deck.roots, { path, from });
 		if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(path, "not a file");
 		// 302 rather than 301: which file a relative path resolves to depends on the
-		// deck that is open, and that changes.
-		res.redirect(302, fileUrl(target));
+		// deck that is open, and that changes. A board that is the page asks for the bridge, and still does there.
+		res.redirect(302, `${fileUrl(target)}${req.query.guest === undefined ? "" : "?guest=1"}`);
 	});
 
 	/** The resolved file itself, at its absolute path — read-only and quarantined (§4). */
@@ -500,6 +511,11 @@ export function createHttpApp(app: App): Express {
 			const target = resolveFileRequest(app.deck.roots, { path: requested });
 			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
 			quarantine(res, target);
+			// A web page outside the deck that is its board, with the bridge in it, as one inside the deck gets (`/board/*path`).
+			if (req.query.guest !== undefined && /\.html?$/i.test(target)) {
+				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}board/lib/embed-guest.js`));
+				return;
+			}
 			await sendFile(res, target);
 		}),
 	);
@@ -538,6 +554,32 @@ export function createHttpApp(app: App): Express {
 			// Immutable by construction: the name is the hash of the contents.
 			res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 			res.type("html").send(app.boards.revisions.read(sha));
+		}),
+	);
+
+	/**
+	 * Where a file the picker named sits in the deck, and, for a film or a sound, what it is: the
+	 * same `media` an upload answers with, its poster written beside it once. For placing a picked
+	 * file on the canvas, which refers to deck files by their deck path and copies nothing. The picker
+	 * names deck files by their full path; a file outside the deck answers `inDeck: false`.
+	 */
+	api.get(
+		"/where",
+		asyncRoute(async (req, res) => {
+			const asked = typeof req.query.path === "string" ? req.query.path : "";
+			const root = resolve(app.deck.path);
+			const full = resolve(root, asked);
+			if (!asked || (full !== root && !full.startsWith(root + sep)) || !existsSync(full) || !statSync(full).isFile()) {
+				res.json({ inDeck: false });
+				return;
+			}
+			const path = relative(root, full).split(sep).join("/");
+			// Only what is named as a film or a sound is asked of ffmpeg, which reads a still picture as a one-frame film.
+			const playable = /\.(mp4|m4v|webm|mov|ogv|mkv|mp3|m4a|aac|wav|flac|ogg|oga|opus|weba)$/i.test(path);
+			const asset = playable ? await withMedia(root, { path, name: basename(full), bytes: statSync(full).size, reused: true }) : undefined;
+			// A PDF, an SVG or a web page: a picture of it for its card (`files/preview.ts`).
+			const preview = previewKind(path) ? await filePreview(root, path) : undefined;
+			res.json({ inDeck: true, path, ...(asset?.media ? { media: asset.media } : {}), ...(preview ? { preview } : {}) });
 		}),
 	);
 
@@ -622,6 +664,104 @@ export function createHttpApp(app: App): Express {
 		void app.bridge.run(token, code, sessionID).then((outcome) => res.json(outcome));
 	});
 
+	/*
+	 * Google Docs (`google/`): signing in as the person, the pictures in a Doc's page, and the
+	 * agents' Google Docs tools. The sign-in is started by the page with its own origin, since
+	 * behind a proxy this server cannot tell what address the browser used to reach it.
+	 */
+	api.get("/google/status", (_req, res) => {
+		res.setHeader("Cache-Control", "no-store");
+		res.json(app.google.state());
+	});
+	api.get("/google/signin", (req, res) => {
+		const origin = typeof req.query.origin === "string" && /^https?:\/\/[^/\s]+$/.test(req.query.origin) ? req.query.origin : `${req.protocol}://${req.get("host")}`;
+		try {
+			res.redirect(302, app.google.auth.signInUrl(origin));
+		} catch (error) {
+			res.status(400).type("text/plain").send((error as Error).message);
+		}
+	});
+	const signedIn = (res: Response, said: string, ok: boolean) =>
+		res
+			.status(ok ? 200 : 400)
+			.type("html")
+			.send(`<!doctype html><meta charset="utf-8"><title>Google</title><body style="font:16px system-ui;margin:15vh auto;max-width:28em;line-height:1.5"><h1 style="font-size:22px">${ok ? "Signed in" : "Not signed in"}</h1><p>${said.replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"))}</p><p>You can close this tab and go back to Decks.</p></body>`);
+	api.get(
+		"/google/callback",
+		asyncRoute(async (req, res) => {
+			try {
+				const email = await app.google.auth.finish({ code: String(req.query.code ?? ""), state: String(req.query.state ?? ""), ...(req.query.error ? { url: `http://x/?error=${String(req.query.error)}` } : {}) });
+				signedIn(res, `Decks can now read and edit the Google Docs ${email} can.`, true);
+			} catch (error) {
+				signedIn(res, (error as Error).message, false);
+			}
+		}),
+	);
+	api.post(
+		"/google/code",
+		asyncRoute(async (req, res) => {
+			try {
+				const email = await app.google.auth.finish({ url: String((req.body as { url?: unknown })?.url ?? "") });
+				res.json({ ok: true, email });
+			} catch (error) {
+				res.json({ ok: false, message: (error as Error).message });
+			}
+		}),
+	);
+	/** The person's Google Docs for the file picker, the ones they looked at last first; `q` narrows them by name. */
+	api.get(
+		"/google/docs",
+		asyncRoute(async (req, res) => {
+			res.setHeader("Cache-Control", "no-store");
+			if (!app.google.state().signedIn) {
+				res.status(401).json({ error: "Not signed in to Google." });
+				return;
+			}
+			try {
+				res.json({ docs: await app.google.api().list(typeof req.query.q === "string" ? req.query.q : undefined) });
+			} catch (error) {
+				res.status(502).json({ error: (error as Error).message });
+			}
+		}),
+	);
+	api.post("/google/signout", (_req, res) => {
+		app.google.auth.signOut();
+		res.json({ ok: true });
+	});
+	api.get(
+		"/google/image/:doc/:object",
+		asyncRoute(async (req, res) => {
+			const doc = await app.google.api().get(String(req.params.doc)).catch(() => undefined);
+			const uri = doc?.inlineObjects?.[String(req.params.object)]?.inlineObjectProperties?.embeddedObject?.imageProperties?.contentUri;
+			const fetched = uri ? await fetch(uri).catch(() => undefined) : undefined;
+			if (!fetched?.ok) {
+				res.status(404).end();
+				return;
+			}
+			res.setHeader("Content-Type", fetched.headers.get("content-type") ?? "image/png");
+			res.setHeader("Cache-Control", "private, max-age=600");
+			res.end(Buffer.from(await fetched.arrayBuffer()));
+		}),
+	);
+	/*
+	 * The agents' Google Docs tools, for a runtime outside this process (opencode, antigravity),
+	 * with the same identity as the canvas tool: a token per agent, or opencode's session id.
+	 */
+	api.post(
+		"/gdocs/call",
+		asyncRoute(async (req, res) => {
+			const header = req.headers.authorization;
+			const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : undefined;
+			const body = (req.body ?? {}) as { tool?: unknown; args?: unknown; sessionID?: unknown };
+			const agentId = app.bridge.agentFor(token, typeof body.sessionID === "string" ? body.sessionID : undefined);
+			if (!agentId) {
+				res.json({ text: "This tool's token is not valid any more. The agent it belonged to has gone.", isError: true });
+				return;
+			}
+			res.json(await app.google.tool(String(body.tool ?? ""), (body.args ?? {}) as Record<string, unknown>, app.agentName(agentId)));
+		}),
+	);
+
 	server.use("/api", api);
 
 	// The built UI, when there is one. In development Vite serves it instead and
@@ -688,4 +828,16 @@ function aspectOf(deck: { path: string }, boardPath: string): string | undefined
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * A web page with `lib/embed-guest.js` put first in its head, so it takes the scrolls it can use and
+ * hands the rest to the canvas. A page that brings its own bridge (it says `decks:embed-ready`) is
+ * left as it is: two bridges would hand every scroll up twice.
+ */
+function withGuest(page: string, src: string): string {
+	if (page.includes("decks:embed-ready")) return page;
+	const tag = `<script src="${src}"></script>`;
+	const head = /<head[^>]*>/i.exec(page);
+	return head ? `${page.slice(0, head.index + head[0].length)}${tag}${page.slice(head.index + head[0].length)}` : `${tag}${page}`;
 }

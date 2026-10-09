@@ -4,7 +4,7 @@ import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
 import { CARD, MEDIA } from "@decks/pen";
-import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileItem, markdownText } from "../canvas/pen/card-frame.ts";
+import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "../canvas/pen/card-frame.ts";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
@@ -12,6 +12,7 @@ import { selected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { setDraft, setPicking } from "../state/ui.ts";
 import { embedPath, mayUpload, uploadAsset } from "./upload.ts";
+import { api } from "../connections/connection.ts";
 import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
 import { switchTo } from "../connections/connection.ts";
@@ -27,8 +28,6 @@ async function openDroppedBundle(file: File): Promise<void> {
 	}
 }
 
-/** The heading a board made by a drop starts under, and where its first row sits. */
-const FIRST_ROW = 152;
 
 /** Pictures the stage's painter decodes itself: these go on the canvas as they are. SVG does not, so it goes on a board. */
 const RASTER = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico"]);
@@ -54,6 +53,8 @@ const SOUND_H = 72;
  * the server's answer — the upload comes back with `media` or it does not, and a file that turns
  * out not to be media is placed as an ordinary dropped file would be.
  */
+/** What opens as a document page, edited where it is: the docs server's `EDITABLE`. */
+const DOCUMENTS = new Set(["md", "markdown", "txt", "tex", "bib", "sty", "cls", "ltx", "rst", "org", "docx"]);
 const PLAYABLE = new Set(["mp4", "m4v", "webm", "mov", "ogv", "mkv", "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "weba"]);
 const isPlayable = (file: File) => PLAYABLE.has(extensionOf(file)) || file.type.startsWith("video/") || file.type.startsWith("audio/");
 
@@ -225,9 +226,9 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	};
 
 	/**
-	 * Files dropped on empty canvas. Pictures and text files go on the stage itself, where they
-	 * landed (`ontoStage`); anything else — a PDF, a video, a web page — gets a board of its own
-	 * there (`onNewBoard`).
+	 * Files dropped on empty canvas, all of them on the stage itself where they landed: pictures, text,
+	 * films and sounds as items of their own (`ontoStage`), anything else — a PDF, an SVG, a web page
+	 * — as a file card (`asFileCards`).
 	 */
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }) => {
 		const stage = document.querySelector(".stage");
@@ -243,7 +244,83 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const rest = files.filter((file) => !onStage(file));
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		if (direct.length > 0) await ontoStage(direct, middle);
-		if (rest.length > 0) await onNewBoard(rest, at);
+		if (rest.length > 0) await asFileCards(rest, { x: middle.x, y: middle.y + (direct.length ? 260 : 0) });
+	};
+
+	/**
+	 * Files the stage has no item of its own for — a PDF, an SVG, a web page, a spreadsheet — copied
+	 * into the deck and put on the canvas as file cards (`fileCard`): a picture of each where the
+	 * server can draw one, its name and kind under it. In a row centred on `middle`, a stage point.
+	 */
+	const asFileCards = async (files: File[], middle: { x: number; y: number }) => {
+		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		const paths: string[] = [];
+		const failures: string[] = [];
+		for (const file of files) {
+			try {
+				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`))).path);
+			} catch (error) {
+				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+		await placeFileCards(paths, middle);
+		report.done([paths.length ? `${paths.length === 1 ? files[0]?.name : `${paths.length} files`} put on the canvas` : "", ...failures].filter(Boolean).join("; ") || undefined, failures.length ? "warn" : "info");
+	};
+
+	/**
+	 * A PDF or a web page as a board that is the file, edge to edge (`newFileBoard` on the server):
+	 * a PDF in its first page's shape, its other pages scrolling inside; a page at a laptop's shape,
+	 * live. Centred on `middle`. Answers the board's path.
+	 */
+	const fileBoard = async (path: string, middle: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
+		const pdf = /\.pdf$/i.test(path);
+		// A PDF's first page gives the board its shape; a web page needs no picture to be a page.
+		const where = pdf ? ((await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { w: number; h: number } }) : {};
+		const w = pdf ? 816 : 1200;
+		// The file's own shape, under the 40px bar that names it and reloads it (`board.css`, `data-bare`).
+		const h = (pdf && where.preview ? Math.round((w * where.preview.h) / Math.max(1, where.preview.w)) : pdf ? 1056 : 750) + 40;
+		return askForBoard((request) =>
+			send({ type: "board.create", file: path, size: { w, h }, ...(aimed ? { at: { x: Math.round(middle.x - w / 2), y: Math.round(middle.y - h / 2) } } : {}), request }),
+		);
+	};
+	/** A PDF or a web page is a board that is the file; an SVG is a picture shown live on the canvas (`liveFileItem`). */
+	const FULL = /\.(pdf|html?)$/i;
+	const LIVE = /\.svg$/i;
+
+	/** Deck files as file cards in a row centred on `middle`, each with the picture the server makes of it (`/api/where`); a PDF or a web page as a board of its own. */
+	const placeFileCards = async (all: string[], middle: { x: number; y: number }) => {
+		const agentId = state.focused;
+		for (const path of all.filter((one) => FULL.test(one))) await fileBoard(path, middle);
+		const stamp = Date.now().toString(36);
+		let n = 0;
+		const fresh = () => `file-${stamp}-${n++}`;
+		const live = all.filter((one) => LIVE.test(one));
+		if (agentId && live.length) {
+			const ops: Array<Record<string, unknown>> = [];
+			let at = middle.x;
+			for (const path of live) {
+				const where = (await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { preview: string; w: number; h: number } };
+				const node = liveFileItem(path, fresh, { ...(where.preview ? { still: where.preview.preview, w: where.preview.w, h: where.preview.h } : {}), url: fromStage });
+				const w = Number(node.width);
+				ops.push({ op: "insert", node, box: { x1: Math.round(at - w / 2), y1: Math.round(middle.y - 200), x2: Math.round(at + w / 2) } });
+				at += w + GAP;
+			}
+			send({ type: "stage.pen.edit", agentId, ops });
+		}
+		const paths = all.filter((one) => !FULL.test(one) && !LIVE.test(one));
+		if (!agentId || paths.length === 0) return;
+		const total = paths.length * FILE_CARD_W + GAP * (paths.length - 1);
+		let x = Math.round(middle.x - total / 2);
+		const ops: Array<Record<string, unknown>> = [];
+		for (const path of paths) {
+			const where = (await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { preview: string; w: number; h: number; pages?: number; title?: string } };
+			// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
+			const node = fileCard(fromStage(path), fresh, { ...(where.preview ?? {}), url: fromStage });
+			const tall = where.preview ? Math.min(420, (FILE_CARD_W * where.preview.h) / Math.max(1, where.preview.w)) + 52 : 52;
+			ops.push({ op: "insert", node, box: { x1: x, y1: Math.round(middle.y - tall / 2), x2: x + FILE_CARD_W } });
+			x += FILE_CARD_W + GAP;
+		}
+		send({ type: "stage.pen.edit", agentId, ops });
 	};
 
 	/**
@@ -311,7 +388,8 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				 * The canvas draws the still and puts a play badge on it; nothing decodes until it is
 				 * pressed, which is what the measurement asked for.
 				 */
-				if (asset.media) {
+				// Only a file named as a film or a sound: ffmpeg reads a still picture as a one-frame film.
+				if (asset.media && isPlayable(file)) {
 					const facts = asset.media;
 					const sound = facts.kind === "audio";
 					const w = sound ? SOUND_W : Math.min(PICTURE_W, facts.w ?? natural.width);
@@ -357,38 +435,6 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		}
 		const added = items.length === 0 ? "" : `${items.length === 1 ? files[0]?.name : `${items.length} files`} put on the canvas`;
 		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
-	};
-
-	/**
-	 * Files the stage cannot hold as items of its own (a PDF, a video, a web page): a board of their
-	 * own, centred where they landed. Laid out first, the same way a drop on a board is (`flow`),
-	 * under the heading a new board comes with, so the board can be asked for at the size that holds
-	 * them; then made, placed, and filled through the ordinary drop path.
-	 */
-	const onNewBoard = async (files: File[], at: { x: number; y: number }) => {
-		const stage = document.querySelector(".stage");
-		if (!stage) return;
-		const shapes = await Promise.all(files.map(shapeFor));
-		const width = Math.min(1200, Math.max(880, Math.max(...shapes.map((shape) => shape.width)) + 96));
-		const boxes = flow(shapes, { x: 48, y: FIRST_ROW }, width);
-		const height = Math.max(400, Math.max(...boxes.map((box) => box.top + box.height)) + 48);
-		// `at` is already in stage pixels: the stage is the viewport (`camera/coords.ts`).
-		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
-		const path = await askForBoard((request) =>
-			send({
-				type: "board.create",
-				format: "board",
-				title: files.length === 1 ? files[0]!.name : `${files.length} files`,
-				size: { w: width, h: height },
-				at: { x: Math.round(middle.x - width / 2), y: Math.round(middle.y - height / 2) },
-				request,
-			}),
-		);
-		if (!path) {
-			notice("warn", "The board for that file was not made. Try dropping it again.");
-			return;
-		}
-		await dropOnBoard(path, files, { x: 48, y: FIRST_ROW });
 	};
 
 	/**
@@ -462,7 +508,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 *
 	 * The file comes from the picker the app already has: anything in the deck or a root it
 	 * declares, or a file from the computer copied into the deck first. The server makes the
-	 * board (`newDocBoard`), and opening it copies the document into `docs/` to be worked on.
+	 * board (`newDocBoard`); the file is edited where it is, and its history is kept in `docs/`.
 	 */
 	const documentAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
 		const stage = document.querySelector(".stage");
@@ -473,19 +519,122 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 					setPicking(undefined);
 					resolve(path);
 				},
+				google: true,
 			}),
 		);
 		if (!picked) return undefined;
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		const size = { w: 1000, h: 1100 };
+		// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the board.
+		const google = picked.startsWith("google:") ? picked.slice(7) : undefined;
 		return askForBoard((request) =>
 			send({
 				type: "board.create",
-				document: picked,
+				...(google ? { google } : { document: picked }),
 				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
 				request,
 			}),
 		);
+	};
+
+	/**
+	 * A file put on the canvas from the File button, centred where it was asked for. It is chosen in
+	 * the picker — anything in the deck or a root it declares, a file from this device copied in, or
+	 * a Google Doc — and placed by what it is: a document opens as a page edited where it is, a
+	 * picture, a film or a sound is an item on the canvas itself, and anything else (a PDF, a web
+	 * page, a spreadsheet) gets a board holding it, as a dropped file does. Answers the board made, if any.
+	 */
+	/**
+	 * A file from the picker, placed by what it is. `aimed` is false from the toolbar's button, which names
+	 * no point: a board then takes the nearest open slot beside the newest board, as the Board button's does,
+	 * rather than landing on whatever is in the middle of the screen.
+	 */
+	const fileAt = async (at: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
+		const stage = document.querySelector(".stage");
+		if (!stage) return undefined;
+		const picked = await new Promise<string | undefined>((resolve) =>
+			setPicking({
+				resolve: (path) => {
+					setPicking(undefined);
+					resolve(path);
+				},
+				google: true,
+				purpose: "canvas",
+			}),
+		);
+		if (!picked) return undefined;
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		const extension = (picked.split("/").pop()?.split(".").pop() ?? "").toLowerCase();
+		const google = picked.startsWith("google:") ? picked.slice(7) : undefined;
+		if (google || DOCUMENTS.has(extension)) {
+			const size = { w: 1000, h: 1100 };
+			// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the board.
+			return askForBoard((request) =>
+				send({
+					type: "board.create",
+					...(google ? { google } : { document: picked }),
+					...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}),
+					request,
+				}),
+			);
+		}
+		const agentId = state.focused;
+		// In the deck, the stage file refers to it where it is, with nothing copied: the server says where that is, and what a film or a sound is.
+		const where = (await (await fetch(api(`/where?path=${encodeURIComponent(picked)}`))).json().catch(() => ({ inDeck: false }))) as { inDeck: boolean; path?: string; media?: { kind: "video" | "audio"; poster?: string; seconds?: number; w?: number; h?: number } };
+		const inDeck = where.inDeck && !!where.path;
+		const deckPath = where.path ?? picked;
+		const place = (node: Record<string, unknown>, w: number, h: number) => {
+			if (!agentId) return;
+			const box = { x1: Math.round(middle.x - w / 2), y1: Math.round(middle.y - h / 2), x2: Math.round(middle.x + w / 2), y2: Math.round(middle.y + h / 2) };
+			send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { ...node, id: `file-${Date.now().toString(36)}` }, box }] });
+		};
+		const name = picked.split("/").pop() ?? picked;
+		if (inDeck && RASTER.has(extension)) {
+			const natural = await new Promise<{ width: number; height: number }>((resolve) => {
+				const image = new Image();
+				image.onload = () => resolve({ width: image.naturalWidth || 480, height: image.naturalHeight || 360 });
+				image.onerror = () => resolve({ width: 480, height: 360 });
+				image.src = api(`/file?path=${encodeURIComponent(deckPath)}`);
+			});
+			const w = Math.min(PICTURE_W, natural.width);
+			place({ type: "rectangle", name, cornerRadius: 8, fill: { type: "image", url: fromStage(deckPath), mode: "fill" } }, w, Math.round((w * natural.height) / Math.max(1, natural.width)));
+			return undefined;
+		}
+		if (inDeck && PLAYABLE.has(extension)) {
+			const facts = where.media;
+			if (facts) {
+				const sound = facts.kind === "audio";
+				const w = sound ? SOUND_W : Math.min(PICTURE_W, facts.w ?? 640);
+				const h = sound ? SOUND_H : Math.round((w * (facts.h ?? 360)) / Math.max(1, facts.w ?? 640));
+				place(
+					{
+						type: "rectangle",
+						name,
+						cornerRadius: 8,
+						...(facts.poster ? { fill: { type: "image", url: fromStage(facts.poster), mode: "fill" } } : { fill: "#1f2328" }),
+						metadata: { type: MEDIA, kind: facts.kind, file: deckPath, ...(facts.poster ? { poster: facts.poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }) },
+					},
+					w,
+					h,
+				);
+				return undefined;
+			}
+		}
+		// A PDF or a web page: a board that is the file. Anything else in the deck, an SVG among it: an item on the canvas, the file used where it is.
+		if (FULL.test(name)) return fileBoard(inDeck ? deckPath : picked, middle, aimed);
+		if (inDeck) {
+			await placeFileCards([deckPath], middle);
+			return undefined;
+		}
+		// A file outside the deck: its bytes, the way a drop brings them.
+		const response = await fetch(api(`/file?path=${encodeURIComponent(picked)}`));
+		if (!response.ok) {
+			notice("warn", `${name} could not be read (${response.status}).`);
+			return undefined;
+		}
+		const blob = await response.blob();
+		await onEmptyCanvas([new File([blob], name, { type: blob.type })], at);
+		return undefined;
 	};
 
 	/** A board asked for by a drop heard its path — see `board.created` in the frame switch. */
@@ -557,5 +706,5 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		});
 	};
 
-	return { drops, addFile, intoComposer, paste, boardAt, documentAt, askForBoard, hearBoard, install };
+	return { drops, addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
 }

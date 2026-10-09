@@ -43,7 +43,7 @@ say("the first-choice slot is on screen to draw in", onPage, JSON.stringify(scre
 const hadIds = new Set(doc().children.map((n) => n.id));
 await page.mouse.click(screen.x, screen.y);
 await page.keyboard.press("Escape");
-await page.keyboard.press("c");
+await page.keyboard.press("n");
 await page.mouse.click(screen.x, screen.y);
 await settle(page, 600);
 await page.keyboard.type("In the way");
@@ -78,9 +78,9 @@ say("A's own view is far from its boards", Math.hypot(camA.x - newest.x, camA.y 
 say("the note is still there when the ＋ is pressed", doc().children.some((n) => n.id === note?.id));
 // The ＋, pressed in A's window.
 const before = new Set(boards().map((b) => b.path));
-await page.locator('button[aria-label="A new board, on the canvas"]').click();
+await page.locator("button[data-new-board-button]").click();
 await settle(page, 300);
-await page.locator(".popover [data-row]").first().click();
+await page.locator('.popover [data-new-board="board"]').click();
 const made = await until(() => boards().find((b) => !before.has(b.path)), 10000);
 const n = note && { x: note.x, y: note.y, w: note.width ?? 240, h: note.height ?? 120 };
 const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;

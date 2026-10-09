@@ -122,6 +122,12 @@ export class StageBridge {
 		return held.tool.run(code);
 	}
 
+	/** Which agent a call speaks for: a per-agent token, or opencode's session with the server's token. */
+	agentFor(token: string | undefined, sessionID?: string): string | undefined {
+		if (sessionID !== undefined) return this.serverToken !== undefined && token === this.serverToken ? this.bySession.get(sessionID)?.agentId : undefined;
+		return this.agentOf(token);
+	}
+
 	/** Which agent a token speaks for, for a caller that wants to say so. */
 	agentOf(token: string | undefined): string | undefined {
 		return token ? this.byToken.get(token)?.agentId : undefined;

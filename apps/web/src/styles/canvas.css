@@ -1016,6 +1016,23 @@
 	touch-action: none;
 }
 	/*
+	 * An SVG shown live (`Stage.tsx`, `liveFiles`): under the sheet, which draws a hole where it is. It
+	 * never takes the pointer: the stage picks, moves and sizes it as a drawn item.
+	 */
+	.world > .file-live {
+	position: absolute;
+	box-sizing: border-box;
+	overflow: hidden;
+	pointer-events: none;
+}
+	.world > .file-live > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	user-select: none;
+}
+	/*
 	 * The stage's one sheet (`canvas/pen/layer.ts`): the drawing, and each board as its picture or as
 	 * a hole over its document, painted in a worker and placed by the camera it was drawn for. Over
 	 * the boards' surfaces, and never in the way of a gesture.

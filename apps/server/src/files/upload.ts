@@ -243,7 +243,7 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
  * Nothing here can refuse an upload: a deployment with no ffmpeg, or a container it cannot open,
  * answers with no `media` at all, and what is placed is an item with no still rather than no item.
  */
-async function withMedia(deckRoot: string, asset: UploadedAsset): Promise<UploadedAsset> {
+export async function withMedia(deckRoot: string, asset: UploadedAsset): Promise<UploadedAsset> {
 	const facts = await mediaFacts(join(deckRoot, asset.path)).catch(() => undefined);
 	if (!facts) return asset;
 	const kept = posterPath(asset.path);

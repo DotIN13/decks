@@ -79,11 +79,13 @@ description: How to write a board. One format: a one-screen page you design, who
 - **A document to write in is a document board, not an embed.** A `.md`, `.tex` or `.docx` the
   person will type into goes in a board of its own holding one box,
   `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md" style="left: 0; top: 0; right: 0; bottom: 0"></div>`
-  (the path relative to the board), at about 1000 by 1100. The page reads formatted and is typed
-  into a block at a time. Opening it copies the file into `docs/<name>/`, with its history and
-  suggestions beside it: edit that copy, `docs/<name>/<file>`, with your own tools, and your edit
-  reaches the person as a suggestion to accept or reject. The original changes only when they press
-  Write back; an edit you make to the original instead is merged into the copy as a suggestion.
+  (the path relative to the board), at about 1000 by 1100. Markdown and LaTeX are typed into as
+  they read, with a toolbar of styles; Word is typed into a paragraph at a time. The file is edited
+  where it is: every keystroke goes to it, and its history and review are kept apart in `docs/<name>/`,
+  which is not yours to write. Edit the file itself with your own tools: your edit lands at once, highlighted on the words you changed, and the person accepts or rejects
+  it, one at a time or all at once. History shows and restores any earlier version.
+  A Google Doc opens the same way from its link; edit it with `gdocs_read` and `gdocs_edit`
+  (markdown in, real Docs formatting out), never by writing the mirror the page keeps in `docs/`.
 - **Charts, 3D and animation: import from the head's import map.** Every new board carries one,
   naming `d3`, `three` (with `three/addons/`), `gsap` and `chart.js` pinned on jsDelivr. Edit it for
   anything else, and reach for a library with `const d3 = await import("d3")` where you draw, on

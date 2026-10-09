@@ -28,6 +28,9 @@
  */
 (() => {
 	if (window.parent === window) return;
+	// Once a page: the server puts this in a board that is the page, and the page may load it as well.
+	if (window.decksGuest) return;
+	window.decksGuest = true;
 
 	const post = (message) => {
 		try {
@@ -48,8 +51,11 @@
 
 	const canScroll = (element, deltaX, deltaY) => {
 		const style = getComputedStyle(element);
-		const vertical = /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1;
-		const horizontal = /auto|scroll/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1;
+		// The page's own scroll: the viewport scrolls unless the root says hidden, and its computed overflow is `visible`.
+		const root = element === (document.scrollingElement ?? document.documentElement);
+		const scrolls = (overflow) => /auto|scroll/.test(overflow) || (root && overflow !== "hidden" && overflow !== "clip");
+		const vertical = scrolls(style.overflowY) && element.scrollHeight > element.clientHeight + 1;
+		const horizontal = scrolls(style.overflowX) && element.scrollWidth > element.clientWidth + 1;
 
 		if (vertical && Math.abs(deltaY) >= Math.abs(deltaX)) {
 			const room = deltaY > 0 ? element.scrollHeight - element.clientHeight - element.scrollTop : element.scrollTop;
@@ -62,16 +68,48 @@
 		return false;
 	};
 
+	/*
+	 * A board that is this page (`data-bare`) holds it whole: the frame is made as tall and as wide as
+	 * the page, and the board's own box scrolls it, as it scrolls a PDF's pages. So the page itself
+	 * never scrolls, and only the boxes inside it are this file's to scroll.
+	 */
+	let hosted = false;
+	const lastSize = { w: 0, h: 0 };
+	const sendSize = () => {
+		const root = document.documentElement;
+		const w = Math.ceil(Math.max(root.scrollWidth, document.body?.scrollWidth ?? 0));
+		const h = Math.ceil(Math.max(root.scrollHeight, document.body?.scrollHeight ?? 0));
+		if (w === lastSize.w && h === lastSize.h) return;
+		lastSize.w = w;
+		lastSize.h = h;
+		post({ t: "decks:size", w, h });
+	};
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent || event.data?.t !== "decks:hosted" || hosted) return;
+		hosted = true;
+		const style = document.createElement("style");
+		style.dataset.decksUi = "true";
+		style.textContent = "html, body { overflow: hidden !important; }";
+		(document.head ?? document.documentElement).appendChild(style);
+		const watch = new ResizeObserver(sendSize);
+		watch.observe(document.documentElement);
+		if (document.body) watch.observe(document.body);
+		new MutationObserver(sendSize).observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
+		window.addEventListener("load", sendSize);
+		sendSize();
+	});
+
 	/** The nearest box under the pointer that can still take this scroll, if any. */
 	const scrollableUnder = (target, deltaX, deltaY) => {
+		const root = document.scrollingElement ?? document.documentElement;
 		let node = target instanceof Element ? target : null;
 		while (node) {
+			if (hosted && (node === root || node === document.body)) return undefined;
 			if (canScroll(node, deltaX, deltaY)) return node;
 			node = node.parentElement;
 		}
 		// The page itself, when it is the thing with the overflow.
-		const root = document.scrollingElement ?? document.documentElement;
-		return root && canScroll(root, deltaX, deltaY) ? root : undefined;
+		return !hosted && root && canScroll(root, deltaX, deltaY) ? root : undefined;
 	};
 
 	/*
@@ -183,14 +221,104 @@
 		}
 	});
 
+	/*
+	 * A scroll this page can take is still scrolled by the board's rule (`frame-gestures.ts`): by hand,
+	 * the wheel's screen pixels turned into this page's at the canvas's zoom, so what is under the
+	 * fingers follows them. Only the board knows the zoom, so the box is asked for by number and the
+	 * board answers with the distance.
+	 */
+	const asks = new Map();
+	let asked = 0;
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent) return;
+		const message = event.data;
+		if (!message || message.t !== "decks:scroll") return;
+		const box = asks.get(message.id);
+		asks.delete(message.id);
+		if (!box) return;
+		box.scrollLeft += Number(message.dx) || 0;
+		box.scrollTop += Number(message.dy) || 0;
+	});
+
+	/*
+	 * A middle-drag, or a drag with Space held, pans the canvas wherever it starts, as over a board.
+	 * The pointer is handed up as it moves; the board replays it to `frame-gestures.ts`.
+	 */
+	let space = false;
+	const typing = (target) => target instanceof Element && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+	document.addEventListener(
+		"keydown",
+		(event) => {
+			if (event.code !== "Space" || typing(event.target)) return;
+			event.preventDefault();
+			if (space) return;
+			space = true;
+			post({ t: "decks:space", held: true });
+		},
+		true,
+	);
+	const spaceUp = () => {
+		if (!space) return;
+		space = false;
+		post({ t: "decks:space", held: false });
+	};
+	document.addEventListener("keyup", (event) => event.code === "Space" && spaceUp(), true);
+	window.addEventListener("blur", spaceUp);
+	document.addEventListener(
+		"pointerdown",
+		(event) => {
+			if (event.pointerType === "touch") return;
+			if (!(event.button === 1 || (event.button === 0 && space))) return;
+			event.preventDefault();
+			event.stopPropagation();
+			// Screen positions: the canvas moves this page under a still mouse, so its own pixels would fight the pan.
+			const at = (e) => ({ sx: e.screenX, sy: e.screenY });
+			document.documentElement.style.cursor = "grabbing";
+			post({ t: "decks:pointer", phase: "down", button: event.button, ...at(event) });
+			try {
+				document.documentElement.setPointerCapture(event.pointerId);
+			} catch {
+				/* the document listeners carry the drag regardless */
+			}
+			// The button this drag is held by, as `buttons` says it: a move without it is a release that never arrived.
+			const held = event.button === 1 ? 4 : 1;
+			let done = false;
+			const up = (e) => {
+				if (done) return;
+				done = true;
+				post({ t: "decks:pointer", phase: "up", button: event.button, ...at(e ?? event) });
+				document.documentElement.style.removeProperty("cursor");
+				document.removeEventListener("pointermove", move, true);
+				document.removeEventListener("pointerup", up, true);
+				document.removeEventListener("pointercancel", up, true);
+				window.removeEventListener("blur", lost);
+				window.removeEventListener("pagehide", lost);
+			};
+			const lost = () => up(undefined);
+			const move = (e) => ((e.buttons & held) === 0 ? up(e) : post({ t: "decks:pointer", phase: "move", button: event.button, ...at(e) }));
+			document.addEventListener("pointermove", move, true);
+			document.addEventListener("pointerup", up, true);
+			document.addEventListener("pointercancel", up, true);
+			window.addEventListener("blur", lost);
+			window.addEventListener("pagehide", lost);
+		},
+		true,
+	);
+	// No autoscroll and no paste from a middle press: it is the canvas's.
+	document.addEventListener("auxclick", (event) => event.button === 1 && event.preventDefault(), true);
+
 	window.addEventListener(
 		"wheel",
 		(event) => {
 			// A pinch is always the canvas zooming; nothing inside an embed zooms.
 			const zooming = event.ctrlKey || event.metaKey;
-			if (!zooming && scrollableUnder(event.target, event.deltaX, event.deltaY)) return;
-
+			const box = zooming ? undefined : scrollableUnder(event.target, event.deltaX, event.deltaY);
 			event.preventDefault();
+			if (box) {
+				asks.set(++asked, box);
+				post({ t: "decks:scroll-ask", id: asked, dx: event.deltaX, dy: event.deltaY });
+				return;
+			}
 			post({
 				t: "decks:wheel",
 				dx: event.deltaX,

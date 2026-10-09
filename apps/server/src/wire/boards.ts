@@ -184,7 +184,18 @@ export const boards = {
 		const h = bounded(message.size?.h, 240, 4000);
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
 		let path: string;
-		if (typeof message.document === "string" && message.document.trim()) {
+		// A Google Doc: linked first, which asks Google, so the board is made when the answer is in.
+		if (typeof message.google === "string" && message.google.trim()) {
+			void wire.google.link(message.google.trim()).then(
+				(mirror) => place(wire.boards.newDocBoard(mirror, wire.google.remote(mirror)?.title)),
+				(error: Error) => reply({ type: "notice", level: "warn", text: error.message }),
+			);
+			return;
+		}
+		if (typeof message.file === "string" && message.file.trim()) {
+			// One file, the whole board: a PDF or a web page put on the canvas from the file picker or a drop.
+			path = wire.boards.newFileBoard(message.file.trim(), { w: w ?? 1000, h: h ?? 750 }, typeof message.title === "string" && message.title.trim() ? title : undefined);
+		} else if (typeof message.document === "string" && message.document.trim()) {
 			// A document: refused here, in a sentence, for a file a document page could not open.
 			try {
 				path = wire.boards.newDocBoard(wire.docs.openable(message.document.trim()));
@@ -193,22 +204,25 @@ export const boards = {
 				return;
 			}
 		} else path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
-		const agent = wire.target();
-		/*
-		 * The place first, then the canvas. A drop and a double-click name the point themselves, and
-		 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
-		 * the board being put beside the newest board for one frame and then moved to the cursor.
-		 * With no point named — the ＋ in the corner — there is nothing to keep and the board takes
-		 * the nearest open slot beside the stage's newest board (`deck/place.ts`).
-		 */
-		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
-			agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
+		place(path);
+		function place(path: string) {
+			const agent = wire.target();
+			/*
+			 * The place first, then the canvas. A drop and a double-click name the point themselves, and
+			 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
+			 * the board being put beside the newest board for one frame and then moved to the cursor.
+			 * With no point named — the ＋ in the corner — there is nothing to keep and the board takes
+			 * the nearest open slot beside the stage's newest board (`deck/place.ts`).
+			 */
+			if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
+				agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
+			}
+			agent.setInPlay([...agent.inPlay, path], { place: true });
+			const placed = wire.stageState().boards.find((one) => one.path === path);
+			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
+			// After the board is announced, so the asker already holds it when it hears the path.
+			if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
 		}
-		agent.setInPlay([...agent.inPlay, path], { place: true });
-		const placed = wire.stageState().boards.find((one) => one.path === path);
-		if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
-		// After the board is announced, so the asker already holds it when it hears the path.
-		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
 	},
 
 	"board.delete": (message, reply, wire) => {

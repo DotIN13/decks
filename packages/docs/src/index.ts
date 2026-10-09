@@ -36,8 +36,8 @@ export interface Splice {
 export type DocFormat = "text" | "docx";
 
 /**
- * Who made a `doc.changed`: `"person"` for typing on a page (and an accept, reject or restore,
- * which a person pressed), an agent's name when the server can tell, and `"outside"` otherwise.
+ * Who made a `doc.changed`: `"person"` for typing on a page (and a restore, which a person
+ * pressed), an agent's name when the server can tell, and `"outside"` otherwise.
  */
 export type DocAuthor = "person" | "outside" | (string & {});
 
@@ -104,7 +104,8 @@ export function transformSplices(a: readonly Splice[], b: readonly Splice[], aFi
 
 /**
  * A write that did not come from a page: an agent's own Edit, Write or script, or any other
- * program. Kept until a person accepts or rejects it, and drawn on the page as a tracked change.
+ * program. It is already in the file, highlighted on the page, until a person accepts it (it
+ * stays) or rejects it (its reverse splices land, like anyone's typing).
  *
  * `from` and `to` are the versions either side of it (the service's `VersionStore`), and `splices` turn
  * `from` into `to`. `by` is who the server believes wrote it, which is `"outside"` when it cannot say.
@@ -116,6 +117,68 @@ export interface DocChange {
 	from: string;
 	to: string;
 	splices: Splice[];
+}
+
+export interface CompileError {
+	message: string;
+	/** The line of the document, counting from 1. */
+	line?: number;
+}
+
+/** What typesetting a document gave: the PDF, when there is one, and LaTeX's errors. */
+export interface CompileResult {
+	ok: boolean;
+	/** Absolute path of the PDF written. */
+	pdf?: string;
+	errors: CompileError[];
+	/** Why nothing ran at all (no engine installed, say), in a sentence. */
+	error?: string;
+}
+
+/** The git repository a document sits in, as `git status` has it, without asking the remote. */
+export interface GitStatus {
+	/** The branch checked out, or a short commit when none is. */
+	branch: string;
+	/** The branch it pulls from and pushes to (`origin/master`), when it has one. */
+	upstream?: string;
+	/** Where that is, with any token or password taken out of the address. */
+	remote?: string;
+	/** What to call the remote: "Overleaf" for an Overleaf project, else its host. */
+	label?: string;
+	/** Commits here the remote does not have, and the other way round, as of the last fetch. */
+	ahead: number;
+	behind: number;
+	/** Files with edits not yet committed. */
+	changed: number;
+}
+
+/** What a pull or a push did, in a sentence, and the repository as it stands after. */
+export interface GitResult {
+	ok: boolean;
+	message: string;
+	status?: GitStatus;
+}
+
+/** A document whose words live somewhere else, kept in step by the server: a Google Doc. */
+export interface DocRemote {
+	kind: "google";
+	title: string;
+	/** Where to open it in its own editor. */
+	url: string;
+}
+
+/** How the server's link to a remote document stands. */
+export interface DocRemoteStatus {
+	state: "synced" | "syncing" | "signin" | "error";
+	/** When the page's text and the Doc last agreed. */
+	at?: number;
+	message?: string;
+	/** Who this server is signed in to Google as. */
+	email?: string;
+	/** "fake" when the server talks to its stand-in for Google. */
+	mode?: "google" | "fake";
+	/** The sign-in needs the address the browser landed on pasted back. */
+	paste?: boolean;
 }
 
 /** One kept version of a document, oldest first in a list. */
@@ -133,22 +196,34 @@ export type DocClientMessage =
 	| { type: "doc.close"; path: string; client: string }
 	/** Splices made on revision `rev`, at most one batch every 50 ms; `batch` is echoed in the answer. */
 	| { type: "doc.patch"; path: string; client: string; rev: number; batch: string; splices: Splice[] }
-	/** Keep a change made from outside (`accept`), or undo it with the reverse splices. */
+	/** Keep a change from outside (`accept`), or take it back. `change` `"*"` is every change waiting. */
 	| { type: "doc.review"; path: string; client: string; change: string; accept: boolean }
 	| { type: "doc.versions"; path: string }
+	/** One kept version's text, to look at. */
+	| { type: "doc.version"; path: string; sha: string }
+	/** Typeset the document (LaTeX) as it stands, and say where the PDF is. */
+	| { type: "doc.compile"; path: string; client: string }
 	/** Put the text back as it was in one kept version, as one edit like any other. */
 	| { type: "doc.restore"; path: string; client: string; sha: string }
-	/** Write a working copy back over the file it was copied from. */
-	| { type: "doc.writeback"; path: string; client: string };
+	/**
+	 * The git repository the document is in: `status` reads it; `pull` commits the edits made here
+	 * and merges the remote's; `push` does that and sends the commits. Answered by `doc.repo`.
+	 */
+	| { type: "doc.git"; path: string; client: string; action: "status" | "pull" | "push" }
+	/** Styles for a Google Doc, as Docs requests at the page's indices, sent once the typing before them is in. */
+	/** Docs requests for a Google Doc, made when the page read `text`: the server brings the Doc to that text first, so typing after them lands after them. */
+	| { type: "doc.gstyle"; path: string; client: string; requests: unknown[]; text?: string }
+	/** A comment on a Google Doc: a new one on the quoted words, a reply, or resolving one. */
+	| { type: "doc.gcomment"; path: string; client: string; action: "create" | "reply" | "resolve"; comment?: string; content?: string; quote?: string };
 
 /** What the service sends: to the page that asked, or to every page. */
 export type DocServerMessage =
 	/**
-	 * A document as it is now, for the page that opened it; `changes` are those still to review.
-	 * `path` is what to call it from now on, which is its working copy when the server keeps one;
-	 * `asked` is the path the page sent, and `source` the original a working copy was copied from.
+	 * A document as it is now, for the page that opened it; `changes` are the writes from outside still waiting to be accepted or rejected.
+	 * `path` is what to call it from now on, which differs from `asked`, the path the page sent, for
+	 * another spelling of the file or a copy from before documents were edited in place.
 	 */
-	| { type: "doc.state"; path: string; asked: string; client?: string; source?: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string }
+	| { type: "doc.state"; path: string; asked: string; client?: string; rev: number; format: DocFormat; text: string; changes: DocChange[]; error?: string; remote?: DocRemote }
 	/**
 	 * To the page that sent `batch`: the revision it made, and which of its splices did not land.
 	 * When any did not, `text` is the whole document at `rev`, so the page resyncs without asking.
@@ -158,12 +233,31 @@ export type DocServerMessage =
 	 * To every page: revision `base` became `rev` by these splices, in the server's text. A page
 	 * on `base` applies them; a page on anything else opens the document again. `client` is the page
 	 * that typed them, with the `batch` they came in, absent for a write from outside, which carries
-	 * the `change` to review instead. A page that no longer holds that batch (it opened the document
+	 * the `change` to review instead. `settled` names changes accepted or rejected, whose highlights go. A page that no longer holds that batch (it opened the document
 	 * again while the batch was on its way) applies it like anyone else's.
 	 */
-	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; by: DocAuthor; client?: string; batch?: string; change?: DocChange; settled?: string }
+	| { type: "doc.changed"; path: string; base: number; rev: number; splices: Splice[]; by: DocAuthor; client?: string; batch?: string; change?: DocChange; settled?: string[] }
 	| { type: "doc.versions"; path: string; versions: DocVersion[] }
-	/** A working copy written back to `source`, or why not. */
-	| { type: "doc.written"; path: string; source?: string; error?: string }
+	| { type: "doc.version"; path: string; sha: string; at?: number; text?: string; error?: string }
+	/**
+	 * A typesetting finished: `pdf` is the path to fetch it by, when one was made; `errors` are
+	 * LaTeX's own, each with the line of the document it stopped at when it said one.
+	 */
+	| { type: "doc.compiled"; path: string; ok: boolean; pdf?: string; errors: CompileError[]; at: number; ms: number; error?: string }
+	/**
+	 * What `doc.git` found or did. `status` absent means the document is in no repository. What a
+	 * pull changed in the document arrives as a `doc.changed` like any write from outside.
+	 */
+	| { type: "doc.repo"; path: string; action: "status" | "pull" | "push"; ok: boolean; status?: GitStatus; message?: string }
+	/**
+	 * To the pages on a Google Doc's mirror: the Doc as Google returned it, for drawing, and the
+	 * index-aligned text it reads as (`gdoc/units.ts`), so a page whose text is ahead can lay its
+	 * own typing over it.
+	 */
+	| { type: "doc.gdoc"; path: string; document: unknown; text: string }
+	/** To the pages on a Google Doc: its open comments, or why they cannot be shown. */
+	| { type: "doc.gcomments"; path: string; comments: unknown[]; error?: string }
+	/** To every page: how a remote document's link stands, sent when it changes. */
+	| { type: "doc.remote"; path: string; status: DocRemoteStatus }
 	/** Something a person should be told, in a sentence. */
 	| { type: "notice"; level: "info" | "warn" | "error"; text: string };

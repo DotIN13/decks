@@ -32,6 +32,9 @@ import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
 import { DocLibrary, DocService } from "@decks/docs/server";
+import { compileTex } from "./docs/compile.ts";
+import { gitSync } from "./docs/git.ts";
+import { GoogleDocs } from "./google/docs.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
 
@@ -68,7 +71,13 @@ export class App {
 	readonly boards: BoardService;
 	/** Documents open as pages (`@decks/docs`), resolved by `docs/resolve.ts`. */
 	readonly docs: DocService;
-	/** The deck's `docs/` library, made once per deck, so each folder has one version store. */
+	/** Google Docs opened as document pages, kept in step through a markdown mirror (`google/docs.ts`). */
+	readonly google: GoogleDocs;
+	/** An agent's name as it says it, for crediting its edits; its id when it has said none. */
+	agentName(agentId: string): string {
+		return this.agents.get(agentId)?.who()?.name ?? agentId;
+	}
+	/** The deck's `docs/`, where each document's history and review are kept, made once per deck so each folder has one version store. */
 	private library: DocLibrary | undefined;
 	private docLibrary(): DocLibrary {
 		const dir = join(this.deck.path, "docs");
@@ -196,10 +205,20 @@ export class App {
 			resolve: (path) => resolveDoc(this.deck.roots, path),
 			versions: this.boards.revisions,
 			send: (message) => this.send(message),
-			writer: (file) => this.writers.who(file),
-			// Opening a file copies it into the deck's docs/, where its history and suggestions live.
+			writer: (file) => this.google.writer(file) ?? this.writers.who(file),
+			remote: (file) => this.google.remote(file),
+			opened: (file) => this.google.opened(file),
+			style: (file, requests, text) => this.google.style(file, requests, text),
+			comment: (file, message) => this.google.comment(file, message),
+			// A document is edited where it is, in its repository or folder; its history, review and PDF are kept in the deck's docs/.
 			library: () => this.docLibrary(),
+			// LaTeX pages typeset to a PDF beside the page (`docs/compile.ts`).
+			compile: compileTex,
+			// A document in a git repository pulls and pushes it, to stay in step with Overleaf (`docs/git.ts`).
+			git: gitSync,
 		});
+		this.google = new GoogleDocs({ dataDir: config.dataDir, library: () => this.docLibrary(), docs: this.docs, send: (message) => this.send(message) });
+		this.google.start();
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
 		 *

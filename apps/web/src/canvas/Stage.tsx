@@ -9,6 +9,7 @@ import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
 import { can } from "../connections/backend.ts";
 import FilePlus from "lucide-solid/icons/file-plus";
+import Paperclip from "lucide-solid/icons/paperclip";
 import FileText from "lucide-solid/icons/file-text";
 import Presentation from "lucide-solid/icons/presentation";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
@@ -45,7 +46,7 @@ import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, medi
 import { pageFont } from "./pen/fonts.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, newCard } from "./pen/card-frame.ts";
+import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, isLiveFile, newCard } from "./pen/card-frame.ts";
 import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE, firstLine } from "./pen/markdown-layout.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
@@ -186,7 +187,7 @@ export function Stage(props: {
 	 */
 	/** A board where the canvas menu was opened, in stage pixels: an ordinary board or a slide deck. */
 	onCreateBoard?: (at: { x: number; y: number }, format?: "board" | "slides") => void;
-	/** Open a file as a document page, centred at a point (the Add menu's Document…). */
+	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
 	/** Per-board reload counters, from `stage.reload`. */
@@ -667,14 +668,24 @@ export function Stage(props: {
 	 * or a resize is drawn as a preview.
 	 */
 	const [penDrag, setPenDrag] = createSignal({ dx: 0, dy: 0 });
+	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
+	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());
+	let holesAsked: { ids: ReadonlySet<string>; mark: number } | undefined;
 	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number; given?: { x: number; y: number } } | undefined>();
+	/*
+	 * The resize as the sheet has drawn it, which the outline follows: each step is drawn again by the
+	 * worker, a frame after the pointer, and an outline on the pointer's size ran a frame ahead of the
+	 * shape at every step. Each step waits here for the frame painted with it (`layer.ts`, `shows`).
+	 */
+	const [shownResize, setShownResize] = createSignal<ReturnType<typeof penResize>>();
+	const resizeSteps: Array<{ mark: number; resize: NonNullable<ReturnType<typeof penResize>> }> = [];
 	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
 	/*
 	 * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
 	 * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
 	 */
-	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; card?: true; legacy?: true; held?: Record<string, string>; insertAt?: number; caretAt?: { x: number; y: number } } | undefined>();
+	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; kind?: string; card?: true; legacy?: true; held?: Record<string, string>; insertAt?: number; caretAt?: { x: number; y: number } } | undefined>();
 	/**
 	 * The one film or sound playing, if any.
 	 *
@@ -784,6 +795,23 @@ export function Stage(props: {
 		if (was.size === paths.size && [...paths].every((path) => was.has(path))) return;
 		setOnSheet(paths);
 	};
+	let lastDrawnDoc: PenDocument | undefined;
+	let drawnGeneration = 0;
+	/**
+	 * After a move or a resize is let go: if no new drawing comes back (the server refused it, or it
+	 * changed nothing), the drag's offset and the resized outline still go, back onto the drawing.
+	 */
+	const settleGesture = () => {
+		const at = drawnGeneration;
+		setTimeout(() => {
+			if (drawnGeneration !== at) return;
+			penLayer.preview(undefined);
+			setPenDrag({ dx: 0, dy: 0 });
+			setPenResize(undefined);
+			resizeSteps.length = 0;
+			setShownResize(undefined);
+		}, 2000);
+	};
 	penLayer.drawn = () => {
 		if (unmute && wordsOf(penLayer.placed.get(unmute.id)?.node) === unmute.value) unmuteNow();
 		/*
@@ -791,17 +819,28 @@ export function Stage(props: {
 		 * goes. Not when the answer *arrives* — the layout is only redone on the next frame, and for
 		 * that frame the outline sat on the old layout with no offset, back where the drag began.
 		 */
-		if (penLayer.drawnDoc === props.pen?.doc) {
+		// A layout of the same document (a resize step redrawn, a font landing) is not the answer: only a newly drawn one is.
+		const fresh = penLayer.drawnDoc !== lastDrawnDoc;
+		lastDrawnDoc = penLayer.drawnDoc;
+		if (fresh) drawnGeneration++;
+		if (fresh && penLayer.drawnDoc === props.pen?.doc) {
 			setPenDrag({ dx: 0, dy: 0 });
 			setPenResize(undefined);
+			resizeSteps.length = 0;
+			setShownResize(undefined);
 		}
 		setPenDrawn((n) => n + 1);
 	};
 	/** Items made or copied here that the server has not answered with yet: selected, and not let go. */
 	const penAwaited = new Set<string>();
 	createEffect(() => {
-		// A selection of items the drawing no longer has is let go, whoever took them away.
-		const doc = props.pen?.doc;
+		/*
+		 * A selection of items the drawing no longer has is let go, whoever took them away — once the
+		 * sheet has drawn the drawing without them, so the outline goes in the frame the item does and
+		 * not a frame or two before it, while the item was still on screen.
+		 */
+		penDrawn();
+		const doc = penLayer.drawnDoc ?? props.pen?.doc;
 		const present = doc ? penIds(doc) : new Set<string>();
 		for (const id of penAwaited) if (present.has(id)) penAwaited.delete(id);
 		const selected = untrack(penSelection);
@@ -830,11 +869,19 @@ export function Stage(props: {
 			setPenTool("select");
 		}
 	});
+	/*
+	 * The drag as far as the canvas shows it: nothing yet while the carried picture of what was picked
+	 * up is on its way (`layer.ts`, `onCarryPending`), so outlines and handles stay on the items, which
+	 * the sheet still draws where they were, and both go with the pointer from the same frame.
+	 */
+	const [carryPending, setCarryPending] = createSignal(false);
+	penLayer.onCarryPending = setCarryPending;
+	const shownDrag = () => (carryPending() ? { dx: 0, dy: 0 } : penDrag());
 	/** Where each selected item is now, moved by any drag and sized by any resize in progress. */
 	const penOutlines = createMemo(() => {
 		penDrawn();
-		const drag = penDrag();
-		const resize = penResize();
+		const drag = shownDrag();
+		const resize = shownResize();
 		const out: Array<{ id: string; x: number; y: number; w: number; h: number }> = [];
 		const typing = penText()?.id;
 		for (const id of penSelection()) {
@@ -995,12 +1042,14 @@ export function Stage(props: {
 		const placed = penLayer.placed.get(hit.id);
 		const box = placed?.box ?? hit.box;
 		penLayer.muteText(new Set([hit.id]));
-		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
+		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), kind: node.type, ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
 	};
 	/** A file's chip, or its icon or name: the file opens in a tab of its own. Answers whether it was one. */
 	const openFileOf = (id: string): boolean => {
-		const located = props.pen ? indexOf(props.pen.doc).get(id) : undefined;
-		const file = located ? (isFile(located.node) ? located.node : isFile(located.parent) ? located.parent : undefined) : undefined;
+		// The chip itself, or anything inside it: a file card's picture, tile, name.
+		const index = props.pen ? indexOf(props.pen.doc) : undefined;
+		let file: PenNode | undefined;
+		for (let at = index?.get(id); at && !file; at = at.parent ? index?.get(at.parent.id) : undefined) if (isFile(at.node)) file = at.node;
 		if (!file || typeof file.metadata?.path !== "string") return false;
 		setPenSelection([file.id]);
 		window.open(new URL(file.metadata.path, new URL(props.pen?.base || "/", location.origin)).href, "_blank", "noopener");
@@ -1114,7 +1163,12 @@ export function Stage(props: {
 	let typedValue: { id: string; value: string } | undefined;
 	const previewTyped = (id: string, value: string) => {
 		typedValue = { id, value };
-		typedFrame ??= requestAnimationFrame(() => {
+		typedFrame ??= requestAnimationFrame(() => showTyped());
+	};
+	/** The typed words drawn now, not at the next frame: what putting the editor away draws in its place. */
+	const showTyped = () => {
+		{
+			if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
 			typedFrame = undefined;
 			const doc = props.pen?.doc;
 			if (!doc || !typedValue) return;
@@ -1127,7 +1181,7 @@ export function Stage(props: {
 				found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
 			} else found.node.content = typedValue.value;
 			penLayer.setDoc(copy, props.pen?.base ?? "");
-		});
+		}
 	};
 	/** Back to the document as the server has it, for an edit taken back with Escape. */
 	const dropTyped = () => {
@@ -1154,13 +1208,89 @@ export function Stage(props: {
 		if (unmute) clearTimeout(unmute.timer);
 		unmute = undefined;
 		penLayer.muteText(undefined);
+		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
+		if (editorGhost) ghostUntil = penLayer.mark();
 	};
+	/*
+	 * A still copy of the editor, left where the editor was when the typing was put away, until the
+	 * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
+	 * the editor was taken away at once, and the canvas, which leaves the words out while they are
+	 * the editor's, drew them only once the server's answer had been laid out.
+	 */
+	let editorGhost: HTMLElement | undefined;
+	/** What waits for the next frame the sheet shows: a deleted item's outline goes with the item. */
+	const afterFrame: Array<{ mark: number; run: () => void }> = [];
+	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`layer.ts`, `mark`). */
+	let ghostUntil: number | undefined;
+	const leaveGhost = () => {
+		dropGhost();
+		const live = worldEl?.querySelector<HTMLElement>(":scope > .pen-text");
+		if (!live) return;
+		const copy = live.cloneNode(true) as HTMLElement;
+		if (live instanceof HTMLTextAreaElement) (copy as HTMLTextAreaElement).value = live.value;
+		// Only the words and what holds them: not the card's style bar, the caret, or the focus ring.
+		for (const extra of copy.querySelectorAll(".pce-bar, [data-editorGhost-skip]")) extra.remove();
+		copy.removeAttribute("id");
+		copy.setAttribute("aria-hidden", "true");
+		copy.setAttribute("tabindex", "-1");
+		copy.querySelectorAll("[contenteditable]").forEach((el) => el.setAttribute("contenteditable", "false"));
+		if (copy.hasAttribute("contenteditable")) copy.setAttribute("contenteditable", "false");
+		copy.style.pointerEvents = "none";
+		copy.style.boxShadow = "none";
+		copy.style.caretColor = "transparent";
+		copy.classList.add("pen-editorGhost");
+		live.after(copy);
+		editorGhost = copy;
+		ghostUntil = undefined;
+		// Never left standing: a sheet that paints nothing for a second has had its chance.
+		const left = copy;
+		setTimeout(() => {
+			if (editorGhost === left && ghostUntil !== undefined) dropGhost();
+		}, 1000);
+	};
+	const dropGhost = () => {
+		editorGhost?.remove();
+		editorGhost = undefined;
+		ghostUntil = undefined;
+	};
+	{
+		const before = penLayer.presented;
+		penLayer.presented = () => {
+			before?.();
+			if (ghostUntil !== undefined && penLayer.shows(ghostUntil)) dropGhost();
+			if (holesAsked && penLayer.shows(holesAsked.mark)) {
+				setHolesShown(holesAsked.ids);
+				holesAsked = undefined;
+			}
+			let drawnStep: (typeof resizeSteps)[number] | undefined;
+			while (resizeSteps.length && penLayer.shows(resizeSteps[0]!.mark)) drawnStep = resizeSteps.shift();
+			if (drawnStep && penResize()) setShownResize(drawnStep.resize);
+			if (draftFor && penLayer.placed.has(draftFor)) {
+				draftFor = undefined;
+				setPenDraft(undefined);
+			}
+			for (let k = afterFrame.length - 1; k >= 0; k--) {
+				const wait = afterFrame[k]!;
+				if (!penLayer.shows(wait.mark)) continue;
+				afterFrame.splice(k, 1);
+				wait.run();
+			}
+		};
+	}
+	onCleanup(dropGhost);
+	/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
+	type LiveFile = { id: string; file: string; name: string };
+	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
+	const LIVE_FILES = 12;
+	/** A plain text item with no words is invisible, so a fresh one left empty goes; a note or a card is a shape you can see, and is kept. */
+	const emptyVanishes = (open: { kind?: string; card?: true }) => !open.card && open.kind === "text";
 	const commitPenText = (value: string) => {
 		const open = penText();
+		if (open) leaveGhost();
 		setPenText(undefined);
 		if (!open || !props.onPenEdit) return unmuteNow();
-		// A text or note made by a tool and left empty was never wanted.
-		if (open.fresh && !value.trim()) {
+		// A text made by a tool and left empty was never wanted: with no words it is nothing on the canvas. A note or a card stays, empty, where it was put.
+		if (open.fresh && !value.trim() && emptyVanishes(open)) {
 			unmuteNow();
 			dropTyped();
 			return props.onPenEdit([{ op: "delete", id: open.id }]);
@@ -1173,8 +1303,16 @@ export function Stage(props: {
 			return dropTyped();
 		}
 		if (unmute) clearTimeout(unmute.timer);
+		/*
+		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
+		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It
+		 * used to wait for the server's answer to be drawn, and a card's words, which keep their ids in
+		 * the answer, were left out for a frame after its copy had already shown them.
+		 */
+		typedValue = { id: open.id, value };
+		showTyped();
+		unmuteNow();
 		if (!open.card && !open.legacy) {
-			unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
 			props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 			return;
 		}
@@ -1187,7 +1325,6 @@ export function Stage(props: {
 			if (!base) return unmuteNow();
 			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
 			const children = cardChildren(value, card.children ?? [], { fresh: freshIds(), inner: cardInner(card), size: pictureSize });
-			unmute = { id: open.id, value: cardMarkdown(children), timer: setTimeout(unmuteNow, 3000) };
 			// A card's blocks are edited one by one, and only the ones that changed; a note card becomes a frame.
 			const ops = isCard(base) ? cardEdits(base.id, base.children ?? [], children) : [{ op: "replace" as const, id: open.id, node: { ...card, children } }];
 			if (!ops.length) return unmuteNow();
@@ -1337,8 +1474,14 @@ export function Stage(props: {
 			return true;
 		}
 		if (selected.length && (key === "Delete" || key === "Backspace")) {
+			// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
+			penLayer.hide(new Set(selected));
+			const mark = penLayer.mark();
 			penEdit(selected.map((id) => ({ op: "delete", id })));
-			setPenSelection([]);
+			const clear = () => setPenSelection((now) => (now === selected ? [] : now));
+			afterFrame.push({ mark, run: clear });
+			// A sheet that shows no frame (nothing painting) does not keep the outline.
+			setTimeout(clear, 250);
 			return true;
 		}
 		if (key === "Escape" && (selected.length || boardPicks().length || penTool() !== "select")) {
@@ -1856,6 +1999,7 @@ export function Stage(props: {
 						setPenDrag({ dx: 0, dy: 0 });
 						penCopyBy(ids, offset.dx, offset.dy);
 					} else penMoveBy(ids, offset.dx, offset.dy, into, slot);
+					if (ids.length) settleGesture();
 					moveBoards(boards, offset.dx, offset.dy);
 					setBoardDrag(undefined);
 				});
@@ -2050,9 +2194,11 @@ export function Stage(props: {
 				}
 				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(floor, Math.round(Math.abs(y2 - y1))) };
 				const box = givenFor(next);
-				setPenResize({ id, ...next, given: { x: box.x, y: box.y } });
+				const step = { id, ...next, given: { x: box.x, y: box.y } };
+				setPenResize(step);
 				// A card's height is left out, so the drawing re-measures its words at the new width.
 				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(words ? {} : { h: box.h }) }]]));
+				resizeSteps.push({ mark: penLayer.mark(), resize: step });
 			},
 			(moved) => {
 				setGuides([]);
@@ -2060,6 +2206,7 @@ export function Stage(props: {
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
 				// A card still following its words: its width alone, and no height written.
+				settleGesture();
 				if (words) return penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w) } }]);
 				penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w), y2: r(box.y + box.h) } }]);
 			},
@@ -2133,7 +2280,7 @@ export function Stage(props: {
 		if (!node || !box || !mediaOf(node)) return undefined;
 		if (!penSelection().includes(now.id)) return undefined;
 		if (localCamera.zoom < INTERACT_ZOOM) return undefined;
-		const drag = penDrag();
+		const drag = shownDrag();
 		return { ...now, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h };
 	});
 	// What stopped it above is still holding the file open: let it go, so nothing decodes off screen.
@@ -2350,7 +2497,7 @@ export function Stage(props: {
 		const boards = (name: string) => props.boards.find((board) => board.path === name);
 		const points = arrowPoints(node.metadata, penLayer.placed, boards);
 		if (!points) return undefined;
-		const drag = penDrag();
+		const drag = shownDrag();
 		const [fx, fy] = points[0]!;
 		const [tx, ty] = points[points.length - 1]!;
 		return { id: node.id, from: { x: fx + drag.dx, y: fy + drag.dy }, to: { x: tx + drag.dx, y: ty + drag.dy } };
@@ -2414,7 +2561,23 @@ export function Stage(props: {
 		return best?.id;
 	};
 
+	/*
+	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
+	 * item is drawn only once the server has answered, and taking the outline away at the release left
+	 * the spot empty for two or three frames.
+	 */
+	let draftFor: string | undefined;
+	const keepDraftFor = (id: string) => {
+		draftFor = id;
+		setTimeout(() => {
+			if (draftFor !== id) return;
+			draftFor = undefined;
+			setPenDraft(undefined);
+		}, 1500);
+	};
 	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }, from?: { name: string; box: Box; side?: ArrowSide }) => {
+		// A new drawing: the outline still standing in for the last item is not this one's to take away.
+		draftFor = undefined;
 		setPenDraft({ tool, x1: at.x, y1: at.y, x2: at.x, y2: at.y });
 		// An arrow lights up what each of its ends would join, from the first press to the release.
 		const startJoin = tool === "arrow" ? (from ?? joinAt(at)) : undefined;
@@ -2432,7 +2595,6 @@ export function Stage(props: {
 				}
 			},
 			(moved, e) => {
-				setPenDraft(undefined);
 				setJoinHint([]);
 				setSideHint([]);
 				setPenTool("select");
@@ -2448,12 +2610,16 @@ export function Stage(props: {
 					const toJoin = joinAt(end);
 					const from = fromJoin ? endOf(fromJoin) : pointEnd(at);
 					const to = toJoin && toJoin.name !== fromJoin?.name ? endOf(toJoin) : pointEnd(end);
-					if (!moved && (!fromJoin || !toJoin || fromJoin.name === toJoin.name)) return;
+					if (!moved && (!fromJoin || !toJoin || fromJoin.name === toJoin.name)) return void setPenDraft(undefined);
 					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to } } }]);
+					keepDraftFor(id);
 					selectMade([id]);
 					return;
 				}
-				if (!moved) return penMakeAt(tool, at);
+				if (!moved) {
+					setPenDraft(undefined);
+					return penMakeAt(tool, at);
+				}
 				const made = madeSize(tool);
 				const x1 = Math.round(moved ? Math.min(at.x, end.x) : at.x);
 				const y1 = Math.round(moved ? Math.min(at.y, end.y) : at.y);
@@ -2466,6 +2632,9 @@ export function Stage(props: {
 					tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				const node = madeNode(tool, id, { w, h });
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
+				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
+				if (tool === "text" || tool === "note" || tool === "card") setPenDraft(undefined);
+				else keepDraftFor(id);
 				selectMade([id]);
 				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box: { x: x1, y: y1, w, h: tool === "card" ? 80 : h } }, true);
 			},
@@ -3575,7 +3744,7 @@ export function Stage(props: {
 			}
 			if (performance.now() - since > 600) return;
 			const deep = penLayer.hitTest(at, { deep: true });
-			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && openFileOf(deep.id)) {
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (openLiveFile(deep.id) || openFileOf(deep.id))) {
 				lastTap = undefined;
 				return;
 			}
@@ -3640,6 +3809,8 @@ export function Stage(props: {
 				setPlaying({ id: hit.id, kind: media.kind, file: media.file });
 				return;
 			}
+			// A file shown live: a web page taken into, an SVG opened in a tab.
+			if (hit && openLiveFile(hit.id)) return;
 			// A file's chip opens the file, in a tab of its own.
 			if (hit && openFileOf(hit.id)) return;
 			// A card opens for typing: at the words, or with a new line in the gap that was double-clicked.
@@ -3901,6 +4072,78 @@ export function Stage(props: {
 	const sleepOnZoom = createMemo(() => SLEEP_ON_ZOOM && scaling());
 	/** The camera as of its last rest, as `restZoom` is the zoom. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
+
+	/*
+	 * SVGs shown live on the canvas (`liveFileItem`), each as an image. Each is an element in the boards' layer, under the sheet, which draws a hole
+	 * where it is (`paint.ts`, `holes`): so it moves with the boards in the same frame, and what is drawn
+	 * over it stays over it. As a board's page: only from the live zoom, only near the screen as of the
+	 * camera's last rest, the nearest few; while a zoom moves, or the item is being moved or sized, the
+	 * sheet draws its still over it instead, and the element waits underneath, still loaded.
+	 */
+	const liveFiles = createMemo(
+		() => {
+			penDrawn();
+			const cam = restCamera();
+			if (cam.zoom < INTERACT_ZOOM || !props.pen) return [] as LiveFile[];
+			const v = view();
+			const mx = v.width * 0.25;
+			const my = v.height * 0.25;
+			const near: Array<LiveFile & { d: number }> = [];
+			for (const placed of penLayer.placed.values()) {
+				const node = placed.node;
+				if (!isLiveFile(node) || node.metadata?.kind !== "svg" || typeof node.metadata.file !== "string") continue;
+				const box = penLayer.bounds.get(node.id) ?? placed.box;
+				const a = toScreen(cam, v, { x: box.x, y: box.y });
+				const b = toScreen(cam, v, { x: box.x + box.w, y: box.y + box.h });
+				if (b.x < -mx || a.x > v.width + mx || b.y < -my || a.y > v.height + my) continue;
+				near.push({ id: node.id, file: node.metadata.file, name: String(node.name ?? node.metadata.file.split("/").pop()), d: Math.hypot((a.x + b.x - v.width) / 2, (a.y + b.y - v.height) / 2) });
+			}
+			return near.sort((p, q) => p.d - q.d).slice(0, LIVE_FILES).map(({ d: _d, ...file }) => file);
+		},
+		[],
+		{ equals: (a, b) => a.length === b.length && a.every((file, k) => file.id === b[k]!.id && file.file === b[k]!.file && file.name === b[k]!.name) },
+	);
+	/**
+	 * The items the sheet draws as holes: the live ones, and none while a zoom moves. A moved or sized one
+	 * stays live: its element goes with the drag as the sheet's hole does (`liveBox`), so an animation being
+	 * carried keeps playing, not its still.
+	 */
+	const fileHoles = createMemo(
+		() => {
+			if (scaling()) return new Set<string>();
+			return new Set(liveFiles().map((file) => file.id));
+		},
+		new Set<string>(),
+		{ equals: (a, b) => a.size === b.size && [...a].every((id) => b.has(id)) },
+	);
+	createEffect(
+		on(fileHoles, (ids) => {
+			penLayer.holes(ids);
+			holesAsked = { ids, mark: penLayer.mark() };
+		}),
+	);
+	/** Where each live file is on the stage, from the layout the sheet drew. */
+	const liveBox = (id: string) => {
+		penDrawn();
+		const placed = penLayer.placed.get(id);
+		const resized = shownResize();
+		if (resized?.id === id) return { x: resized.x, y: resized.y, w: resized.w, h: resized.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
+		const box = penLayer.bounds.get(id) ?? placed?.box;
+		if (!box) return undefined;
+		// Carried with the drag, from the frame the sheet carries it in (`shownDrag`).
+		const drag = penSelection().includes(id) ? shownDrag() : { dx: 0, dy: 0 };
+		return { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
+	};
+	/** A double-click on a live SVG opens it in a tab. */
+	const openLiveFile = (id: string): boolean => {
+		const index = props.pen ? indexOf(props.pen.doc) : undefined;
+		let node: PenNode | undefined;
+		for (let at = index?.get(id); at && !node; at = at.parent ? index?.get(at.parent.id) : undefined) if (isLiveFile(at.node)) node = at.node;
+		if (!node || typeof node.metadata?.file !== "string") return false;
+		setPenSelection([node.id]);
+		window.open(deckFileUrl(node.metadata.file), "_blank", "noopener");
+		return true;
+	};
 	/**
 	 * On a phone, the one board that is live (`ONE_LIVE`): of the boards on screen, the one the
 	 * middle of the screen is on, or else nearest it; the one on top where two overlap. Decided
@@ -4318,6 +4561,26 @@ export function Stage(props: {
 				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
 				 * `pen/layer.ts` and `pen/scene.ts`.
 				 */}
+				{/* Files shown live, under the sheet's holes for them (`liveFiles`): after the boards, so over them, as the drawing is. */}
+				<For each={liveFiles()}>
+					{(file) => {
+						const box = () => liveBox(file.id);
+						const shown = () => holesShown().has(file.id);
+						return (
+							<Show when={box()}>
+								{(at) => (
+									<div
+										class="file-live"
+										data-live-file={file.id}
+										style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${at().w}px`, height: `${at().h}px`, "border-radius": `${at().radius}px`, visibility: shown() ? "visible" : "hidden" }}
+									>
+										<img src={deckFileUrl(file.file)} alt={file.name} draggable={false} />
+									</div>
+								)}
+							</Show>
+						);
+					}}
+				</For>
 				<canvas class="stage-sheet" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
 				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
@@ -4668,7 +4931,7 @@ export function Stage(props: {
 							setPenText(undefined);
 							unmuteNow();
 							dropTyped();
-							if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
+							if (open?.fresh && emptyVanishes(open)) props.onPenEdit?.([{ op: "delete", id: open.id }]);
 						};
 						// A card is typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words.
 						if (look.markdown)
@@ -4695,7 +4958,8 @@ export function Stage(props: {
 										"line-height": look.line === undefined ? "1.5" : String(look.line),
 										color: look.ink,
 										background: look.paper ?? "transparent",
-										"border-radius": `${NOTE_RADIUS}px`,
+										// Rounded only where the item is: a note or a card has corners, words on the canvas do not.
+										"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
 										"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
 									}}
 									onInput={(value) => previewTyped(open.id, value)}
@@ -4723,7 +4987,7 @@ export function Stage(props: {
 									"text-align": look.align as "left",
 									color: look.ink,
 									background: look.paper ?? "transparent",
-									"border-radius": look.paper ? `${NOTE_RADIUS}px` : "2px",
+									"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
 									"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
 								}}
 								value={open.value}
@@ -4780,10 +5044,10 @@ export function Stage(props: {
 							<Show when={props.onOpenDocument}>
 								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="document" onClick={documentFromMenu}>
 									<span class="row-icon">
-										<Icon of={FileText} size={15} />
+										<Icon of={Paperclip} size={15} />
 									</span>
-									<span class="row-label">Document…</span>
-									<span class="row-note">.md .tex .docx</span>
+									{/* Bold like Board and Slides beside it, which are bold because they carry a note. */}
+								<span class="row-label row-name">Open File…</span>
 								</button>
 							</Show>
 							<Show when={props.onPenEdit}>

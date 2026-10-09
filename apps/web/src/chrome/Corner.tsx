@@ -253,53 +253,7 @@ export function Corner(props: {
 			 * and goes with the state it acts on is a control you have to hunt for at exactly
 			 * the moment you want it, and the count in the title is what says why it is off.
 			 */}
-			{/*
-				Three formats, so the choice is made where a board is made.
-				
-				A press used to be one thing and is now a small menu, which is the least it can
-				be: the formats are not variants of one board, they are three different kinds of
-				file with three different editors, and picking after the fact means renaming the
-				file. Ordinary board first, because it is what almost every press wants.
-			*/}
-			<Popover
-				placement="bottom-start"
-				label="A new board"
-				class="w-[236px]"
-				trigger={(api) => (
-					<button
-						ref={api.ref}
-						type="button"
-						class="icon-button max-[640px]:hidden"
-						data-writes
-						aria-haspopup="menu"
-						aria-expanded={api.open}
-						data-on={api.open ? "soft" : undefined}
-						title="A new board, on the canvas"
-						aria-label="A new board, on the canvas"
-						onClick={api.toggle}
-					>
-						<Icon of={FilePlus} size={15} />
-					</button>
-				)}
-			>
-				<For each={FORMATS}>
-					{(choice) => (
-						<button
-							type="button"
-							data-row
-							data-flat="true"
-							title={choice.note}
-							onClick={() => props.onNewBoard(choice.format)}
-						>
-							<span class="row-icon">
-								<Icon of={choice.icon} size={15} />
-							</span>
-							<span class="row-label">{choice.label}</span>
-							<span class="row-note">{choice.extension}</span>
-						</button>
-					)}
-				</For>
-			</Popover>
+			{/* The new-board button is the first in the tools column now (`canvas/pen/PenBar.tsx`); on a phone it is rows in ⋯ below. */}
 			<button
 				type="button"
 				class="icon-button max-[640px]:hidden"

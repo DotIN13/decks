@@ -94,10 +94,10 @@ function run(seed: number, steps: number) {
 			const where = at === -1 ? now.length : at;
 			writeFileSync(file, `${now.slice(0, where)}\n\nAgent line ${++agentWrites}.${now.slice(where)}`);
 		} else if (roll < 0.66) {
-			// A person rejects or accepts whatever change is waiting.
+			// A person accepts or rejects a change waiting, or all of them.
 			const page = pages[0]!;
-			const change = page.changes[0];
-			if (change) rnd() < 0.5 ? page.reject(change.id) : page.accept(change.id);
+			const change = rnd() < 0.2 ? "*" : page.changes[0]?.id;
+			if (change) rnd() < 0.5 ? page.reject(change) : page.accept(change);
 		} else if (roll < 0.8) {
 			if (timers.length) timers.shift()!();
 		} else if (roll < 0.9) serve();

@@ -37,6 +37,11 @@ export interface PaintContext {
 	skip?: ReadonlySet<string>;
 	/** Items drawn without their words: the ones being typed into, where the editor shows the words. */
 	mute?: ReadonlySet<string>;
+	/**
+	 * Items drawn as a hole: a file shown live by an element under the sheet (`Stage.tsx`, file
+	 * items), which shows through here as a board's page does. What is drawn after it still covers it.
+	 */
+	holes?: ReadonlySet<string>;
 	/** How far a card's wide table has been scrolled sideways, by the card and the table's place in it. */
 	scroll?(id: string, index: number): number;
 }
@@ -59,6 +64,14 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 	const placed = ctx.placed.get(node.id);
 	if (!placed) return;
 	const { ck, doc } = ctx;
+	if (ctx.holes?.has(node.id)) {
+		const clear = new ck.Paint();
+		clear.setBlendMode(ck.BlendMode.Clear);
+		clear.setAntiAlias(true);
+		canvas.drawRRect(rrectOf(ck, placed, doc), clear);
+		clear.delete();
+		return;
+	}
 	const theme = placed.theme;
 	const { x, y, w, h } = placed.box;
 	const opacity = Math.max(0, Math.min(1, num(doc, node.opacity, theme, 1)));

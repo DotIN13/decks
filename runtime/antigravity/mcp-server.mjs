@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
  * Antigravity's own tool surface is fixed: the CLI ships its built-ins plus
  * `call_mcp_tool`, so the only way a board-writing tool gets into the agent's
  * toolset is MCP. This server is what the CLI spawns (`mcp_config.json` in the
- * HOME Decks hands it) and it exposes exactly one tool: the same `stage_eval`
+ * HOME Decks hands it) and it exposes the canvas tool and the Google Docs tools: the same `stage_eval`
  * every other runtime gets, in the same words.
  *
  * The body is one HTTP call back to the Decks server that spawned the CLI. The
@@ -38,7 +38,10 @@ const TOOL_DESCRIPTION = readFileSync(resolve(HERE, "../tool-description.txt"), 
 const STAGE_URL = process.env.DECKS_STAGE_URL ?? "";
 const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
 
-/** The one tool, named and worded as `stage/tool.ts` has it. */
+/** The Google Docs tools, worded in `runtime/gdocs-tools.json` as every runtime has them. */
+const GDOCS = JSON.parse(readFileSync(resolve(HERE, "../gdocs-tools.json"), "utf8"));
+
+/** The canvas tool, named and worded as `stage/tool.ts` has it, and the Google Docs tools. */
 const TOOLS = [
 	{
 		name: "stage_eval",
@@ -55,9 +58,19 @@ const TOOLS = [
 			required: ["code"],
 		},
 	},
+	...GDOCS.map((t) => ({
+		name: t.name,
+		description: t.description,
+		inputSchema: {
+			type: "object",
+			properties: Object.fromEntries(Object.entries(t.parameters).map(([key, about]) => [key, { type: "string", description: about }])),
+			required: Object.keys(t.parameters).filter((key) => key !== "new"),
+		},
+	})),
 ];
 
 async function callTool(name, args) {
+	if (GDOCS.some((t) => t.name === name)) return callGdocs(name, args);
 	if (name !== "stage_eval") throw new Error(`Unknown tool: ${name}`);
 	const code = String((args && args.code) ?? "");
 	if (!STAGE_URL || !STAGE_TOKEN) {
@@ -100,6 +113,20 @@ process.stdin.on("data", (chunk) => {
 		});
 	}
 });
+
+/** A Google Docs tool: the same server, the same token, its own route. */
+async function callGdocs(name, args) {
+	if (!STAGE_URL || !STAGE_TOKEN) throw new Error("This antigravity session was not started by Decks, so there is no Google Docs to reach.");
+	const response = await fetch(STAGE_URL.replace(/\/stage\/eval$/, "/gdocs/call"), {
+		method: "POST",
+		headers: { "content-type": "application/json", authorization: `Bearer ${STAGE_TOKEN}` },
+		body: JSON.stringify({ tool: name, args: args ?? {} }),
+	});
+	if (!response.ok) throw new Error(`Decks answered ${response.status}.`);
+	const outcome = await response.json();
+	if (outcome && outcome.isError) throw new Error(String(outcome.text));
+	return String(outcome.text);
+}
 
 async function handle(message) {
 	if (message.method === "initialize") {

@@ -18,6 +18,8 @@ export function mountLiveDoc(
 		markdown?: (into: HTMLElement, source: string) => Promise<void> | void;
 		math?: (into: HTMLElement) => Promise<void> | void;
 		file?: (path: string) => Promise<ArrayBuffer>;
+		pdf?: (into: HTMLElement, bytes: ArrayBuffer, width: number) => Promise<number>;
+		api?: string;
 	} = {},
 ): void {
 	const raw = host.dataset.path?.trim();

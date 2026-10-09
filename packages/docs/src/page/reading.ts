@@ -77,7 +77,7 @@ export class Reading {
 	}
 
 	private get tex(): boolean {
-		return /\.(tex|sty|cls|ltx)$/i.test(this.sync.source ?? this.sync.path);
+		return /\.(tex|sty|cls|ltx)$/i.test(this.sync.path);
 	}
 
 	/** Draw every block, keeping the one being typed into as it is. */

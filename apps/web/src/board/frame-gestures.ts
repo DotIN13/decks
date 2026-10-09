@@ -153,6 +153,8 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	};
 
 	const toStage = (clientX: number, clientY: number) => pointFromBoard(geometry(), clientX, clientY);
+	// How large the board is drawn, for a page embedded in it that scrolls by this file's rule (`embed-guest.js`).
+	(win as Window & { decksScale?: () => number }).decksScale = () => geometry().scale;
 
 	const onWheel = (event: WheelEvent) => {
 		// A pinch is always the canvas zooming; nothing inside a board zooms.
@@ -570,6 +572,14 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 * and gets no `scrollableUnder` treatment. Positions arrive in the frame's own pixels,
 	 * which is what `fingerAt` wants, so the conversion is the same one every finger gets.
 	 */
+	/*
+	 * What one finger from an embed means, by the rule a finger on the board follows (`onTouchMove`):
+	 * the page has kept what its own boxes can take, and what arrives can still scroll a box that holds
+	 * the page here — a board that is the page scrolls it as it scrolls a PDF's pages.
+	 */
+	const embedAt = new Map<number, { x: number; y: number; on: EventTarget | null }>();
+	let embedMode: "undecided" | "camera" | "scroll" = "undecided";
+	let embedScrolling: Element | undefined;
 	const onEmbedFinger = (event: Event) => {
 		const detail = (event as CustomEvent).detail as { phase?: string; id?: number; x?: number; y?: number } | null;
 		if (!detail) return;
@@ -580,22 +590,92 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		const finger = { id, x: at.x, y: at.y };
 
 		if (phase === "down") {
+			if (fromEmbed.size === 0) {
+				embedMode = "undecided";
+				embedScrolling = undefined;
+			}
 			fromEmbed.add(id);
+			embedAt.set(id, { x: detail.x as number, y: detail.y as number, on: event.target });
 			host.touch("down", finger);
 			return;
 		}
 		if (phase === "move") {
+			const was = embedAt.get(id);
+			const board = was ? { dx: (detail.x as number) - was.x, dy: (detail.y as number) - was.y } : { dx: 0, dy: 0 };
+			if (was) {
+				was.x = detail.x as number;
+				was.y = detail.y as number;
+			}
+			if (was && embedMode === "undecided" && !host.pinching() && (Math.abs(board.dx) >= 2 || Math.abs(board.dy) >= 2)) {
+				const box = scrollableUnder(was.on, -board.dx, -board.dy);
+				embedMode = box ? "scroll" : "camera";
+				embedScrolling = box;
+				if (box) host.claimTouch(id);
+			}
 			const step = host.touch("move", finger);
 			// Said out loud for the editor, exactly as a finger on the board says it.
-			if (step.kind !== "idle") noteCameraMove(doc);
+			if (step.kind !== "idle" && embedMode !== "scroll") noteCameraMove(doc);
+			if (step.kind === "pinch") {
+				embedMode = "camera";
+				embedScrolling = undefined;
+				return;
+			}
+			if (embedMode !== "scroll" || !embedScrolling) return;
+			embedScrolling.scrollLeft -= board.dx;
+			embedScrolling.scrollTop -= board.dy;
 			return;
 		}
 		if (phase === "up") {
 			fromEmbed.delete(id);
+			embedAt.delete(id);
 			host.touch("up", finger);
 		}
 	};
 	doc.addEventListener("decks:embed-finger", onEmbedFinger);
+	/*
+	 * A middle-drag or a Space-drag that started inside an embedded page (`embed-guest.js`), in screen
+	 * pixels: a still mouse is still there however the pan moves the page, so the steps are the mouse's.
+	 */
+	let embedPan: { sx: number; sy: number } | undefined;
+	/*
+	 * Ended on any sign the button is up, not only on the page's word for it: the page can lose the
+	 * release (the pointer left it, it reloaded), and a pan nobody ends follows the mouse forever. So a
+	 * move in this board or in the app with no button held ends it, and so does a release there or a
+	 * window that loses focus.
+	 */
+	const app = frame.ownerDocument;
+	const endEmbedPan = () => {
+		if (!embedPan) return;
+		embedPan = undefined;
+		for (const where of [doc, app]) {
+			where.removeEventListener("pointermove", embedPanMoved, true);
+			where.removeEventListener("pointerup", endEmbedPan, true);
+		}
+		app.defaultView?.removeEventListener("blur", endEmbedPan);
+	};
+	const embedPanMoved = (event: PointerEvent) => {
+		if (event.isTrusted && event.buttons === 0) endEmbedPan();
+	};
+	const onEmbedPan = (event: Event) => {
+		const detail = (event as CustomEvent).detail as { phase?: string; sx?: number; sy?: number } | null;
+		if (!detail || !Number.isFinite(detail.sx) || !Number.isFinite(detail.sy)) return;
+		const at = { sx: detail.sx as number, sy: detail.sy as number };
+		if (detail.phase === "down") {
+			endEmbedPan();
+			embedPan = at;
+			for (const where of [doc, app]) {
+				where.addEventListener("pointermove", embedPanMoved, true);
+				where.addEventListener("pointerup", endEmbedPan, true);
+			}
+			app.defaultView?.addEventListener("blur", endEmbedPan);
+			return;
+		}
+		if (!embedPan) return;
+		if (detail.phase === "up") return endEmbedPan();
+		if (detail.phase === "move") host.pan(at.sx - embedPan.sx, at.sy - embedPan.sy);
+		embedPan = at;
+	};
+	doc.addEventListener("decks:embed-pan", onEmbedPan);
 
 	/*
 	 * Bubble, not capture, and that is the whole handshake with the editor: it also
@@ -625,9 +705,12 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		doc.removeEventListener("pointerup", onTouchUp, true);
 		doc.removeEventListener("pointercancel", onTouchUp, true);
 		doc.removeEventListener("decks:embed-finger", onEmbedFinger);
+		doc.removeEventListener("decks:embed-pan", onEmbedPan);
+		endEmbedPan();
 		releaseFingers();
 		touchStyle.remove();
 		win.removeEventListener("blur", onBlur);
 		if (spaceHeld) host.space(false);
+		delete (win as Window & { decksScale?: () => number }).decksScale;
 	};
 }

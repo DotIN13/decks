@@ -1,4 +1,4 @@
-import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocServerMessage, type Splice } from "./index.ts";
+import { applySplice, transformSplices, type DocChange, type DocClientMessage, type DocFormat, type DocRemote, type DocServerMessage, type Splice } from "./index.ts";
 
 /**
  * `@decks/docs/client`: one page's copy of a document, kept in step with the file through the
@@ -24,7 +24,7 @@ export interface DocSyncOptions {
 	 * After every change to `text`. `applied` are the splices that made it, in order, so a page
 	 * can move its caret and its marks; absent when the text was replaced whole (`"open"`).
 	 */
-	onUpdate: (sync: DocSync, why: "open" | "remote" | "local" | "review", applied?: readonly Splice[]) => void;
+	onUpdate: (sync: DocSync, why: "open" | "remote" | "local" | "outside" | "review", applied?: readonly Splice[]) => void;
 	/** A name for this page; random by default. */
 	client?: string;
 	/** For tests: how a batch is scheduled. */
@@ -32,25 +32,28 @@ export interface DocSyncOptions {
 }
 
 export class DocSync {
-	/** What the server calls the document: the path asked for, until it names a working copy. */
+	/** What the server calls the document: the path asked for, until the server names it otherwise. */
 	path: string;
-	/** For a working copy, the original it was copied from and is written back to. */
-	source: string | undefined;
+	/** Where its words live when that is not the file: a Google Doc. */
+	remote: DocRemote | undefined;
 	readonly client: string;
 	text = "";
 	format: DocFormat = "text";
 	/** The last revision the server confirmed this page has. */
 	rev = 0;
+	/** Writes from outside this page's typing (an agent, another program) waiting for review, oldest first. */
 	changes: DocChange[] = [];
 	error: string | undefined;
 	ready = false;
 	/** Opened from a root that is not writable: shown, never sent. */
 	readOnly = false;
 
-	private inflight: { batch: string; splices: Splice[] } | undefined;
+	private inflight: { batch: string; splices: Splice[]; n: number } | undefined;
 	private pending: Splice[] = [];
 	private timer: unknown;
 	private seq = 0;
+	/** The last of this page's batches the server has taken (`mark`, `landed`). */
+	private taken = 0;
 
 	constructor(private readonly options: DocSyncOptions) {
 		this.path = options.path;
@@ -61,6 +64,7 @@ export class DocSync {
 		this.ready = false;
 		// What was sent may still land; if it does, it arrives as a batch this page no longer holds.
 		this.inflight = undefined;
+		this.taken = this.seq;
 		this.pending = [];
 		this.options.send({ type: "doc.open", path: this.path, client: this.client });
 	}
@@ -85,22 +89,36 @@ export class DocSync {
 		}
 	}
 
+	/** Keep a change from outside; `"*"` keeps every one waiting. */
 	accept(change: string): void {
 		this.options.send({ type: "doc.review", path: this.path, client: this.client, change, accept: true });
 	}
 
+	/** Take a change from outside back; `"*"` takes every one waiting back. */
 	reject(change: string): void {
+		this.flush();
 		this.options.send({ type: "doc.review", path: this.path, client: this.client, change, accept: false });
+	}
+
+	/** Ask for one kept version's text, which comes back as `doc.version`. */
+	version(sha: string): void {
+		this.options.send({ type: "doc.version", path: this.path, sha });
+	}
+
+	/** Ask for the document typeset as it stands; the answer comes back as `doc.compiled`. */
+	compile(): void {
+		this.flush();
+		this.options.send({ type: "doc.compile", path: this.path, client: this.client });
+	}
+
+	/** Read the document's git repository, or pull or push it; the answer comes back as `doc.repo`. */
+	git(action: "status" | "pull" | "push"): void {
+		if (action !== "status") this.flush();
+		this.options.send({ type: "doc.git", path: this.path, client: this.client, action });
 	}
 
 	restore(sha: string): void {
 		this.options.send({ type: "doc.restore", path: this.path, client: this.client, sha });
-	}
-
-	/** Write the working copy back over its original. */
-	writeBack(): void {
-		this.flush();
-		this.options.send({ type: "doc.writeback", path: this.path, client: this.client });
 	}
 
 	versions(): void {
@@ -110,7 +128,7 @@ export class DocSync {
 	/** Send what is waiting, unless a batch is still on its way. */
 	flush(): void {
 		if (this.inflight || this.pending.length === 0 || !this.ready) return;
-		this.inflight = { batch: `${this.client}-${++this.seq}`, splices: this.pending };
+		this.inflight = { batch: `${this.client}-${++this.seq}`, splices: this.pending, n: this.seq };
 		this.pending = [];
 		this.options.send({ type: "doc.patch", path: this.path, client: this.client, rev: this.rev, batch: this.inflight.batch, splices: this.inflight.splices });
 	}
@@ -128,13 +146,14 @@ export class DocSync {
 				// Another page on this document, in the same browser, asked: its answer is not ours.
 				if (message.client !== undefined && message.client !== this.client) return;
 				this.path = message.path;
-				this.source = message.source;
+				this.remote = message.remote;
 				this.text = message.text;
 				this.format = message.format;
 				this.rev = message.rev;
 				this.changes = message.changes;
 				this.error = message.error;
 				this.inflight = undefined;
+				this.taken = this.seq;
 				this.pending = [];
 				// An error with a revision is a document that opened read-only; without one, it did not open.
 				this.ready = !message.error || message.rev !== 0;
@@ -144,6 +163,8 @@ export class DocSync {
 			case "doc.patched":
 				if (!this.matches(message.path) || message.batch !== this.inflight?.batch) return;
 				if (message.refused.length > 0) {
+					// Nothing waiting on this typing can wait for it any longer.
+					this.taken = this.seq;
 					// The server sent the text as it stands, so the page starts again from it without asking.
 					if (message.text === undefined) return this.open();
 					this.text = message.text;
@@ -154,6 +175,7 @@ export class DocSync {
 					return;
 				}
 				this.rev = message.rev;
+				this.taken = this.inflight.n;
 				this.inflight = undefined;
 				this.flush();
 				return;
@@ -169,8 +191,8 @@ export class DocSync {
 				if (!applied) return this.open();
 				this.rev = message.rev;
 				if (message.change) this.changes = [...this.changes, message.change];
-				if (message.settled) this.changes = this.changes.filter((c) => c.id !== message.settled);
-				this.options.onUpdate(this, message.change || message.settled ? "review" : "remote", applied);
+				if (message.settled) this.changes = this.changes.filter((c) => !message.settled!.includes(c.id));
+				this.options.onUpdate(this, message.change ? "outside" : message.settled ? "review" : "remote", applied);
 				return;
 		}
 	}
@@ -201,6 +223,16 @@ export class DocSync {
 		this.pending = waiting.b;
 		this.text = text;
 		return waiting.a;
+	}
+
+	/** The batch that will carry everything typed here so far, for `landed`. */
+	mark(): number {
+		return this.pending.length ? this.seq + 1 : this.seq;
+	}
+
+	/** The server has everything that was typed here by `mark`, whatever has been typed since. */
+	landed(mark: number): boolean {
+		return this.taken >= mark || !this.ready;
 	}
 
 	/** Nothing typed here is still on its way to the server. */

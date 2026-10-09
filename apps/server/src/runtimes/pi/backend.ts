@@ -1,4 +1,5 @@
 import { sentAs } from "../../agents/sent-as.ts";
+import { gdocsCaller } from "../../google/agent-tools.ts";
 import { existsSync } from "node:fs";
 import {
 	createAgentSession,
@@ -86,7 +87,7 @@ export class PiBackend implements AgentBackend {
 			// has, and where it came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent }), this.commandReader()],
+			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken) }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
