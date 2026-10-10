@@ -3,6 +3,11 @@ import { touchedCanvas } from "../camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
+import PanelLeft from "lucide-solid/icons/panel-left";
+import MessageSquare from "lucide-solid/icons/message-square";
+import Scan from "lucide-solid/icons/scan";
+import MousePointer from "lucide-solid/icons/mouse-pointer-2";
+import Pencil from "lucide-solid/icons/pencil";
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
@@ -15,8 +20,8 @@ import Presentation from "lucide-solid/icons/presentation";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
-import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
-import { canvasBox } from "../camera/insets.ts";
+import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { canvasBox, insets } from "../camera/insets.ts";
 import { deckFileUrl } from "../lib/api.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -53,6 +58,8 @@ import { parseMarkdown } from "./pen/markdown.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 import { untilReleased } from "./held.ts";
+import { springCurve } from "../app/spring.ts";
+import { lendFrame } from "./borrow.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -169,6 +176,18 @@ export function Stage(props: {
 	onFocusToggle?: () => void;
 	/** The same, named by a board: the button in its own title bar (`board/BoardFrame.tsx`). */
 	onFocusBoard?: (path: string) => void;
+	/**
+	 * What the focus view's header needs from the app: the canvas's name for the trail, and the two
+	 * panels it can open and close. The canvas's own toolbars are hidden while a board is in focus, so
+	 * these are the header's, in the same row as the board's own bar (`FocusBar` below).
+	 */
+	/**
+	 * A board the app is presenting with the canvas's own page (`canvas/borrow.ts`): kept loaded and
+	 * awake here while it is away, and the canvas's gestures leave it alone, since the canvas is
+	 * under the overlay and a wheel over the page must not pan it.
+	 */
+	presenting?: string;
+	focusBar?: { canvas?: string; boardsOpen: boolean; onToggleBoards: () => void; historyOn: boolean; onHistory: () => void; mode: "browse" | "edit"; onMode: (mode: "browse" | "edit") => void };
 	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
 	onPresent?: (path: string, at: number) => void;
 	/** Open a flow or slides board as its own source. */
@@ -592,14 +611,6 @@ export function Stage(props: {
 	const LAYER_BUDGET = 48;
 	/** WebKit's engine, on a Mac or on any iPhone browser: its user agent names AppleWebKit and never Chrome/. */
 	const SLEEP_ON_ZOOM = typeof navigator !== "undefined" && /AppleWebKit/.test(navigator.userAgent) && !/Chrome\/|Android/.test(navigator.userAgent);
-
-	/**
-	 * The air a focused page keeps around it, in stage pixels.
-	 *
-	 * Stage pixels and not board ones, because it is the *window* being measured: a margin that
-	 * scaled with the page would vanish as you zoomed out and eat the width as you zoomed in.
-	 */
-	const FOCUS_AIR = 32;
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
@@ -2859,16 +2870,28 @@ export function Stage(props: {
 	 * the view's frame reports to.
 	 */
 	const [focusZoom, setFocusZoom] = createSignal(1);
+	/** The canvas's own page, while the focus view has it (`canvas/borrow.ts`). */
+	const [focusLent, setFocusLent] = createSignal<HTMLIFrameElement>();
+	/** The page lent away, to the focus view or to the present overlay, whose geometry is its own. */
+	const lent = (): HTMLIFrameElement | undefined =>
+		focusLent() ?? (props.presenting ? (document.querySelector<HTMLIFrameElement>(`.present-fit > iframe[data-path="${CSS.escape(props.presenting)}"]`) ?? undefined) : undefined);
 	let focusEl: HTMLDivElement | undefined;
 	const focused = () => props.boards.find((candidate) => candidate.path === props.focus);
 
-	/** The page width filled to the window, never blown up past its own size. */
-	const fitFocus = () => {
+	/*
+	 * The work area the focused board has: the window right of the board list. The conversation floats
+	 * over its right side and takes nothing from it, so opening and closing the history never moves
+	 * or resizes the page.
+	 */
+	const focusPane = () => ({ w: Math.max(120, view().width - insets().left), h: view().height });
+	/** The zoom that makes a designed board as wide as the room it has, up to twice its size. */
+	const fitZoom = () => {
 		const board = focused();
-		if (!board) return;
-		const width = Math.max(120, view().width - FOCUS_AIR * 2);
-		setFocusZoom(Math.min(1, width / board.w));
+		if (!board) return 1;
+		return Math.min(2, Math.max(120, focusPane().w) / board.w);
 	};
+	const fitFocus = () => setFocusZoom(fitZoom());
+	const focusFitted = () => Math.abs(focusZoom() - fitZoom()) < 0.005;
 
 	/*
 	 * Fit on entering, and again when the window changes shape — in this view the window *is*
@@ -2880,6 +2903,7 @@ export function Stage(props: {
 		if (!props.focus) return;
 		const width = view().width;
 		if (!width) return;
+		insets().left;
 		untrack(fitFocus);
 	});
 
@@ -2985,10 +3009,12 @@ export function Stage(props: {
 		 * a frame-by-frame assertion, which is happy to see *some* intermediate value, and obvious in
 		 * a chart of the curve the samples were supposed to be on.
 		 */
+		// iOS's spring, no bounce: away at once, settling into place (`app/spring.ts`).
+		const curve = springCurve(ms);
 		const step = () => {
 			if (mine !== glideToken) return;
 			const t = Math.min(1, (performance.now() - at) / ms);
-			writeCamera(t >= 1 ? to : between(from, to, easeOutCubic(t)));
+			writeCamera(t >= 1 ? to : between(from, to, curve(t)));
 			if (t >= 1) {
 				glideRaf = undefined;
 				setGliding(false);
@@ -3421,12 +3447,21 @@ export function Stage(props: {
 	});
 
 	/** What a board frame hands back when a canvas gesture starts inside it. */
+	/*
+	 * Presenting with the canvas's own page: the canvas is under the overlay, so what that page hands
+	 * the stage (a wheel past its end, a drag, a canvas key) goes nowhere instead of moving a canvas
+	 * nobody can see.
+	 */
+	const overlaid = () => props.presenting !== undefined && !props.focus;
 	const gestures: FrameGestureHost = {
-		wheel,
-		touch,
+		wheel: (gesture) => {
+			if (!overlaid()) wheel(gesture);
+		},
+		touch: (phase, finger) => (overlaid() ? { kind: "idle" } : touch(phase, finger)),
 		claimTouch: (id) => claimed.add(id),
 		pinching: () => touches.count() > 1,
 		pan: (dx, dy) => {
+			if (overlaid()) return;
 			// A drag across the page scrolls it, exactly as dragging a document does — and there
 			// is nothing sideways to go to, so only the vertical part means anything.
 			if (props.focus) {
@@ -3437,7 +3472,7 @@ export function Stage(props: {
 		},
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
-		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
+		interactive: () => lent() !== undefined || localCamera.zoom >= INTERACT_ZOOM,
 		/*
 		 * Where a world point is on the stage right now, from the camera the gestures are
 		 * moving — `localCamera`, which is written synchronously in the same handler that
@@ -3447,10 +3482,20 @@ export function Stage(props: {
 		 * whole stage, and a pinch had two of them per step.
 		 */
 		screenOf: (world) => {
+			/*
+			 * A page lent to the focus view or the overlay is not where the camera says: it is wherever that
+			 * view put it, at that view's scale. It is the only page taking the pointer while it is away, and
+			 * the point asked about is always its own corner, so its rectangle is the answer.
+			 */
+			const away = lent();
+			if (away?.isConnected) {
+				const rect = away.getBoundingClientRect();
+				return { x: rect.left, y: rect.top, scale: away.offsetWidth > 0 ? rect.width / away.offsetWidth : 1 };
+			}
 			const at = toScreen(localCamera, view(), world);
 			return { x: at.x, y: at.y, scale: localCamera.zoom };
 		},
-		key: (name) => shortcut(name),
+		key: (name) => (overlaid() ? false : shortcut(name)),
 		/*
 		 * Same three keys as the window handler above, and deliberately the same code path —
 		 * a board frame forwards the *intent* rather than a key name, because `shortcut` takes
@@ -4037,8 +4082,7 @@ export function Stage(props: {
 		keep(props.cursor?.path);
 		const next = [...found]
 			.sort((a, b) => a - b)
-			.map((at) => boards[at]!)
-			.filter((board) => board.path !== props.focus);
+			.map((at) => boards[at]!);
 		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
 		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
 	});
@@ -4288,7 +4332,7 @@ export function Stage(props: {
 	 * (the `.focus` page below), and two copies of this — forty props, every wire the board
 	 * needs — is how the two views would drift apart.
 	 */
-	const boardNode = (board: Board, alone = false) => (
+	const boardNode = (board: Board, alone = false, sized = false) => (
 						<BoardFrame
 							board={board}
 							/*
@@ -4305,6 +4349,9 @@ export function Stage(props: {
 							camera={props.camera}
 							mounted={
 								alone ||
+								/* Lent to the focus view or the present overlay (`canvas/borrow.ts`): its page is the one on screen. */
+								props.focus === board.path ||
+								props.presenting === board.path ||
 								/* The selected board and the edited one are live at any zoom, on any device. */
 								props.selected === board.path ||
 								props.editing?.path === board.path ||
@@ -4336,7 +4383,7 @@ export function Stage(props: {
 							pictured={onSheet().has(board.path)}
 							covering={sleepOnZoom()}
 							carried={carriedPages().has(board.path)}
-							asleep={!alone && props.renderer === "dom" && props.editing?.path !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
+							asleep={!alone && props.renderer === "dom" && props.editing?.path !== board.path && props.focus !== board.path && props.presenting !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
 							{...(!alone && shotAdaptor().capture ? { capture: (frame: HTMLIFrameElement) => shotAdaptor().capture!(frame, board) } : {})}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
@@ -4389,9 +4436,9 @@ export function Stage(props: {
 								if (on) setHoverBoard(board.path);
 								else if (untrack(hoverBoard) === board.path) setHoverBoard(undefined);
 							}}
-							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
+							{...(props.onExtent && !sized ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
-							{...(props.onResize ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
+							{...(props.onResize && !sized ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 							onOpen={() => pushCamera(frame([boxOf(board)]))}
 							{...(props.onFocusBoard ? { focused: props.focus === board.path, onFocus: () => props.onFocusBoard?.(board.path) } : {})}
@@ -5126,63 +5173,236 @@ export function Stage(props: {
 				/>
 			</Show>
 			<Show when={focused()} keyed>
-				{(board) => (
-					<>
-						{/*
-						 * The focus view: this board as a page, in the stage's own box.
-						 *
-						 * The outer box is scrollable and the middle one is the page at the size it is
-						 * *drawn*, because a CSS transform does not change layout — a scroll container
-						 * holding only the scaled copy would scroll by the untransformed height, which
-						 * is the whole document and then some. So the page reserves `w × zoom`, the
-						 * document inside it is scaled from its own top-left corner, and the scroll
-						 * extent is honest.
-						 *
-						 * Nothing is re-fitted here: the zoom is the stage's (`focusZoom`), because the
-						 * gesture host that reports a wheel over the page belongs to the stage, and one
-						 * number with two owners is a number that disagrees with itself.
-						 */}
-						<div class="focus" ref={(element) => (focusEl = element)}>
-							<div class="focus-page" style={{ width: `${board.w * focusZoom()}px`, height: `${board.h * focusZoom()}px` }}>
-								<div
-									class="focus-scaled"
-									style={{ width: `${board.w}px`, height: `${board.h}px`, transform: `scale(${focusZoom()})`, "transform-origin": "top left" }}
+				{(board) => {
+					/*
+					 * Two kinds of board, two layouts, one header.
+					 *
+					 * A board that is one document or one file (`fills`) is laid out at the size of the work
+					 * area, at its own scale, and its own bar is the header: the app's controls are laid over
+					 * the two ends of that bar, and the board leaves room for them (`data-focus-*` on its frame,
+					 * read by `lib/board.js`). Any other board is a designed page: it is scaled to the width,
+					 * edge to edge, under a header the app draws itself.
+					 *
+					 * The outer box is scrollable and the middle one is the page at the size it is *drawn*,
+					 * because a CSS transform does not change layout: a scroll container holding only the
+					 * scaled copy would scroll by the untransformed height.
+					 */
+					const fills = board.fills === true;
+					/*
+					 * The canvas's own page, moved here and back (`canvas/borrow.ts`), so the board is read as
+					 * it was left: scrolled where it was, typed into, its PDF drawn. A few frames' grace for a
+					 * board the canvas had no page for yet (it is kept loaded from now on); then, or in a
+					 * browser that cannot move a frame without reloading it, a page of this view's own.
+					 */
+					let host: HTMLDivElement | undefined;
+					const [own, setOwn] = createSignal(false);
+					onMount(() => {
+						let tries = 20;
+						let id = 0;
+						let lending: ReturnType<typeof lendFrame>;
+						const attempt = () => {
+							if (!host) return;
+							lending = lendFrame(board.path, host);
+							if (lending) {
+								setFocusLent(lending.frame);
+								return;
+							}
+							if (tries-- > 0) id = requestAnimationFrame(attempt);
+							else setOwn(true);
+						};
+						attempt();
+						onCleanup(() => {
+							cancelAnimationFrame(id);
+							setFocusLent(undefined);
+							lending?.give();
+						});
+					});
+					// The lent page is the size this view gives it: the work area for a board that fills itself.
+					createEffect(() => {
+						const frameEl = focusLent();
+						if (!frameEl) return;
+						const pane = focusPane();
+						frameEl.style.width = `${fills ? pane.w : board.w}px`;
+						frameEl.style.height = `${fills ? pane.h : board.h}px`;
+					});
+					let start: HTMLDivElement | undefined;
+					let end: HTMLDivElement | undefined;
+					const stamp = () => {
+						const frameEl = focusEl?.querySelector("iframe");
+						if (!frameEl || !fills) return;
+						frameEl.setAttribute("data-focus-bar", "");
+						// From the header's own edges, so its padding is counted in: the board's bar runs edge to edge under it.
+						const across = start?.parentElement?.offsetWidth ?? 0;
+						frameEl.setAttribute("data-focus-left", String(Math.ceil(start ? start.offsetLeft + start.offsetWidth : 0)));
+						frameEl.setAttribute("data-focus-right", String(Math.ceil(end ? across - end.offsetLeft : 0)));
+					};
+					onMount(() => {
+						if (!fills || !focusEl) return;
+						const sizes = new ResizeObserver(stamp);
+						if (start) sizes.observe(start);
+						if (end) sizes.observe(end);
+						// The frame is made, and made again on a reload, after this view is.
+						const frames = new MutationObserver(stamp);
+						frames.observe(focusEl, { childList: true, subtree: true });
+						stamp();
+						onCleanup(() => {
+							sizes.disconnect();
+							frames.disconnect();
+						});
+					});
+					return (
+						<>
+							<div class="focus" classList={{ "focus-fills": fills }} ref={(element) => (focusEl = element)}>
+								<Show
+									when={fills}
+									fallback={
+										<div class="focus-page" style={{ width: `${board.w * focusZoom()}px`, height: `${board.h * focusZoom()}px` }}>
+											<div
+												class="focus-scaled"
+												style={{ width: `${board.w}px`, height: `${board.h}px`, transform: `scale(${focusZoom()})`, "transform-origin": "top left" }}
+												ref={host}
+											>
+												<Show when={own()}>{boardNode(board, true)}</Show>
+											</div>
+										</div>
+									}
 								>
-									{boardNode(board, true)}
+									{/*
+									 * Its own size is the work area's, for as long as it is here; nothing of that is written back.
+									 *
+									 * Getters, and the node made once: a new board object for each size would be a new frame for
+									 * each size, so opening the board list beside the page loaded the page again.
+									 */}
+									<div class="focus-fill" style={{ width: `${focusPane().w}px`, height: `${focusPane().h}px` }} ref={host}>
+										<Show when={own()}>
+										{untrack(() =>
+											boardNode(
+												{
+													...board,
+													get w() {
+														return focusPane().w;
+													},
+													get h() {
+														return focusPane().h;
+													},
+												},
+												true,
+												true,
+											),
+										)}
+										</Show>
+									</div>
+								</Show>
+							</div>
+							{/*
+							 * The header: the way back to the board list and the trail on the left; the zoom, the
+							 * history and the way out on the right. Over a board's own bar it is two clusters and
+							 * nothing between them, so the bar's name and buttons show through the middle.
+							 */}
+							{/* An inset, as the toolbars it stands in for are: what floats under the top (the inspector) starts below it. */}
+							<div class="focus-bar" classList={{ "focus-bar-over": fills }} data-inset="top">
+								<div class="focus-bar-start" ref={start}>
+									<Show when={props.focusBar}>
+										{(bar) => (
+											<button
+												class="icon-button"
+												type="button"
+												aria-pressed={bar().boardsOpen}
+												title={bar().boardsOpen ? "Hide the board list" : "Show the board list"}
+												aria-label={bar().boardsOpen ? "Hide the board list" : "Show the board list"}
+												onClick={() => bar().onToggleBoards()}
+											>
+												<Icon of={PanelLeft} size={16} />
+											</button>
+										)}
+									</Show>
+									<span class="focus-crumb">
+										<Show when={props.focusBar?.canvas}>
+											<span class="focus-crumb-canvas">{props.focusBar?.canvas}</span>
+											<span class="focus-crumb-slash">/</span>
+										</Show>
+										<Show when={!fills}>
+											<b class="focus-crumb-board">{board.title}</b>
+										</Show>
+									</span>
+								</div>
+								<div class="focus-bar-end" ref={end}>
+									{/*
+									 * Reading or editing a designed board: the canvas toolbar's switch, which is put away
+									 * with the rest of that toolbar here. A document or a file is edited by typing into it.
+									 */}
+									<Show when={!fills && props.focusBar}>
+										{(bar) => (
+											<div class="mode-set focus-mode">
+												<button
+													type="button"
+													class="icon-button"
+													data-on={bar().mode === "browse" ? "true" : undefined}
+													aria-pressed={bar().mode === "browse"}
+													title="Browse: read the board"
+													aria-label="Browse the boards"
+													onClick={() => bar().onMode("browse")}
+												>
+													<Icon of={MousePointer} size={15} />
+												</button>
+												<button
+													type="button"
+													class="icon-button"
+													data-on={bar().mode === "edit" ? "true" : undefined}
+													aria-pressed={bar().mode === "edit"}
+													title="Edit the board: drag components, retype text"
+													aria-label="Edit the boards"
+													onClick={() => bar().onMode("edit")}
+												>
+													<Icon of={Pencil} size={15} />
+												</button>
+											</div>
+										)}
+									</Show>
+									<Show when={!fills}>
+										{/* An icon, as its neighbours are; the zoom it would undo is in its tooltip. */}
+										<button
+											class="icon-button focus-fit"
+											type="button"
+											aria-pressed={focusFitted()}
+											title={focusFitted() ? "Fitted to the width" : `Fit the board to the width (now ${Math.round(focusZoom() * 100)}%)`}
+											aria-label="Fit the board to the width"
+											onClick={fitFocus}
+										>
+											<Icon of={Scan} size={16} />
+										</button>
+									</Show>
+									<Show when={props.focusBar}>
+										{(bar) => (
+											<button
+												class="icon-button"
+												type="button"
+												aria-pressed={bar().historyOn}
+												title={bar().historyOn ? "Hide the conversation" : "Show the conversation"}
+												aria-label={bar().historyOn ? "Hide the conversation" : "Show the conversation"}
+												onClick={() => bar().onHistory()}
+											>
+												<Icon of={MessageSquare} size={16} />
+											</button>
+										)}
+									</Show>
+									{/* A close glyph and the key, the way `Present` labels its own way out. */}
+									<button
+										class="chip-button focus-exit"
+										type="button"
+										title="Leave the focus view (Esc)"
+										aria-label="Leave the focus view"
+										onClick={() => props.onFocusToggle?.()}
+									>
+										<Icon of={X} size={13} />
+										<span>Leave</span>
+										<kbd>Esc</kbd>
+									</button>
 								</div>
 							</div>
-						</div>
-						{/*
-						 * The way out, on screen.
-						 *
-						 * The focus view has no title bar, deliberately — the bar is how you *identify and
-						 * choose* a board among others, and there are no others here — but that left `Escape`
-						 * and `d` as the only exits, and a keyboard shortcut is not a door: somebody who
-						 * arrived with the mouse and never pressed a key has no way to learn either.
-						 *
-						 * **Centred in the page's top margin**, which is the one band of this view that is
-						 * reliably empty: `.focus` pads 32px at the top edge (`FOCUS_AIR`) and a 28px chip at
-						 * 2px from the top ends where the page begins, so it is beside the document and never
-						 * over it. The corners are not free — the first version sat in the top-right one and
-						 * was drawn *under* the zoom pill, which is `z-20` in the app's own bar and above
-						 * anything the stage paints, so it was visible and unclickable.
-						 *
-						 * A close glyph and the key, the way `Present` labels its own way out: the glyph says
-						 * what the button does, and the word teaches the shortcut to the next person.
-						 */}
-						<button
-							class="focus-exit"
-							type="button"
-							title="Leave the focus view (Esc)"
-							aria-label="Leave the focus view"
-							onClick={() => props.onFocusToggle?.()}
-						>
-							<Icon of={X} size={13} />
-							<span>Leave</span>
-							<kbd>Esc</kbd>
-						</button>
-					</>
-				)}
+						</>
+					);
+				}}
 			</Show>
 		</div>
 	);

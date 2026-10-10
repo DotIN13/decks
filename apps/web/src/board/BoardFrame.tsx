@@ -11,8 +11,8 @@ import { Icon } from "../ui/icons.tsx";
 import ExternalLink from "lucide-solid/icons/external-link";
 import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
-import BookOpen from "lucide-solid/icons/book-open";
 import Maximize from "lucide-solid/icons/maximize-2";
+import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
@@ -1311,7 +1311,7 @@ export function BoardFrame(props: {
 										aria-label={props.focused ? `Show the whole canvas instead of ${props.board.title}` : `Focus on ${props.board.title}`}
 										onClick={() => props.onFocus?.()}
 									>
-										<Icon of={BookOpen} size={12} />
+										<Icon of={Maximize} size={12} />
 									</button>
 								</Show>
 								<Show when={props.onPresent && !props.board.live}>
@@ -1324,7 +1324,7 @@ export function BoardFrame(props: {
 										aria-label={`${props.board.format === "slides" ? "Present" : "Fullscreen"} ${props.board.title}`}
 										onClick={() => props.onPresent?.()}
 									>
-										<Show when={props.board.format === "slides"} fallback={<Icon of={Maximize} size={12} />}>Present</Show>
+										<Show when={props.board.format === "slides"} fallback={<Icon of={Presentation} size={12} />}>Present</Show>
 									</button>
 								</Show>
 								<Show when={!props.board.live}>

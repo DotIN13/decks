@@ -24,13 +24,17 @@ const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
 /**
  * How long the camera takes to arrive when it is asked to glide rather than jump.
  *
+ * 500ms on a critically damped spring (`app/spring.ts`), the pace of an app opening on iOS: most of
+ * the travel is in the first third and the rest is a settle, so it reads as quick and lands softly.
+ * Before the spring it was 420ms on an ease-out cubic, and the note below is why it is not shorter.
+ *
  * 420ms: long enough to see the direction of the movement and read it as an arrival, which 260ms
  * was not — at 260 the first 50ms carried half the travel, so it read as a jump with a tail. The
  * scale settle is not a constraint on this number: `Stage`'s `nowScaling` re-arms its own 300ms
  * timer on every frame the zoom moves, so it fires 300ms after the glide lands whatever the
  * duration, and a zooming glide still asks for one redraw at the end rather than sixty.
  */
-export const GLIDE_MS = 420;
+export const GLIDE_MS = 500;
 
 /**
  * The glide the app has been asked for, or nothing.
@@ -67,8 +71,5 @@ export function moveCamera(next: Camera, options?: { animate?: boolean; ms?: num
 		setGlide(options?.animate && !calm ? { token: ++glides, ms: options.ms ?? GLIDE_MS } : undefined);
 	});
 }
-
-/** Leaving a board's page for the canvas: the fall into it reversed, a beat quicker. */
-export const LEAVE_BOARD_MS = 360;
 
 export { camera, glide, setCamera };

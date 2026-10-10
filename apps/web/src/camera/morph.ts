@@ -51,23 +51,27 @@ export function morphFrame(from: Camera, to: Camera, s: number, box: WorldBox, v
  *
  * Opening a board is the camera arriving and the page taking over on the last frame, so the last
  * frame has to *be* the page: the same scale, the same place on the screen. The page's place is
- * the reading view's own layout — centred between the side insets, a line under the top inset,
- * never wider than the window less its air, never past life size — and it is worked out here from
- * the same numbers the stylesheet uses (`styles/canvas.css`, `.focus`).
+ * the reading view's own layout (`styles/canvas.css`, `.focus`): the work area right of the board
+ * list, edge to edge, under the view's header, and as wide as the room up to twice life size. A
+ * board that fills itself has no header of the app's above it (its own bar is the header), so it
+ * lands at the top; it is laid out again at the work area's size, so the landing is its width.
  */
 export function cameraOntoPage(
 	board: WorldBox,
 	view: Viewport,
 	insets: { left: number; right: number; top: number },
-	air = 32,
+	o: { fills?: boolean; header?: number } = {},
 ): Camera {
-	const zoom = Math.min(1, Math.max(120, view.width - air * 2) / Math.max(1, board.w));
-	const room = view.width - insets.left - insets.right;
-	const left = insets.left + (room - board.w * zoom) / 2;
-	const top = insets.top + 12;
+	const room = Math.max(120, view.width - insets.left - insets.right);
+	const zoom = o.fills ? room / Math.max(1, board.w) : Math.min(2, room / Math.max(1, board.w));
+	const left = insets.left;
+	const top = o.fills ? 0 : (o.header ?? FOCUS_HEADER);
 	return {
 		zoom,
 		x: board.x - (left - view.width / 2) / zoom,
 		y: board.y - (top - view.height / 2) / zoom,
 	};
 }
+
+/** The focus view's header row, in screen pixels (`.focus-bar` in `styles/canvas.css`). */
+export const FOCUS_HEADER = 52;

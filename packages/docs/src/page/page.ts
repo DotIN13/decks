@@ -154,6 +154,10 @@ const STYLE = `
 .dp-status[data-state="saving"] { color: var(--b-warn, #b45309); }
 .dp-status[data-state="error"] { color: var(--b-danger, #b91c1c); }
 .dp-bar:has(+ .dp-tools[hidden]) { border-bottom-color: var(--dp-line); }
+/* In the app's focus view the bar is the view's header, with room at each end for the app's controls (\`lib/board.js\`, \`watchFocus\`). */
+html[data-decks-focus] .dp-bar { height: 52px; padding-left: calc(var(--decks-focus-left, 0px) + 4px); padding-right: calc(var(--decks-focus-right, 0px) + 8px); border-bottom-color: var(--dp-hair); }
+html[data-decks-focus] .dp-bar:has(+ .dp-tools[hidden]) { border-bottom-color: var(--dp-hair); }
+html[data-decks-focus] .dp-tools { background: transparent; border-bottom-color: var(--dp-hair); }
 .dp-spacer { flex: 1; }
 .dp-btn .dp-count { background: var(--b-accent, #2563eb); color: #fff; }
 /* The bar's buttons are quiet: no border, ink icons, an accent tint when open; Changes is tinted while edits wait. */

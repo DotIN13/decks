@@ -464,6 +464,51 @@ table.table,
 	white-space: nowrap;
 }
 
+/*
+ * In the app's focus view, a board that is one file has its bar as the view's header (`board.js`,
+ * `watchFocus`): the height of the app's header, with room at each end for the app's controls laid
+ * over it, and the file under it centred clear of the conversation when that is open.
+ */
+/* The board is laid out at the work area's size there, not the size in its file. */
+html[data-decks-focus] body.board {
+	width: 100vw !important;
+	height: 100vh !important;
+	min-height: 0 !important;
+}
+
+/* A document's box loses its frame there too: it is the page, not a card on one. */
+html[data-decks-focus] body.board > .live[data-live="doc"] {
+	border: 0;
+	border-radius: 0;
+}
+
+html[data-decks-focus] .embed[data-bare] > .embed-head {
+	height: 52px;
+	padding-left: calc(var(--decks-focus-left, 0px) + 4px);
+	padding-right: calc(var(--decks-focus-right, 0px) + 8px);
+	border-bottom: 1px solid var(--b-border);
+}
+
+html[data-decks-focus] .embed[data-bare] > .embed-head .name {
+	font-size: 14px;
+}
+
+/* A PDF's pages at a reading width rather than the window's, on the layer colour, a gap apart. */
+html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body {
+	box-sizing: border-box;
+	background: var(--b-bg);
+	padding-top: 28px;
+	padding-bottom: 140px;
+}
+
+html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
+	width: min(860px, calc(100% - 64px));
+	margin: 0 auto 20px;
+	border: 1px solid var(--b-border);
+	background: #fff;
+}
+
+/* The app's own icon button (`.icon-button`, `styles/chrome.css`): 28px, a 6px corner, and a wash of the line colour on hover. */
 .embed-reload {
 	display: grid;
 	flex: none;
@@ -471,16 +516,24 @@ table.table,
 	height: 28px;
 	padding: 0;
 	border: 0;
-	border-radius: 7px;
+	border-radius: 6px;
 	background: transparent;
 	color: var(--b-muted);
 	cursor: pointer;
 	place-items: center;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
 }
 
 .embed-reload:hover {
-	background: var(--b-bg-deep);
+	background: color-mix(in srgb, var(--b-fg) 10%, transparent);
 	color: var(--b-fg);
+}
+
+.embed-reload:focus-visible {
+	outline: 2px solid var(--b-accent);
+	outline-offset: 1px;
 }
 
 .embed > .embed-head {

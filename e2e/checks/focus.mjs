@@ -78,6 +78,8 @@ const state = () =>
 			worldHidden: world ? getComputedStyle(world).visibility === "hidden" : false,
 			worldInert: world ? world.hasAttribute("inert") && getComputedStyle(world).pointerEvents === "none" : false,
 			worldNodes: [...document.querySelectorAll(".world .board-node")].map((node) => node.dataset.path),
+			// Where each board's page is: the focused one's is lent to the view (`canvas/borrow.ts`).
+			frames: [...document.querySelectorAll("iframe[data-path]")].map((frame) => ({ path: frame.dataset.path, inFocus: Boolean(frame.closest(".focus")) })),
 			nodes: [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path),
 			page: page_ ? { w: Math.round(page_.getBoundingClientRect().width), centre: Math.round(page_.getBoundingClientRect().x + page_.getBoundingClientRect().width / 2) } : null,
 			beside: panel ? Math.round(panel.right + (innerWidth - panel.right) / 2) : null,
@@ -96,22 +98,25 @@ say(
 );
 say(
 	"…with the canvas put away rather than taken apart",
-	focused.worldNodes.length > 0 && !focused.worldNodes.includes(NOTES),
-	`${focused.worldNodes.length} board(s) still mounted behind it, this one excluded`,
+	focused.worldNodes.length > 1 && focused.worldNodes.includes(NOTES),
+	`${focused.worldNodes.length} board(s) still mounted behind it, this one with them`,
 );
+/*
+ * The page on screen is the canvas's own, lent to the view rather than loaded again, so it is read
+ * as it was left and the canvas has it back the same way. One page for the board, and it is here.
+ */
+const notesFrames = focused.frames.filter((frame) => frame.path === NOTES);
 say(
-	"…so exactly one element carries this board, and it is the one on screen",
-	focused.nodes.filter((path) => path === NOTES).length === 1,
-	JSON.stringify(focused.nodes),
+	"…so exactly one page carries this board, and it is the one on screen",
+	notesFrames.length === 1 && notesFrames[0].inFocus && focused.nodes.filter((path) => path === NOTES).length === 1,
+	JSON.stringify(notesFrames),
 );
 /*
  * The way out is on screen, not only on the keyboard.
  *
- * The focus view has no title bar — deliberately, since the bar is how you identify a board
- * among others and there are no others here — and that left `Escape` and `d` as the only
- * exits. A keyboard shortcut is not a door: somebody who arrived with the mouse and never
- * pressed a key has nothing to find. So there is one button, and this is the assertion that
- * it is where the page's margin is rather than over the page.
+ * A keyboard shortcut is not a door: somebody who arrived with the mouse and never pressed a key
+ * has nothing to find. So the view's header has a Leave button at its right end, and this is the
+ * assertion that it is in the header rather than over the page.
  */
 const exit = await page.evaluate(() => {
 	const button = document.querySelector(".focus-exit");
@@ -138,7 +143,7 @@ const exit = await page.evaluate(() => {
 	};
 });
 say("the focus view offers a way out that is not a key", exit.present && exit.label === "Leave the focus view", JSON.stringify(exit));
-say("…drawn in the page's own margin, so it covers nothing", exit.present && exit.air >= 0, `${exit.air}px of air between the button and the page's top edge`);
+say("…in the view's header, so it covers nothing", exit.present && exit.air >= 0, `${exit.air}px of air between the button and the page's top edge`);
 say("…with nothing drawn over it, which is what makes it pressable", exit.hit === "the button", String(exit.hit));
 /*
  * The bar is laid out at the size it is drawn, and the world keeps its layer.
@@ -164,21 +169,20 @@ const raster = await page.evaluate(() => ({ worldWillChange: getComputedStyle(do
 say("the world is not promised a raster, so zooming cannot soften what it draws", raster.worldWillChange === "auto", JSON.stringify(raster));
 
 /*
- * One corner, and the page draws it.
+ * Edge to edge: no corner on the page, and none on the board inside it.
  *
- * A board on the canvas is a rounded box (`.board-node > .surface`, 12px) and that radius is
- * *inside* the frame, so it scales with the page while the page's own does not — two curves that
- * cross at every zoom but 1, and a square-cornered page showing behind the board's curve. That
- * is what "double corner radius" was.
+ * A board on the canvas is a rounded box (`.board-node > .surface`, 12px), and that radius is
+ * *inside* the frame, so it would scale with the page. The page runs from the board list to the
+ * window's edge now, so neither draws one.
  */
 const corners = await page.evaluate(() => {
 	const page_ = document.querySelector(".focus-page");
-	const surface = document.querySelector(".focus .board-node > .surface");
-	return { page: page_ ? getComputedStyle(page_).borderRadius : null, surface: surface ? getComputedStyle(surface).borderRadius : null };
+	const frame = document.querySelector(".focus iframe");
+	return { page: page_ ? getComputedStyle(page_).borderRadius : null, frame: frame ? getComputedStyle(frame).borderRadius : null };
 });
 say(
-	"…with one rounded corner, drawn by the page rather than by the board inside it",
-	corners.page === "12px" && corners.surface === "0px",
+	"…edge to edge, with no corner on the page or the board inside it",
+	corners.page === "0px" && corners.frame === "0px",
 	JSON.stringify(corners),
 );
 
@@ -218,12 +222,11 @@ say("a wheel over the page scrolls it", after > before, `${before} → ${after}`
 await editMode(page);
 await settle(page, 400);
 const editable = await page.evaluate((path) => {
-	const nodes = [...document.querySelectorAll(`.board-node[data-path="${path}"]`)];
-	const frame = nodes[0]?.querySelector("iframe");
+	const frames = [...document.querySelectorAll(`iframe[data-path="${path}"]`)];
 	return {
-		copies: nodes.length,
-		inFocus: Boolean(nodes[0]?.closest(".focus")),
-		frame: Boolean(frame),
+		copies: frames.length,
+		inFocus: Boolean(frames[0]?.closest(".focus")),
+		frame: Boolean(frames[0]?.contentDocument),
 		mode: document.querySelector(".stage")?.dataset.mode,
 	};
 }, NOTES);
@@ -254,21 +257,23 @@ await settle(page, 700);
 const backIn = await page.evaluate(() => Boolean(document.querySelector(".focus")));
 say("the view can also be entered by its key", backIn, String(backIn));
 /*
- * The exit chip stands clear of both top clusters.
+ * The canvas's own toolbars are put away while a board is in focus, and the header names the board.
  *
- * It used to be centred on the canvas column, which put it under the top-left pill as soon
- * as the pill carried a canvas switcher — the press landed on the text tool. It centres in
- * the gap between the clusters now (`--band-left`/`--band-right`), and this is that, in
- * numbers, because it is the kind of thing a stylesheet change can undo silently.
+ * Their controls have nothing to act on here; the header carries the three that still mean
+ * something. A toolbar left up would also be drawn over the header, which is how the first exit
+ * button of this view came to be visible and unclickable.
  */
-const band = await page.evaluate(() => {
-	const rect = (el) => (el ? { left: Math.round(el.getBoundingClientRect().left), right: Math.round(el.getBoundingClientRect().right) } : undefined);
-	return {
-		pill: rect(document.querySelector('.float.pill[data-inset="top"]')),
-		exit: rect(document.querySelector(".focus-exit")),
-	};
-});
-say("the exit chip stands clear of the top-left pill", Boolean(band.exit && band.pill && band.exit.left > band.pill.right), JSON.stringify(band));
+const header = await page.evaluate(() => ({
+	pills: [...document.querySelectorAll(".float.pill")].map((pill) => getComputedStyle(pill).display),
+	tools: [...document.querySelectorAll(".pen-tools")].map((tools) => getComputedStyle(tools).display),
+	trail: document.querySelector(".focus-crumb-board")?.textContent ?? "",
+	exitInBar: Boolean(document.querySelector(".focus-bar .focus-exit")),
+}));
+say(
+	"the canvas's toolbars are put away, and the header names the board and holds the way out",
+	header.pills.every((d) => d === "none") && header.tools.every((d) => d === "none") && header.trail.startsWith("What the survey round found") && header.exitInBar,
+	JSON.stringify(header),
+);
 await page.locator(".focus-exit").click();
 await settle(page, 700);
 const byButton = await state();
@@ -280,6 +285,8 @@ say(
 
 await page.keyboard.press("Escape");
 await settle(page, 300);
+// Back to browsing: edit mode's inspector stands over the top right, where a board at this zoom has its pill.
+await editMode(page, false);
 await selectBoard(page, NOTES);
 // Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
 await pressBoardAction(page, "Comment");

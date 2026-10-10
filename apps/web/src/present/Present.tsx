@@ -1,10 +1,13 @@
 import { api } from "../connections/connection.ts";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 import { attachBoardOpen } from "../board/board-links.ts";
 import { attachBoardEval } from "../board/board-eval.ts";
+import { lendFrame } from "../canvas/borrow.ts";
+import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS, springEasing } from "../app/spring.ts";
+import { reducedMotion } from "../state/camera.ts";
 
 /**
  * A board, fullscreen.
@@ -127,6 +130,37 @@ export function Present(props: {
 		setAt(handle.current());
 	};
 
+	/*
+	 * Opening and closing, the way iOS opens an app from its icon: the board grows out of its place on
+	 * the canvas into the screen on a spring, while the black comes up behind it, and closing is the
+	 * same thing back into its place. With no place to grow from (the board is off screen) it rises
+	 * from slightly smaller instead. Nothing moves with reduced motion.
+	 */
+	const placeOnCanvas = () => {
+		const box = document.querySelector(`.world .board-node[data-path="${CSS.escape(props.board.path)}"] > .surface`)?.getBoundingClientRect();
+		return box && box.width > 1 && box.bottom > 0 && box.right > 0 && box.top < window.innerHeight && box.left < window.innerWidth ? box : undefined;
+	};
+	/** What moves: the scaled board's box, or the frame itself when it has no box of its own. */
+	const moving = (): HTMLElement | undefined => (fitEl?.getAttribute("style") ? fitEl : frameEl);
+	const fromPlace = (target: HTMLElement, place: DOMRect | undefined): Keyframe => {
+		const now = target.getBoundingClientRect();
+		if (!place || now.width < 1 || now.height < 1) return { transform: "scale(0.94)", opacity: 0, transformOrigin: "50% 50%" };
+		return {
+			transform: `translate(${place.left - now.left}px, ${place.top - now.top}px) scale(${place.width / now.width}, ${place.height / now.height})`,
+			opacity: 1,
+			transformOrigin: "0 0",
+		};
+	};
+	const settled = (origin: string): Keyframe => ({ transform: "none", opacity: 1, transformOrigin: origin });
+	const opening = (place: DOMRect | undefined) => {
+		if (reducedMotion()) return;
+		const target = moving();
+		if (!target) return;
+		const start = fromPlace(target, place);
+		target.animate([start, settled(String(start.transformOrigin))], { duration: SPRING_MS, easing: springEasing(SPRING_MS) });
+		layerEl?.animate([{ backgroundColor: "rgb(11 13 16 / 0)" }, { backgroundColor: "rgb(11 13 16 / 1)" }], { duration: 300, easing: "ease-out" });
+	};
+
 	/** Once, whichever way out arrives first — see `present/fullscreen.ts` and each caller. */
 	let left = false;
 	const leave = () => {
@@ -134,7 +168,27 @@ export function Present(props: {
 		left = true;
 		props.onLeave?.(deck()?.current() ?? at());
 		exitFullscreen(document);
-		props.onExit();
+		const target = moving();
+		if (reducedMotion() || !target || !layerEl) {
+			props.onExit();
+			return;
+		}
+		// After the window has left fullscreen, so the place it goes back to is where it will be.
+		layerEl.style.pointerEvents = "none";
+		requestAnimationFrame(() => {
+			const end = fromPlace(target, placeOnCanvas());
+			const back = target.animate([settled(String(end.transformOrigin)), end], { duration: SPRING_BACK_MS, easing: springEasing(SPRING_BACK_MS, SPRING_BACK_RESPONSE), fill: "forwards" });
+			layerEl?.animate([{ backgroundColor: "rgb(11 13 16 / 1)" }, { backgroundColor: "rgb(11 13 16 / 0)" }], { duration: 250, easing: "ease-in", fill: "forwards" });
+			let gone = false;
+			const exit = () => {
+				if (gone) return;
+				gone = true;
+				props.onExit();
+			};
+			back.finished.then(exit, exit);
+			// However the animation ends, the overlay goes.
+			window.setTimeout(exit, SPRING_BACK_MS + 120);
+		});
 	};
 
 	/*
@@ -193,26 +247,109 @@ export function Present(props: {
 		if (!doc) return;
 		doc.addEventListener("keydown", act, true);
 		doc.addEventListener("pointermove", wake);
+		// A tap is how a finger asks for the controls: a touch screen has no pointer moving over it.
+		doc.addEventListener("pointerdown", wake);
 		frameListeners = () => {
 			doc.removeEventListener("keydown", act, true);
 			doc.removeEventListener("pointermove", wake);
+			doc.removeEventListener("pointerdown", wake);
 		};
 	};
 
 	onMount(() => {
 		window.addEventListener("keydown", act, true);
 		window.addEventListener("pointermove", wake);
+		window.addEventListener("pointerdown", wake);
 		// The way out with no keystroke in it: the browser leaving fullscreen on its own, which
 		// is what Escape does there — Chrome consumes it and the page never sees it.
 		onCleanup(onFullscreenLeft(document, leave));
 		onCleanup(() => {
 			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);
+			window.removeEventListener("pointerdown", wake);
 			frameListeners?.();
 			detachLinks?.();
 			detachEval?.();
 			clearTimeout(wakeTimer);
 		});
+	});
+
+	/*
+	 * A designed board fills the screen: scaled to the window's width or its height, whichever runs out
+	 * first, and centred. A deck scales itself (`slides.js`), and a board that fills itself (one document,
+	 * one file) or had to be wrapped in a shell is laid out at the window's size instead.
+	 */
+	const [screen, setScreen] = createSignal({ w: window.innerWidth, h: window.innerHeight });
+	const onResize = () => setScreen({ w: window.innerWidth, h: window.innerHeight });
+	window.addEventListener("resize", onResize);
+	onCleanup(() => window.removeEventListener("resize", onResize));
+	const scaled = () => !slides() && !props.board.shell && !props.board.fills;
+	const fit = () => Math.min(screen().w / Math.max(1, props.board.w), screen().h / Math.max(1, props.board.h));
+	/** How the frame is drawn here: scaled to the screen, or the window's height at most the board's width. */
+	const frameStyle = (): Record<string, string> | undefined =>
+		scaled()
+			? { width: `${props.board.w}px`, height: `${props.board.h}px`, transform: `scale(${fit()})`, "transform-origin": "0 0" }
+			: /* One file or one document: centred, the window's height, and no wider than the board was made. */
+				props.board.fills && !slides()
+				? { width: `min(100vw, ${props.board.w}px)`, height: "100vh" }
+				: undefined;
+
+	/*
+	 * The canvas's own page, moved here and back (`canvas/borrow.ts`), so the board is presented as it
+	 * was left on the canvas and the canvas has it back the same way. A deck is the exception: it is
+	 * presented in a mode of its own (`present=1`), so it gets its own page. So does a board the canvas
+	 * has no page for within a few frames, and every board in a browser that cannot move a frame.
+	 */
+	let fitEl: HTMLDivElement | undefined;
+	const [own, setOwn] = createSignal(slides());
+	const [lentFrame, setLentFrame] = createSignal<HTMLIFrameElement>();
+	onMount(() => {
+		// Where the board is on the canvas, read before its page leaves it.
+		const place = placeOnCanvas();
+		// In the same frame the overlay first draws, so its finished layout never shows before the zoom.
+		if (slides()) {
+			opening(place);
+			return;
+		}
+		let tries = 20;
+		let id = 0;
+		let lending: ReturnType<typeof lendFrame>;
+		const attempt = () => {
+			if (!fitEl) return;
+			lending = lendFrame(props.board.path, fitEl);
+			if (lending) {
+				lending.frame.classList.add("present-frame");
+				frameEl = lending.frame;
+				setLentFrame(lending.frame);
+				listenInFrame();
+				// The keyboard goes into the page, as it does into a page of the overlay's own (`onMount` above).
+				lending.frame.focus();
+				opening(place);
+				return;
+			}
+			if (tries-- > 0) id = requestAnimationFrame(attempt);
+			else {
+				setOwn(true);
+				opening(place);
+			}
+		};
+		attempt();
+		onCleanup(() => {
+			cancelAnimationFrame(id);
+			frameListeners?.();
+			frameListeners = undefined;
+			lending?.frame.classList.remove("present-frame");
+			// The closing animation holds its last frame; the canvas gets its page without it.
+			for (const running of lending?.frame.getAnimations() ?? []) running.cancel();
+			lending?.give();
+		});
+	});
+	createEffect(() => {
+		const frame = lentFrame();
+		if (!frame) return;
+		const style = frameStyle();
+		for (const name of ["width", "height", "transform", "transform-origin"]) frame.style.removeProperty(name);
+		for (const [name, value] of Object.entries(style ?? {})) frame.style.setProperty(name, value);
 	});
 
 	return (
@@ -222,7 +359,7 @@ export function Present(props: {
 			data-format={props.board.format}
 			/* A board that had to be wrapped in a shell has no measured height of its own, so it
 			   is the one presented as a page that scrolls (`styles/canvas.css`). */
-			data-shell={props.board.shell ?? undefined}
+			data-shell={props.board.shell ?? (props.board.fills ? "fills" : undefined)}
 			tabIndex={-1}
 			ref={(element) => {
 				layerEl = element;
@@ -236,6 +373,8 @@ export function Present(props: {
 			role="dialog"
 			aria-label={`${props.board.title} — ${slides() ? "presenting" : "fullscreen"}`}
 		>
+			<div class="present-fit" ref={fitEl} style={scaled() ? { width: `${props.board.w * fit()}px`, height: `${props.board.h * fit()}px` } : undefined}>
+			<Show when={own()}>
 			<iframe
 				class="present-frame"
 				title={props.board.title}
@@ -246,11 +385,9 @@ export function Present(props: {
 				 * flag's `overflow: hidden` would take away the scrolling it is there to do.
 				 */
 				src={api(`/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`)}
-				/* A board is shown at the size it was written at, which is the size it is read at
-				    on the canvas. A board that had to be wrapped in a shell — a markdown file or a
-				    page from somewhere else — is a document nobody measured: CSS gives that one the
-				    window and lets it scroll. */
-				style={props.board.shell || props.board.format === "slides" ? undefined : { width: `${props.board.w}px`, height: `${props.board.h}px` }}
+				/* A designed board is laid out at the size it was written at and scaled to the screen
+				    (`fit`). A board wrapped in a shell is given the window by CSS. */
+				style={frameStyle()}
 				ref={(element) => {
 					frameEl = element;
 					element.addEventListener("load", () => {
@@ -277,8 +414,15 @@ export function Present(props: {
 					});
 				}}
 			/>
-			<div class="present-bar">
-				<Show when={slides()}>
+			</Show>
+			</div>
+			{/* The way out, top centre, shown with the other controls when the pointer moves or a finger taps. */}
+			<button type="button" class="present-exit" onClick={leave} aria-label={slides() ? "Stop presenting" : "Leave fullscreen"}>
+				Esc
+			</button>
+			{/* A deck's paging, at the foot. */}
+			<Show when={slides()}>
+				<div class="present-bar">
 					<button type="button" class="present-step" onClick={() => { deck()?.prev(); setAt(deck()?.current() ?? 0); }} aria-label="Previous slide">
 						‹
 					</button>
@@ -290,11 +434,8 @@ export function Present(props: {
 					<button type="button" class="present-step" onClick={() => { deck()?.next(); setAt(deck()?.current() ?? 0); }} aria-label="Next slide">
 						›
 					</button>
-				</Show>
-				<button type="button" class="present-exit" onClick={leave} aria-label={slides() ? "Stop presenting" : "Leave fullscreen"}>
-					Esc
-				</button>
-			</div>
+				</div>
+			</Show>
 		</div>
 	);
 }

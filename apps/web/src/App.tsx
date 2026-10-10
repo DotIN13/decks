@@ -13,9 +13,10 @@ import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
-import { camera, GLIDE_MS, glide, LEAVE_BOARD_MS, moveCamera, reducedMotion, setCamera } from "./state/camera.ts";
+import { camera, glide, moveCamera, reducedMotion, setCamera } from "./state/camera.ts";
 import { cameraOntoPage } from "./camera/morph.ts";
 import { flyAlong } from "./app/fly-along.ts";
+import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS } from "./app/spring.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
@@ -807,7 +808,7 @@ export function App() {
 	 * out — so the arrival has to end *exactly* where that page will be (`cameraOntoPage`), at the
 	 * same scale, and then the page replaces the canvas with nothing to see. The camera you had is
 	 * kept, and the way out flies back to it rather than to a fit, so the canvas is where you put
-	 * it down. `GLIDE_MS` in, a little less out; nothing but the swap with reduced motion.
+	 * it down. On iOS's spring, `SPRING_MS` in and a stiffer one out; nothing but the swap with reduced motion.
 	 */
 	let focusReturn: { camera: Camera; path: string } | undefined;
 	const stageGeometry = () => {
@@ -829,7 +830,7 @@ export function App() {
 			return;
 		}
 		focusReturn = { camera: camera(), path };
-		flyAlong(camera(), cameraOntoPage(board, geometry.view, geometry.insets), boxOf(board), geometry.view, GLIDE_MS, () => {
+		flyAlong(camera(), cameraOntoPage(board, geometry.view, { ...geometry.insets, right: 0 }, { fills: board.fills === true }), boxOf(board), geometry.view, SPRING_MS, () => {
 			// Only if nothing else was asked for while it flew.
 			if (focusReturn?.path === path) setFocus(path);
 		});
@@ -841,7 +842,7 @@ export function App() {
 		const board = back ? stageBoards().find((one) => one.path === back.path) : undefined;
 		const geometry = stageGeometry();
 		if (!back || !board || !geometry || reducedMotion()) return;
-		flyAlong(camera(), back.camera, boxOf(board), geometry.view, LEAVE_BOARD_MS);
+		flyAlong(camera(), back.camera, boxOf(board), geometry.view, SPRING_BACK_MS, undefined, SPRING_BACK_RESPONSE);
 	};
 
 	const toggleFocus = (wanted?: string) => {
@@ -1304,7 +1305,7 @@ export function App() {
 
 
 	return (
-		<div class="app" data-reader={can("write") ? undefined : ""}>
+		<div class="app" data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
 			{/*
 				No title bar.
 				*
@@ -1377,6 +1378,19 @@ export function App() {
 						onEditSource={openSource}
 						{...(focus() === undefined ? {} : { focus: focus()! })}
 						onFocusToggle={() => toggleFocus()}
+						{...(presenting()?.kind === "board" ? { presenting: (presenting() as { path: string }).path } : {})}
+						focusBar={{
+							...(stageOf(state.focused) ? { canvas: stageOf(state.focused)!.title } : {}),
+							boardsOpen: boardsOpen(),
+							onToggleBoards: () => showBoards(!boardsOpen()),
+							historyOn: historyShown(),
+							onHistory: toggleHistory,
+							mode: mode(),
+							onMode: (next) => {
+								if (next === "edit") setDrawing(false);
+								setMode(next);
+							},
+						}}
 						onFocusBoard={(path) => toggleFocus(path)}
 						{...(editingSource()
 							? {

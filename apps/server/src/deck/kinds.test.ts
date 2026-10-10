@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defaultWidth, formatOf, isBoardFile, isOurs, shellFor, slideHeight } from "./kinds.ts";
+import { defaultWidth, fillsOf, formatOf, isBoardFile, isOurs, shellFor, slideHeight } from "./kinds.ts";
 
 /*
  * There used to be two board formats here, told apart by a word on the body's class. They are
@@ -91,4 +91,12 @@ test("the defaults, and a slide's aspect", () => {
 	// A deck that says something absurd gets 16:9 rather than a division by zero.
 	assert.equal(slideHeight(960, "0:0"), 540);
 	assert.equal(slideHeight(960, "wide"), 540);
+});
+
+test("a board fills itself when it is one document or one file", () => {
+	const file = '<body class="board">\n\t\t<div data-id="file" data-embed="../../x.pdf" data-bare style="left: 0; top: 0; right: 0; bottom: 0"></div>';
+	assert.equal(fillsOf(file, undefined), true, "a file board");
+	assert.equal(fillsOf("<body class=\"board\"><div class=\"live\" data-live=\"doc\"></div>", "doc"), true, "a document board");
+	assert.equal(fillsOf('<body class="board"><div data-embed="../x.pdf"></div>', undefined), false, "an embed inside a designed board");
+	assert.equal(fillsOf(board, undefined), false);
 });

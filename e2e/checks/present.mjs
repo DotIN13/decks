@@ -77,9 +77,11 @@ const overlay = () =>
 		};
 	});
 
+// The overlay closes on a spring back into the board's place (`present/Present.tsx`), about half a second.
+const CLOSING = 800;
 const leave = async () => {
 	await page.keyboard.press("Escape");
-	await settle(page, 300);
+	await settle(page, CLOSING);
 	return page.evaluate(() => Boolean(document.querySelector(".present")));
 };
 
@@ -207,7 +209,7 @@ await page.evaluate(() => {
 	Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => null });
 	document.dispatchEvent(new Event("fullscreenchange"));
 });
-await settle(page, 400);
+await settle(page, CLOSING);
 say(
 	"…and the browser leaving fullscreen takes the overlay with it, with no second Escape",
 	(await overlay()) === null,
@@ -220,11 +222,10 @@ const afterDeck = await overlay();
 say("…and the canvas keeps its own frames behind it", afterDeck === null, "canvas back");
 
 /*
- * 4. A board written as a document: its own rectangle, like any other board.
+ * 4. A board written as a document: laid out at its own size and scaled to fill the screen.
  *
- * It used to fill the window, because it was a *flow* board and that was a format. There is one
- * board format now, so the rule is one rule: a board is presented at the size it was written at,
- * which is the size it is read at on the canvas. The frame takes the pointer and the keyboard,
+ * Fitted to the window's width or its height, whichever runs out first, so a board is shown as
+ * large as the screen allows and is never cut off. The frame takes the pointer and the keyboard,
  * which is what a document needs and a slide does not.
  */
 await present(ours("boards/notes.html"));
@@ -232,8 +233,10 @@ await settle(page, 700);
 const documentOverlay = await overlay();
 const documentSize = await sizeOf(ours("boards/notes.html"));
 say(
-	"a board written as a document opens at its own size, not the window's",
-	documentOverlay?.format === "board" && Math.abs(documentOverlay.frame.w - documentSize.w) <= 2,
+	"a board written as a document fills the screen's width or its height, at its own shape",
+	documentOverlay?.format === "board" &&
+		(Math.abs(documentOverlay.frame.w - documentOverlay.window.w) <= 2 || Math.abs(documentOverlay.frame.h - documentOverlay.window.h) <= 2) &&
+		Math.abs(documentOverlay.frame.w / documentOverlay.frame.h - documentSize.w / documentSize.h) < 0.02,
 	`${JSON.stringify(documentOverlay?.frame)} for a board of ${documentSize.w}×${documentSize.h}`,
 );
 say("…and takes the pointer events, because it is a document", documentOverlay?.pointer !== "none", String(documentOverlay?.pointer));
@@ -241,7 +244,7 @@ say("…with the keyboard inside it, so the arrows scroll rather than page", doc
 say("…and Escape still gets out, from inside the frame", (await leave()) === false, "overlay gone");
 
 /*
- * 5. A board of placed boxes: the same rectangle rule, at 1:1, and its own buttons reachable.
+ * 5. A board of placed boxes: the same fit, and its own buttons reachable.
  */
 await present(ours("boards/plan.html"));
 await settle(page, 700);
@@ -249,11 +252,13 @@ const componentOverlay = await overlay();
 const declared = { path: ours("boards/plan.html") };
 const size = await sizeOf(declared.path);
 say(
-	"a board of placed boxes opens at its own size too",
-	componentOverlay?.format === "board" && Math.abs(componentOverlay.frame.w - size.w) <= 2,
+	"a board of placed boxes fills the screen the same way",
+	componentOverlay?.format === "board" &&
+		(Math.abs(componentOverlay.frame.w - componentOverlay.window.w) <= 2 || Math.abs(componentOverlay.frame.h - componentOverlay.window.h) <= 2) &&
+		Math.abs(componentOverlay.frame.w / componentOverlay.frame.h - size.w / size.h) < 0.02,
 	`${JSON.stringify(componentOverlay?.frame)} for a board of ${size.w}×${size.h}`,
 );
-say("…centred in a scrollable overlay, so a tall board can be scrolled", componentOverlay?.overflow === "auto", String(componentOverlay?.overflow));
+say("…fitted, so the overlay has nothing to scroll", componentOverlay?.overflow === "hidden", String(componentOverlay?.overflow));
 say("…and clickable, which is the one place below half zoom it is", componentOverlay?.pointer !== "none", String(componentOverlay?.pointer));
 say("…and Escape leaves it too", (await leave()) === false, "overlay gone");
 

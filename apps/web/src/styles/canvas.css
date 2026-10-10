@@ -30,6 +30,24 @@
 		place-items: center;
 	}
 
+	/*
+	 * A designed board is fitted too, to the window's width or height, whichever runs out first
+	 * (`present/Present.tsx`): its box is the scaled size and the frame inside is scaled from its
+	 * corner. Any other frame ignores the box, which then lays out as if it were not there.
+	 */
+	.present:not([data-shell]):not([data-format="slides"]) {
+		overflow: hidden;
+	}
+
+	.present-fit {
+		display: contents;
+	}
+
+	.present-fit[style] {
+		display: block;
+		overflow: hidden;
+	}
+
 	/* A slide is fitted, never scrolled — `slides.js` scales it to this box. */
 	.present[data-format="slides"] {
 		overflow: hidden;
@@ -186,13 +204,37 @@
 	/* Out of the way until the pointer moves — a presentation with permanent buttons on it
 	   is a demo of a tool rather than a talk. `pointer-events` goes with the opacity so an
 	   invisible bar cannot swallow a click meant for the slide. */
-	.present[data-idle="true"] .present-bar {
+	.present[data-idle="true"] :is(.present-bar, .present-exit) {
 		opacity: 0;
 		pointer-events: none;
 	}
 
-	.present-step,
+	/* The way out, top centre. */
 	.present-exit {
+		position: absolute;
+		top: 16px;
+		left: 50%;
+		height: 30px;
+		padding: 0 12px;
+		border: 0;
+		border-radius: var(--radius-pill);
+		/* Dark glass, so it reads over a white page as well as over the black around one. */
+		background: rgb(16 18 22 / 62%);
+		backdrop-filter: blur(6px);
+		box-shadow: 0 0 0 1px rgb(255 255 255 / 12%);
+		color: #fff;
+		font-family: var(--mono, monospace);
+		font-size: var(--type-note);
+		cursor: pointer;
+		transform: translateX(-50%);
+		transition: opacity 200ms ease, background-color 120ms ease;
+	}
+
+	.present-exit:hover {
+		background: rgb(16 18 22 / 80%);
+	}
+
+	.present-step {
 		display: grid;
 		width: 30px;
 		height: 30px;
@@ -205,15 +247,7 @@
 		place-items: center;
 	}
 
-	.present-exit {
-		width: auto;
-		padding: 0 10px;
-		font-family: var(--mono, monospace);
-		font-size: var(--type-note);
-	}
-
-	.present-step:hover,
-	.present-exit:hover {
+	.present-step:hover {
 		background: rgb(255 255 255 / 22%);
 	}
 
@@ -241,51 +275,35 @@
 		overflow-x: hidden;
 		overflow-y: auto;
 		/*
-		 * Room at the top and bottom so the first and last lines of a long page are not jammed
-		 * against the window's edge — and on the sides, the room the open panels are using.
-		 *
-		 * `--inset-left`/`--inset-right` are the same numbers the dock positions itself with
-		 * (`camera/insets.ts` measures the chrome that declares itself), so the page is centred
-		 * in the space *beside* a panel rather than underneath it. A reading view whose first
-		 * paragraph is behind a floating panel is not a view of one document; it is a view of one
-		 * document and a panel.
+		 * The work area, which is the window right of the board list: the page starts at the board
+		 * list's edge (`--inset-left`, measured in `camera/insets.ts`) and runs to the window's, under
+		 * the view's header. The composer floats over the foot, so the bottom keeps its height
+		 * (`--dock-h`, written by `App`) and the last lines scroll clear of it. The conversation floats
+		 * over the right and takes no room, so the page never resizes for it.
 		 */
-		/* The composer floats over the foot of this box, so the last lines of a page would sit
-		   under it: the bottom padding is the composer's measured height (`--dock-h`, written
-		   by `App`) plus the air the top has, so the page scrolls clear of the bar. */
-		/* The page starts under the toolbars, not beside them: the top is the measured chrome
-		   inset plus air, so the first line is never behind the pill. */
-		padding: calc(var(--inset-top, 52px) + 12px) var(--inset-right, 0px) calc(var(--dock-h, 96px) + 32px) var(--inset-left, 0px);
+		padding: var(--focus-header, 52px) 0 calc(var(--dock-h, 96px) + 32px) var(--inset-left, 0px);
 		inset: 0;
-		background: var(--canvas, var(--panel));
+		background: var(--panel);
 		/* Scrolling a page is not dragging a canvas: no inertia chain to the shell. */
 		overscroll-behavior: contain;
 	}
 
+	/* A board that fills itself scrolls inside its own frame, so the box only places it. */
+	.focus.focus-fills {
+		overflow: hidden;
+		padding: 0 0 0 var(--inset-left, 0px);
+	}
+
 	/*
-	 * The page's box is the size it is *drawn* — the scaled size — because a CSS transform
-	 * does not change layout. The document inside it is scaled from its own top-left corner, so
-	 * the two agree about where the page ends and the scrollbar is honest.
+	 * The page's box is the size it is *drawn*, the scaled size, because a CSS transform does not
+	 * change layout: the document inside it is scaled from its own top-left corner, and the two agree
+	 * about where the page ends. Edge to edge, so no corner, no shadow and no margin but the centring
+	 * a page narrower than its room gets.
 	 */
 	.focus-page {
 		margin: 0 auto;
 		overflow: hidden;
-		/*
-		 * The page owns the corner, and the *board* stops drawing one inside it.
-		 *
-		 * A board on the canvas is a rounded box — `.board-node > .surface`, 12px — and that
-		 * radius is *inside* the frame, so it scales with the page: at 1.5× it is 18px against
-		 * this 12px, and the two curves cross. Worse at any zoom, the page's own rectangle showed
-		 * wherever the board's curve cut in, which is what "double corner radius" is: a radius,
-		 * and a square-cornered box behind it.
-		 *
-		 * So one curve, on the page, at screen scale, and nothing painted behind it — which also
-		 * means the corner shows whatever the app is behind the page rather than a white wedge
-		 * under a board that may not be white.
-		 */
-		border-radius: var(--radius-board, 12px);
 		background: transparent;
-		box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 14px 40px rgb(0 0 0 / 16%);
 	}
 
 	.focus .board-node > .surface {
@@ -293,58 +311,107 @@
 		background: transparent;
 	}
 
-	.focus-scaled {
+	.focus-scaled,
+	.focus-fill {
 		position: relative;
 	}
 
+	/* The canvas's own page, lent to this view (`canvas/borrow.ts`), as it is drawn on the canvas. */
+	:is(.focus-scaled, .focus-fill) > iframe {
+		display: block;
+		border: 0;
+	}
+
 	/*
-	 * The focus view's way out, and the only chrome it has.
+	 * The focus view's header: one row across the work area, the height of the canvas's toolbars
+	 * and their gutter, with a hairline under it.
 	 *
-	 * In the stage's own box rather than in the page, so it holds still while the document
-	 * scrolls under it and cannot be scrolled off the top — and centred in the page's **top
-	 * margin**, which is the one band of this view that is reliably empty. `.focus` pads 32px
-	 * at the top edge (`FOCUS_AIR` in `Stage`) and this chip is 28px at 2px from the top, so it
-	 * ends where the page begins: it is beside the document and never over it, which matters
-	 * because the whole point of this view is reading the document.
-	 *
-	 * Not in a corner. The first version was in the top-right one, where it was drawn *under*
-	 * the app's zoom pill — `z-20`, a sibling of the stage, so nothing painted inside the stage
-	 * can be above it — and the result was a button that was visible, reported by every query
-	 * as present, and impossible to click. `e2e/checks/focus.mjs` now asks the page what is at
-	 * the button's own centre, which is the assertion that failure needed.
+	 * Over a board's own bar (`.focus-bar-over`) it is drawn by the bar: what is here is the two
+	 * clusters of the app's controls, at the two ends, and the board pads its bar by their widths
+	 * (`lib/board.js`, `data-focus-left` and `-right`), so the board's name and buttons sit in the
+	 * middle of the same row.
 	 */
-	/* A raised chip in the app's own button system: the card colour, a strong hairline, the
-	   shared shadow, a close glyph, the word, and the key as a keycap. */
-	.focus-exit {
+	.focus-bar {
 		position: absolute;
-		/* Level with the two toolbars, in the band between them: a 28px chip centred on their
-		   40px, and the page begins 18px under it. */
-		top: 18px;
-		/* Centred in the clear span of the top band, between the two clusters (`--band-left`
-		   and `--band-right`, measured in `camera/insets.ts`). Centring it on the canvas
-		   column put it *under* the top-left pill: the pill is a float, so nothing is
-		   subtracted for it, and it reaches the middle of a 1440px window once it carries a
-		   canvas switcher. The fallback is the old rule, for a window with no clusters in it. */
-		left: calc((var(--band-left, var(--inset-left, 0px)) + var(--band-right, calc(100% - var(--inset-right, 0px)))) / 2);
-		transform: translateX(-50%);
+		top: 0;
+		left: var(--inset-left, 0px);
+		right: 0;
 		z-index: var(--z-over-board);
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		box-sizing: border-box;
+		height: var(--focus-header, 52px);
+		padding: 0 12px 0 10px;
+		border-bottom: 1px solid var(--line);
+		background: var(--panel);
+	}
+
+	/* It comes up as the page lands, rather than being there before the camera arrives. */
+	@media (prefers-reduced-motion: no-preference) {
+		.focus-bar {
+			animation: focus-bar-in 220ms ease-out both;
+		}
+	}
+
+	@keyframes focus-bar-in {
+		from {
+			opacity: 0;
+		}
+	}
+
+	.focus-bar.focus-bar-over {
+		border-bottom: 0;
+		background: transparent;
+		pointer-events: none;
+	}
+
+	.focus-bar-start,
+	.focus-bar-end {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		pointer-events: auto;
+	}
+
+	.focus-bar-over .focus-bar-start {
+		/* Its width is the board bar's left padding, so it ends where the board's name begins. */
+		padding-right: 2px;
+	}
+
+	/* One gap between every control at the right end, the board's own last button included
+	   (`--decks-focus-right` in `lib/board.css` leaves the same 8px). */
+	.focus-bar-end {
+		flex: none;
+		gap: 8px;
+	}
+
+	.focus-crumb {
+		display: flex;
+		align-items: center;
 		gap: 6px;
-		height: 28px;
-		padding: 0 8px 0 8px;
-		border: 1px solid var(--line-strong);
-		border-radius: var(--control-radius, 8px);
-		background: var(--raise, var(--panel));
-		box-shadow: var(--shadow);
-		color: var(--fg);
-		font: inherit;
-		font-size: var(--type-ui);
+		min-width: 0;
+		margin-left: 4px;
+		font-size: var(--type-body);
+		white-space: nowrap;
+	}
+
+	.focus-crumb-canvas {
+		overflow: hidden;
+		color: var(--muted);
+		text-overflow: ellipsis;
+	}
+
+	.focus-crumb-slash {
+		color: var(--faint);
+	}
+
+	.focus-crumb-board {
+		overflow: hidden;
 		font-weight: 600;
-		cursor: pointer;
-		transition:
-			border-color 120ms ease,
-			background-color 120ms ease;
+		text-overflow: ellipsis;
 	}
 
 	.focus-exit > svg {
@@ -369,37 +436,6 @@
 		place-items: center;
 	}
 
-	.focus-exit:hover {
-		border-color: var(--fg);
-	}
-
-	.focus-exit:hover > svg {
-		color: var(--fg);
-	}
-
-	/*
-	 * On a phone the two toolbars span the whole top, so the chip goes under them: its top
-	 * is the measured chrome inset plus a little air, and the page starts below it. A
-	 * finger-sized target, since a finger is what presses it there.
-	 */
-	@media (max-width: 760px) {
-		.focus {
-			padding-top: calc(var(--inset-top, 52px) + 52px);
-			/* Zoomed in with two fingers the page is wider than the screen, and the rest of
-			   it has to be reachable: sideways scrolling, which a desktop page never needs
-			   because its zoom keys stop where the page fits. */
-			overflow-x: auto;
-		}
-		/* Centred on the screen: the band between the two toolbars is a sliver on a phone, and its
-		   middle put the chip off to the right, under the corner cluster. */
-		.focus-exit {
-			top: calc(var(--inset-top, 52px) + 8px);
-			left: 50%;
-			height: 36px;
-			padding: 0 12px;
-		}
-	}
-
 	/* No key to name where there is no keyboard. */
 	@media (hover: none) {
 		.focus-exit > kbd {
@@ -407,9 +443,38 @@
 		}
 	}
 
-	.focus-exit:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 1px;
+	/*
+	 * The canvas's own controls go while a board is in focus: its two toolbars and the drawing's
+	 * tools have nothing to act on, and the header carries the three that still mean something
+	 * (the board list, the conversation, the way out). The composer and the conversation stay
+	 * where they always are.
+	 */
+	.app[data-focus] .float.pill,
+	.app[data-focus] .pen-tools {
+		display: none;
+	}
+
+	.focus-mode {
+		gap: 8px;
+	}
+
+	/* Somebody who can only read has nothing to edit, here as on the canvas's toolbar. */
+	.app[data-reader] .focus-mode {
+		display: none;
+	}
+
+	/* On a phone the work area is the whole width, and the zoom is a pinch. */
+	@media (max-width: 760px) {
+		.focus {
+			/* Zoomed in with two fingers the page is wider than the screen, and the rest of it has
+			   to be reachable: sideways scrolling, which a desktop page never needs. */
+			overflow-x: auto;
+		}
+		.focus-fit,
+		.focus-crumb-canvas,
+		.focus-crumb-slash {
+			display: none;
+		}
 	}
 
 	/*
@@ -854,7 +919,9 @@
 	left: 0;
 	display: flex;
 	overflow: hidden;
-	align-items: baseline;
+	/* Every item on the bar's middle line: the name, the path and the buttons, at any zoom. A shared
+	   baseline left the words 2px above the buttons, which sit centred. */
+	align-items: center;
 	gap: 8px;
 	height: 24px;
 	color: var(--muted);
@@ -868,6 +935,7 @@
 }
 	.bar-layer .chrome .title {
 	overflow: hidden;
+	line-height: 20px;
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -883,6 +951,7 @@
 	color: var(--faint);
 	font-family: var(--font-mono);
 	font-size: 11px;
+	line-height: 20px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }

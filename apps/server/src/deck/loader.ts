@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
-import { defaultWidth, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
+import { defaultWidth, fillsOf, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
@@ -514,6 +514,7 @@ export class Deck {
 			modifiedAt: modifiedAtOf(absolute),
 			...(meta.poster ? { poster: meta.poster } : {}),
 			...(live ? { live } : {}),
+			...(fillsOf(source, live) ? { fills: true as const } : {}),
 			inContext: [],
 		};
 	}

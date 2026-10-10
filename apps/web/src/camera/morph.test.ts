@@ -20,14 +20,16 @@ test("in the middle of a flight the boards stay on the line from where they were
 });
 
 test("the camera for a board's page puts it where the reading view draws the page", () => {
-	const view = { width: 1400, height: 900 };
-	const insets = { left: 0, right: 0, top: 52 };
+	const view = { width: 1440, height: 900 };
+	const insets = { left: 264, right: 0, top: 0 };
 	const board = { x: 2000, y: 600, w: 1000, h: 700 };
 	const camera = cameraOntoPage(board, view, insets);
-	assert.equal(camera.zoom, 1, "a board narrower than the window is read at its own size");
+	assert.ok(Math.abs(camera.zoom - 1176 / 1000) < 1e-9, "a designed board is as wide as the room beside the board list");
 	const corner = toScreen(camera, view, { x: board.x, y: board.y });
-	assert.ok(Math.abs(corner.x - 200) < 0.5, "centred: (1400 - 1000) / 2");
-	assert.ok(Math.abs(corner.y - 64) < 0.5, "a line under the top inset");
-	const wide = cameraOntoPage({ x: 0, y: 0, w: 2000, h: 900 }, view, insets);
-	assert.ok(Math.abs(wide.zoom - (1400 - 64) / 2000) < 1e-9, "a wide board is fitted to the window less its air");
+	assert.ok(Math.abs(corner.x - 264) < 0.5, "edge to edge from the board list");
+	assert.ok(Math.abs(corner.y - 52) < 0.5, "under the view's header");
+	const huge = cameraOntoPage({ x: 0, y: 0, w: 400, h: 300 }, view, insets);
+	assert.equal(huge.zoom, 2, "never more than twice life size");
+	const file = cameraOntoPage(board, view, insets, { fills: true });
+	assert.ok(Math.abs(toScreen(file, view, { x: board.x, y: board.y }).y) < 0.5, "a board that fills itself has its own bar at the top");
 });

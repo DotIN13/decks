@@ -7,8 +7,8 @@ import { Icon } from "../ui/icons.tsx";
 import ExternalLink from "lucide-solid/icons/external-link";
 import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
-import BookOpen from "lucide-solid/icons/book-open";
 import Maximize from "lucide-solid/icons/maximize-2";
+import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
@@ -87,7 +87,7 @@ export function BoardCallout(props: {
 			</button>
 			<Show when={props.onFocus}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Focus" title="Focus on this board" onClick={() => props.onFocus?.()}>
-					<Icon of={BookOpen} size={16} />
+					<Icon of={Maximize} size={16} />
 				</button>
 			</Show>
 			<Show when={props.onPresent && !props.board.live}>
@@ -99,7 +99,7 @@ export function BoardCallout(props: {
 					title={props.board.format === "slides" ? "Present the slides" : "Fullscreen"}
 					onClick={() => props.onPresent?.()}
 				>
-					<Show when={props.board.format === "slides"} fallback={<Icon of={Maximize} size={16} />}>
+					<Show when={props.board.format === "slides"} fallback={<Icon of={Presentation} size={16} />}>
 						<span class="callout-word">Present</span>
 					</Show>
 				</button>

@@ -116,9 +116,12 @@ export function PresentEmbed(props: {
 		if (!doc) return;
 		doc.addEventListener("keydown", act, true);
 		doc.addEventListener("pointermove", wake);
+		// A tap is how a finger asks for the controls: a touch screen has no pointer moving over it.
+		doc.addEventListener("pointerdown", wake);
 		frameListeners = () => {
 			doc.removeEventListener("keydown", act, true);
 			doc.removeEventListener("pointermove", wake);
+			doc.removeEventListener("pointerdown", wake);
 		};
 	};
 
@@ -127,6 +130,7 @@ export function PresentEmbed(props: {
 		enterFullscreen(layerEl);
 		window.addEventListener("keydown", act, true);
 		window.addEventListener("pointermove", wake);
+		window.addEventListener("pointerdown", wake);
 		/*
 		 * And the way out that produces no keystroke at all: the browser leaving fullscreen by
 		 * itself. Chrome takes Escape for that and never dispatches it here, which is why the
@@ -136,6 +140,7 @@ export function PresentEmbed(props: {
 		onCleanup(() => {
 			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);
+			window.removeEventListener("pointerdown", wake);
 			frameListeners?.();
 			clearTimeout(wakeTimer);
 		});
@@ -199,11 +204,10 @@ export function PresentEmbed(props: {
 					</div>
 				</Match>
 			</Switch>
-			<div class="present-bar">
-				<button type="button" class="present-exit" onClick={leave} aria-label="Leave fullscreen">
-					Esc
-				</button>
-			</div>
+			{/* The way out, top centre, shown with the other controls when the pointer moves or a finger taps. */}
+			<button type="button" class="present-exit" onClick={leave} aria-label="Leave fullscreen">
+				Esc
+			</button>
 		</div>
 	);
 }

@@ -3,7 +3,7 @@ import BringToFront from "lucide-solid/icons/bring-to-front";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
 import FolderOpen from "lucide-solid/icons/folder-open";
-import Maximize from "lucide-solid/icons/maximize-2";
+import Presentation from "lucide-solid/icons/presentation";
 import SendToBack from "lucide-solid/icons/send-to-back";
 import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
@@ -563,7 +563,7 @@ export function Inspector(props: {
 								aria-label={`Fullscreen ${source().split("/").pop() || "this file"}`}
 								onClick={() => props.onFullscreen()}
 							>
-								<Icon of={Maximize} size={15} />
+								<Icon of={Presentation} size={15} />
 							</button>
 							<a
 								class="embed-tab"

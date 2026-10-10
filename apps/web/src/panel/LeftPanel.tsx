@@ -232,7 +232,8 @@ export function LeftPanel(props: {
 		if (!props.open || !sheet()) return;
 		const away = (event: PointerEvent) => {
 			const target = event.target as Element | null;
-			if (!target?.closest?.(".stage") || target.closest('aside[aria-label="Boards"]')) return;
+			// The focus view's header is in the stage and is not canvas: its own button opens and closes this.
+			if (!target?.closest?.(".stage") || target.closest('aside[aria-label="Boards"], .focus-bar')) return;
 			event.stopPropagation();
 			event.preventDefault();
 			props.onOpenChange(false);

@@ -68,6 +68,13 @@ export interface Board {
 	 * it), and nothing to fill a window with.
 	 */
 	live?: string;
+	/**
+	 * The board is one box filling it, a document or a single file, so it can be laid out at any size.
+	 *
+	 * The focus view reads it: a board like this takes the whole work area at its own scale and its own
+	 * bar becomes the view's header, where any other board is a designed page that is scaled to the width.
+	 */
+	fills?: true;
 	x: number;
 	y: number;
 	w: number;

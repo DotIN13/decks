@@ -796,7 +796,8 @@
 			reload.className = "embed-reload";
 			reload.title = "Load the file again";
 			reload.setAttribute("aria-label", "Reload");
-			reload.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>';
+			// Lucide's rotate-cw at the app's own size and stroke (`ui/icons.tsx`), so it reads as one of the app's buttons beside them.
+			reload.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>';
 			reload.addEventListener("click", (event) => {
 				event.stopPropagation();
 				host.dataset.reloaded = String(Date.now());
@@ -1392,9 +1393,36 @@
 
 	// --- go ----------------------------------------------------------------------
 
+	/*
+	 * The app's focus view, as this board's frame says it.
+	 *
+	 * A board that is one document or one file is laid out across the whole work area there, and its
+	 * own bar is the view's header: the app lays its controls over the two ends of the bar, and says on
+	 * this frame's element how wide they are (`data-focus-left`, `-right`; `canvas/Stage.tsx`). A board is in the app's own
+	 * origin, so it can read its frame's element; the bar's rules are in `board.css` and the document
+	 * page's (`.dp-bar`) are keyed to the same attribute.
+	 */
+	function watchFocus() {
+		let host = null;
+		try {
+			host = window.frameElement;
+		} catch {
+			return;
+		}
+		if (!host) return;
+		const root = document.documentElement;
+		const apply = () => {
+			root.toggleAttribute("data-decks-focus", host.hasAttribute("data-focus-bar"));
+			for (const side of ["left", "right"]) root.style.setProperty(`--decks-focus-${side}`, `${Number(host.getAttribute(`data-focus-${side}`)) || 0}px`);
+		};
+		new MutationObserver(apply).observe(host, { attributes: true, attributeFilter: ["data-focus-bar", "data-focus-left", "data-focus-right"] });
+		apply();
+	}
+
 	async function start() {
 		const meta = readMeta();
 		applyMeta(meta);
+		watchFocus();
 
 		const work = [];
 
