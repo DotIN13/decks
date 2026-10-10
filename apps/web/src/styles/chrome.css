@@ -417,6 +417,22 @@
 		background: none;
 		cursor: default;
 	}
+	/*
+	 * Its width is the menu's, never its own: the reading changes every second ("Checking…", "1,204
+	 * of 5,000 made", "All ready"), and a row sized by its words made the whole menu grow and shrink
+	 * with each one. Inline-size containment takes the row out of the menu's width, and a long
+	 * reading is cut with an ellipsis instead.
+	 */
+	.popover [data-row].picture-progress {
+		contain: inline-size;
+		/* As wide as its "All ready" state on one line, so the menu is a little wider than its other rows need. */
+		contain-intrinsic-inline-size: 158px;
+	}
+	.picture-progress .meta {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.picture-progress-track {
 		display: block;
 		height: 3px;
