@@ -33,6 +33,8 @@ export interface UploadedAsset {
 		kind: "video" | "audio";
 		/** The poster's own deck path, beside the file. */
 		poster?: string;
+		/** A sound's loudness along its length, 0 to 1 per bar, for its waveform. */
+		peaks?: number[];
 		seconds?: number;
 		w?: number;
 		h?: number;

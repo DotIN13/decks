@@ -2,8 +2,8 @@
  * A film or a sound as an item on the canvas.
  *
  * It is pen's own rectangle, filled with the still the server wrote and marked `decks.media`
- * (`@decks/pen`, `MEDIA`), and the canvas paints a play badge on it rather than mounting a
- * player: forty-eight films playing cost about a thousand times what forty-eight stills cost, so
+ * (`@decks/pen`, `MEDIA`), and the canvas paints its controls on it rather than mounting a
+ * player until it is pressed: forty-eight films playing cost about a thousand times what forty-eight stills cost, so
  * nothing decodes until one is pressed.
  *
  * Needs no model: the item goes on over the wire as `stage.pen.edit`, which is the same operation
@@ -110,36 +110,36 @@ if (spot) {
 	});
 	say("the canvas draws the film where the file puts it", !!filmBox && Math.round(filmBox.width / (filmBox.height || 1)) === 2, JSON.stringify(filmBox && { w: Math.round(filmBox.width), h: Math.round(filmBox.height) }));
 
-	// Pressed, it is the item that is found: a media item is an ordinary drawn item to the pointer.
-	if (filmBox) {
-		await page.mouse.click(filmBox.x + filmBox.width / 2, filmBox.y + filmBox.height / 2);
-		const picked = await until(() => page.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
-		say("a press on a film selects it, as any drawn item", !!picked);
-		// And it has no element of its own: at rest a film is paint, which is the point of the design.
-		const players = await page.evaluate(() => document.querySelectorAll("video, audio").length);
-		say("…and nothing is decoding: there is no player on the canvas at rest", players === 0, `players ${players}`);
-	}
-
 	/*
-	 * Double-clicked, one player mounts over it — and only one, whichever was asked for last. The
-	 * item has to be close enough that a board would be live, which is the same rule.
+	 * Pressed once, it plays: one player mounts over it, and the press selects it as any press on
+	 * an item does. The item has to be on screen; nothing else is asked of the zoom.
 	 */
 	if (filmBox) {
-		await page.keyboard.press("Escape");
-		await settle(page, 200);
-		const film = await boxOf("media-film");
-		await page.mouse.dblclick(film.x + film.width / 2, film.y + film.height / 2);
+		const players = await page.evaluate(() => document.querySelectorAll("video, audio").length);
+		say("nothing is decoding: there is no player on the canvas at rest", players === 0, `players ${players}`);
+		await page.mouse.click(filmBox.x + filmBox.width * 0.75, filmBox.y + filmBox.height * 0.4);
 		const player = await until(() => page.evaluate(() => {
 			const one = document.querySelector(".pen-player video");
 			return one ? { players: document.querySelectorAll(".pen-player video, .pen-player audio").length, src: one.getAttribute("src") } : undefined;
 		}));
-		say("a double-click on a film mounts one player over it", !!player && player.players === 1, JSON.stringify(player));
+		say("one click on a film mounts one player over it", !!player && player.players === 1, JSON.stringify(player));
 		say("…and it plays the file the item names", (player?.src ?? "").includes("a-film.mp4"), player?.src);
+		const picked = await until(() => page.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
+		say("…and the click selects it, as any drawn item", !!picked);
 
-		// Letting go of the item stops it: nothing decodes behind a selection you have left.
+		// Letting go of the item does not stop it: a film keeps playing while you work elsewhere.
 		await page.keyboard.press("Escape");
-		const stopped = await until(() => page.evaluate(() => document.querySelectorAll(".pen-player").length === 0));
-		say("…and letting go of it stops the player", !!stopped);
+		await settle(page, 400);
+		const kept = await page.evaluate(() => document.querySelectorAll(".pen-player").length === 1);
+		say("…and letting go of it leaves it playing", kept);
+
+		// The sound's own play button, where the still drew it, starts it in the film's place.
+		const sound = await boxOf("media-sound");
+		await page.mouse.click(sound.x + sound.height / 2, sound.y + sound.height / 2);
+		const swapped = await until(() => page.evaluate(() => (document.querySelector(".pen-player")?.dataset.kind === "audio" && document.querySelectorAll(".pen-player").length === 1 ? true : undefined)));
+		say("a click on a sound plays it instead: one player at a time", !!swapped);
+		const parts = await page.evaluate(() => ({ disc: !!document.querySelector(".pen-player-disc"), wave: !!document.querySelector(".pen-player-wave"), name: document.querySelector(".pen-player-name")?.textContent }));
+		say("…drawn as its card: a play button, its name and its waveform", parts.disc && parts.wave && parts.name === "a-talk.m4a", JSON.stringify(parts));
 	}
 
 	const soundBox = await boxOf("media-sound");

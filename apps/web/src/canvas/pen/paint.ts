@@ -2,6 +2,7 @@ import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wa
 import { arrowLabel, arrowStyle, bool, color, fillsOf, isArrow, isCard, isMarkdown, isMarkdownText, mediaOf, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
 import { CARD_PALETTE } from "./markdown-layout.ts";
+import { clockOf, filmLayout, playTriangle, SOUND_INK, soundLayout, waveBars } from "./media-look.ts";
 import type { IconShape } from "./icons.ts";
 
 /**
@@ -98,10 +99,12 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		case "rectangle": {
 			const rrect = rrectOf(ck, placed, doc);
 			// A card with no fill of its own is on the card's paper, as a note card is (`CARD`).
-			const paper = isCard(node) && !fillsOf(node.fill).length;
+			// A sound is on the same paper, whatever fill it was given: its card follows the scheme (`paintMedia`).
+			const sound = mediaOf(node)?.kind === "audio";
+			const paper = (isCard(node) && !fillsOf(node.fill).length) || sound;
 			if (paper) paintCardPaper(canvas, ctx, rrect, CARD_PALETTE[ctx.scheme].paper);
 			paintShadows(canvas, ctx, node, theme, (paint) => canvas.drawRRect(rrect, paint));
-			paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawRRect(rrect, paint));
+			if (!sound) paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawRRect(rrect, paint));
 			if (node.type === "frame" && Array.isArray(node.children) && node.children.length) {
 				const clip = bool(doc, node.clip, theme, false);
 				canvas.save();
@@ -708,68 +711,88 @@ function paintIcon(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: Them
 // --- what is not drawn yet ---------------------------------------------------------------------
 
 /**
- * The badge on a film or a sound: a disc with a triangle in it, and the running time beside it.
+ * A film or a sound, at rest: what it looks like before it is pressed, and what the one live
+ * player laid over it (`MediaPlayer.tsx`) looks like once it is, from the same layout
+ * (`media-look.ts`) so the press moves nothing.
  *
- * Drawn over the item's own fill, which for a film is the still the server took and for a sound is
- * nothing at all, so the badge is the whole of what a sound looks like at rest. It says, without a
- * word, that pressing this starts something — and it is drawn rather than mounted, which is the
- * point: a canvas of films costs a canvas of pictures until one of them is pressed.
- *
- * The badge keeps a size in stage pixels, so a film shrunk to a thumbnail does not get a disc
- * wider than itself.
+ * A film is its still (the item's fill) with a play button in the middle and its running time in
+ * a pill in the corner, as a video is shown anywhere. A sound has no still: it is a card in the
+ * notes' paper, with a play button, its name, its running time and its waveform, which is what
+ * tells one sound from another without playing them.
  */
 function paintMedia(canvas: Canvas, ctx: PaintContext, node: PenNode, placed: Placed): void {
 	const media = mediaOf(node);
 	if (!media) return;
 	const { ck } = ctx;
 	const { box } = placed;
-	const sound = media.kind === "audio";
-	const r = Math.max(9, Math.min(28, Math.min(box.w, box.h) * (sound ? 0.3 : 0.14)));
-	// A film's badge is in the middle of the picture; a sound has no picture, so its badge leads a row.
-	const cx = sound ? box.x + 16 + r : box.x + box.w / 2;
-	const cy = sound ? box.y + box.h / 2 : box.y + box.h / 2;
+	const fill = (colour: Float32Array) => {
+		const paint = new ck.Paint();
+		paint.setAntiAlias(true);
+		paint.setColor(colour);
+		return paint;
+	};
+	const triangle = (cx: number, cy: number, r: number, paint: InstanceType<typeof ck.Paint>) => {
+		const builder = new ck.PathBuilder();
+		builder.addPolygon(playTriangle(cx, cy, r), true);
+		const path = builder.detachAndDelete();
+		canvas.drawPath(path, paint);
+		path.delete();
+	};
 
-	const disc = new ck.Paint();
-	disc.setAntiAlias(true);
-	disc.setColor(ck.Color4f(0, 0, 0, 0.45));
-	canvas.drawCircle(cx, cy, r, disc);
-	disc.setStyle(ck.PaintStyle.Stroke);
-	disc.setStrokeWidth(Math.max(1, r * 0.08));
-	disc.setColor(ck.Color4f(1, 1, 1, 0.9));
+	if (media.kind === "audio") {
+		const ink = SOUND_INK[ctx.scheme];
+		const look = soundLayout(box);
+		const disc = fill(colorOf(ck, ink.disc));
+		canvas.drawCircle(look.disc.cx, look.disc.cy, look.disc.r, disc);
+		disc.delete();
+		const glyph = fill(colorOf(ck, ink.glyph));
+		triangle(look.disc.cx, look.disc.cy, look.disc.r * 0.62, glyph);
+		glyph.delete();
+
+		const label = (text: string, size: number, weight: number, colour: string, width: number, align?: string) =>
+			ctx.fonts.paragraph(text, { fontFamily: "Inter", fontSize: size, fontWeight: weight, fontStyle: "normal", letterSpacing: 0, lineHeight: undefined }, { color: colorOf(ck, colour), width, oneLine: true, ...(align ? { align } : {}) });
+		const name = label(String(node.name ?? media.file.split("/").pop() ?? "Sound"), look.name.size, 600, ink.fg, look.name.w);
+		canvas.drawParagraph(name, look.name.x, look.name.y);
+		name.delete();
+		if (media.seconds !== undefined) {
+			const time = label(clockOf(Math.round(media.seconds)), look.time.size, 500, ink.muted, 120, "right");
+			canvas.drawParagraph(time, look.time.right - 120, look.time.y);
+			time.delete();
+		}
+
+		const bars = waveBars(look.wave, media.peaks);
+		const bar = fill(colorOf(ck, ink.bar));
+		if (bars.length) for (const one of bars) canvas.drawRRect(ck.RRectXY(ck.XYWHRect(one.x, one.y, one.w, one.h), one.w / 2, one.w / 2), bar);
+		else {
+			const thick = Math.max(2, 3 * look.k);
+			canvas.drawRRect(ck.RRectXY(ck.XYWHRect(look.wave.x, look.wave.y + look.wave.h / 2 - thick / 2, look.wave.w, thick), thick / 2, thick / 2), bar);
+		}
+		bar.delete();
+		return;
+	}
+
+	// A film: a dark glass disc in the middle, the triangle in white.
+	const look = filmLayout(box);
+	const { cx, cy, r } = look.disc;
+	const disc = fill(ck.Color4f(0, 0, 0, 0.5));
 	canvas.drawCircle(cx, cy, r, disc);
 	disc.delete();
+	const glyph = fill(ck.Color4f(1, 1, 1, 0.96));
+	triangle(cx, cy, r * 0.62, glyph);
+	glyph.delete();
 
-	// The triangle, a little right of centre so it reads as pointing rather than sitting.
-	const play = new ck.Paint();
-	play.setAntiAlias(true);
-	play.setColor(ck.Color4f(1, 1, 1, 0.95));
-	const side = r * 0.78;
-	const builder = new ck.PathBuilder();
-	builder.addPolygon([cx - side * 0.34, cy - side * 0.52, cx + side * 0.56, cy, cx - side * 0.34, cy + side * 0.52], true);
-	const path = builder.detachAndDelete();
-	canvas.drawPath(path, play);
-	path.delete();
-	play.delete();
-
-	// The running time: beside a sound's badge, where its whole strip is the label, and under a film's.
-	if (media.seconds === undefined || r < 12) return;
-	const size = Math.max(11, Math.min(14, r * 0.6));
-	const words = clockOf(media.seconds);
-	const ink = sound ? ck.Color4f(0.12, 0.14, 0.16, 1) : ck.Color4f(1, 1, 1, 0.92);
-	const paragraph = ctx.fonts.paragraph(words, { fontFamily: "Inter", fontSize: size, fontWeight: 600, fontStyle: "normal", letterSpacing: 0, lineHeight: undefined }, { color: ink, align: sound ? "left" : "center", width: 160 });
-	const height = paragraph.getHeight();
-	if (sound) canvas.drawParagraph(paragraph, cx + r + 12, cy - height / 2);
-	else canvas.drawParagraph(paragraph, box.x + box.w / 2 - 80, cy + r + 6);
-	paragraph.delete();
-}
-
-/** A running time as a clock, as the board runtime prints it: 1:04, or 1:02:03 past an hour. */
-function clockOf(seconds: number): string {
-	const whole = Math.max(0, Math.round(seconds));
-	const pad = (value: number) => String(value).padStart(2, "0");
-	const minutes = Math.floor(whole / 60) % 60;
-	const hours = Math.floor(whole / 3600);
-	return hours > 0 ? `${hours}:${pad(minutes)}:${pad(whole % 60)}` : `${minutes}:${pad(whole % 60)}`;
+	if (media.seconds === undefined || box.h < 60) return;
+	const { pill } = look;
+	const words = ctx.fonts.paragraph(clockOf(Math.round(media.seconds)), { fontFamily: "Inter", fontSize: pill.size, fontWeight: 600, fontStyle: "normal", letterSpacing: 0, lineHeight: undefined }, { color: ck.Color4f(1, 1, 1, 0.96), width: 200 });
+	const tw = Math.ceil(words.getMaxIntrinsicWidth());
+	const th = words.getHeight();
+	const pw = tw + pill.padX * 2;
+	const ph = th + pill.padY * 2;
+	const back = fill(ck.Color4f(0, 0, 0, 0.62));
+	canvas.drawRRect(ck.RRectXY(ck.XYWHRect(pill.right - pw, pill.bottom - ph, pw, ph), ph / 2.6, ph / 2.6), back);
+	back.delete();
+	canvas.drawParagraph(words, pill.right - pw + pill.padX, pill.bottom - ph + pill.padY);
+	words.delete();
 }
 
 function paintPlaceholder(canvas: Canvas, ctx: PaintContext, node: PenNode, placed: Placed): void {

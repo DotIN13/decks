@@ -23,6 +23,7 @@ import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox, insets } from "../camera/insets.ts";
 import { deckFileUrl } from "../lib/api.ts";
+import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
 import type { EditorHost, Tool } from "../board/Editor.ts";
@@ -707,6 +708,26 @@ export function Stage(props: {
 	 * one stops the last, and the canvas never holds more than a single player.
 	 */
 	const [playing, setPlaying] = createSignal<{ id: string; kind: "video" | "audio"; file: string } | undefined>();
+	/** The playing element, for a click on the item to pause and resume. */
+	let playingElement: HTMLMediaElement | undefined;
+	/** When the one playing was started, so the second press of a double-click does not pause it at once. */
+	let playingSince = 0;
+	/** Where each film or sound was left, so pressing it again goes on from there. */
+	const playedTo = new Map<string, number>();
+	/**
+	 * A press on a film or a sound: it plays, or the one playing pauses or goes on. The press
+	 * selects it as well, as a press on any item does, so it can still be moved and styled.
+	 */
+	const toggleMedia = (id: string, media: { kind: "video" | "audio"; file: string }) => {
+		const now = playing();
+		if (now?.id === id && playingElement) {
+			if (playingElement.paused) void playingElement.play().catch(() => {});
+			else if (performance.now() - playingSince > 400) playingElement.pause();
+			return;
+		}
+		playingSince = performance.now();
+		setPlaying({ id, kind: media.kind, file: media.file });
+	};
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/**
 	 * Boards picked up with the drawing: by a marquee, or Shift and a press on a title bar. They move
@@ -2076,7 +2097,11 @@ export function Stage(props: {
 			 */
 			const href = penLayer.linkAt(at);
 			const follows = href && (props.mode === "browse" || event.metaKey || event.ctrlKey);
-			dragSelection(event, moving, boards, undefined, follows ? () => openLink(href) : undefined);
+			// A film or a sound: a click that does not move plays it, or pauses it.
+			const playable = inner && mediaOf(inner.node) ? inner : mediaOf(hit.node) ? hit : undefined;
+			const media = playable ? mediaOf(playable.node) : undefined;
+			const tap = follows ? () => openLink(href) : playable && media && !event.shiftKey ? () => toggleMedia(playable.id, media) : undefined;
+			dragSelection(event, moving, boards, undefined, tap);
 			return true;
 		}
 		/*
@@ -2278,10 +2303,10 @@ export function Stage(props: {
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
 	 *
-	 * It stops on its own in three cases, which are the board's rules rather than new ones: the item
-	 * is gone from the file, it is no longer the selection, or the camera has pulled back past the
-	 * zoom at which a board stops being live. Below that zoom a film is a picture again, and a
-	 * picture is what the sheet already has.
+	 * It plays on while you work elsewhere on the canvas: letting go of the item, panning or zooming
+	 * out does not stop it, because one decoder costs nothing a frame notices and a sound you are
+	 * listening to should not end because you clicked away. It goes when it ends, when another is
+	 * started, or when the item is gone from the file.
 	 */
 	const playingBox = createMemo(() => {
 		penDrawn();
@@ -2289,11 +2314,21 @@ export function Stage(props: {
 		if (!now) return undefined;
 		const node = penLayer.placed.get(now.id)?.node;
 		const box = penLayer.bounds.get(now.id);
-		if (!node || !box || !mediaOf(node)) return undefined;
-		if (!penSelection().includes(now.id)) return undefined;
-		if (localCamera.zoom < INTERACT_ZOOM) return undefined;
+		const media = mediaOf(node);
+		if (!node || !box || !media) return undefined;
 		const drag = shownDrag();
-		return { ...now, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h };
+		const moving = penSelection().includes(now.id);
+		return {
+			...now,
+			name: String(node.name ?? media.file.split("/").pop() ?? ""),
+			...(media.seconds === undefined ? {} : { seconds: media.seconds }),
+			...(media.peaks ? { peaks: media.peaks } : {}),
+			radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 8,
+			x: box.x + (moving ? drag.dx : 0),
+			y: box.y + (moving ? drag.dy : 0),
+			w: box.w,
+			h: box.h,
+		};
 	});
 	// What stopped it above is still holding the file open: let it go, so nothing decodes off screen.
 	createEffect(() => {
@@ -3790,6 +3825,17 @@ export function Stage(props: {
 			}
 			if (performance.now() - since > 600) return;
 			const deep = penLayer.hitTest(at, { deep: true });
+			// A film or a sound: a tap plays it or pauses it, and selects it as any tap does.
+			const playable = deep && mediaOf(deep.node) ? deep : mediaOf(hit.node) ? hit : undefined;
+			const media = playable ? mediaOf(playable.node) : undefined;
+			if (playable && media) {
+				lastTap = undefined;
+				toggleMedia(playable.id, media);
+				props.onSelect(undefined);
+				setBoardPicks([]);
+				setPenSelection([hit.id]);
+				return;
+			}
 			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (openLiveFile(deep.id) || openFileOf(deep.id))) {
 				lastTap = undefined;
 				return;
@@ -3849,10 +3895,9 @@ export function Stage(props: {
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
 			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
 			// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
-			const media = hit ? mediaOf(hit.node) : undefined;
-			if (hit && media) {
+			// A film or a sound: its first press already started it, so the second is only a press.
+			if (hit && mediaOf(hit.node)) {
 				setPenSelection([hit.id]);
-				setPlaying({ id: hit.id, kind: media.kind, file: media.file });
 				return;
 			}
 			// A file shown live: a web page taken into, an SVG opened in a tab.
@@ -4864,36 +4909,35 @@ export function Stage(props: {
 				 * is no browser in there. It is the same bargain a board makes — a picture until you
 				 * are close and have asked — and it is one element, never a wall of them.
 				 */}
-				<Show when={playingBox()}>
-					{(now) => (
-						<div
-							class="pen-player"
-							data-kind={now().kind}
-							style={{
-								left: `${now().x}px`,
-								top: `${now().y}px`,
-								width: `${now().w}px`,
-								height: `${now().h}px`,
-							}}
-						>
-							{now().kind === "video" ? (
-								<video
-									src={deckFileUrl(now().file)}
-									controls
-									autoplay
-									playsinline
-									ref={(el) => el.addEventListener("ended", () => setPlaying(undefined))}
+				<Show when={playingBox()?.id} keyed>
+					{(id) => {
+						const now = () => playingBox()!;
+						const first = now();
+						return (
+							<Show when={playingBox()}>
+								<MediaPlayer
+									kind={first.kind}
+									src={deckFileUrl(first.file)}
+									name={first.name}
+									{...(first.seconds === undefined ? {} : { seconds: first.seconds })}
+									{...(first.peaks ? { peaks: first.peaks } : {})}
+									box={{ x: now().x, y: now().y, w: now().w, h: now().h }}
+									radius={now().radius}
+									scheme={scheme()}
+									{...(playedTo.get(id) ? { from: playedTo.get(id)! } : {})}
+									ref={(element) => (playingElement = element)}
+									onEnded={() => {
+										playedTo.delete(id);
+										setPlaying(undefined);
+									}}
+									onLeave={(at) => {
+										playingElement = undefined;
+										if (at > 0.5) playedTo.set(id, at);
+									}}
 								/>
-							) : (
-								<audio
-									src={deckFileUrl(now().file)}
-									controls
-									autoplay
-									ref={(el) => el.addEventListener("ended", () => setPlaying(undefined))}
-								/>
-							)}
-						</div>
-					)}
+							</Show>
+						);
+					}}
 				</Show>
 				<Show when={radiusHandle()}>
 					{(box) => {

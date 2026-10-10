@@ -1238,25 +1238,176 @@
 	.world > .pen-player {
 	position: absolute;
 	overflow: hidden;
-	border-radius: 8px;
 	transform-origin: 0 0;
 	z-index: 2;
-	background: #000;
+	/* Presses on the picture are the canvas's: a click plays or pauses, a drag moves the item. */
+	pointer-events: none;
+	font-family: var(--font-sans);
 }
-	.world > .pen-player[data-kind="audio"] {
-	display: flex;
-	align-items: center;
-	padding: 0 12px;
-	background: var(--panel);
+	.world > .pen-player button,
+	.world > .pen-player [role="slider"] {
+	pointer-events: auto;
+}
+	.world > .pen-player[data-kind="video"] {
+	background: #000;
 }
 	.world > .pen-player > video {
 	display: block;
 	width: 100%;
 	height: 100%;
-	object-fit: contain;
+	object-fit: cover;
 }
-	.world > .pen-player > audio {
-	width: 100%;
+	/* The still's play button, where the still had it, while the film is paused. */
+	.world > .pen-player .pen-player-big {
+	position: absolute;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 50%);
+	color: #fff;
+	cursor: pointer;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.16s ease, visibility 0s linear 0.16s, transform 0.16s ease;
+}
+	.world > .pen-player[data-paused] .pen-player-big {
+	opacity: 1;
+	visibility: visible;
+	transition: opacity 0.16s ease, transform 0.16s ease;
+}
+	.world > .pen-player .pen-player-big:hover {
+	transform: scale(1.06);
+	background: rgb(0 0 0 / 62%);
+}
+	.world > .pen-player .pen-player-big svg {
+	width: 62%;
+	height: 62%;
+	fill: currentColor;
+}
+	/* The film's bar: along its foot while the pointer is near or it is paused. */
+	.world > .pen-player .pen-player-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	gap: calc(var(--u) * 8px);
+	padding: calc(var(--u) * 24px) calc(var(--u) * 10px) calc(var(--u) * 8px);
+	background: linear-gradient(to top, rgb(0 0 0 / 62%), rgb(0 0 0 / 0%));
+	color: #fff;
+	font-size: calc(var(--u) * 12px);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+	.world > .pen-player:is([data-near], [data-paused]) .pen-player-bar {
+	opacity: 1;
+	visibility: visible;
+	transition: opacity 0.2s ease;
+}
+	.world > .pen-player .pen-player-bar button {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: calc(var(--u) * 28px);
+	height: calc(var(--u) * 28px);
+	padding: 0;
+	border: 0;
+	border-radius: calc(var(--u) * 7px);
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+	.world > .pen-player .pen-player-bar button:hover {
+	background: rgb(255 255 255 / 18%);
+}
+	.world > .pen-player .pen-player-bar svg {
+	width: calc(var(--u) * 18px);
+	height: calc(var(--u) * 18px);
+	fill: currentColor;
+}
+	.world > .pen-player .pen-player-bar svg[fill="none"] {
+	fill: none;
+}
+	.world > .pen-player .pen-player-clock {
+	flex: none;
+	white-space: nowrap;
+}
+	.world > .pen-player .pen-player-track {
+	position: relative;
+	flex: 1;
+	height: calc(var(--u) * 16px);
+	cursor: pointer;
+}
+	.world > .pen-player .pen-player-track::before,
+	.world > .pen-player .pen-player-track > i {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 50%;
+	height: calc(var(--u) * 4px);
+	margin-top: calc(var(--u) * -2px);
+	border-radius: 99px;
+}
+	.world > .pen-player .pen-player-track::before {
+	right: 0;
+	background: rgb(255 255 255 / 32%);
+}
+	.world > .pen-player .pen-player-track > i {
+	background: #fff;
+}
+	/* A sound: the card the still drew, with the same places (`pen/media-look.ts`). */
+	.world > .pen-player[data-kind="audio"] > audio {
+	display: none;
+}
+	.world > .pen-player[data-kind="audio"] > * {
+	position: absolute;
+	box-sizing: border-box;
+}
+	.world > .pen-player .pen-player-disc {
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	cursor: pointer;
+	transition: transform 0.12s ease, filter 0.12s ease;
+}
+	.world > .pen-player .pen-player-disc:hover {
+	filter: brightness(1.08);
+}
+	.world > .pen-player .pen-player-disc:active {
+	transform: scale(0.94);
+}
+	.world > .pen-player .pen-player-disc svg {
+	width: 62%;
+	height: 62%;
+	fill: currentColor;
+}
+	.world > .pen-player .pen-player-name {
+	overflow: hidden;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+	.world > .pen-player .pen-player-time {
+	font-weight: 500;
+	line-height: 1.2;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+	.world > .pen-player .pen-player-wave {
+	cursor: pointer;
+}
+	.world > .pen-player .pen-player-wave > i {
+	position: absolute;
+	border-radius: 99px;
 }
 	.world > .pen-draft {
 	position: absolute;

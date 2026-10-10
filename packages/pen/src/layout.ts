@@ -75,6 +75,8 @@ export interface MediaItem {
 	/** The deck path of the still, when there is one. */
 	poster?: string;
 	seconds?: number;
+	/** A sound's loudness along its length, 0 to 1 per bar: its waveform. */
+	peaks?: number[];
 }
 
 /** What an item says it is, when it is a film or a sound; `undefined` for everything else. */
@@ -89,6 +91,7 @@ export function mediaOf(node: PenNode | undefined): MediaItem | undefined {
 		file,
 		...(typeof data.poster === "string" && data.poster ? { poster: data.poster } : {}),
 		...(typeof data.seconds === "number" && Number.isFinite(data.seconds) ? { seconds: data.seconds } : {}),
+		...(Array.isArray(data.peaks) && data.peaks.length && data.peaks.every((peak) => typeof peak === "number") ? { peaks: data.peaks as number[] } : {}),
 	};
 }
 

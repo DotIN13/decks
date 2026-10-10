@@ -119,12 +119,14 @@ export class PenFonts {
 	}
 
 	/** A laid-out paragraph in this style, which the caller deletes. */
-	paragraph(text: string, style: TextStyle, options: { color?: Float32Array; align?: string; width: number; underline?: boolean; strike?: boolean; shadows?: Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> }): Paragraph {
+	paragraph(text: string, style: TextStyle, options: { color?: Float32Array; align?: string; width: number; underline?: boolean; strike?: boolean; oneLine?: boolean; shadows?: Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> }): Paragraph {
 		const ck = this.ck;
 		const align = options.align === "center" ? ck.TextAlign.Center : options.align === "right" ? ck.TextAlign.Right : options.align === "justify" ? ck.TextAlign.Justify : ck.TextAlign.Left;
 		const decoration = (options.underline ? ck.UnderlineDecoration : 0) | (options.strike ? ck.LineThroughDecoration : 0);
 		const paragraphStyle = new ck.ParagraphStyle({
 			textAlign: align,
+			// A label that must stay on its line, a file's name: cut with an ellipsis rather than wrapped.
+			...(options.oneLine ? { maxLines: 1, ellipsis: "…" } : {}),
 			textStyle: {
 				color: options.color ?? ck.BLACK,
 				fontFamilies: this.chain(style.fontFamily),

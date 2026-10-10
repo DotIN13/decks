@@ -120,3 +120,37 @@ export async function writePoster(deck: string, asset: string, facts?: MediaFact
 		return undefined;
 	}
 }
+
+/** How many bars a sound's waveform is drawn with: enough to read its shape, few enough to keep in the item. */
+export const PEAK_BARS = 56;
+
+/**
+ * How loud a sound is along its length, as `PEAK_BARS` numbers from 0 to 1: the waveform a sound's
+ * item is drawn with, so it can be told from another sound without being played.
+ *
+ * Decoded once, to one channel at a thousand samples a second: a fifteen-minute talk is under two
+ * megabytes of samples that way, read in about a second, and a bar is far wider than what that
+ * rate loses. Each bar is its stretch's average loudness (the root of the mean square: a peak alone saturates
+ * on speech), scaled so the loudest bar is 1, and
+ * rounded to two places because the numbers live in the stage file.
+ */
+export async function soundPeaks(file: string, bars = PEAK_BARS): Promise<number[] | undefined> {
+	if (!(await ffmpegReady())) return undefined;
+	const raw = await run(ffmpegCommand(), ["-hide_banner", "-loglevel", "error", "-i", file, "-vn", "-ac", "1", "-ar", "1000", "-f", "s16le", "-"], { encoding: "buffer", maxBuffer: 64 << 20 }).then(
+		(out) => out.stdout as Buffer,
+		() => undefined,
+	);
+	if (!raw || raw.length < bars * 4) return undefined;
+	const samples = Math.floor(raw.length / 2);
+	const peaks: number[] = [];
+	for (let bar = 0; bar < bars; bar++) {
+		const from = Math.floor((bar * samples) / bars);
+		const to = Math.max(from + 1, Math.floor(((bar + 1) * samples) / bars));
+		let power = 0;
+		for (let i = from; i < to; i++) power += raw.readInt16LE(i * 2) ** 2;
+		peaks.push(Math.sqrt(power / (to - from)));
+	}
+	const top = Math.max(...peaks);
+	if (top <= 0) return undefined;
+	return peaks.map((peak) => Math.round((peak / top) * 100) / 100);
+}

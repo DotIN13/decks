@@ -406,6 +406,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 								file: asset.path,
 								...(facts.poster ? { poster: facts.poster } : {}),
 								...(facts.seconds === undefined ? {} : { seconds: facts.seconds }),
+								...(facts.peaks ? { peaks: facts.peaks } : {}),
 							},
 						},
 						w,
@@ -580,7 +581,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		}
 		const agentId = state.focused;
 		// In the deck, the stage file refers to it where it is, with nothing copied: the server says where that is, and what a film or a sound is.
-		const where = (await (await fetch(api(`/where?path=${encodeURIComponent(picked)}`))).json().catch(() => ({ inDeck: false }))) as { inDeck: boolean; path?: string; media?: { kind: "video" | "audio"; poster?: string; seconds?: number; w?: number; h?: number } };
+		const where = (await (await fetch(api(`/where?path=${encodeURIComponent(picked)}`))).json().catch(() => ({ inDeck: false }))) as { inDeck: boolean; path?: string; media?: { kind: "video" | "audio"; poster?: string; peaks?: number[]; seconds?: number; w?: number; h?: number } };
 		const inDeck = where.inDeck && !!where.path;
 		const deckPath = where.path ?? picked;
 		const place = (node: Record<string, unknown>, w: number, h: number) => {
@@ -612,7 +613,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 						name,
 						cornerRadius: 8,
 						...(facts.poster ? { fill: { type: "image", url: fromStage(facts.poster), mode: "fill" } } : { fill: "#1f2328" }),
-						metadata: { type: MEDIA, kind: facts.kind, file: deckPath, ...(facts.poster ? { poster: facts.poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }) },
+						metadata: { type: MEDIA, kind: facts.kind, file: deckPath, ...(facts.poster ? { poster: facts.poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.peaks ? { peaks: facts.peaks } : {}) },
 					},
 					w,
 					h,

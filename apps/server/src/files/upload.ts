@@ -4,7 +4,7 @@ import type { Readable } from "node:stream";
 import { join } from "node:path";
 import { MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
 import { resolveAssetWrite } from "../deck/roots.ts";
-import { mediaFacts, posterPath, writePoster } from "./media.ts";
+import { mediaFacts, posterPath, soundPeaks, writePoster } from "./media.ts";
 
 /**
  * A file the user dragged in from outside, copied into the deck (DESIGN §3).
@@ -248,5 +248,7 @@ export async function withMedia(deckRoot: string, asset: UploadedAsset): Promise
 	if (!facts) return asset;
 	const kept = posterPath(asset.path);
 	const poster = facts.kind === "video" ? (existsSync(join(deckRoot, kept)) ? kept : await writePoster(deckRoot, asset.path, facts)) : undefined;
-	return { ...asset, media: { kind: facts.kind, ...(poster ? { poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.w ? { w: facts.w, h: facts.h } : {}) } };
+	// A sound has no picture to stand for it; its loudness along its length is drawn instead.
+	const peaks = facts.kind === "audio" ? await soundPeaks(join(deckRoot, asset.path)).catch(() => undefined) : undefined;
+	return { ...asset, media: { kind: facts.kind, ...(poster ? { poster } : {}), ...(peaks ? { peaks } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.w ? { w: facts.w, h: facts.h } : {}) } };
 }

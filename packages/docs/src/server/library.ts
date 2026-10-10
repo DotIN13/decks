@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, extname, join, relative, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { DocChange, DocFormat } from "../index.ts";
 import { DirectoryVersions, type VersionStore } from "./versions.ts";
 
@@ -19,7 +19,10 @@ import { DirectoryVersions, type VersionStore } from "./versions.ts";
  */
 
 export interface DocMeta {
-	/** The document's absolute path. */
+	/**
+	 * The document's absolute path, as `readMeta` hands it back. On disk it is written relative to
+	 * the record folder when it is in the same deck, so a deck that moves keeps its records.
+	 */
 	source: string;
 	format: DocFormat;
 	openedAt: number;
@@ -58,7 +61,7 @@ export class DocLibrary {
 		const folder = this.freshFolder(basename(file, extname(file)));
 		mkdirSync(folder, { recursive: true });
 		const meta: DocMeta = { source: file, format, openedAt: Date.now() };
-		writeFileSync(join(folder, "doc.json"), `${JSON.stringify(meta, null, "\t")}\n`);
+		this.writeMeta(folder, meta);
 		this.bySource.set(file, folder);
 		return folder;
 	}
@@ -71,7 +74,7 @@ export class DocLibrary {
 			// A mirror from when Docs were mirrored as markdown: the folder keeps its history, the mirror is made again.
 			if (!meta.source.endsWith(".gdoc.txt")) {
 				const mirror = join(folder, `${basename(folder)}.gdoc.txt`);
-				writeFileSync(join(folder, "doc.json"), `${JSON.stringify({ ...meta, source: mirror }, null, "\t")}\n`);
+				this.writeMeta(folder, { ...meta, source: mirror });
 				return { folder, mirror, fresh: true };
 			}
 			return { folder, mirror: meta.source, fresh: false };
@@ -81,7 +84,7 @@ export class DocLibrary {
 		// Text whose every character is one of the Doc's indices (`gdoc/units.ts`), not something to read by hand.
 		const mirror = join(folder, `${basename(folder)}.gdoc.txt`);
 		const meta: DocMeta = { source: mirror, format: "text", openedAt: Date.now(), google: { id, title, url } };
-		writeFileSync(join(folder, "doc.json"), `${JSON.stringify(meta, null, "\t")}\n`);
+		this.writeMeta(folder, meta);
 		return { folder, mirror, fresh: true };
 	}
 
@@ -91,6 +94,16 @@ export class DocLibrary {
 			const meta = readMeta(folder);
 			return meta?.google ? [{ folder, mirror: meta.source, google: meta.google }] : [];
 		});
+	}
+
+	/**
+	 * A folder's record, its source written relative to the folder when the source is in the deck
+	 * the library is in (the folder above `dir`), and absolute when it is somewhere else.
+	 */
+	private writeMeta(folder: string, meta: DocMeta): void {
+		const inDeck = !relative(dirname(this.dir), meta.source).startsWith("..") && !isAbsolute(relative(dirname(this.dir), meta.source));
+		const source = inDeck ? relative(folder, meta.source).split(sep).join("/") : meta.source;
+		writeFileSync(join(folder, "doc.json"), `${JSON.stringify({ ...meta, source }, null, "\t")}\n`);
 	}
 
 	/** The folder of a document's records, if it has been opened before. */
@@ -156,10 +169,24 @@ export class DocLibrary {
 	}
 }
 
+/**
+ * A folder's record, with its source as an absolute path.
+ *
+ * Relative sources are the folder's own (`writeMeta`). An absolute one from before that, naming a
+ * file in this very folder by where the deck used to be (a Google Doc's mirror, after the deck
+ * moved), is found where the folder is now; any other source that is gone is left as it is, and
+ * simply matches no file, so opening that file again starts a new record.
+ */
 function readMeta(folder: string): DocMeta | undefined {
 	try {
 		const meta = JSON.parse(readFileSync(join(folder, "doc.json"), "utf8")) as DocMeta;
-		return typeof meta.source === "string" ? meta : undefined;
+		if (typeof meta.source !== "string") return undefined;
+		if (!isAbsolute(meta.source)) return { ...meta, source: resolve(folder, meta.source) };
+		if (existsSync(meta.source)) return meta;
+		const mark = `/${basename(folder)}/`;
+		const at = meta.source.lastIndexOf(mark);
+		const here = at >= 0 ? join(folder, meta.source.slice(at + mark.length)) : undefined;
+		return here && existsSync(here) ? { ...meta, source: here } : meta;
 	} catch {
 		return undefined;
 	}

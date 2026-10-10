@@ -151,7 +151,38 @@ export function resolveFileRequest(
 	for (const root of resolved.roots) {
 		if (root.exists && containedIn(root.path, real)) return real;
 	}
+	// A path written down before the deck or a root moved: the same file where it is now.
+	const moved = isAbsolute(cleaned) && !existsSync(candidate) ? movedTo(resolved, cleaned) : undefined;
+	if (moved) return moved;
 	throw new PathRefused(request.path, "it is outside the deck and every declared root");
+}
+
+/**
+ * Where a file named by an absolute path that is gone has moved to, inside the deck or a root.
+ *
+ * Boards and records write a full path for a file outside the deck, and sometimes for one inside
+ * it; move the deck or a project folder and every such path names nothing. The file is usually
+ * still there, under the deck or root it was always in, at the same path below it. So the old
+ * path's tail is tried under each, longest first: `/old/home/deck/docs/resume/resume.gdoc.txt` is
+ * found as `docs/resume/resume.gdoc.txt` in the deck. A tail must keep at least two parts, a
+ * folder and a name, so a bare file name never matches some other file that shares it; and what
+ * is found must exist and pass the same containment test as any other path.
+ */
+export function movedTo(resolved: ResolvedRoots, gone: string): string | undefined {
+	const parts = gone.split("/").filter(Boolean);
+	const places = [resolved.deck, ...resolved.roots.filter((root) => root.exists).map((root) => root.path)];
+	for (let from = 1; from <= parts.length - 2; from++) {
+		const tail = parts.slice(from).join("/");
+		for (const place of places) {
+			// Below the place, or from its own folder's name down: `projects/decks/runtime/x` in a root that is `decks`.
+			for (const candidate of [resolve(place, tail), resolve(dirname(place), tail)]) {
+				if (!existsSync(candidate)) continue;
+				const real = realPathOf(candidate);
+				if (containedIn(place, real) && real !== place) return real;
+			}
+		}
+	}
+	return undefined;
 }
 
 /**

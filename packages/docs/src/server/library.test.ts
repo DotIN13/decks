@@ -40,7 +40,7 @@ test("a file is edited where it is, and only its records go in a folder of their
 	assert.equal(readFileSync(join(root, "papers/paper.md"), "utf8"), "# Results, for now\n\nThe effect is small.\n");
 	assert.deepEqual(readdirSync(join(root, "papers")), ["paper.md"], "nothing is added beside the file");
 	assert.deepEqual(readdirSync(join(root, "docs/paper")).sort(), ["doc.json", "versions"]);
-	assert.equal(JSON.parse(readFileSync(join(root, "docs/paper/doc.json"), "utf8")).source, join(root, "papers/paper.md"));
+	assert.equal(JSON.parse(readFileSync(join(root, "docs/paper/doc.json"), "utf8")).source, "../../papers/paper.md");
 	docs.closeAll();
 	done();
 });
@@ -98,4 +98,21 @@ test("a file that may not be written opens read-only", () => {
 	assert.equal(readFileSync(join(root, "ro/locked.md"), "utf8"), "fixed\n");
 	docs.closeAll();
 	done();
+});
+
+test("a record names a file in its deck relative to itself, so the deck can move", () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "decks-library-")));
+	mkdirSync(join(root, "papers"));
+	writeFileSync(join(root, "papers", "a.md"), "# A\n");
+	const library = new DocLibrary(join(root, "docs"));
+	const folder = library.folder(join(root, "papers", "a.md"), "text");
+	assert.equal(JSON.parse(readFileSync(join(folder, "doc.json"), "utf8")).source, "../../papers/a.md");
+	assert.equal(library.find(join(root, "papers", "a.md")), folder);
+	// A Google Doc's mirror written down where the deck used to be is found in its folder.
+	const google = library.googleFolder("doc-1", "Resume", "https://docs.google.com/document/d/doc-1");
+	writeFileSync(google.mirror, "x");
+	const meta = JSON.parse(readFileSync(join(google.folder, "doc.json"), "utf8"));
+	writeFileSync(join(google.folder, "doc.json"), JSON.stringify({ ...meta, source: `/gone/deck/docs/${relative(join(root, "docs"), google.mirror)}` }));
+	assert.equal(library.googleDocs()[0]?.mirror, google.mirror);
+	rmSync(root, { recursive: true, force: true });
 });

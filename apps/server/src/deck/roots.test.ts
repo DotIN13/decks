@@ -163,3 +163,16 @@ test("a symlink out of assets/ is refused, whichever end it is on", () => {
 	symlinkSync(elsewhere, join(other, "assets"));
 	assert.throws(() => resolveAssetWrite(other, "photo.png"), PathRefused);
 });
+
+test("an absolute path from before the deck or a root moved is found where the file is now", () => {
+	const { base, deck, shared } = fixture();
+	const roots = resolveRoots(deck, [{ path: shared, writable: false }]);
+	mkdirSync(join(deck, "docs", "resume"), { recursive: true });
+	writeFileSync(join(deck, "docs", "resume", "resume.gdoc.txt"), "mirror");
+	assert.equal(resolveFileRequest(roots, { path: "/old/home/deck/docs/resume/resume.gdoc.txt" }), join(deck, "docs", "resume", "resume.gdoc.txt"));
+	assert.equal(resolveFileRequest(roots, { path: "/old/home/shared/report.html" }), join(shared, "report.html"));
+	// A bare name is not enough to say it is the same file.
+	assert.throws(() => resolveFileRequest(roots, { path: "/elsewhere/note.md" }), PathRefused);
+	// Nor does a path that still exists outside get moved in: it is refused as it always was.
+	assert.throws(() => resolveFileRequest(roots, { path: join(base, "outside", "secret.txt") }), PathRefused);
+});
