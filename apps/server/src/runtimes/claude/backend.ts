@@ -145,6 +145,8 @@ export class ClaudeBackend implements AgentBackend {
 	 * login the process started with — so `report` asks a fresh process once the agent has moved.
 	 */
 	private startedOn: string | undefined;
+	/** A switch arrived mid-turn on macOS: start again on the new account when the turn ends. */
+	private restartForAccount = false;
 	/** How many times this turn has been retried past a busy login (`transient.ts`). */
 	private transientTries = 0;
 	/**
@@ -270,7 +272,8 @@ export class ClaudeBackend implements AgentBackend {
 			 *
 			 * A symlink — **this agent's own** — so re-pointing it switches the account inside
 			 * this session and no other. The CLI re-reads its credentials per request, so the
-			 * next turn uses whoever the link points at now. Set for the CLI's own login too,
+			 * next turn uses whoever the link points at now; on macOS, where the token is a
+			 * keychain entry named at spawn, `accountChanged` starts the process again instead. Set for the CLI's own login too,
 			 * which is what makes a session that started on it switchable: a subprocess's
 			 * environment cannot be changed after `spawn`, so a session given no variable is
 			 * pinned to `~/.claude` for life.
@@ -344,6 +347,11 @@ export class ClaudeBackend implements AgentBackend {
 					if (message.type === "result") {
 						this.recoverStaleSession(translator.lastAssistantText());
 						this.retryTransient();
+						// After both: a retry opens its new process on the new account already.
+						if (this.restartForAccount) {
+							this.restartForAccount = false;
+							if (this.onOtherAccount()) void this.restart();
+						}
 					}
 				}
 			} catch (error) {
@@ -814,6 +822,32 @@ export class ClaudeBackend implements AgentBackend {
 		if (code === 0) this.context.notice("info", "Signed out of Claude.");
 		else if (stderr.trim()) this.context.notice("warn", stderr.trim().split("\n").slice(-1)[0] ?? "Could not sign out.");
 		else this.context.notice("info", "Claude was not signed in.");
+	}
+
+	/**
+	 * The agent moved to another subscription (`AgentSession.useAccount`).
+	 *
+	 * On Linux and Windows the token is read through the agent's link, which has already
+	 * moved, so the next turn spends the new account and nothing needs doing. On macOS it is
+	 * read from a keychain entry named when the process started (`accounts.ts`,
+	 * `activeEnvironment`). Measured 2026-10-10: a process started on one account, its link
+	 * repointed between turns, sent its second turn on the first account. So the process
+	 * starts again, resuming this conversation, which keeps its history. Never mid-turn:
+	 * that would cut the reply off, so a switch during a turn waits for it to end.
+	 */
+	accountChanged(): void {
+		if (process.platform !== "darwin" || !this.onOtherAccount()) return;
+		if (this.streaming) {
+			this.restartForAccount = true;
+			return;
+		}
+		void this.restart();
+	}
+
+	/** Whether this process was started on an account other than the one the agent is on now. */
+	private onOtherAccount(): boolean {
+		const now = this.context.account?.id();
+		return this.startedOn !== undefined && now !== undefined && now !== this.startedOn;
 	}
 
 	/**

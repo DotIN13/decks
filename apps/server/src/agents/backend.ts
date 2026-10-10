@@ -283,6 +283,13 @@ export interface AgentBackend {
 	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
 	/** A handle a new chat can open, holding everything up to that point. */
 	forkFrom(entryId: string): Promise<string | undefined>;
+	/**
+	 * This agent was moved to another subscription, and its link already points there.
+	 *
+	 * For a runtime that cannot follow the link while it runs: Claude Code on macOS reads its
+	 * token from a keychain entry chosen when the process starts, so it must start again.
+	 */
+	accountChanged?(): void;
 
 	dispose(): void;
 }

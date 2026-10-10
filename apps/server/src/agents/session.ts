@@ -1752,6 +1752,9 @@ export class DeckAgent {
 	 * because which subscription answered is part of what happened — the same reasoning as
 	 * `noteModel`, and for the same reader.
 	 *
+	 * Except on macOS, where the token is a keychain entry fixed when the process started:
+	 * there the link moves the files and not the login, so the backend is told and starts again.
+	 *
 	 * A no-op when it is already on that account: both callers can arrive at the value they
 	 * already had, and a line per non-change is a transcript that logs the furniture.
 	 */
@@ -1764,6 +1767,7 @@ export class DeckAgent {
 		const who = this.accounts.describe(accountId);
 		this.translator.notice("info", `Now spending ${who?.email ?? "another subscription"}.`);
 		this.emit({ type: "agent.account", id: this.id, account: accountId });
+		this.backend?.accountChanged?.();
 		return true;
 	}
 
