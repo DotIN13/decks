@@ -1,7 +1,7 @@
 import { sentAs } from "../../agents/sent-as.ts";
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import {
@@ -139,6 +139,12 @@ export class ClaudeBackend implements AgentBackend {
 	private commandList: SlashCommand[] = CLAUDE_COMMANDS;
 	/** Which limit window has already been warned about, so it is said once and not per turn. */
 	private warnedAbout: string | undefined;
+	/**
+	 * The account this session's process was started on. A switch reaches its *turns* (the CLI
+	 * reads the credentials again for every message) but not its usage read, which keeps the
+	 * login the process started with — so `report` asks a fresh process once the agent has moved.
+	 */
+	private startedOn: string | undefined;
 	/** How many times this turn has been retried past a busy login (`transient.ts`). */
 	private transientTries = 0;
 	/**
@@ -216,6 +222,7 @@ export class ClaudeBackend implements AgentBackend {
 		const accounts = this.context.accounts;
 		const account = this.context.account;
 		const accountEnv = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
+		this.startedOn = account?.id();
 
 		const options: Options = {
 			cwd: this.context.cwd,
@@ -924,8 +931,20 @@ export class ClaudeBackend implements AgentBackend {
 		 * read plus the context reading queued behind it.
 		 */
 		const plan = this.planUsage();
+		/*
+		 * The windows of the account the agent is on *now*.
+		 *
+		 * Measured 2026-10-09 against two real subscriptions: a session moved from one at 60% to
+		 * one at 0% sent its next turn on the new one (its rate-limit event said 0%, with the new
+		 * account's reset time), while its usage read went on saying 60% for as long as it was
+		 * asked. The CLI re-reads its credentials for a message but not for `/oauth/usage`. So
+		 * after a switch the windows come from a process started on the new account, and only
+		 * the session's own cost still comes from the session.
+		 */
+		const moved = accounts && mine && this.startedOn !== undefined && mine !== this.startedOn;
+		const windows = moved ? probeUsage(accounts.environmentFor(this.context.stageAgent.id, mine)).then((fresh) => fresh ?? plan) : plan;
 		const [usage, identity] = await Promise.all([
-			plan,
+			windows,
 			accounts ? claudeIdentity(accounts.keychainDir(mine ?? accounts.active()?.id ?? "") || undefined) : Promise.resolve({} as Awaited<ReturnType<typeof claudeIdentity>>),
 			this.refreshUsage(plan),
 		]);
@@ -1586,11 +1605,13 @@ function resetWords(at: number | undefined): string {
  * that is the one that must be read rather than remembered: somebody who runs
  * `claude auth login` in a terminal has changed it without Decks hearing about it.
  */
-export async function claudeIdentity(configDir?: string): Promise<{ email?: string; orgName?: string; plan?: string }> {
+export async function claudeIdentity(configDir?: string): Promise<{ email?: string; orgName?: string; plan?: string; signedOut?: true }> {
 	try {
 		const { stdout } = await runClaudeCommand(["auth", "status"], 30_000, configDir);
 		const data = JSON.parse(stdout) as { loggedIn?: boolean; email?: string; orgName?: string; subscriptionType?: string };
-		if (data.loggedIn !== true) return {};
+		// Said by the CLI, which is the one answer that means the account cannot be used. A
+		// command that failed or timed out says nothing either way, and answers `{}`.
+		if (data.loggedIn !== true) return { signedOut: true };
 		return {
 			...(data.email ? { email: data.email } : {}),
 			...(data.orgName ? { orgName: data.orgName } : {}),
@@ -1599,4 +1620,48 @@ export async function claudeIdentity(configDir?: string): Promise<{ email?: stri
 	} catch {
 		return {};
 	}
+}
+
+/**
+ * One usage read from a process of its own, on the account `env` names, and then gone.
+ *
+ * For a session whose agent has changed account since it started (`ClaudeBackend.report`). A
+ * query with no message never sends a turn, so this spends nothing: it is the process starting,
+ * the usage request, and the process closing, about two and a half seconds. `undefined` when
+ * it cannot answer, so the caller can fall back on what it had.
+ */
+export async function probeUsage(env: NodeJS.ProcessEnv | undefined): Promise<SDKControlGetUsageResponse | undefined> {
+	if (!env) return undefined;
+	const executable = claudeExecutable();
+	// Never yields: the probe is a usage read, not a conversation.
+	async function* nothing(): AsyncGenerator<SDKUserMessage> {
+		await new Promise<never>(() => {});
+	}
+	const probe = query({ prompt: nothing(), options: { env, cwd: tmpdir(), ...(executable ? { pathToClaudeCodeExecutable: executable } : {}) } });
+	void (async () => {
+		try {
+			for await (const _ of probe) {
+				/* drained so the process is not left waiting on a reader */
+			}
+		} catch {
+			/* closed below, which ends the loop with an error worth nothing */
+		}
+	})();
+	try {
+		const read = (probe as Partial<Query>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
+		if (typeof read !== "function") return undefined;
+		return await Promise.race([read.call(probe), new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 15_000).unref?.())]);
+	} catch {
+		return undefined;
+	} finally {
+		probe.close?.();
+	}
+}
+
+/** The 5-hour window out of a usage read, as an account row shows it. */
+export function fiveHourOf(read: SDKControlGetUsageResponse | undefined): { percent: number; resetsAt?: number } | undefined {
+	const window = (read as { rate_limits?: { five_hour?: { utilization?: unknown; resets_at?: unknown } | null } } | undefined)?.rate_limits?.five_hour;
+	if (!window || typeof window.utilization !== "number" || !Number.isFinite(window.utilization)) return undefined;
+	const resetsAt = typeof window.resets_at === "string" ? Date.parse(window.resets_at) : typeof window.resets_at === "number" ? epochMs(window.resets_at) : undefined;
+	return { percent: Math.max(0, Math.min(100, Math.round(window.utilization))), ...(resetsAt && Number.isFinite(resetsAt) ? { resetsAt } : {}) };
 }

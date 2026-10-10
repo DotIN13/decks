@@ -22,7 +22,7 @@ import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
-import { releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
+import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 import { forgetPen, receivePen } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
@@ -612,6 +612,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "agent.account":
 					ensureAgent(message.id);
 					setState("agents", message.id, "spending", message.account);
+					accountChanged(message.id);
 					return;
 				case "error":
 					notice("error", message.text);

@@ -1,4 +1,5 @@
 import type { ClaudeAccount, WebStatus } from "@decks/protocol";
+import FiveHour from "./FiveHour.tsx";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
@@ -299,6 +300,10 @@ function Row(props: {
 							<span class="state flex-none text-accent">default for new</span>
 						</Match>
 					</Switch>
+					{/* How much of the 5-hour window is used, beside the status: the reason to pick one. */}
+					<Show when={props.account.signedIn}>
+						<FiveHour reading={props.account.fiveHour} />
+					</Show>
 				</span>
 			</div>
 

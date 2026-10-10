@@ -446,6 +446,30 @@
 		background: var(--color-danger);
 	}
 
+	/* An account's 5-hour window on its row (`settings/FiveHour.tsx`): "xx% used", in the picker and settings. */
+	.five-hour {
+		flex: none;
+		color: var(--muted);
+		font-size: var(--type-hint);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	/*
+	 * The amber is the boards' own warning colour (`--b-warn` in `runtime/lib/theme.css`, yellow
+	 * 900), the one the row was designed in: the app's `--color-warn` is a lighter yellow made
+	 * for fills and bars, and as text on white it is hard to read.
+	 */
+	.five-hour[data-level="warn"] {
+		color: #ac8833;
+		font-weight: 600;
+	}
+
+	.five-hour[data-level="high"] {
+		color: var(--color-danger);
+		font-weight: 600;
+	}
+
 	/*
 	 * An action at the bottom of a popover, and the shape of one that is not built yet.
 	 *

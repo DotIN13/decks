@@ -314,4 +314,25 @@
 .account-row .state {
 	font-variant-numeric: tabular-nums;
 }
+	/*
+	 * The × sits beside the email, on the first line, rather than in a column of its own: a
+	 * held column left every row's second line, and the "xx% used" at its end, a control's
+	 * width short of the edge, and the CLI's own row, which has no ×, out of line with them.
+	 */
+.account-row {
+	position: relative;
+}
+.account-row > .close {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+}
+.account-row:has(> .close) .row-label {
+	padding-right: calc(var(--control-sm) + 4px);
+}
+	/* The 5-hour figure (`FiveHour.tsx`) in the row note's own type, set apart from the state word. */
+.account-row .five-hour {
+	margin-left: 10px;
+	font-size: inherit;
+}
 }

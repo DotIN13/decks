@@ -157,6 +157,12 @@ function claudeHome(): ClaudeHome {
 /** The row for the CLI's own `~/.claude`, which has no directory of its own. */
 export const DEFAULT_ACCOUNT = "default";
 
+/** A 5-hour window: whole percent used, and when it starts again, in epoch milliseconds. */
+export interface FiveHour {
+	percent: number;
+	resetsAt?: number;
+}
+
 export class ClaudeAccounts {
 	/**
 	 * `home` is where the CLI's own login keeps its things — passed in rather than looked up
@@ -355,6 +361,38 @@ export class ClaudeAccounts {
 		const link = this.agentLink(agentId);
 		if (!this.ensureLink(target, link)) return undefined;
 		return accountEnvironment(link, this.home.platform === "darwin" ? this.keychainDir(id) : link);
+	}
+
+	/**
+	 * The environment for a process that is about one account and no agent: a usage read for
+	 * the account rows (`App.refreshLimits`). The account's own directory on both variables, as
+	 * a one-off command gets it, except that the CLI's own login goes through its mirror.
+	 */
+	environmentOf(accountId: string): NodeJS.ProcessEnv | undefined {
+		const id = this.has(accountId) ? accountId : this.defaultId();
+		const target = this.targetFor(id);
+		if (id === DEFAULT_ACCOUNT) this.mirrorDefault();
+		return accountEnvironment(target, this.home.platform === "darwin" ? this.keychainDir(id) : target);
+	}
+
+	/**
+	 * How much of each account's 5-hour window is used, as last seen.
+	 *
+	 * Read by `App.refreshLimits`, every half hour and when the picker or settings opens. Kept
+	 * in memory only: a figure from before a restart is a guess.
+	 */
+	private readonly fiveHours = new Map<string, FiveHour & { at: number }>();
+
+	/** Note a reading; true when it changed what a row would show. */
+	noteFiveHour(accountId: string, reading: FiveHour): boolean {
+		const was = this.fiveHours.get(accountId);
+		this.fiveHours.set(accountId, { ...reading, at: Date.now() });
+		return !was || was.percent !== reading.percent || was.resetsAt !== reading.resetsAt;
+	}
+
+	/** The last reading, and when it was taken; `undefined` when none has been. */
+	fiveHour(accountId: string): (FiveHour & { at: number }) | undefined {
+		return this.fiveHours.get(accountId);
 	}
 
 	/** Repoint one agent's link. Returns whether the link can be relied on. */

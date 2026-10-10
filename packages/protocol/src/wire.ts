@@ -274,7 +274,8 @@ export type ClientMessage =
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	/** Read the account list — the settings panel asking on open. */
-	| { type: "claude.accounts" }
+	/** `limits`: read every account's 5-hour figure again, for a picker or settings just opened. */
+	| { type: "claude.accounts"; limits?: true }
 	/** Sign in to another Claude account, which adds it to the list. */
 	| { type: "claude.accounts.add" }
 	/** Use this one from now on, chosen by hand. */

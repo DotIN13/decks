@@ -1,4 +1,5 @@
 import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
+import FiveHour from "../../settings/FiveHour.tsx";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
@@ -47,6 +48,8 @@ export function ModelPicker(props: {
 	accounts?: ClaudeAccount[];
 	account?: string;
 	onAccount?: (id: string) => void;
+	/** The picker opened with the accounts in it: read their 5-hour figures again. */
+	onAccountsOpen?: () => void;
 	disabled?: boolean;
 }) {
 	const [filter, setFilter] = createSignal("");
@@ -79,6 +82,8 @@ export function ModelPicker(props: {
 	return (
 		<Popover
 			placement="top"
+			// Opened: the accounts' 5-hour figures are about to be looked at, so they are read again.
+			onOpenChange={(open) => open && (props.accounts?.length ?? 0) > 1 && props.onAccountsOpen?.()}
 			/*
 			 * 344 rather than 320: a little more room for a model name, which is what the card is mostly
 			 * made of. The field and the thinking scale are both sized by this, so widening the card widens
@@ -332,7 +337,7 @@ export function ModelPicker(props: {
 										</Show>
 									</span>
 									<span class="row-label flex-1 truncate">{account.email ?? account.id}</span>
-									<Show when={!account.signedIn}>
+									<Show when={!account.signedIn} fallback={<FiveHour reading={account.fiveHour} />}>
 										<span class="meta flex-none text-micro">signed out</span>
 									</Show>
 								</button>

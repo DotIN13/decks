@@ -227,6 +227,21 @@ function createUi() {
 	};
 
 	/**
+	 * The agent now spends another subscription: the figures kept for it are the old one's.
+	 *
+	 * Dropped rather than shown under a "reading again" line, because they are not an older
+	 * reading of the same thing — they are another account's windows, and drawn beside the new
+	 * account's name they say it is as spent as the one just left. An open panel reads again at
+	 * once, which is the switch showing in the meter as soon as it is made.
+	 */
+	const accountChanged = (id: string) => {
+		seenReports.delete(id);
+		if (usagePanel() !== id) return;
+		setUsageReport({ loading: true });
+		send({ type: "agent.report", id });
+	};
+
+	/**
 	 * Unread counts, kept here rather than on the server.
 	 *
 	 * "Have I read this" is a fact about a person in front of a browser, not about the
@@ -314,6 +329,7 @@ function createUi() {
 		usageReport,
 		setUsageReport,
 		tookReport,
+		accountChanged,
 		readUsage,
 		openUsage,
 		unread,
@@ -368,6 +384,7 @@ export const {
 	usageReport,
 	setUsageReport,
 	tookReport,
+	accountChanged,
 	readUsage,
 	openUsage,
 	unread,

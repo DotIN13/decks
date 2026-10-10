@@ -1699,7 +1699,7 @@ export function App() {
 								setSettings(true);
 								// Read on open rather than kept in step: every identity in the list comes
 								// from the CLI, and the CLI's own login can change without the deck hearing.
-								send({ type: "claude.accounts" });
+								send({ type: "claude.accounts", limits: true });
 							},
 						},
 						{
@@ -2100,6 +2100,7 @@ export function App() {
 						   as "no subscription" rather than as "the list has not arrived". */
 						account={(state.focused ? state.agents[state.focused]?.spending : undefined) ?? state.activeAccount}
 						onAccount={(id: string) => send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
+						onAccountsOpen={() => send({ type: "claude.accounts", limits: true })}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
 						 * what it hands back is a deck path — so what it inserts is an `@` mention

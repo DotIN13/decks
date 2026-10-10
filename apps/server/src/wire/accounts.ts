@@ -10,8 +10,10 @@ import type { WirePart } from "./context.ts";
  * the agent's dialog bridge that puts the code prompt on screen.
  */
 export const accounts = {
-	"claude.accounts": (_message, reply, wire) => {
+	"claude.accounts": (message, reply, wire) => {
 		void wire.publishAccounts(reply);
+		// The model picker or settings has just opened: the 5-hour figures are being looked at.
+		if (message.limits) void wire.refreshLimits();
 	},
 
 	"claude.accounts.add": (_message, reply, wire) => {

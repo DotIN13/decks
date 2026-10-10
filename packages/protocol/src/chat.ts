@@ -253,6 +253,11 @@ export interface ClaudeAccount {
 	isDefault?: true;
 	/** Signed in and usable. False for a row the CLI reports as signed out. */
 	signedIn: boolean;
+	/**
+	 * How much of its 5-hour window is used, as last read: whole percent, when it starts
+	 * again (epoch ms), and when the reading was taken. Absent until one has been.
+	 */
+	fiveHour?: { percent: number; resetsAt?: number; at: number };
 }
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";

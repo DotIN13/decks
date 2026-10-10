@@ -134,6 +134,8 @@ export interface WireContext {
 
 	/** The install's Claude subscriptions, republished after anything moves one. */
 	publishAccounts(reply?: Reply, options?: { reread?: boolean }): Promise<void>;
+	/** Read every account's 5-hour figure now, and send the rows again when one moved. */
+	refreshLimits(): Promise<void>;
 	/** Refresh one account's token before several sessions race to (`claude/transient.ts`). */
 	warmAccount(id: string): Promise<void>;
 }

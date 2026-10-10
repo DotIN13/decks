@@ -20,7 +20,7 @@ import { Pairing } from "./share/pairing.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
-import { claudeIdentity } from "./runtimes/claude/backend.ts";
+import { claudeIdentity, fiveHourOf, probeUsage } from "./runtimes/claude/backend.ts";
 import { mapSeries } from "./lib/series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
@@ -46,6 +46,10 @@ import { Writers } from "./docs/writers.ts";
  */
 /** How long an account's identity is worth reusing before asking the CLI again. */
 const IDENTITY_TTL_MS = 60_000;
+/** How often every account's 5-hour figure is read in the background. */
+const FIVE_HOUR_EVERY_MS = 30 * 60_000;
+/** Opening the picker twice in a row reads once: an answer this fresh is the answer. */
+const FIVE_HOUR_FRESH_MS = 15_000;
 
 const RESYNC_MS = 4000;
 
@@ -384,9 +388,9 @@ export class App {
 	 * the one thing that *can* change without Decks hearing (somebody running
 	 * `claude auth login` in a terminal) is exactly what `reread` is for.
 	 */
-	private readonly identities = new Map<string, { at: number; identity: { email?: string; orgName?: string; plan?: string } }>();
+	private readonly identities = new Map<string, { at: number; identity: { email?: string; orgName?: string; plan?: string; signedOut?: true } }>();
 
-	private async identityOf(id: string, isDefault: boolean, reread: boolean): Promise<{ email?: string; orgName?: string; plan?: string }> {
+	private async identityOf(id: string, isDefault: boolean, reread: boolean): Promise<{ email?: string; orgName?: string; plan?: string; signedOut?: true }> {
 		const cached = this.identities.get(id);
 		if (!reread && cached && Date.now() - cached.at < IDENTITY_TTL_MS) return cached.identity;
 		const identity = await claudeIdentity(isDefault ? undefined : this.claudeAccounts.configDir(id));
@@ -397,6 +401,49 @@ export class App {
 		 */
 		if (identity.email || identity.plan) this.identities.set(id, { at: Date.now(), identity });
 		return identity;
+	}
+
+	/**
+	 * Each account's 5-hour window, read for the rows in the model picker and settings.
+	 *
+	 * Read at two moments and no others: every half hour in the background (`startLimits`), and
+	 * when somebody opens the model picker or settings, which is when the figure is looked at.
+	 * One account at a time, through a process that sends no message (`probeUsage`, about 2.4 s),
+	 * and one round at a time: an open while a round is running waits for that round.
+	 */
+	private limitsRound: Promise<void> | undefined;
+	private limitsTimer: NodeJS.Timeout | undefined;
+	private readonly limitsTried = new Map<string, number>();
+
+	refreshLimits(): Promise<void> {
+		if (this.limitsRound) return this.limitsRound;
+		const now = Date.now();
+		const due = this.claudeAccounts
+			.list()
+			.map((account) => account.id)
+			.filter((id) => this.claudeAccounts.usable(id) && now - (this.limitsTried.get(id) ?? 0) > FIVE_HOUR_FRESH_MS);
+		if (due.length === 0) return Promise.resolve();
+		const round = (async () => {
+			let changed = false;
+			await mapSeries(due, async (id) => {
+				this.limitsTried.set(id, Date.now());
+				const reading = fiveHourOf(await probeUsage(this.claudeAccounts.environmentOf(id)));
+				if (reading && this.claudeAccounts.noteFiveHour(id, reading)) changed = true;
+			});
+			if (changed) await this.publishAccounts();
+		})().finally(() => {
+			this.limitsRound = undefined;
+		});
+		this.limitsRound = round;
+		return round;
+	}
+
+	/** The half-hourly read, started with the deck; `unref` so it never holds the process open. */
+	private startLimits(): void {
+		clearInterval(this.limitsTimer);
+		this.limitsTimer = setInterval(() => void this.refreshLimits(), FIVE_HOUR_EVERY_MS);
+		this.limitsTimer.unref?.();
+		void this.refreshLimits();
 	}
 
 	async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
@@ -416,7 +463,15 @@ export class App {
 		const accounts = await mapSeries(stored, async (account) => {
 			const isDefault = account.id === DEFAULT_ACCOUNT;
 			const identity = await this.identityOf(account.id, isDefault, options?.reread === true);
-			const signedIn = Boolean(identity.email || identity.plan);
+			/*
+			 * Signed out only when the CLI says so, or there is no token on the disk at all.
+			 *
+			 * A check that failed is not that. `auth status` times out or errors while another
+			 * process holds the login's refresh lock, which is most likely just after a limit,
+			 * when every agent on the account is retrying. That greyed the row out in the model
+			 * picker at the moment a person wanted to leave the spent account for it.
+			 */
+			const signedIn = Boolean(identity.email || identity.plan) || (!identity.signedOut && this.claudeAccounts.usable(account.id));
 			return {
 					id: account.id,
 					...(isDefault ? { isDefault: true as const } : {}),
@@ -426,6 +481,7 @@ export class App {
 					...(identity.email ?? account.email ? { email: identity.email ?? account.email } : {}),
 					...(identity.orgName ?? account.orgName ? { orgName: identity.orgName ?? account.orgName } : {}),
 					...(identity.plan ?? account.plan ? { plan: identity.plan ?? account.plan } : {}),
+					...(this.claudeAccounts.fiveHour(account.id) ? { fiveHour: this.claudeAccounts.fiveHour(account.id)! } : {}),
 			};
 		});
 		// Recorded so a row keeps its name when the CLI is next slow to answer.
@@ -625,6 +681,7 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = setInterval(() => this.resyncBoards(), RESYNC_MS);
 		this.resyncTimer.unref?.();
+		this.startLimits();
 	}
 
 	/**
@@ -940,6 +997,8 @@ export class App {
 		this.unwatch = undefined;
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = undefined;
+		clearInterval(this.limitsTimer);
+		this.limitsTimer = undefined;
 		this.web.dispose();
 		this.thumbs.dispose();
 		this.pens.close();

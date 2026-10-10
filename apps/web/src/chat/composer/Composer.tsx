@@ -76,6 +76,8 @@ export function Composer(props: {
 	accounts?: ClaudeAccount[];
 	account?: string;
 	onAccount?: (id: string) => void;
+	/** The model picker opened with the accounts in it (`ModelPicker`). */
+	onAccountsOpen?: () => void;
 	/**
 	 * Words the deck has put here, rather than typed: the message a rewind took back.
 	 *
@@ -576,6 +578,7 @@ export function Composer(props: {
 						{...(props.accounts ? { accounts: props.accounts } : {})}
 						{...(props.account ? { account: props.account } : {})}
 						{...(props.onAccount ? { onAccount: props.onAccount } : {})}
+						{...(props.onAccountsOpen ? { onAccountsOpen: props.onAccountsOpen } : {})}
 					/>
 
 					<span class="flex-1" />
