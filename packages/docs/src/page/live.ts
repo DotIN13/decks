@@ -29,6 +29,8 @@ export interface LiveHost {
 	math?(into: HTMLElement): Promise<void> | void;
 	/** A URL a picture's address can be drawn from: relative addresses are the file's neighbours. */
 	asset?(src: string): Promise<string | undefined>;
+	/** A URL of a PDF's first page drawn as a picture, for a LaTeX figure that is a PDF. */
+	pdfPicture?(src: string): Promise<string | undefined>;
 	/** Where other writers' words are, to highlight. */
 	marks(): readonly Mark[];
 	changes(): readonly DocChange[];
@@ -1137,8 +1139,9 @@ export class LiveEditor {
 						return;
 					}
 					if (/\.pdf$/i.test(src)) {
-						// A PDF figure cannot be an <img>: it is named instead.
-						img.closest(".lv-figimg")?.classList.add("lv-missing");
+						// A PDF figure cannot be an <img> itself: its first page is drawn as one, or it is named instead.
+						if (!this.host.pdfPicture) return next();
+						void this.host.pdfPicture(src).then((url) => (url ? (img.src = url) : next()));
 						return;
 					}
 					if (/^(https?:|data:|blob:)/.test(src)) img.src = src;

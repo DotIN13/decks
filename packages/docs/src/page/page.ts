@@ -544,6 +544,8 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 	let picked: { sha: string; at: number } | undefined;
 	let mode: "page" | "source" = "page";
 	const urls = new Map<string, Promise<string | undefined>>();
+	const pictures = new Map<string, Promise<string | undefined>>();
+	const near = (src: string) => (src.startsWith("/") ? src : `${dir(sync.path)}/${decodeURI(src)}`);
 
 	const sync = new DocSync({
 		path: options.path,
@@ -564,6 +566,21 @@ export function mountDocPage(host: HTMLElement, options: DocPageOptions): DocPag
 					.then((bytes) => URL.createObjectURL(new Blob([bytes])))
 					.catch(() => undefined);
 				urls.set(path, url);
+			}
+			return url;
+		},
+		pdfPicture: (src) => {
+			if (!options.file || !options.pdf) return Promise.resolve(undefined);
+			const path = near(src);
+			let url = pictures.get(path);
+			if (!url) {
+				const into = document.createElement("div");
+				url = options
+					.file(path)
+					.then((bytes) => options.pdf!(into, bytes, 1200))
+					.then(() => into.querySelector("img")?.src ?? into.querySelector("canvas")?.toDataURL("image/png"))
+					.catch(() => undefined);
+				pictures.set(path, url);
 			}
 			return url;
 		},
