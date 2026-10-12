@@ -379,6 +379,32 @@ export function renderFileBoard(title: string, src: string, size: { w: number; h
 }
 
 /**
+ * A board that is an app (`apps/service.ts`): one `data-live="app"` box filling it, which
+ * `lib/live-app.js` draws as a bar (state, name, Reload, Open, Log) over a frame of `/app/<name>/`.
+ * A stub, like a document board: nothing about the app is in it but its name, so the app can
+ * change, build and restart without the board being written again.
+ */
+export function renderAppBoard(name: string, title: string, size?: { w?: number; h?: number }): string {
+	const w = Math.round(size?.w ?? 1100);
+	const h = Math.round(size?.h ?? 760);
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeAttr(title)}</title>
+		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
+		<link rel="stylesheet" href="../../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="live" data-id="app" data-live="app" data-app="${escapeAttr(name)}" style="left: 0; top: 0; right: 0; bottom: 0"></div>
+
+		<script src="../../lib/board.js"></script>
+	</body>
+</html>
+`;
+}
+
+/**
  * The status board for the user's shared Chrome.
  *
  * A stub, like a mirror: the component carries `data-live="web"` and draws itself from the

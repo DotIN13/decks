@@ -4,6 +4,10 @@
  * anything you `console.log`. This is the whole API: if something is not here, it does not
  * exist. Board content is files: write it with your ordinary tools.
  */
+export type AppKind = "static" | "build" | "server";
+export interface AppState { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number }
+export interface AppOutcome { ok: boolean; status: AppState["status"]; ms: number; errors: string[]; pending?: true }
+
 export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; box: Box; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
 
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
@@ -169,6 +173,34 @@ export interface Stage {
 	 * who can open Decks can open what is forwarded, so close a port when you are done with it.
 	 */
 	ports(change?: { open?: number; close?: number; label?: string }): Promise<Array<{ port: number; label?: string; by?: string; at: number; node: string; rnode: string }>>;
+	/**
+	 * Apps: a folder in the deck's `apps/<name>/` that you write with your own tools, which Decks
+	 * serves at `/app/<name>/` and shows as a board that is the app (`boards/apps/<name>.html`, with
+	 * a bar saying whether it is building, running, asleep or broken). Take the lowest rung that does
+	 * the job: a single board needs none of this; `static` is files served as they are; `build` is
+	 * a `package.json` whose build writes `dist/` (Solid, React, a Next.js export); `server` is any
+	 * program that listens on `$PORT`, started on demand and put to sleep after ten minutes unseen.
+	 * `apps/<name>/app.json` says which: `{ "kind": "server", "start": "node server.js" }`, with
+	 * `build`, `install`, `root`, `prefix` (the server sees `/app/<name>/…`, and `$BASE_PATH`) and
+	 * `idleMinutes`. Inside an app, use relative addresses (`api/items`, not `/api/items`).
+	 * `build`, `run` and `check` wait up to fifteen seconds; `pending` means ask `status` again later.
+	 */
+	apps: {
+		list(): Promise<AppState[]>;
+		status(name: string): Promise<AppState>;
+		/** Starters: "static" (default), "node" (a server with no packages), "solid", "react", "next". */
+		create(name: string, o?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }>;
+		/** The board for an app whose folder you wrote yourself. */
+		board(name: string): Promise<string>;
+		build(name: string): Promise<AppOutcome>;
+		run(name: string): Promise<AppOutcome>;
+		stop(name: string): Promise<{ stopped: boolean }>;
+		/** After you change a server app's code: stop it and start it again (a built app is built again). Its board reloads by itself. */
+		restart(name: string): Promise<AppOutcome>;
+		logs(name: string, o?: { tail?: number }): Promise<string[]>;
+		/** The app opened in the server's browser: what `fit` is to a board. Read `verdict`; `file` is a picture. */
+		check(name: string): Promise<{ verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }>;
+	};
 	/**
 	 * Who you are and what you are doing: read with nothing, change with a patch. Answers with the
 	 * identity as stored — tags are slugged, deduped and capped at four, and `workspace` (the

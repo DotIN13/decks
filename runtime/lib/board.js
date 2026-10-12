@@ -1406,6 +1406,17 @@
 		}
 	}
 
+	/** A board that is an app: a bar over a frame of `/app/<name>/` — `lib/live-app.js`, reading the server's `/api/apps`. */
+	async function mountLiveApp(host) {
+		try {
+			const module = await needModule("live-app.js");
+			module.mountLiveApp(host, { api: API });
+		} catch (error) {
+			host.textContent = `Cannot show this app: ${error.message}`;
+			host.dataset.state = "broken";
+		}
+	}
+
 	// --- go ----------------------------------------------------------------------
 
 	/*
@@ -1462,6 +1473,9 @@
 		}
 		for (const element of document.querySelectorAll('[data-live="doc"]')) {
 			work.push(mountLiveDoc(element));
+		}
+		for (const element of document.querySelectorAll('[data-live="app"]')) {
+			work.push(mountLiveApp(element));
 		}
 		/*
 		 * A slide deck, which is neither a document nor live.

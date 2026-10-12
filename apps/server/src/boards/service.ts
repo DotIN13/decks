@@ -13,7 +13,7 @@ import {
 	renderMirror,
 	renderWebBoard,
 	renderDocBoard,
-	renderFileBoard,
+	renderAppBoard, renderFileBoard,
 	slugFor,
 	WEB_BOARD_SIZE,
 	type BoardFormat,
@@ -443,6 +443,23 @@ export class BoardService {
 			if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 			return path;
 		}
+	}
+
+	/**
+	 * The board that shows an app (`renderAppBoard`, `apps/service.ts`): `boards/apps/<name>.html`.
+	 * One per app, so asking again hands back the board it already has, wherever it was put.
+	 */
+	newAppBoard(name: string, title: string, size?: { w?: number; h?: number }): string {
+		const path = `boards/apps/${name}.html`;
+		const target = this.deck.fileOf(path);
+		if (existsSync(target)) return path;
+		const html = renderAppBoard(name, title, size);
+		mkdirSync(dirname(target), { recursive: true });
+		writeFileSync(target, html);
+		this.revisions.record(path, html);
+		const board = this.deck.refresh(path);
+		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+		return path;
 	}
 
 	/**

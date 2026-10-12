@@ -81,6 +81,8 @@ export default defineConfig({
 			// Forwarded ports (`server/ports.ts`), which the server answers for, websockets and all.
 			"/node/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
 			"/rnode/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
+			// The deck's apps (`server/apps/route.ts`): files, or a server app's own server, websockets and all.
+			"/app/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
 		},
 	},
 	/*

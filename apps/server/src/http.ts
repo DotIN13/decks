@@ -7,6 +7,7 @@ import { readMeta } from "./deck/meta.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
+import { appRequest } from "./apps/route.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
@@ -76,6 +77,10 @@ export function createHttpApp(app: App): Express {
 	 */
 	server.use((req, res, next) => {
 		if (!forwardRequest(req, res, app.forwards)) next();
+	});
+	// The deck's apps (`apps/route.ts`), for the same reason: a server app's request is the app's.
+	server.use((req, res, next) => {
+		if (!appRequest(req, res, app.apps)) next();
 	});
 	server.use(express.json({ limit: "8mb" }));
 
@@ -761,6 +766,40 @@ export function createHttpApp(app: App): Express {
 			res.json(await app.google.tool(String(body.tool ?? ""), (body.args ?? {}) as Record<string, unknown>, app.agentName(agentId)));
 		}),
 	);
+
+	/*
+	 * The deck's apps (`apps/service.ts`), for the bar on an app's board (`lib/live-app.js`): what
+	 * each is doing, its log, that its board is still in view, and the bar's Restart.
+	 */
+	const appOf = (req: Request, res: Response): string | undefined => {
+		const name = String(req.params.name ?? "");
+		if (app.apps.exists(name)) return name;
+		res.status(404).json({ error: `There is no app called ${name}.` });
+		return undefined;
+	};
+	api.get("/apps", (_req, res) => {
+		res.json({ apps: app.apps.list() });
+	});
+	api.get("/apps/:name", (req, res) => {
+		const name = appOf(req, res);
+		if (name) res.set("cache-control", "no-store").json(app.apps.state(name));
+	});
+	api.get("/apps/:name/log", (req, res) => {
+		const name = appOf(req, res);
+		if (name) res.set("cache-control", "no-store").json({ lines: app.apps.log(name, Number(req.query.tail) || 200) });
+	});
+	api.post("/apps/:name/seen", (req, res) => {
+		const name = appOf(req, res);
+		if (!name) return;
+		app.apps.seen(name);
+		res.json({ ok: true });
+	});
+	api.post("/apps/:name/restart", async (req, res) => {
+		const name = appOf(req, res);
+		if (!name) return;
+		app.apps.stop(name);
+		res.json(await app.apps.run(name, 30_000));
+	});
 
 	server.use("/api", api);
 

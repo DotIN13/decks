@@ -10,6 +10,8 @@ import { checkAvatar } from "./avatar.ts";
 import type { StageShots } from "./shots.ts";
 import type { StagePens } from "./pens.ts";
 import type { Forwards } from "../ports.ts";
+import type { Apps } from "../apps/service.ts";
+import type { AppCheck } from "../apps/check.ts";
 
 /**
  * The single path from a tool to the canvas.
@@ -28,6 +30,8 @@ import type { Forwards } from "../ports.ts";
 export interface StageHost {
 	/** Write a new blank board and return its deck-relative path. */
 	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number } }): string;
+	/** The board that shows an app, `boards/apps/<name>.html`; the one it has if it has one. */
+	newAppBoard(name: string, title: string): string;
 	/** A live board: a stub that draws one agent's conversation. See `App.newMirror`. */
 	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string;
 	/** Write a board's file, record the revision, and tell everyone. */
@@ -135,6 +139,10 @@ export class StageService {
 	pens: StagePens | undefined;
 	/** The ports forwarded through Decks, which agents open and close (`ports.ts`). `undefined` in tests without one. */
 	forwards: Forwards | undefined;
+	/** The deck's apps (`apps/service.ts`). `undefined` in tests without one. */
+	apps: Apps | undefined;
+	/** An app opened in the server's own Chromium (`apps/check.ts`). */
+	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
 	shots: StageShots | undefined;
 	/** The server's own picture of a whole board, fresh from its file (`boards/thumbs.ts`): what a screenshot falls back to. */
@@ -220,6 +228,11 @@ export class StageService {
 		return board;
 	}
 
+	/** The board that shows an app (`apps/service.ts`). */
+	appBoard(name: string, title: string): string {
+		return this.host.newAppBoard(name, title);
+	}
+
 	/** A new blank board — the shell, so the agent writes only the content. */
 	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number } }): string {
 		return this.host.newBoard(options);
@@ -296,7 +309,12 @@ export class StageService {
 		 * and then the margin is added, which is what every board did before this.
 		 */
 		const ends = measured.page !== undefined && measured.page >= measured.h;
-		const h = ends ? measured.h : measured.h + margin;
+		/*
+		 * A board that is one box filling it — an app, a document page, one file — is the size it was
+		 * given: the box ends at the board's foot because the board does, so fitting it to the box
+		 * plus a margin grew it by the margin every time it was asked.
+		 */
+		const h = board.fills ? board.h : ends ? measured.h : measured.h + margin;
 		const reading = away ?? this.host.reading?.(path, board.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);

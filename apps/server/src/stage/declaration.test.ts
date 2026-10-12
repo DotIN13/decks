@@ -91,6 +91,7 @@ function builtStageTool() {
 		const deck = Deck.open(root);
 		const service = new StageService(deck, {
 			newMirror: () => "boards/mirrors/x.html",
+			newAppBoard: () => "boards/apps/x.html",
 			newBoard: (options) => `boards/${(options.title ?? "x").toLowerCase().replace(/\W+/g, "-")}.html`,
 			writeBoard: (path, html) => {
 				writeFileSync(join(root, path), html);

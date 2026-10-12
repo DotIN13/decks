@@ -31,6 +31,8 @@ import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
 import { Forwards } from "./ports.ts";
+import { Apps } from "./apps/service.ts";
+import { checkApp } from "./apps/check.ts";
 import { DocLibrary, DocService } from "@decks/docs/server";
 import { compileTex } from "./docs/compile.ts";
 import { gitSync } from "./docs/git.ts";
@@ -69,6 +71,8 @@ export class App {
 	readonly pens: StagePens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
 	readonly forwards: Forwards;
+	/** The apps agents build in the deck's `apps/` (`apps/service.ts`). */
+	readonly apps: Apps;
 	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
@@ -176,6 +180,7 @@ export class App {
 
 			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),
+			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
 			extent: (path, rev) => this.boards.extent(path, rev),
 			awaitExtent: (path, rev, ms) => this.boards.awaitExtent(path, rev, ms),
@@ -203,6 +208,8 @@ export class App {
 		this.stage.pens = this.pens;
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
+		this.apps = new Apps(deck.path);
+		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
 		this.docs = new DocService({
@@ -291,6 +298,7 @@ export class App {
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
 			borrow: (use) => this.thumbs.borrow(use),
 		});
+		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.stage.boardPicture = async (path, scheme) => {
 			const board = deck.board(path);
 			if (!board) throw new Error(`There is no board ${path}.`);
@@ -810,6 +818,7 @@ export class App {
 		this.stage.setDeck(this.deck);
 		this.pens.setDeck(this.deck.path);
 		this.forwards.setDeck(this.deck.path);
+		this.apps.setDeck(this.deck.path);
 		this.boards.setDeck(this.deck);
 		this.docs.closeAll();
 		this.settings.setDeck(this.deck.path);
@@ -1001,6 +1010,7 @@ export class App {
 		this.limitsTimer = undefined;
 		this.web.dispose();
 		this.thumbs.dispose();
+		this.apps.dispose();
 		this.pens.close();
 		this.agents.dispose();
 	}

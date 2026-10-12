@@ -52,6 +52,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
+		newAppBoard: () => "boards/apps/x.html",
 		newBoard: (options) => {
 			// The extension is the server's business and comes from the format — the stub
 			// mirrors the real table so a test can assert *which file* a format asked for.
@@ -707,6 +708,7 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 	const deck = Deck.open(root);
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
+		newAppBoard: () => "boards/apps/x.html",
 		newBoard: () => "",
 		writeBoard: () => {
 			throw new Error("not used here");

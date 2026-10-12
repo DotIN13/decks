@@ -100,12 +100,13 @@ export function liveKindOf(source: string): string | undefined {
 }
 
 /**
- * Whether a board is one box that fills it: a document (`data-live="doc"`) or one file (`data-bare`).
+ * Whether a board is one box that fills it: a document (`data-live="doc"`), an app (`data-live="app"`)
+ * or one file (`data-bare`).
  *
  * The same cheap scan as `liveKindOf`, over the start of the body, where both templates put it.
  */
 export function fillsOf(source: string, live: string | undefined): boolean {
-	if (live === "doc") return true;
+	if (live === "doc" || live === "app") return true;
 	return /<body[^>]*>[\s\S]{0,4000}?<div[^>]*\bdata-embed=[^>]*\bdata-bare\b/i.test(source);
 }
 
