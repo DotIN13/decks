@@ -312,16 +312,37 @@ export class ClaudeAccounts {
 	 * Built beside the real link and renamed over it, because `symlink` onto an existing
 	 * path fails and removing it first would leave a window with no link at all — which a
 	 * live session would read as "no credentials" rather than as "one moment please".
+	 *
+	 * Except on Windows, where a link to a directory is itself a directory and a rename will
+	 * not replace one: it fails with EPERM, every time, however idle the link is. Measured
+	 * 2026-10-12: a chat moved to a second account kept its link on the first, with the new
+	 * one stranded beside it as `.next`, and went on spending the account that had run out.
+	 * So there the old link is removed and the rename tried again. That is the window this
+	 * method exists to avoid, and it is taken only where the atomic move cannot be had: a
+	 * request landing inside it fails once, where without it every request used the wrong login.
 	 */
 	private point(target: string, at: string = this.link): boolean {
+		const staging = `${at}.next`;
 		try {
 			mkdirSync(dirname(at), { recursive: true });
-			const staging = `${at}.next`;
 			rmSync(staging, { force: true });
 			symlinkSync(target, staging);
-			renameSync(staging, at);
+			try {
+				renameSync(staging, at);
+			} catch (error) {
+				// Only ever a link is removed: anything else sitting there is not this method's to delete.
+				if (!lstatSync(at).isSymbolicLink()) throw error;
+				rmSync(at, { force: true });
+				renameSync(staging, at);
+			}
 			return true;
 		} catch {
+			// A staged link left behind is a second answer to "which account", so it goes.
+			try {
+				rmSync(staging, { force: true });
+			} catch {
+				/* nothing was staged, or it will not go: the next switch removes it first anyway */
+			}
 			/*
 			 * A filesystem with no symlinks, or one that refuses. The account is still
 			 * recorded as active and every *new* session picks it up through `activeConfigDir`

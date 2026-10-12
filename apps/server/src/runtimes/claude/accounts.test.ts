@@ -573,6 +573,30 @@ test("two agents get two links, and repointing one leaves the other alone", () =
 	cleanup();
 });
 
+/*
+ * The Windows case, and it runs everywhere because the claim is the same everywhere: a link
+ * that already exists moves. There a rename will not replace a link to a directory, so the
+ * switch was recorded and never landed — the old link stayed and the new one sat beside it.
+ */
+test("a link that already exists is moved, back and forth, and nothing is left staged beside it", () => {
+	const { accounts, dir, cleanup } = store();
+	const one = add(accounts, "one@example.com");
+	const two = add(accounts, "two@example.com");
+	accounts.environmentFor("agent-a", one);
+
+	for (const id of [two, one, two]) {
+		assert.equal(accounts.pointAgentAt("agent-a", id), true);
+		assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(id));
+		assert.equal(existsSync(join(dir, "claude-accounts", "agents", "agent-a.next")), false, "no second link waiting");
+	}
+
+	// And the machine-wide link, which is moved by the same method.
+	accounts.use(one);
+	assert.equal(pointsAt(dir), accounts.configDir(one));
+	assert.equal(lstatSync(join(dir, "claude-accounts", "active.next"), { throwIfNoEntry: false }), undefined);
+	cleanup();
+});
+
 test("an agent named an account that has since been forgotten falls back to the default", () => {
 	const { accounts, dir, cleanup } = store({ platform: "linux" });
 	const gone = add(accounts, "gone@example.com");
