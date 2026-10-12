@@ -155,7 +155,7 @@ export type SceneOutput =
 			gpu?: boolean;
 	  }
 	/** A new layout of the drawing, after a change, for the page's hit tests. */
-	| { type: "layout"; seq: number; placed: Array<[string, Placed]>; bounds: Array<[string, Frame]>; cards: CardGeometry[] }
+	| { type: "layout"; seq: number; placed: Array<[string, Placed]>; bounds: Array<[string, Frame]>; cards: CardGeometry[]; partial?: true }
 	/** Which boards the sheet is drawing a picture of, as they change. */
 	| { type: "pictured"; paths: string[] }
 	/** Development only: what the scene holds, once a second after a `debug` message. */
@@ -288,6 +288,24 @@ export class StageScene {
 	private boards: SceneBoard[] = [];
 	private boardFrames = new Map<string, Frame>();
 	private dirty = true;
+	/*
+	 * Whether the next rebuild has to draw every item again. A gesture's step (`preview`) and a
+	 * board moving under an arrow change a few items of a document that is otherwise the one
+	 * drawn last: those are drawn again and the rest keep their recordings. Anything else (a new
+	 * document, the scheme, a font or a picture arriving, what is hidden) redraws the lot.
+	 */
+	private allDirty = true;
+	/*
+	 * The items a resize is changing, while one is: the rest of the sheet is drawn once into `still`
+	 * and each step draws that picture and these items over it. With every item on screen, drawing
+	 * them all at each step was most of the step, and a resize changes one of them.
+	 */
+	private sizing: ReadonlySet<string> | undefined;
+	private still: { key: string; image: Image } | undefined;
+	/** Bumped by everything that can change what the still shows, other than the gesture's own steps. */
+	private stillGen = 0;
+	/** What the last rebuild previewed, so a step that lets an item go draws it back where it was. */
+	private lastMoving: ReadonlyMap<string, PenPreview> | undefined;
 	private disposed = false;
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private settle: ReturnType<typeof setTimeout> | undefined;
@@ -318,7 +336,7 @@ export class StageScene {
 	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture> } | undefined;
 	/** The boards a drag is carrying (`carry`). */
 	private carryBoards: ReadonlySet<string> = new Set();
-	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed> } | undefined;
+	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed>; source: PenDocument | undefined } | undefined;
 	private readonly images = new Map<string, Image | "loading" | "failed">();
 	private readonly icons = new PenIcons(() => this.redraw());
 
@@ -382,7 +400,7 @@ export class StageScene {
 				this.doc = message.doc;
 				this.docSeq = message.seq;
 				this.base = message.base;
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				if (message.doc && message.doc.children.length > 0) void this.start();
 				break;
 			}
@@ -404,7 +422,7 @@ export class StageScene {
 				if (message.scheme === this.scheme) return;
 				this.scheme = message.scheme;
 				if (this.fonts) this.fonts.scheme = message.scheme;
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				break;
 			case "view":
 				this.view = { width: message.width, height: message.height, dpr: message.dpr, overscan: message.overscan, budget: message.budget, widest: message.widest };
@@ -433,24 +451,24 @@ export class StageScene {
 			case "hide": {
 				if (message.ids.length === 0 && this.hidden.size === 0) return;
 				this.hidden = new Set(message.ids);
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				break;
 			}
 			case "holes": {
 				if (message.ids.length === 0 && this.holes.size === 0) return;
 				this.holes = new Set(message.ids);
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				break;
 			}
 			case "mute": {
 				if (message.ids.length === 0 && this.muted.size === 0) return;
 				this.muted = new Set(message.ids);
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				break;
 			}
 			case "scroll":
 				this.scrolls = new Map(message.scrolls);
-				this.dirty = true;
+				this.dirty = this.allDirty = true;
 				break;
 			case "ink":
 				if (message.strokes.length === 0 && this.ink.length === 0) {
@@ -475,12 +493,15 @@ export class StageScene {
 				this.dispose();
 				return;
 		}
+		// Anything but a step of the gesture changes what the still behind it shows.
+		if (message.type !== "preview") this.stillGen++;
 		this.wanted = true;
 		this.schedule();
 	}
 
 	/** Draw again: something the scene fetched or decoded has arrived. */
 	private again(): void {
+		this.stillGen++;
 		this.wanted = true;
 		this.schedule();
 	}
@@ -488,7 +509,7 @@ export class StageScene {
 	// --- the frame ------------------------------------------------------------------------
 
 	private redraw(): void {
-		this.dirty = true;
+		this.dirty = this.allDirty = true;
 		this.again();
 	}
 
@@ -756,13 +777,42 @@ export class StageScene {
 		this.boardPaint ??= new ck.Paint();
 		const canvas = surface.getCanvas();
 		canvas.clear(ck.TRANSPARENT);
-		canvas.save();
-		canvas.scale(this.drawDpr, this.drawDpr);
-		canvas.translate(cssW / 2, cssH / 2);
-		canvas.scale(camera.zoom, camera.zoom);
-		canvas.translate(-camera.x, -camera.y);
+		const place = () => {
+			canvas.save();
+			canvas.scale(this.drawDpr, this.drawDpr);
+			canvas.translate(cssW / 2, cssH / 2);
+			canvas.scale(camera.zoom, camera.zoom);
+			canvas.translate(-camera.x, -camera.y);
+		};
+		place();
 		const slide = this.slide?.ready && this.slide.carried ? this.slide : undefined;
-		if (carriedOnly) {
+		const sizing = !carriedOnly && !slide && this.sizing?.size ? this.sizing : undefined;
+		if (!sizing && this.still) {
+			this.still.image.delete();
+			this.still = undefined;
+		}
+		if (sizing) {
+			const inView = (this.itemIndex?.search(this.sheetRect(cssW, cssH)) ?? []).map((at) => this.items[at]!);
+			const key = `${this.stillGen}|${camera.x},${camera.y},${camera.zoom}|${pxW}x${pxH}|${this.drawDpr}|${[...sizing].sort().join(",")}`;
+			if (this.still?.key !== key) {
+				this.still?.image.delete();
+				this.still = undefined;
+				this.paintBoardsGpu(canvas, boards, surface);
+				this.paintNewsGpu(canvas, boards.filter((board) => board.glow && board.news), camera.zoom);
+				for (const item of inView) if (!sizing.has(item.id)) canvas.drawPicture(item.picture);
+				canvas.restore();
+				const image = surface.makeImageSnapshot();
+				if (image) this.still = { key, image };
+				place();
+			} else {
+				canvas.restore();
+				canvas.drawImage(this.still.image, 0, 0);
+				place();
+			}
+			// Over the rest while it is being sized, as a moved item is carried over everything.
+			for (const item of inView) if (sizing.has(item.id)) canvas.drawPicture(item.picture);
+			this.paintInkGpu(canvas);
+		} else if (carriedOnly) {
 			// Carried boards under carried items, as they sit on the sheet.
 			this.paintBoardsGpu(canvas, boards, surface);
 			if (slide) canvas.drawPicture(slide.carried!);
@@ -1198,16 +1248,99 @@ export class StageScene {
 		return needs;
 	}
 
-	private sendLayout(cards: CardGeometry[]): void {
-		this.host.post({ type: "layout", seq: this.docSeq, placed: [...this.placed], bounds: [...this.bounds], cards });
+	private sendLayout(cards: CardGeometry[], only?: ReadonlySet<string>): void {
+		if (!only) {
+			this.host.post({ type: "layout", seq: this.docSeq, placed: [...this.placed], bounds: [...this.bounds], cards });
+			return;
+		}
+		// A step of a gesture: only the items drawn again, which the page lays over what it has.
+		const placed = [...this.placed].filter(([id]) => only.has(id));
+		const bounds = [...this.bounds].filter(([id]) => only.has(id));
+		this.host.post({ type: "layout", seq: this.docSeq, placed, bounds, cards, partial: true });
+	}
+
+	/**
+	 * A copy of `doc` in which the items named, and the items holding them, are new objects, and
+	 * every other item is shared with `doc`. The items named are copied whole, since what is done
+	 * to them reaches into their children (`fitShapes` redraws a shape's outline); the ones holding
+	 * them only get a new list of children. A step of a resize used to copy the whole file, which
+	 * on a drawing of 1,500 items was 4 ms a step before anything was drawn.
+	 */
+	private copyAlong(doc: PenDocument, ids: Iterable<string>): { doc: PenDocument; copies: Map<string, PenNode> } {
+		const index = indexOf(doc);
+		const root: PenDocument = { ...doc, children: [...doc.children] };
+		const made = new Map<PenNode, PenNode>();
+		const copies = new Map<string, PenNode>();
+		const holder = (parent: PenNode | undefined): PenNode[] => {
+			if (!parent) return root.children;
+			return (shallow(parent).children ??= []);
+		};
+		const place = (original: PenNode, copy: PenNode) => {
+			made.set(original, copy);
+			const list = holder(index.get(original.id)?.parent);
+			const at = list.indexOf(original);
+			if (at !== -1) list[at] = copy;
+		};
+		const shallow = (node: PenNode): PenNode => {
+			const known = made.get(node);
+			if (known) return known;
+			const copy: PenNode = { ...node, ...(node.children ? { children: [...node.children] } : {}) };
+			place(node, copy);
+			return copy;
+		};
+		// Outermost first, so an item inside another is found in its copy rather than copied apart from it.
+		const depth = (id: string) => {
+			let n = 0;
+			for (let up = index.get(id)?.parent; up; up = index.get(up.id)?.parent) n++;
+			return n;
+		};
+		for (const id of [...ids].sort((a, b) => depth(a) - depth(b))) {
+			const found = index.get(id);
+			if (!found || copies.has(id)) continue;
+			// Inside an item already copied whole: its copy is in there, and is the one to change.
+			let within: PenNode | undefined;
+			for (let up = found.parent; up && !within; up = index.get(up.id)?.parent) within = copies.get(up.id);
+			if (within) {
+				for (const inner of walk([within])) if (inner.id === id) copies.set(id, inner);
+				continue;
+			}
+			const was = made.get(found.node);
+			// Copied whole, from the copy if it was already copied on the way to another.
+			const copy = structuredClone(was ?? found.node);
+			if (was) {
+				const list = holder(found.parent);
+				const at = list.indexOf(was);
+				if (at !== -1) list[at] = copy;
+				made.set(found.node, copy);
+			} else place(found.node, copy);
+			copies.set(id, copy);
+		}
+		return { doc: root, copies };
 	}
 
 	private rebuild(): void {
-		this.dropItems();
+		/*
+		 * Only the items a step changes are drawn again, when nothing else has changed since the last
+		 * rebuild: the same document, scheme, fonts and pictures, and a preview or a board's move as
+		 * the reason. Recording every item's picture again was three quarters of a resize step, and
+		 * grew with the drawing rather than with what was being sized.
+		 */
+		const partial = !this.allDirty && this.painted !== undefined && this.painted.source === this.doc && this.items.length > 0;
+		this.allDirty = false;
+		const kept = partial ? new Map(this.items.map((item) => [item.id, item.picture])) : undefined;
+		const keptPlaced = partial ? this.painted!.placed : undefined;
+		if (partial) {
+			this.items = [];
+			this.itemIndex = undefined;
+		} else this.dropItems();
 		this.dropSlide();
 		const { ck, fonts } = this;
+		const source = this.doc;
 		let doc = this.doc;
+		const lastMoving = this.lastMoving;
+		this.lastMoving = this.moving;
 		if (!doc || doc.children.length === 0) {
+			for (const picture of kept?.values() ?? []) picture.delete();
 			this.placed = new Map();
 			this.bounds = new Map();
 			this.painted = undefined;
@@ -1215,7 +1348,10 @@ export class StageScene {
 			return;
 		}
 		// CanvasKit is still on its way: the layout comes with the first picture.
-		if (!ck || !fonts) return;
+		if (!ck || !fonts) {
+			for (const picture of kept?.values() ?? []) picture.delete();
+			return;
+		}
 		const theme = baseTheme(doc, this.scheme);
 		/*
 		 * Arrows are routed here as well as on the server: a file written by hand, or a board dragged
@@ -1223,55 +1359,90 @@ export class StageScene {
 		 * drawing; the file is the server's to rewrite.
 		 */
 		if (this.moving?.size) {
-			const copy = structuredClone(doc);
-			const index = indexOf(copy);
+			const { doc: copy, copies } = this.copyAlong(doc, this.moving.keys());
 			for (const [id, change] of this.moving) {
-				const found = index.get(id);
-				if (!found) continue;
-				found.node.x = (typeof found.node.x === "number" ? found.node.x : 0) + change.dx;
-				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + change.dy;
-				if (change.w !== undefined) found.node.width = change.w;
-				if (change.h !== undefined && !(found.node.type === "text" && found.node.textGrowth !== "fixed-width-height")) found.node.height = change.h;
+				const node = copies.get(id);
+				if (!node) continue;
+				node.x = (typeof node.x === "number" ? node.x : 0) + change.dx;
+				node.y = (typeof node.y === "number" ? node.y : 0) + change.dy;
+				if (change.w !== undefined) node.width = change.w;
+				if (change.h !== undefined && !(node.type === "text" && node.textGrowth !== "fixed-width-height")) node.height = change.h;
 				/*
 				 * How round the corners are. A shape from the library keeps it in its own metadata and
 				 * has its outline rebuilt from it by `fitShapes` below; pen's rectangle and frame have a
 				 * `cornerRadius` of their own.
 				 */
 				if (change.radius !== undefined) {
-					if (shapeRadius(found.node) === undefined) found.node.cornerRadius = change.radius === null || change.radius <= 0 ? undefined : change.radius;
-					else found.node.metadata = { type: "", ...found.node.metadata, radius: Math.max(0, change.radius ?? 0) };
+					if (shapeRadius(node) === undefined) node.cornerRadius = change.radius === null || change.radius <= 0 ? undefined : change.radius;
+					else node.metadata = { type: "", ...node.metadata, radius: Math.max(0, change.radius ?? 0) };
 				}
-				if (change.w !== undefined && found.node.type === "text" && (found.node.textGrowth ?? "auto") === "auto") found.node.textGrowth = "fixed-width";
+				if (change.w !== undefined && node.type === "text" && (node.textGrowth ?? "auto") === "auto") node.textGrowth = "fixed-width";
 				// A field being changed in the properties panel, drawn before it is saved.
-				for (const [field, value] of Object.entries(change.set ?? {})) (found.node as unknown as Record<string, unknown>)[field] = value === null ? undefined : value;
+				for (const [field, value] of Object.entries(change.set ?? {})) (node as unknown as Record<string, unknown>)[field] = value === null ? undefined : value;
 			}
 			// A shape being sized draws its outline at the new size, as the saved edit will (`fitShapes`).
-			fitShapes(copy);
+			fitShapes({ ...copy, children: [...copies.values()] });
 			doc = copy;
 		}
-		if ([...walk(doc.children)].some((node) => isArrow(node))) {
-			const copy = structuredClone(doc);
+		const arrows: string[] = [];
+		for (const node of walk(doc.children)) if (isArrow(node)) arrows.push(node.id);
+		if (arrows.length > 0) {
+			const { doc: copy } = this.copyAlong(doc, arrows);
 			if (reroute(copy, layout(copy, expand(copy), { theme, measure: fonts.measure }), (path) => this.boardFrames.get(path))) doc = copy;
 		}
 		const nodes = expand(doc);
+		/*
+		 * The fonts the words need, which a step that only moves, sizes or rounds an item cannot change:
+		 * asking meant reading every card's markdown again at every step.
+		 */
+		const sameWords = partial && [...(this.moving?.values() ?? [])].every((change) => change.set === undefined);
 		const generation = fonts.generation;
-		void fonts.need(this.fontsFor(nodes, doc, theme)).then((fresh) => {
-			// A font landed after this picture was drawn without it: lay out and draw again.
-			if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
-		});
+		if (!sameWords)
+			void fonts.need(this.fontsFor(nodes, doc, theme)).then((fresh) => {
+				// A font landed after this picture was drawn without it: lay out and draw again.
+				if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
+			});
 		const placed = layout(doc, nodes, { theme, measure: fonts.measure });
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
-		this.painted = { nodes, doc, placed };
+		this.painted = { nodes, doc, placed, source };
 		const ctx = { ...this.paintContext(doc, placed), skip: this.hidden, mute: this.muted, holes: this.holes };
+		/*
+		 * Which items a partial rebuild draws again: the ones holding what is or was previewed, the
+		 * ones holding an arrow (an end may have moved), and any whose box came out different.
+		 */
+		const again = new Set<string>();
+		const ids = new Set<string>();
+		if (partial) {
+			const changed = new Set([...(this.moving?.keys() ?? []), ...(lastMoving?.keys() ?? [])]);
+			const sameBox = (a: Frame | undefined, b: Frame | undefined) => !!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+			for (const node of nodes) {
+				let redo = !kept!.has(node.id) || !sameBox(placed.get(node.id)?.box, keptPlaced!.get(node.id)?.box);
+				const inside: string[] = [];
+				for (const inner of walk([node])) {
+					inside.push(inner.id);
+					if (!redo && (changed.has(inner.id) || isArrow(inner))) redo = true;
+				}
+				if (!redo) continue;
+				again.add(node.id);
+				for (const id of inside) ids.add(id);
+			}
+		}
 		const covers: Rect[] = [];
 		for (const node of nodes) {
 			if (this.hidden.has(node.id)) continue;
-			this.items.push({ id: node.id, picture: this.record((canvas) => paintDocument(canvas, [node], ctx)) });
+			const old = kept?.get(node.id);
+			let picture: Picture;
+			if (old && !again.has(node.id)) {
+				picture = old;
+				kept!.delete(node.id);
+			} else picture = this.record((canvas) => paintDocument(canvas, [node], ctx));
+			this.items.push({ id: node.id, picture });
 			// An item with no box of its own is drawn wherever the sheet is.
 			const box = this.bounds.get(node.id) ?? placed.get(node.id)?.box;
 			covers.push(box ? { x: box.x - ITEM_REACH, y: box.y - ITEM_REACH, w: box.w + 2 * ITEM_REACH, h: box.h + 2 * ITEM_REACH } : { x: -1e9, y: -1e9, w: 2e9, h: 2e9 });
 		}
+		for (const picture of kept?.values() ?? []) picture.delete();
 		this.itemIndex = new BoxIndex(covers);
 		// The cards' links and wide tables, laid out as they were drawn, for the page's presses.
 		const cards: CardGeometry[] = [];
@@ -1284,7 +1455,8 @@ export class StageScene {
 			const laid = fonts.markdown(content, textStyleOf(doc, node, one.theme), { width: box.w - pad * 2, align: node.textAlign ?? "left" });
 			cards.push({ id: node.id, order: one.order, box, pad, links: laid.links, scrollers: laid.scrollers });
 		}
-		this.sendLayout(cards);
+		this.sizing = partial && this.moving?.size ? again : undefined;
+		this.sendLayout(cards, partial ? ids : undefined);
 	}
 
 	/** An image fill's picture, fetched once; the drawing is redone when it arrives. */
@@ -1313,6 +1485,8 @@ export class StageScene {
 		clearTimeout(this.settle);
 		this.dropSlide();
 		this.dropItems();
+		this.still?.image.delete();
+		this.still = undefined;
 		for (const entry of this.entries.values()) this.letGo(entry);
 		this.entries.clear();
 		for (const image of this.images.values()) if (typeof image === "object") image.delete();

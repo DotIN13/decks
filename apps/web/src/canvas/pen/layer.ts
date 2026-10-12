@@ -226,7 +226,18 @@ export class PenLayer {
 			 * editors from the layout, and a layout taken in a frame or two before its picture showed a
 			 * deleted item without its outline, or an outline already where the item was not yet drawn.
 			 */
-			this.layoutNext = message;
+			/*
+			 * A step of a gesture carries only the items it drew again, laid over the layout before it.
+			 * One still waiting for its frame is the layout before it, so the two are put together here.
+			 */
+			const waiting = this.layoutNext;
+			if (message.partial && waiting) {
+				const placed = new Map(waiting.placed);
+				const bounds = new Map(waiting.bounds);
+				for (const [id, one] of message.placed) placed.set(id, one);
+				for (const [id, box] of message.bounds) bounds.set(id, box);
+				this.layoutNext = { ...message, placed: [...placed], bounds: [...bounds], ...(waiting.partial ? {} : { partial: undefined }) };
+			} else this.layoutNext = message;
 			clearTimeout(this.layoutTimer);
 			// A layout no frame follows (nothing on screen changed) is taken in anyway, a moment later.
 			this.layoutTimer = setTimeout(() => this.takeLayout(), 120);
@@ -234,6 +245,22 @@ export class PenLayer {
 	}
 
 	private layoutNext: Extract<SceneOutput, { type: "layout" }> | undefined;
+	private indexStale = false;
+	private hitsTimer: ReturnType<typeof setTimeout> | undefined;
+	/** The items' boxes, searchable; made again on first use after a layout. */
+	private index(): BoxIndex {
+		if (this.indexStale) {
+			this.indexStale = false;
+			this.placedIndex = new BoxIndex(this.placedList.map((one) => this.bounds.get(one.node.id) ?? one.box));
+		}
+		return this.placedIndex;
+	}
+	private refreshHits(): void {
+		clearTimeout(this.hitsTimer);
+		if (this.disposed) return;
+		this.hitWindow = undefined;
+		this.writeHits();
+	}
 	private layoutTimer: ReturnType<typeof setTimeout> | undefined;
 	private takeLayout(): void {
 		const message = this.layoutNext;
@@ -241,15 +268,31 @@ export class PenLayer {
 		this.layoutNext = undefined;
 		if (!message || this.disposed) return;
 		{
-			this.placed = new Map(message.placed);
-			this.bounds = new Map(message.bounds);
+			if (message.partial) {
+				const placed = new Map(this.placed);
+				const bounds = new Map(this.bounds);
+				for (const [id, one] of message.placed) placed.set(id, one);
+				for (const [id, box] of message.bounds) bounds.set(id, box);
+				this.placed = placed;
+				this.bounds = bounds;
+			} else {
+				this.placed = new Map(message.placed);
+				this.bounds = new Map(message.bounds);
+			}
 			this.placedList = [...this.placed.values()];
-			this.placedIndex = new BoxIndex(this.placedList.map((one) => this.bounds.get(one.node.id) ?? one.box));
-			this.hitWindow = undefined;
 			this.cards = message.cards;
 			if (this.docs.has(message.seq)) this.drawnDoc = this.docs.get(message.seq);
 			for (const seq of this.docs.keys()) if (seq <= message.seq) this.docs.delete(seq);
-			this.writeHits();
+			/*
+			 * The index and the click shapes are for the pointer's next press, and a step of a gesture is
+			 * not one: the pointer is held by the handle. So during one they are made once it rests, not
+			 * at every step, where they were a third of the page's time; anything asking sooner makes
+			 * the index then (`index`).
+			 */
+			this.indexStale = true;
+			clearTimeout(this.hitsTimer);
+			if (message.partial) this.hitsTimer = setTimeout(() => this.refreshHits(), 200);
+			else this.refreshHits();
 			this.drawn?.();
 		}
 	}
@@ -398,7 +441,7 @@ export class PenLayer {
 	 */
 	hitTest(point: { x: number; y: number }, options?: { deep?: boolean; skip?: (node: PenNode) => boolean }): PenHit | undefined {
 		let best: Placed | undefined;
-		for (const at of this.placedIndex.search({ x: point.x, y: point.y, w: 0, h: 0 })) {
+		for (const at of this.index().search({ x: point.x, y: point.y, w: 0, h: 0 })) {
 			const placed = this.placedList[at]!;
 			const { node } = placed;
 			if (node.id.includes("/") || node.type === "group") continue;
@@ -488,7 +531,7 @@ export class PenLayer {
 	within(r: Frame): string[] {
 		const index = this.doc ? indexOf(this.doc) : new Map();
 		const inside = new Set<string>();
-		for (const at of this.placedIndex.search(r)) {
+		for (const at of this.index().search(r)) {
 			const { node, box: given } = this.placedList[at]!;
 			if (node.id.includes("/") || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
 			// A shape's outline and words are never picked apart from it.
@@ -759,7 +802,7 @@ export class PenLayer {
 		 */
 		const reach = this.view.width > 0 ? this.windowRect(1) : undefined;
 		this.hitWindow = reach;
-		const near = reach ? this.placedIndex.search(reach).map((at) => this.placedList[at]!) : this.placedList;
+		const near = reach ? this.index().search(reach).map((at) => this.placedList[at]!) : this.placedList;
 		for (const placed of near) {
 			let top = placed;
 			while (top.parent) top = this.placed.get(top.parent) ?? top;

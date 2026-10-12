@@ -338,6 +338,21 @@
 		if (typeof meta.theme === "string") document.documentElement.dataset.theme = meta.theme;
 	}
 
+	/*
+	 * A new size from the canvas's handles, applied to the page as it is (`BoardFrame.tsx`). The
+	 * same numbers go into the file, so the tag is rewritten to say them too: whatever reads it
+	 * next reads what the file now says, and the page is not reloaded to learn it.
+	 */
+	window.__decksSize = (size) => {
+		const meta = readMeta();
+		if (Number.isFinite(Number(size?.w))) meta.w = Math.round(Number(size.w));
+		if (Number.isFinite(Number(size?.h))) meta.h = Math.round(Number(size.h));
+		const tag = document.querySelector('meta[name="board"]');
+		if (tag) tag.setAttribute("content", JSON.stringify(meta));
+		applyMeta(meta);
+		return true;
+	};
+
 	// --- markdown and maths ------------------------------------------------------
 
 	/**

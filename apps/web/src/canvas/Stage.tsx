@@ -740,7 +740,16 @@ export function Stage(props: {
 	const [ownDrag, setOwnDrag] = createSignal<{ path: string; x: number; y: number } | undefined>();
 	const [boardDrag, setBoardDrag] = createSignal<{ paths: readonly string[]; dx: number; dy: number } | undefined>();
 	/** A board being resized by its handles, held from the first move until the board is at it. */
-	const [boardResize, setBoardResize] = createSignal<{ path: string; x: number; y: number; w: number; h: number } | undefined>();
+	const [boardResize, setBoardResize] = createSignal<{ path: string; x: number; y: number; w: number; h: number; released?: { rev: number } } | undefined>();
+	/** Whether an arrow on the drawing ends on this board. */
+	const arrowEndsOn = (path: string) => {
+		for (const { node } of penLayer.placed.values()) {
+			if (!isArrow(node)) continue;
+			const ends = (node.metadata ?? {}) as { from?: unknown; to?: unknown };
+			if (arrowEndItem(ends.from) === path || arrowEndItem(ends.to) === path) return true;
+		}
+		return false;
+	};
 	/**
 	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
 	 *
@@ -752,7 +761,15 @@ export function Stage(props: {
 		const look = scheme();
 		// A board drawn into a canvas of its own keeps its own picture: the sheet leaves it alone.
 		const own = props.renderer === "canvas-per-board";
-		const resize = boardResize();
+		/*
+		 * A live board being sized is its page, drawn over the sheet at the new box, so the sheet
+		 * keeps it where it was until the file has the size: each step otherwise painted the whole
+		 * sheet again, about 10 ms of the worker's time, to move a hole nobody can see. A board
+		 * shown as a picture is drawn by the sheet, and one an arrow ends on is followed by the
+		 * arrow, so those two are still sent at every step.
+		 */
+		const held = boardResize();
+		const resize = held && (!live.has(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
 		penLayer.setBoards(
 			props.boards
 				.filter((board) => board.path !== props.focus)
@@ -2424,7 +2441,9 @@ export function Stage(props: {
 				if (next.x !== start.x || next.y !== start.y) props.onMove(path, next.x, next.y);
 				if (next.w !== start.w || next.h !== start.h) props.onResize?.(path, { w: next.w, h: next.h });
 				// The box is let go of when the board is at it, or after a moment if the file settles elsewhere.
-				const held = { path, ...next };
+				const rev = props.boards.find((candidate) => candidate.path === path)?.rev ?? 0;
+				const held = { path, ...next, released: { rev } };
+				setBoardResize(held);
 				setTimeout(() => {
 					if (untrack(boardResize) === held) setBoardResize(undefined);
 				}, 4000);
@@ -2433,11 +2452,21 @@ export function Stage(props: {
 	};
 	createEffect(() => {
 		const held = boardResize();
-		if (!held || held.path === undefined) return;
+		/*
+		 * Only once the handle is let go. While it is held the box is wherever the pointer puts it,
+		 * shorter than the words if that is where the pointer is: a board's height is a floor under
+		 * its content, so this let go of the box the moment it was pulled above the board's height,
+		 * and the bottom edge could not be dragged up at all. After the lift, the board takes the
+		 * size the file and its content give it, which is its content's height when that is more.
+		 */
+		if (!held?.released) return;
 		const board = props.boards.find((candidate) => candidate.path === held.path);
 		if (!board) return setBoardResize(undefined);
 		const slides = board.format === "slides";
-		if (board.x === held.x && board.y === held.y && board.w === held.w && (slides || board.h >= held.h)) setBoardResize(undefined);
+		const at = board.x === held.x && board.y === held.y && board.w === held.w;
+		// The size from before the write is not the answer: wait for the write, unless the board is already exactly the box.
+		if (board.rev === held.released.rev && !(at && board.h === held.h)) return;
+		if (at && (slides || board.h >= held.h)) setBoardResize(undefined);
 	});
 
 	/*

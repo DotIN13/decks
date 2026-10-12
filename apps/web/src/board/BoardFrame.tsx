@@ -747,6 +747,27 @@ export function BoardFrame(props: {
 	};
 	createEffect(applySrc);
 
+	/*
+	 * A size from the stage's handles, given to the page as it is dragged, once a frame at most.
+	 * The page used to keep the width it loaded with until the file came back and the frame was
+	 * reloaded at the new one; now the words reflow under the handle, and the write that follows
+	 * leaves the page where it is (`state/patches.ts`, `sizedHere`). A deck sizes its slides itself.
+	 */
+	let sizeFrame = 0;
+	createEffect(() => {
+		const box = sizing();
+		if (!box || props.board.format === "slides") return;
+		const { w, h } = box;
+		cancelAnimationFrame(sizeFrame);
+		sizeFrame = requestAnimationFrame(() => {
+			try {
+				(frameEl?.contentWindow as { __decksSize?: (size: { w: number; h: number }) => void } | null | undefined)?.__decksSize?.({ w, h });
+			} catch {
+				/* a page from elsewhere, which keeps its own size */
+			}
+		});
+	});
+
 	/**
 	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and
 	 * the measurement. Called from the frame's `load` whichever renderer put it there.
@@ -917,8 +938,9 @@ export function BoardFrame(props: {
 			}}
 			data-path={props.board.path}
 			title={props.board.title}
-			width={props.board.w}
-			height={props.board.h}
+			// At the box being dragged, as the node is: the page is given that size as it goes (`__decksSize`).
+			width={sizing()?.w ?? props.board.w}
+			height={sizing()?.h ?? props.board.h}
 			referrerpolicy="no-referrer"
 			// A drawable child of a canvas (`canvas-per-board`); ignored by a plain box.
 			attr:drawable=""
@@ -1406,10 +1428,9 @@ export function BoardFrame(props: {
 			<div
 				class="surface"
 				/*
-				 * Drawn at the size being dragged, like the node. The document inside it is still
-				 * the old file until the write lands, so the difference between the two is the
-				 * empty panel the new area is — the honest picture of "this is the box you are
-				 * asking for, and the board has not been rewritten yet".
+				 * Drawn at the size being dragged, like the node and the frame in it. The page is given
+				 * the new size as it goes and lays itself out at it, so the new area is the board, not
+				 * an empty panel waiting for the write.
 				 */
 				style={{
 					width: `${(sizing()?.w ?? props.board.w)}px`,

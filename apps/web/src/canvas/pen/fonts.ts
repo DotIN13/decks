@@ -182,12 +182,25 @@ export class PenFonts {
 	/** The measure `@decks/pen`'s layout takes, with this browser's fonts. A card's markdown is measured as it is drawn. */
 	readonly measure: MeasureText = (text, style, maxWidth, node) => {
 		if (node && (isMarkdown(node) || isMarkdownText(node))) return { w: maxWidth ?? 240, h: this.markdown(text, style, { width: maxWidth ?? 240, align: node.textAlign ?? "left" }).height };
+		/*
+		 * Kept, as a card's layout is: a layout of the drawing measures every text in it, and a step
+		 * of a resize lays the whole drawing out again to place one item. Setting each paragraph
+		 * anew was most of that layout on a stage of notes.
+		 */
+		const key = JSON.stringify([this.generation, maxWidth === undefined ? -1 : Math.round(maxWidth * 10), style, text]);
+		const known = this.sizes.get(key);
+		if (known) return known;
 		const paragraph = this.paragraph(text || " ", style, { width: maxWidth ?? 1e6 });
 		const w = maxWidth === undefined ? Math.ceil(paragraph.getMaxIntrinsicWidth()) : Math.min(maxWidth, Math.ceil(paragraph.getLongestLine()));
 		const h = paragraph.getHeight();
 		paragraph.delete();
-		return { w, h };
+		const size = { w, h };
+		if (this.sizes.size >= 4096) this.sizes.delete(this.sizes.keys().next().value!);
+		this.sizes.set(key, size);
+		return size;
 	};
+	/** Plain text measured, by font generation, width, style and words (`measure`). */
+	private readonly sizes = new Map<string, { w: number; h: number }>();
 }
 
 /**
