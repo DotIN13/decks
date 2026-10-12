@@ -67,3 +67,21 @@ test("elsewhere the link already carries the token, so nothing restarts", () => 
 		assert.equal(restarts(), 0);
 	});
 });
+
+test("after a restart the next prompt goes to the new query, not the one it replaced", async () => {
+	type Feed = { input(feed: number): AsyncGenerator<{ message: { content: string } }>; push(text: string): void; closed: boolean; feed: number; wake?: () => void };
+	const b = Object.create(ClaudeBackend.prototype) as unknown as Feed;
+	Object.assign(b, { queue: [], closed: false, feed: 1 });
+	const old = b.input(1);
+	const parked = old.next();
+	// What `restart` does: close, wake the old feed, open a new one before the old one resumes.
+	b.closed = true;
+	b.wake?.();
+	b.closed = false;
+	b.feed = 2;
+	const fresh = b.input(2);
+	const next = fresh.next();
+	assert.equal((await parked).done, true);
+	b.push("ok");
+	assert.equal((await next).value?.message.content, "ok");
+});

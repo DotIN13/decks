@@ -123,6 +123,13 @@ export class ClaudeBackend implements AgentBackend {
 	private queue: SDKUserMessage[] = [];
 	private wake: (() => void) | undefined;
 	private closed = false;
+	/**
+	 * Which query's input is live. Bumped by every `startQuery`, so a generator left from the
+	 * query a restart replaced ends instead of parking again: `closed` is already false by the
+	 * time it wakes, and two generators sharing `queue` and `wake` meant the next prompt could
+	 * go to the dead query, leaving the agent thinking for good.
+	 */
+	private feed = 0;
 	private streaming = false;
 	private pump: Promise<void> | undefined;
 
@@ -291,7 +298,8 @@ export class ClaudeBackend implements AgentBackend {
 		};
 
 		this.closed = false;
-		this.session = query({ prompt: this.input(), options });
+		const feed = ++this.feed;
+		this.session = query({ prompt: this.input(feed), options });
 
 		// Drained in the background for the agent's life: this is the event loop.
 		this.pump = (async () => {
@@ -355,7 +363,8 @@ export class ClaudeBackend implements AgentBackend {
 					}
 				}
 			} catch (error) {
-				if (this.closed) return;
+				// A query a restart replaced ending is not this agent stopping.
+				if (this.closed || feed !== this.feed) return;
 				this.streaming = false;
 				translator.setState("idle");
 				// Before reporting a stop: the same failure arrives here when the first turn cannot
@@ -392,8 +401,8 @@ export class ClaudeBackend implements AgentBackend {
 	 * A generator rather than a channel object because that is the shape `query()` takes.
 	 * It parks on a promise when the queue is empty, so an idle agent costs nothing.
 	 */
-	private async *input(): AsyncGenerator<SDKUserMessage> {
-		while (!this.closed) {
+	private async *input(feed: number): AsyncGenerator<SDKUserMessage> {
+		while (!this.closed && feed === this.feed) {
 			const next = this.queue.shift();
 			if (!next) {
 				await new Promise<void>((resolve) => {
