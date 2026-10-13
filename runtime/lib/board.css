@@ -1514,28 +1514,36 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
  * The markdown path gets this from `[data-md]`, which styles what it rendered. A board holds
  * hand-written HTML instead, so the same rhythm is stated here: the first heading sits flush
  * with the padding, and everything after it is separated rather than crowded.
+ *
+ * These are defaults, so they must lose to any rule the board writes. `:where()` takes the
+ * `.board .doc` out of their weight: the rhythm counts as a bare tag (0,0,1), which beats the
+ * tag defaults near the top of this file only by coming later, and loses to any class a board
+ * styles (`.lede { margin: 0 0 26px }`) and to a tag rule in the board's own <style>, which comes
+ * after this sheet. Written as `.board .doc p` they weighed (0,2,1) and silently beat those.
+ * Not `:where()` round the whole selector: at (0,0,0) the tag defaults above would win instead.
+ * The flush first child weighs one class (0,1,0), enough to beat the heading rule after it.
  */
-.board .doc > :first-child {
+:where(.board .doc) > :first-child {
 	margin-top: 0;
 }
 
-.board .doc h1,
-.board .doc h2,
-.board .doc h3 {
+:where(.board .doc) h1,
+:where(.board .doc) h2,
+:where(.board .doc) h3 {
 	margin: 1.4em 0 0.5em;
 	line-height: 1.25;
 }
 
-.board .doc p,
-.board .doc ul,
-.board .doc ol,
-.board .doc table,
-.board .doc pre,
-.board .doc blockquote {
+:where(.board .doc) p,
+:where(.board .doc) ul,
+:where(.board .doc) ol,
+:where(.board .doc) table,
+:where(.board .doc) pre,
+:where(.board .doc) blockquote {
 	margin: 0.75em 0 0;
 }
 
-.board .doc li {
+:where(.board .doc) li {
 	margin: 0.3em 0;
 }
 
