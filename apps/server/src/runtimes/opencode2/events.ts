@@ -18,7 +18,8 @@ import type { Translator } from "../../agents/translator.ts";
  * - **The prompt is not echoed back as text.** It arrives as `session.inbox.*`, so there is no
  *   user message to filter out.
  * - **A turn ends with `session.execution.succeeded`, `failed` or `interrupted`.** There is no
- *   `session.idle`.
+ *   `session.idle`. But not every execution is a turn: moving a session to another folder runs
+ *   as an execution of its own, with no model step in it, and that one ends nothing.
  */
 export interface Opencode2StreamHooks {
 	/** The turn ended, however it ended. */
@@ -51,6 +52,9 @@ export class Opencode2Stream {
 	private replying = false;
 	/** An error was already said this turn: a failed step is followed by a failed execution. */
 	private errored = false;
+	/** What the running execution has done: a model step, or a move of the session. */
+	private stepped = false;
+	private moved = false;
 
 	constructor(
 		private readonly t: Translator,
@@ -83,7 +87,15 @@ export class Opencode2Stream {
 				return this.toolEnded(data.id, text(data.content), false);
 			case "session.tool.failed":
 				return this.toolEnded(data.id, (data.error as { message?: string } | undefined)?.message ?? "failed", true);
+			case "session.execution.started":
+				this.stepped = false;
+				this.moved = false;
+				return;
+			case "session.moved":
+				this.moved = true;
+				return;
 			case "session.step.started": {
+				this.stepped = true;
 				const model = data.model as { id?: string; providerID?: string; variant?: string } | undefined;
 				if (model?.id && model.providerID) this.hooks.model(model.providerID, model.id, model.variant);
 				return;
@@ -106,6 +118,8 @@ export class Opencode2Stream {
 				}
 				return;
 			case "session.execution.succeeded":
+				// A move that ran as its own execution: the agent's turn, if any, is still ahead.
+				if (this.moved && !this.stepped) return;
 				return this.finish("succeeded");
 			case "session.execution.failed":
 				if (!this.errored) this.failed(data.error);

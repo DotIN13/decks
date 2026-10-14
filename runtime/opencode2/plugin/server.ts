@@ -45,9 +45,29 @@ async function callDecks(path: string, body: Record<string, unknown>, what: stri
   return outcome.text
 }
 
+/**
+ * The environment an agent's commands should have: the values the Decks server started
+ * OpenCode 2 with, before it gave OpenCode its own folders (`opencode2/manager.ts`). A `null`
+ * is a variable that was not set, and stays unset.
+ */
+const restore = (() => {
+  try {
+    return JSON.parse(process.env.DECKS_OPENCODE2_RESTORE ?? "{}") as Record<string, string | null>
+  } catch {
+    return {}
+  }
+})()
+
 export default Plugin.define({
   id: "decks",
   setup: async (ctx) => {
+    await ctx.shell.hook("create.before", (command) => {
+      for (const [name, value] of Object.entries(restore)) {
+        if (value === null) delete command.env[name]
+        else command.env[name] = value
+      }
+      delete command.env.DECKS_OPENCODE2_RESTORE
+    })
     await ctx.tool.transform((editor) => {
       editor.add({
         name: "stage_eval",

@@ -3,6 +3,7 @@ import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption,
 import { DEFAULT_THINKING } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint, IsolationContext } from "../../agents/backend.ts";
 import { deckContext, isolationNote } from "../../agents/context.ts";
+import { sentAs } from "../../agents/sent-as.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 // The level vocabulary is Decks' own and the same for both opencodes, so it is read from there
 // rather than copied: it maps Decks' scale onto whatever variant names a model declares.
@@ -137,16 +138,7 @@ export class Opencode2Backend implements AgentBackend {
 		if (added.length > 0) this.context.notice("info", `OpenCode 2 now has your opencode 1 key for ${added.join(", ")}.`);
 
 		await this.refreshModels();
-		const model = this.wantedModel();
-		const session = (await this.client.session.create({
-			title: "Decks",
-			location: { directory: this.directory },
-			...(model ? { model } : {}),
-			permissions: rulesOf(this.currentMode),
-		} as never)) as { id?: string };
-		this.sessionId = session.id;
-		if (!this.sessionId) throw new Error("OpenCode 2 started but would not open a session.");
-		if (model) this.applied = keyOf(model);
+		this.sessionId = await this.openSession();
 
 		// The canvas tool's calls name this session; the bridge resolves that to this agent.
 		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, this.context.tool, "opencode2");
@@ -164,6 +156,39 @@ export class Opencode2Backend implements AgentBackend {
 		});
 		void this.pump();
 		void this.refreshCommands();
+	}
+
+	/**
+	 * The session this chat continues, or a new one.
+	 *
+	 * OpenCode 2 keeps sessions in its database across server restarts, so a chat that was
+	 * resting, or a fork opened as a new chat, carries on in the session it names (`resumeRef`).
+	 * Its permissions are set to this chat's mode again, and its model to the chat's, since
+	 * either may have changed while it rested. One that is gone starts the chat afresh, as a
+	 * missing pi session file does.
+	 */
+	private async openSession(): Promise<string> {
+		const model = this.wantedModel();
+		const resume = this.context.resumeRef;
+		if (resume) {
+			const found = (await this.client.session.get({ sessionID: resume } as never).catch(() => undefined)) as { id?: string } | undefined;
+			if (found?.id) {
+				await this.client.session.update({ sessionID: found.id, permissions: rulesOf(this.currentMode) } as never).catch(() => undefined);
+				this.sessionId = found.id;
+				await this.applyModel().catch(() => undefined);
+				return found.id;
+			}
+			this.context.notice("warn", "OpenCode 2 no longer has this conversation, so the chat starts a new one.");
+		}
+		const session = (await this.client.session.create({
+			title: "Decks",
+			location: { directory: this.directory },
+			...(model ? { model } : {}),
+			permissions: rulesOf(this.currentMode),
+		} as never)) as { id?: string };
+		if (!session.id) throw new Error("OpenCode 2 started but would not open a session.");
+		if (model) this.applied = keyOf(model);
+		return session.id;
 	}
 
 	/** The deck's description and the guidelines, as every runtime gets them. */
@@ -236,10 +261,15 @@ export class Opencode2Backend implements AgentBackend {
 	private async send(text: string): Promise<void> {
 		if (!this.sessionId) throw new Error("This OpenCode 2 chat is not connected any more. Start it again.");
 		await this.applyModel();
+		/*
+		 * Mid-turn input steers, as it does on pi: the person is correcting what they watch. Input
+		 * to an idle chat is queued instead, because a steer jumps the queue, and the queue may hold
+		 * a move into or out of isolated mode that this prompt has to come after.
+		 */
+		const delivery = this.streamingNow ? "steer" : "queue";
 		this.streamingNow = true;
 		this.context.translator.setState("thinking");
-		// Mid-turn input steers, as it does on pi: the person is correcting what they watch.
-		await this.client.session.prompt({ sessionID: this.sessionId, text, delivery: "steer" } as never);
+		await this.client.session.prompt({ sessionID: this.sessionId, text, delivery } as never);
 	}
 
 	/** The model and level the chat asks for, as OpenCode 2 names them. */
@@ -455,26 +485,81 @@ export class Opencode2Backend implements AgentBackend {
 	}
 
 	/**
-	 * No time machine yet, as with opencode 1. OpenCode 2 has `fork` and a staged `revert`, so this
-	 * is a *not yet*: a rewind in Decks also restores the boards, which needs each user message
-	 * paired with an id the server keeps.
+	 * Tag each user message in the transcript with the OpenCode 2 message it became.
+	 *
+	 * The same walk as pi's and Claude's: from the end, because the transcript in memory is a
+	 * capped tail and the two lists share a suffix, and stopping at the first message whose text
+	 * disagrees, which costs one message its rewind and is the right way to be wrong.
 	 */
-	timeline(): ConversationPoint[] {
-		return [];
+	async syncEntryIds(): Promise<void> {
+		if (!this.sessionId) return;
+		let entries: Array<{ id: string; text: string }>;
+		try {
+			const answered = (await this.client.message.list({ sessionID: this.sessionId, type: "user", order: "asc", limit: 500 } as never)) as unknown as {
+				data?: Array<{ id: string; payload?: { text?: string }; text?: string }>;
+			};
+			entries = (answered.data ?? []).map((message) => ({ id: message.id, text: message.payload?.text ?? message.text ?? "" }));
+		} catch {
+			return;
+		}
+		const items = this.context.translator.userMessages();
+		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
+			const entry = entries[entries.length - offset];
+			const item = items[items.length - offset];
+			if (!entry || !item) break;
+			if (item.entryId === entry.id) continue;
+			if (!sentAs(entry.text, item.text)) break;
+			this.context.translator.tagUser(item.id, entry.id);
+		}
 	}
 
-	async syncEntryIds(): Promise<void> {}
+	/** The points worth returning to: the user's messages that `syncEntryIds` paired. */
+	timeline(): ConversationPoint[] {
+		return this.context.translator
+			.userMessages()
+			.filter((item) => item.entryId)
+			.map((item) => ({ id: item.entryId as string, at: item.at }));
+	}
 
+	/**
+	 * Nothing recorded, as for Claude: OpenCode 2 has no entry Decks can write a board revision
+	 * into, and `App.boardsAt` falls back to the revision store's own times, which is how an
+	 * empty map asks for it.
+	 */
 	revisionsAt(): Record<string, string> {
 		return {};
 	}
 
-	async rewindTo(): Promise<{ cancelled: boolean }> {
-		return { cancelled: true };
+	/**
+	 * Go back to just before a message, in place.
+	 *
+	 * OpenCode 2 reverts a session to a message in two steps, staged and then committed, and the
+	 * session keeps its id. Files are left alone (`files: false`): Decks restores the boards from
+	 * its own revisions, and OpenCode undoing the same files from its snapshots would be a second
+	 * writer racing the first.
+	 */
+	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
+		if (!this.sessionId) return { cancelled: true };
+		if (this.streamingNow) throw new Error("Stop OpenCode 2 before rewinding.");
+		const text = this.context.translator.userMessages().find((item) => item.entryId === entryId)?.text;
+		try {
+			await this.client.session.revert.stage({ sessionID: this.sessionId, messageID: entryId, files: false } as never);
+			await this.client.session.revert.commit({ sessionID: this.sessionId } as never);
+		} catch (error) {
+			this.context.notice("warn", `OpenCode 2 would not rewind: ${(error as Error).message}`);
+			return { cancelled: true };
+		}
+		return { cancelled: false, ...(text ? { editorText: text } : {}) };
 	}
 
-	async forkFrom(): Promise<string | undefined> {
-		return undefined;
+	/**
+	 * Everything before a message, as a session of its own for a new chat to open. Before it, so
+	 * the new chat opens with that message still unasked, as on pi and Claude.
+	 */
+	async forkFrom(entryId: string): Promise<string | undefined> {
+		if (!this.sessionId) return undefined;
+		const forked = (await this.client.session.fork({ sessionID: this.sessionId, before: entryId } as never).catch(() => undefined)) as { id?: string } | undefined;
+		return forked?.id;
 	}
 
 	dispose(): void {

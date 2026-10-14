@@ -122,9 +122,21 @@ export class Opencode2Manager {
 
 	/** The environment the server is started with: Decks' secret, its folders, its config. */
 	environment(spec: Opencode2ServerSpec, secret: string): NodeJS.ProcessEnv {
+		const folders = opencode2Folders(this.baseEnv.HOME, this.baseEnv).env;
+		/*
+		 * What the commands an agent runs should see instead. The folder settings are for OpenCode
+		 * 2 alone: an agent's `pip` or `gh` inheriting `XDG_CACHE_HOME` would quietly use a cache
+		 * of OpenCode's. So the original values travel with the server, and Decks' plugin
+		 * (`runtime/opencode2/plugin`) puts them back on every shell command, with `null` for one
+		 * that was not set at all. The server's password goes the same way: a command has no
+		 * business holding the key to the server that runs it.
+		 */
+		const restore: Record<string, string | null> = { OPENCODE_PASSWORD: null };
+		for (const name of Object.keys(folders)) restore[name] = this.baseEnv[name] ?? null;
 		return {
 			...this.baseEnv,
-			...opencode2Folders(this.baseEnv.HOME, this.baseEnv).env,
+			...folders,
+			DECKS_OPENCODE2_RESTORE: JSON.stringify(restore),
 			OPENCODE_PASSWORD: secret,
 			OPENCODE_CONFIG_CONTENT: JSON.stringify(spec.config),
 			// Decks decides which OpenCode 2 runs; an update in the background would change it

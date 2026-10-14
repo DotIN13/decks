@@ -105,3 +105,16 @@ test("a permission request reaches the backend with what it asks for", () => {
 	t.feed("permission.asked", { action: "shell" });
 	assert.deepEqual(t.asked, [{ id: "per_1", action: "shell", message: "run ls" }], "a request with no id cannot be answered, so it is not passed on");
 });
+
+test("moving the session runs as an execution of its own, and ends no turn", () => {
+	const t = transcript();
+	t.feed("session.execution.started", {});
+	t.feed("session.moved", { directory: "/iso" });
+	t.feed("session.execution.succeeded", {});
+	assert.deepEqual(t.ended, [], "the move is not the agent's turn");
+	t.feed("session.execution.started", {});
+	t.feed("session.step.started", { model: { id: "m", providerID: "p" } });
+	t.feed("session.text.delta", { ...M1, delta: "ok" });
+	t.feed("session.execution.succeeded", {});
+	assert.deepEqual(t.ended, ["succeeded"]);
+});

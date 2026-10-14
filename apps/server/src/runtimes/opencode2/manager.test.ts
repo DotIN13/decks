@@ -47,6 +47,23 @@ test("the server is started in its own folders, never opencode 1's", async () =>
 	}
 });
 
+test("what an agent's commands should see instead travels with the server", async () => {
+	const spawned: NodeJS.ProcessEnv[] = [];
+	const manager = new Opencode2Manager({
+		env: { HOME: "/home/someone", XDG_CACHE_HOME: "/home/someone/.my-cache" },
+		spawn: (_argv, env) => {
+			spawned.push(env);
+			return fakeChild() as unknown as Opencode2Child;
+		},
+	});
+	await manager.acquire(SPEC);
+	const restore = JSON.parse(spawned[0]!.DECKS_OPENCODE2_RESTORE!);
+	assert.equal(restore.XDG_CACHE_HOME, "/home/someone/.my-cache", "a setting the person had comes back as it was");
+	assert.equal(restore.XDG_DATA_HOME, null, "one they did not have is taken away again");
+	assert.equal(restore.OPENCODE_CONFIG_DIR, null);
+	assert.equal(restore.OPENCODE_PASSWORD, null, "and a command never holds the server's password");
+});
+
 test("the URL is read from OpenCode 2's own line, and the secret is its password and the tools' token", async () => {
 	const { manager, spawned } = managerWith();
 	const handle = await manager.acquire(SPEC);
