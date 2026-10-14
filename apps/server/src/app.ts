@@ -209,6 +209,7 @@ export class App {
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
 		this.apps = new Apps(deck.path);
+		this.apps.decksPort = config.port;
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.

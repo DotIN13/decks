@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -146,4 +146,25 @@ test("names are checked, and a starter will not write over an app", () => {
 		apps.dispose();
 		rmSync(deck, { recursive: true, force: true });
 	}
+});
+
+test("a server app is told where to run stage code, with a secret that is its own", async () => {
+	await withDeck(async ({ deck, apps, get }) => {
+		apps.decksPort = 4999;
+		const folder = join(deck, "apps", "teller");
+		mkdirSync(folder, { recursive: true });
+		writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
+		writeFileSync(
+			join(folder, "server.js"),
+			`require("node:http").createServer((q, s) => s.end(JSON.stringify({ url: process.env.DECKS_STAGE_URL, token: process.env.DECKS_STAGE_TOKEN, app: process.env.DECKS_APP, sdk: process.env.DECKS_SDK }))).listen(process.env.PORT, "127.0.0.1");`,
+		);
+		const seen = (await (await get("/app/teller/")).json()) as { url: string; token: string; app: string; sdk: string };
+		assert.equal(seen.url, "http://127.0.0.1:4999/api/apps/teller/stage");
+		assert.equal(seen.app, "teller");
+		assert.ok(existsSync(seen.sdk) && seen.sdk.endsWith("packages/sdk/src/index.js"), "and where the SDK is, to import");
+		assert.ok(apps.holdsToken("teller", seen.token), "the token it was given is the one Decks checks");
+		assert.equal(apps.holdsToken("teller", seen.token.slice(1)), false);
+		assert.equal(apps.holdsToken("other", seen.token), false, "and it is no other app's");
+		assert.equal(apps.holdsToken("teller", undefined), false);
+	});
 });

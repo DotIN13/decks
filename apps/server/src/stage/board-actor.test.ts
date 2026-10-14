@@ -103,3 +103,14 @@ test("a board has no row of its own to tag or to place in a workspace", () => {
 	assert.equal(actor.setWorkspace("decks"), null);
 	assert.deepEqual(calls, []);
 });
+
+test("an actor made with a create hook makes agents for the conversation, as an app's does", async () => {
+	const { api, calls } = conversation();
+	const made: Array<[string, unknown]> = [];
+	const actor = boardActor({ path: "boards/apps/polls.html", name: "app polls", conversation: { ...api, create: async (fromId, spec) => (made.push([fromId, spec]), { agent: "agent-9", name: spec.name }) } });
+
+	assert.equal(actor.identity().name, "app polls");
+	assert.deepEqual(await actor.create?.({ name: "Labeler", kind: "claude" }), { agent: "agent-9", name: "Labeler" });
+	assert.deepEqual(made, [["agent-1", { name: "Labeler", kind: "claude" }]], "made by the conversation in front of the person");
+	assert.deepEqual(calls, []);
+});

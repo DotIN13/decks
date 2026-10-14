@@ -2,10 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { ServerMessage } from "@decks/protocol";
 import { asBoardFormat } from "../boards/templates.ts";
 import { codeFor } from "../boards/eval-code.ts";
-import { boardActor } from "../stage/board-actor.ts";
-import { runEval, safeJson } from "../stage/eval.ts";
-import { createStageTool } from "../stage/tool.ts";
-import type { Registry } from "../agents/registry.ts";
+import { runAsCaller } from "../stage/caller-run.ts";
 import type { WireContext, WirePart } from "./context.ts";
 
 /**
@@ -356,51 +353,20 @@ async function runBoardEval(
 	}
 
 	/*
-	 * The same stage object an agent gets, with the board as the actor (`stage/board-actor.ts`).
+	 * The same stage object an agent gets, with the board as the actor (`stage/caller-run.ts`).
 	 *
 	 * `event` is the one name added to the snippet's scope: which component was pressed, what
 	 * it carried, and the board it sits on.
 	 */
-	const conversation = {
-		id: focused.id,
-		context: () => [...focused.context],
-		inPlay: () => [...focused.inPlay],
-		setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => focused.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
-		positions: () => focused.positions(),
-		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
-		camera: () => wire.cameras.answer(focused.id, focused.stageName?.()),
-		queue: () => focused.queue(),
-		agents: () => wire.agents.summaries(),
-		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => wire.agents.send(fromId, target, spec),
-		recordRevision: (board: string) => wire.boards.recordRevision(board),
-		boardPathOf: (file: string) => wire.boards.boardPathOf(file),
-	};
-	const actor = boardActor({ path, conversation });
-	const stage = createStageTool({ stage: wire.stage, agent: actor, port: wire.port }).stage;
-
 	const event = {
 		id,
 		board: path,
 		path,
 		...(value !== undefined ? { value } : {}),
 	};
-	const outcome = await runEval(code, stage, { scope: { event } });
-
-	/*
-	 * One notice, always — the run is announced whether it worked or not.
-	 *
-	 * That is the design's second mitigation and the one worth having: a thing that starts on
-	 * its own and says nothing reads as a fault, and an agent reading the conversation later
-	 * needs to know a click did something. The first line of the code is in it because that is
-	 * what makes the notice checkable against the file.
-	 */
-	const first = code.split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
-	const said = first.length > 80 ? `${first.slice(0, 80)}…` : first;
-	if (outcome.error) {
-		focused.translator.notice("error", `${path} ran "${id}" and failed: ${outcome.error}`);
-		reply({ type: "notice", level: "error", text: `${path}: ${outcome.error}` });
-		return;
-	}
-	const returned = outcome.value === undefined ? "" : ` → ${safeJson(outcome.value).replace(/\s+/g, " ").slice(0, 200)}`;
-	focused.translator.notice("info", `${path} ran "${id}": ${said}${returned}`);
+	const outcome = await runAsCaller(
+		{ agents: wire.agents, cameras: wire.cameras, boards: wire.boards, stage: wire.stage, port: wire.port },
+		{ board: path, name: path, code, scope: { event }, what: `ran "${id}"` },
+	);
+	if (outcome.error) reply({ type: "notice", level: "error", text: `${path}: ${outcome.error}` });
 }

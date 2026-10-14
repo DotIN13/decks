@@ -1,5 +1,5 @@
 import type { AgentKind, AgentState, Camera, Identity } from "@decks/protocol";
-import type { QueuedWork, SendSpec, StageAgentHooks } from "./tool.ts";
+import type { CreateSpec, QueuedWork, SendSpec, StageAgentHooks } from "./tool.ts";
 
 /**
  * The stage object a *board* is when it runs its own code.
@@ -49,6 +49,8 @@ export interface BoardConversation {
 		queued?: number;
 	}>;
 	send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+	/** Make an agent, as the conversation would: on its runtime, account and workspace unless the spec says otherwise. */
+	create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }>;
 	recordRevision(path: string): string | undefined;
 	boardPathOf(file: string): string | undefined;
 }
@@ -61,9 +63,10 @@ function boardName(path: string): string {
 	return `board ${path.split("/").filter(Boolean).pop() ?? path}`;
 }
 
-export function boardActor(options: { path: string; conversation: BoardConversation }): StageAgentHooks {
+export function boardActor(options: { path: string; conversation: BoardConversation; name?: string }): StageAgentHooks {
 	const { path, conversation } = options;
-	let identity: Identity = { name: boardName(path), color: BOARD_COLOR };
+	// An app is a board too, with a name of its own (`app polls`) instead of its file's.
+	let identity: Identity = { name: options.name ?? boardName(path), color: BOARD_COLOR };
 
 	return {
 		id: conversation.id,
@@ -95,6 +98,8 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		// The sender is the conversation, because a queue's reply has to find somebody to
 		// land in and a board has no inbox of its own.
 		send: (target, spec) => conversation.send(conversation.id, target, spec),
+		// `stage.send({ name, kind }, …)` makes the agent first; it is made for the conversation, like a send.
+		...(conversation.create ? { create: (spec: CreateSpec) => conversation.create!(conversation.id, spec) } : {}),
 		queue: () => conversation.queue(),
 		recordRevision: (board) => conversation.recordRevision(board),
 		boardPathOf: (file) => conversation.boardPathOf(file),

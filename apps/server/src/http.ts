@@ -8,6 +8,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
 import { appRequest } from "./apps/route.ts";
+import { SDK_FILE } from "./apps/service.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
@@ -16,6 +17,7 @@ import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
+import { runAsCaller } from "./stage/caller-run.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -794,6 +796,74 @@ export function createHttpApp(app: App): Express {
 		app.apps.seen(name);
 		res.json({ ok: true });
 	});
+	/**
+	 * Stage code run by an app (`stage/caller-run.ts`): the same `stage` an agent has, acting for the
+	 * conversation in front of the person, under the app's own name.
+	 *
+	 * Two callers. An app's **server** sends the secret Decks put in its environment
+	 * (`DECKS_STAGE_TOKEN`, `apps/service.ts`), which says which app it is. An app's **page** has no
+	 * secret to keep, and is let in only from this origin (`Sec-Fetch-Site: same-origin`), which every
+	 * app page is: there is no authentication anywhere in Decks (see the top of this file), and a page
+	 * on this origin can already reach `/ws`, which runs tool calls for whoever asks.
+	 *
+	 * What makes it the person's decision is the question, once per app, like a board's code: the code
+	 * runs inside the Decks server and can do anything it can. Answered 200 even when the code fails,
+	 * as `/stage/eval` is, so the caller reads `error` instead of guessing at a status.
+	 */
+	/**
+	 * The SDK, for an app's page: `import { decks } from "../../api/sdk/decks.mjs"`. It is one file
+	 * with no dependencies (`packages/sdk`), and a server app is told its path on disk instead.
+	 */
+	api.get("/sdk/decks.mjs", (_req, res) => {
+		res.setHeader("Cache-Control", "no-cache");
+		res.type("text/javascript").sendFile(SDK_FILE);
+	});
+
+	api.post(
+		"/apps/:name/stage",
+		asyncRoute(async (req, res) => {
+			const name = appOf(req, res);
+			if (!name) return;
+			const header = req.headers.authorization;
+			const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : undefined;
+			const site = typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined;
+			const from = token !== undefined ? "server" : "page";
+			if (token !== undefined ? !app.apps.holdsToken(name, token) : site !== "same-origin") {
+				res.status(403).json({ ok: false, error: token !== undefined ? `That is not ${name}'s stage token.` : "Stage code from a page is taken only from this app's own origin." });
+				return;
+			}
+			const body = (req.body ?? {}) as { code?: unknown; value?: unknown };
+			const code = typeof body.code === "string" ? body.code : "";
+			if (!code.trim()) {
+				res.status(400).json({ ok: false, error: "Send { code } with the stage code to run." });
+				return;
+			}
+			const key = `apps/${name}`;
+			if (!app.evalTrust.allows(key)) {
+				const answer = await app.agents.focused().bridge.choose({
+					title: "Let this app run stage code?",
+					message: `The app ${name} wants to run code with the stage API inside the Decks server, so it can do anything the server can: read files, write boards, move the canvas, message agents.`,
+					options: [
+						{ label: "Allow once" },
+						{ label: "Always allow this app", description: `Remember ${name}, and stop asking` },
+						{ label: "No", description: "Run nothing" },
+					],
+				});
+				if (answer === "Always allow this app") app.evalTrust.allow(key);
+				else if (answer !== "Allow once") {
+					res.status(403).json({ ok: false, error: `The person did not let ${name} run stage code.` });
+					return;
+				}
+			}
+			const board = app.apps.state(name).board;
+			const event = { app: name, board, from, ...(body.value !== undefined ? { value: body.value } : {}) };
+			const outcome = await runAsCaller(
+				{ agents: app.agents, cameras: app.cameras, boards: app.boards, stage: app.stage, port: app.port },
+				{ board, name: `app ${name}`, code, scope: { event }, what: "ran stage code", mayCreate: true },
+			);
+			res.json({ ok: !outcome.error, ...outcome });
+		}),
+	);
 	api.post("/apps/:name/restart", async (req, res) => {
 		const name = appOf(req, res);
 		if (!name) return;

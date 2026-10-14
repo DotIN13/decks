@@ -53,6 +53,28 @@ await stage.show(app.board, { at: { x1: 0, y1: 0 } });
 - **Keys never go in a page.** A server app reads them from a file in its folder.
 - Do not write in `node_modules/`, `dist/` or `.decks/`; they are generated.
 
+## An app can run stage code
+
+An app gets the `stage` object you have, through Decks' SDK, acting for the conversation the
+person is reading, under the name `app <name>`. Use it to hand work to an agent, show a board, or
+read the canvas. The person is asked once to allow it, and every run is noted in their chat.
+
+```js
+// A server app: Decks says where the SDK is, and gives it the app's own token.
+const { decks } = await import(process.env.DECKS_SDK);
+// A page: import { decks } from "../../api/sdk/decks.mjs";
+
+await decks.stage.boards();                                          // any stage verb
+await decks.sendTo({ name: "Helper", kind: "claude" }, { task: "…" }); // made when missing
+await decks.run("return (await stage.agents()).length");              // or stage code of your own
+```
+
+- Arguments and results are JSON. A run is cut off at 20 seconds, so hand long work over with a
+  send and read its result from a file the agent writes in your app's folder.
+- Keep the calls in your server, not in the page, when the server can make them: then what the app
+  may do is in one file somebody can read.
+- `packages/sdk/README.md` has the rest, and `examples/mcp-server.mjs` is an MCP server on it.
+
 ## Recipes
 
 - **A library in a static app:** `import { marked } from "https://esm.sh/marked@14";`, inside a

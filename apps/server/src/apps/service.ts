@@ -1,7 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createServer, connect } from "node:net";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** The SDK a server app imports to run stage code (`packages/sdk`), told to it as `DECKS_SDK`. */
+export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/src/index.js");
 
 /**
  * Apps an agent builds, each a folder in the deck's `apps/` (DESIGN: the app ladder).
@@ -103,6 +108,10 @@ export class Apps {
 	private readonly jobs = new Map<string, Job>();
 	private readonly writes = new Map<string, number>();
 	private sweep: ReturnType<typeof setInterval> | undefined;
+	/** One secret per app, handed to its server's environment so it can run stage code (`stageToken`). */
+	private readonly tokens = new Map<string, string>();
+	/** Decks' own port, set by `app.ts`, so a server app is told where to call back for stage code. */
+	decksPort: number | undefined;
 
 	constructor(private deckPath: string) {
 		this.sweep = setInterval(() => this.sleepUnseen(), 60_000);
@@ -110,8 +119,34 @@ export class Apps {
 		process.once("exit", () => this.stopAll());
 	}
 
+	/**
+	 * The secret an app's server proves itself with when it runs stage code (`POST /api/apps/<name>/stage`).
+	 *
+	 * Minted on first use and kept for this process's life, so a server restarted by Decks gets the
+	 * same one; a restart of Decks mints new ones, and every app process is restarted with it anyway.
+	 * The secret says *which app* is calling, nothing more: whether that app may run code at all is
+	 * the person's decision, asked once (`http.ts`).
+	 */
+	stageToken(name: string): string {
+		let token = this.tokens.get(name);
+		if (!token) {
+			token = randomBytes(24).toString("base64url");
+			this.tokens.set(name, token);
+		}
+		return token;
+	}
+
+	/** Whether a request's bearer token is this app's. */
+	holdsToken(name: string, token: string | undefined): boolean {
+		const mine = this.tokens.get(name);
+		if (!mine || !token) return false;
+		const a = Buffer.from(mine), b = Buffer.from(token);
+		return a.length === b.length && timingSafeEqual(a, b);
+	}
+
 	setDeck(deckPath: string): void {
 		this.stopAll();
+		this.tokens.clear();
 		this.deckPath = deckPath;
 	}
 
@@ -454,7 +489,11 @@ export class Apps {
 
 	/** The environment an app's commands run in: this server's, minus `NODE_ENV=production`, which makes npm leave out a build's tools. */
 	private env(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
-		const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
+		const env: NodeJS.ProcessEnv = { ...process.env };
+		// An app's stage secret is its own, never one inherited from whoever started Decks.
+		delete env.DECKS_STAGE_URL;
+		delete env.DECKS_STAGE_TOKEN;
+		Object.assign(env, extra);
 		if (env.NODE_ENV === "production") delete env.NODE_ENV;
 		delete env.DECKS_DATA_DIR;
 		return env;
@@ -483,7 +522,17 @@ export class Apps {
 		this.write(name, `$ ${command}    (PORT=${port})`);
 		const child = spawn("bash", ["-lc", command], {
 			cwd: this.folder(name),
-			env: this.env({ PORT: String(port), HOST: "127.0.0.1", HOSTNAME: "127.0.0.1", BASE_PATH: `/app/${name}` }),
+			env: this.env({
+				PORT: String(port),
+				HOST: "127.0.0.1",
+				HOSTNAME: "127.0.0.1",
+				BASE_PATH: `/app/${name}`,
+				// Where the server runs stage code, as an agent would: POST { code, value } with this bearer token.
+				...(this.decksPort ? { DECKS_STAGE_URL: `http://127.0.0.1:${this.decksPort}/api/apps/${name}/stage`, DECKS_STAGE_TOKEN: this.stageToken(name) } : {}),
+				DECKS_APP: name,
+				// `const { decks } = await import(process.env.DECKS_SDK)` reads the two above; see packages/sdk.
+				DECKS_SDK: SDK_FILE,
+			}),
 			stdio: ["ignore", "pipe", "pipe"],
 			detached: true,
 		});
