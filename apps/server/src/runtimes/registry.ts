@@ -3,6 +3,7 @@ import { antigravity } from "./antigravity/index.ts";
 import type { AgentRuntime } from "./contract.ts";
 import { claude } from "./claude/index.ts";
 import { opencode } from "./opencode/index.ts";
+import { opencode2 } from "./opencode2/index.ts";
 import { pi } from "./pi/index.ts";
 
 /**
@@ -21,6 +22,7 @@ export const RUNTIMES: Record<AgentKind, AgentRuntime> = {
 	pi,
 	claude,
 	opencode,
+	opencode2,
 	antigravity,
 };
 

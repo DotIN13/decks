@@ -20,8 +20,8 @@ later, ready for you to edit by hand or to hand to the next agent.
   Decks runs, wakes and puts to sleep for you.
 - **Documents you can write in.** Markdown, LaTeX (with a PDF preview), Word and Google
   Docs open as pages. An agent's edits arrive highlighted, for you to accept or reject.
-- **Many agents, four runtimes.** Run agents on [Pi](https://github.com/earendil-works/pi),
-  Claude Code, opencode or Antigravity. Each has a name, a face and its own canvas, and
+- **Many agents, five runtimes.** Run agents on [Pi](https://github.com/earendil-works/pi),
+  Claude Code, opencode, OpenCode 2 or Antigravity. Each has a name, a face and its own canvas, and
   they can hand work to one another.
 - **Your files, in place.** Show PDFs, images, films and source code on a board, or drop
   files from your desktop onto the canvas.

@@ -91,6 +91,17 @@ export function opencodeConfigDir(): string {
 	return resolve(HERE, "opencode");
 }
 
+/**
+ * OpenCode 2's plugin folder: Decks' canvas and Google Docs tools, as one plugin.
+ *
+ * Named to the server by absolute path in its inline config, never through
+ * `OPENCODE_CONFIG_DIR`: in OpenCode 2 that variable *replaces* the person's own config folder
+ * rather than adding to it, as it did in opencode 1.
+ */
+export function opencode2PluginDir(): string {
+	return resolve(HERE, "opencode2", "plugin");
+}
+
 /** Antigravity's MCP server, which the CLI spawns for its one tool. */
 export function antigravityServer(): string {
 	return resolve(HERE, "antigravity", "mcp-server.mjs");
@@ -112,5 +123,6 @@ export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean 
 	{ path: "tool-description.txt", what: "the canvas tool's words, for every runtime" },
 	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },
 	{ path: "opencode", what: "opencode's config directory: its tool and Decks' skills", dir: true },
+	{ path: "opencode2/plugin", what: "OpenCode 2's plugin: the canvas and Google Docs tools", dir: true },
 	{ path: "antigravity/mcp-server.mjs", what: "antigravity's one-tool MCP server" },
 ];

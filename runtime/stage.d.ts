@@ -221,7 +221,7 @@ export interface Stage {
 	 * puts their report in your transcript, to read on your next turn.
 	 */
 	send(
-		to: string | { name: string; kind?: "pi" | "claude" | "opencode" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; tags?: string[]; workspace?: string },
+		to: string | { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; tags?: string[]; workspace?: string },
 		work: { task: string; boards?: string[]; reply?: boolean },
 	): Promise<{ queued: true; position: number; agent?: string; name?: string }>;
 }

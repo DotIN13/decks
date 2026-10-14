@@ -126,3 +126,17 @@ test("a new server's token retires the old one", async () => {
 	assert.equal((await bridge.run("old-server", "x", "ses_1")).isError, true);
 	assert.deepEqual(await bridge.run("new-server", "x", "ses_1"), { text: "ada:x", isError: false });
 });
+
+test("opencode 1 and OpenCode 2 servers each keep their own token", async () => {
+	const bridge = new StageBridge();
+	bridge.setServerToken("v1-token");
+	bridge.registerSession("ses_v1", "ada", fakeTool("ada"));
+	// The second server starting must not invalidate the first one's tools: one shared slot did.
+	bridge.setServerToken("v2-token", "opencode2");
+	bridge.registerSession("ses_v2", "bo", fakeTool("bo"), "opencode2");
+	assert.deepEqual(await bridge.run("v1-token", "x", "ses_v1"), { text: "ada:x", isError: false });
+	assert.deepEqual(await bridge.run("v2-token", "y", "ses_v2"), { text: "bo:y", isError: false });
+	assert.equal((await bridge.run("v2-token", "x", "ses_v1")).isError, true, "one server's token does not reach the other's sessions");
+	assert.equal(bridge.agentFor("v2-token", "ses_v2"), "bo");
+	assert.equal(bridge.agentFor("v1-token", "ses_v2"), undefined);
+});

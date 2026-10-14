@@ -52,7 +52,7 @@ const chat = (id, name, kind, state) => ({
 	inPlay: [],
 });
 
-const KINDS = ["pi", "claude", "opencode", "antigravity"];
+const KINDS = ["pi", "claude", "opencode", "opencode2", "antigravity"];
 
 // --- the still drawings ---------------------------------------------------------------------
 
@@ -78,7 +78,7 @@ const still = await page.evaluate(() =>
 	})),
 );
 
-say("the menu draws one still mark per runtime", still.length === 4, JSON.stringify(still.map((one) => one.agent)));
+say("the menu draws one still mark per runtime", still.length === KINDS.length, JSON.stringify(still.map((one) => one.agent)));
 const opencodeStill = still.find((one) => one.agent === "opencode");
 const antigravityStill = still.find((one) => one.agent === "antigravity");
 /*
@@ -201,7 +201,7 @@ for (const kind of KINDS) {
 			? at?.tiles.length === 10 && at.tiles.every((one) => one.opacity === "1" && one.transform === "none")
 			: kind === "claude"
 				? at?.frames.filter((one) => one === "1").length === 1
-				: kind === "opencode"
+				: kind === "opencode" || kind === "opencode2"
 					? at?.walls.length === 4 && at.walls.every((one) => one.transform === "none") && at.fill.transform === "none" && at.fill.opacity === "1"
 					: at?.trace.dash === "0px" && at.cycle.opacity === "1";
 	say(`…as the complete ${kind} mark rather than an empty one`, rests, JSON.stringify(at));

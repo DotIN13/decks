@@ -24,7 +24,7 @@ import { createUniqueId, For, Match, Show, Switch } from "solid-js";
  */
 
 /** How much of the 24-unit frame each mark's ink may fill. */
-const INK: Record<AgentKind, number> = { claude: 18, pi: 15.5, opencode: 16.5, antigravity: 17 };
+const INK: Record<AgentKind, number> = { claude: 18, pi: 15.5, opencode: 16.5, opencode2: 16.5, antigravity: 17 };
 
 const CLAUDE_PATH =
 	"m19.6 66.5 19.7-11 .3-1-.3-.5h-1l-3.3-.2-11.2-.3L14 53l-9.5-.5-2.4-.5L0 49l.2-1.5 2-1.3 2.9.2 6.3.5 9.5.6 6.9.4L38 49.1h1.6l.2-.7-.5-.4-.4-.4L29 41l-10.6-7-5.6-4.1-3-2-1.5-2-.6-4.2 2.7-3 3.7.3.9.2 3.7 2.9 8 6.1L37 36l1.5 1.2.6-.4.1-.3-.7-1.1L33 25l-6-10.4-2.7-4.3-.7-2.6c-.3-1-.4-2-.4-3l3-4.2L28 0l4.2.6L33.8 2l2.6 6 4.1 9.3L47 29.9l2 3.8 1 3.4.3 1h.7v-.5l.5-7.2 1-8.7 1-11.2.3-3.2 1.6-3.8 3-2L61 2.6l2 2.9-.3 1.8-1.1 7.7L59 27.1l-1.5 8.2h.9l1-1.1 4.1-5.4 6.9-8.6 3-3.5L77 13l2.3-1.8h4.3l3.1 4.7-1.4 4.9-4.4 5.6-3.7 4.7-5.3 7.1-3.2 5.7.3.4h.7l12-2.6 6.4-1.1 7.6-1.3 3.5 1.6.4 1.6-1.4 3.4-8.2 2-9.6 2-14.3 3.3-.2.1.2.3 6.4.6 2.8.2h6.8l12.6.9 3.3 2.2 2 2.6-.3 2-5.1 2.6-6.8-1.6-16-3.8-5.4-1.4h-.8v.5l4.5 4.4 8.3 7.5 10.4 9.6.5 2.4-1.3 1.9-1.4-.2-9.2-7-3.6-3.1-8-6.7h-.5v.7l1.8 2.7L74 80.5l.8 4.6-.7 1.5-2.6.9-2.8-.5-5.8-8.2-6-9.1-4.8-8.3-.6.3-2.8 30.5-1.3 1.6-3 1.1-2.5-1.9-1.3-3 1.3-6.1 1.6-8 1.3-6.3 1.2-7.9.7-2.6v-.2H49L43 72l-9 12.3-7.2 7.6-1.7.7-3-1.5.3-2.8L24 86l10-12.8 6-7.9 4-4.6-.1-.5h-.3L17.2 77.4l-4.7.6-2-2 .2-3 1-1 8-5.5Z";
@@ -197,7 +197,7 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 				a panel: two definitions per row that nothing references is a mask and a clip the
 				browser parses for nothing.
 			*/}
-			<Show when={props.busy && (props.agent === "opencode" || props.agent === "antigravity")}>
+			<Show when={props.busy && (opencodeMark(props.agent) || props.agent === "antigravity")}>
 				<defs>
 				{/* Where opencode's block is allowed to be: the opening it rises into. */}
 				<clipPath id={`${ids}-opening`}>
@@ -250,7 +250,7 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 						and then the block rising into the opening from below it. The walls are the
 						symbol's own rectangles, taken apart so each can grow on its own.
 					*/}
-					<Match when={props.busy && props.agent === "opencode"}>
+					<Match when={props.busy && opencodeMark(props.agent)}>
 						<g class="oc-cycle">
 							<rect class="oc-wall oc-top" x="128" y="96" width="256" height="64" />
 							<rect class="oc-wall oc-right" x="320" y="160" width="64" height="192" />
@@ -282,8 +282,14 @@ const STILL_INK: Record<AgentKind, { x: number; y: number; w: number; h: number 
 	claude: CLAUDE_INK,
 	pi: PI_INK,
 	opencode: OPENCODE_INK,
+	opencode2: OPENCODE_INK,
 	antigravity: ANTIGRAVITY_INK,
 };
+
+/** OpenCode 2 is drawn with opencode's own mark: the same project, the same symbol. */
+function opencodeMark(agent: AgentKind): boolean {
+	return agent === "opencode" || agent === "opencode2";
+}
 
 /** The symbol for a runtime, at rest. */
 function Still(props: { agent: AgentKind }) {
@@ -293,7 +299,7 @@ function Still(props: { agent: AgentKind }) {
 				<path fill-rule="evenodd" d={PI_P} />
 				<path d={PI_DOT} />
 			</Match>
-			<Match when={props.agent === "opencode"}>
+			<Match when={opencodeMark(props.agent)}>
 				<path fill-rule="evenodd" d={OPENCODE_RING} />
 				<path d={OPENCODE_BLOCK} />
 			</Match>

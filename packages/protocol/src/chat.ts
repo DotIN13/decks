@@ -14,7 +14,7 @@ export type AgentState = "idle" | "thinking" | "streaming" | "tool" | "waiting";
  * antigravity's Python one. What differs between them is `capabilities`, not a method that
  * throws.
  */
-export type AgentKind = "pi" | "claude" | "opencode" | "antigravity";
+export type AgentKind = "pi" | "claude" | "opencode" | "opencode2" | "antigravity";
 
 /**
  * The same four, as a value.
@@ -23,7 +23,7 @@ export type AgentKind = "pi" | "claude" | "opencode" | "antigravity";
  * backend class, the browser draws a row per kind in the new-agent menu. Written once here
  * so a fifth runtime is one edit rather than three that drift.
  */
-export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "antigravity"];
+export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "opencode2", "antigravity"];
 
 /**
  * One runtime, as a browser can understand it.

@@ -36,16 +36,18 @@ export class StageBridge {
 	private readonly byToken = new Map<string, { agentId: string; tool: StageTool }>();
 	private readonly byAgent = new Map<string, string>();
 	/** One opencode session, resolved from the id its tool sends back. */
-	private readonly bySession = new Map<string, { agentId: string; tool: StageTool }>();
+	private readonly bySession = new Map<string, { agentId: string; tool: StageTool; server: string }>();
 	/**
-	 * The single token the shared opencode server holds (`opencode/manager.ts`).
+	 * The token each shared server holds, by server: `opencode` (`opencode/manager.ts`) and
+	 * `opencode2` (`opencode2/manager.ts`), which can both be running.
 	 *
-	 * Told to the bridge by the first agent to bring the server up, and replaced for every
+	 * Told to the bridge by the first agent to bring a server up, and replaced for every
 	 * server lifetime: a dead server's token stops validating the moment its successor's
 	 * is installed, so a session id from the old process cannot be replayed against the
-	 * new one.
+	 * new one. Per server, because one shared slot let the second server to start
+	 * invalidate every tool call from the first.
 	 */
-	private serverToken: string | undefined;
+	private readonly serverTokens = new Map<string, string>();
 
 	/**
 	 * Mint this agent's token, or return the one it already has.
@@ -75,9 +77,9 @@ export class StageBridge {
 		this.byToken.delete(token);
 	}
 
-	/** Replace the shared server's token — called whenever a server is raised. */
-	setServerToken(token: string): void {
-		this.serverToken = token;
+	/** Replace a shared server's token — called whenever that server is raised. */
+	setServerToken(token: string, server = "opencode"): void {
+		this.serverTokens.set(server, token);
 	}
 
 	/**
@@ -87,8 +89,14 @@ export class StageBridge {
 	 * wants to know who a call speaks for can ask, and the answer is the agent's, not a
 	 * guess about it.
 	 */
-	registerSession(sessionId: string, agentId: string, tool: StageTool): void {
-		this.bySession.set(sessionId, { agentId, tool });
+	registerSession(sessionId: string, agentId: string, tool: StageTool, server = "opencode"): void {
+		this.bySession.set(sessionId, { agentId, tool, server });
+	}
+
+	/** Whether a token is the one the server holding this session was given. */
+	private sessionHolds(held: { server: string } | undefined, token: string | undefined): boolean {
+		const expected = held ? this.serverTokens.get(held.server) : undefined;
+		return expected !== undefined && token === expected;
 	}
 
 	/** The session (and its agent) is gone, so it stops answering. */
@@ -112,9 +120,9 @@ export class StageBridge {
 			// caller is the process Decks spawned. A session id with anything but that token
 			// is refused the same way a bad per-agent token is — the identity did not hold.
 			if (typeof sessionID !== "string" || sessionID === "") return { text: "The canvas call did not say which opencode session it came from.", isError: true };
-			if (this.serverToken === undefined || token !== this.serverToken) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
 			const held = this.bySession.get(sessionID);
 			if (!held) return { text: "This opencode session is not registered to a live Decks agent any more.", isError: true };
+			if (!this.sessionHolds(held, token)) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
 			return held.tool.run(code);
 		}
 		const held = token ? this.byToken.get(token) : undefined;
@@ -124,7 +132,10 @@ export class StageBridge {
 
 	/** Which agent a call speaks for: a per-agent token, or opencode's session with the server's token. */
 	agentFor(token: string | undefined, sessionID?: string): string | undefined {
-		if (sessionID !== undefined) return this.serverToken !== undefined && token === this.serverToken ? this.bySession.get(sessionID)?.agentId : undefined;
+		if (sessionID !== undefined) {
+			const held = this.bySession.get(sessionID);
+			return this.sessionHolds(held, token) ? held?.agentId : undefined;
+		}
 		return this.agentOf(token);
 	}
 

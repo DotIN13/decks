@@ -21,6 +21,7 @@
 		"@decks/runtime": "*",
 		"@earendil-works/pi-coding-agent": "^1.2.0",
 		"@opencode-ai/sdk": "^1.18.29",
+		"@opencode/client": "2.0.29",
 		"esbuild": "^0.25.0",
 		"express": "^5.1.0",
 		"parse5": "^7.3.0",
