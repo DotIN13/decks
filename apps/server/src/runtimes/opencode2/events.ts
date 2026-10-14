@@ -84,7 +84,7 @@ export class Opencode2Stream {
 			case "session.tool.called":
 				return this.called(data);
 			case "session.tool.success":
-				return this.toolEnded(data.id, text(data.content), false);
+				return this.toolEnded(data.id, text(data.content), false, images(data.content));
 			case "session.tool.failed":
 				return this.toolEnded(data.id, (data.error as { message?: string } | undefined)?.message ?? "failed", true);
 			case "session.execution.started":
@@ -169,14 +169,15 @@ export class Opencode2Stream {
 		this.t.toolStart(id, name, name, data.input ?? {});
 	}
 
-	private toolEnded(id: unknown, output: string, isError: boolean): void {
+	/** `images` is how many pictures the result carried, which the chip counts; never a duration. */
+	private toolEnded(id: unknown, output: string, isError: boolean, images = 0): void {
 		if (typeof id !== "string") return;
 		const opened = this.open.get(id);
 		// A result for a call that never opened (it failed while its input was still arriving)
 		// still gets its chip, so the failure is visible.
 		if (opened === undefined) this.called({ id, input: {} });
 		this.open.delete(id);
-		this.t.toolEnd(id, output, isError, opened === undefined ? 0 : Date.now() - opened);
+		this.t.toolEnd(id, output, isError, images);
 	}
 
 	private failed(error: unknown): void {
@@ -207,6 +208,16 @@ function text(content: unknown): string {
 		.map((part) => (part && typeof part === "object" && (part as { type?: string }).type === "text" ? String((part as { text?: unknown }).text ?? "") : ""))
 		.filter(Boolean)
 		.join("\n");
+}
+
+/** The pictures in a tool's result: an image part, or any part whose media type is an image. */
+function images(content: unknown): number {
+	if (!Array.isArray(content)) return 0;
+	return content.filter((part) => {
+		if (!part || typeof part !== "object") return false;
+		const { type, mime, mediaType } = part as { type?: string; mime?: string; mediaType?: string };
+		return type === "image" || /^image\//.test(mime ?? mediaType ?? "");
+	}).length;
 }
 
 /** Tokens in the model's context after a step: what it read, including the cache, and wrote. */

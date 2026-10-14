@@ -65,6 +65,20 @@ test("a turn with a tool call becomes the reply, the call and its result, and th
 	assert.deepEqual(t.readings, [{ context: 3825 + 43 + 74 + 2688 }, { cost: 0.0012 }], "context from the step, only cost from the running totals");
 });
 
+test("a tool row counts the pictures its result carried, not how long it ran", async () => {
+	const t = transcript();
+	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_1", name: "stage_eval" });
+	t.feed("session.tool.called", { assistantMessageID: "msg_1", id: "call_1", input: {} });
+	await new Promise((ok) => setTimeout(ok, 30));
+	t.feed("session.tool.success", { assistantMessageID: "msg_1", id: "call_1", content: [{ type: "text", text: "ok" }] });
+	t.feed("session.tool.input.started", { assistantMessageID: "msg_1", id: "call_2", name: "read" });
+	t.feed("session.tool.called", { assistantMessageID: "msg_1", id: "call_2", input: {} });
+	t.feed("session.tool.success", { assistantMessageID: "msg_1", id: "call_2", content: [{ type: "text", text: "Image read" }, { type: "file", mime: "image/jpeg", url: "data:" }] });
+	const [first, second] = tools(t.translator);
+	assert.equal(first?.images ?? 0, 0, "30 ms of running is not 30 pictures");
+	assert.equal(second?.images, 1);
+});
+
 test("a run that never streamed is said whole at its end", () => {
 	const t = transcript();
 	t.feed("session.text.ended", { ...M1, text: "Short." });

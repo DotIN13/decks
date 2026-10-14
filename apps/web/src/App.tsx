@@ -1489,8 +1489,11 @@ export function App() {
 						stageName={state.focused ? pens()[state.focused]?.stage : undefined}
 						agentLabel={(agentId, name) => {
 							// "Name · Model", as a design tool tags a collaborator: the model by the name its picker shows.
+							// The live model first: a switch arrives as `agent.model`, which moves the agent's
+							// state and not its chat row, so the row alone kept the model the chat started on.
 							const chat = state.chats.find((one) => one.id === agentId);
-							const model = chat?.model ? (optionFor(runtimeFor(chat.kind)?.models ?? [], chat.model)?.label ?? chat.model.model) : undefined;
+							const current = state.agents[agentId]?.model ?? chat?.model;
+							const model = current ? (optionFor(runtimeFor(chat?.kind)?.models ?? [], current)?.label ?? current.model) : undefined;
 							return model ? `${name} · ${model}` : name;
 						}}
 						news={newsGlow()}
