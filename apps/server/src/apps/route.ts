@@ -83,7 +83,12 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			res.writeHead(answer.statusCode ?? 502, headers);
 			answer.pipe(res);
 		});
+		// A browser that goes away mid-answer (a video seeking) leaves the app's answer unread, and the kernel holds it for good.
+		res.on("close", () => {
+			if (!res.writableFinished) upstream.destroy();
+		});
 		upstream.on("error", (error) => {
+			if (res.destroyed) return;
 			if (res.headersSent) return void res.destroy();
 			plain(res, 502, `apps/${at.name} did not answer: ${error.message}`);
 		});
