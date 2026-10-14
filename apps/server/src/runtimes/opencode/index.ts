@@ -11,7 +11,7 @@ import type { AgentRuntime } from "../contract.ts";
  */
 export const opencode: AgentRuntime = {
 	kind: "opencode",
-	label: "opencode",
+	label: "OpenCode",
 	capabilities: OPENCODE_CAPABILITIES,
 	commands: OPENCODE_COMMANDS,
 	availability: () =>

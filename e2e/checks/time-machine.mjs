@@ -12,7 +12,7 @@ const original = read(plan);
 const { browser, page, errors } = await open();
 try {
 	// A fresh agent, so the history is this run's, on the runtime named by its menu label
-	// ("Pi", "Claude Code", "opencode", "OpenCode 2"): rewind and fork are each runtime's own.
+	// ("Pi", "Claude Code", "OpenCode", "OpenCode 2"): rewind and fork are each runtime's own.
 	// DECKS_E2E_KIND ("claude", "opencode2", …) then asserts the chat really is that runtime.
 	await newAgent(page, process.env.DECKS_E2E_RUNTIME ?? "pi");
 	await settle(page, 1200);
