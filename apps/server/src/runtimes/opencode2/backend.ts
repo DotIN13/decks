@@ -495,10 +495,13 @@ export class Opencode2Backend implements AgentBackend {
 		if (!this.sessionId) return;
 		let entries: Array<{ id: string; text: string }>;
 		try {
-			const answered = (await this.client.message.list({ sessionID: this.sessionId, type: "user", order: "asc", limit: 500 } as never)) as unknown as {
+			// The newest 200, which is OpenCode 2's ceiling for one page (it refuses more) and more
+			// than the transcript's tail holds; asked newest first and turned round, since the walk
+			// below needs the end of the list and not its start.
+			const answered = (await this.client.message.list({ sessionID: this.sessionId, type: "user", order: "desc", limit: 200 } as never)) as unknown as {
 				data?: Array<{ id: string; payload?: { text?: string }; text?: string }>;
 			};
-			entries = (answered.data ?? []).map((message) => ({ id: message.id, text: message.payload?.text ?? message.text ?? "" }));
+			entries = (answered.data ?? []).map((message) => ({ id: message.id, text: message.payload?.text ?? message.text ?? "" })).reverse();
 		} catch {
 			return;
 		}

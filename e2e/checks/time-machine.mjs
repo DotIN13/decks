@@ -11,8 +11,10 @@ const original = read(plan);
 
 const { browser, page, errors } = await open();
 try {
-	// A fresh agent, so the history is this run's.
-	await newAgent(page);
+	// A fresh agent, so the history is this run's, on the runtime named by its menu label
+	// ("Pi", "Claude Code", "opencode", "OpenCode 2"): rewind and fork are each runtime's own.
+	// DECKS_E2E_KIND ("claude", "opencode2", …) then asserts the chat really is that runtime.
+	await newAgent(page, process.env.DECKS_E2E_RUNTIME ?? "pi");
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 
@@ -147,6 +149,53 @@ try {
 		toasts.every((text) => !text.includes(rewound.slice(0, 24))),
 		JSON.stringify(toasts),
 	);
+
+	/*
+	 * The runtime really went back, not only the transcript on screen.
+	 *
+	 * Asked from memory, so the board, which Restore already set back, cannot answer for it:
+	 * a runtime whose conversation still held the second turn would say "second turn".
+	 */
+	const lastReply = async () => (await page.locator(".stream .stream-roll > *").last().innerText()).trim();
+	await page.locator(".dockfield").fill("");
+	await ask(page, "Without reading or touching any file: what is the last text you gave that sticky in this conversation? Reply with just that text.");
+	const remembered = await lastReply();
+	say("after a rewind the model no longer remembers the rewound turn", /first turn/i.test(remembered) && !/second turn/i.test(remembered), JSON.stringify(remembered.slice(-80)));
+
+	/*
+	 * A fork from that question opens a new chat holding everything before it: the first turn,
+	 * and not the rewound second one. Counted, not looked for by name: a fork can take its
+	 * parent's name.
+	 */
+	const chatIds = () => new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	const chatsBefore = chatIds();
+	const third = mine.last();
+	await third.hover();
+	await third.locator(".stream-rw").click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+	await page.locator(".popover [data-row]").filter({ hasText: /^Fork/ }).first().click();
+	let forkId;
+	for (let waited = 0; waited < 30000 && !forkId; waited += 250) {
+		forkId = [...chatIds()].find((id) => !chatsBefore.has(id));
+		if (!forkId) await settle(page, 250);
+	}
+	say("forking opens a new chat", Boolean(forkId));
+	const forkKind = (link.last("agents")?.chats ?? []).find((chat) => chat.id === forkId)?.kind;
+	say(
+		"…on the runtime this run is about",
+		!process.env.DECKS_E2E_KIND || forkKind === process.env.DECKS_E2E_KIND,
+		`${forkKind}${process.env.DECKS_E2E_KIND ? ` (asked for ${process.env.DECKS_E2E_KIND})` : ""}`,
+	);
+	const forkWarnings = (await page.locator(".notice").allInnerTexts()).filter((text) => /nothing before that message/i.test(text));
+	say("…without saying there is nothing to fork", forkWarnings.length === 0, JSON.stringify(forkWarnings));
+	await settle(page, 1500);
+	await ask(page, "Without reading or touching any file: what text did you give that sticky in this conversation? Reply with just that text.");
+	say(
+		"…and the page moved to it, so the next message went to the fork",
+		link.received.some((message) => message.type === "agent.state" && message.id === forkId && message.state !== "idle"),
+	);
+	const forked = await lastReply();
+	say("the fork remembers the conversation before the fork point", /first turn/i.test(forked) && !/second turn/i.test(forked), JSON.stringify(forked.slice(-80)));
 
 	link.close();
 	say("no page errors", errors.length === 0, errors.join(" | "));

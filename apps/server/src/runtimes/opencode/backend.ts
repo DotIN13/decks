@@ -5,6 +5,7 @@ import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption,
 import type { IsolationContext } from "../../agents/backend.ts";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { deckContext, isolationNote } from "../../agents/context.ts";
+import { sentAs } from "../../agents/sent-as.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import { OpencodeStream } from "./events.ts";
@@ -159,17 +160,7 @@ export class OpencodeBackend implements AgentBackend {
 
 		this.client = createOpencodeClient({ baseUrl: this.url, directory: deck.path });
 
-		// One session per agent, opened on the mode the chat was left in. The permission
-		// rides on the session — see the module comment for why that is not a fiction —
-		// and the model does not: it rides on every prompt below.
-		const session = await this.client.session.create({
-			body: {
-				title: "Decks",
-				permission: rulesetOf(this.currentMode),
-			} as never,
-		});
-		this.sessionId = session.data?.id;
-		if (!this.sessionId) throw new Error("opencode started but would not open a session.");
+		this.sessionId = await this.openSession();
 
 		// The canvas tool's calls name this session; the bridge resolves that to this
 		// agent. Registered before the conversation can run a single turn.
@@ -189,6 +180,35 @@ export class OpencodeBackend implements AgentBackend {
 
 		await this.refreshModels();
 		void this.refreshCommands();
+	}
+
+	/**
+	 * The session this chat talks in: the one it names, or a new one.
+	 *
+	 * A chat that was resting, or a fork opened as a new chat, carries on in the session it
+	 * names (`resumeRef`), on the shared server that keeps every session in its own database. A
+	 * new session is opened on the mode the chat was left in. The permission rides on the
+	 * session either way (see the module comment for why that is not a fiction), and the model
+	 * does not: it rides on every prompt.
+	 */
+	private async openSession(): Promise<string> {
+		const resume = this.context.resumeRef;
+		if (resume) {
+			const found = await this.client.session.get({ path: { id: resume } }).catch(() => undefined);
+			if (found?.data?.id) {
+				await this.client.session.update({ path: { id: found.data.id }, body: { permission: rulesetOf(this.currentMode) } as never }).catch(() => undefined);
+				return found.data.id;
+			}
+			this.context.notice("warn", "opencode no longer has this conversation, so the chat starts a new one.");
+		}
+		const session = await this.client.session.create({
+			body: {
+				title: "Decks",
+				permission: rulesetOf(this.currentMode),
+			} as never,
+		});
+		if (!session.data?.id) throw new Error("opencode started but would not open a session.");
+		return session.data.id;
 	}
 
 	/**
@@ -511,38 +531,103 @@ export class OpencodeBackend implements AgentBackend {
 	private isolation: IsolationContext | undefined;
 
 	/**
-	 * Isolation on or off, in place. opencode opens a new session on every start, so restarting it
-	 * would lose the conversation; the next turn simply runs in the new folder with the new words.
+	 * Isolation on or off, in place. Nothing has to restart: the next turn simply runs in the new
+	 * folder with the new words.
 	 */
 	async setIsolation(isolation: IsolationContext | undefined): Promise<void> {
 		this.isolation = isolation;
 	}
 
 	/**
-	 * No time machine yet, and it is declared rather than stubbed to throw.
+	 * Tag each user message in the transcript with the opencode message it became.
 	 *
-	 * opencode has `fork` and `revert`, so this is a *not yet* rather than a *cannot*. But a
-	 * rewind in Decks also restores the boards to the revision they were at, which needs
-	 * every user message paired with an id the server will still recognise afterwards. Until
-	 * that pairing is real, an empty timeline is the honest answer: the messages offer no
-	 * rewind rather than offering one that half works.
+	 * The same walk as the other runtimes': from the end, because the transcript in memory is a
+	 * capped tail and the two lists share a suffix, stopping at the first message whose text
+	 * disagrees. One thing is opencode's own: a revert is pending until the next prompt, and
+	 * the reverted messages are still listed until then, so everything from the revert point on
+	 * is left out, or the walk would stop on the first of them and pair nothing.
 	 */
-	timeline(): ConversationPoint[] {
-		return [];
+	async syncEntryIds(): Promise<void> {
+		if (!this.sessionId) return;
+		let entries: Array<{ id: string; text: string }>;
+		try {
+			const [session, listed] = await Promise.all([
+				this.client.session.get({ path: { id: this.sessionId } }),
+				this.client.session.messages({ path: { id: this.sessionId } }),
+			]);
+			const reverted = session.data?.revert?.messageID;
+			entries = [];
+			for (const message of listed.data ?? []) {
+				if (reverted && message.info.id === reverted) break;
+				if (message.info.role !== "user") continue;
+				const text = message.parts
+					.filter((part) => part.type === "text" && !(part as { synthetic?: boolean }).synthetic)
+					.map((part) => (part as { text: string }).text)
+					.join("");
+				entries.push({ id: message.info.id, text });
+			}
+		} catch {
+			return;
+		}
+		const items = this.context.translator.userMessages();
+		for (let offset = 1; offset <= Math.min(entries.length, items.length); offset += 1) {
+			const entry = entries[entries.length - offset];
+			const item = items[items.length - offset];
+			if (!entry || !item) break;
+			if (item.entryId === entry.id) continue;
+			if (!sentAs(entry.text, item.text)) break;
+			this.context.translator.tagUser(item.id, entry.id);
+		}
 	}
 
-	async syncEntryIds(): Promise<void> {}
+	/** The points worth returning to: the user's messages that `syncEntryIds` paired. */
+	timeline(): ConversationPoint[] {
+		return this.context.translator
+			.userMessages()
+			.filter((item) => item.entryId)
+			.map((item) => ({ id: item.entryId as string, at: item.at }));
+	}
 
+	/**
+	 * Nothing recorded, as for Claude and OpenCode 2: opencode has no entry Decks can write a
+	 * board revision into, and `App.boardsAt` falls back to the revision store's own times,
+	 * which is how an empty map asks for it.
+	 */
 	revisionsAt(): Record<string, string> {
 		return {};
 	}
 
-	async rewindTo(): Promise<{ cancelled: boolean }> {
-		return { cancelled: true };
+	/**
+	 * Go back to just before a message, in place.
+	 *
+	 * opencode's revert marks the session and drops the marked messages when the next prompt
+	 * arrives, so the session keeps its id and the chat its place on the shared server. It also
+	 * undoes file edits from its own snapshots, but only in a git project: a deck is not one, so
+	 * the boards are left to Decks' own revisions, as on every other runtime.
+	 */
+	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
+		if (!this.sessionId) return { cancelled: true };
+		if (this.streamingNow) throw new Error("Stop opencode before rewinding.");
+		const text = this.context.translator.userMessages().find((item) => item.entryId === entryId)?.text;
+		try {
+			const answered = await this.client.session.revert({ path: { id: this.sessionId }, body: { messageID: entryId } });
+			if (answered.error) throw new Error(JSON.stringify(answered.error).slice(0, 200));
+		} catch (error) {
+			this.context.notice("warn", `opencode would not rewind: ${(error as Error).message}`);
+			return { cancelled: true };
+		}
+		return { cancelled: false, ...(text ? { editorText: text } : {}) };
 	}
 
-	async forkFrom(): Promise<string | undefined> {
-		return undefined;
+	/**
+	 * Everything before a message, as a session of its own for a new chat to open. opencode's
+	 * fork copies the messages before the one named, so the new chat opens with that message
+	 * still unasked, as on the other runtimes.
+	 */
+	async forkFrom(entryId: string): Promise<string | undefined> {
+		if (!this.sessionId) return undefined;
+		const forked = await this.client.session.fork({ path: { id: this.sessionId }, body: { messageID: entryId } }).catch(() => undefined);
+		return forked?.data?.id;
 	}
 
 	dispose(): void {

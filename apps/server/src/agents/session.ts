@@ -449,12 +449,6 @@ export class DeckAgent {
 		this.accountsChanged = options.accountsChanged;
 		this.commandsChanged = options.commandsChanged;
 		this.stageBridge = options.bridge;
-		// A fork opens a conversation that already happened, so it should open with the
-		// canvas that conversation had rather than an empty context.
-		if (options.forkedFrom) {
-			this.snapshots.seed(options.forkedFrom.agentId, this.id, options.forkedFrom.at);
-			this.apply(this.snapshots.latest(this.id));
-		}
 
 		/*
 		 * The translator's frames pass through here so the agent can keep the one
@@ -531,6 +525,19 @@ export class DeckAgent {
 			status: () => {},
 			working: () => {},
 		});
+
+		/*
+		 * A fork opens a conversation that already happened, so it should open with the
+		 * canvas that conversation had rather than an empty context.
+		 *
+		 * Last, because applying it writes the chat's record, which reads the transcript: run
+		 * before the translator existed, it threw inside the constructor and took the server
+		 * down with it, so every fork from any runtime ended the deck instead of opening a chat.
+		 */
+		if (options.forkedFrom) {
+			this.snapshots.seed(options.forkedFrom.agentId, this.id, options.forkedFrom.at);
+			this.apply(this.snapshots.latest(this.id));
+		}
 	}
 
 	/** Mutable only through `orphan`: a subagent outlives the parent it reported to. */
