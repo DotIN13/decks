@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { createServer, get, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
@@ -30,7 +29,7 @@ test("a request the browser drops closes the app's side too", async () => {
 		seen: () => {},
 		portFor: async () => appPort,
 	} as unknown as Apps;
-	const decks = createServer((req, res) => void appRequest(req, res, apps));
+	const decks = createServer((req, res) => void appRequest(req, res as Parameters<typeof appRequest>[1], apps));
 	const decksPort = await listen(decks);
 
 	await new Promise<void>((resolve) => {
