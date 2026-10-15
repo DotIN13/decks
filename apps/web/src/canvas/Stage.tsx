@@ -57,7 +57,7 @@ import { Insert } from "./pen/Insert.tsx";
 import { CARD_PALETTE, firstLine } from "./pen/markdown-layout.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
-import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
+import type { Box, Guide } from "./pen/snap.ts";
 import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
@@ -2039,7 +2039,7 @@ export function Stage(props: {
 				}
 				let lines: Guide[] = [];
 				if (start && !(e.metaKey || e.ctrlKey)) {
-					const snapped = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, targets, SNAP_PX / localCamera.zoom);
+					const snapped = penLayer.snapMove({ ...start, x: start.x + dx, y: start.y + dy }, targets, SNAP_PX / localCamera.zoom);
 					if (!e.shiftKey || dx !== 0) dx += snapped.dx;
 					if (!e.shiftKey || dy !== 0) dy += snapped.dy;
 					lines = snapped.guides;
@@ -2296,7 +2296,7 @@ export function Stage(props: {
 				// The edges being dragged snap to what is around, unless ⌘ or Ctrl is held.
 				let lines: Guide[] = [];
 				if (!(e.metaKey || e.ctrlKey)) {
-					const snapped = snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
+					const snapped = penLayer.snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
 					({ x1, y1, x2, y2 } = snapped.box);
 					lines = snapped.guides;
 				}
@@ -2470,7 +2470,7 @@ export function Stage(props: {
 				let y2 = start.y + start.h + (!slides && handle.includes("s") ? dy : 0);
 				let lines: Guide[] = [];
 				if (!(e.metaKey || e.ctrlKey)) {
-					const snapped = snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
+					const snapped = penLayer.snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
 					({ x1, y1, x2, y2 } = snapped.box);
 					lines = snapped.guides;
 				}

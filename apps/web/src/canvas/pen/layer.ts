@@ -2,6 +2,7 @@ import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type 
 import { isFile, isLiveFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
 import type { Picker } from "@decks/engine/pick";
+import { snapEdges, snapMove, type Box, type Guide } from "./snap.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
 
@@ -267,6 +268,17 @@ export class PenLayer {
 		this.writeHits();
 	}
 	private layoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** Snap a moved box, by the C++ scene with the engine on and by `snap.ts` otherwise; the same answer either way (`snap-diff.mjs`). */
+	snapMove(moving: Box, targets: readonly Box[], threshold: number): { dx: number; dy: number; guides: Guide[] } {
+		const picker = this.tileSink ? this.picker : undefined;
+		return picker ? picker.snapMove(moving, targets, threshold) : snapMove(moving, targets, threshold);
+	}
+	/** Snap the edges a resize moves, as `snapMove` does a move. */
+	snapEdges(box: { x1: number; y1: number; x2: number; y2: number }, edges: ReadonlyArray<"x1" | "x2" | "y1" | "y2">, targets: readonly Box[], threshold: number) {
+		const picker = this.tileSink ? this.picker : undefined;
+		return picker ? picker.snapEdges(box, edges, targets, threshold) : snapEdges(box, edges, targets, threshold);
+	}
 
 	/**
 	 * With the engine on, picking is the C++ scene's (`@decks/engine/pick`): a copy on this page,
