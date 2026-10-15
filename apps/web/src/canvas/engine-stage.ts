@@ -18,7 +18,7 @@ import { createEngine, type Engine } from "@decks/engine";
 import type { SceneBoard } from "./pen/layer.ts";
 import type { SceneOutput } from "./pen/scene.ts";
 
-type TileMessage = Extract<SceneOutput, { type: "tile" | "tiles-clear" }>;
+type TileMessage = Extract<SceneOutput, { type: "tile" | "tiles-clear" | "tiles-done" }>;
 /** Drawing tiles held at most, a megabyte each: about three screens' worth at 2x. */
 const MAX_TILES = 96;
 
@@ -99,6 +99,7 @@ export class EngineStage {
 	backend: string | undefined;
 	/** The drawing's tiles held on the card, by the worker's key (`pen/scene.ts`, `drawTiles`). */
 	private tiles = new Map<string, { level: number; x: number; y: number; size: number; used: number }>();
+	/** The level on screen. A new level's tiles are held back until the worker says the view is whole. */
 	private tileLevel = 0;
 	private tileSettle: ReturnType<typeof setTimeout> | undefined;
 	/** Tell the worker a tile was let go of (`PenLayer.forgetTile`). */
@@ -134,9 +135,10 @@ export class EngineStage {
 	}
 
 	/**
-	 * A tile of the drawing from the worker, onto the layer over the board pages. Tiles of the level
-	 * before a zoom stay under the new level's until a moment after the last new one arrives, so a
-	 * zoom never shows a gap; then they go.
+	 * A tile of the drawing from the worker, onto the layer over the board pages. A tile of the level
+	 * on screen shows at once, replacing its old self. After a zoom, the new level's tiles wait unseen
+	 * until the worker says every one in view is sent (`tiles-done`), then replace the old level in one
+	 * frame: two levels drawn at once doubled every shadow and soft edge, and shapes went dark.
 	 */
 	tile(message: TileMessage): void {
 		const engine = this.engine;
@@ -150,50 +152,49 @@ export class EngineStage {
 			this.draw();
 			return;
 		}
-		const { key, level, x, y, size, bitmap } = message;
-		if (level !== this.tileLevel) {
-			this.tileLevel = level;
-			// The previous level's tiles go under the new one's while the new ones arrive.
-			for (const [name, one] of this.tiles) engine.set(`tile:${name}`, { layer: 1, order: 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${name}`, crisp: true });
+		if (message.type === "tiles-done") {
+			this.showLevel(message.level);
+			return;
 		}
+		const { key, level, x, y, size, bitmap } = message;
+		if (this.tileLevel === 0) this.tileLevel = level;
 		if (!bitmap) {
 			this.dropTile(key, false);
 		} else {
 			engine.texture(`tile:${key}`, bitmap, 1, { mipmaps: false });
 			bitmap.close();
-			engine.set(`tile:${key}`, { layer: 1, order: 2, x, y, w: size, h: size, texture: `tile:${key}`, crisp: true });
 			this.tiles.set(key, { level, x, y, size, used: this.frame });
-			// Tiles of another level that this one covers whole go at once: after a zoom out, one coarse
-			// tile replaces many fine ones, which would otherwise wait for the zoom to go quiet.
-			for (const [name, one] of this.tiles)
-				if (one.level !== level && one.x >= x && one.y >= y && one.x + one.size <= x + size && one.y + one.size <= y + size) this.dropTile(name, true);
+			if (level === this.tileLevel) this.placeTile(key);
 			this.keepTilesToBudget();
 		}
 		this.draw();
+		// Should the word never come, the new level shows anyway once its tiles stop arriving.
 		clearTimeout(this.tileSettle);
-		this.tileSettle = setTimeout(() => this.dropOldLevels(), 300);
+		if (level !== this.tileLevel) this.tileSettle = setTimeout(() => this.showLevel(level), 2000);
+	}
+
+	private placeTile(key: string): void {
+		const one = this.tiles.get(key);
+		if (one) this.engine?.set(`tile:${key}`, { layer: 1, order: 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${key}`, crisp: true });
 	}
 
 	private dropTile(key: string, tell: boolean): void {
-		if (!this.tiles.has(key) && !tell) {
-			this.engine?.remove(`tile:${key}`);
-			return;
-		}
 		this.engine?.remove(`tile:${key}`);
 		this.engine?.forget(`tile:${key}`);
 		this.tiles.delete(key);
 		if (tell) this.forgetTile?.(key);
 	}
 
-	/** After a zoom has settled and its tiles are in: the levels before it go. */
-	private dropOldLevels(): void {
-		let dropped = false;
-		for (const [key, one] of this.tiles)
-			if (one.level !== this.tileLevel) {
-				this.dropTile(key, true);
-				dropped = true;
-			}
-		if (dropped) this.draw();
+	/** The level whose tiles are all in goes on screen, and every other level's tiles go, in one frame. */
+	private showLevel(level: number): void {
+		clearTimeout(this.tileSettle);
+		this.tileSettle = undefined;
+		this.tileLevel = level;
+		for (const [key, one] of this.tiles) {
+			if (one.level === level) this.placeTile(key);
+			else this.dropTile(key, true);
+		}
+		this.draw();
 	}
 
 	/** Past the budget, the tiles furthest from the window go, and the worker hears of each. */
@@ -249,7 +250,7 @@ export class EngineStage {
 		if (!engine) return;
 		engine.clear();
 		// Clearing took the tiles' items too: they go back as they were.
-		for (const [key, one] of this.tiles) engine.set(`tile:${key}`, { layer: 1, order: one.level === this.tileLevel ? 2 : 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${key}`, crisp: true });
+		for (const [key, one] of this.tiles) if (one.level === this.tileLevel) this.placeTile(key);
 		const paper: [number, number, number, number] = this.scheme === "dark" ? [30, 30, 32, 1] : [255, 255, 255, 1];
 		let order = 0;
 		for (const board of this.boards) {

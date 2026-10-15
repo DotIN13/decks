@@ -180,7 +180,9 @@ export type SceneOutput =
 	 */
 	| { type: "tile"; key: string; level: number; x: number; y: number; size: number; bitmap?: ImageBitmap }
 	/** In tile mode: the drawing is empty, every tile the page holds can go. */
-	| { type: "tiles-clear" };
+	| { type: "tiles-clear" }
+	/** In tile mode: every tile in view at `level` has been sent, so the page can swap to that level whole. */
+	| { type: "tiles-done"; level: number };
 
 /** What the scene needs of where it runs. */
 export interface SceneHost {
@@ -386,6 +388,8 @@ export class StageScene {
 	/** Stage areas that changed since tiles were last drawn: the tiles over them are drawn again. */
 	private tileStale: Frame[] = [];
 	/** A canvas of one tile, with its own surface. */
+	/** The level the page was last told is whole in view (`tiles-done`). */
+	private tilesDoneLevel = 0;
 	private tileGpu: { canvas: OffscreenCanvas | HTMLCanvasElement; surface: Surface } | undefined;
 	/** Whether the page has been told the tiles are all drawn for what it last sent (`seen`). */
 	private tilesSaid = -1;
@@ -711,7 +715,13 @@ export class StageScene {
 		if (more || this.wanted) {
 			this.wanted = true;
 			this.schedule();
-		} else this.sayTilesDrawn();
+		} else {
+			if (this.tilesDoneLevel !== level || drawn > 0) {
+				this.tilesDoneLevel = level;
+				this.host.post({ type: "tiles-done", level });
+			}
+			this.sayTilesDrawn();
+		}
 	}
 
 	/** One tile: the items over it, recorded once, replayed into a square at the level's scale. */

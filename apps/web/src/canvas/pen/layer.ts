@@ -217,7 +217,7 @@ export class PenLayer {
 			return;
 		}
 		if (message.type === "frame") this.present(message);
-		else if (message.type === "tile" || message.type === "tiles-clear") {
+		else if (message.type === "tile" || message.type === "tiles-clear" || message.type === "tiles-done") {
 			if (this.tileSink) this.tileSink(message);
 			else if (message.type === "tile") message.bitmap?.close();
 		}
@@ -730,14 +730,14 @@ export class PenLayer {
 
 	/** Whether the camera is being moved: pictures wait for it to stop before changing size. */
 	/** Where the drawing's tiles go in tile mode (`setTiles`): the page's engine. */
-	private tileSink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" }>) => void) | undefined;
+	private tileSink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" | "tiles-done" }>) => void) | undefined;
 
 	/**
 	 * Tile mode: the drawing is drawn as squares for `sink`, the engine on the page
 	 * (`canvas/engine-stage.ts`), and no sheet is drawn. The page says when it lets a tile go
 	 * (`forgetTile`), so the worker draws it again when it is next in view.
 	 */
-	setTiles(sink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" }>) => void) | undefined): void {
+	setTiles(sink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" | "tiles-done" }>) => void) | undefined): void {
 		this.tileSink = sink;
 		this.send({ type: "tiles", on: !!sink });
 	}
