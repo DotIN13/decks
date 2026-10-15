@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
+import { baseTheme, estimateText, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
@@ -189,14 +189,16 @@ export type SceneOutput =
 
 /** The C++ layout, once loaded: only with the engine on, so the sheet never fetches it. */
 let cppLayout: SceneLayout | undefined;
-let cppLoading = false;
-function loadCppLayout(): void {
-	if (cppLoading) return;
-	cppLoading = true;
-	import("@decks/engine/scene")
+let cppLoading: Promise<SceneLayout | undefined> | undefined;
+function loadCppLayout(): Promise<SceneLayout | undefined> {
+	cppLoading ??= import("@decks/engine/scene")
 		.then(({ loadScene }) => loadScene())
 		.then((scene) => (cppLayout = scene))
-		.catch((error: unknown) => console.error(`stage scene: the C++ layout did not load (${String((error as Error)?.message ?? error)}); TypeScript lays out instead`));
+		.catch((error: unknown) => {
+			console.error(`stage scene: the C++ layout did not load (${String((error as Error)?.message ?? error)}); TypeScript lays out instead`);
+			return undefined;
+		});
+	return cppLoading;
 }
 
 /** What the scene needs of where it runs. */
@@ -213,7 +215,10 @@ export interface SceneHost {
 /** One top-level drawn item, recorded on its own so a frame can leave it out when it is off the sheet. */
 interface DrawnItem {
 	id: string;
-	picture: Picture;
+	/** CanvasKit's recording of it; none when the engine draws everything (`native`). */
+	picture?: Picture;
+	/** What it draws, as words, when there is no recording to compare: changed means its tiles are drawn again. */
+	sig?: string;
 }
 
 /**
@@ -414,7 +419,7 @@ export class StageScene {
 	 * left where they are are the ones already recorded, minus the carried ones. An item that is not
 	 * carried but holds one that is (a child picked out of a group) is recorded again without it.
 	 */
-	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture>; sent?: boolean } | undefined;
+	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture | undefined>; sent?: boolean; carriedIds?: string[] } | undefined;
 	/** The boards a drag is carrying (`carry`). */
 	private carryBoards: ReadonlySet<string> = new Set();
 	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed>; source: PenDocument | undefined } | undefined;
@@ -555,8 +560,14 @@ export class StageScene {
 				if (message.on === this.tiles) return;
 				this.tiles = message.on;
 				this.tileDrawn.clear();
-				if (message.on) loadCppLayout();
+				if (message.on) void loadCppLayout();
 				if (this.fonts) this.fonts.keepFiles = message.on;
+				// The engine stopped drawing tiles and CanvasKit was never loaded: load it now, fonts and all.
+				if (!message.on && this.fonts && !this.ck) {
+					this.starting = undefined;
+					this.fonts = undefined;
+					void this.start();
+				}
 				break;
 			case "tile-gone":
 				this.tileDrawn.delete(message.key);
@@ -570,7 +581,7 @@ export class StageScene {
 					for (const box of [inkBounds(this.ink), inkBounds(message.strokes)]) if (box) this.tileStale.push(box);
 				}
 				this.ink = message.strokes;
-				if (!this.ck) void this.start();
+				if (!this.fonts) void this.start();
 				break;
 			case "ack":
 				this.awaiting = false;
@@ -607,13 +618,13 @@ export class StageScene {
 	 * was and where it is. A whole rebuild changes every item; a step of a drag, the moved ones.
 	 */
 	private rebuildMarkingTiles(): void {
-		const before = new Map(this.items.map((item) => [item.id, item.picture]));
+		const before = new Map(this.items.map((item) => [item.id, item.picture ?? item.sig]));
 		const boundsBefore = this.bounds;
 		this.rebuild();
 		const after = new Set<string>();
 		for (const item of this.items) {
 			after.add(item.id);
-			if (before.get(item.id) === item.picture) continue;
+			if (before.get(item.id) === (item.picture ?? item.sig)) continue;
 			const was = boundsBefore.get(item.id);
 			const now = this.bounds.get(item.id);
 			if (was) this.tileStale.push(was);
@@ -641,7 +652,7 @@ export class StageScene {
 			this.sayTilesDrawn();
 			return;
 		}
-		if (!ck || !this.fonts) return;
+		if (!this.fonts || (!ck && !this.native)) return;
 		const dpr = this.view.dpr;
 		/*
 		 * The screen's own scale at rest, so a tile's pixel is a screen pixel and words are as sharp as
@@ -666,13 +677,13 @@ export class StageScene {
 			}
 		}
 		// A drag's lifted items, once per drag, as one picture the page slides with the pointer (`layer.ts`).
-		const slide = this.slide?.ready && this.slide.carried ? this.slide : undefined;
+		const slide = this.slide?.ready && (this.slide.carried || this.slide.carriedIds?.length) ? this.slide : undefined;
 		if (slide && !slide.sent) {
 			slide.sent = true;
 			const cssW = Math.ceil(this.view.width * (1 + 2 * this.view.overscan));
 			const cssH = Math.ceil(this.view.height * (1 + 2 * this.view.overscan));
 			this.drawDpr = dpr;
-			const only = this.paintGpu([], this.camera, cssW, cssH, Math.max(1, Math.round(cssW * dpr)), Math.max(1, Math.round(cssH * dpr)), true);
+			const only = this.native ? this.paintCarried(cssW, cssH, Math.max(1, Math.round(cssW * dpr)), Math.max(1, Math.round(cssH * dpr))) : this.paintGpu([], this.camera, cssW, cssH, Math.max(1, Math.round(cssW * dpr)), Math.max(1, Math.round(cssH * dpr)), true);
 			if (only) {
 				this.awaiting = true;
 				const bitmap = await this.host.snapshot(only);
@@ -754,8 +765,15 @@ export class StageScene {
 				this.uploadPictures();
 			}
 			const slide = this.slide?.ready ? this.slide : undefined;
-			if (this.cppPainter && this.cppPainter.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) })) {
+			const drawn = this.cppPainter?.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) });
+			// Without CanvasKit there is nothing to fall back to: the engine's tile is the tile, all it could draw.
+			if (this.cppPainter && (drawn || this.native)) {
 				this.tilesBy.cpp++;
+				if (!drawn) {
+					this.tilesBy.short = (this.tilesBy.short ?? 0) + 1;
+					const why = this.cppPainter.why || "?";
+					(this.tilesBy.shortWhy ??= {})[why] = (this.tilesBy.shortWhy[why] ?? 0) + 1;
+				}
 				return await this.host.snapshot(this.cppCanvas);
 			}
 		}
@@ -782,7 +800,8 @@ export class StageScene {
 			const item = this.items[at];
 			// What a drag lifts is the carried picture's, not the tiles'.
 			if (!item || slide?.ids.has(item.id)) continue;
-			canvas.drawPicture(slide?.replaced?.get(item.id) ?? item.picture);
+			const picture = slide?.replaced?.get(item.id) ?? item.picture;
+			if (picture) canvas.drawPicture(picture);
 		}
 		this.paintInkGpu(canvas);
 		canvas.restore();
@@ -811,10 +830,11 @@ export class StageScene {
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
 			const card = (text: string, style: TextStyle, node: PenNode) =>
 				encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => {
-					const image = fonts.images?.(url);
-					if (!image) return undefined;
+					// The browser's copy, which the painter draws; or CanvasKit's, for its size, while CanvasKit draws.
 					const picture = this.picture(url);
-					return { width: () => image.width(), height: () => image.height(), ...(picture ? { id: picture.id } : {}) };
+					if (picture) return { width: () => picture.width, height: () => picture.height, id: picture.id };
+					const image = fonts.images?.(url);
+					return image ? { width: () => image.width(), height: () => image.height() } : undefined;
 				} }, node.textAlign ?? "left");
 			const scheme = this.scheme;
 			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme, { picture: (url) => this.picture(url) }), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
@@ -826,7 +846,15 @@ export class StageScene {
 	private cppCanvas: OffscreenCanvas | HTMLCanvasElement | undefined;
 	private cppPainter: Painter | null | undefined;
 	/** Tiles painted by each painter, for the diagnostics. */
-	private tilesBy = { cpp: 0, canvaskit: 0 };
+	private tilesBy: { cpp: number; canvaskit: number; short?: number; shortWhy?: Record<string, number> } = { cpp: 0, canvaskit: 0 };
+	/**
+	 * The engine draws everything, and CanvasKit is never loaded: tile mode, once the engine's module is
+	 * here. The fonts are files for the engine, pictures are the browser's, and a card's links come from
+	 * the engine's own layout of it.
+	 */
+	private get native(): boolean {
+		return this.tiles && !this.ck && !this.off.has("native");
+	}
 	/** Which layout drew the last frame, and what measured its plain words, for the diagnostics. */
 	private layoutBy: "c++" | "typescript" = "typescript";
 	private wordsBy: "c++" | "canvaskit" = "canvaskit";
@@ -1136,7 +1164,7 @@ export class StageScene {
 				this.still = undefined;
 				this.paintBoardsGpu(canvas, boards, surface);
 				this.paintNewsGpu(canvas, boards.filter((board) => board.glow && board.news), camera.zoom);
-				for (const item of inView) if (!sizing.has(item.id)) canvas.drawPicture(item.picture);
+				for (const item of inView) if (!sizing.has(item.id) && item.picture) canvas.drawPicture(item.picture);
 				canvas.restore();
 				const image = surface.makeImageSnapshot();
 				if (image) this.still = { key, image };
@@ -1147,7 +1175,7 @@ export class StageScene {
 				place();
 			}
 			// Over the rest while it is being sized, as a moved item is carried over everything.
-			for (const item of inView) if (sizing.has(item.id)) canvas.drawPicture(item.picture);
+			for (const item of inView) if (sizing.has(item.id) && item.picture) canvas.drawPicture(item.picture);
 			this.paintInkGpu(canvas);
 		} else if (carriedOnly) {
 			// Carried boards under carried items, as they sit on the sheet.
@@ -1157,7 +1185,8 @@ export class StageScene {
 			const inView = (this.itemIndex?.search(this.sheetRect(cssW, cssH)) ?? []).map((at) => this.items[at]!);
 			const draw = (item: DrawnItem) => {
 				if (slide?.ids.has(item.id)) return;
-				canvas.drawPicture(slide?.replaced?.get(item.id) ?? item.picture);
+				const picture = slide?.replaced?.get(item.id) ?? item.picture;
+				if (picture) canvas.drawPicture(picture);
 			};
 			this.paintBoardsGpu(canvas, boards, surface);
 			this.paintNewsGpu(canvas, boards.filter((board) => board.glow && board.news), camera.zoom);
@@ -1480,6 +1509,22 @@ export class StageScene {
 	// --- the drawing ------------------------------------------------------------------------
 
 	private start(): Promise<void> {
+		// With the engine drawing the tiles, CanvasKit is not loaded at all (unless `native` is switched off, to compare).
+		if (this.tiles && !this.off.has("native"))
+			this.starting ??= loadCppLayout().then((scene) => {
+				if (this.disposed) return;
+				if (!scene) {
+					// The engine did not load: CanvasKit after all.
+					this.starting = undefined;
+					this.tiles = false;
+					void this.start();
+					return;
+				}
+				this.fonts = new PenFonts();
+				this.fonts.keepFiles = true;
+				this.fonts.scheme = this.scheme;
+				this.redraw();
+			});
 		this.starting ??= canvasKit().then((ck) => {
 			if (this.disposed) return;
 			this.ck = ck;
@@ -1524,12 +1569,12 @@ export class StageScene {
 			this.shrinkGpu();
 		}
 		this.slide?.carried?.delete();
-		for (const picture of this.slide?.replaced?.values() ?? []) picture.delete();
+		for (const picture of this.slide?.replaced?.values() ?? []) picture?.delete();
 		this.slide = undefined;
 	}
 
 	private dropItems(): void {
-		for (const item of this.items) item.picture.delete();
+		for (const item of this.items) item.picture?.delete();
 		this.items = [];
 		this.itemIndex = undefined;
 	}
@@ -1549,6 +1594,20 @@ export class StageScene {
 
 	private recordSlide(): void {
 		const { ck, fonts, slide, painted } = this;
+		if (this.native && fonts && slide && painted) {
+			// Nothing recorded: the items holding what is lifted are only marked, so their tiles are drawn
+			// again without it, and the engine draws what is lifted when it is sent (`paintCarried`).
+			slide.replaced = new Map();
+			for (const node of painted.nodes) {
+				if (slide.ids.has(node.id)) continue;
+				for (const inner of walk([node])) if (inner !== node && slide.ids.has(inner.id)) slide.replaced.set(node.id, undefined);
+			}
+			slide.carriedIds = [...slide.ids].filter((id) => painted.placed.has(id));
+			slide.ready = true;
+			if (slide.carriedIds.length) slide.carried = undefined;
+			this.staleSlide(slide);
+			return;
+		}
 		if (!ck || !fonts || !slide || !painted) return;
 		// A live file being carried is carried as its hole: its element goes with the drag under the sheet.
 		const ctx = { ...this.paintContext(painted.doc, painted.placed), holes: this.holes };
@@ -1571,7 +1630,7 @@ export class StageScene {
 	}
 
 	/** The tiles over a drag's items and what holds them, drawn again when the drag starts or ends. */
-	private staleSlide(slide: { ids: ReadonlySet<string>; replaced?: Map<string, Picture> }): void {
+	private staleSlide(slide: { ids: ReadonlySet<string>; replaced?: Map<string, Picture | undefined> }): void {
 		for (const id of [...slide.ids, ...(slide.replaced?.keys() ?? [])]) {
 			const box = this.bounds.get(id);
 			if (box) this.tileStale.push(box);
@@ -1672,6 +1731,34 @@ export class StageScene {
 		return { doc: root, copies };
 	}
 
+	/**
+	 * What an item draws, as words: itself, every box in it, and what about the stage changes how it is
+	 * drawn (light or dark, its fonts and pictures, words being typed over, a file shown under it, a
+	 * card's tables scrolled). Two equal signatures draw the same tiles.
+	 */
+	private signature(node: PenNode, placed: Map<string, Placed>, doc: PenDocument): string {
+		const boxes: Array<[string, number, number, number, number]> = [];
+		const flags: string[] = [];
+		for (const inner of walk([node])) {
+			const box = placed.get(inner.id)?.box;
+			if (box) boxes.push([inner.id, box.x, box.y, box.w, box.h]);
+			if (this.muted.has(inner.id)) flags.push(`m${inner.id}`);
+			if (this.holes.has(inner.id)) flags.push(`h${inner.id}`);
+		}
+		for (const [key, offset] of this.scrolls) if (offset && boxes.some(([id]) => key.startsWith(`${id}:`))) flags.push(`${key}=${offset}`);
+		void doc;
+		return JSON.stringify([node, boxes, flags, this.scheme, this.fonts?.generation, this.fonts?.imageVersion]);
+	}
+
+	/** What a drag lifts, drawn by the engine alone over the window, for the page to slide (`carried`). */
+	private paintCarried(cssW: number, cssH: number, pxW: number, pxH: number): OffscreenCanvas | HTMLCanvasElement | undefined {
+		const ids = this.slide?.carriedIds;
+		if (!cppLayout || !this.cppPainter || !this.cppCanvas || !ids?.length) return undefined;
+		const rect = this.sheetRect(cssW, cssH);
+		this.cppPainter.region(rect.x, rect.y, rect.w, rect.h, pxW, pxH, { dark: this.scheme === "dark", only: new Set(ids), holes: this.holes, mute: this.muted, scrolls: this.scrolls });
+		return this.cppCanvas;
+	}
+
 	private rebuild(): void {
 		/*
 		 * Only the items a step changes are drawn again, when nothing else has changed since the last
@@ -1681,7 +1768,7 @@ export class StageScene {
 		 */
 		const partial = !this.allDirty && this.painted !== undefined && this.painted.source === this.doc && this.items.length > 0;
 		this.allDirty = false;
-		const kept = partial ? new Map(this.items.map((item) => [item.id, item.picture])) : undefined;
+		const kept = partial ? new Map<string, Picture | string | undefined>(this.items.map((item) => [item.id, item.picture ?? item.sig])) : undefined;
 		const keptPlaced = partial ? this.painted!.placed : undefined;
 		if (partial) {
 			this.items = [];
@@ -1694,7 +1781,7 @@ export class StageScene {
 		const lastMoving = this.lastMoving;
 		this.lastMoving = this.moving;
 		if (!doc || doc.children.length === 0) {
-			for (const picture of kept?.values() ?? []) picture.delete();
+			for (const picture of kept?.values() ?? []) if (typeof picture === "object") picture.delete();
 			this.placed = new Map();
 			this.bounds = new Map();
 			this.painted = undefined;
@@ -1702,10 +1789,12 @@ export class StageScene {
 			return;
 		}
 		// CanvasKit is still on its way: the layout comes with the first picture.
-		if (!ck || !fonts) {
-			for (const picture of kept?.values() ?? []) picture.delete();
+		if (!fonts || (!ck && !this.native)) {
+			for (const picture of kept?.values() ?? []) if (typeof picture === "object") picture.delete();
 			return;
 		}
+		// Without CanvasKit, words the engine does not measure itself are estimated; it measures them all once its fonts are here.
+		const measure: MeasureText = this.native ? estimateText : fonts.measure;
 		const theme = baseTheme(doc, this.scheme);
 		/*
 		 * Arrows are routed here as well as on the server: a file written by hand, or a board dragged
@@ -1742,7 +1831,7 @@ export class StageScene {
 		for (const node of walk(doc.children)) if (isArrow(node)) arrows.push(node.id);
 		if (arrows.length > 0) {
 			const { doc: copy } = this.copyAlong(doc, arrows);
-			if (reroute(copy, this.layout(copy, expand(copy), { theme, measure: fonts.measure }), (path) => this.boardFrames.get(path))) doc = copy;
+			if (reroute(copy, this.layout(copy, expand(copy), { theme, measure }), (path) => this.boardFrames.get(path))) doc = copy;
 		}
 		const nodes = expand(doc);
 		/*
@@ -1756,11 +1845,11 @@ export class StageScene {
 				// A font landed after this picture was drawn without it: lay out and draw again.
 				if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
 			});
-		const placed = this.layout(doc, nodes, { theme, measure: fonts.measure });
+		const placed = this.layout(doc, nodes, { theme, measure });
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
 		this.painted = { nodes, doc, placed, source };
-		const ctx = { ...this.paintContext(doc, placed), skip: this.hidden, mute: this.muted, holes: this.holes };
+		const ctx = this.native ? undefined : { ...this.paintContext(doc, placed), skip: this.hidden, mute: this.muted, holes: this.holes };
 		/*
 		 * Which items a partial rebuild draws again: the ones holding what is or was previewed, the
 		 * ones holding an arrow (an end may have moved), and any whose box came out different.
@@ -1786,17 +1875,16 @@ export class StageScene {
 		for (const node of nodes) {
 			if (this.hidden.has(node.id)) continue;
 			const old = kept?.get(node.id);
-			let picture: Picture;
 			if (old && !again.has(node.id)) {
-				picture = old;
+				this.items.push(typeof old === "string" ? { id: node.id, sig: old } : { id: node.id, picture: old });
 				kept!.delete(node.id);
-			} else picture = this.record((canvas) => paintDocument(canvas, [node], ctx));
-			this.items.push({ id: node.id, picture });
+			} else if (ctx) this.items.push({ id: node.id, picture: this.record((canvas) => paintDocument(canvas, [node], ctx)) });
+			else this.items.push({ id: node.id, sig: this.signature(node, placed, doc) });
 			// An item with no box of its own is drawn wherever the sheet is.
 			const box = this.bounds.get(node.id) ?? placed.get(node.id)?.box;
 			covers.push(box ? { x: box.x - ITEM_REACH, y: box.y - ITEM_REACH, w: box.w + 2 * ITEM_REACH, h: box.h + 2 * ITEM_REACH } : { x: -1e9, y: -1e9, w: 2e9, h: 2e9 });
 		}
-		for (const picture of kept?.values() ?? []) picture.delete();
+		for (const picture of kept?.values() ?? []) if (typeof picture === "object") picture.delete();
 		this.itemIndex = new BoxIndex(covers);
 		// The cards' links and wide tables, laid out as they were drawn, for the page's presses.
 		const cards: CardGeometry[] = [];
@@ -1806,6 +1894,11 @@ export class StageScene {
 			if (!isMarkdown(node) && !text) continue;
 			const content = String(resolve(doc, node.content, withTheme(one.theme, node)) ?? "");
 			const pad = text ? 0 : NOTE_PAD;
+			if (this.native) {
+				const laid = cppLayout?.cardGeometry(node.id, box.w - pad * 2);
+				cards.push({ id: node.id, order: one.order, box, pad, links: laid?.links ?? [], scrollers: laid?.scrollers ?? [] });
+				continue;
+			}
 			const laid = fonts.markdown(content, textStyleOf(doc, node, one.theme), { width: box.w - pad * 2, align: node.textAlign ?? "left" });
 			cards.push({ id: node.id, order: one.order, box, pad, links: laid.links, scrollers: laid.scrollers });
 		}

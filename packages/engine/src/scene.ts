@@ -28,6 +28,7 @@ const NOTE_LIKE = new Set(["note", "prompt", "context"]);
 
 interface SceneModule {
 	HEAPF64: Float64Array;
+	HEAP32: Int32Array;
 	_scene_input(count: number): number;
 	_scene_reset(): void;
 	_scene_add(): number;
@@ -39,6 +40,7 @@ interface SceneModule {
 	_scene_count(): number;
 	_scene_bytes(count: number): number;
 	_scene_card(handle: number, count: number, poolLength: number): void;
+	_scene_card_geometry(handle: number, width: number): number;
 	_scene_text(handle: number, length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, markdown: number): void;
 	HEAPU8: Uint8Array;
 	GL: { registerContext(context: unknown, attributes: Record<string, unknown>): number; makeContextCurrent(handle: number): boolean; getNewId(table: unknown[]): number; textures: unknown[] };
@@ -53,6 +55,8 @@ interface SceneModule {
 	UTF8ToString(at: number): string;
 	_paint_scheme(dark: number): void;
 	_paint_tile(x: number, y: number, size: number, pixels: number): number;
+	_paint_region(x: number, y: number, w: number, h: number, pw: number, ph: number): number;
+	_paint_only(at: number, count: number): void;
 	_scene_layout(): number;
 	_scene_results(): number;
 }
@@ -82,6 +86,8 @@ export interface SceneLayout {
 	): Map<string, Placed>;
 	/** A font file for the scene's own measuring, as the page's font provider gets it. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
+	/** A card's links and wide tables laid out `width` wide, as `layoutMarkdown` reports them; undefined for an item with no card. */
+	cardGeometry(id: string, width: number): { links: Array<{ x: number; y: number; w: number; h: number; href: string; scroller?: number }>; scrollers: Array<{ x: number; y: number; w: number; h: number; content: number }> } | undefined;
 	/** How big the engine's memory has grown, in bytes (it never shrinks). */
 	heapBytes(): number;
 	/**
@@ -93,21 +99,38 @@ export interface SceneLayout {
 	readonly last: { sent: number; measured: number; held: number };
 }
 
+/**
+ * What a paint is told about the stage: light or dark; `skip`, items carried on a picture of their own;
+ * `holes`, items shown live under the drawing; `mute`, items whose words are not drawn while someone
+ * types over them; `scrolls`, how far each card's wide tables are scrolled, by `id:index`; `overlay`,
+ * drawing ops in stage pixels over everything, the ink still under the pen (`inkOps` in the app).
+ */
+export interface PaintOptions {
+	dark: boolean;
+	skip?: ReadonlySet<string>;
+	holes?: ReadonlySet<string>;
+	mute?: ReadonlySet<string>;
+	scrolls?: ReadonlyMap<string, number>;
+	overlay?: readonly number[];
+}
+
 export interface Painter {
 	/**
 	 * Paint the square at stage (x, y), `size` stage units wide, into the canvas, `pixels` square. False
 	 * when something there is beyond the painter yet, and the caller paints it some other way.
-	 * `skip`: items carried on a picture of their own; `holes`: items shown live under the drawing.
 	 */
-	/** `mute`: items whose words are not drawn, while someone types over them. */
+	tile(x: number, y: number, size: number, pixels: number, options: PaintOptions): boolean;
+	/**
+	 * Paint the rectangle at stage (x, y), `w` by `h`, into the canvas made `pw` by `ph`; with `only`,
+	 * just those items, each as if it stood alone (a drag's lifted items). A tile after it puts the
+	 * canvas back to the tile's size.
+	 */
+	region(x: number, y: number, w: number, h: number, pw: number, ph: number, options: PaintOptions & { only?: ReadonlySet<string> }): boolean;
 	/** Hand a decoded picture to the painter; answers the id a paint record names it by. */
 	image(source: TexImageSource, width: number, height: number): number;
 	dropImage(id: number): void;
 	/** Why the last tile was not drawn, in words. */
 	why?: string;
-	/** `scrolls`: how far each card's wide tables are scrolled, by `id:index`. */
-	/** `overlay`: drawing ops in stage pixels over everything, the ink still under the pen (`inkOps` in the app). */
-	tile(x: number, y: number, size: number, pixels: number, options: { dark: boolean; skip?: ReadonlySet<string>; holes?: ReadonlySet<string>; mute?: ReadonlySet<string>; scrolls?: ReadonlyMap<string, number>; overlay?: readonly number[] }): boolean;
 }
 
 /** What the page last told the scene about one item. */
@@ -118,6 +141,8 @@ interface Known {
 	children: number[];
 	paint?: string;
 	ops?: string;
+	/** A card's strings as encoded, for reading its links' addresses back (`cardGeometry`). */
+	cardPool?: Uint8Array;
 }
 
 const inNode = typeof (globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node === "string" && typeof (globalThis as { window?: unknown }).window === "undefined";
@@ -153,6 +178,23 @@ export async function loadScene(): Promise<SceneLayout> {
 	return {
 		last,
 		font: (bytes, family) => text.font(bytes, family),
+		cardGeometry(id, width) {
+			const entry = known.get(id);
+			if (!entry?.cardPool) return undefined;
+			const at = module._scene_card_geometry(entry.handle, width) >> 3;
+			const v = module.HEAPF64;
+			const pool = entry.cardPool;
+			const decoder = new TextDecoder();
+			let k = at;
+			const links: Array<{ x: number; y: number; w: number; h: number; href: string; scroller?: number }> = [];
+			for (let n = v[k++]!; n > 0; n--) {
+				const [x, y, w, h, hrefAt, hrefLength, scroller] = [v[k++]!, v[k++]!, v[k++]!, v[k++]!, v[k++]!, v[k++]!, v[k++]!];
+				links.push({ x, y, w, h, href: decoder.decode(pool.subarray(hrefAt, hrefAt + hrefLength)), ...(scroller >= 0 ? { scroller } : {}) });
+			}
+			const scrollers: Array<{ x: number; y: number; w: number; h: number; content: number }> = [];
+			for (let n = v[k++]!; n > 0; n--) scrollers.push({ x: v[k++]!, y: v[k++]!, w: v[k++]!, h: v[k++]!, content: v[k++]! });
+			return { links, scrollers };
+		},
 		heapBytes: () => module.HEAPU8.length,
 		painter(canvas) {
 			const gl = (canvas as OffscreenCanvas).getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
@@ -162,8 +204,40 @@ export async function loadScene(): Promise<SceneLayout> {
 			module._paint_init();
 			let flagged: number[] = [];
 			const textures = new Map<number, { texture: WebGLTexture; name: number }>();
+			const paint = (x: number, y: number, w: number, h: number, pw: number, ph: number, { dark, skip, holes, mute, scrolls, overlay }: PaintOptions): boolean => {
+				module.GL.makeContextCurrent(handle);
+				const ink = overlay ?? [];
+				const inkAt = module._scene_input(Math.max(1, ink.length));
+				module.HEAPF64.set(ink, inkAt >> 3);
+				module._paint_overlay(inkAt, ink.length);
+				module._paint_scheme(dark ? 1 : 0);
+				module._paint_scroll(-1, 0, 0);
+				for (const [key, offset] of scrolls ?? []) {
+					const cut = key.lastIndexOf(":");
+					const entry = known.get(key.slice(0, cut));
+					if (entry && offset) module._paint_scroll(entry.handle, Number(key.slice(cut + 1)), offset);
+				}
+				for (const h of flagged) module._paint_flags(h, 0, 0, 0);
+				flagged = [];
+				const flags = new Map<number, [number, number, number]>();
+				for (const [set, which] of [[skip, 0], [holes, 1], [mute, 2]] as const)
+					for (const id of set ?? []) {
+						const entry = known.get(id);
+						if (!entry) continue;
+						const f = flags.get(entry.handle) ?? [0, 0, 0];
+						f[which] = 1;
+						flags.set(entry.handle, f);
+					}
+				for (const [h, f] of flags) {
+					module._paint_flags(h, f[0], f[1], f[2]);
+					flagged.push(h);
+				}
+				const drawn = module._paint_region(x, y, w, h, pw, ph) === 1;
+				painter.why = drawn ? "" : module.UTF8ToString(module._paint_why());
+				return drawn;
+			};
 			let nextPicture = 1;
-			return {
+			const painter: Painter = {
 				image(source, width, height) {
 					module.GL.makeContextCurrent(handle);
 					const texture = gl.createTexture()!;
@@ -191,39 +265,32 @@ export async function loadScene(): Promise<SceneLayout> {
 					module.GL.textures[known.name] = null;
 					textures.delete(id);
 				},
-				tile(x, y, size, pixels, { dark, skip, holes, mute, scrolls, overlay }) {
-					module.GL.makeContextCurrent(handle);
-					const ink = overlay ?? [];
-					const inkAt = module._scene_input(Math.max(1, ink.length));
-					module.HEAPF64.set(ink, inkAt >> 3);
-					module._paint_overlay(inkAt, ink.length);
-					module._paint_scheme(dark ? 1 : 0);
-					module._paint_scroll(-1, 0, 0);
-					for (const [key, offset] of scrolls ?? []) {
-						const cut = key.lastIndexOf(":");
-						const entry = known.get(key.slice(0, cut));
-						if (entry && offset) module._paint_scroll(entry.handle, Number(key.slice(cut + 1)), offset);
+				tile(x, y, size, pixels, options) {
+					if ((canvas as OffscreenCanvas).width !== pixels || (canvas as OffscreenCanvas).height !== pixels) {
+						(canvas as OffscreenCanvas).width = pixels;
+						(canvas as OffscreenCanvas).height = pixels;
 					}
-					for (const h of flagged) module._paint_flags(h, 0, 0, 0);
-					flagged = [];
-					const flags = new Map<number, [number, number, number]>();
-					for (const [set, which] of [[skip, 0], [holes, 1], [mute, 2]] as const)
-						for (const id of set ?? []) {
-							const entry = known.get(id);
-							if (!entry) continue;
-							const f = flags.get(entry.handle) ?? [0, 0, 0];
-							f[which] = 1;
-							flags.set(entry.handle, f);
-						}
-					for (const [h, f] of flags) {
-						module._paint_flags(h, f[0], f[1], f[2]);
-						flagged.push(h);
+					return paint(x, y, size, size, pixels, pixels, options);
+				},
+				region(x, y, w, h, pw, ph, options) {
+					// The painter's own canvas, made the region's size: a tile after it puts it back.
+					if ((canvas as OffscreenCanvas).width !== pw || (canvas as OffscreenCanvas).height !== ph) {
+						(canvas as OffscreenCanvas).width = pw;
+						(canvas as OffscreenCanvas).height = ph;
 					}
-					const drawn = module._paint_tile(x, y, size, pixels) === 1;
-					this.why = drawn ? "" : module.UTF8ToString(module._paint_why());
+					const only = [...(options.only ?? [])].flatMap((id) => {
+						const entry = known.get(id);
+						return entry ? [entry.handle] : [];
+					});
+					const at = module._scene_input(Math.max(1, only.length));
+					module.HEAP32.set(only, at >> 2);
+					module._paint_only(at, only.length);
+					const drawn = paint(x, y, w, h, pw, ph, options);
+					module._paint_only(at, 0);
 					return drawn;
 				},
 			};
+			return painter;
 		},
 		layout(doc, nodes, { theme, measure, measureKey, chain, card, paint, ops }) {
 			const measureText = measure ?? estimateText;
@@ -276,6 +343,7 @@ export async function loadScene(): Promise<SceneLayout> {
 							module.HEAPF64.set(wire.numbers, module._scene_input(wire.numbers.length) >> 3);
 							module.HEAPU8.set(wire.pool, module._scene_bytes(wire.pool.length));
 							module._scene_card(entry.handle, wire.numbers.length, wire.pool.length);
+							entry.cardPool = wire.pool;
 						}
 					}
 				}

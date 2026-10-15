@@ -49,6 +49,7 @@ const fontsourceId = (family: string) => family.trim().toLowerCase().replace(/\s
 const roundWeight = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
 
 export class PenFonts {
+	/** CanvasKit's font provider; none when the engine draws everything and CanvasKit is never loaded. */
 	readonly provider: TypefaceFontProvider;
 	/** Bumped when a font lands, so pictures drawn without it are redrawn. */
 	generation = 0;
@@ -62,8 +63,13 @@ export class PenFonts {
 	keepFiles = false;
 	readonly files: Array<{ family: string; bytes: ArrayBuffer | undefined }> = [];
 
-	constructor(private readonly ck: CanvasKit) {
-		this.provider = ck.TypefaceFontProvider.Make();
+	/**
+	 * Without CanvasKit (`ck` undefined) the fonts are only fetched and kept as files for the engine
+	 * (`keepFiles`): `paragraph`, `markdown` and `measure` then have nothing to set words with and must
+	 * not be called.
+	 */
+	constructor(private readonly ck?: CanvasKit) {
+		this.provider = (ck ? ck.TypefaceFontProvider.Make() : undefined) as TypefaceFontProvider;
 	}
 
 	/**
@@ -118,7 +124,7 @@ export class PenFonts {
 				const response = await fetch(source);
 				if (!response.ok) continue;
 				const bytes = await response.arrayBuffer();
-				this.provider.registerFont(bytes, family);
+				this.provider?.registerFont(bytes, family);
 				if (this.keepFiles) this.files.push({ family, bytes });
 				this.loaded.push({ url: source.slice(source.lastIndexOf("/fonts/") + 7), bytes: bytes.byteLength });
 				this.generation++;
@@ -132,7 +138,7 @@ export class PenFonts {
 
 	/** A laid-out paragraph in this style, which the caller deletes. */
 	paragraph(text: string, style: TextStyle, options: { color?: Float32Array; align?: string; width: number; underline?: boolean; strike?: boolean; oneLine?: boolean; shadows?: Array<{ color: Float32Array; offset: [number, number]; blurRadius: number }> }): Paragraph {
-		const ck = this.ck;
+		const ck = this.ck!;
 		const align = options.align === "center" ? ck.TextAlign.Center : options.align === "right" ? ck.TextAlign.Right : options.align === "justify" ? ck.TextAlign.Justify : ck.TextAlign.Left;
 		const decoration = (options.underline ? ck.UnderlineDecoration : 0) | (options.strike ? ck.LineThroughDecoration : 0);
 		const paragraphStyle = new ck.ParagraphStyle({
@@ -180,7 +186,7 @@ export class PenFonts {
 			this.cards.set(key, known);
 			return known;
 		}
-		const made = layoutMarkdown({ ck: this.ck, provider: this.provider, chain: (family) => this.chain(family), image: (url) => this.images?.(url), mono: MONO_FAMILY, scheme: this.scheme }, parseMarkdown(text), style, Math.max(1, options.width), options.align);
+		const made = layoutMarkdown({ ck: this.ck!, provider: this.provider, chain: (family) => this.chain(family), image: (url) => this.images?.(url), mono: MONO_FAMILY, scheme: this.scheme }, parseMarkdown(text), style, Math.max(1, options.width), options.align);
 		this.cards.set(key, made);
 		// The least recently used go, beyond what a stage of cards needs at once.
 		while (this.cards.size > 64) {

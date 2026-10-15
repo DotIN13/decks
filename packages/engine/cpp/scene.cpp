@@ -17,6 +17,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "card.h"
+
 extern "C" {
 // Measure an item's words: one line when `maxWidth` is NaN, wrapped at it otherwise. `withNode` 0 is
 // the plain measure, as `layout.ts` asks for a text that grows to fit (no item is passed there).
@@ -478,6 +480,26 @@ int sceneChildren(int handle, const int** out) {
 	if (out) *out = nodes[size_t(handle)].children.data();
 	return int(nodes[size_t(handle)].children.size());
 }
+// A card's links and wide tables laid out `width` wide, for the page's presses: [links, each x, y, w,
+// h, address at, address length, table or -1; tables, each x, y, w, h, content width].
+std::vector<double> cardGeometryOut;
+extern "C" EMSCRIPTEN_KEEPALIVE double* scene_card_geometry(int handle, double width) {
+	cardGeometryOut.clear();
+	if (handle < 0 || size_t(handle) >= nodes.size() || !nodes[size_t(handle)].ownCard) {
+		cardGeometryOut = {0, 0};
+		return cardGeometryOut.data();
+	}
+	const Node& n = nodes[size_t(handle)];
+	std::vector<CardLink> links;
+	std::vector<CardScroller> scrollers;
+	cardGeometry(n.card.data(), n.card.size(), n.cardPool.data(), std::max(1.0, width), links, scrollers);
+	cardGeometryOut.push_back(double(links.size()));
+	for (const CardLink& l : links) cardGeometryOut.insert(cardGeometryOut.end(), {l.x, l.y, l.w, l.h, double(l.hrefAt), double(l.hrefLength), double(l.scroller)});
+	cardGeometryOut.push_back(double(scrollers.size()));
+	for (const CardScroller& s : scrollers) cardGeometryOut.insert(cardGeometryOut.end(), {s.x, s.y, s.w, s.h, s.content});
+	return cardGeometryOut.data();
+}
+
 // An item's card as the page encoded it (`scene_card`), for the painter to draw; false when it has none.
 bool sceneCard(int handle, const double** nums, size_t* count, const char** pool) {
 	if (handle < 0 || size_t(handle) >= nodes.size() || !nodes[size_t(handle)].ownCard) return false;

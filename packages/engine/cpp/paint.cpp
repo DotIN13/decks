@@ -1842,12 +1842,15 @@ EMSCRIPTEN_KEEPALIVE void paint_scroll(int handle, int index, double offset) {
 	list[size_t(index)] = offset;
 }
 
-// Paint the square of the drawing at stage (x, y), `size` stage units wide, into a `pixels`-square
-// canvas. Returns 1 when everything in it was drawn, 0 when something there is beyond this painter.
-EMSCRIPTEN_KEEPALIVE int paint_tile(double x, double y, double size, int pixels) {
-	tileW = tileH = pixels;
+// Paint the rectangle of the drawing at stage (x, y), `w` by `h` stage units, into a `pw` by `ph` canvas.
+// Returns 1 when everything in it was drawn, 0 when something there is beyond this painter. With
+// `paint_only` set, only those items are drawn, each as if it stood alone (a drag's lifted items).
+std::vector<int> onlyItems;
+EMSCRIPTEN_KEEPALIVE int paint_region(double x, double y, double w, double h, int pw, int ph) {
+	tileW = pw;
+	tileH = ph;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, pixels, pixels);
+	glViewport(0, 0, pw, ph);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1855,16 +1858,20 @@ EMSCRIPTEN_KEEPALIVE int paint_tile(double x, double y, double size, int pixels)
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUseProgram(program);
 	glBindVertexArray(vao);
-	glUniform2f(uView, float(pixels), float(pixels));
-	const double level = double(pixels) / size;
+	glUniform2f(uView, float(pw), float(ph));
+	const double lx = double(pw) / w, ly = double(ph) / h;
 	painter = Painter{};
 	whyNot = "";
 	// Glyph masks are let go between tiles, never inside one: a paragraph holds on to the ones it placed.
 	if (glyphMasks.size() > 4096) glyphMasks.clear();
-	painter.m = Affine{level, 0, 0, level, -x * level, -y * level};
-	const int* roots = nullptr;
-	const int count = sceneRoots(&roots);
-	std::vector<int> list(roots, roots + count);
+	painter.m = Affine{lx, 0, 0, ly, -x * lx, -y * ly};
+	std::vector<int> list;
+	if (!onlyItems.empty()) list = onlyItems;
+	else {
+		const int* roots = nullptr;
+		const int count = sceneRoots(&roots);
+		list.assign(roots, roots + count);
+	}
 	for (int root : list) {
 		const PaintBox b = sceneBox(root);
 		// Far from the tile: nothing of it shows. Its shadows and stroke reach past its box by what they
@@ -1874,13 +1881,16 @@ EMSCRIPTEN_KEEPALIVE int paint_tile(double x, double y, double size, int pixels)
 			const bool contained = r.rotation == 0 && r.kind != K_PATH && (r.clip || sceneChildren(root, nullptr) == 0);
 			double reach = 64 + std::max({r.stroke.widths[0], r.stroke.widths[1], r.stroke.widths[2], r.stroke.widths[3]});
 			for (const Shadow& sh : r.shadows) reach = std::max(reach, 64 + sh.blur * 2 + std::max(std::fabs(sh.dx), std::fabs(sh.dy)));
-			if (b.placed && contained && (b.x > x + size + reach || b.y > y + size + reach || b.x + b.w < x - reach || b.y + b.h < y - reach)) continue;
+			if (b.placed && contained && (b.x > x + w + reach || b.y > y + h + reach || b.x + b.w < x - reach || b.y + b.h < y - reach)) continue;
 		}
 		paintNode(root);
 	}
-	if (!overlay.empty()) paintOps(overlay);
+	if (!overlay.empty() && onlyItems.empty()) paintOps(overlay);
 	glBindVertexArray(0);
 	return painter.supported ? 1 : 0;
 }
+EMSCRIPTEN_KEEPALIVE int paint_tile(double x, double y, double size, int pixels) { return paint_region(x, y, size, size, pixels, pixels); }
+// Draw only these items in the next paints (`count` handles at `handles`); a count of 0 draws everything again.
+EMSCRIPTEN_KEEPALIVE void paint_only(const int* handles, int count) { onlyItems.assign(handles, handles + count); }
 
 }  // extern "C"

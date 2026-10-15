@@ -15,6 +15,7 @@ struct CardRunPaint {
 	CardColour ink, back;
 	int lines = 0;
 	CardColour lineInk;
+	size_t hrefAt = 0, hrefLength = 0;  // its link's address in the card's pool; none when empty
 };
 
 struct CardOp {
@@ -42,3 +43,9 @@ struct CardPalette { CardColour fg, muted, faint, line, strong, subtle, code, ac
 // A card laid out `width` wide into `ops`; answers its height. `ok` is false for what it cannot record
 // (a picture that has arrived but was not handed to the painter).
 double cardOps(const double* nums, size_t count, const char* pool, double width, std::vector<CardOp>& ops, CardPalette& palette, bool& ok);
+
+// What the page presses on a card: each link's box (from the card's top-left, and the wide table it
+// scrolls with or -1) and its address in the pool, and each wide table's box and width.
+struct CardLink { double x, y, w, h; size_t hrefAt, hrefLength; int scroller; };
+struct CardScroller { double x, y, w, h, content; };
+void cardGeometry(const double* nums, size_t count, const char* pool, double width, std::vector<CardLink>& links, std::vector<CardScroller>& scrollers);

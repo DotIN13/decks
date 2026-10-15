@@ -19,7 +19,8 @@ export interface PenHit {
  * Parts switched off for a debugging run on a phone, development builds only: `rec_off` is the crash
  * recorder's cookie (`assets/_tools/crash-recorder.mjs` in the deck), a comma list. `sheet` stops the
  * sheet drawing anything, `pictures` draws no board pictures, `gpu` never uses CanvasKit, `small`
- * decodes pictures no wider than 192px, `serial` fetches and decodes one at a time.
+ * decodes pictures no wider than 192px, `serial` fetches and decodes one at a time, `native` loads
+ * CanvasKit beside the engine, as before it drew everything.
  */
 export const debugOff: ReadonlySet<string> = new Set(
 	typeof document !== "undefined" && (import.meta.env?.DEV || /(?:^|; )rec_off=/.test(document.cookie)) ? decodeURIComponent((/(?:^|; )rec_off=([^;]*)/.exec(document.cookie) ?? [])[1] ?? "").split(",").filter(Boolean) : [],

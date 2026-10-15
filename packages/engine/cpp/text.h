@@ -36,3 +36,5 @@ void faceDecorations(int face, double out[5]);
 const char* faceBytes(int face, size_t* length);
 // A face's own weight and slant, as it was matched (`pickFace`).
 void faceStyle(int face, int* weight, bool* italic);
+// A face's ascent and descent per unit of size, both positive.
+void faceExtents(int face, double* ascent, double* descent);

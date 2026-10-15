@@ -110,6 +110,9 @@ private:
 		r.paint.back = colour();
 		r.paint.lines = int(next());
 		r.paint.lineInk = colour();
+		const Ref href = ref();
+		r.paint.hrefAt = href.at;
+		r.paint.hrefLength = href.length;
 		return r;
 	}
 	std::vector<Run> runs(int count) {
@@ -498,6 +501,47 @@ private:
 double cardHeight(const double* nums, size_t count, const char* pool, double width) {
 	Card card(nums, count, pool);
 	return card.layout(width);
+}
+
+namespace {
+void linksIn(const std::vector<CardOp>& ops, int scroller, std::vector<CardLink>& links, std::vector<CardScroller>& scrollers) {
+	for (const CardOp& op : ops) {
+		if (op.kind == CardOp::SCROLL) {
+			scrollers.push_back({op.x, op.y, op.w, op.h, op.content});
+			linksIn(op.ops, op.index, links, scrollers);
+			continue;
+		}
+		if (op.kind != CardOp::TEXT) continue;
+		bool any = false;
+		for (const CardRunPaint& p : op.paints) any = any || p.hrefLength > 0;
+		if (!any) continue;
+		std::vector<PlacedGlyph> glyphs;
+		std::vector<PlacedLine> lines;
+		std::vector<PlacedPiece> pieces;
+		double out[4];
+		placeGlyphs(op.text.data(), int(op.text.size()), op.spans, op.base, op.lineHeight, op.w, op.align, glyphs, lines, out, &pieces);
+		for (const PlacedPiece& piece : pieces) {
+			if (piece.span < 0 || size_t(piece.span) >= op.paints.size()) continue;
+			const CardRunPaint& p = op.paints[size_t(piece.span)];
+			if (!p.hrefLength) continue;
+			// As tall as the run's font, about its baseline (`getRectsForRange`, tight).
+			double asc, desc;
+			faceExtents(piece.face, &asc, &desc);
+			const double size = op.spans[size_t(piece.span)].size;
+			links.push_back({op.x + piece.x0, op.y + piece.baseline - asc * size, piece.x1 - piece.x0, (asc + desc) * size, p.hrefAt, p.hrefLength, scroller});
+		}
+	}
+}
+}  // namespace
+
+void cardGeometry(const double* nums, size_t count, const char* pool, double width, std::vector<CardLink>& links, std::vector<CardScroller>& scrollers) {
+	std::vector<CardOp> ops;
+	CardPalette palette;
+	bool ok = true;
+	cardOps(nums, count, pool, width, ops, palette, ok);
+	links.clear();
+	scrollers.clear();
+	linksIn(ops, -1, links, scrollers);
 }
 
 double cardOps(const double* nums, size_t count, const char* pool, double width, std::vector<CardOp>& ops, CardPalette& palette, bool& ok) {

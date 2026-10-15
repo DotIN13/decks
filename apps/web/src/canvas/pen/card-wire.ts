@@ -72,6 +72,8 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv, align =
 			if (run.added) (lines = 1), (lineInk = rgba(S.added));
 			if (run.underline) (lines = 1 | (run.strike ? 2 : 0)), (lineInk = ink ? rgba(ink) : INHERIT);
 			numbers.push(...(ink ? rgba(ink) : INHERIT), ...(back ? rgba(back) : NONE), lines, ...lineInk);
+			// Where its link goes, for the page's presses (`cardGeometry`); empty for none.
+			ref(run.link ?? "");
 		});
 	};
 	const blocks = (list: readonly Block[]) => {

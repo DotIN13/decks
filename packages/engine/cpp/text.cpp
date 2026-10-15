@@ -809,3 +809,7 @@ void faceStyle(int face, int* weight, bool* italic) {
 	*weight = faces[size_t(face)].weight;
 	*italic = faces[size_t(face)].italic;
 }
+void faceExtents(int face, double* ascent, double* descent) {
+	*ascent = faces[size_t(face)].ascent;
+	*descent = faces[size_t(face)].descent;
+}
