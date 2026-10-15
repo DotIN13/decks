@@ -57,6 +57,40 @@ try {
 		await page.evaluate(() => document.querySelector(".stage-sheet")?.hidden === true && globalThis.__decksSheet?.ck !== true),
 		String(JSON.stringify(await page.evaluate(() => globalThis.__decksSheet ?? null))).slice(0, 200),
 	);
+	/*
+	 * Picking by the C++ scene: a press on a drawn square selects it, and a press inside a diagonal
+	 * line's box but well off the line does not, as the browser's own path test answered before.
+	 */
+	const agentId = await until(() => link.last("agents")?.focused);
+	const at = await page.evaluate(() => {
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const toStage = (x, y) => ({ x: (x - m.e) / m.a, y: (y - m.f) / m.a });
+		return { zoom: m.a, square: toStage(500, 300), line: toStage(900, 300) };
+	});
+	const side = Math.round(120 / at.zoom);
+	link.send({
+		type: "stage.pen.edit",
+		agentId,
+		ops: [
+			{ op: "insert", node: { type: "rectangle", id: "e2e-pick-square", fill: "#bfdbfe" }, box: { x1: Math.round(at.square.x), y1: Math.round(at.square.y), x2: Math.round(at.square.x) + side, y2: Math.round(at.square.y) + side } },
+			{ op: "insert", node: { type: "path", id: "e2e-pick-line", geometry: "M0 0 L100 100", stroke: "#333", strokeWidth: 2 }, box: { x1: Math.round(at.line.x), y1: Math.round(at.line.y), x2: Math.round(at.line.x) + side * 2, y2: Math.round(at.line.y) + side * 2 } },
+		],
+	});
+	await until(() => page.evaluate(() => (globalThis.__decksEngine?.stats().tiles ?? 0) > 0));
+	await settle(page, 600);
+	const handles = () => page.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length);
+	// Off the line, in the empty corner of its box: nothing.
+	await page.mouse.click(900 + 200, 300 + 30);
+	await settle(page, 400);
+	say("a press in a line's box but off the line selects nothing", (await handles()) === 0, String(await handles()));
+	await page.mouse.click(560, 360);
+	const picked = await until(() => handles().then((n) => n === 8));
+	say("a press on a drawn square selects it", !!picked, String(await handles()));
+	const picking = await page.evaluate(() => globalThis.__decksSheet?.picking);
+	say("and the C++ scene answered it", typeof picking === "string" && picking.startsWith("c++"), String(picking));
+	await page.keyboard.press("Escape");
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "e2e-pick-square" }, { op: "delete", id: "e2e-pick-line" }] });
+	await settle(page, 600);
 	link.close();
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

@@ -5,7 +5,8 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./scene": "./src/scene.ts"
+		"./scene": "./src/scene.ts",
+		"./pick": "./src/pick.ts"
 	},
 	"scripts": {
 		"build:wasm": "bash build.sh",

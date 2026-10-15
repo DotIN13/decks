@@ -18,12 +18,12 @@ em++ cpp/engine.cpp -std=c++20 -O3 -flto \
 ls -la wasm
 
 # The scene: the drawing's model and layout, with no GPU, for the page, a worker and the server.
-em++ cpp/scene.cpp -std=c++20 -O3 -flto \
+em++ cpp/scene.cpp cpp/pick.cpp -std=c++20 -O3 -flto \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \
-	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results \
-	-sEXPORTED_RUNTIME_METHODS=HEAPF64 \
+	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results,_pick_io,_pick_add,_pick_remove,_pick_set,_pick_geometry,_pick_point,_pick_within,_pick_found \
+	-sEXPORTED_RUNTIME_METHODS=HEAPF64,HEAP32,HEAPU8 \
 	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
 	-o wasm/scene.mjs
 ls -la wasm/scene.*

@@ -1,6 +1,7 @@
 import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { isFile, isLiveFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
+import type { Picker } from "@decks/engine/pick";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { StageScene, type CardGeometry, type LiveInk, type PenPreview, type SceneBoard, type SceneInput, type SceneOutput } from "./scene.ts";
 
@@ -266,6 +267,37 @@ export class PenLayer {
 		this.writeHits();
 	}
 	private layoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/**
+	 * With the engine on, picking is the C++ scene's (`@decks/engine/pick`): a copy on this page,
+	 * brought up to date with the worker's layout on first use after one, and sent only what changed.
+	 * Until it has loaded, and with the engine off, the TypeScript it was ported from answers.
+	 */
+	private picker: Picker | undefined;
+	private pickerLoading = false;
+	private pickerStale = true;
+	private cppPicker(): Picker | undefined {
+		if (!this.tileSink) return undefined;
+		if (!this.picker) {
+			if (!this.pickerLoading) {
+				this.pickerLoading = true;
+				import("@decks/engine/pick")
+					.then(({ loadPicker }) => loadPicker())
+					.then((picker) => {
+						this.picker = picker;
+						this.pickerStale = true;
+					})
+					.catch((error: unknown) => console.error(`stage picking: the C++ picker did not load (${String((error as Error)?.message ?? error)}); TypeScript picks instead`));
+			}
+			return undefined;
+		}
+		if (this.pickerStale) {
+			this.pickerStale = false;
+			this.picker.sync(this.placed, this.bounds);
+			sheetStats().picking = `c++, ${this.picker.sent} sent`;
+		}
+		return this.picker;
+	}
 	private takeLayout(): void {
 		const message = this.layoutNext;
 		clearTimeout(this.layoutTimer);
@@ -294,6 +326,7 @@ export class PenLayer {
 			 * the index then (`index`).
 			 */
 			this.indexStale = true;
+			this.pickerStale = true;
 			clearTimeout(this.hitsTimer);
 			if (message.partial) this.hitsTimer = setTimeout(() => this.refreshHits(), 200);
 			else this.refreshHits();
@@ -449,7 +482,16 @@ export class PenLayer {
 	 */
 	hitTest(point: { x: number; y: number }, options?: { deep?: boolean; skip?: (node: PenNode) => boolean }): PenHit | undefined {
 		let best: Placed | undefined;
-		for (const at of this.index().search({ x: point.x, y: point.y, w: 0, h: 0 })) {
+		const picker = this.cppPicker();
+		// With the engine on, the C++ scene answers which items a press reaches, topmost first.
+		if (picker)
+			for (const id of picker.point(point.x, point.y, (2 * BAND_PX) / this.camera.zoom)) {
+				const placed = this.placed.get(id);
+				if (!placed || options?.skip?.(placed.node)) continue;
+				best = placed;
+				break;
+			}
+		else for (const at of this.index().search({ x: point.x, y: point.y, w: 0, h: 0 })) {
 			const placed = this.placedList[at]!;
 			const { node } = placed;
 			if (node.id.includes("/") || node.type === "group") continue;
@@ -537,6 +579,8 @@ export class PenLayer {
 	}
 
 	within(r: Frame): string[] {
+		const picker = this.cppPicker();
+		if (picker) return picker.within(r);
 		const index = this.doc ? indexOf(this.doc) : new Map();
 		const inside = new Set<string>();
 		for (const at of this.index().search(r)) {
@@ -739,6 +783,7 @@ export class PenLayer {
 	 */
 	setTiles(sink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" | "tiles-done" }>) => void) | undefined): void {
 		this.tileSink = sink;
+		if (sink) this.cppPicker();
 		this.send({ type: "tiles", on: !!sink });
 	}
 
