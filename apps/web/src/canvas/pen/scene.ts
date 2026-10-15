@@ -459,7 +459,7 @@ export class StageScene {
 			if (entry.decoding !== undefined) decoding++;
 		}
 		const heap = (this.ck as unknown as { HEAPU8?: Uint8Array } | undefined)?.HEAPU8?.buffer.byteLength;
-		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, error: this.lastError };
+		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, words: this.wordsBy, error: this.lastError };
 		this.drawnSince = 0;
 		return out;
 	}
@@ -554,6 +554,7 @@ export class StageScene {
 				this.tiles = message.on;
 				this.tileDrawn.clear();
 				if (message.on) loadCppLayout();
+				if (this.fonts) this.fonts.keepFiles = message.on;
 				break;
 			case "tile-gone":
 				this.tileDrawn.delete(message.key);
@@ -776,17 +777,27 @@ export class StageScene {
 	 * off, the TypeScript it was ported from. The two agree on every saved stage (`layout-diff.mjs`).
 	 */
 	private layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure: MeasureText }): Map<string, Placed> {
-		if (this.tiles && cppLayout) {
+		if (this.tiles && cppLayout && this.fonts) {
 			this.layoutBy = "c++";
-			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
 			const fonts = this.fonts;
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: fonts ? `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}` : "" });
+			// The C++ measures plain words itself, with the font files CanvasKit was given, in the order it got them.
+			for (const file of fonts.files)
+				if (file.bytes) {
+					cppLayout.font(file.bytes, file.family);
+					file.bytes = undefined;
+				}
+			// It can only if it has every file: fonts loaded before the engine came on were not kept, and then the page measures.
+			const ownWords = fonts.files.length === fonts.loaded.length;
+			this.wordsBy = ownWords ? "c++" : "canvaskit";
+			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family) } : {}) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);
 	}
-	/** Which layout drew the last frame, for the diagnostics. */
+	/** Which layout drew the last frame, and what measured its plain words, for the diagnostics. */
 	private layoutBy: "c++" | "typescript" = "typescript";
+	private wordsBy: "c++" | "canvaskit" = "canvaskit";
 
 	/** The page hears that the tiles show everything it has sent so far, as a frame with no sheet. */
 	private sayTilesDrawn(): void {
@@ -1441,6 +1452,8 @@ export class StageScene {
 			if (this.disposed) return;
 			this.ck = ck;
 			this.fonts = new PenFonts(ck);
+			// With the engine on, the C++ scene is handed every font file too (`layout`).
+			this.fonts.keepFiles = this.tiles;
 			this.fonts.images = (url) => this.image(url);
 			this.fonts.scheme = this.scheme;
 			this.redraw();

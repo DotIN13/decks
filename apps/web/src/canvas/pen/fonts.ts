@@ -50,6 +50,12 @@ export class PenFonts {
 	private readonly settled = new Map<string, Promise<boolean>>();
 	/** Every font file handed to CanvasKit, and its size: each is copied into the wasm heap, which never shrinks. */
 	readonly loaded: Array<{ url: string; bytes: number }> = [];
+	/**
+	 * The files themselves, in the order CanvasKit got them, kept only while `keepFiles` is on: the
+	 * engine's own text measure (`@decks/engine/scene`) is handed each, and lets go of it once it has.
+	 */
+	keepFiles = false;
+	readonly files: Array<{ family: string; bytes: ArrayBuffer | undefined }> = [];
 
 	constructor(private readonly ck: CanvasKit) {
 		this.provider = ck.TypefaceFontProvider.Make();
@@ -108,6 +114,7 @@ export class PenFonts {
 				if (!response.ok) continue;
 				const bytes = await response.arrayBuffer();
 				this.provider.registerFont(bytes, family);
+				if (this.keepFiles) this.files.push({ family, bytes });
 				this.loaded.push({ url: source.slice(source.lastIndexOf("/fonts/") + 7), bytes: bytes.byteLength });
 				this.generation++;
 				return true;

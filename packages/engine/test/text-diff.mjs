@@ -5,6 +5,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import CanvasKitInit from "canvaskit-wasm/bin/canvaskit.js";
 import { loadText } from "../src/text.ts";
+import { loadScene } from "../src/scene.ts";
+import { execSync } from "node:child_process";
+import { baseTheme, expand, layout, parse } from "@decks/pen";
 
 const dir = process.env.FONTS ?? new URL("../../../_scratch/fonts/", import.meta.url).pathname;
 const family = (file) => {
@@ -63,4 +66,34 @@ for (let i = 0; i < cases; i++) {
 	}
 }
 console.log(`${cases} measures: ${failed} differ (${wDiff} in width, ${hDiff} in height)`);
-process.exit(failed ? 1 : 0);
+
+// Whole drawings: the TypeScript layout measuring with CanvasKit, against the C++ scene measuring its
+// own words with the same fonts (a card's markdown is measured by CanvasKit in both).
+const scene = await loadScene();
+for (const file of readdirSync(dir).filter((f) => f.endsWith(".ttf")).sort()) scene.font(new Uint8Array(readFileSync(dir + file)), family(file));
+const measure = (t, style, maxWidth) => reference(t, style, maxWidth);
+let stages = 0, layoutsDiffer = 0, items = 0;
+for (const path of execSync("find /home/decks/data/decks /mnt/data/decks-data/worktrees -name '*.pen' -not -path '*/node_modules/*' 2>/dev/null || true", { encoding: "utf8" }).split("\n").filter(Boolean)) {
+	let doc;
+	try {
+		doc = parse(readFileSync(path, "utf8"));
+	} catch {
+		continue;
+	}
+	stages++;
+	const theme = baseTheme(doc, "light");
+	const nodes = expand(doc);
+	const want = layout(doc, nodes, { theme, measure });
+	const got = scene.layout(doc, nodes, { theme, measure, chain, measureKey: "test" });
+	items += want.size;
+	for (const [id, a] of want) {
+		const b = got.get(id);
+		if (!b || Math.abs(a.box.x - b.box.x) > 1e-6 || Math.abs(a.box.y - b.box.y) > 1e-6 || Math.abs(a.box.w - b.box.w) > 1e-6 || Math.abs(a.box.h - b.box.h) > 1e-6) {
+			layoutsDiffer++;
+			if (layoutsDiffer <= 6) console.log(`layout differs: ${path} ${id} (${a.node.type}) ${JSON.stringify(a.box)} vs ${JSON.stringify(b?.box)} "${String(a.node.content ?? "").slice(0, 60)}"`);
+			break;
+		}
+	}
+}
+console.log(`${stages} saved drawings, ${items} items, laid out with the C++ measuring its own words: ${layoutsDiffer} drawings differ`);
+process.exit(failed || layoutsDiffer ? 1 : 0);

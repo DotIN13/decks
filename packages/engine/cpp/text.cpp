@@ -249,12 +249,14 @@ EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
 // (`chainLength` bytes). `maxWidth` NaN is one line per paragraph. Answers in `text_answer`: the
 // unbroken width (rounded to a hundredth, trailing spaces in), the longest line (trailing spaces
 // out), the height, and the number of lines.
-EMSCRIPTEN_KEEPALIVE int text_measure(int length, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth) {
-	const char* s = scratch.data();
+// The measure itself, for the layout (`scene.cpp`) and for `text_measure`: `length` bytes of UTF-8 at
+// `s`, the chain of family names one a line at `chainNames`. Answers in `out` as `text_measure` does.
+int measureWords(const char* s, int length, const char* chainNames, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth, double* out) {
+	double* answer = out;
 	// The chain, each family narrowed to its face for this weight and slant.
 	std::vector<int> chain;
 	{
-		std::string names(scratch.data() + length, size_t(chainLength));
+		std::string names(chainNames, size_t(chainLength));
 		size_t at = 0;
 		while (at <= names.size()) {
 			size_t nl = names.find('\n', at);
@@ -575,6 +577,10 @@ EMSCRIPTEN_KEEPALIVE int text_measure(int length, int chainLength, double size, 
 	answer[2] = height;
 	answer[3] = lines;
 	return lines;
+}
+
+EMSCRIPTEN_KEEPALIVE int text_measure(int length, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth) {
+	return measureWords(scratch.data(), length, scratch.data() + length, chainLength, size, weight, italic, letterSpacing, lineHeight, maxWidth, answer);
 }
 
 }  // extern "C"

@@ -22,6 +22,8 @@ extern "C" {
 // the plain measure, as `layout.ts` asks for a text that grows to fit (no item is passed there).
 // Writes the width and height to `out`.
 extern void scene_measure(int handle, double maxWidth, int withNode, double* out);
+// Words measured in C++ (`text.cpp`), with the fonts it holds.
+int measureWords(const char* s, int length, const char* chainNames, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth, double* out);
 }
 
 namespace {
@@ -72,6 +74,13 @@ struct Node {
 	double pathW, pathH;  // NaN: no bounds
 	std::vector<int> children;
 	bool live = false;
+	// Its words and their style, when the scene measures them itself (`scene_text`); a card's
+	// markdown is measured by the page, as are all words when no words were given.
+	bool ownWords = false, markdown = false;
+	std::string text, chain;
+	double fontSize = 14, letterSpacing = 0, lineHeight = NAN;
+	int weight = 400;
+	bool italic = false;
 	// What its words measured, by the width asked and whether the item was passed along.
 	struct Measured { double maxWidth; int withNode; Dim size; };
 	std::vector<Measured> measured;
@@ -97,9 +106,19 @@ Dim measure(int handle, double maxWidth, bool withNode) {
 	auto& known = nodes[handle].measured;
 	for (const auto& one : known)
 		if (one.withNode == int(withNode) && (one.maxWidth == maxWidth || (std::isnan(one.maxWidth) && std::isnan(maxWidth)))) return one.size;
-	double out[2] = {0, 0};
-	scene_measure(handle, maxWidth, withNode ? 1 : 0, out);
-	Dim size{out[0], out[1]};
+	const Node& n = nodes[handle];
+	Dim size{0, 0};
+	if (n.ownWords && !(n.markdown && withNode)) {
+		// Plain words, measured here as the page's `PenFonts.measure` measures them: an empty text as one space.
+		double out[4] = {0, 0, 0, 0};
+		const std::string& words = n.text.empty() ? std::string(" ") : n.text;
+		measureWords(words.data(), int(words.size()), n.chain.data(), int(n.chain.size()), n.fontSize, n.weight, n.italic ? 1 : 0, n.letterSpacing, n.lineHeight, std::isnan(maxWidth) ? NAN : std::max(1.0, maxWidth), out);
+		size = {std::isnan(maxWidth) ? std::ceil(out[0]) : std::min(maxWidth, std::ceil(out[1])), out[2]};
+	} else {
+		double out[2] = {0, 0};
+		scene_measure(handle, maxWidth, withNode ? 1 : 0, out);
+		size = {out[0], out[1]};
+	}
 	// A few widths per item at most: a fill share and its own width. More means a resize is passing through.
 	if (known.size() >= 8) known.erase(known.begin());
 	known.push_back({maxWidth, int(withNode), size});
@@ -371,6 +390,28 @@ EMSCRIPTEN_KEEPALIVE void scene_children(int handle, int count) {
 
 // The item's words, or what it is, changed: what they measured no longer holds.
 EMSCRIPTEN_KEEPALIVE void scene_words(int handle) { nodes[handle].measured.clear(); }
+
+// An item's words for the scene to measure itself: `length` bytes of UTF-8 at `scene_bytes`, then its
+// font chain, one family a line. `markdown`: a card's words, which the page still measures when the
+// item is passed along (see `measure`).
+std::vector<char> bytes(256);
+EMSCRIPTEN_KEEPALIVE char* scene_bytes(int count) {
+	if (int(bytes.size()) < count) bytes.resize(count);
+	return bytes.data();
+}
+EMSCRIPTEN_KEEPALIVE void scene_text(int handle, int length, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, int markdown) {
+	Node& n = nodes[handle];
+	n.ownWords = true;
+	n.text.assign(bytes.data(), size_t(length));
+	n.chain.assign(bytes.data() + length, size_t(chainLength));
+	n.fontSize = size;
+	n.weight = weight;
+	n.italic = italic != 0;
+	n.letterSpacing = letterSpacing;
+	n.lineHeight = lineHeight;
+	n.markdown = markdown != 0;
+	n.measured.clear();
+}
 
 // A font arrived, or anything else every measure depends on changed.
 EMSCRIPTEN_KEEPALIVE void scene_fonts() {

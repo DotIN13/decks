@@ -11,8 +11,9 @@
  * kept until its words, style or kind change, or `measureKey` does (a font arrived), so laying out an
  * unchanged drawing measures nothing. `measure` must depend only on those, as the browser's does.
  */
-import { bool, estimateText, MISSING, num, paddingOf, pathBounds, resolve, textStyleOf, withTheme, type MeasureText, type PenDocument, type PenNode, type Placed, type TextStyle, type ThemeState } from "@decks/pen";
+import { bool, estimateText, isMarkdown, isMarkdownText, MISSING, num, paddingOf, pathBounds, resolve, textStyleOf, withTheme, type MeasureText, type PenDocument, type PenNode, type Placed, type TextStyle, type ThemeState } from "@decks/pen";
 import createSceneModule from "../wasm/scene.mjs";
+import { textOf } from "./text.ts";
 
 /** The record the scene reads for one item, in `cpp/scene.cpp`'s `Field` order. */
 const FIELDS = ["parent", "kind", "visible", "visibleInParent", "x", "y", "wKind", "wValue", "wFallback", "hKind", "hValue", "hFallback", "layout", "padT", "padR", "padB", "padL", "gap", "justify", "align", "absolute", "growth", "fallback", "pathW", "pathH"] as const;
@@ -36,13 +37,23 @@ interface SceneModule {
 	_scene_fonts(): void;
 	_scene_remove(handle: number): void;
 	_scene_count(): number;
+	_scene_bytes(count: number): number;
+	_scene_text(handle: number, length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, markdown: number): void;
+	HEAPU8: Uint8Array;
 	_scene_layout(): number;
 	_scene_results(): number;
 }
 
 export interface SceneLayout {
 	/** Every item's box on the stage, as `layout` in `@decks/pen` gives it. */
-	layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure?: MeasureText; measureKey?: string }): Map<string, Placed>;
+	/**
+	 * `chain`, when given, has the scene measure plain words itself (`cpp/text.cpp`), with the fonts
+	 * handed to `font`, each family followed by those `chain` names; `measure` is then asked only for
+	 * a card's markdown. Without it, `measure` is asked for all words, as before.
+	 */
+	layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure?: MeasureText; measureKey?: string; chain?: (family: string) => readonly string[] }): Map<string, Placed>;
+	/** A font file for the scene's own measuring, as the page's font provider gets it. */
+	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
 	/** What the last layout sent and measured, and how many items the scene holds. */
 	readonly last: { sent: number; measured: number; held: number };
 }
@@ -82,9 +93,13 @@ export async function loadScene(): Promise<SceneLayout> {
 		module.HEAPF64.set(list, at);
 		module._scene_children(handle, list.length);
 	};
+	const text = textOf(module);
+	const encoder = new TextEncoder();
+	const roundWeight = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
 	return {
 		last,
-		layout(doc, nodes, { theme, measure, measureKey }) {
+		font: (bytes, family) => text.font(bytes, family),
+		layout(doc, nodes, { theme, measure, measureKey, chain }) {
 			const measureText = measure ?? estimateText;
 			if (measureText !== lastMeasure || measureKey !== lastKey) {
 				module._scene_fonts();
@@ -116,10 +131,19 @@ export async function loadScene(): Promise<SceneLayout> {
 					entry.record.set(record);
 					sent++;
 				}
-				const words = texty ? JSON.stringify([node.type, content, style, node.metadata?.type, node.textAlign]) : node.type;
+				const words = texty ? JSON.stringify([node.type, content, style, node.metadata?.type, node.textAlign, !!chain]) : node.type;
 				if (words !== entry.words) {
 					module._scene_words(entry.handle);
 					entry.words = words;
+					// The words themselves, for the scene to measure: all but a card's markdown, which the page lays out.
+					if (texty && chain && style) {
+						const bytes = encoder.encode(content);
+						const names = encoder.encode(chain(style.fontFamily).join("\n"));
+						const at = module._scene_bytes(bytes.length + names.length);
+						module.HEAPU8.set(bytes, at);
+						module.HEAPU8.set(names, at + bytes.length);
+						module._scene_text(entry.handle, bytes.length, names.length, style.fontSize, roundWeight(style.fontWeight), style.fontStyle === "italic" ? 1 : 0, style.letterSpacing, style.lineHeight ?? NaN, isMarkdown(node) || isMarkdownText(node) ? 1 : 0);
+					}
 				}
 				const children = (node.children ?? []).map((child) => send(child, t, node.id, node.type === "group" ? t : undefined));
 				if (children.length !== entry.children.length || children.some((handle, i) => handle !== entry!.children[i])) {
