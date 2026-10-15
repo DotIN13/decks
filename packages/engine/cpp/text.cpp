@@ -18,6 +18,8 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+
+#include "text.h"
 #include <vector>
 
 namespace {
@@ -29,6 +31,8 @@ struct Face {
 	hb_blob_t* blob = nullptr;
 	hb_face_t* face = nullptr;
 	hb_font_t* font = nullptr;
+	const char* bytes = nullptr;  // the file, which the blob owns
+	size_t length = 0;
 	double upem = 1000;
 	double ascent = 0, descent = 0;  // per unit of font size, both positive
 	int ascender = 0, descender = 0, lineGap = 0;  // in font units, as the file states them (descender negative)
@@ -229,6 +233,8 @@ EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
 	char* copy = static_cast<char*>(std::malloc(size_t(bytes)));
 	std::memcpy(copy, scratch.data(), size_t(bytes));
 	f.blob = hb_blob_create(copy, unsigned(bytes), HB_MEMORY_MODE_READONLY, copy, std::free);
+	f.bytes = copy;
+	f.length = size_t(bytes);
 	f.face = hb_face_create(f.blob, 0);
 	f.font = hb_font_create(f.face);
 	f.upem = hb_face_get_upem(f.face);
@@ -263,16 +269,17 @@ std::vector<int> chainOf(const char* names, int length, int weight, bool italic)
 	return chain;
 }
 
-// One run of words in one style: bytes [from, to) of the paragraph, its faces, size and spacing.
-struct Span {
-	size_t from, to;
-	std::vector<int> chain;
-	double size;
-	double letterSpacing;
-};
+
+// One glyph of a cluster: its number in its font, and where it sits from the cluster's start, in pixels.
+struct ClusterGlyph { uint32_t id; float dx, dy; };
+
+// A line as laid out: its code points [start, visible) drawn, up to `end` with the spaces it ends in;
+// its width without them, its top and height in the paragraph, and its fonts' ascent (negative) and descent.
+struct LineOut { size_t start, visible, end; double width, top, height; float ascent, descent; };
 
 // A paragraph shaped: everything about it that does not depend on the width it is laid out at.
 struct Shaped {
+	std::vector<std::vector<ClusterGlyph>> glyphs;  // each cluster's, at its first code point
 	std::vector<uint32_t> cps;
 	std::vector<size_t> starts;
 	std::vector<int> sp, faceOf, glyphCount, scriptRun, glyphFrom, glyphTo, runOf;
@@ -306,6 +313,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	std::vector<double> advance(n, 0);
 	std::vector<char> clusterStart(n, 0);
 	std::vector<int> glyphCount(n, 0);
+	std::vector<std::vector<ClusterGlyph>> clusterGlyphs(n);
 	// With letter spacing that pulls letters apart, they are not joined into ligatures, as Skia's paragraph shapes them.
 	static const hb_feature_t noLigatures[] = {{HB_TAG('l', 'i', 'g', 'a'), 0, 0, unsigned(-1)}, {HB_TAG('c', 'l', 'i', 'g'), 0, 0, unsigned(-1)}};
 	/*
@@ -379,10 +387,20 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 					faceOf[k] = faceIndex;
 					advance[k] = 0;
 					clusterStart[k] = 0;
+					clusterGlyphs[k].clear();
 				}
 				advance[cp] = width;
 				clusterStart[cp] = 1;
 				glyphCount[cp] = int(h - g);
+				// Each glyph where Skia's shaper puts it: the advances before it in the cluster, each with
+				// the letter spacing after it, then its own offset.
+				float at = 0;
+				for (unsigned k = g; k < h; k++) {
+					const hb_position_t plain = hb_font_get_glyph_h_advance(face.font, info[k].codepoint);
+					const double own = double(std::llround(double(plain) * double(xScale) / 64.0)) / 65536.0 + double(pos[k].x_advance - plain) / face.upem * scaleFor;
+					clusterGlyphs[cp].push_back({info[k].codepoint, float(at + pos[k].x_offset / face.upem * scaleFor), float(-pos[k].y_offset / face.upem * scaleFor)});
+					at += float(own + letterSpacing);
+				}
 			}
 			g = h;
 		}
@@ -440,6 +458,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	}
 	std::vector<char> canBreak;
 	breaks(cps, canBreak);
+	out.glyphs = std::move(clusterGlyphs);
 	out.cps = std::move(cps);
 	out.starts = std::move(starts);
 	out.sp = std::move(sp);
@@ -486,7 +505,7 @@ const Shaped& shapedFor(const char* s, int length, const std::vector<Span>& span
  * line is as tall as its tallest run. `base` is the paragraph's own style, which an empty line takes.
  * Answers in `out`: the unbroken width (to a hundredth), the longest line, the height, the lines.
  */
-int measureSpans(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, double* out) {
+int layoutSpans(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, double* out, std::vector<LineOut>* linesOut, const Shaped** shapedOut) {
 	double* answer = out;
 	for (const Span& span : spans)
 		if (span.chain.empty()) {
@@ -498,6 +517,8 @@ int measureSpans(const char* s, int length, const std::vector<Span>& spans, cons
 		return 0;
 	}
 	const Shaped& S = shapedFor(s, length, spans);
+	if (shapedOut) *shapedOut = &S;
+	if (linesOut) linesOut->clear();
 	const auto& cps = S.cps;
 	const auto& starts = S.starts;
 	const size_t n = cps.size();
@@ -539,6 +560,7 @@ int measureSpans(const char* s, int length, const std::vector<Span>& spans, cons
 	// asked for is given to each font apart, its extra split evenly above and below (Skia's half
 	// leading), so fonts of different proportions in one line make it a little taller than asked.
 	// Worked in single precision as Skia works it, since 13 px at 1.5 comes to a hair under 19.5.
+	float lineAscent = 0, lineDescent = 0;
 	auto lineHeightOf = [&](size_t a, size_t b) {
 		float asc = 0, desc = 0;
 		bool first = true;
@@ -561,6 +583,8 @@ int measureSpans(const char* s, int length, const std::vector<Span>& spans, cons
 		// An empty line is as tall as the style of the line break that makes it; an empty text, the paragraph's own.
 		if (first && b < n && cps[b] == '\n') take(faces[size_t(faceOf[b])], spans[size_t(sp[b])].size);
 		if (first) take(faces[size_t(base.chain[0])], base.size);
+		lineAscent = asc;
+		lineDescent = desc;
 		// The difference taken in double, as Skia's `InternalLineMetrics::height` takes it.
 		return std::round(double(desc) - double(asc));
 	};
@@ -666,6 +690,7 @@ int measureSpans(const char* s, int length, const std::vector<Span>& spans, cons
 			// The empty line after a final line break keeps the line before's height: Skia does not clear its metrics there.
 			const double lineHeightHere = lineStart == end && end == n && n > 0 && cps[n - 1] == '\n' && lines > 0 ? lastLineHeight : lineHeightOf(lineStart, metricsEnd > lineStart ? metricsEnd : lineEnd);
 			lastLineHeight = lineHeightHere;
+			if (linesOut) linesOut->push_back({lineStart, visible, lineEnd, w, height, lineHeightHere, lineAscent, lineDescent});
 			height += lineHeightHere;
 			lines++;
 			if (lineEnd >= end) break;
@@ -679,6 +704,59 @@ int measureSpans(const char* s, int length, const std::vector<Span>& spans, cons
 	answer[2] = height;
 	answer[3] = lines;
 	return lines;
+}
+
+int measureSpans(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, double* out) {
+	return layoutSpans(s, length, spans, base, lineHeight, maxWidth, out, nullptr, nullptr);
+}
+
+// Every glyph of a paragraph laid out at `maxWidth`, where Skia's paragraph draws it: lines one under
+// another, each aligned in the width rounded down (left 0, right 1, centre 2), each run of a line after
+// the one before, each cluster where its run puts it. `y` is the glyph's baseline.
+int placeGlyphs(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, int align, std::vector<PlacedGlyph>& glyphs, std::vector<PlacedLine>& lines, double* out, std::vector<PlacedPiece>* pieces) {
+	glyphs.clear();
+	lines.clear();
+	if (pieces) pieces->clear();
+	std::vector<LineOut> laid;
+	const Shaped* S = nullptr;
+	const int count = layoutSpans(s, length, spans, base, lineHeight, maxWidth, out, &laid, &S);
+	if (!S || count == 0) return count;
+	const double width = std::isnan(maxWidth) ? 0 : std::floor(maxWidth);
+	for (const LineOut& line : laid) {
+		float shift = 0;
+		if (!std::isnan(maxWidth)) {
+			const float delta = float(width) - float(line.width);
+			shift = align == 1 ? delta : align == 2 ? delta / 2 : 0;
+		}
+		// Skia's paragraph draws a line's glyphs at its top plus its ascent rounded to a whole pixel.
+		const double baseline = line.top + std::floor(-double(line.ascent) + 0.5);
+		lines.push_back({double(shift), baseline, line.width, line.top, line.height});
+		float runX = shift;
+		for (size_t k = line.start; k < line.visible;) {
+			// One run's piece of this line.
+			size_t e = k;
+			while (e < line.visible && S->runOf[e] == S->runOf[k]) e++;
+			for (size_t c = k; c < e; c++) {
+				if (!S->clusterStart[c]) continue;
+				const float at = runX + (S->posAt[c] - S->posAt[k]);
+				// Letter spacing puts half its gap before each letter of a left-aligned line (`Run::addSpacesEvenly`
+				// starts at half); a centred or right-aligned line starts at its aligned edge, as CanvasKit draws them.
+				const float half = shift == 0 && align == 0 ? float(spans[size_t(S->sp[c])].letterSpacing) / 2 : 0;
+				for (const ClusterGlyph& g : S->glyphs[c]) glyphs.push_back({S->faceOf[c], g.id, double(at + half + g.dx), baseline + g.dy, spans[size_t(S->sp[c])].size, S->sp[c]});
+			}
+			float endPos;
+			if (e < S->cps.size() && S->runOf[e] == S->runOf[k]) endPos = S->posAt[e];
+			else {
+				size_t last = e - 1;
+				endPos = S->posAt[last] + float(S->advance[last]);
+			}
+			const float next = runX + (endPos - S->posAt[k]);
+			if (pieces && e > k) pieces->push_back({S->sp[k], S->faceOf[k], double(runX), double(next), line.top, line.height, line.top + line.height - double(line.descent)});
+			runX = next;
+			k = e;
+		}
+	}
+	return count;
 }
 
 // Plain words in one style, one run: for the layout (`scene.cpp`) and for `text_measure`. `length`
@@ -709,4 +787,24 @@ EMSCRIPTEN_KEEPALIVE double* text_face_metrics(int face) {
 	answer[3] = faces[size_t(face)].upem;
 	return answer;
 }
+}
+
+hb_font_t* faceFont(int face) { return face >= 0 && size_t(face) < faces.size() ? faces[size_t(face)].font : nullptr; }
+void faceDecorations(int face, double out[5]) {
+	const Face& f = faces[size_t(face)];
+	hb_position_t v = 0;
+	out[0] = f.upem;
+	out[1] = hb_ot_metrics_get_position(f.font, HB_OT_METRICS_TAG_UNDERLINE_OFFSET, &v) ? v : -f.upem / 10;
+	out[2] = hb_ot_metrics_get_position(f.font, HB_OT_METRICS_TAG_UNDERLINE_SIZE, &v) ? v : f.upem / 20;
+	out[3] = hb_ot_metrics_get_position(f.font, HB_OT_METRICS_TAG_STRIKEOUT_OFFSET, &v) ? v : f.upem / 4;
+	out[4] = hb_ot_metrics_get_position(f.font, HB_OT_METRICS_TAG_STRIKEOUT_SIZE, &v) ? v : f.upem / 20;
+}
+const char* faceBytes(int face, size_t* length) {
+	if (face < 0 || size_t(face) >= faces.size()) return nullptr;
+	*length = faces[size_t(face)].length;
+	return faces[size_t(face)].bytes;
+}
+void faceStyle(int face, int* weight, bool* italic) {
+	*weight = faces[size_t(face)].weight;
+	*italic = faces[size_t(face)].italic;
 }

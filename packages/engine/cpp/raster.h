@@ -67,6 +67,7 @@ enum class Cut { FILL, FINE, HAIR };
 std::vector<Polyline> flatten(const Path& path, const Affine& m, Cut cut);
 // Dashes laid as Skia lays them, in the path's own units; `resScale` is how many pixels a unit is.
 Path dash(const Path& path, const std::vector<double>& pattern, double resScale);
+bool pointAlong(const Path& path, double fraction, double resScale, Vec& out);
 std::vector<Polyline> stroke(const std::vector<Polyline>& lines, double width, Cap cap, Join join, double miterLimit);
 // Only the pixels in [left, right) × [top, bottom) are covered.
 // What a stroke one device pixel wide or less is drawn as: the lines with their caps (`hairline`), then

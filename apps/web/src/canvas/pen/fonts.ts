@@ -33,6 +33,11 @@ const EMOJI_FAMILY = "Noto Color Emoji";
 const EXT = " Ext";
 const EMOJI = /\p{Extended_Pictographic}/u;
 
+/** The families a paragraph in `family` asks for, in order (`PenFonts.chain`). */
+export function fontChain(family: string): string[] {
+	return [...new Set([family, `${family}${EXT}`, FALLBACK, `${FALLBACK}${EXT}`, CJK_FAMILY, ...SYMBOL_FAMILIES, EMOJI_FAMILY])];
+}
+
 export interface FontNeed {
 	family: string;
 	weight: number;
@@ -68,7 +73,7 @@ export class PenFonts {
 	 * punctuation, so "10 s" came out in a symbol font and a full stop as a missing-glyph box.
 	 */
 	chain(family: string): string[] {
-		return [...new Set([family, `${family}${EXT}`, FALLBACK, `${FALLBACK}${EXT}`, CJK_FAMILY, ...SYMBOL_FAMILIES, EMOJI_FAMILY])];
+		return fontChain(family);
 	}
 
 	/** Fetch whatever these texts need; true when anything new arrived. */

@@ -779,6 +779,20 @@ struct Measure {
 
 }  // namespace
 
+// Where `fraction` of a path's first contour's length falls, measured as Skia's contour measure measures
+// it (`getPosTan`); false for a path of no length.
+bool pointAlong(const Path& path, double fraction, double resScale, Vec& out) {
+	for (const Sub& sub : path.subs) {
+		const Measure m(sub, resScale);
+		if (m.length <= 0) continue;
+		double t;
+		const size_t piece = m.find(m.length * fraction, t);
+		out = m.at(m.pieces[piece].seg, t);
+		return true;
+	}
+	return false;
+}
+
 // A path cut into dashes, `SkDashPath` laying `pattern` (on, off, …) along each contour from its start.
 Path dash(const Path& path, const std::vector<double>& pattern, double resScale) {
 	double total = 0;

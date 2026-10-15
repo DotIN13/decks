@@ -5,7 +5,7 @@ import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
 import { encodeCard } from "./card-wire.ts";
-import { paintRecord } from "./paint-wire.ts";
+import { inkOps, opsOf, paintRecord } from "./paint-wire.ts";
 import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
 import { parseMarkdown, wordsOf } from "./markdown.ts";
 import { PenIcons } from "./icons.ts";
@@ -745,7 +745,7 @@ export class StageScene {
 	private async paintTile(rect: Frame, level: number, hits: number[], inked = false): Promise<ImageBitmap | undefined> {
 		// With the engine on, our own painter first (`@decks/engine`, `cpp/paint.cpp`); a tile holding
 		// something it does not draw yet, or a pen's ink, is painted by CanvasKit below.
-		if (cppLayout && !inked && this.cppPainter !== null) {
+		if (cppLayout && this.cppPainter !== null) {
 			if (!this.cppCanvas) {
 				this.cppCanvas = this.host.canvas();
 				this.cppCanvas.width = TILE;
@@ -753,7 +753,7 @@ export class StageScene {
 				this.cppPainter = cppLayout.painter(this.cppCanvas) ?? null;
 			}
 			const slide = this.slide?.ready ? this.slide : undefined;
-			if (this.cppPainter && this.cppPainter.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes })) {
+			if (this.cppPainter && this.cppPainter.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) })) {
 				this.tilesBy.cpp++;
 				return await this.host.snapshot(this.cppCanvas);
 			}
@@ -808,9 +808,9 @@ export class StageScene {
 			const ownWords = fonts.files.length === fonts.loaded.length;
 			this.wordsBy = ownWords ? "c++" : "canvaskit";
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
-			const card = (text: string, style: TextStyle) => encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => fonts.images?.(url) });
+			const card = (text: string, style: TextStyle, node: PenNode) => encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => fonts.images?.(url) }, node.textAlign ?? "left");
 			const scheme = this.scheme;
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme) });
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);

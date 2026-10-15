@@ -1,6 +1,7 @@
 import type { TextStyle } from "@decks/pen";
 import { highlight } from "./highlight.ts";
 import { parseMarkdown, type Block, type Run } from "./markdown.ts";
+import { ALERTS, CARD_PALETTE, INK, MARK, SUGGEST } from "./markdown-layout.ts";
 
 /**
  * A card's markdown, parsed here and handed to the C++ scene (`packages/engine/cpp/card.cpp`), which
@@ -8,7 +9,8 @@ import { parseMarkdown, type Block, type Run } from "./markdown.ts";
  *
  * Numbers, and a pool of UTF-8 each string points into by its offset and length. A run's words are
  * written as `layoutMarkdown` sets them (a picture's alt after 🖼, a suggestion's 💬), with the font
- * chain it asks for; what only changes colour is left out, since it changes no size.
+ * chain it asks for, and what the painter needs to draw it (`paint.cpp`): the palette, and each run's
+ * ink, background and lines, as colours [r, g, b, a] where an alpha of -1 means the block's own colour.
  */
 export interface CardWire {
 	numbers: Float64Array;
@@ -25,8 +27,19 @@ export interface CardEnv {
 
 const SIZE_SCALE = { small: 0.85, large: 1.25, huge: 1.6 } as const;
 const encoder = new TextEncoder();
+/** A colour as four numbers, from `#rrggbb` or `#rrggbbaa`. */
+const rgba = (hex: string): number[] => {
+	const n = parseInt(hex.slice(1), 16);
+	const a = hex.length > 7 ? (n & 0xff) / 255 : 1;
+	const rgb = hex.length > 7 ? n >>> 8 : n;
+	return [((rgb >> 16) & 0xff) / 255, ((rgb >> 8) & 0xff) / 255, (rgb & 0xff) / 255, a];
+};
+/** The block's own colour, whatever it is where the run sits. */
+const INHERIT = [0, 0, 0, -1];
+const NONE = [0, 0, 0, 0];
+const PALETTE = ["fg", "muted", "faint", "line", "strong", "subtle", "code", "accent", "box"] as const;
 
-export function encodeCard(text: string, style: TextStyle, env: CardEnv): CardWire {
+export function encodeCard(text: string, style: TextStyle, env: CardEnv, align = "left"): CardWire {
 	const numbers: number[] = [];
 	const bytes: number[] = [];
 	const known = new Map<string, [number, number]>();
@@ -47,6 +60,18 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv): CardWi
 			ref(run.image ? `🖼 ${run.image.alt || "image"}` : run.text + (run.reason && list[i + 1]?.reason !== run.reason ? " 💬" : ""));
 			ref(chain(run.code ? env.mono : (run.face ?? style.fontFamily)));
 			numbers.push((run.code ? 1 : 0) | (run.sup ? 2 : 0) | (run.bold ? 4 : 0) | (run.italic ? 8 : 0), run.size ? SIZE_SCALE[run.size] : 1);
+			// How it is drawn, as `para` in markdown-layout.ts styles it: ink, background, lines and their colour.
+			const C = CARD_PALETTE[env.scheme];
+			const S = SUGGEST[env.scheme];
+			const ink = run.added ? S.added : run.removed ? S.removed : run.link || run.wiki || run.sup ? C.accent : run.image ? C.muted : run.colour ? INK[run.colour][env.scheme] : undefined;
+			const back = run.added ? S.addedBg : run.mark ? MARK[run.mark][env.scheme] : run.code ? C.code : undefined;
+			let lines = 0;
+			let lineInk: number[] = INHERIT;
+			if (run.strike || run.removed) (lines = 2), (lineInk = run.removed ? rgba(S.removed) : INHERIT);
+			if (run.link || run.wiki) (lines = 1), (lineInk = rgba(`${C.accent}66`));
+			if (run.added) (lines = 1), (lineInk = rgba(S.added));
+			if (run.underline) (lines = 1 | (run.strike ? 2 : 0)), (lineInk = ink ? rgba(ink) : INHERIT);
+			numbers.push(...(ink ? rgba(ink) : INHERIT), ...(back ? rgba(back) : NONE), lines, ...lineInk);
 		});
 	};
 	const blocks = (list: readonly Block[]) => {
@@ -83,7 +108,7 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv): CardWi
 			case "quote":
 				numbers.push(6, block.alert ? 1 : 0);
 				ref(block.title ?? "Note");
-				numbers.push(block.blocks.length);
+				numbers.push(...(block.alert ? rgba(ALERTS[block.alert][env.scheme]) : NONE), block.blocks.length);
 				blocks(block.blocks);
 				return;
 			case "code": {
@@ -91,7 +116,7 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv): CardWi
 				numbers.push(7, coloured.length);
 				for (const run of coloured) {
 					ref(run.text);
-					numbers.push((run.bold ? 4 : 0) | (run.italic ? 8 : 0));
+					numbers.push((run.bold ? 4 : 0) | (run.italic ? 8 : 0), ...(run.colour ? rgba(run.colour) : INHERIT));
 				}
 				return;
 			}
@@ -116,10 +141,12 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv): CardWi
 		}
 	};
 	const parsed = parseMarkdown(text);
-	numbers.push(1, style.fontSize, style.fontWeight, style.letterSpacing, style.lineHeight ?? NaN);
+	numbers.push(2, style.fontSize, style.fontWeight, style.letterSpacing, style.lineHeight ?? NaN);
 	ref(chain(style.fontFamily));
 	ref(chain(env.mono));
-	numbers.push(parsed.length);
+	// The palette, in `PALETTE`'s order, and the alignment the card's paragraphs take.
+	for (const name of PALETTE) numbers.push(...rgba(CARD_PALETTE[env.scheme][name]));
+	numbers.push(align === "center" ? 2 : align === "right" ? 1 : 0, parsed.length);
 	blocks(parsed);
 	return { numbers: Float64Array.from(numbers), pool: Uint8Array.from(bytes) };
 }

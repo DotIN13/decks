@@ -20,13 +20,25 @@
 #include <string>
 #include <vector>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_OUTLINE_H
+#include FT_BITMAP_H
+#include FT_TRUETYPE_TABLES_H
+#include <hb.h>
+
+#include <unordered_map>
+
+#include "card.h"
 #include "raster.h"
+#include "text.h"
 
 // The scene's items and their boxes (`scene.cpp`).
 struct PaintBox { double x, y, w, h; bool placed; };
 int sceneRoots(const int** out);
 int sceneChildren(int handle, const int** out);
 PaintBox sceneBox(int handle);
+bool sceneCard(int handle, const double** nums, size_t* count, const char** pool);
 
 namespace {
 
@@ -40,7 +52,16 @@ struct Stroke {
 	double widths[4] = {0, 0, 0, 0};  // top, right, bottom, left
 	int align = 1;                    // 0 inside, 1 centred, 2 outside
 };
-enum Kind : int { K_NONE = 0, K_RECT = 1, K_ELLIPSE = 2, K_PATH = 3, K_NOTE = 6, K_GROUP = 7, K_UNSUPPORTED = 99 };
+enum Kind : int { K_NONE = 0, K_RECT = 1, K_ELLIPSE = 2, K_PATH = 3, K_NOTE = 6, K_GROUP = 7, K_TEXT = 8, K_OPS = 9, K_UNSUPPORTED = 99 };
+// Words to set in an item (a text, or a note's): `paint.ts`'s `paintText`.
+struct Words {
+	bool on = false, markdown = false;  // markdown: drawn from the item's card (`card.cpp`)
+	std::string text, chain;  // UTF-8, and the family chain one name a line
+	double pad = 0, size = 14, letterSpacing = 0, lineHeight = NAN;
+	int weight = 400, align = 0, vertical = 0;  // align: left, right, centre; vertical: top, middle, bottom
+	bool italic = false, underline = false, strike = false, grow = false;  // grow: a text that sizes to its words
+	Rgba color{0, 0, 0, 1};
+};
 // SVG geometry and the viewBox it is drawn in (x, y, w, h; a zero size is not scaled).
 struct Affine_ { double sx, sy, tx, ty; };
 struct Geometry {
@@ -74,9 +95,16 @@ struct Record {
 	int sides = 3;
 	double polyRadius = 0, inner = 0, start = 0, sweep = 360;
 	std::vector<Geometry> geometry;  // the whole path; for a dashed arrow, then its line and its heads
+	Words words;
+	// What the page reduced the rest of the item to (`paint-wire.ts`, `ops`): drawn after it, in its place.
+	std::vector<double> ops;
 };
+// The page's drawing ops for the stroke still under the pen, in stage pixels, over everything (`paint_overlay`).
+std::vector<double> overlay;
 std::vector<Record> records;
-std::vector<char> skipped, holes;
+std::vector<char> skipped, holes, muted;
+// How far each card's wide tables are scrolled sideways, by item and table (`paint_scroll`).
+std::unordered_map<int, std::vector<double>> scrolls;
 bool dark = false;
 
 // --- GL ---------------------------------------------------------------------------------------------
@@ -282,6 +310,12 @@ struct Painter {
 	std::vector<GLuint> layerTextures;
 };
 Painter painter;
+// Why the last tile was refused, for tallying what the painter still lacks (`paint_why`).
+const char* whyNot = "";
+void refuse(const char* why) {
+	painter.supported = false;
+	whyNot = why;
+}
 
 void setUniforms(const Affine& m, const double rect[4], const double shape[4], const double radii[4], Rgba color, int mode, double strokeWidth, int align, double sigma) {
 	const float mat[9] = {float(m.a), float(m.b), 0, float(m.c), float(m.d), 0, float(m.e), float(m.f), 1};
@@ -309,7 +343,7 @@ void setUniforms(const Affine& m, const double rect[4], const double shape[4], c
 		glUniform1f(glGetUniformLocation(program, ("uClipLevel[" + at + "]").c_str()), float(clip.level));
 		glUniform1i(glGetUniformLocation(program, ("uClipKind[" + at + "]").c_str()), clip.kind);
 	}
-	if (painter.clips.size() > 4) painter.supported = false;
+	if (painter.clips.size() > 4) refuse("more than four clips");
 }
 
 void drawQuad() { glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); }
@@ -323,20 +357,29 @@ void drawShape(const double box[4], const double radii[4], Rgba color, int mode,
 	double shape[4] = {box[0] + dx, box[1] + dy, box[2], box[3]};
 	// A blurred rounded rectangle Skia draws as a stretched nine-part mask starts on whole pixels: its
 	// box, in the tile, rounded out to them first (`shadowRRect` decides when that holds).
-	if (mode == 4 && sigma > 0 && snapShadow && painter.m.b == 0 && painter.m.c == 0) {
-		// In the tile a mirror swaps the ends, so round the lower one down and the higher one up.
+	if (mode == 4 && sigma > 0 && snapShadow) {
+		// The box's corners in the tile, rounded out to whole pixels, and back: with a view that keeps
+		// rectangles upright (a mirror or a right-angle turn included) that is still a box.
 		const Affine& m = painter.m;
-		const double x0 = m.a * shape[0] + m.e, x1 = m.a * (shape[0] + shape[2]) + m.e;
-		const double y0 = m.d * shape[1] + m.f, y1 = m.d * (shape[1] + shape[3]) + m.f;
-		const double l = std::floor(std::min(x0, x1) + 1e-6), r = std::ceil(std::max(x0, x1) - 1e-6);
-		const double t = std::floor(std::min(y0, y1) + 1e-6), b = std::ceil(std::max(y0, y1) - 1e-6);
-		const double ix0 = ((m.a > 0 ? l : r) - m.e) / m.a, ix1 = ((m.a > 0 ? r : l) - m.e) / m.a;
-		const double iy0 = ((m.d > 0 ? t : b) - m.f) / m.d, iy1 = ((m.d > 0 ? b : t) - m.f) / m.d;
-		shape[0] = ix0, shape[1] = iy0, shape[2] = ix1 - ix0, shape[3] = iy1 - iy0;
+		double xs[4], ys[4];
+		const double cx[4] = {shape[0], shape[0] + shape[2], shape[0], shape[0] + shape[2]}, cy[4] = {shape[1], shape[1], shape[1] + shape[3], shape[1] + shape[3]};
+		for (int k = 0; k < 4; k++) xs[k] = m.a * cx[k] + m.c * cy[k] + m.e, ys[k] = m.b * cx[k] + m.d * cy[k] + m.f;
+		const double l = std::floor(*std::min_element(xs, xs + 4) + 1e-6), r = std::ceil(*std::max_element(xs, xs + 4) - 1e-6);
+		const double t = std::floor(*std::min_element(ys, ys + 4) + 1e-6), b = std::ceil(*std::max_element(ys, ys + 4) - 1e-6);
+		const Affine inv = m.inverse();
+		const double p0x = inv.a * l + inv.c * t + inv.e, p0y = inv.b * l + inv.d * t + inv.f;
+		const double p1x = inv.a * r + inv.c * b + inv.e, p1y = inv.b * r + inv.d * b + inv.f;
+		shape[0] = std::min(p0x, p1x), shape[1] = std::min(p0y, p1y), shape[2] = std::fabs(p1x - p0x), shape[3] = std::fabs(p1y - p0y);
 	}
 	const double quad[4] = {shape[0] - grow, shape[1] - grow, shape[2] + grow * 2, shape[3] + grow * 2};
 	setUniforms(painter.m, quad, shape, radii, color, mode, strokeWidth, align, sigma);
 	drawQuad();
+}
+
+// A radius too big for its box, made smaller as Skia's `setRectXY` does: by the one factor that fits it.
+double fitted(double radius, double w, double h) {
+	if (radius <= 0) return 0;
+	return radius * std::min({1.0, w / (radius * 2), h / (radius * 2)});
 }
 
 // --- paths: outlines made coverage masks on the CPU (`raster.cpp`), coloured here ---------------------
@@ -537,11 +580,14 @@ void shadowRRect(const double box[4], const double radii[4], const Shadow& s) {
 			const int window = int(std::floor(deviceSigma * 3 * std::sqrt(2 * M_PI) / 4 + 0.5));
 			margin = window % 2 ? 3 * (window / 2) : 3 * (window / 2) - 1;
 		}
-		const double w = box[2] * level, h = box[3] * level;
+		// Its size in the tile: a right-angle turn swaps width and height.
+		const bool turned = painter.m.a == 0 && painter.m.d == 0;
+		const double w = (turned ? box[3] : box[2]) * level, h = (turned ? box[2] : box[3]) * level;
 		const double across = (std::max(radii[0], radii[3]) + std::max(radii[1], radii[2])) * level + 4 * margin;
 		const double down = (std::max(radii[0], radii[1]) + std::max(radii[3], radii[2])) * level + 4 * margin;
 		const bool mixed = !(radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3]);
-		if (mixed || across >= w || down >= h || painter.m.b != 0 || painter.m.c != 0) {
+		const bool upright = (painter.m.b == 0 && painter.m.c == 0) || turned;
+		if (mixed || across >= w || down >= h || !upright) {
 			blurredShape(rrectPath(box, radii), s);
 			return;
 		}
@@ -600,7 +646,626 @@ void paintPath(const Record& r, const double box[4]) {
 		strokePath(path, evenOdd, s.widths[0], 1, r.cap, r.join, {}, s.color);
 		return;
 	}
+	const bool uniform = s.widths[0] == s.widths[1] && s.widths[1] == s.widths[2] && s.widths[2] == s.widths[3];
+	if (!uniform && r.sub != 0) {
+		// Per side, as `paintStroke` draws it: a bar along each edge of the box, inside it, each cut by the shape.
+		const raster::Mask inside = coverage(flat(path), evenOdd);
+		const double x = box[0], y = box[1], w = box[2], h = box[3];
+		const double bars[4][4] = {{x, y, w, s.widths[0]}, {x, y + h - s.widths[2], w, s.widths[2]}, {x, y, s.widths[3], h}, {x + w - s.widths[1], y, s.widths[1], h}};
+		for (const auto& b : bars) {
+			if (b[2] <= 0 || b[3] <= 0) continue;
+			raster::Path bar;
+			bar.moveTo({b[0], b[1]});
+			bar.lineTo({b[0] + b[2], b[1]});
+			bar.lineTo({b[0] + b[2], b[1] + b[3]});
+			bar.lineTo({b[0], b[1] + b[3]});
+			bar.close();
+			drawMask(raster::combine(coverage(flat(bar), false), inside, true), s.color);
+		}
+		return;
+	}
 	strokePath(path, evenOdd, s.widths[0], s.align, r.cap, r.join, r.dash, s.color);
+}
+
+// --- words -------------------------------------------------------------------------------------------
+//
+// Each glyph is drawn as Skia draws text with CanvasKit's FreeType: its outline at the size it is drawn
+// in the tile, scaled as FreeType scales (to 64ths of a pixel), unhinted, at a quarter-pixel step across
+// and a whole pixel down, and filled with exact coverage. Masks are kept by face, glyph, size and step,
+// and a text's glyphs are laid over one another into one mask for its colour.
+
+// A glyph as drawn: its face and number, the matrix it is drawn through (its size, any turn, mirror or
+// slant, each to a 1/4096), its quarter-pixel steps across and down, and whether it is hinted or thickened.
+struct GlyphKey {
+	int face;
+	uint32_t id;
+	int m[4];
+	int stepX, stepY;
+	bool hinted, bold;
+	bool operator==(const GlyphKey& o) const { return face == o.face && id == o.id && m[0] == o.m[0] && m[1] == o.m[1] && m[2] == o.m[2] && m[3] == o.m[3] && stepX == o.stepX && stepY == o.stepY && hinted == o.hinted && bold == o.bold; }
+};
+struct GlyphKeyHash {
+	size_t operator()(const GlyphKey& k) const {
+		size_t h = size_t(k.face) * 1000003u ^ size_t(k.id) * 9176u;
+		for (int v : k.m) h = h * 31u ^ size_t(v);
+		return h ^ size_t(k.stepX) << 20 ^ size_t(k.stepY) << 22 ^ (k.hinted ? 1u << 24 : 0) ^ (k.bold ? 1u << 25 : 0);
+	}
+};
+std::unordered_map<GlyphKey, raster::Mask, GlyphKeyHash> glyphMasks;
+
+// FreeType, as CanvasKit's text draws with it: each face opened once from the bytes the text code holds.
+FT_Library ftLibrary = nullptr;
+std::vector<FT_Face> ftFaces;
+FT_Face ftFace(int face) {
+	if (!ftLibrary && FT_Init_FreeType(&ftLibrary)) return nullptr;
+	if (size_t(face) >= ftFaces.size()) ftFaces.resize(size_t(face) + 1, nullptr);
+	if (!ftFaces[size_t(face)]) {
+		size_t length = 0;
+		const char* bytes = faceBytes(face, &length);
+		if (!bytes || FT_New_Memory_Face(ftLibrary, reinterpret_cast<const FT_Byte*>(bytes), FT_Long(length), 0, &ftFaces[size_t(face)])) return nullptr;
+	}
+	return ftFaces[size_t(face)];
+}
+
+/*
+ * A glyph's coverage as Skia's FreeType scaler makes it (`SkScalerContext_FreeType::generateImage`):
+ * the size to FreeType in 64ths cut down, loaded with light hinting (the auto-hinter, heights only),
+ * moved right by its quarter-pixel step, and filled by FreeType's smooth rasteriser. The mask's corner
+ * is where its first pixel sits from the glyph's origin, y down.
+ */
+// A style the face lacks is faked as Skia's paragraph fakes it: italic slanted by a quarter
+// (`setSkewX(-1/4)`), bold thickened by FreeType's emboldening at a 24th of the em.
+/*
+ * A glyph's coverage as Skia's FreeType scaler makes it (`SkScalerContext_FreeType::generateImage`).
+ * `A` is the whole matrix it is drawn through, y down (x' = A0 x + A2 y, y' = A1 x + A3 y), its size
+ * included: split as Skia splits it (`computeMatrices`, full pre-scale) into a size for FreeType, in
+ * 64ths cut down, and what is left (a turn, a mirror, a slant) for FreeType's transform. Hinted lightly
+ * (the auto-hinter, heights only) when the matrix keeps rectangles upright; moved by its quarter-pixel
+ * steps; filled by FreeType's smooth rasteriser. The mask's corner is where its first pixel sits from
+ * the glyph's origin.
+ */
+const raster::Mask& glyphMask(int face, uint32_t id, const double A[4], int stepX, int stepY, bool hinted, bool bold, bool* drawable) {
+	const GlyphKey key{face, id, {int(std::lround(A[0] * 4096)), int(std::lround(A[1] * 4096)), int(std::lround(A[2] * 4096)), int(std::lround(A[3] * 4096))}, stepX, stepY, hinted, bold};
+	auto found = glyphMasks.find(key);
+	if (found != glyphMasks.end()) return found->second;
+	raster::Mask& mask = glyphMasks[key];
+	FT_Face f = ftFace(face);
+	if (!f) return mask;
+	// The scale: where the baseline goes, its length, and the height left once it is turned level (a Givens rotation).
+	double sx, sy, r[4];
+	const bool skewedOrFlipped = A[1] != 0 || A[2] != 0 || A[0] < 0 || A[3] < 0;
+	if (skewedOrFlipped) {
+		const double hx = A[0], hy = A[1], len = std::hypot(hx, hy);
+		const double cs = len > 0 ? hx / len : 1, sn = len > 0 ? hy / len : 0;
+		// G A, with G turning the baseline level: its first column is (len, 0).
+		const double ga0 = cs * A[0] + sn * A[1], ga3 = -sn * A[2] + cs * A[3];
+		sx = std::fabs(ga0), sy = std::fabs(ga3);
+	} else sx = std::fabs(A[0]), sy = std::fabs(A[3]);
+	if (sx <= 0 || sy <= 0) return mask;
+	r[0] = A[0] / sx, r[1] = A[1] / sx, r[2] = A[2] / sy, r[3] = A[3] / sy;
+	if (FT_Set_Char_Size(f, FT_F26Dot6(sx * 64), FT_F26Dot6(sy * 64), 72, 72)) return mask;
+	// FreeType's y goes up: the matrix's off-diagonal entries change sign.
+	FT_Matrix rest{FT_Fixed(std::lround(r[0] * 65536)), FT_Fixed(std::lround(-r[2] * 65536)), FT_Fixed(std::lround(-r[1] * 65536)), FT_Fixed(std::lround(r[3] * 65536))};
+	const bool identity = !skewedOrFlipped;
+	FT_Set_Transform(f, identity ? nullptr : &rest, nullptr);
+	const FT_Error failed = FT_Load_Glyph(f, id, (hinted ? FT_LOAD_TARGET_LIGHT : FT_LOAD_NO_HINTING) | FT_LOAD_NO_BITMAP | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH);
+	FT_Set_Transform(f, nullptr, nullptr);
+	if (failed || f->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+		*drawable = false;
+		glyphMasks.erase(key);
+		static const raster::Mask none;
+		return none;
+	}
+	FT_Outline* outline = &f->glyph->outline;
+	if (bold) {
+		// Thickened by a 24th of the em, then moved back by half of it, so it grows about its middle.
+		const FT_Pos strength = FT_MulFix(f->units_per_EM, f->size->metrics.y_scale) / 24;
+		FT_Outline_Embolden(outline, strength);
+		FT_Outline_Translate(outline, -strength / 2, -strength / 2);
+	}
+	FT_Outline_Translate(outline, stepX * 16, -stepY * 16);
+	FT_BBox box;
+	FT_Outline_Get_CBox(outline, &box);
+	const long left = box.xMin >> 6, right = (box.xMax + 63) >> 6, bottom = box.yMin >> 6, top = (box.yMax + 63) >> 6;
+	if (right <= left || top <= bottom) return mask;
+	mask.x = int(left);
+	mask.y = int(-top);
+	mask.w = int(right - left);
+	mask.h = int(top - bottom);
+	mask.a.assign(size_t(mask.w) * size_t(mask.h), 0);
+	FT_Bitmap target;
+	FT_Bitmap_Init(&target);
+	target.width = unsigned(mask.w);
+	target.rows = unsigned(mask.h);
+	target.pitch = mask.w;
+	target.buffer = mask.a.data();
+	target.pixel_mode = FT_PIXEL_MODE_GRAY;
+	target.num_grays = 256;
+	FT_Outline_Translate(outline, -left * 64, -bottom * 64);
+	FT_Outline_Get_Bitmap(ftLibrary, outline, &target);
+	return mask;
+}
+
+/*
+ * Skia's text gamma (`SkTMaskGamma`, as CanvasKit is built: contrast 0.5, the paint's and the device's
+ * gamma both sRGB's curve): eight tables, one for each eighth of the text colour's luminance, that make
+ * a glyph's edge coverage darker for light text and lighter for dark, so it reads as the same weight.
+ */
+const uint8_t* gammaTable(Rgba color) {
+	static uint8_t tables[8][256];
+	static bool built = false;
+	if (!built) {
+		auto toLuma = [](float x) { return x <= 0.04045f ? x / 12.92f : std::pow((x + 0.055f) / 1.055f, 2.4f); };
+		auto fromLuma = [](float x) { return x <= 0.0031308f ? x * 12.92f : 1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f; };
+		for (int i = 0; i < 8; i++) {
+			const int lum = (i << 5) | (i << 2) | (i >> 1);
+			const float src = float(lum) / 255.0f, dst = 1.0f - src;
+			const float linSrc = toLuma(src), linDst = toLuma(dst);
+			const float contrast = 0.5f * linDst;
+			for (int k = 0; k < 256; k++) {
+				const float raw = float(k) / 255.0f;
+				const float a = raw + ((1.0f - raw) * contrast * raw);
+				if (std::fabs(src - dst) < 1.0f / 256.0f) tables[i][k] = uint8_t(std::floor(255.0f * a + 0.5f));
+				else {
+					const float out = fromLuma(linSrc * a + (1.0f - a) * linDst);
+					tables[i][k] = uint8_t(std::clamp(int(std::floor(255.0f * (out - dst) / (src - dst) + 0.5f)), 0, 255));
+				}
+			}
+		}
+		built = true;
+	}
+	// The colour's luminance as Skia takes it (`SkComputeLuminance`), on 8-bit channels.
+	auto byte = [](float v) { return int(std::lround(std::clamp(v, 0.f, 1.f) * 255)); };
+	const int lum = (byte(color.r) * 54 + byte(color.g) * 183 + byte(color.b) * 19) >> 8;
+	return tables[lum >> 5];
+}
+
+// A face's lines as Skia's FreeType reads them (`getFontMetrics`), per unit of size: underline
+// position (down from the baseline, to its middle) and thickness, strikeout position and thickness.
+void lineMetrics(int face, double out[4]) {
+	FT_Face f = ftFace(face);
+	if (!f || !f->units_per_EM) {
+		out[0] = 0.1, out[1] = 1.0 / 14, out[2] = -0.25, out[3] = 1.0 / 14;
+		return;
+	}
+	const double upem = f->units_per_EM;
+	out[0] = -double(f->underline_position + f->underline_thickness / 2) / upem;
+	out[1] = double(f->underline_thickness) / upem;
+	const TT_OS2* os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(f, FT_SFNT_OS2));
+	out[2] = os2 ? -double(os2->yStrikeoutPosition) / upem : NAN;
+	out[3] = os2 ? double(os2->yStrikeoutSize) / upem : NAN;
+}
+
+int spanWeight(const std::vector<Span>& spans, int span) { return span >= 0 && size_t(span) < spans.size() ? spans[size_t(span)].weight : 400; }
+bool spanItalic(const std::vector<Span>& spans, int span) { return span >= 0 && size_t(span) < spans.size() && spans[size_t(span)].italic; }
+
+// A paint's colour where an alpha below zero means the block's own.
+Rgba resolved(const CardColour& c, Rgba own) { return c.a < 0 ? own : Rgba{c.r, c.g, c.b, c.a}; }
+
+/*
+ * A paragraph of styled runs drawn as Skia's paragraph draws it, line by line: each run's background
+ * (a rectangle as tall as the line, without anti-aliasing), its glyphs in its colour, then its lines
+ * under or through it at the font's own position and thickness.
+ */
+void paintParagraph(const std::string& text, const std::vector<Span>& spans, const Span& base, double lineHeight, double width, int align, const std::vector<CardRunPaint>& paints, Rgba own, double ox, double oy, double* heightOut = nullptr) {
+	const Affine& m = painter.m;
+	// Positions step by quarter pixels along the axes the baseline keeps to (`SkComputeAxisAlignmentForHText`):
+	// across for level words, down for words turned a right angle, both for any other turn.
+	const bool level = m.b == 0, upright = m.a == 0 && !level;
+	for (const Span& sp : spans)
+		if (sp.chain.empty()) {
+			refuse("words with no font");
+			return;
+		}
+	std::vector<PlacedGlyph> glyphs;
+	std::vector<PlacedLine> lines;
+	std::vector<PlacedPiece> pieces;
+	double out[4];
+	placeGlyphs(text.data(), int(text.size()), spans, base, lineHeight, width, align, glyphs, lines, out, &pieces);
+	if (heightOut) *heightOut = out[2];
+	auto paintOf = [&](int span) -> const CardRunPaint& {
+		static CardRunPaint none;
+		return span >= 0 && size_t(span) < paints.size() ? paints[size_t(span)] : none;
+	};
+	// Backgrounds: rectangles rounded to whole pixels, as a paint without anti-aliasing fills one.
+	for (const PlacedPiece& p : pieces) {
+		const CardRunPaint& pp = paintOf(p.span);
+		if (pp.back.a <= 0) continue;
+		if (m.b != 0 || m.c != 0 || m.a < 0 || m.d < 0) {
+			// Turned or mirrored: the rectangle through the view, filled (Skia fills it without anti-aliasing).
+			raster::Path rect;
+			rect.moveTo({ox + p.x0, oy + p.top});
+			rect.lineTo({ox + p.x1, oy + p.top});
+			rect.lineTo({ox + p.x1, oy + p.top + p.height});
+			rect.lineTo({ox + p.x0, oy + p.top + p.height});
+			rect.close();
+			drawMask(coverage(flat(rect), false), Rgba{pp.back.r, pp.back.g, pp.back.b, pp.back.a});
+			continue;
+		}
+		const double l = std::floor(m.a * (ox + p.x0) + m.e + 0.5), r = std::floor(m.a * (ox + p.x1) + m.e + 0.5);
+		const double t = std::floor(m.d * (oy + p.top) + m.f + 0.5), b = std::floor(m.d * (oy + p.top + p.height) + m.f + 0.5);
+		raster::Mask rect;
+		rect.x = int(std::max(l, 0.0)), rect.y = int(std::max(t, 0.0));
+		rect.w = int(std::min(r, double(tileW))) - rect.x, rect.h = int(std::min(b, double(tileH))) - rect.y;
+		if (rect.w <= 0 || rect.h <= 0) continue;
+		rect.a.assign(size_t(rect.w) * size_t(rect.h), 255);
+		drawMask(rect, Rgba{pp.back.r, pp.back.g, pp.back.b, pp.back.a});
+	}
+	// Glyphs, by colour, each colour's laid over one another into one mask, as Skia blends each glyph's own.
+	struct Ink { Rgba colour; std::vector<std::pair<const raster::Mask*, std::pair<int, int>>> placed; };
+	std::vector<Ink> inks;
+	for (const PlacedGlyph& g : glyphs) {
+		const Rgba colour = resolved(paintOf(g.span).ink, own);
+		const double dx = m.a * (ox + g.x) + m.c * (oy + g.y) + m.e, dy = m.b * (ox + g.x) + m.d * (oy + g.y) + m.f;
+		const double qx = upright ? std::floor(dx + 0.5) : std::floor((dx + 0.125) * 4) / 4;
+		const double qy = level ? std::floor(dy + 0.5) : std::floor((dy + 0.125) * 4) / 4;
+		const int ix = int(std::floor(qx)), iy = int(std::floor(qy));
+		const int stepX = int((qx - ix) * 4), stepY = int((qy - iy) * 4);
+		int faceWeight;
+		bool faceItalic;
+		faceStyle(g.face, &faceWeight, &faceItalic);
+		const bool fakeBold = spanWeight(spans, g.span) >= 600 && spanWeight(spans, g.span) - faceWeight >= 200, fakeItalic = spanItalic(spans, g.span) && !faceItalic;
+		// The glyph's whole matrix: the view's, its size, and the slant a faked italic adds (x - y / 4, y down).
+		const double k = fakeItalic ? -0.25 : 0;
+		const double A[4] = {m.a * g.size, m.b * g.size, (m.a * k + m.c) * g.size, (m.b * k + m.d) * g.size};
+		const bool hinted = (A[1] == 0 && A[2] == 0) || (A[0] == 0 && A[3] == 0);
+		bool drawable = true;
+		const raster::Mask& mask = glyphMask(g.face, g.id, A, stepX, stepY, hinted, fakeBold, &drawable);
+		if (!drawable) {
+			// A glyph with no outline (a colour emoji's picture): CanvasKit draws it, this painter does not.
+			refuse("a glyph with no outline (colour emoji)");
+			return;
+		}
+		if (mask.w <= 0 || mask.h <= 0) continue;
+		const int mx = ix + mask.x, my = iy + mask.y;
+		if (mx >= tileW || my >= tileH || mx + mask.w <= 0 || my + mask.h <= 0) continue;
+		Ink* ink = nullptr;
+		for (Ink& k : inks)
+			if (k.colour.r == colour.r && k.colour.g == colour.g && k.colour.b == colour.b && k.colour.a == colour.a) ink = &k;
+		if (!ink) {
+			inks.push_back({colour, {}});
+			ink = &inks.back();
+		}
+		ink->placed.push_back({&mask, {mx, my}});
+	}
+	for (const Ink& ink : inks) {
+		int x0 = INT32_MAX, y0 = INT32_MAX, x1 = INT32_MIN, y1 = INT32_MIN;
+		for (const auto& [mask, at] : ink.placed) x0 = std::min(x0, at.first), y0 = std::min(y0, at.second), x1 = std::max(x1, at.first + mask->w), y1 = std::max(y1, at.second + mask->h);
+		x0 = std::max(x0, 0), y0 = std::max(y0, 0), x1 = std::min(x1, tileW), y1 = std::min(y1, tileH);
+		if (x1 <= x0 || y1 <= y0) continue;
+		std::vector<float> uncovered(size_t(x1 - x0) * size_t(y1 - y0), 1.f);
+		const uint8_t* gamma = gammaTable(ink.colour);
+		for (const auto& [mask, at] : ink.placed)
+			for (int y = 0; y < mask->h; y++) {
+				const int ty = at.second + y;
+				if (ty < y0 || ty >= y1) continue;
+				for (int x = 0; x < mask->w; x++) {
+					const int tx = at.first + x;
+					if (tx < x0 || tx >= x1) continue;
+					const uint8_t a = gamma[mask->a[size_t(y) * size_t(mask->w) + size_t(x)]];
+					if (a) uncovered[size_t(ty - y0) * size_t(x1 - x0) + size_t(tx - x0)] *= 1 - a / 255.f;
+				}
+			}
+		raster::Mask all;
+		all.x = x0, all.y = y0, all.w = x1 - x0, all.h = y1 - y0;
+		all.a.resize(uncovered.size());
+		for (size_t i = 0; i < uncovered.size(); i++) all.a[i] = uint8_t(std::lround((1 - uncovered[i]) * 255));
+		drawMask(all, ink.colour);
+	}
+	// Lines under and through, each a stroke along the run's piece (`Decorations::paint`).
+	for (const PlacedPiece& p : pieces) {
+		const CardRunPaint& pp = paintOf(p.span);
+		if (!pp.lines) continue;
+		const Rgba colour = resolved(pp.lineInk, own);
+		double metric[4];
+		lineMetrics(p.face, metric);
+		const double size = spans[size_t(std::clamp(p.span, 0, int(spans.size()) - 1))].size;
+		for (int which = 1; which <= 2; which <<= 1) {
+			if (!(pp.lines & which)) continue;
+			double thickness = size / 14.0;
+			double position;
+			if (which == 1) {
+				if (metric[1] > 0) thickness = metric[1] * size;
+				position = metric[0] * size > 0 ? metric[0] * size : thickness;
+			} else {
+				if (metric[1] > 0) thickness = metric[1] * size;
+				if (!std::isnan(metric[3]) && metric[3] > 0) thickness = metric[3] * size;
+				position = std::isnan(metric[2]) ? -size * 0.25 : metric[2] * size;
+			}
+			const double y = oy + p.baseline + position;
+			raster::Path line;
+			line.moveTo({ox + p.x0, y});
+			line.lineTo({ox + p.x1, y});
+			strokePath(line, false, thickness, 1, 0, 0, {}, colour);
+		}
+	}
+}
+
+// Drawing ops of a card (`card.cpp`), from (ox, oy): what `layoutMarkdown`'s `drawOps` draws.
+void paintCardOps(const std::vector<CardOp>& ops, const CardPalette& C, double ox, double oy, int handle) {
+	auto rgba = [](const CardColour& c) { return Rgba{c.r, c.g, c.b, c.a}; };
+	for (const CardOp& op : ops) {
+		switch (op.kind) {
+			case CardOp::TEXT:
+				paintParagraph(op.text, op.spans, op.base, op.lineHeight, op.w, op.align, op.paints, rgba(op.colour), ox + op.x, oy + op.y);
+				break;
+			case CardOp::BOX: {
+				const double box[4] = {ox + op.x, oy + op.y, op.w, op.h};
+				const double r = op.r > 0 ? fitted(op.r, op.w, op.h) : 0;
+				const double radii[4] = {r, r, r, r};
+				drawShape(box, radii, rgba(op.colour), 0);
+				break;
+			}
+			case CardOp::CHECK: {
+				const double box[4] = {ox + op.x, oy + op.y, op.w, op.h};
+				const double r = fitted(op.w * 0.25, op.w, op.h);
+				const double radii[4] = {r, r, r, r};
+				drawShape(box, radii, rgba(op.checked ? C.accent : C.box), 0);
+				if (!op.checked) strokePath(rrectPath(box, radii), false, 1, 1, 0, 0, {}, rgba(C.strong));
+				else {
+					const double s = op.w;
+					raster::Path tick;
+					tick.moveTo({box[0] + s * 0.26, box[1] + s * 0.52});
+					tick.lineTo({box[0] + s * 0.43, box[1] + s * 0.69});
+					tick.lineTo({box[0] + s * 0.75, box[1] + s * 0.33});
+					strokePath(tick, false, s * 0.14, 1, 1, 1, {}, Rgba{1, 1, 1, 1});
+				}
+				break;
+			}
+			case CardOp::SCROLL: {
+				const double max = op.content - op.w;
+				const auto found = scrolls.find(handle);
+				const double asked = found != scrolls.end() && size_t(op.index) < found->second.size() ? found->second[size_t(op.index)] : 0;
+				const double offset = std::max(0.0, std::min(max, asked));
+				painter.clips.push_back(Clip{painter.m.inverse(), {ox + op.x, oy + op.y, op.w, op.h}, {0, 0, 0, 0}, painter.m.scale()});
+				paintCardOps(op.ops, C, ox - offset, oy, handle);
+				painter.clips.pop_back();
+				// The bar: how much of the table shows, and where along it the view is.
+				const double thumb = std::max(24.0, (op.w / op.content) * op.w);
+				const double at = max > 0 ? (offset / max) * (op.w - thumb) : 0;
+				const double track[4] = {ox + op.x, oy + op.y + op.h - 3, op.w, 3};
+				const double bar[4] = {ox + op.x + at, oy + op.y + op.h - 3, thumb, 3};
+				const double round[4] = {1.5, 1.5, 1.5, 1.5};
+				drawShape(track, round, rgba(C.line), 0);
+				drawShape(bar, round, rgba(C.faint), 0);
+				break;
+			}
+		}
+	}
+}
+
+// A card's markdown inside its box (`paintMarkdown`): cut at the paper's own corners when padded.
+void paintCard(int handle, const double box[4], double pad) {
+	const double* nums = nullptr;
+	size_t count = 0;
+	const char* pool = nullptr;
+	if (!sceneCard(handle, &nums, &count, &pool)) {
+		refuse("card not in the scene");
+		return;
+	}
+	std::vector<CardOp> ops;
+	CardPalette palette;
+	bool ok = true;
+	cardOps(nums, count, pool, std::max(1.0, box[2] - pad * 2), ops, palette, ok);
+	if (!ok) {
+		refuse("card with a picture");
+		return;
+	}
+	if (pad > 0) {
+		const double r = fitted(12, box[2], box[3]);
+		painter.clips.push_back(Clip{painter.m.inverse(), {box[0], box[1], box[2], box[3]}, {r, r, r, r}, painter.m.scale()});
+	}
+	paintCardOps(ops, palette, box[0] + pad, box[1] + pad, handle);
+	if (pad > 0) painter.clips.pop_back();
+}
+
+void paintWords(const Words& w, const double box[4]) {
+	if (!w.on || w.text.empty()) return;
+	const std::vector<int> chain = chainOf(w.chain.data(), int(w.chain.size()), w.weight, w.italic);
+	if (chain.empty()) {
+		refuse("words with no font");
+		return;
+	}
+	const double width = std::max(1.0, box[2] - w.pad * 2) + (w.grow ? 1 : 0);
+	Span one{0, w.text.size(), chain, w.size, w.letterSpacing};
+	one.weight = w.weight;
+	one.italic = w.italic;
+	CardRunPaint paint;
+	paint.ink = CardColour{w.color.r, w.color.g, w.color.b, w.color.a};
+	paint.lines = (w.underline ? 1 : 0) | (w.strike ? 2 : 0);
+	paint.lineInk = paint.ink;
+	// Measured first, for where it sits up and down in its box.
+	std::vector<PlacedGlyph> glyphs;
+	std::vector<PlacedLine> lines;
+	double out[4];
+	placeGlyphs(w.text.data(), int(w.text.size()), std::vector<Span>{one}, one, w.lineHeight, width, w.align, glyphs, lines, out);
+	const double inner = box[3] - w.pad * 2, height = out[2];
+	const double offset = w.vertical == 1 ? (inner - height) / 2 : w.vertical == 2 ? inner - height : 0;
+	paintParagraph(w.text, std::vector<Span>{one}, one, w.lineHeight, width, w.align, std::vector<CardRunPaint>{paint}, w.color, box[0] + w.pad, box[1] + w.pad + std::max(0.0, offset));
+}
+
+// --- drawing ops -----------------------------------------------------------------------------------
+//
+// What the page reduces an icon, a film's or a sound's badge, a placeholder, an arrow's words, a prompt's
+// model name and the ink under the pen to (`paint-wire.ts`, `ops`), in the item's coordinates:
+//   1 path   [d, affine 6, fill rgba, even-odd, stroke rgba, width, cap, join, dashes, ...dash]
+//   2 rrect  [x, y, w, h, radius, fill rgba, stroke rgba, width, dashes, ...dash]
+//   3 words  [x, y, band, width, align, one line, size, weight, italic, colour, text, chain]: with a band,
+//            set in the middle of it, at least a pixel down
+//   4 pill   [right, bottom, pad x, pad y, radius divisor, back rgba, size, weight, colour, text, chain]
+//   5 label  [line d, affine 6, size, weight, colour, patch rgba, text, chain]: at the line's middle
+// A string is [length, ...bytes]; a colour is four numbers.
+
+struct OpReader {
+	const std::vector<double>& v;
+	size_t at = 0;
+	double next() { return at < v.size() ? v[at++] : 0; }
+	Rgba rgba() {
+		Rgba c;
+		c.r = float(next()), c.g = float(next()), c.b = float(next()), c.a = float(next());
+		return c;
+	}
+	std::string text() {
+		const int n = int(next());
+		std::string out;
+		for (int k = 0; k < n && at < v.size(); k++) out.push_back(char(int(next())));
+		return out;
+	}
+	std::vector<double> dash() {
+		const int n = int(next());
+		std::vector<double> out;
+		for (int k = 0; k < n; k++) out.push_back(next());
+		return out;
+	}
+};
+
+// Words set as `fonts.paragraph` sets them: one style, a width, an alignment; with `oneLine`, cut to the
+// first line with an ellipsis when they would wrap. Answers the paragraph's height and longest line.
+void opWords(const std::string& text, const std::string& chainNames, double size, int weight, bool italic, double width, int align, bool oneLine, Rgba colour, double x, double y, double* height, double* longest, double* intrinsic, bool draw) {
+	const std::vector<int> chain = chainOf(chainNames.data(), int(chainNames.size()), weight, italic);
+	if (chain.empty()) {
+		refuse("words with no font");
+		return;
+	}
+	Span one{0, text.size(), chain, size, 0, weight, italic};
+	std::vector<PlacedGlyph> glyphs;
+	std::vector<PlacedLine> lines;
+	double out[4];
+	std::string words = text;
+	placeGlyphs(words.data(), int(words.size()), std::vector<Span>{one}, one, NAN, width, align, glyphs, lines, out);
+	if (oneLine && lines.size() > 1) {
+		// The first line, letters taken off its end until it and an ellipsis fit (`TextLine::createEllipsis`);
+		// when not even the ellipsis fits, nothing is drawn.
+		bool fits = false;
+		for (size_t cut = words.size(); cut > 0; cut--) {
+			if ((words[cut - 1] & 0xC0) == 0x80) continue;
+			std::string trial = words.substr(0, cut);
+			while (!trial.empty() && trial.back() == ' ') trial.pop_back();
+			trial += "\xE2\x80\xA6";
+			Span t{0, trial.size(), chain, size, 0, weight, italic};
+			double o[4];
+			std::vector<PlacedGlyph> g;
+			std::vector<PlacedLine> l;
+			placeGlyphs(trial.data(), int(trial.size()), std::vector<Span>{t}, t, NAN, NAN, align, g, l, o);
+			if (o[1] <= width) {
+				words = trial;
+				fits = true;
+				break;
+			}
+		}
+		if (!fits) {
+			if (height) *height = out[2];
+			if (longest) *longest = 0;
+			if (intrinsic) *intrinsic = out[0];
+			return;
+		}
+		one = Span{0, words.size(), chain, size, 0, weight, italic};
+		placeGlyphs(words.data(), int(words.size()), std::vector<Span>{one}, one, NAN, width, align, glyphs, lines, out);
+	}
+	if (height) *height = out[2];
+	if (longest) *longest = out[1];
+	if (intrinsic) *intrinsic = out[0];
+	if (!draw) return;
+	CardRunPaint paint;
+	paint.ink = CardColour{colour.r, colour.g, colour.b, colour.a};
+	paintParagraph(words, std::vector<Span>{one}, one, NAN, width, align, std::vector<CardRunPaint>{paint}, colour, x, y);
+}
+
+void paintOps(const std::vector<double>& ops) {
+	OpReader o{ops};
+	while (o.at < ops.size()) {
+		const int kind = int(o.next());
+		switch (kind) {
+			case 1: {
+				const std::string d = o.text();
+				const double a = o.next(), b = o.next(), c = o.next(), dd = o.next(), e = o.next(), f = o.next();
+				const Rgba fill = o.rgba();
+				const bool evenOdd = o.next() != 0;
+				const Rgba stroke = o.rgba();
+				const double width = o.next();
+				const int cap = int(o.next()), join = int(o.next());
+				const std::vector<double> dash = o.dash();
+				raster::Path parsed;
+				if (!raster::parseSvg(d, parsed)) break;
+				// The path's own transform goes into the path, so its stroke is as wide as asked, scaled with it.
+				const Affine saved = painter.m;
+				painter.m = Affine{a, b, c, dd, e, f}.then(painter.m);
+				if (fill.a > 0) drawMask(coverage(flat(parsed), evenOdd), fill);
+				if (stroke.a > 0 && width > 0) strokePath(parsed, evenOdd, width, 1, cap, join, dash, stroke);
+				painter.m = saved;
+				break;
+			}
+			case 2: {
+				const double box[4] = {o.next(), o.next(), o.next(), o.next()};
+				const double r = fitted(o.next(), box[2], box[3]);
+				const double radii[4] = {r, r, r, r};
+				const Rgba fill = o.rgba(), stroke = o.rgba();
+				const double width = o.next();
+				const std::vector<double> dash = o.dash();
+				if (fill.a > 0) drawShape(box, radii, fill, 0);
+				if (stroke.a > 0 && width > 0) strokePath(rrectPath(box, radii), false, width, 1, 0, 0, dash, stroke);
+				break;
+			}
+			case 3: {
+				const double x = o.next(), y = o.next(), band = o.next(), width = o.next();
+				const int align = int(o.next());
+				const bool oneLine = o.next() != 0;
+				const double size = o.next();
+				const int weight = int(o.next());
+				const bool italic = o.next() != 0;
+				const Rgba colour = o.rgba();
+				const std::string text = o.text(), chain = o.text();
+				double top = y;
+				if (band > 0) {
+					double h = 0;
+					opWords(text, chain, size, weight, italic, width, align, oneLine, colour, x, y, &h, nullptr, nullptr, false);
+					top = y + std::max(1.0, (band - h) / 2);
+				}
+				opWords(text, chain, size, weight, italic, width, align, oneLine, colour, x, top, nullptr, nullptr, nullptr, true);
+				break;
+			}
+			case 4: {
+				const double right = o.next(), bottom = o.next(), padX = o.next(), padY = o.next(), divisor = o.next();
+				const Rgba back = o.rgba();
+				const double size = o.next();
+				const int weight = int(o.next());
+				const Rgba colour = o.rgba();
+				const std::string text = o.text(), chain = o.text();
+				double h = 0, intrinsic = 0;
+				opWords(text, chain, size, weight, false, 200, 0, false, colour, 0, 0, &h, nullptr, &intrinsic, false);
+				const double tw = std::ceil(intrinsic), pw = tw + padX * 2, ph = h + padY * 2;
+				const double box[4] = {right - pw, bottom - ph, pw, ph};
+				const double r = fitted(ph / divisor, pw, ph);
+				const double radii[4] = {r, r, r, r};
+				drawShape(box, radii, back, 0);
+				opWords(text, chain, size, weight, false, 200, 0, false, colour, right - pw + padX, bottom - ph + padY, nullptr, nullptr, nullptr, true);
+				break;
+			}
+			case 5: {
+				const std::string d = o.text();
+				const double a = o.next(), b = o.next(), c = o.next(), dd = o.next(), e = o.next(), f = o.next();
+				const double size = o.next();
+				const int weight = int(o.next());
+				const Rgba colour = o.rgba(), patch = o.rgba();
+				const std::string text = o.text(), chain = o.text();
+				raster::Path parsed;
+				if (!raster::parseSvg(d, parsed)) break;
+				raster::Vec at;
+				// Where half its length falls, measured as Skia's contour measure measures it at a scale of one.
+				if (!raster::pointAlong(parsed.transformed(raster::Affine{a, b, c, dd, e, f}), 0.5, 1, at)) break;
+				double h = 0, longest = 0;
+				opWords(text, chain, size, weight, false, 400, 2, false, colour, 0, 0, &h, &longest, nullptr, false);
+				const double w = std::min(400.0, longest);
+				const double box[4] = {at.x - w / 2 - 5, at.y - h / 2 - 2, w + 10, h + 4};
+				const double radii[4] = {5, 5, 5, 5};
+				drawShape(box, radii, patch, 0);
+				opWords(text, chain, size, weight, false, 400, 2, false, colour, at.x - 200, at.y - h / 2, nullptr, nullptr, nullptr, true);
+				break;
+			}
+			default:
+				return;
+		}
+	}
 }
 
 // --- items -------------------------------------------------------------------------------------------
@@ -616,11 +1281,6 @@ void appShadows(const double box[4], const double radii[4]) {
 }
 raster::Path rrectPath(const double box[4], const double radii[4]);
 void strokePath(const raster::Path& path, bool evenOdd, double width, int align, int cap, int join, const std::vector<double>& dash, Rgba color);
-// A radius too big for its box, made smaller as Skia's `setRectXY` does: by the one factor that fits it.
-double fitted(double radius, double w, double h) {
-	if (radius <= 0) return 0;
-	return radius * std::min({1.0, w / (radius * 2), h / (radius * 2)});
-}
 // The hairline edge outside the box, as a CSS outline is: one unit wide, so drawn as Skia's hairline
 // once a unit is a pixel or less.
 void hairline(const double box[4], double radius) {
@@ -727,8 +1387,18 @@ void paintNode(int handle) {
 	const PaintBox placed = sceneBox(handle);
 	if (!placed.placed) return;
 	const Record& r = records[size_t(handle)];
-	if (r.kind == K_UNSUPPORTED || holes[size_t(handle)]) {
-		painter.supported = false;
+	if (holes[size_t(handle)]) {
+		// A file shown live by an element under the sheet: its box cleared, so the element shows through.
+		const double box[4] = {placed.x, placed.y, placed.w, placed.h};
+		double radii[4];
+		for (int i = 0; i < 4; i++) radii[i] = std::max(0.0, std::min({records[size_t(handle)].radii[i], placed.w / 2, placed.h / 2}));
+		glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+		drawShape(box, radii, Rgba{0, 0, 0, 1}, 0);
+		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		return;
+	}
+	if (r.kind == K_UNSUPPORTED) {
+		refuse("unsupported item");
 		return;
 	}
 	if (r.kind == K_NONE) return;
@@ -739,7 +1409,9 @@ void paintNode(int handle) {
 	// The item's turn about its top-left corner, counter-clockwise, then its mirror in its box.
 	Affine local;
 	if (r.rotation != 0) {
-		const double t = -r.rotation * M_PI / 180, cs = std::cos(t), sn = std::sin(t);
+		// Skia snaps a sine or cosine within 1/4096 of zero to zero (`SkScalarSinSnapToZero`), so a right angle is exact.
+		auto snap = [](double v) { return std::fabs(v) <= 1.0 / 4096 ? 0.0 : v; };
+		const double t = -r.rotation * M_PI / 180, cs = snap(std::cos(t)), sn = snap(std::sin(t));
 		local = Affine{cs, sn, -sn, cs, placed.x - cs * placed.x + sn * placed.y, placed.y - sn * placed.x - cs * placed.y};
 	}
 	if (r.flipX || r.flipY) {
@@ -789,14 +1461,27 @@ void paintNode(int handle) {
 			if (r.fills.empty()) drawShape(box, round, r.paperColor, 0);
 			for (const Rgba& fill : r.fills) drawShape(box, round, fill, 0);
 			hairline(box, 12);
+			if (!muted[size_t(handle)]) {
+				if (r.words.markdown) paintCard(handle, box, r.words.pad);
+				else paintWords(r.words, box);
+			}
 			break;
 		}
+		case K_TEXT:
+			if (!muted[size_t(handle)]) {
+				if (r.words.markdown) paintCard(handle, box, r.words.pad);
+				else paintWords(r.words, box);
+			}
+			break;
 		case K_GROUP:
 			paintChildren(handle);
+			break;
+		case K_OPS:
 			break;
 		default:
 			break;
 	}
+	if (!r.ops.empty()) paintOps(r.ops);
 	if (opacity < 1) endLayer(opacity);
 	painter.m = saved;
 }
@@ -838,6 +1523,7 @@ EMSCRIPTEN_KEEPALIVE void paint_record(int handle, const double* f, int count) {
 		records.resize(size_t(handle) + 1);
 		skipped.resize(records.size(), 0);
 		holes.resize(records.size(), 0);
+		muted.resize(records.size(), 0);
 	}
 	Record r;
 	int at = 0;
@@ -874,6 +1560,35 @@ EMSCRIPTEN_KEEPALIVE void paint_record(int handle, const double* f, int count) {
 		const int dashes = int(next());
 		for (int i = 0; i < dashes; i++) r.dash.push_back(next());
 	}
+	if (r.kind == K_NOTE || r.kind == K_TEXT) {
+		// [has words, pad, colour, align, vertical, underline, strike, grow, size, weight, italic, spacing,
+		//  line height or NaN, bytes, ...UTF-8, chain bytes, ...chain]
+		Words& w = r.words;
+		const int on = int(next());
+		w.on = on != 0;
+		// [2, pad]: a card's markdown, which the scene holds.
+		if (on == 2) {
+			w.markdown = true;
+			w.pad = next();
+		} else if (w.on) {
+			w.pad = next();
+			w.color = rgba();
+			w.align = int(next());
+			w.vertical = int(next());
+			w.underline = next() != 0;
+			w.strike = next() != 0;
+			w.grow = next() != 0;
+			w.size = next();
+			w.weight = int(next());
+			w.italic = next() != 0;
+			w.letterSpacing = next();
+			w.lineHeight = next();
+			const int bytes = int(next());
+			for (int k = 0; k < bytes; k++) w.text.push_back(char(int(next())));
+			const int chainBytes = int(next());
+			for (int k = 0; k < chainBytes; k++) w.chain.push_back(char(int(next())));
+		}
+	}
 	if (r.kind == K_PATH) {
 		r.sub = int(next());
 		r.evenOdd = next() != 0;
@@ -895,15 +1610,41 @@ EMSCRIPTEN_KEEPALIVE void paint_record(int handle, const double* f, int count) {
 			r.geometry.push_back(std::move(g));
 		}
 	}
+	r.ops = std::move(records[size_t(handle)].ops);
 	records[size_t(handle)] = r;
 }
 
-EMSCRIPTEN_KEEPALIVE void paint_flags(int handle, int skip, int hole) {
+EMSCRIPTEN_KEEPALIVE void paint_flags(int handle, int skip, int hole, int mute) {
 	if (handle < 0 || size_t(handle) >= records.size()) return;
 	skipped[size_t(handle)] = char(skip);
 	holes[size_t(handle)] = char(hole);
+	muted[size_t(handle)] = char(mute);
 }
 EMSCRIPTEN_KEEPALIVE void paint_scheme(int isDark) { dark = isDark != 0; }
+EMSCRIPTEN_KEEPALIVE const char* paint_why() { return whyNot; }
+// An item's drawing ops, made once its box is known (`paint-wire.ts`, `opsOf`): `count` numbers at `f`.
+EMSCRIPTEN_KEEPALIVE void paint_ops(int handle, const double* f, int count) {
+	if (handle < 0) return;
+	if (size_t(handle) >= records.size()) {
+		records.resize(size_t(handle) + 1);
+		skipped.resize(records.size(), 0);
+		holes.resize(records.size(), 0);
+		muted.resize(records.size(), 0);
+	}
+	records[size_t(handle)].ops.assign(f, f + count);
+}
+// The ink under the pen, as drawing ops in stage pixels at the scene's input (`count` numbers): drawn over everything.
+EMSCRIPTEN_KEEPALIVE void paint_overlay(const double* f, int count) { overlay.assign(f, f + count); }
+// How far an item's card has its `index`th wide table scrolled; a handle of -1 forgets them all.
+EMSCRIPTEN_KEEPALIVE void paint_scroll(int handle, int index, double offset) {
+	if (handle < 0) {
+		scrolls.clear();
+		return;
+	}
+	auto& list = scrolls[handle];
+	if (list.size() <= size_t(index)) list.resize(size_t(index) + 1, 0);
+	list[size_t(index)] = offset;
+}
 
 // Paint the square of the drawing at stage (x, y), `size` stage units wide, into a `pixels`-square
 // canvas. Returns 1 when everything in it was drawn, 0 when something there is beyond this painter.
@@ -921,17 +1662,27 @@ EMSCRIPTEN_KEEPALIVE int paint_tile(double x, double y, double size, int pixels)
 	glUniform2f(uView, float(pixels), float(pixels));
 	const double level = double(pixels) / size;
 	painter = Painter{};
+	whyNot = "";
+	// Glyph masks are let go between tiles, never inside one: a paragraph holds on to the ones it placed.
+	if (glyphMasks.size() > 4096) glyphMasks.clear();
 	painter.m = Affine{level, 0, 0, level, -x * level, -y * level};
 	const int* roots = nullptr;
 	const int count = sceneRoots(&roots);
 	std::vector<int> list(roots, roots + count);
 	for (int root : list) {
 		const PaintBox b = sceneBox(root);
-		// Far from the tile: nothing of it shows (its shadow reaches a little past its box).
-		const bool contained = root < int(records.size()) && records[size_t(root)].rotation == 0 && (records[size_t(root)].clip || sceneChildren(root, nullptr) == 0);
-		if (b.placed && contained && (b.x > x + size + 64 || b.y > y + size + 64 || b.x + b.w < x - 64 || b.y + b.h < y - 64)) continue;
+		// Far from the tile: nothing of it shows. Its shadows and stroke reach past its box by what they
+		// say; a path's own geometry can reach past it anywhere, so a path is never left out.
+		if (root < int(records.size())) {
+			const Record& r = records[size_t(root)];
+			const bool contained = r.rotation == 0 && r.kind != K_PATH && (r.clip || sceneChildren(root, nullptr) == 0);
+			double reach = 64 + std::max({r.stroke.widths[0], r.stroke.widths[1], r.stroke.widths[2], r.stroke.widths[3]});
+			for (const Shadow& sh : r.shadows) reach = std::max(reach, 64 + sh.blur * 2 + std::max(std::fabs(sh.dx), std::fabs(sh.dy)));
+			if (b.placed && contained && (b.x > x + size + reach || b.y > y + size + reach || b.x + b.w < x - reach || b.y + b.h < y - reach)) continue;
+		}
 		paintNode(root);
 	}
+	if (!overlay.empty()) paintOps(overlay);
 	glBindVertexArray(0);
 	return painter.supported ? 1 : 0;
 }

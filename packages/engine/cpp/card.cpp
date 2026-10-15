@@ -5,8 +5,9 @@
 //
 // The encoding: numbers, and a pool of UTF-8 a string is a reference into (its offset and length).
 // A card is [version, fontSize, fontWeight, letterSpacing, lineHeight or NaN, base chain, mono chain,
-// block count, blocks...]; a run of words is [text, chain, flags (1 code, 2 superscript, 4 bold,
-// 8 italic), size scale]; the blocks are read in `one`.
+// palette (nine colours), alignment, block count, blocks...]; a run of words is [text, chain, flags
+// (1 code, 2 superscript, 4 bold, 8 italic), size scale, ink, background, lines, their colour]; the
+// blocks are read in `one`. With ops asked for, it also records what `layoutMarkdown` draws.
 #include <emscripten/emscripten.h>
 
 #include <algorithm>
@@ -17,14 +18,8 @@
 #include <tuple>
 #include <vector>
 
-struct Span {
-	size_t from, to;
-	std::vector<int> chain;
-	double size;
-	double letterSpacing;
-};
-int measureSpans(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, double* out);
-std::vector<int> chainOf(const char* names, int length, int weight, bool italic);
+#include "card.h"
+#include "text.h"
 
 namespace {
 
@@ -37,12 +32,14 @@ struct Run {
 	Ref text, chain;
 	int flags;
 	double scale;
+	CardRunPaint paint;
 };
 
 struct Frame {
 	double size;
 	double weight;
 	int depth;
+	CardColour colour;
 };
 
 struct Para {
@@ -54,7 +51,9 @@ class Card {
 public:
 	Card(const double* nums, size_t count, const char* pool) : n_(nums), count_(count), pool_(pool) {}
 
-	double height(double width) {
+	// The card's height; with `ops`, what it draws too.
+	double layout(double width, std::vector<CardOp>* ops = nullptr) {
+		ops_ = ops;
 		at_ = 0;
 		const double version = next();
 		(void)version;
@@ -64,10 +63,15 @@ public:
 		lineHeight_ = next();
 		base_ = ref();
 		mono_ = ref();
+		CardColour* palette[] = {&palette_.fg, &palette_.muted, &palette_.faint, &palette_.line, &palette_.strong, &palette_.subtle, &palette_.code, &palette_.accent, &palette_.box};
+		for (CardColour* c : palette) *c = colour();
+		align_ = int(next());
 		const int blocks = int(next());
-		const Frame f{fontSize_, fontWeight_, 0};
-		return stack(blocks, 0, width, f, fontSize_);
+		const Frame f{fontSize_, fontWeight_, 0, palette_.fg};
+		return stack(blocks, 0, 0, width, f, fontSize_);
 	}
+	const CardPalette& palette() const { return palette_; }
+	bool ok() const { return ok_; }
 
 private:
 	const double* n_;
@@ -76,6 +80,10 @@ private:
 	size_t at_ = 0;
 	double fontSize_ = 14, fontWeight_ = 400, letterSpacing_ = 0, lineHeight_ = NAN;
 	Ref base_{0, 0}, mono_{0, 0};
+	CardPalette palette_;
+	int align_ = 0;
+	std::vector<CardOp>* ops_ = nullptr;
+	bool ok_ = true;
 	std::map<std::tuple<size_t, size_t, int, bool>, std::vector<int>> chains_;
 
 	double next() { return at_ < count_ ? n_[at_++] : 0; }
@@ -84,12 +92,24 @@ private:
 		const size_t l = size_t(next());
 		return {a, l};
 	}
+	CardColour colour() {
+		CardColour c;
+		c.r = float(next());
+		c.g = float(next());
+		c.b = float(next());
+		c.a = float(next());
+		return c;
+	}
 	Run run() {
 		Run r;
 		r.text = ref();
 		r.chain = ref();
 		r.flags = int(next());
 		r.scale = next();
+		r.paint.ink = colour();
+		r.paint.back = colour();
+		r.paint.lines = int(next());
+		r.paint.lineInk = colour();
 		return r;
 	}
 	std::vector<Run> runs(int count) {
@@ -103,137 +123,288 @@ private:
 		if (found != chains_.end()) return found->second;
 		return chains_[key] = chainOf(pool_ + names.at, int(names.length), weight, italic);
 	}
+	static CardRunPaint plain() {
+		CardRunPaint p;
+		p.ink.a = -1;
+		p.lineInk.a = -1;
+		return p;
+	}
+	Run own(Ref text) { return Run{text, base_, 0, 1, plain()}; }
 
-	// One paragraph of runs, as `para` in markdown-layout.ts builds it, laid out at `w`.
-	Para para(const std::vector<Run>& list, const Frame& f, double w, double lineHeight = 1.5, double size = NAN, double weight = NAN) {
+	// One paragraph of runs, as `para` in markdown-layout.ts builds it, laid out at `w`; drawn at
+	// (x, y) when `draw` (a table measures its cells before it places them).
+	Para para(const std::vector<Run>& list, const Frame& f, double x, double y, double w, bool draw, double lineHeight = 1.5, double size = NAN, double weight = NAN, int align = -1) {
 		const double sz = std::isnan(size) ? f.size : size;
 		const double wt = std::isnan(weight) ? f.weight : weight;
 		std::string text;
 		std::vector<Span> spans;
-		Span base{0, 0, chain(base_, int(wt), false), sz, letterSpacing_};
-		auto add = [&](const std::string& words, Ref names, int flags, double scale) {
+		std::vector<CardRunPaint> paints;
+		Span base{0, 0, chain(base_, int(wt), false), sz, letterSpacing_, int(wt), false};
+		auto add = [&](const std::string& words, Ref names, int flags, double scale, const CardRunPaint& paint) {
 			const bool code = flags & 1, sup = flags & 2, bold = flags & 4, italic = flags & 8;
 			const double runSize = (sup ? sz * 0.75 : code ? sz * 0.88 : sz) * scale;
 			const int runWeight = int(bold ? std::max(600.0, wt + 200) : wt);
-			Span span{text.size(), text.size() + words.size(), chain(names, runWeight, italic), runSize, letterSpacing_};
+			Span span{text.size(), text.size() + words.size(), chain(names, runWeight, italic), runSize, letterSpacing_, runWeight, italic};
 			text += words;
 			spans.push_back(span);
+			paints.push_back(paint);
 		};
-		if (list.empty()) add(" ", base_, 0, SIZE_SCALE_NONE);
-		for (const Run& r : list) add(std::string(pool_ + r.text.at, r.text.length), r.chain, r.flags, r.scale);
+		if (list.empty()) add(" ", base_, 0, SIZE_SCALE_NONE, plain());
+		for (const Run& r : list) add(std::string(pool_ + r.text.at, r.text.length), r.chain, r.flags, r.scale, r.paint);
+		const double lh = std::isnan(lineHeight_) ? lineHeight : lineHeight_;
 		double out[4];
-		measureSpans(text.data(), int(text.size()), spans, base, std::isnan(lineHeight_) ? lineHeight : lineHeight_, std::max(1.0, w), out);
+		measureSpans(text.data(), int(text.size()), spans, base, lh, std::max(1.0, w), out);
+		if (draw && ops_) {
+			CardOp op;
+			op.kind = CardOp::TEXT;
+			op.x = x;
+			op.y = y;
+			op.w = std::max(1.0, w);
+			op.colour = f.colour;
+			op.text = std::move(text);
+			op.spans = std::move(spans);
+			op.base = base;
+			op.lineHeight = lh;
+			op.align = align < 0 ? align_ : align;
+			op.paints = std::move(paints);
+			ops_->push_back(std::move(op));
+		}
 		return {out[2], out[0]};
 	}
 	// Words of the card's own, a marker, a title, a placeholder: one plain run.
-	Para words(Ref text, const Frame& f, double w, double size = NAN, double weight = NAN) {
-		return para(std::vector<Run>{Run{text, base_, 0, 1}}, f, w, 1.5, size, weight);
+	Para words(Ref text, const Frame& f, double x, double y, double w, double size = NAN, double weight = NAN, int align = -1) {
+		return para(std::vector<Run>{own(text)}, f, x, y, w, true, 1.5, size, weight, align);
+	}
+	void box(double x, double y, double w, double h, CardColour colour, double r = 0) {
+		if (!ops_) return;
+		CardOp op;
+		op.kind = CardOp::BOX;
+		op.x = x, op.y = y, op.w = w, op.h = h, op.r = r;
+		op.colour = colour;
+		ops_->push_back(std::move(op));
 	}
 
 	// Code, set as `colouredCode` sets it: the mono face at 0.88 of the size, a line height of 1.5, no spacing.
-	double code(int count, double size, double w) {
+	double code(int count, double x, double y, double size, double w) {
 		std::string text;
 		std::vector<Span> spans;
+		std::vector<CardRunPaint> paints;
 		Span base{0, 0, chain(mono_, 400, false), size, 0};
 		for (int i = 0; i < count; i++) {
 			const Ref t = ref();
 			const int flags = int(next());
+			CardRunPaint paint = plain();
+			paint.ink = colour();
 			std::string words(pool_ + t.at, t.length);
 			if (words.empty()) words = " ";
-			spans.push_back(Span{text.size(), text.size() + words.size(), chain(mono_, flags & 4 ? 700 : 400, flags & 8), size, 0});
+			spans.push_back(Span{text.size(), text.size() + words.size(), chain(mono_, flags & 4 ? 700 : 400, flags & 8), size, 0, flags & 4 ? 700 : 400, (flags & 8) != 0});
+			paints.push_back(paint);
 			text += words;
 		}
 		if (spans.empty()) {
 			text = " ";
 			spans.push_back(Span{0, 1, base.chain, size, 0});
+			paints.push_back(plain());
 		}
 		double out[4];
 		measureSpans(text.data(), int(text.size()), spans, base, 1.5, std::max(1.0, w), out);
+		if (ops_) {
+			CardOp op;
+			op.kind = CardOp::TEXT;
+			op.x = x, op.y = y, op.w = std::max(1.0, w);
+			op.colour = palette_.fg;
+			op.text = std::move(text);
+			op.spans = std::move(spans);
+			op.base = base;
+			op.lineHeight = 1.5;
+			op.align = 0;
+			op.paints = std::move(paints);
+			ops_->push_back(std::move(op));
+		}
 		return out[2];
 	}
 
-	double stack(int count, double y, double w, const Frame& f, double gap) {
+	double stack(int count, double x, double y, double w, const Frame& f, double gap) {
 		for (int i = 0; i < count; i++) {
 			const int kind = int(n_[at_]);
 			if (i > 0) y += kind == 1 ? std::max(gap, f.size * 1.25) : gap;
-			y = one(y, w, f);
+			y = one(x, y, w, f);
 		}
 		return y;
 	}
 
-	double one(double y, double w, const Frame& f) {
+	static std::string roman(int n) {
+		static const std::pair<int, const char*> table[] = {{10, "x"}, {9, "ix"}, {5, "v"}, {4, "iv"}, {1, "i"}};
+		std::string out;
+		for (const auto& [value, letters] : table)
+			while (n >= value) out += letters, n -= value;
+		return out;
+	}
+	static std::string marker(bool ordered, int n, int depth) {
+		if (!ordered) return depth == 0 ? "\u2022" : depth == 1 ? "\u25e6" : "\u25aa";
+		if (depth == 0) return std::to_string(n) + ".";
+		if (depth == 1) return roman(n) + ".";
+		return std::string(1, char(96 + (((n - 1) % 26) + 26) % 26 + 1)) + ".";
+	}
+	// A marker's words go into the pool's place: a run over a string of our own.
+	Para ownWords(const std::string& words, const Frame& f, double x, double y, double w, int align) {
+		extra_.push_back(words);
+		const std::string& kept = extra_.back();
+		// A run's text is a reference into the pool; this one is our own string, set as one plain span.
+		std::vector<Span> spans{Span{0, kept.size(), chain(base_, int(f.weight), false), f.size, letterSpacing_, int(f.weight), false}};
+		const double lh = std::isnan(lineHeight_) ? 1.5 : lineHeight_;
+		double out[4];
+		measureSpans(kept.data(), int(kept.size()), spans, spans[0], lh, std::max(1.0, w), out);
+		if (ops_) {
+			CardOp op;
+			op.kind = CardOp::TEXT;
+			op.x = x, op.y = y, op.w = std::max(1.0, w);
+			op.colour = f.colour;
+			op.text = kept;
+			op.spans = spans;
+			op.base = spans[0];
+			op.lineHeight = lh;
+			op.align = align;
+			op.paints = {plain()};
+			ops_->push_back(std::move(op));
+		}
+		return {out[2], out[0]};
+	}
+	std::vector<std::string> extra_;
+
+	double one(double x, double y, double w, const Frame& f) {
 		const int kind = int(next());
 		switch (kind) {
 			case 1: {  // heading
 				const int level = std::clamp(int(next()), 1, 6);
 				const auto list = runs(int(next()));
-				return y + para(list, f, w, 1.3, f.size * HEADING_SIZE[level - 1], 600).height;
+				Frame hf = f;
+				if (level >= 5) hf.colour = palette_.muted;
+				return y + para(list, hf, x, y, w, true, 1.3, f.size * HEADING_SIZE[level - 1], 600).height;
 			}
 			case 2: {  // paragraph
 				const auto list = runs(int(next()));
-				return y + para(list, f, w).height;
+				return y + para(list, f, x, y, w, true).height;
 			}
 			case 3: {  // image: [has picture, its width, its height, the width asked for or NaN, words]
 				const bool has = next() != 0;
 				const double iw0 = next(), ih0 = next(), asked = next();
 				const Ref text = ref();
 				if (has && iw0 > 0) {
+					// The picture itself the painter does not have.
+					ok_ = false;
 					const double iw = std::min(w, std::isnan(asked) ? iw0 : asked);
 					return y + iw * ih0 / iw0;
 				}
-				(void)text;
-				return y + f.size * 3;
+				const double h = f.size * 3;
+				box(x, y, w, h, palette_.subtle, 8);
+				Frame mf = f;
+				mf.colour = palette_.muted;
+				// Measured first, then placed in the middle of the box.
+				std::vector<CardOp>* keep = ops_;
+				ops_ = nullptr;
+				const double ph = words(text, mf, 0, 0, w - f.size * 2, f.size * 0.875, NAN, 2).height;
+				ops_ = keep;
+				words(text, mf, x + f.size, y + (h - ph) / 2, w - f.size * 2, f.size * 0.875, NAN, 2);
+				return y + h;
 			}
 			case 4: {  // embed: [words]
 				const Ref text = ref();
 				const double pad = f.size * 0.75;
-				return y + words(text, f, w - pad * 2, f.size * 0.94).height + pad * 2;
+				std::vector<CardOp>* keep = ops_;
+				ops_ = nullptr;
+				const double ph = words(text, f, 0, 0, w - pad * 2, f.size * 0.94).height;
+				ops_ = keep;
+				const double h = ph + pad * 2;
+				box(x, y, w, h, palette_.subtle, 8);
+				words(text, f, x + pad, y + pad, w - pad * 2, f.size * 0.94);
+				return y + h;
 			}
 			case 5: {  // list: [ordered, start, loose, items, then each: checked (-1 none), blocks, blocks...]
-				next();
-				next();
+				const bool ordered = next() != 0;
+				const int start = int(next());
 				const bool loose = next() != 0;
 				const int items = int(next());
 				const double indent = f.size * 1.6;
 				for (int i = 0; i < items; i++) {
 					if (i > 0) y += loose ? f.size : f.size * 0.2;
-					next();  // checked: drawn, not measured
+					const double top = y;
+					const int checked = int(next());
+					if (checked >= 0) {
+						const double size = f.size * 0.85;
+						if (ops_) {
+							CardOp op;
+							op.kind = CardOp::CHECK;
+							op.x = x + indent - size - f.size * 0.45;
+							op.y = top + (f.size * 1.5 - size) / 2;
+							op.w = op.h = size;
+							op.checked = checked == 1;
+							ops_->push_back(std::move(op));
+						}
+					} else {
+						Frame mf = f;
+						mf.colour = palette_.muted;
+						ownWords(marker(ordered, start + i, f.depth), mf, x, top, indent - f.size * 0.4, 1);
+					}
 					const int blocks = int(next());
-					y = stack(blocks, y, w - indent, Frame{f.size, f.weight, f.depth + 1}, loose ? f.size : 0);
+					y = stack(blocks, x + indent, y, w - indent, Frame{f.size, f.weight, f.depth + 1, f.colour}, loose ? f.size : 0);
 				}
 				return y;
 			}
-			case 6: {  // quote: [alert, title, blocks, blocks...]
+			case 6: {  // quote: [alert, title, alert colour, blocks, blocks...]
 				const bool alert = next() != 0;
 				const Ref title = ref();
+				const CardColour accent = colour();
 				const int blocks = int(next());
+				const double bar = 2;
 				const double pad = alert ? f.size * 0.4 : 0;
-				const double inset = 2 + f.size * 0.9;
+				const double inset = bar + f.size * 0.9;
+				const double top = y;
 				y += pad;
 				if (alert) {
-					y += words(title, f, w - inset, NAN, 600).height;
+					Frame tf = f;
+					tf.colour = accent;
+					y += words(title, tf, x + inset, y, w - inset, NAN, 600).height;
 					if (blocks) y += f.size * 0.3;
 				}
-				y = stack(blocks, y, w - inset, f, f.size);
-				return y + pad;
+				Frame qf = f;
+				if (!alert) qf.colour = palette_.muted;
+				y = stack(blocks, x + inset, y, w - inset, qf, f.size);
+				y += pad;
+				box(x, top, bar, std::max(1.0, y - top), alert ? accent : palette_.strong, 1);
+				return y;
 			}
-			case 7: {  // code: [runs, then each: text, flags]
+			case 7: {  // code: [runs, then each: text, flags, colour]
 				const double pad = f.size * 0.85;
-				return y + code(int(next()), f.size * 0.88, w - pad * 2) + pad * 2;
+				const int count = int(next());
+				// The box goes under the words: measured, the box laid, then the words.
+				const size_t mark = at_;
+				std::vector<CardOp>* keep = ops_;
+				ops_ = nullptr;
+				const double ch = code(count, 0, 0, f.size * 0.88, w - pad * 2);
+				ops_ = keep;
+				at_ = mark;
+				const double h = ch + pad * 2;
+				box(x, y, w, h, palette_.subtle, 8);
+				code(count, x + pad, y + pad, f.size * 0.88, w - pad * 2);
+				return y + h;
 			}
 			case 8:
-				return table(y, w, f);
+				return table(x, y, w, f);
 			case 9:  // rule
+				box(x, y + f.size * 0.5, w, 1, palette_.line);
 				return y + f.size + 1;
 			case 10: {  // footnotes: [items, then each: number, blocks, blocks...]
+				box(x, y, w, 1, palette_.line);
 				y += f.size * 0.75;
-				const Frame small{f.size * 0.875, f.weight, f.depth};
+				const Frame small{f.size * 0.875, f.weight, f.depth, palette_.muted};
 				const double indent = small.size * 1.6;
 				const int items = int(next());
 				for (int i = 0; i < items; i++) {
 					if (i > 0) y += small.size * 0.2;
-					next();
-					y = stack(int(next()), y, w - indent, small, 0);
+					const int number = int(next());
+					ownWords(std::to_string(number) + ".", small, x, y, indent - small.size * 0.4, 1);
+					y = stack(int(next()), x + indent, y, w - indent, small, 0);
 				}
 				return y;
 			}
@@ -242,24 +413,29 @@ private:
 	}
 
 	// A table, as `table` in markdown-layout.ts sets it: [columns, rows, aligns..., then each cell: runs, runs...].
-	double table(double y, double w, const Frame& f) {
+	double table(double x, double y, double w, const Frame& f) {
 		const int columns = int(next());
 		const int rows = int(next());
-		for (int c = 0; c < columns; c++) next();  // alignment: drawn, not measured
+		std::vector<int> aligns;
+		for (int c = 0; c < columns; c++) aligns.push_back(int(next()));
 		std::vector<std::vector<std::vector<Run>>> cells(static_cast<size_t>(rows), std::vector<std::vector<Run>>(static_cast<size_t>(columns)));
 		for (int r = 0; r < rows; r++)
 			for (int c = 0; c < columns; c++) cells[size_t(r)][size_t(c)] = runs(int(next()));
 		const double padX = f.size * 0.75, padY = f.size * 0.45;
 		auto left = [&](int c) { return c == 0 ? 0.0 : padX; };
 		auto pads = [&](int c) { return left(c) + (c == columns - 1 ? 0.0 : padX); };
-		auto cellPara = [&](int r, int c, double width) {
-			return para(cells[size_t(r)][size_t(c)], f, width, 1.5, r == 0 ? f.size * 0.9 : f.size, r == 0 ? 600 : f.weight);
+		Frame header = f;
+		header.colour = palette_.muted;
+		// Alignment as encoded (0 left, 1 centre, 2 right) to the painter's (0 left, 1 right, 2 centre).
+		auto alignOf = [&](int c) { return aligns[size_t(c)] == 1 ? 2 : aligns[size_t(c)] == 2 ? 1 : 0; };
+		auto cellPara = [&](int r, int c, double cx, double cy, double width, bool draw) {
+			return para(cells[size_t(r)][size_t(c)], r == 0 ? header : f, cx, cy, width, draw, 1.5, r == 0 ? f.size * 0.9 : f.size, r == 0 ? 600 : f.weight, alignOf(c));
 		};
 		std::vector<double> natural(static_cast<size_t>(columns));
 		for (int c = 0; c < columns; c++) {
 			double widest = f.size * 2 + pads(c);
 			for (int r = 0; r < rows; r++) {
-				const double width = std::ceil(cellPara(r, c, 1e5).intrinsic) + 1;
+				const double width = std::ceil(cellPara(r, c, 0, 0, 1e5, false).intrinsic) + 1;
 				widest = std::max(widest, std::min(width, std::max(f.size * 16, w * 0.66)) + pads(c));
 			}
 			natural[size_t(c)] = widest;
@@ -273,14 +449,39 @@ private:
 		for (double v : widths) sum += v;
 		const double content = std::max(w, sum);
 		const bool scrolls = content > w + 0.5;
+		std::vector<CardOp>* outer = ops_;
+		std::vector<CardOp> own;
+		if (scrolls && ops_) ops_ = &own;
+		const double top = y;
 		for (int r = 0; r < rows; r++) {
 			double tallest = 0;
-			for (int c = 0; c < columns; c++) tallest = std::max(tallest, cellPara(r, c, widths[size_t(c)] - pads(c)).height);
+			for (int c = 0; c < columns; c++) tallest = std::max(tallest, cellPara(r, c, 0, 0, widths[size_t(c)] - pads(c), false).height);
+			double cx = x;
+			for (int c = 0; c < columns; c++) {
+				cellPara(r, c, cx + left(c), y + padY, widths[size_t(c)] - pads(c), true);
+				cx += widths[size_t(c)];
+			}
 			y += tallest + padY * 2;
+			// A line under the header and a hairline between rows; none after the last.
+			if (r < rows - 1) box(x, y - 0.5, content, 1, r == 0 ? palette_.strong : palette_.line);
 		}
-		if (scrolls) y += f.size * 0.6;
+		if (scrolls) {
+			ops_ = outer;
+			const double bar = f.size * 0.6;
+			if (ops_) {
+				CardOp op;
+				op.kind = CardOp::SCROLL;
+				op.index = scrollers_++;
+				op.x = x, op.y = top, op.w = w, op.h = y - top + bar;
+				op.content = content;
+				op.ops = std::move(own);
+				ops_->push_back(std::move(op));
+			}
+			y += bar;
+		}
 		return y;
 	}
+	int scrollers_ = 0;
 };
 
 }  // namespace
@@ -288,7 +489,16 @@ private:
 // A card's height: `count` numbers at `nums`, strings in `pool`, laid out `width` wide.
 double cardHeight(const double* nums, size_t count, const char* pool, double width) {
 	Card card(nums, count, pool);
-	return card.height(width);
+	return card.layout(width);
+}
+
+double cardOps(const double* nums, size_t count, const char* pool, double width, std::vector<CardOp>& ops, CardPalette& palette, bool& ok) {
+	Card card(nums, count, pool);
+	ops.clear();
+	const double height = card.layout(width, &ops);
+	palette = card.palette();
+	ok = card.ok();
+	return height;
 }
 
 extern "C" {

@@ -45,7 +45,7 @@ export const CARD_PALETTE = {
 	dark: { paper: "#242424", fg: "#fafafa", muted: "#aeaeae", faint: "#808080", line: "#ffffff1f", strong: "#ffffff3d", subtle: "#2e2e2e", code: "#ffffff14", accent: "#6f8bff", box: "#242424" },
 } as const;
 /** A callout's colour, by the colour Obsidian gives its type (`CALLOUTS`). */
-const ALERTS: Record<Alert, { light: string; dark: string }> = {
+export const ALERTS: Record<Alert, { light: string; dark: string }> = {
 	blue: { light: "#3b5cf6", dark: "#6f8bff" },
 	cyan: { light: "#0e8a9e", dark: "#3cc3d6" },
 	green: { light: "#2a9d52", dark: "#4cc97a" },
@@ -55,7 +55,7 @@ const ALERTS: Record<Alert, { light: string; dark: string }> = {
 	gray: { light: "#6b6b6b", dark: "#a0a0a0" },
 };
 /** Coloured words, `[words]{.red}`, readable on the card's paper in either scheme. */
-const INK: Record<Colour, { light: string; dark: string }> = {
+export const INK: Record<Colour, { light: string; dark: string }> = {
 	red: { light: "#d92e3c", dark: "#f06a74" },
 	orange: { light: "#c2410c", dark: "#fb923c" },
 	yellow: { light: "#a16207", dark: "#facc15" },
@@ -64,7 +64,7 @@ const INK: Record<Colour, { light: string; dark: string }> = {
 	purple: { light: "#7c3aed", dark: "#c084fc" },
 };
 /** Highlights behind words, Obsidian's six and its own (the yellow). */
-const MARK: Record<Colour | "default", { light: string; dark: string }> = {
+export const MARK: Record<Colour | "default", { light: string; dark: string }> = {
 	default: { light: "#facc1573", dark: "#facc1547" },
 	yellow: { light: "#facc1573", dark: "#facc1547" },
 	red: { light: "#f8717159", dark: "#f871714d" },
@@ -74,7 +74,7 @@ const MARK: Record<Colour | "default", { light: string; dark: string }> = {
 	purple: { light: "#c084fc59", dark: "#c084fc4d" },
 };
 /** An agent's suggestion: what it adds in its blue, what it takes out struck through in red. */
-const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0262d" }, dark: { added: "#7aa2ff", addedBg: "#7aa2ff26", removed: "#f06a74" } };
+export const SUGGEST = { light: { added: "#2563eb", addedBg: "#2563eb1f", removed: "#c0262d" }, dark: { added: "#7aa2ff", addedBg: "#7aa2ff26", removed: "#f06a74" } };
 const HEADING_SIZE = [1.6, 1.3, 1.12, 1, 0.9, 0.85];
 
 /**

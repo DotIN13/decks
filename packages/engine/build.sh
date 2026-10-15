@@ -22,13 +22,23 @@ ls -la wasm
 # FreeType, whose install fails on this disk, and HarfBuzz reads fonts without it.
 HB="${HARFBUZZ:-/mnt/data/decks-data/tools/harfbuzz-10.1.0}"
 if [ ! -f "$HB/harfbuzz.o" ]; then em++ -std=c++17 -O2 -DHB_NO_MT -fno-exceptions -fno-rtti -c "$HB/src/harfbuzz.cc" -o "$HB/harfbuzz.o"; fi
-em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp cpp/paint.cpp cpp/raster.cpp "$HB/harfbuzz.o" -I"$HB/src" -std=c++20 -O3 \
+# FreeType, likewise built once from its own source, with only the modules the engine draws glyphs with
+# (TrueType, CFF, the auto-hinter, the smooth rasteriser): see the commands below the scene's.
+FT="${FREETYPE:-/mnt/data/decks-data/tools/freetype-2.14.3}"
+if [ ! -f "$FT/libfreetype.a" ]; then
+	mkdir -p "$FT/obj"
+	for src in src/base/ftsystem.c src/base/ftinit.c src/base/ftdebug.c src/base/ftbase.c src/base/ftbitmap.c src/base/ftmm.c src/autofit/autofit.c src/truetype/truetype.c src/cff/cff.c src/psaux/psaux.c src/pshinter/pshinter.c src/psnames/psnames.c src/sfnt/sfnt.c src/smooth/smooth.c src/gzip/ftgzip.c; do
+		emcc -O2 -DFT2_BUILD_LIBRARY '-DFT_CONFIG_MODULES_H="ftmodule-decks.h"' -I "$PWD/cpp" -I "$FT/include" -c "$FT/$src" -o "$FT/obj/$(basename "$src" .c).o"
+	done
+	emar rcs "$FT/libfreetype.a" "$FT"/obj/*.o
+fi
+em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp cpp/paint.cpp cpp/raster.cpp "$HB/harfbuzz.o" "$FT/libfreetype.a" -I"$HB/src" -I"$FT/include" -std=c++20 -O3 \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \
-	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_bytes,_scene_text,_scene_card,_text_card,_paint_init,_paint_record,_paint_flags,_paint_scheme,_paint_tile,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results,_pick_io,_pick_add,_pick_remove,_pick_set,_pick_geometry,_pick_point,_pick_within,_pick_found,_snap_in,_snap_out,_snap_move,_snap_edges,_text_scratch,_text_answer,_text_lines,_text_font,_text_measure,_text_face_metrics \
+	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_bytes,_scene_text,_scene_card,_text_card,_paint_init,_paint_record,_paint_flags,_paint_scheme,_paint_ops,_paint_overlay,_paint_why,_paint_scroll,_paint_tile,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results,_pick_io,_pick_add,_pick_remove,_pick_set,_pick_geometry,_pick_point,_pick_within,_pick_found,_snap_in,_snap_out,_snap_move,_snap_edges,_text_scratch,_text_answer,_text_lines,_text_font,_text_measure,_text_face_metrics \
 	-sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 \
-	-sEXPORTED_RUNTIME_METHODS=HEAPF64,HEAP32,HEAPU8,GL \
+	-sEXPORTED_RUNTIME_METHODS=HEAPF64,HEAP32,HEAPU8,GL,UTF8ToString \
 	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
 	-o wasm/scene.mjs
 ls -la wasm/scene.*

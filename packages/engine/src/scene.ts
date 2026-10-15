@@ -44,7 +44,12 @@ interface SceneModule {
 	GL: { registerContext(context: unknown, attributes: Record<string, unknown>): number; makeContextCurrent(handle: number): boolean };
 	_paint_init(): void;
 	_paint_record(handle: number, at: number, count: number): void;
-	_paint_flags(handle: number, skip: number, hole: number): void;
+	_paint_flags(handle: number, skip: number, hole: number, mute: number): void;
+	_paint_scroll(handle: number, index: number, offset: number): void;
+	_paint_ops(handle: number, at: number, count: number): void;
+	_paint_overlay(at: number, count: number): void;
+	_paint_why(): number;
+	UTF8ToString(at: number): string;
 	_paint_scheme(dark: number): void;
 	_paint_tile(x: number, y: number, size: number, pixels: number): number;
 	_scene_layout(): number;
@@ -70,10 +75,14 @@ export interface SceneLayout {
 			card?: (text: string, style: TextStyle, node: PenNode) => { numbers: Float64Array; pool: Uint8Array };
 			/** An item's paint record (`paint-wire.ts` in the app), for the painter (`painter`). */
 			paint?: (node: PenNode, theme: ThemeState) => number[];
+			/** What else an item draws, as drawing ops, once its box is known (`opsOf` in the app). */
+			ops?: (node: PenNode, theme: ThemeState, box: { x: number; y: number; w: number; h: number }) => number[] | undefined;
 		},
 	): Map<string, Placed>;
 	/** A font file for the scene's own measuring, as the page's font provider gets it. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
+	/** How big the engine's memory has grown, in bytes (it never shrinks). */
+	heapBytes(): number;
 	/**
 	 * The C++ painter (`cpp/paint.cpp`), drawing into a WebGL 2 canvas of its own: the items the last
 	 * layout placed, with the paint records `paint` gave. Undefined when the canvas has no WebGL 2.
@@ -89,7 +98,12 @@ export interface Painter {
 	 * when something there is beyond the painter yet, and the caller paints it some other way.
 	 * `skip`: items carried on a picture of their own; `holes`: items shown live under the drawing.
 	 */
-	tile(x: number, y: number, size: number, pixels: number, options: { dark: boolean; skip?: ReadonlySet<string>; holes?: ReadonlySet<string> }): boolean;
+	/** `mute`: items whose words are not drawn, while someone types over them. */
+	/** Why the last tile was not drawn, in words. */
+	why?: string;
+	/** `scrolls`: how far each card's wide tables are scrolled, by `id:index`. */
+	/** `overlay`: drawing ops in stage pixels over everything, the ink still under the pen (`inkOps` in the app). */
+	tile(x: number, y: number, size: number, pixels: number, options: { dark: boolean; skip?: ReadonlySet<string>; holes?: ReadonlySet<string>; mute?: ReadonlySet<string>; scrolls?: ReadonlyMap<string, number>; overlay?: readonly number[] }): boolean;
 }
 
 /** What the page last told the scene about one item. */
@@ -99,6 +113,7 @@ interface Known {
 	words: string;
 	children: number[];
 	paint?: string;
+	ops?: string;
 }
 
 const inNode = typeof (globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node === "string" && typeof (globalThis as { window?: unknown }).window === "undefined";
@@ -114,7 +129,7 @@ export async function loadScene(): Promise<SceneLayout> {
 	const module = (await createSceneModule(options)) as unknown as SceneModule;
 	const known = new Map<string, Known>();
 	let roots: number[] = [];
-	let items: Array<{ node: PenNode; theme: ThemeState; style: TextStyle | undefined; content: string; parent: string | undefined }> = [];
+	let items: Array<{ node: PenNode; theme: ThemeState; style: TextStyle | undefined; content: string; parent: string | undefined; entry: Known }> = [];
 	let lastMeasure: MeasureText | undefined;
 	let lastKey: string | undefined;
 	const last = { sent: 0, measured: 0, held: 0 };
@@ -134,6 +149,7 @@ export async function loadScene(): Promise<SceneLayout> {
 	return {
 		last,
 		font: (bytes, family) => text.font(bytes, family),
+		heapBytes: () => module.HEAPU8.length,
 		painter(canvas) {
 			const gl = (canvas as OffscreenCanvas).getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
 			if (!gl) return undefined;
@@ -142,23 +158,41 @@ export async function loadScene(): Promise<SceneLayout> {
 			module._paint_init();
 			let flagged: number[] = [];
 			return {
-				tile(x, y, size, pixels, { dark, skip, holes }) {
+				tile(x, y, size, pixels, { dark, skip, holes, mute, scrolls, overlay }) {
 					module.GL.makeContextCurrent(handle);
+					const ink = overlay ?? [];
+					const inkAt = module._scene_input(Math.max(1, ink.length));
+					module.HEAPF64.set(ink, inkAt >> 3);
+					module._paint_overlay(inkAt, ink.length);
 					module._paint_scheme(dark ? 1 : 0);
-					for (const h of flagged) module._paint_flags(h, 0, 0);
+					module._paint_scroll(-1, 0, 0);
+					for (const [key, offset] of scrolls ?? []) {
+						const cut = key.lastIndexOf(":");
+						const entry = known.get(key.slice(0, cut));
+						if (entry && offset) module._paint_scroll(entry.handle, Number(key.slice(cut + 1)), offset);
+					}
+					for (const h of flagged) module._paint_flags(h, 0, 0, 0);
 					flagged = [];
-					for (const [set, which] of [[skip, 0], [holes, 1]] as const)
+					const flags = new Map<number, [number, number, number]>();
+					for (const [set, which] of [[skip, 0], [holes, 1], [mute, 2]] as const)
 						for (const id of set ?? []) {
 							const entry = known.get(id);
 							if (!entry) continue;
-							module._paint_flags(entry.handle, which === 0 ? 1 : 0, which === 1 ? 1 : 0);
-							flagged.push(entry.handle);
+							const f = flags.get(entry.handle) ?? [0, 0, 0];
+							f[which] = 1;
+							flags.set(entry.handle, f);
 						}
-					return module._paint_tile(x, y, size, pixels) === 1;
+					for (const [h, f] of flags) {
+						module._paint_flags(h, f[0], f[1], f[2]);
+						flagged.push(h);
+					}
+					const drawn = module._paint_tile(x, y, size, pixels) === 1;
+					this.why = drawn ? "" : module.UTF8ToString(module._paint_why());
+					return drawn;
 				},
 			};
 		},
-		layout(doc, nodes, { theme, measure, measureKey, chain, card, paint }) {
+		layout(doc, nodes, { theme, measure, measureKey, chain, card, paint, ops }) {
 			const measureText = measure ?? estimateText;
 			if (measureText !== lastMeasure || measureKey !== lastKey) {
 				module._scene_fonts();
@@ -182,7 +216,7 @@ export async function loadScene(): Promise<SceneLayout> {
 				const texty = node.type === "text" || NOTE_LIKE.has(node.type);
 				const style = texty ? textStyleOf(doc, node, t) : undefined;
 				const content = texty ? String(resolve(doc, node.content, t) ?? "") : "";
-				items[entry.handle] = { node, theme: t, style, content, parent: parentId };
+				items[entry.handle] = { node, theme: t, style, content, parent: parentId, entry };
 				recordOf(record, doc, node, t, groupTheme);
 				if (!sameRecord(record, entry.record)) {
 					module.HEAPF64.set(record, module._scene_input(FIELDS.length) >> 3);
@@ -252,6 +286,17 @@ export async function loadScene(): Promise<SceneLayout> {
 			for (let i = 0; i < count; i++) {
 				const item = items[out[i * 7]!]!;
 				placed.set(item.node.id, { node: item.node, box: { x: out[i * 7 + 1]!, y: out[i * 7 + 2]!, w: out[i * 7 + 3]!, h: out[i * 7 + 4]! }, parent: item.parent, theme: item.theme, order: out[i * 7 + 6]! });
+				if (ops) {
+					const numbers = ops(item.node, item.theme, { x: out[i * 7 + 1]!, y: out[i * 7 + 2]!, w: out[i * 7 + 3]!, h: out[i * 7 + 4]! }) ?? [];
+					const key = numbers.join(",");
+					const entry = item.entry;
+					if (entry && key !== entry.ops) {
+						const at = module._scene_input(Math.max(1, numbers.length));
+						module.HEAPF64.set(numbers, at >> 3);
+						module._paint_ops(entry.handle, at, numbers.length);
+						entry.ops = key;
+					}
+				}
 			}
 			last.sent = sent;
 			last.measured = measured;

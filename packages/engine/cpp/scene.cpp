@@ -478,6 +478,16 @@ int sceneChildren(int handle, const int** out) {
 	if (out) *out = nodes[size_t(handle)].children.data();
 	return int(nodes[size_t(handle)].children.size());
 }
+// An item's card as the page encoded it (`scene_card`), for the painter to draw; false when it has none.
+bool sceneCard(int handle, const double** nums, size_t* count, const char** pool) {
+	if (handle < 0 || size_t(handle) >= nodes.size() || !nodes[size_t(handle)].ownCard) return false;
+	const Node& n = nodes[size_t(handle)];
+	*nums = n.card.data();
+	*count = n.card.size();
+	*pool = n.cardPool.data();
+	return true;
+}
+
 PaintBox sceneBox(int handle) {
 	if (handle < 0 || size_t(handle) >= placements.size()) return {0, 0, 0, 0, false};
 	const Placement& p = placements[size_t(handle)];
