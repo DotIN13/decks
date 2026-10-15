@@ -16,3 +16,14 @@ em++ cpp/engine.cpp -std=c++20 -O3 -flto \
 	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
 	-o wasm/engine.mjs
 ls -la wasm
+
+# The scene: the drawing's model and layout, with no GPU, for the page, a worker and the server.
+em++ cpp/scene.cpp -std=c++20 -O3 -flto \
+	--js-library cpp/scene-library.js \
+	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
+	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \
+	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_node,_scene_layout,_scene_results \
+	-sEXPORTED_RUNTIME_METHODS=HEAPF64 \
+	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
+	-o wasm/scene.mjs
+ls -la wasm/scene.*

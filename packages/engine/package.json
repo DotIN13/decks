@@ -4,12 +4,16 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./scene": "./src/scene.ts"
 	},
 	"scripts": {
 		"build:wasm": "bash build.sh",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test:browser": "node test/run.mjs"
+	},
+	"dependencies": {
+		"@decks/pen": "*"
 	},
 	"devDependencies": {
 		"tsx": "^4.20.7",

@@ -1,6 +1,7 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
+import type { SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
 import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
@@ -183,6 +184,18 @@ export type SceneOutput =
 	| { type: "tiles-clear" }
 	/** In tile mode: every tile in view at `level` has been sent, so the page can swap to that level whole. */
 	| { type: "tiles-done"; level: number };
+
+/** The C++ layout, once loaded: only with the engine on, so the sheet never fetches it. */
+let cppLayout: SceneLayout | undefined;
+let cppLoading = false;
+function loadCppLayout(): void {
+	if (cppLoading) return;
+	cppLoading = true;
+	import("@decks/engine/scene")
+		.then(({ loadScene }) => loadScene())
+		.then((scene) => (cppLayout = scene))
+		.catch((error: unknown) => console.error(`stage scene: the C++ layout did not load (${String((error as Error)?.message ?? error)}); TypeScript lays out instead`));
+}
 
 /** What the scene needs of where it runs. */
 export interface SceneHost {
@@ -446,7 +459,7 @@ export class StageScene {
 			if (entry.decoding !== undefined) decoding++;
 		}
 		const heap = (this.ck as unknown as { HEAPU8?: Uint8Array } | undefined)?.HEAPU8?.buffer.byteLength;
-		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, error: this.lastError };
+		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, error: this.lastError };
 		this.drawnSince = 0;
 		return out;
 	}
@@ -540,6 +553,7 @@ export class StageScene {
 				if (message.on === this.tiles) return;
 				this.tiles = message.on;
 				this.tileDrawn.clear();
+				if (message.on) loadCppLayout();
 				break;
 			case "tile-gone":
 				this.tileDrawn.delete(message.key);
@@ -755,6 +769,22 @@ export class StageScene {
 		surface.flush();
 		return await this.host.snapshot(element);
 	}
+
+	/**
+	 * Where every item is: with the engine on, the C++ scene works it out (`@decks/engine/scene`), the
+	 * first of the drawing's work to move into the engine; until it has loaded, and with the engine
+	 * off, the TypeScript it was ported from. The two agree on every saved stage (`layout-diff.mjs`).
+	 */
+	private layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure: MeasureText }): Map<string, Placed> {
+		if (this.tiles && cppLayout) {
+			this.layoutBy = "c++";
+			return cppLayout.layout(doc, nodes, options);
+		}
+		this.layoutBy = "typescript";
+		return layout(doc, nodes, options);
+	}
+	/** Which layout drew the last frame, for the diagnostics. */
+	private layoutBy: "c++" | "typescript" = "typescript";
 
 	/** The page hears that the tiles show everything it has sent so far, as a frame with no sheet. */
 	private sayTilesDrawn(): void {
@@ -1665,7 +1695,7 @@ export class StageScene {
 		for (const node of walk(doc.children)) if (isArrow(node)) arrows.push(node.id);
 		if (arrows.length > 0) {
 			const { doc: copy } = this.copyAlong(doc, arrows);
-			if (reroute(copy, layout(copy, expand(copy), { theme, measure: fonts.measure }), (path) => this.boardFrames.get(path))) doc = copy;
+			if (reroute(copy, this.layout(copy, expand(copy), { theme, measure: fonts.measure }), (path) => this.boardFrames.get(path))) doc = copy;
 		}
 		const nodes = expand(doc);
 		/*
@@ -1679,7 +1709,7 @@ export class StageScene {
 				// A font landed after this picture was drawn without it: lay out and draw again.
 				if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
 			});
-		const placed = layout(doc, nodes, { theme, measure: fonts.measure });
+		const placed = this.layout(doc, nodes, { theme, measure: fonts.measure });
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
 		this.painted = { nodes, doc, placed, source };
