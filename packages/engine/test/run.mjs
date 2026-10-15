@@ -103,6 +103,20 @@ for (const prefer of ["webgpu", "webgl2"]) {
 	say(`${prefer}: and a frame with no change draws nothing`, moved.second[0] === -1 && moved.second[1] === -1, JSON.stringify(moved.second));
 	const [moved1, moved2] = await read(0, [[10, 70], [30, 70]]);
 	say(`${prefer}: the red square moved left by the camera's 100 px`, near(moved1, [255, 0, 0, 255]) && moved2[3] === 0, `${moved1} / ${moved2}`);
+	// Two crisp pictures meeting at a fractional pixel, as drawing tiles do: no seam between them,
+	// and the shared edge lands on a whole pixel.
+	await page.evaluate(async () => {
+		const e = window.t.engine;
+		e.camera(400, 250, 1);
+		await window.t.picture("t1", 64, 64, 0, 1);
+		e.set("ta", { layer: 1, order: 5, x: 600.3, y: 380, w: 50.3, h: 50, texture: "t1", crisp: true });
+		e.set("tb", { layer: 1, order: 5, x: 650.6, y: 380, w: 50.3, h: 50, texture: "t1", crisp: true });
+		e.render(true);
+		await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+	});
+	const seam = await read(1, [[649, 400], [650, 400], [651, 400], [600, 400], [701, 400]]);
+	say(`${prefer}: crisp tiles meet with no seam`, seam.slice(0, 3).every((p) => p[3] === 255), seam.map((p) => p.join(",")).join(" / "));
+	say(`${prefer}: and their outer edges land on whole pixels`, seam[3][3] === 255 && seam[4][3] === 0, `${seam[3]} / ${seam[4]}`);
 	say(`${prefer}: no page errors`, errors.length === 0, errors.join(" | ").slice(0, 300));
 
 	// Memory: a 1600 x 1000 window at 2x with 300 board pictures from 40 textures of 960 x 540.

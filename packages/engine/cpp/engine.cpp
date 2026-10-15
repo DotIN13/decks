@@ -385,7 +385,9 @@ void main() {
 )";
 
 const char* GLSL_FS = R"(#version 300 es
-precision mediump float;
+// highp: at medium precision a phone or a Mac GPU may keep texture places to 1/2048, a quarter of a
+// tile's pixel, which softens what should land texel for pixel.
+precision highp float;
 in vec2 vUv; in vec4 vColour; in vec2 vLocal; in vec2 vHalf; in vec4 vStyle;
 uniform sampler2D tex;
 uniform float textured;
