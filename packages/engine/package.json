@@ -1,0 +1,19 @@
+{
+	"name": "@decks/engine",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build:wasm": "bash build.sh",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test:browser": "node test/run.mjs"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3",
+		"@webgpu/types": "^0.1.66"
+	}
+}
