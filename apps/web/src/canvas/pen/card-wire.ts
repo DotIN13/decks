@@ -21,8 +21,8 @@ export interface CardEnv {
 	chain(family: string): readonly string[];
 	mono: string;
 	scheme: "light" | "dark";
-	/** A picture's size once it has arrived, as the card is drawn with it. */
-	image?(url: string): { width(): number; height(): number } | undefined;
+	/** A picture's size once it has arrived, as the card is drawn with it, and its id with the painter. */
+	image?(url: string): { width(): number; height(): number; id?: number } | undefined;
 }
 
 const SIZE_SCALE = { small: 0.85, large: 1.25, huge: 1.6 } as const;
@@ -92,6 +92,7 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv, align =
 				const has = !!image && image.width() > 0;
 				numbers.push(3, has ? 1 : 0, has ? image!.width() : 0, has ? image!.height() : 0, block.width ?? NaN);
 				ref(`🖼 ${block.alt || block.url}`);
+				numbers.push(has && image!.id !== undefined ? image!.id : -1);
 				return;
 			}
 			case "embed":

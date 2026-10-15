@@ -286,15 +286,23 @@ private:
 				const auto list = runs(int(next()));
 				return y + para(list, f, x, y, w, true).height;
 			}
-			case 3: {  // image: [has picture, its width, its height, the width asked for or NaN, words]
+			case 3: {  // image: [has picture, its width, its height, the width asked for or NaN, words, picture id or -1]
 				const bool has = next() != 0;
 				const double iw0 = next(), ih0 = next(), asked = next();
 				const Ref text = ref();
+				const int image = int(next());
 				if (has && iw0 > 0) {
-					// The picture itself the painter does not have.
-					ok_ = false;
 					const double iw = std::min(w, std::isnan(asked) ? iw0 : asked);
-					return y + iw * ih0 / iw0;
+					const double ih = iw * ih0 / iw0;
+					if (image < 0) ok_ = false;
+					else if (ops_) {
+						CardOp op;
+						op.kind = CardOp::IMAGE;
+						op.x = x, op.y = y, op.w = iw, op.h = ih;
+						op.image = image;
+						ops_->push_back(std::move(op));
+					}
+					return y + ih;
 				}
 				const double h = f.size * 3;
 				box(x, y, w, h, palette_.subtle, 8);

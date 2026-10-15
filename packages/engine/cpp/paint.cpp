@@ -45,10 +45,21 @@ namespace {
 // --- what the page sends for an item ---------------------------------------------------------------
 
 struct Rgba { float r, g, b, a; };
+// A gradient fill, as `gradientShader` places it in an item's box: linear (0), radial (1) or sweep (2),
+// its centre and size as fractions of the box, its turn in degrees, and its stops. kind -1 is none.
+struct Grad {
+	int kind = -1;  // 3: a picture
+	int image = -1, mode = 0;  // a picture's texture (`paint_image`), and how it fills the box: cover, fit, stretch
+	bool nearest = false;      // sampled at the nearest pixel, as CanvasKit's `drawImageRect` samples a card's picture
+	double cx = 0.5, cy = 0.5, sw = 1, sh = 1, rotation = 0;
+	std::vector<Rgba> colors;
+	std::vector<float> at;
+};
 struct Shadow { Rgba color; double blur, dx, dy; };
 struct Stroke {
 	bool on = false;
 	Rgba color{0, 0, 0, 0};
+	Grad grad;
 	double widths[4] = {0, 0, 0, 0};  // top, right, bottom, left
 	int align = 1;                    // 0 inside, 1 centred, 2 outside
 };
@@ -80,6 +91,7 @@ struct Record {
 	bool clip = false;
 	double radii[4] = {0, 0, 0, 0};  // top-left, top-right, bottom-right, bottom-left
 	std::vector<Rgba> fills;
+	std::vector<Grad> fillGrads;  // beside each fill: its gradient, or none
 	Stroke stroke;
 	std::vector<Shadow> shadows;
 	// A card's paper (a frame marked a card with no fill, or a sound) and a note card: the app's two
@@ -149,6 +161,15 @@ uniform vec4 uClipRadii[4];
 uniform float uClipLevel[4];
 uniform int uClipKind[4];      // 0 a rounded rectangle, 1 an ellipse
 uniform sampler2D uMask;       // mode 7: a coverage mask over the shape's box, in tile pixels
+uniform int uPaintKind;        // 0 the colour; 1 linear, 2 radial, 3 sweep gradient; 4 a picture
+uniform sampler2D uImage;      // kind 4: the picture, premultiplied
+uniform mat3 uImageMatrix;     // kind 4: the item's space to the picture's (0 to 1 across it)
+uniform int uImageDecal;       // kind 4: transparent outside the picture, rather than its edge repeated
+uniform mat3 uPaintMatrix;     // tile pixels to the item's space
+uniform vec4 uGrad;            // linear: its two ends; radial: centre, radius, height over width; sweep: centre
+uniform vec4 uStopColor[16];
+uniform float uStopAt[16];
+uniform int uStopCount;
 out vec4 outColor;
 
 float sdRoundBox(vec2 p, vec2 halfSize, vec4 r) {
@@ -200,6 +221,54 @@ float roundedBoxShadow(vec2 p, vec2 halfSize, float sigma, float corner) {
 	return value;
 }
 
+// The paint at this pixel: the colour, or a gradient's, interpolated between its stops unpremultiplied
+// and clamped at its ends, as Skia's gradients are.
+vec4 paintAt() {
+	if (uPaintKind == 0) return uColor;
+	vec2 q = (uPaintMatrix * vec3(gl_FragCoord.x, gl_FragCoord.y, 1.0)).xy;
+	if (uPaintKind == 4) {
+		vec2 uv = (uImageMatrix * vec3(q, 1.0)).xy;
+		vec4 p = texture(uImage, uv);
+		vec4 straight = p.a > 0.0 ? vec4(p.rgb / p.a, p.a) : vec4(0.0);
+		if (uImageDecal == 1) {
+			// Transparent past the edge, with the edge filtered against it as Skia's decal mode filters it:
+			// half a texel either side of the edge fades to nothing. Skia fades an opaque picture's colour
+			// as well as its alpha there, so its edge darkens as it fades; so does this.
+			vec2 size = vec2(textureSize(uImage, 0));
+			vec2 inside = clamp(uv * size + 0.5, 0.0, 1.0) * clamp((1.0 - uv) * size + 0.5, 0.0, 1.0);
+			float f = inside.x * inside.y;
+			straight = vec4(straight.rgb * f, straight.a * f);
+		}
+		return vec4(straight.rgb, straight.a * uColor.a);
+	}
+	float t;
+	if (uPaintKind == 1) {
+		vec2 d = uGrad.zw - uGrad.xy;
+		t = dot(q - uGrad.xy, d) / dot(d, d);
+	} else if (uPaintKind == 2) {
+		vec2 v = vec2(q.x - uGrad.x, (q.y - uGrad.y) / uGrad.w);
+		t = length(v) / uGrad.z;
+	} else {
+		vec2 v = q - uGrad.xy;
+		t = atan(v.y, v.x) / 6.28318530718;
+		if (t < 0.0) t += 1.0;
+	}
+	t = clamp(t, 0.0, 1.0);
+	vec4 c = uStopColor[0];
+	if (t > uStopAt[0]) {
+		for (int i = 1; i < 16; i++) {
+			if (i >= uStopCount) break;
+			if (t <= uStopAt[i]) {
+				float span = uStopAt[i] - uStopAt[i - 1];
+				c = mix(uStopColor[i - 1], uStopColor[i], span > 0.0 ? (t - uStopAt[i - 1]) / span : 1.0);
+				break;
+			}
+			c = uStopColor[i];
+		}
+	}
+	return vec4(c.rgb, c.a * uColor.a);
+}
+
 void main() {
 	vec2 centre = uShapeRect.xy + uShapeRect.zw * 0.5;
 	vec2 p = vLocal - centre;
@@ -234,8 +303,9 @@ void main() {
 		vec2 qc = q.xy - (r.xy + r.zw * 0.5);
 		c *= cover((uClipKind[i] == 1 ? sdEllipse(qc, r.zw * 0.5) : sdRoundBox(qc, r.zw * 0.5, uClipRadii[i])) * uClipLevel[i]);
 	}
-	float a = uColor.a * c;
-	outColor = vec4(uColor.rgb * a, a);
+	vec4 col = paintAt();
+	float a = col.a * c;
+	outColor = vec4(col.rgb * a, a);
 }
 )";
 
@@ -310,6 +380,20 @@ struct Painter {
 	std::vector<GLuint> layerTextures;
 };
 Painter painter;
+// Pictures handed over by the page (`paint_image`): a texture the page made in this context, and its size.
+struct Picture { GLuint texture; int w, h; };
+std::unordered_map<int, Picture> pictures;
+// The gradient the next draws are filled with, and the box it is placed in (`Using`).
+const Grad* activeGrad = nullptr;
+double activeBox[4] = {0, 0, 0, 0};
+struct Using {
+	Using(const Grad& g, const double box[4]) {
+		if (g.kind < 0) return;
+		activeGrad = &g;
+		for (int i = 0; i < 4; i++) activeBox[i] = box[i];
+	}
+	~Using() { activeGrad = nullptr; }
+};
 // Why the last tile was refused, for tallying what the painter still lacks (`paint_why`).
 const char* whyNot = "";
 void refuse(const char* why) {
@@ -344,6 +428,52 @@ void setUniforms(const Affine& m, const double rect[4], const double shape[4], c
 		glUniform1i(glGetUniformLocation(program, ("uClipKind[" + at + "]").c_str()), clip.kind);
 	}
 	if (painter.clips.size() > 4) refuse("more than four clips");
+	// The paint: the colour, or the gradient placed in its box as `gradientShader` places it.
+	if (!activeGrad) glUniform1i(glGetUniformLocation(program, "uPaintKind"), 0);
+	else {
+		const Grad& g = *activeGrad;
+		const double bx = activeBox[0], by = activeBox[1], bw = activeBox[2], bh = activeBox[3];
+		const double cx = bx + bw * g.cx, cy = by + bh * g.cy, sw = bw * g.sw, sh = bh * g.sh;
+		glUniform1i(glGetUniformLocation(program, "uPaintKind"), g.kind + 1);
+		if (g.kind == 3) {
+			// A picture placed as `fillPaint` places one: covering the box, fitted inside it, or stretched to it,
+			// centred. Card pictures are drawn into a box of their own size (`mode` stretch, sampled nearest).
+			const auto found = pictures.find(g.image);
+			const Picture pic = found != pictures.end() ? found->second : Picture{0, 1, 1};
+			const double sx0 = bw / pic.w, sy0 = bh / pic.h;
+			const double cover = std::max(sx0, sy0), contain = std::min(sx0, sy0);
+			const double sx = g.mode == 2 ? sx0 : g.mode == 1 ? contain : cover, sy = g.mode == 2 ? sy0 : g.mode == 1 ? contain : cover;
+			const double tx = bx + (bw - pic.w * sx) / 2, ty = by + (bh - pic.h * sy) / 2;
+			// Item to picture: (x - tx) / sx pixels, over its width.
+			const float im[9] = {float(1 / (sx * pic.w)), 0, 0, 0, float(1 / (sy * pic.h)), 0, float(-tx / (sx * pic.w)), float(-ty / (sy * pic.h)), 1};
+			glUniformMatrix3fv(glGetUniformLocation(program, "uImageMatrix"), 1, GL_FALSE, im);
+			glUniform1i(glGetUniformLocation(program, "uImageDecal"), g.mode == 1 ? 1 : 0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, pic.texture);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, g.nearest ? GL_NEAREST : GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, g.nearest ? GL_NEAREST : GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glUniform1i(glGetUniformLocation(program, "uImage"), 1);
+			glActiveTexture(GL_TEXTURE0);
+		} else if (g.kind == 0) {
+			// 0 degrees points up, angles run counter-clockwise; the length is the size's height.
+			const double rad = g.rotation * M_PI / 180, dx = -std::sin(rad), dy = -std::cos(rad), half = sh / 2;
+			glUniform4f(glGetUniformLocation(program, "uGrad"), float(cx - dx * half), float(cy - dy * half), float(cx + dx * half), float(cy + dy * half));
+		} else if (g.kind == 1) {
+			glUniform4f(glGetUniformLocation(program, "uGrad"), float(cx), float(cy), float(std::max(1.0, sw / 2)), float(sh / std::max(1.0, sw)));
+		} else glUniform4f(glGetUniformLocation(program, "uGrad"), float(cx), float(cy), 0, 0);
+		Affine flip{1, 0, 0, -1, 0, double(tileH)};
+		const Affine toItem = flip.then(painter.m.inverse());
+		const float pm[9] = {float(toItem.a), float(toItem.b), 0, float(toItem.c), float(toItem.d), 0, float(toItem.e), float(toItem.f), 1};
+		glUniformMatrix3fv(glGetUniformLocation(program, "uPaintMatrix"), 1, GL_FALSE, pm);
+		const int n = std::min<int>(16, int(g.colors.size()));
+		std::vector<float> cols, ats;
+		for (int i = 0; i < n; i++) cols.insert(cols.end(), {g.colors[size_t(i)].r, g.colors[size_t(i)].g, g.colors[size_t(i)].b, g.colors[size_t(i)].a}), ats.push_back(g.at[size_t(i)]);
+		glUniform4fv(glGetUniformLocation(program, "uStopColor"), n, cols.data());
+		glUniform1fv(glGetUniformLocation(program, "uStopAt"), n, ats.data());
+		glUniform1i(glGetUniformLocation(program, "uStopCount"), n);
+	}
 }
 
 void drawQuad() { glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); }
@@ -628,9 +758,13 @@ void paintPath(const Record& r, const double box[4]) {
 	}
 	if (!r.fills.empty()) {
 		const raster::Mask mask = coverage(fillLines(), evenOdd);
-		for (const Rgba& fill : r.fills) drawMask(mask, fill);
+		for (size_t i = 0; i < r.fills.size(); i++) {
+			Using u(r.fillGrads[i], box);
+			drawMask(mask, r.fills[i]);
+		}
 	}
 	if (!r.stroke.on) return;
+	Using strokePaint(r.stroke.grad, box);
 	const Stroke& s = r.stroke;
 	if (r.arrow) {
 		// An arrow's line is centred, and when dashed only its first subpath is: the heads stay solid.
@@ -1010,6 +1144,19 @@ void paintCardOps(const std::vector<CardOp>& ops, const CardPalette& C, double o
 					tick.lineTo({box[0] + s * 0.75, box[1] + s * 0.33});
 					strokePath(tick, false, s * 0.14, 1, 1, 1, {}, Rgba{1, 1, 1, 1});
 				}
+				break;
+			}
+			case CardOp::IMAGE: {
+				// The picture drawn into its own box, sampled at the nearest pixel (`drawImageRect`'s default).
+				const double box[4] = {ox + op.x, oy + op.y, op.w, op.h};
+				const double none[4] = {0, 0, 0, 0};
+				Grad picture;
+				picture.kind = 3;
+				picture.image = op.image;
+				picture.mode = 2;
+				picture.nearest = true;
+				Using u(picture, box);
+				drawShape(box, none, Rgba{1, 1, 1, 1}, 0);
 				break;
 			}
 			case CardOp::SCROLL: {
@@ -1430,13 +1577,19 @@ void paintNode(int handle) {
 			}
 			for (const Shadow& s : r.shadows) shadowRRect(box, radii, s);
 			if (!r.sound)
-				for (const Rgba& fill : r.fills) drawShape(box, radii, fill, 0);
+				for (size_t i = 0; i < r.fills.size(); i++) {
+					Using u(r.fillGrads[i], box);
+					drawShape(box, radii, r.fills[i], 0);
+				}
 			if (r.clip) {
 				painter.clips.push_back(Clip{painter.m.inverse(), {box[0], box[1], box[2], box[3]}, {radii[0], radii[1], radii[2], radii[3]}, painter.m.scale()});
 				paintChildren(handle);
 				painter.clips.pop_back();
 			} else paintChildren(handle);
-			paintStroke(r, box, radii, false);
+			{
+				Using u(r.stroke.grad, box);
+				paintStroke(r, box, radii, false);
+			}
 			if (r.paper) hairline(box, r.radii[0]);
 			break;
 		}
@@ -1447,8 +1600,14 @@ void paintNode(int handle) {
 				if (s.blur > 0) blurredShape(ovalPath(box), s);
 				else drawShape(box, none, s.color, 6, 0, 1, 0, s.dx, s.dy);
 			}
-			for (const Rgba& fill : r.fills) drawShape(box, none, fill, 2);
-			paintStroke(r, box, none, true);
+			for (size_t i = 0; i < r.fills.size(); i++) {
+				Using u(r.fillGrads[i], box);
+				drawShape(box, none, r.fills[i], 2);
+			}
+			{
+				Using u(r.stroke.grad, box);
+				paintStroke(r, box, none, true);
+			}
 			break;
 		}
 		case K_PATH:
@@ -1459,7 +1618,10 @@ void paintNode(int handle) {
 			const double round[4] = {r12, r12, r12, r12};
 			appShadows(box, round);
 			if (r.fills.empty()) drawShape(box, round, r.paperColor, 0);
-			for (const Rgba& fill : r.fills) drawShape(box, round, fill, 0);
+			for (size_t i = 0; i < r.fills.size(); i++) {
+				Using u(r.fillGrads[i], box);
+				drawShape(box, round, r.fills[i], 0);
+			}
 			hairline(box, 12);
 			if (!muted[size_t(handle)]) {
 				if (r.words.markdown) paintCard(handle, box, r.words.pad);
@@ -1540,10 +1702,38 @@ EMSCRIPTEN_KEEPALIVE void paint_record(int handle, const double* f, int count) {
 		r.sound = next() != 0;
 		r.paperColor = rgba();
 		for (double& v : r.radii) v = next();
+		// A paint: [0, rgba] a colour, or [1, kind, centre x, y, size w, h, turn, opacity, stops, ...] a gradient.
+		auto paint = [&](Rgba& colour, Grad& grad) {
+			const int kind = int(next());
+			if (kind == 0) {
+				colour = rgba();
+				return;
+			}
+			if (kind == 2) {
+				// [2, picture, mode, opacity]
+				grad.kind = 3;
+				grad.image = int(next());
+				grad.mode = int(next());
+				colour = Rgba{1, 1, 1, float(next())};
+				return;
+			}
+			grad.kind = int(next());
+			grad.cx = next(), grad.cy = next(), grad.sw = next(), grad.sh = next(), grad.rotation = next();
+			colour = Rgba{1, 1, 1, float(next())};
+			const int stops = int(next());
+			for (int k = 0; k < stops; k++) {
+				grad.colors.push_back(rgba());
+				grad.at.push_back(float(std::clamp(next(), 0.0, 1.0)));
+			}
+		};
 		const int fills = int(next());
-		for (int i = 0; i < fills; i++) r.fills.push_back(rgba());
+		for (int i = 0; i < fills; i++) {
+			r.fills.emplace_back();
+			r.fillGrads.emplace_back();
+			paint(r.fills.back(), r.fillGrads.back());
+		}
 		r.stroke.on = next() != 0;
-		r.stroke.color = rgba();
+		if (r.stroke.on) paint(r.stroke.color, r.stroke.grad);
 		for (double& v : r.stroke.widths) v = next();
 		r.stroke.align = int(next());
 		const int shadows = int(next());
@@ -1622,6 +1812,12 @@ EMSCRIPTEN_KEEPALIVE void paint_flags(int handle, int skip, int hole, int mute) 
 }
 EMSCRIPTEN_KEEPALIVE void paint_scheme(int isDark) { dark = isDark != 0; }
 EMSCRIPTEN_KEEPALIVE const char* paint_why() { return whyNot; }
+// A picture the page uploaded into this context as texture `texture` (an Emscripten GL name), `w` by `h`;
+// a texture of 0 forgets it.
+EMSCRIPTEN_KEEPALIVE void paint_image(int id, int texture, int w, int h) {
+	if (!texture) pictures.erase(id);
+	else pictures[id] = Picture{GLuint(texture), std::max(1, w), std::max(1, h)};
+}
 // An item's drawing ops, made once its box is known (`paint-wire.ts`, `opsOf`): `count` numbers at `f`.
 EMSCRIPTEN_KEEPALIVE void paint_ops(int handle, const double* f, int count) {
 	if (handle < 0) return;

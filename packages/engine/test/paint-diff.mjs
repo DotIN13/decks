@@ -58,8 +58,18 @@ const CARDS = [
 	"| Name | Value |\n| --- | ---: |\n| apples | 3 |\n| a much longer row of words | 42 |",
 	"### Small heading\n\n[red words]{.red} and [large]{.large} and a footnote[^1].\n\n[^1]: The note itself.",
 	"Plain words in a card, nothing else: the most common kind.",
+	"A picture:\n\n![a test picture](test.png)\n\nand words after it.",
 	"| a | b | c | d | e | f |\n| --- | --- | --- | --- | --- | --- |\n| wide table that has to scroll sideways because it has so many columns | 2 | 3 | 4 | 5 | 6 |",
 ];
+const gradient = () => ({
+	type: "gradient",
+	gradientType: pick(["linear", "linear", "radial", "angular"]),
+	...(rand() < 0.5 ? { rotation: pick([0, 45, 90, 200]) } : {}),
+	...(rand() < 0.3 ? { center: { x: pick([0.2, 0.5, 0.8]), y: pick([0.3, 0.5]) } } : {}),
+	...(rand() < 0.3 ? { size: { width: pick([0.5, 1, 1.5]), height: pick([0.5, 1, 2]) } } : {}),
+	...(rand() < 0.2 ? { opacity: 0.6 } : {}),
+	colors: Array.from({ length: 2 + Math.floor(rand() * 3) }, () => ({ color: hex(), position: Math.round(rand() * 100) / 100 })),
+});
 let next = 0;
 const GEOMETRY = [
 	"M4 16 L104 16 M84 28 L104 16 L84 4",
@@ -77,11 +87,15 @@ const shape = (depth) => {
 	const type = pick(depth > 1 ? ["rectangle", "ellipse", "rectangle", "polygon", "path", "text"] : ["rectangle", "rectangle", "frame", "ellipse", "group", "note", "polygon", "path", "path", "text", "text", "note", "prompt", "browser"]);
 	const node = { type, id: `s${next++}`, x: Math.round(rand() * 360 - 40), y: Math.round(rand() * 360 - 40), width: 20 + Math.round(rand() * 220), height: 20 + Math.round(rand() * 220) };
 	if (type !== "group" && type !== "note" && rand() < 0.85) node.fill = rand() < 0.15 ? [hex(), hex()] : hex();
+	// A gradient in one fill in six: linear, radial or angular, two to four stops.
+	if (node.fill && rand() < 0.17) node.fill = gradient();
+	// A picture in one fill in eight.
+	if (node.fill && type !== "text" && rand() < 0.12) node.fill = { type: "image", url: "test.png", ...(rand() < 0.7 ? { mode: pick(["fill", "fit", "stretch"]) } : {}), ...(rand() < 0.2 ? { opacity: 0.5 } : {}) };
 	if (type === "rectangle" || type === "frame") {
 		if (rand() < 0.6) node.cornerRadius = rand() < 0.3 ? [0, 8, 24, 4].map(() => Math.round(rand() * 40)) : Math.round(rand() * 40);
 	}
 	if (type !== "group" && type !== "note" && rand() < 0.5) {
-		node.stroke = { fill: hex(), thickness: rand() < 0.2 ? { top: 2, right: 0, bottom: 6, left: 0 } : pick([1, 2, 3, 6, 10]), align: pick(["inside", "center", "outside"]) };
+		node.stroke = { fill: rand() < 0.1 ? gradient() : hex(), thickness: rand() < 0.2 ? { top: 2, right: 0, bottom: 6, left: 0 } : pick([1, 2, 3, 6, 10]), align: pick(["inside", "center", "outside"]) };
 	}
 	if (type !== "group" && rand() < 0.3) node.effect = { type: "shadow", color: pick(["#00000040", "#ff000080", "#0000ff60"]), blur: pick([0, 4, 10, 24]), offset: { x: pick([0, 3, -5]), y: pick([0, 4, 8]) } };
 	if (rand() < 0.2) node.opacity = pick([0.3, 0.6, 0.9]);

@@ -41,7 +41,7 @@ interface SceneModule {
 	_scene_card(handle: number, count: number, poolLength: number): void;
 	_scene_text(handle: number, length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, markdown: number): void;
 	HEAPU8: Uint8Array;
-	GL: { registerContext(context: unknown, attributes: Record<string, unknown>): number; makeContextCurrent(handle: number): boolean };
+	GL: { registerContext(context: unknown, attributes: Record<string, unknown>): number; makeContextCurrent(handle: number): boolean; getNewId(table: unknown[]): number; textures: unknown[] };
 	_paint_init(): void;
 	_paint_record(handle: number, at: number, count: number): void;
 	_paint_flags(handle: number, skip: number, hole: number, mute: number): void;
@@ -49,6 +49,7 @@ interface SceneModule {
 	_paint_ops(handle: number, at: number, count: number): void;
 	_paint_overlay(at: number, count: number): void;
 	_paint_why(): number;
+	_paint_image(id: number, texture: number, w: number, h: number): void;
 	UTF8ToString(at: number): string;
 	_paint_scheme(dark: number): void;
 	_paint_tile(x: number, y: number, size: number, pixels: number): number;
@@ -99,6 +100,9 @@ export interface Painter {
 	 * `skip`: items carried on a picture of their own; `holes`: items shown live under the drawing.
 	 */
 	/** `mute`: items whose words are not drawn, while someone types over them. */
+	/** Hand a decoded picture to the painter; answers the id a paint record names it by. */
+	image(source: TexImageSource, width: number, height: number): number;
+	dropImage(id: number): void;
 	/** Why the last tile was not drawn, in words. */
 	why?: string;
 	/** `scrolls`: how far each card's wide tables are scrolled, by `id:index`. */
@@ -157,7 +161,36 @@ export async function loadScene(): Promise<SceneLayout> {
 			module.GL.makeContextCurrent(handle);
 			module._paint_init();
 			let flagged: number[] = [];
+			const textures = new Map<number, { texture: WebGLTexture; name: number }>();
+			let nextPicture = 1;
 			return {
+				image(source, width, height) {
+					module.GL.makeContextCurrent(handle);
+					const texture = gl.createTexture()!;
+					gl.bindTexture(gl.TEXTURE_2D, texture);
+					gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+					gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+					gl.generateMipmap(gl.TEXTURE_2D);
+					gl.bindTexture(gl.TEXTURE_2D, null);
+					// Named in Emscripten's table, so the C++ binds it as any texture of its own.
+					const name = module.GL.getNewId(module.GL.textures);
+					(texture as { name?: number }).name = name;
+					module.GL.textures[name] = texture;
+					const id = nextPicture++;
+					textures.set(id, { texture, name });
+					module._paint_image(id, name, width, height);
+					return id;
+				},
+				dropImage(id) {
+					const known = textures.get(id);
+					if (!known) return;
+					module.GL.makeContextCurrent(handle);
+					module._paint_image(id, 0, 0, 0);
+					gl.deleteTexture(known.texture);
+					module.GL.textures[known.name] = null;
+					textures.delete(id);
+				},
 				tile(x, y, size, pixels, { dark, skip, holes, mute, scrolls, overlay }) {
 					module.GL.makeContextCurrent(handle);
 					const ink = overlay ?? [];

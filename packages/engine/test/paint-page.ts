@@ -37,12 +37,37 @@ async function loadFonts(ck: Awaited<typeof ckReady>, scene: Awaited<typeof scen
 	return fonts;
 }
 
+// One picture, made here as a PNG: CanvasKit decodes it for the reference, the browser for the painter.
+let pictureReady: Promise<{ bytes: Uint8Array; bitmap: ImageBitmap }> | undefined;
+async function makePicture() {
+	const canvas = new OffscreenCanvas(64, 40);
+	const g = canvas.getContext("2d")!;
+	const grad = g.createLinearGradient(0, 0, 64, 40);
+	grad.addColorStop(0, "#e94f37");
+	grad.addColorStop(1, "#3f88c5");
+	g.fillStyle = grad;
+	g.fillRect(0, 0, 64, 40);
+	g.fillStyle = "#f6f7eb";
+	g.fillRect(8, 8, 12, 24);
+	g.beginPath();
+	g.arc(44, 20, 11, 0, Math.PI * 2);
+	g.fill();
+	const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
+	return { bytes, bitmap: await createImageBitmap(new Blob([bytes])) };
+}
+let ckPicture: unknown;
+let painterPicture: number | undefined;
+
 window.compare = async (doc, tile, scheme, pixels, dumping = false) => {
 	const ck = await ckReady;
 	const scene = await sceneReady;
 	const refusals = new Set<string>();
 	const fonts = await (fontsReady ??= loadFonts(ck, scene));
 	fonts.scheme = scheme;
+	const made = await (pictureReady ??= makePicture());
+	ckPicture ??= ck.MakeImageFromEncoded(made.bytes);
+	const image = (url: string) => (url.endsWith("test.png") ? (ckPicture as never) : undefined);
+	fonts.images = image;
 	const theme = baseTheme(doc, scheme);
 	const nodes = expand(doc);
 	const placed = layout(doc, nodes, { theme, measure: fonts.measure });
@@ -53,21 +78,22 @@ window.compare = async (doc, tile, scheme, pixels, dumping = false) => {
 	canvas.save();
 	canvas.scale(pixels / tile.size, pixels / tile.size);
 	canvas.translate(-tile.x, -tile.y);
-	paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme, image: () => undefined, icon: () => undefined });
+	paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme, image, icon: () => undefined });
 	canvas.restore();
 	const want = canvas.readPixels(0, 0, { width: pixels, height: pixels, colorType: ck.ColorType.RGBA_8888, alphaType: ck.AlphaType.Unpremul, colorSpace: ck.ColorSpace.SRGB })!;
 	surface.delete();
 	// The C++ painter.
-	// The scheme is part of what a card is encoded with (its palette), as the worker's measure key has it.
-	scene.layout(doc, nodes, { theme, measure: fonts.measure, measureKey: scheme, chain: fontChain, card: (text, style, node) => encodeCard(text, style, { chain: fontChain, mono: MONO_FAMILY, scheme }, node.textAlign ?? "left"), paint: (node, t) => {
-		const record = paintRecord(doc, node, t, scheme);
-		if (record[0] === 99) refusals.add(wire.lastRefusal);
-		return record;
-	}, ops: (node, t, box) => wire.opsOf(doc, node, t, scheme, box) });
 	if (!painterCanvas) {
 		painterCanvas = new OffscreenCanvas(pixels, pixels);
 		painter = scene.painter(painterCanvas);
+		painterPicture = painter!.image(made.bitmap, made.bitmap.width, made.bitmap.height);
 	}
+	// The scheme is part of what a card is encoded with (its palette), as the worker's measure key has it.
+	scene.layout(doc, nodes, { theme, measure: fonts.measure, measureKey: scheme, chain: fontChain, card: (text, style, node) => encodeCard(text, style, { chain: fontChain, mono: MONO_FAMILY, scheme, image: (url) => (url.endsWith("test.png") ? { width: () => 64, height: () => 40, id: painterPicture } : undefined) }, node.textAlign ?? "left"), paint: (node, t) => {
+		const record = paintRecord(doc, node, t, scheme, { picture: (url) => (url.endsWith("test.png") && painterPicture !== undefined ? { id: painterPicture, width: 64, height: 40 } : undefined) });
+		if (record[0] === 99) refusals.add(wire.lastRefusal);
+		return record;
+	}, ops: (node, t, box) => wire.opsOf(doc, node, t, scheme, box) });
 	if (painterCanvas.width !== pixels) {
 		painterCanvas.width = pixels;
 		painterCanvas.height = pixels;

@@ -75,39 +75,78 @@ function markdownOf(doc: PenDocument, node: PenNode, theme: ThemeState, pad: num
 }
 
 /** A fill's colour when it is a plain colour that draws; `false` when it draws something else; undefined when it draws nothing. */
-function solid(doc: PenDocument, fill: Fill, theme: ThemeState): Rgba | false | undefined {
-	if (typeof fill === "string") return color(doc, fill, theme);
+/**
+ * A fill as the painter reads it: [0, rgba] a colour; [1, type (0 linear, 1 radial, 2 sweep), centre x,
+ * centre y, size w, size h (each a fraction of the box), rotation, opacity, stops, ...(rgba, at)] a
+ * gradient, which the painter places in the box as `gradientShader` does; [2, picture, mode (0 cover,
+ * 1 fit, 2 stretch), opacity] a picture, which draws nothing until it has arrived, as in `fillPaint`.
+ */
+/** What the painter has been handed: a picture's id and size once it has arrived (`painter.image`). */
+export interface PaintEnv {
+	picture?(url: string): { id: number; width: number; height: number } | undefined;
+}
+
+function paintOf(doc: PenDocument, fill: Fill, theme: ThemeState, env: PaintEnv): number[] | false | undefined {
+	if (typeof fill === "string") {
+		const rgba = color(doc, fill, theme);
+		return rgba ? [0, ...rgba] : undefined;
+	}
 	if (!fill || typeof fill !== "object") return undefined;
 	if (!bool(doc, (fill as { enabled?: unknown }).enabled, theme, true)) return undefined;
-	if (fill.type === "color") return color(doc, (fill as { color?: unknown }).color, theme);
-	if (fill.type === "gradient" || fill.type === "image") return false;
+	if (fill.type === "color") {
+		const rgba = color(doc, (fill as { color?: unknown }).color, theme);
+		return rgba ? [0, ...rgba] : undefined;
+	}
+	if (fill.type === "gradient") {
+		const g = fill as Extract<Fill, { type: "gradient" }>;
+		const stops = (g.colors ?? [])
+			.map((stop) => ({ color: color(doc, stop.color, theme), at: num(doc, stop.position, theme, 0) }))
+			.filter((stop): stop is { color: Rgba; at: number } => !!stop.color)
+			.sort((a, b) => a.at - b.at);
+		if (stops.length === 0) return undefined;
+		if (stops.length === 1) stops.push({ ...stops[0]! });
+		const kind = g.gradientType === "radial" ? 1 : g.gradientType === "angular" ? 2 : 0;
+		return [
+			1, kind,
+			num(doc, g.center?.x, theme, 0.5), num(doc, g.center?.y, theme, 0.5), num(doc, g.size?.width, theme, 1), num(doc, g.size?.height, theme, 1),
+			num(doc, g.rotation, theme, 0), num(doc, (fill as { opacity?: unknown }).opacity, theme, 1),
+			stops.length, ...stops.flatMap((stop) => [...stop.color, stop.at]),
+		];
+	}
+	if (fill.type === "image") {
+		const url = (fill as { url?: unknown }).url;
+		const picture = typeof url === "string" ? env.picture?.(url) : undefined;
+		if (!picture) return undefined;
+		const mode = (fill as { mode?: unknown }).mode;
+		return [2, picture.id, mode === "fit" ? 1 : mode === "stretch" ? 2 : 0, num(doc, (fill as { opacity?: unknown }).opacity, theme, 1)];
+	}
 	return undefined;
 }
 
 /** Why the last record was refused, for tallying what the painter still lacks. */
 export let lastRefusal = "";
 
-export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, scheme: "light" | "dark"): number[] {
+export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, scheme: "light" | "dark", env: PaintEnv = {}): number[] {
 	const head = [num(doc, node.opacity, theme, 1), num(doc, node.rotation, theme, 0), bool(doc, node.flipX, theme, false) ? 1 : 0, bool(doc, node.flipY, theme, false) ? 1 : 0];
 	const unsupported = (reason: string) => {
 		lastRefusal = reason;
 		return [UNSUPPORTED, ...head];
 	};
 	const shape = (kind: number, paper: boolean, sound: boolean, paperColor: string, fillList: Fill[], radii: number[], tail: number[] = []) => {
-		const fills: Rgba[] = [];
+		const fills: number[][] = [];
 		for (const fill of fillList) {
-			const one = solid(doc, fill, theme);
-			if (one === false) return unsupported("fill: gradient or image");
+			const one = paintOf(doc, fill, theme, env);
+			if (one === false) return unsupported("fill");
 			if (one) fills.push(one);
 		}
 		const stroke = strokeOf(doc, node, theme);
-		let strokeColor: Rgba | undefined;
+		let strokePaint: number[] | undefined;
 		if (stroke) {
 			for (const fill of stroke.fills) {
-				const one = solid(doc, fill, theme);
-				if (one === false) return unsupported("stroke: gradient or image");
+				const one = paintOf(doc, fill, theme, env);
+				if (one === false) return unsupported("stroke");
 				if (one) {
-					strokeColor = one;
+					strokePaint = one;
 					break;
 				}
 			}
@@ -126,7 +165,7 @@ export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, 
 			bool(doc, node.clip, theme, false) ? 1 : 0, paper ? 1 : 0, sound ? 1 : 0, ...paperRgba,
 			...radii,
 			fills.length, ...fills.flat(),
-			strokeColor ? 1 : 0, ...(strokeColor ?? [0, 0, 0, 0]), ...(stroke?.widths ?? [0, 0, 0, 0]), stroke ? ALIGN[stroke.align] : 1,
+			strokePaint ? 1 : 0, ...(strokePaint ?? []), ...(stroke?.widths ?? [0, 0, 0, 0]), stroke ? ALIGN[stroke.align] : 1,
 			shadows.length, ...shadows.flat(),
 			stroke ? CAP[stroke.cap] : 0, stroke ? JOIN[stroke.join] : 0, dash.length, ...dash,
 			...tail,

@@ -751,6 +751,7 @@ export class StageScene {
 				this.cppCanvas.width = TILE;
 				this.cppCanvas.height = TILE;
 				this.cppPainter = cppLayout.painter(this.cppCanvas) ?? null;
+				this.uploadPictures();
 			}
 			const slide = this.slide?.ready ? this.slide : undefined;
 			if (this.cppPainter && this.cppPainter.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) })) {
@@ -808,9 +809,15 @@ export class StageScene {
 			const ownWords = fonts.files.length === fonts.loaded.length;
 			this.wordsBy = ownWords ? "c++" : "canvaskit";
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
-			const card = (text: string, style: TextStyle, node: PenNode) => encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => fonts.images?.(url) }, node.textAlign ?? "left");
+			const card = (text: string, style: TextStyle, node: PenNode) =>
+				encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => {
+					const image = fonts.images?.(url);
+					if (!image) return undefined;
+					const picture = this.picture(url);
+					return { width: () => image.width(), height: () => image.height(), ...(picture ? { id: picture.id } : {}) };
+				} }, node.textAlign ?? "left");
 			const scheme = this.scheme;
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme, { picture: (url) => this.picture(url) }), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);
@@ -1815,14 +1822,54 @@ export class StageScene {
 		this.images.set(absolute, "loading");
 		void fetch(absolute)
 			.then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
-			.then((bytes) => {
+			.then(async (bytes) => {
 				const image = this.ck?.MakeImageFromEncoded(new Uint8Array(bytes));
 				this.images.set(absolute, image ?? "failed");
+				// The same picture decoded by the browser, for the engine's painter (`cpp/paint.cpp`).
+				if (cppLayout) {
+					try {
+						const bitmap = await createImageBitmap(new Blob([bytes]));
+						this.pictures.set(absolute, { bitmap, width: bitmap.width, height: bitmap.height });
+						this.uploadPictures();
+					} catch {
+						/* a format the browser does not read: CanvasKit's copy, if any, still draws it */
+					}
+				}
 				if (this.fonts) this.fonts.imageVersion++;
 				this.redraw();
 			})
 			.catch(() => this.images.set(absolute, "failed"));
 		return undefined;
+	}
+
+	/** Pictures decoded by the browser, and their id with the engine's painter once handed to it. */
+	private readonly pictures = new Map<string, { bitmap?: ImageBitmap; width: number; height: number; id?: number }>();
+	/** A picture's id and size with the painter: undefined until it has arrived (and asks for it). */
+	private picture(url: string): { id: number; width: number; height: number } | undefined {
+		const absolute = new URL(url, new URL(this.base || "/", this.host.origin)).href;
+		const known = this.pictures.get(absolute);
+		if (!known) {
+			this.image(url);
+			return undefined;
+		}
+		return known.id === undefined ? undefined : { id: known.id, width: known.width, height: known.height };
+	}
+	/** Hand every decoded picture the painter has not had yet to it, and let go of the bitmap. */
+	private uploadPictures(): void {
+		if (!this.cppPainter) return;
+		let handed = 0;
+		for (const picture of this.pictures.values())
+			if (picture.id === undefined && picture.bitmap) {
+				picture.id = this.cppPainter.image(picture.bitmap, picture.width, picture.height);
+				picture.bitmap.close();
+				picture.bitmap = undefined;
+				handed++;
+			}
+		// Records sent before the painter had them name no picture: lay out again so they do.
+		if (handed && this.fonts) {
+			this.fonts.imageVersion++;
+			this.redraw();
+		}
 	}
 
 	dispose(): void {

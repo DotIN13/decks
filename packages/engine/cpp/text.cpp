@@ -725,8 +725,9 @@ int placeGlyphs(const char* s, int length, const std::vector<Span>& spans, const
 	for (const LineOut& line : laid) {
 		float shift = 0;
 		if (!std::isnan(maxWidth)) {
+			// A line wider than the paragraph is not moved at all (`TextLine::format` returns on delta <= 0).
 			const float delta = float(width) - float(line.width);
-			shift = align == 1 ? delta : align == 2 ? delta / 2 : 0;
+			if (delta > 0) shift = align == 1 ? delta : align == 2 ? delta / 2 : 0;
 		}
 		// Skia's paragraph draws a line's glyphs at its top plus its ascent rounded to a whole pixel.
 		const double baseline = line.top + std::floor(-double(line.ascent) + 0.5);

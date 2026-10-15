@@ -18,10 +18,11 @@ struct CardRunPaint {
 };
 
 struct CardOp {
-	enum Kind { TEXT, BOX, CHECK, SCROLL } kind = BOX;
+	enum Kind { TEXT, BOX, CHECK, SCROLL, IMAGE } kind = BOX;
 	double x = 0, y = 0, w = 0, h = 0, r = 0;
 	CardColour colour;  // a box's fill; a paragraph's block colour
 	bool checked = false;
+	int image = -1;  // a picture's id (`paint_image`)
 	// A paragraph: its words and runs, laid out `w` wide from (x, y).
 	std::string text;
 	std::vector<Span> spans;
@@ -39,5 +40,5 @@ struct CardOp {
 struct CardPalette { CardColour fg, muted, faint, line, strong, subtle, code, accent, box; };
 
 // A card laid out `width` wide into `ops`; answers its height. `ok` is false for what it cannot record
-// (a picture that has arrived).
+// (a picture that has arrived but was not handed to the painter).
 double cardOps(const double* nums, size_t count, const char* pool, double width, std::vector<CardOp>& ops, CardPalette& palette, bool& ok);
