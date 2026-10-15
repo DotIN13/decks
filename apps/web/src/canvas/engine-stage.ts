@@ -154,14 +154,14 @@ export class EngineStage {
 		if (level !== this.tileLevel) {
 			this.tileLevel = level;
 			// The previous level's tiles go under the new one's while the new ones arrive.
-			for (const [name, one] of this.tiles) engine.set(`tile:${name}`, { layer: 1, order: 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${name}` });
+			for (const [name, one] of this.tiles) engine.set(`tile:${name}`, { layer: 1, order: 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${name}`, crisp: true });
 		}
 		if (!bitmap) {
 			this.dropTile(key, false);
 		} else {
-			engine.texture(`tile:${key}`, bitmap, 1);
+			engine.texture(`tile:${key}`, bitmap, 1, { mipmaps: false });
 			bitmap.close();
-			engine.set(`tile:${key}`, { layer: 1, order: 2, x, y, w: size, h: size, texture: `tile:${key}` });
+			engine.set(`tile:${key}`, { layer: 1, order: 2, x, y, w: size, h: size, texture: `tile:${key}`, crisp: true });
 			this.tiles.set(key, { level, x, y, size, used: this.frame });
 			// Tiles of another level that this one covers whole go at once: after a zoom out, one coarse
 			// tile replaces many fine ones, which would otherwise wait for the zoom to go quiet.
@@ -249,7 +249,7 @@ export class EngineStage {
 		if (!engine) return;
 		engine.clear();
 		// Clearing took the tiles' items too: they go back as they were.
-		for (const [key, one] of this.tiles) engine.set(`tile:${key}`, { layer: 1, order: one.level === this.tileLevel ? 2 : 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${key}` });
+		for (const [key, one] of this.tiles) engine.set(`tile:${key}`, { layer: 1, order: one.level === this.tileLevel ? 2 : 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${key}`, crisp: true });
 		const paper: [number, number, number, number] = this.scheme === "dark" ? [30, 30, 32, 1] : [255, 255, 255, 1];
 		let order = 0;
 		for (const board of this.boards) {

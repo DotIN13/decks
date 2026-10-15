@@ -32,7 +32,7 @@ struct Quad {
 	float radius;          // corner radius, stage pixels
 	float stroke;          // > 0: an outline this many screen pixels wide, not a fill
 	float kind;            // 0 colour, 1 texture
-	float pad;
+	float crisp;           // 1: corners on whole device pixels and no soft edge, for tiles that meet edge to edge
 };
 static_assert(sizeof(Quad) == 64, "Quad is four vec4s");
 
@@ -90,7 +90,12 @@ struct V {
 @vertex fn vs(@builtin(vertex_index) i: u32, q: Q) -> V {
 	let corner = vec2f(f32(i & 1u), f32((i >> 1u) & 1u));
 	let stage = q.rect.xy + corner * q.rect.zw;
-	let css = (stage - u.cam) * u.zoom + u.view * 0.5;
+	var css = (stage - u.cam) * u.zoom + u.view * 0.5;
+	// A crisp quad's corners land on whole device pixels: neighbours share their edges exactly, and a
+	// texture drawn at the screen's own scale maps one texel to one pixel.
+	if (q.style.w > 0.5) {
+		css = round(css * u.dpr) / u.dpr;
+	}
 	var o: V;
 	o.pos = vec4f(css.x / u.view.x * 2.0 - 1.0, 1.0 - css.y / u.view.y * 2.0, 0.0, 1.0);
 	o.uv = mix(q.uv.xy, q.uv.zw, corner);
@@ -98,11 +103,15 @@ struct V {
 	let sizePx = q.rect.zw * u.zoom * u.dpr;
 	o.half = sizePx * 0.5;
 	o.local = (corner - 0.5) * sizePx;
-	o.style = vec4f(q.style.x * u.zoom * u.dpr, q.style.y * u.dpr, q.style.z, 0.0);
+	o.style = vec4f(q.style.x * u.zoom * u.dpr, q.style.y * u.dpr, q.style.z, q.style.w);
 	return o;
 }
 
 fn coverage(v: V) -> f32 {
+	// No soft edge on a crisp quad: a tile's edge is another tile's edge, and a soft one is a seam.
+	if (v.style.w > 0.5) {
+		return 1.0;
+	}
 	// Signed distance to a rounded rectangle, in device pixels: negative inside.
 	let r = min(v.style.x, min(v.half.x, v.half.y));
 	let q = abs(v.local) - v.half + r;
@@ -364,13 +373,14 @@ void main() {
 	vec2 corner = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
 	vec2 stage = rect.xy + corner * rect.zw;
 	vec2 css = (stage - u0.zw) * u1.x + u0.xy * 0.5;
+	if (style.w > 0.5) css = floor(css * u1.y + 0.5) / u1.y;
 	gl_Position = vec4(css.x / u0.x * 2.0 - 1.0, 1.0 - css.y / u0.y * 2.0, 0.0, 1.0);
 	vUv = mix(uvr.xy, uvr.zw, corner);
 	vColour = colour;
 	vec2 sizePx = rect.zw * u1.x * u1.y;
 	vHalf = sizePx * 0.5;
 	vLocal = (corner - 0.5) * sizePx;
-	vStyle = vec4(style.x * u1.x * u1.y, style.y * u1.y, style.z, 0.0);
+	vStyle = vec4(style.x * u1.x * u1.y, style.y * u1.y, style.z, style.w);
 }
 )";
 
@@ -386,6 +396,7 @@ void main() {
 	float d = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - r;
 	float cover = clamp(0.5 - d, 0.0, 1.0);
 	if (vStyle.y > 0.0) cover *= clamp(vStyle.y + 0.5 + d, 0.0, 1.0);
+	if (vStyle.w > 0.5) cover = 1.0;
 	outColour = textured > 0.5 ? texture(tex, vUv) * vColour.a * cover : vColour * cover;
 }
 )";
@@ -533,7 +544,7 @@ EMSCRIPTEN_KEEPALIVE void engine_camera(float x, float y, float zoom) {
 }
 
 // One rectangle: placed in stage pixels, drawn on a layer in an order, as a colour or a texture.
-EMSCRIPTEN_KEEPALIVE void engine_item(int id, int layer, double order, float x, float y, float w, float h, int texture, float u0, float v0, float u1, float v1, uint32_t rgba, float radius, float stroke) {
+EMSCRIPTEN_KEEPALIVE void engine_item(int id, int layer, double order, float x, float y, float w, float h, int texture, float u0, float v0, float u1, float v1, uint32_t rgba, float radius, float stroke, int crisp) {
 	layer = layer < 0 ? 0 : layer >= LAYERS ? LAYERS - 1 : layer;
 	auto found = engine.items.find(id);
 	if (found != engine.items.end()) {
@@ -552,7 +563,7 @@ EMSCRIPTEN_KEEPALIVE void engine_item(int id, int layer, double order, float x, 
 	item.texture = texture;
 	float a = ((rgba >> 0) & 255) / 255.f;
 	float premul = a;
-	item.quad = Quad{x, y, w, h, u0, v0, u1, v1, ((rgba >> 24) & 255) / 255.f * premul, ((rgba >> 16) & 255) / 255.f * premul, ((rgba >> 8) & 255) / 255.f * premul, a, radius, stroke, static_cast<float>(texture ? KIND_TEXTURE : KIND_COLOUR), 0};
+	item.quad = Quad{x, y, w, h, u0, v0, u1, v1, ((rgba >> 24) & 255) / 255.f * premul, ((rgba >> 16) & 255) / 255.f * premul, ((rgba >> 8) & 255) / 255.f * premul, a, radius, stroke, static_cast<float>(texture ? KIND_TEXTURE : KIND_COLOUR), crisp ? 1.f : 0.f};
 	touch(layer);
 }
 

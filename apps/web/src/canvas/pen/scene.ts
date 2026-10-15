@@ -622,7 +622,12 @@ export class StageScene {
 		}
 		if (!ck || !this.fonts) return;
 		const dpr = this.view.dpr;
-		const target = 2 ** Math.round(Math.log2(Math.max(1e-3, this.camera.zoom * dpr)));
+		/*
+		 * The screen's own scale at rest, so a tile's pixel is a screen pixel and words are as sharp as
+		 * the sheet drew them; a power of two was up to 30% under it, and stretched words read mushy.
+		 * Rounded only so a camera at rest keeps one key for its tiles.
+		 */
+		const target = Math.round(Math.max(1e-3, this.camera.zoom * dpr) * 1000) / 1000;
 		// Held through a zoom, so its tiles are scaled rather than drawn again at every step; but not past
 		// the point where the window would need more of them than the page keeps (`MAX_TILES` there).
 		const across = (level: number) => Math.ceil((this.view.width / this.camera.zoom) / (TILE / level) + 1) * Math.ceil((this.view.height / this.camera.zoom) / (TILE / level) + 1);

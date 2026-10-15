@@ -35,6 +35,11 @@ export interface Item {
 	radius?: number;
 	/** An outline this many screen pixels wide instead of a fill. */
 	stroke?: number;
+	/**
+	 * Corners on whole device pixels and no soft edge: for tiles, which meet edge to edge and are
+	 * drawn at the screen's scale, so neighbours leave no seam and a texel is a pixel.
+	 */
+	crisp?: boolean;
 }
 
 export interface Engine {
@@ -47,7 +52,7 @@ export interface Engine {
 	remove(id: string): void;
 	clear(): void;
 	/** Hand over a picture, for items that name it. A WebGL 2 texture belongs to one layer. */
-	texture(name: string, source: ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement, layer?: Layer): void;
+	texture(name: string, source: ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement, layer?: Layer, options?: { mipmaps?: boolean }): void;
 	forget(name: string): void;
 	/** Draw the layers that changed. Returns how many items each drew, or -1 for one left as it was. */
 	render(force?: boolean): [number, number];
@@ -68,7 +73,7 @@ interface Module {
 	_engine_init_webgl(under: number, over: number): number;
 	_engine_view(w: number, h: number, dpr: number): void;
 	_engine_camera(x: number, y: number, zoom: number): void;
-	_engine_item(id: number, layer: number, order: number, x: number, y: number, w: number, h: number, texture: number, u0: number, v0: number, u1: number, v1: number, rgba: number, radius: number, stroke: number): void;
+	_engine_item(id: number, layer: number, order: number, x: number, y: number, w: number, h: number, texture: number, u0: number, v0: number, u1: number, v1: number, rgba: number, radius: number, stroke: number, crisp: number): void;
 	_engine_remove(id: number): void;
 	_engine_clear(): void;
 	_engine_texture_gpu(id: number, view: number): void;
@@ -188,21 +193,22 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 		return { texture, bytes: width * height * 4 };
 	};
 
-	const uploadGl = (context: WebGL2RenderingContext, source: Parameters<Engine["texture"]>[1]) => {
+	const uploadGl = (context: WebGL2RenderingContext, source: Parameters<Engine["texture"]>[1], mipmaps: boolean) => {
 		const texture = context.createTexture()!;
 		context.bindTexture(context.TEXTURE_2D, texture);
 		context.pixelStorei(context.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 		context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, source as TexImageSource);
 		// Smaller copies, so a board seen far away is sampled rather than shimmering: a third more memory.
-		context.generateMipmap(context.TEXTURE_2D);
-		context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.LINEAR_MIPMAP_LINEAR);
+		// Not for a tile, drawn at the screen's scale, where they only soften it.
+		if (mipmaps) context.generateMipmap(context.TEXTURE_2D);
+		context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, mipmaps ? context.LINEAR_MIPMAP_LINEAR : context.LINEAR);
 		context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.LINEAR);
 		context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE);
 		context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
 		context.bindTexture(context.TEXTURE_2D, null);
 		const width = (source as { width: number }).width;
 		const height = (source as { height: number }).height;
-		return { texture, bytes: Math.round(width * height * 4 * 4 / 3) };
+		return { texture, bytes: Math.round((width * height * 4 * (mipmaps ? 4 : 3)) / 3) };
 	};
 
 	/*
@@ -256,7 +262,7 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 		set(id, item) {
 			const uv = item.uv ?? [0, 0, 1, 1];
 			const texture = item.texture ? textures.get(item.texture) : 0;
-			module._engine_item(items.get(id), item.layer, item.order, item.x, item.y, item.w, item.h, texture, uv[0], uv[1], uv[2], uv[3], packColour(item.color), item.radius ?? 0, item.stroke ?? 0);
+			module._engine_item(items.get(id), item.layer, item.order, item.x, item.y, item.w, item.h, texture, uv[0], uv[1], uv[2], uv[3], packColour(item.color), item.radius ?? 0, item.stroke ?? 0, item.crisp ? 1 : 0);
 		},
 		remove(id) {
 			const known = items.peek(id);
@@ -268,7 +274,7 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 			module._engine_clear();
 			items.clear();
 		},
-		texture(name, source, layer = 0) {
+		texture(name, source, layer = 0, options = {}) {
 			engine.forget(name);
 			const id = textures.get(name);
 			if (backend === "webgpu") {
@@ -278,7 +284,7 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 			} else {
 				const context = gl[layer];
 				if (!context) return;
-				const { texture, bytes } = uploadGl(context, source);
+				const { texture, bytes } = uploadGl(context, source, options.mipmaps !== false);
 				const glId = bridge.glRegister(texture);
 				module._engine_texture_gl(id, layer, glId);
 				held.set(id, { bytes, layer, release: () => (bridge.glForget(glId), context.deleteTexture(texture)) });
