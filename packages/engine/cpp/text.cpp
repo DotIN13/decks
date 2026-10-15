@@ -38,6 +38,14 @@ struct Face {
 	int ascender = 0, descender = 0, lineGap = 0;  // in font units, as the file states them (descender negative)
 };
 std::vector<Face> faces;
+
+// The width of a face's missing-glyph box at a size, rounded as its other widths are (FreeType's 16.16).
+static double missingWidth(const Face& face, double size) {
+	const long size64 = long(size * 64);
+	const long xScale = std::lround(double(size64) * 65536.0 / face.upem);
+	const hb_position_t plain = hb_font_get_glyph_h_advance(face.font, 0);
+	return double(std::llround(double(plain) * double(xScale) / 64.0)) / 65536.0;
+}
 std::vector<char> scratch(4096);
 double answer[8];
 // Where each line of the last measure starts and ends, in UTF-8 bytes, and its width: three numbers a line.
@@ -93,6 +101,11 @@ bool isHard(uint8_t k) { return k == BK || k == CR || k == LF || k == NL; }
 
 // Whether a line may break before each code point; index 0 never. The rules, LB7 to LB31, in order:
 // the first that speaks decides.
+// The breaking dashes (line break class BA with the Unicode Dash property), which ICU keeps with a word they start.
+static bool isDashBA(uint32_t c) {
+	return c == 0xAD || c == 0x58A || c == 0x5BE || c == 0x1400 || c == 0x2010 || c == 0x2012 || c == 0x2013 || c == 0x2E17 || c == 0x2E40 || c == 0x2E5D;
+}
+
 void breaks(const std::vector<uint32_t>& cps, std::vector<char>& out) {
 	const size_t n = cps.size();
 	out.assign(n, 0);
@@ -147,8 +160,9 @@ void breaks(const std::vector<uint32_t>& cps, std::vector<char>& out) {
 		else if (a == QU && !ea(i)) can = false;
 		else if (a == QU && (i < 2 || !ea(i - 2))) can = false;
 		else if (a == CB || b == CB) can = true;                                            // LB20
-		// LB20a, as ICU has it: a dash that starts a word (a hyphen, or a narrow dash such as –) stays with the letter after it.
-		else if ((a == HY || (a == BA && !ea(i - 1))) && in(b, {AL, HL}) && (i < 2 || in(cls[i - 2], {BK, CR, LF, NL, SP, ZW, CB, GL}))) can = false;
+		// LB20a, as ICU has it: a dash that starts a word (a hyphen, or a breaking dash such as –) stays with the
+		// letter after it. Only dashes: a word-initial bar or dot leader, also BA, breaks after itself.
+		else if ((a == HY || (a == BA && isDashBA(cps[i - 1]))) && in(b, {AL, HL}) && (i < 2 || in(cls[i - 2], {BK, CR, LF, NL, SP, ZW, CB, GL}))) can = false;
 		else if (in(b, {BA, HY, NS}) || a == BB) can = false;                               // LB21
 		else if (i >= 2 && cls[i - 2] == HL && (a == HY || (a == BA && !ea(i - 1))) && b != HL) can = false;  // LB21a
 		else if (a == SY && b == HL) can = false;                                           // LB21b
@@ -424,10 +438,17 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	}
 	for (size_t i = 0; i < n; i++)
 		if (faceOf[i] < 0) faceOf[i] = spans[size_t(sp[i])].chain[0];
+	// Two spans in one run: Skia shapes a run across spans whose font is the same, whatever their colour.
+	auto otherFont = [&](size_t i) {
+		const Span &a = spans[size_t(sp[i])], &b = spans[size_t(sp[i - 1])];
+		return a.chain != b.chain || a.size != b.size || a.letterSpacing != b.letterSpacing || a.weight != b.weight || a.italic != b.italic;
+	};
 	// Each cluster's glyphs, numbered within its run (the code points one font drew in a row): Skia's wrapper counts in these.
 	std::vector<int> glyphFrom(n, 0), glyphTo(n, 0);
 	for (size_t i = 0, counter = 0; i < n; i++) {
-		if (i == 0 || faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || scriptRun[i] != scriptRun[i - 1] || sp[i] != sp[i - 1]) counter = 0;
+		if (i == 0 || faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || otherFont(i)) counter = 0;
+		// A line break is shaped as a glyph of its run, so it is counted, though it is never drawn.
+		if (cps[i] == '\n' && !clusterStart[i]) counter++;
 		if (!clusterStart[i]) continue;
 		glyphFrom[i] = int(counter);
 		counter += size_t(glyphCount[i]);
@@ -444,16 +465,39 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	std::vector<float> posAt(n + 1, 0.f);
 	std::vector<int> runOf(n, 0);
 	for (size_t i = 0, run = 0; i < n; i++) {
-		if (i > 0 && (faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || cps[i] == '\n' || scriptRun[i] != scriptRun[i - 1] || sp[i] != sp[i - 1])) run++;
+		if (i > 0 && (faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || otherFont(i))) run++;
 		runOf[i] = int(run);
 	}
 	{
-		float x = 0;
+		float x = 0, shift = 0;
+		// A letter from a fallback font sits where the first face's shaping put its missing-glyph box, so
+		// what follows counts that box's width rather than the letter's own: Skia shapes the whole text in
+		// the first face, then reshapes what it could not draw, leaving the rest where it was. The
+		// reshaped letters have positions of their own, from where the first of them starts.
+		float fallbackX = 0;
+		bool inFallback = false;
 		for (size_t i = 0; i < n; i++) {
-			if (i > 0 && runOf[i] != runOf[i - 1]) x = 0;
-			posAt[i] = x;
-			x += float(advance[i]);
-			if (i + 1 == n || runOf[i + 1] != runOf[i]) posAt[n] = x;
+			if (i > 0 && scriptRun[i] != scriptRun[i - 1]) x = 0, shift = 0;
+			const auto& chain = spans[size_t(sp[i])].chain;
+			const bool fallback = faceOf[i] >= 0 && !chain.empty() && faces[size_t(faceOf[i])].family != faces[size_t(chain[0])].family;
+			const float ls = clusterStart[i] ? float(spans[size_t(sp[i])].letterSpacing) : 0.f;
+			const float own = float(advance[i] - double(ls) * glyphCount[i]);
+			if (fallback) {
+				if (!inFallback || (i > 0 && runOf[i] != runOf[i - 1])) fallbackX = x;
+				posAt[i] = fallbackX + shift;
+				fallbackX += own;
+				if (clusterStart[i]) {
+					size_t e = i + 1;
+					while (e < n && !clusterStart[e]) e++;
+					x += float(missingWidth(faces[size_t(chain[0])], spans[size_t(sp[i])].size) * double(e - i));
+				}
+			} else {
+				posAt[i] = x + shift;
+				x += own;
+			}
+			inFallback = fallback;
+			for (int g = 0; clusterStart[i] && g < glyphCount[i]; g++) shift += ls;
+			if (i + 1 == n || runOf[i + 1] != runOf[i]) posAt[n] = (fallback ? fallbackX : x) + shift;
 		}
 	}
 	std::vector<char> canBreak;
@@ -548,6 +592,30 @@ int layoutSpans(const char* s, int length, const std::vector<Span>& spans, const
 			k = e;
 		}
 		return double(w);
+	};
+	/*
+	 * A line's width as Skia's wrapper adds it up (`TextStretch::extend`): each cluster's width (the
+	 * difference of its two positions), summed into a word, and the words summed into the line, all in
+	 * single precision. A word ends after a space or where a line may break.
+	 */
+	auto clusterEndAt = [&](size_t k) {
+		size_t e = k + 1;
+		while (e < n && !clusterStart[e]) e++;
+		return e;
+	};
+	auto clusterWidth = [&](size_t k, size_t e) {
+		const float to = e < n && runOf[e] == runOf[k] ? posAt[e] : posAt[e - 1] + float(advance[e - 1]);
+		return to - posAt[k];
+	};
+	auto lineWidth = [&](size_t a, size_t b) {
+		float line = 0, word = 0;
+		for (size_t k = a; k < b;) {
+			const size_t e = std::min(clusterEndAt(k), b);
+			word += clusterWidth(k, e);
+			if (e >= b || cps[k] == ' ' || cps[k] == '\t' || cps[k] == 0x3000 || canBreak[e]) line += word, word = 0;
+			k = e;
+		}
+		return double(line + word);
 	};
 
 	const bool wrap = !std::isnan(maxWidth);
@@ -682,7 +750,7 @@ int layoutSpans(const char* s, int length, const std::vector<Span>& spans, const
 			// The line's own width, without the spaces it ends in.
 			size_t visible = lineEnd;
 			while (visible > lineStart && isSpace(visible - 1)) visible--;
-			const double w = spanWidth(lineStart, visible);
+			const double w = lineWidth(lineStart, visible);
 			longest = std::max(longest, w);
 			lineSpans.push_back(double(starts.empty() || lineStart >= n ? size_t(length) : starts[lineStart]));
 			lineSpans.push_back(double(lineEnd >= n ? size_t(length) : starts[lineEnd]));
@@ -752,7 +820,15 @@ int placeGlyphs(const char* s, int length, const std::vector<Span>& spans, const
 				endPos = S->posAt[last] + float(S->advance[last]);
 			}
 			const float next = runX + (endPos - S->posAt[k]);
-			if (pieces && e > k) pieces->push_back({S->sp[k], S->faceOf[k], double(runX), double(next), line.top, line.height, line.top + line.height - double(line.descent)});
+			// A run can hold several spans of one font (a colour change); each is its own piece.
+			for (size_t a = k; pieces && a < e;) {
+				size_t b = a;
+				while (b < e && S->sp[b] == S->sp[a]) b++;
+				const float from = runX + (S->posAt[a] - S->posAt[k]);
+				const float to = b < e ? runX + (S->posAt[b] - S->posAt[k]) : next;
+				pieces->push_back({S->sp[a], S->faceOf[a], double(from), double(to), line.top, line.height, line.top + line.height - double(line.descent)});
+				a = b;
+			}
 			runX = next;
 			k = e;
 		}
