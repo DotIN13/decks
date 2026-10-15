@@ -778,7 +778,9 @@ export class StageScene {
 	private layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure: MeasureText }): Map<string, Placed> {
 		if (this.tiles && cppLayout) {
 			this.layoutBy = "c++";
-			return cppLayout.layout(doc, nodes, options);
+			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
+			const fonts = this.fonts;
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: fonts ? `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}` : "" });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);

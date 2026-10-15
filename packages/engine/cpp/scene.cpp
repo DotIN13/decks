@@ -3,8 +3,13 @@
 // runs both on every saved stage and on thousands of made-up documents and wants the same boxes.
 //
 // The page resolves what a property means (variables, themes, "fit_content(100)") and hands this
-// numbers, one record per item (`scene_node`); words are measured by whoever calls (`scene_measure`),
-// as in the TypeScript. No GPU here: the same module runs in the page, in a worker and on the server.
+// numbers, one record per item; words are measured by whoever calls (`scene_measure`), as in the
+// TypeScript. No GPU here: the same module runs in the page, in a worker and on the server.
+//
+// The model is kept between layouts, as Figma keeps its document: the page sends only the items
+// whose record changed (`scene_set`), the children lists that changed (`scene_children`) and the
+// items that went (`scene_remove`). An item keeps what its words measured until they change
+// (`scene_words`), or until a font arrives (`scene_fonts`), so an unchanged drawing measures nothing.
 #include <emscripten/emscripten.h>
 
 #include <algorithm>
@@ -40,6 +45,9 @@ enum Field : int {
 	F_COUNT
 };
 
+struct Box { double x, y, w, h; };
+struct Dim { double w, h; };
+
 struct Size {
 	int kind;
 	double value;
@@ -63,14 +71,17 @@ struct Node {
 	double fallback;
 	double pathW, pathH;  // NaN: no bounds
 	std::vector<int> children;
+	bool live = false;
+	// What its words measured, by the width asked and whether the item was passed along.
+	struct Measured { double maxWidth; int withNode; Dim size; };
+	std::vector<Measured> measured;
 };
 
-struct Box { double x, y, w, h; };
-struct Dim { double w, h; };
-
 std::vector<Node> nodes;
+std::vector<int> freeHandles;
 std::vector<int> roots;
-double input[F_COUNT];
+// Where the page writes what it sends: a record, or a list of children.
+std::vector<double> input(F_COUNT);
 // What the layout found, seven numbers per placed item: handle, x, y, w, h, parent, order.
 std::vector<double> results;
 const double NaN = std::nan("");
@@ -83,9 +94,16 @@ Size hug() { return Size{HUG, 0, NaN}; }
 bool has(double v) { return !std::isnan(v); }
 
 Dim measure(int handle, double maxWidth, bool withNode) {
+	auto& known = nodes[handle].measured;
+	for (const auto& one : known)
+		if (one.withNode == int(withNode) && (one.maxWidth == maxWidth || (std::isnan(one.maxWidth) && std::isnan(maxWidth)))) return one.size;
 	double out[2] = {0, 0};
 	scene_measure(handle, maxWidth, withNode ? 1 : 0, out);
-	return {out[0], out[1]};
+	Dim size{out[0], out[1]};
+	// A few widths per item at most: a fill share and its own width. More means a resize is passing through.
+	if (known.size() >= 8) known.erase(known.begin());
+	known.push_back({maxWidth, int(withNode), size});
+	return size;
 }
 
 Dim sizeOf(int handle, double forcedW = NaN, double forcedH = NaN);
@@ -296,18 +314,35 @@ size_t place(int handle, double x, double y, Dim size, int parent) {
 
 extern "C" {
 
-EMSCRIPTEN_KEEPALIVE double* scene_input() { return input; }
+EMSCRIPTEN_KEEPALIVE double* scene_input(int count) {
+	if (int(input.size()) < count) input.resize(count);
+	return input.data();
+}
 
 EMSCRIPTEN_KEEPALIVE void scene_reset() {
 	nodes.clear();
 	roots.clear();
+	freeHandles.clear();
 }
 
-// One item, from the numbers in `scene_input()`. Items come parent first, children in order.
-EMSCRIPTEN_KEEPALIVE int scene_node() {
-	const double* f = input;
-	Node n;
-	n.parent = int(f[F_PARENT]);
+// A handle for a new item, reusing one let go of.
+EMSCRIPTEN_KEEPALIVE int scene_add() {
+	if (!freeHandles.empty()) {
+		int handle = freeHandles.back();
+		freeHandles.pop_back();
+		nodes[handle] = Node{};
+		nodes[handle].live = true;
+		return handle;
+	}
+	nodes.push_back(Node{});
+	nodes.back().live = true;
+	return int(nodes.size() - 1);
+}
+
+// An item's record, from the numbers in `scene_input()`. Its children are set apart (`scene_children`).
+EMSCRIPTEN_KEEPALIVE void scene_set(int handle) {
+	const double* f = input.data();
+	Node& n = nodes[handle];
 	n.kind = Kind(int(f[F_KIND]));
 	n.visible = f[F_VISIBLE] != 0;
 	n.visibleInParent = f[F_VISIBLE_IN_PARENT] != 0;
@@ -325,12 +360,30 @@ EMSCRIPTEN_KEEPALIVE int scene_node() {
 	n.fallback = f[F_FALLBACK];
 	n.pathW = f[F_PATH_W];
 	n.pathH = f[F_PATH_H];
-	const int handle = int(nodes.size());
-	if (n.parent >= 0) nodes[n.parent].children.push_back(handle);
-	else roots.push_back(handle);
-	nodes.push_back(std::move(n));
-	return handle;
 }
+
+// What is in an item, in order, or the drawing's top level for -1: `count` handles from `scene_input()`.
+EMSCRIPTEN_KEEPALIVE void scene_children(int handle, int count) {
+	std::vector<int>& list = handle < 0 ? roots : nodes[handle].children;
+	list.resize(count);
+	for (int i = 0; i < count; i++) list[i] = int(input[i]);
+}
+
+// The item's words, or what it is, changed: what they measured no longer holds.
+EMSCRIPTEN_KEEPALIVE void scene_words(int handle) { nodes[handle].measured.clear(); }
+
+// A font arrived, or anything else every measure depends on changed.
+EMSCRIPTEN_KEEPALIVE void scene_fonts() {
+	for (Node& n : nodes) n.measured.clear();
+}
+
+EMSCRIPTEN_KEEPALIVE void scene_remove(int handle) {
+	nodes[handle] = Node{};
+	freeHandles.push_back(handle);
+}
+
+// How many items the scene holds, and how many words it measured since the last call.
+EMSCRIPTEN_KEEPALIVE int scene_count() { return int(nodes.size() - freeHandles.size()); }
 
 // Lay out every visible top-level item and what is in it. Returns how many items were placed; their
 // boxes are at `scene_results()`, seven numbers each.

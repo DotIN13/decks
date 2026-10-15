@@ -11,12 +11,12 @@ let failed = 0;
 let compared = 0;
 const close = (a, b) => (Number.isNaN(a) && Number.isNaN(b)) || Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a));
 
-function compare(name, doc, measure = estimateText) {
-	for (const mode of ["light", "dark"]) {
+function compare(name, doc, measure = estimateText, using = scene, measureKey = undefined, modes = ["light", "dark"]) {
+	for (const mode of modes) {
 		const theme = baseTheme(doc, mode);
 		const nodes = expand(doc);
 		const want = layout(doc, nodes, { theme, measure });
-		const got = scene.layout(doc, nodes, { theme, measure });
+		const got = using.layout(doc, nodes, { theme, measure, measureKey });
 		compared++;
 		const wantKeys = [...want.keys()];
 		const gotKeys = [...got.keys()];
@@ -110,5 +110,44 @@ for (let i = 0; i < made; i++) {
 	const measure = i % 2 ? estimateText : (text, style, max) => ({ w: Math.min(max ?? 1e9, text.length * style.fontSize * 0.6), h: style.fontSize * 1.3 * (1 + Math.floor((text.length * style.fontSize * 0.6) / Math.max(1, max ?? 1e9))) });
 	compare(`made-up #${i}`, doc, measure);
 }
+// One scene kept through a long run of edits, as the page keeps it: after each edit its layout must
+// still be a fresh TypeScript layout's, and an unchanged drawing must measure nothing.
+const kept = await loadScene();
+let edits = 0;
+let idleMeasures = 0;
+let fontVersion = 0;
+const fontMeasure = (text, style, max) => {
+	const per = style.fontSize * (0.5 + fontVersion * 0.05);
+	const w = text.length * per;
+	return { w: Math.min(max ?? 1e9, w), h: style.fontSize * 1.25 * (1 + Math.floor(w / Math.max(1, max ?? 1e9))) };
+};
+const all = (node, out = []) => (out.push(node), (node.children ?? []).forEach((child) => all(child, out)), out);
+for (let run = 0; run < 40; run++) {
+	next = 0;
+	const doc = { version: "2.6", themes: { Mode: ["Light", "Dark"] }, variables: structuredClone(variables), children: Array.from({ length: 2 + Math.floor(rand() * 3) }, () => item(0)) };
+	for (let step = 0; step < 60; step++) {
+		const nodes = doc.children.flatMap((node) => all(node));
+		const target = pick(nodes);
+		const what = Math.floor(rand() * 9);
+		if (what === 0) target.width = size();
+		else if (what === 1 && "content" in target) target.content = pick(["Changed", "A new longer sentence to wrap here and there", ""]);
+		else if (what === 2) target.enabled = pick([true, false, undefined]);
+		else if (what === 3 && target.children) target.children.push(item(3));
+		else if (what === 4 && target.children?.length) target.children.splice(Math.floor(rand() * target.children.length), 1);
+		else if (what === 5 && target.children?.length > 1) target.children.reverse();
+		else if (what === 6) doc.variables.size.value[0].value = Math.round(rand() * 200);
+		else if (what === 7) fontVersion++;
+		else if (what === 8 && doc.children.length > 1) doc.children.push(doc.children.shift());
+		else target.x = Math.round(rand() * 300);
+		edits++;
+		compare(`edit ${run}.${step}`, doc, fontMeasure, kept, `fonts ${fontVersion}`, ["light"]);
+	}
+	// Laid out again with nothing changed: nothing is sent and nothing measured.
+	compare(`unchanged ${run}`, doc, fontMeasure, kept, `fonts ${fontVersion}`, ["light"]);
+	if (kept.last.sent !== 0) { failed++; console.log(`FAIL unchanged ${run}: ${kept.last.sent} records sent`); }
+	idleMeasures += kept.last.measured;
+}
+if (idleMeasures) { failed++; console.log(`FAIL an unchanged drawing measured ${idleMeasures} times`); }
+console.log(`kept scene: ${edits} edits laid out, ${kept.last.held} items held at the end`);
 console.log(`${saved} saved files and ${made} made-up documents, ${compared} layouts compared: ${failed ? `${failed} differ` : "all the same"}`);
 process.exit(failed ? 1 : 0);

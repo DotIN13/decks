@@ -22,7 +22,7 @@ em++ cpp/scene.cpp -std=c++20 -O3 -flto \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \
-	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_node,_scene_layout,_scene_results \
+	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results \
 	-sEXPORTED_RUNTIME_METHODS=HEAPF64 \
 	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
 	-o wasm/scene.mjs
