@@ -42,7 +42,7 @@ import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
+import { debugOff, PenLayer, type PenHit, type PenPreview, type SceneBoard } from "./pen/layer.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
@@ -61,6 +61,7 @@ import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
+import { EngineStage, engineWanted } from "./engine-stage.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -624,6 +625,27 @@ export function Stage(props: {
 	onCleanup(() => penLayer.dispose());
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
+	/*
+	 * The C++ engine, when it is switched on (`engine-stage.ts`): it draws the boards' pictures under
+	 * their pages, and the sheet keeps the drawing only. Made when its canvas is, below.
+	 */
+	const useEngine = engineWanted();
+	let engineStage: EngineStage | undefined;
+	const startEngine = (under: HTMLCanvasElement) => {
+		engineStage = new EngineStage(under, document.createElement("canvas"));
+		engineStage.pictured = (paths) => picturedNow(paths);
+		onCleanup(() => engineStage?.dispose());
+	};
+	/*
+	 * Edit mode loads the drawing's painter ahead of the first item. A stage of boards alone no longer
+	 * loads it at all (`drawsAnything` in `pen/scene.ts`), so without this the first shape drawn would
+	 * wait for seven megabytes of CanvasKit before it appeared.
+	 */
+	createEffect(() => {
+		if (props.mode === "edit") penLayer.ink([], true);
+	});
+	createEffect(() => engineStage?.setView(view()));
+	createEffect(() => engineStage?.setScheme(scheme()));
 	createEffect(() => {
 		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
@@ -770,7 +792,14 @@ export function Stage(props: {
 		 */
 		const held = boardResize();
 		const resize = held && (!live.has(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
-		penLayer.setBoards(
+		const sendBoards = (boards: SceneBoard[]) => {
+			// With the engine on, the boards are its; the sheet draws the drawing alone.
+			if (useEngine) {
+				engineStage?.setBoards(boards);
+				penLayer.setBoards([]);
+			} else penLayer.setBoards(boards);
+		};
+		sendBoards(
 			props.boards
 				.filter((board) => board.path !== props.focus)
 				.map((board) => {
@@ -793,6 +822,7 @@ export function Stage(props: {
 		);
 	});
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
+	createEffect(() => engineStage?.setMoving(panning() || scaling() || moving() || gliding()));
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {
 		const drag = boardDrag();
@@ -840,11 +870,13 @@ export function Stage(props: {
 	let penMadeAt = 0;
 	/** The boards the sheet has on screen as pictures (`layer.ts`, `pictured`). */
 	const [onSheet, setOnSheet] = createSignal<ReadonlySet<string>>(new Set());
-	penLayer.pictured = (paths) => {
+	const picturedNow = (paths: ReadonlySet<string>) => {
 		const was = untrack(onSheet);
 		if (was.size === paths.size && [...paths].every((path) => was.has(path))) return;
 		setOnSheet(paths);
 	};
+	// With the engine on, the pictures on screen are the engine's to report (`startEngine`).
+	if (!useEngine) penLayer.pictured = picturedNow;
 	let lastDrawnDoc: PenDocument | undefined;
 	let drawnGeneration = 0;
 	/**
@@ -2876,6 +2908,7 @@ export function Stage(props: {
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
+		engineStage?.setCamera(cam);
 		// And the title bars, which are in a layer of their own that does not zoom: the track moves, and the bars only when the zoom changes.
 		const track = barLayer();
 		if (track) {
@@ -4621,6 +4654,7 @@ export function Stage(props: {
 			tabindex={-1}
 			data-mode={props.mode}
 			data-renderer={props.renderer}
+			data-engine={useEngine ? "true" : undefined}
 			data-previewing={Boolean(props.preview)}
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
@@ -4658,6 +4692,10 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
+			{/* The engine's canvas, under the world: the boards' pictures, beneath their pages (`engine-stage.ts`). */}
+			<Show when={useEngine}>
+				<canvas class="stage-engine" aria-hidden="true" ref={startEngine} />
+			</Show>
 			<div class="world" data-sizing={sizingPaths().size > 0 ? "true" : undefined} data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
 				{/*
 				 * A place for every board on the canvas, in file order, filled while it is within reach.

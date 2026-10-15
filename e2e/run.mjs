@@ -178,6 +178,8 @@ const CHECKS = [
 	{ file: "media.mjs", needsAgent: false },
 	/* A frame things can be put into and taken out of, and the panel for how it holds them. */
 	{ file: "frames.mjs", needsAgent: false },
+	/* The C++ stage engine, switched on: boards drawn under their pages, and no sheet. */
+	{ file: "engine.mjs", needsAgent: false },
 	/* A → B → A: whether a canvas comes back where it was left. */
 	{ file: "camera-roundtrip.mjs", needsAgent: false },
 	/*

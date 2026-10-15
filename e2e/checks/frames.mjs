@@ -94,8 +94,13 @@ if (spot) {
 	};
 
 	// --- in: dragging the loose item onto the frame makes it a child -------------------------------
-	const from = await middleOf("f-note");
-	const into = await middleOf("f-box");
+	/*
+	 * Waited for, not read at once: the file is written before the drawing is laid out, and a stage
+	 * that held only boards loads its painter only when the first drawn item arrives (`drawsAnything`
+	 * in `pen/scene.ts`), which takes a second or two.
+	 */
+	const from = await until(() => middleOf("f-note"));
+	const into = await until(() => middleOf("f-box"));
 	const wouldTake = await page.evaluate(([x, y]) => globalThis.__decksFrameUnder?.(x, y), [into.x, into.y]);
 	say("both are on screen to drag between", !!from && !!into, JSON.stringify({ from, into, wouldTake }));
 	if (from && into) {

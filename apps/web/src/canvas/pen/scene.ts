@@ -192,6 +192,16 @@ const LEVELS = [96, 192, 384, 720, 1024, 1440, 2048];
  */
 const SMALL = [192, 480];
 
+/**
+ * Whether a drawing has anything for the sheet to draw. A stage's boards are items of the drawing too
+ * (a `browser` item marked `decks.board`), but the sheet paints nothing for them (`paint.ts`): a stage
+ * of boards alone has no drawing, so it loads no CanvasKit (134 MB of WebAssembly memory, measured)
+ * and paints no sheet of its own.
+ */
+function drawsAnything(doc: PenDocument | undefined): boolean {
+	return !!doc && doc.children.some((child) => !(child.type === "browser" && (child.metadata as { type?: string } | undefined)?.type === "decks.board"));
+}
+
 /** A picture's width from its header, without decoding it: WebP (the server's whole pictures) or JPEG; undefined for anything else. */
 async function pictureWidth(blob: Blob): Promise<number | undefined> {
 	const bytes = new Uint8Array(await blob.slice(0, 256 * 1024).arrayBuffer());
@@ -401,7 +411,7 @@ export class StageScene {
 				this.docSeq = message.seq;
 				this.base = message.base;
 				this.dirty = this.allDirty = true;
-				if (message.doc && message.doc.children.length > 0) void this.start();
+				if (drawsAnything(message.doc)) void this.start();
 				break;
 			}
 			case "boards": {
@@ -531,7 +541,7 @@ export class StageScene {
 	}
 
 	private drawingEmpty(): boolean {
-		return !this.doc || this.doc.children.length === 0;
+		return !drawsAnything(this.doc);
 	}
 
 	private async frame(): Promise<void> {

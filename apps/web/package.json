@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@decks/board-kit": "*",
+    "@decks/engine": "*",
     "@decks/pen": "*",
     "@decks/protocol": "*",
     "canvaskit-wasm": "^0.42.0",

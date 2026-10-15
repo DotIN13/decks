@@ -640,6 +640,20 @@
 	left: 0;
 	transform-origin: 0 0;
 }
+	/*
+	 * The engine's canvas (`engine-stage.ts`): the size of the window, under the world, drawn with the
+	 * camera rather than moved by it. A page asleep over a picture there has no paper of its own, or
+	 * it would cover the picture it is asleep over.
+	 */
+	.stage-engine {
+	position: absolute;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+}
+	.stage[data-engine] .board-node[data-dormant] > .surface {
+	background: transparent;
+}
 	/* --- a board on the stage ---------------------------------------------------- */
 
 .board-node {

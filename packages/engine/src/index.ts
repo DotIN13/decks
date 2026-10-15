@@ -53,6 +53,8 @@ export interface Engine {
 	render(force?: boolean): [number, number];
 	/** Bytes of picture held on the graphics card, as the engine counts them. */
 	textureBytes(): number;
+	/** Items held, and how many each layer drew last time it was drawn. */
+	stats(): { items: number; drawn: [number, number] };
 	/**
 	 * Draw a layer again and read back the colours at some device-pixel points, as RGBA. For tests
 	 * and diagnosis: it does not touch what is on screen with WebGPU, and costs a GPU round trip.
@@ -74,6 +76,7 @@ interface Module {
 	_engine_forget_texture(id: number): void;
 	_engine_target(layer: number, view: number): void;
 	_engine_dirty(layer: number): number;
+	_engine_visible(layer: number): number;
 	_engine_frame(layer: number): number;
 	_engine_stat(which: number): number;
 	engineBridge(): {
@@ -181,7 +184,7 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 			format: "rgba8unorm",
 			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		device!.queue.copyExternalImageToTexture({ source }, { texture, premultipliedAlpha: true }, [width, height]);
+		device!.queue.copyExternalImageToTexture({ source } as Parameters<GPUQueue["copyExternalImageToTexture"]>[0], { texture, premultipliedAlpha: true }, [width, height]);
 		return { texture, bytes: width * height * 4 };
 	};
 
@@ -202,19 +205,49 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 		return { texture, bytes: Math.round(width * height * 4 * 4 / 3) };
 	};
 
+	/*
+	 * A layer with nothing in view lets its canvas go: a canvas the size of the window holds two or
+	 * three buffers of it on the graphics card even when it is blank (26 MB each at 1600 x 1000, 2x).
+	 * After a second of nothing, so a pan across an empty stretch does not set it up and tear it down
+	 * at every step; set up again the moment the layer has something to draw.
+	 */
+	let size = { width: 1, height: 1 };
+	const asleep: [boolean, boolean] = [false, false];
+	const resting: [ReturnType<typeof setTimeout> | undefined, ReturnType<typeof setTimeout> | undefined] = [undefined, undefined];
+	const sleep = (layer: Layer) => {
+		if (asleep[layer] || disposed) return;
+		asleep[layer] = true;
+		contexts?.[layer].unconfigure();
+		canvases[layer].width = 1;
+		canvases[layer].height = 1;
+	};
+	const wake = (layer: Layer) => {
+		if (!asleep[layer]) return;
+		asleep[layer] = false;
+		canvases[layer].width = size.width;
+		canvases[layer].height = size.height;
+		contexts?.[layer].configure({ device: device!, format, alphaMode: "premultiplied" });
+	};
+	const restLater = (layer: Layer) => {
+		clearTimeout(resting[layer]);
+		resting[layer] = setTimeout(() => {
+			if (module._engine_stat(layer + 1) === 0) sleep(layer);
+		}, 1000);
+	};
 	let disposed = false;
 	const engine: Engine & { adapter?: GPUAdapter | null } = {
 		backend,
 		adapter,
 		view(width, height, dpr) {
-			for (const canvas of canvases) {
-				const w = Math.max(1, Math.round(width * dpr));
-				const h = Math.max(1, Math.round(height * dpr));
-				if (canvas.width !== w) canvas.width = w;
-				if (canvas.height !== h) canvas.height = h;
+			size = { width: Math.max(1, Math.round(width * dpr)), height: Math.max(1, Math.round(height * dpr)) };
+			canvases.forEach((canvas, layer) => {
+				if (!asleep[layer]) {
+					if (canvas.width !== size.width) canvas.width = size.width;
+					if (canvas.height !== size.height) canvas.height = size.height;
+				}
 				canvas.style.width = `${width}px`;
 				canvas.style.height = `${height}px`;
-			}
+			});
 			module._engine_view(width, height, dpr);
 		},
 		camera(x, y, zoom) {
@@ -263,8 +296,13 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 			if (disposed) return drawn;
 			for (const layer of [0, 1] as const) {
 				if (!force && !module._engine_dirty(layer)) continue;
+				// A sleeping canvas stays asleep while nothing of its layer is in view.
+				if (asleep[layer] && !force && module._engine_visible(layer) === 0) continue;
+				wake(layer);
 				if (contexts) module._engine_target(layer, bridge.importView(contexts[layer].getCurrentTexture().createView()));
 				drawn[layer] = module._engine_frame(layer);
+				if (drawn[layer] === 0) restLater(layer);
+				else clearTimeout(resting[layer]);
 			}
 			return drawn;
 		},
@@ -301,6 +339,9 @@ export async function createEngine(options: { under: HTMLCanvasElement; over: HT
 			buffer.destroy();
 			target.destroy();
 			return out;
+		},
+		stats() {
+			return { items: module._engine_stat(0), drawn: [module._engine_stat(1), module._engine_stat(2)] };
 		},
 		textureBytes() {
 			let total = 0;

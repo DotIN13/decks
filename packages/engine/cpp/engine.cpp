@@ -488,6 +488,9 @@ struct Engine {
 	// What the last frame drew, per layer, for the page to read (`engine_stats`).
 	int drawn[LAYERS] = {};
 	int runs[LAYERS] = {};
+	// Items on each layer: an empty layer that has been cleared once is never drawn again, so a
+	// canvas with nothing on it asks the browser for no frame at all.
+	int count[LAYERS] = {};
 	std::vector<Quad> quads;
 	std::vector<std::pair<int, int>> spans;
 	std::vector<int> spanTextures;
@@ -538,9 +541,11 @@ EMSCRIPTEN_KEEPALIVE void engine_item(int id, int layer, double order, float x, 
 			engine.orderDirty[found->second.layer] = true;
 			touch(found->second.layer);
 		}
+		engine.count[found->second.layer]--;
 	} else {
 		engine.orderDirty[layer] = true;
 	}
+	engine.count[layer]++;
 	Item& item = engine.items[id];
 	item.layer = layer;
 	item.order = order;
@@ -556,12 +561,14 @@ EMSCRIPTEN_KEEPALIVE void engine_remove(int id) {
 	if (found == engine.items.end()) return;
 	engine.orderDirty[found->second.layer] = true;
 	touch(found->second.layer);
+	engine.count[found->second.layer]--;
 	engine.items.erase(found);
 }
 
 EMSCRIPTEN_KEEPALIVE void engine_clear() {
 	engine.items.clear();
 	for (int i = 0; i < LAYERS; i++) {
+		engine.count[i] = 0;
 		engine.orderDirty[i] = true;
 		touch(i);
 	}
@@ -590,7 +597,32 @@ EMSCRIPTEN_KEEPALIVE void engine_target(int layer, WGPUTextureView view) {
 }
 
 // Whether a layer needs drawing: something on it changed, or the camera moved.
-EMSCRIPTEN_KEEPALIVE int engine_dirty(int layer) { return layer >= 0 && layer < LAYERS && engine.dirty[layer] ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE int engine_dirty(int layer) {
+	if (layer < 0 || layer >= LAYERS || !engine.dirty[layer]) return 0;
+	if (engine.count[layer] == 0 && engine.drawn[layer] == 0) {
+		engine.dirty[layer] = false;
+		return 0;
+	}
+	return 1;
+}
+
+// How many items of a layer are in view now, without drawing: whether a sleeping canvas must wake.
+EMSCRIPTEN_KEEPALIVE int engine_visible(int layer) {
+	if (layer < 0 || layer >= LAYERS) return 0;
+	const Camera& c = engine.camera;
+	const View& v = engine.view;
+	float halfW = v.width / 2 / c.zoom, halfH = v.height / 2 / c.zoom;
+	float left = c.x - halfW, right = c.x + halfW, top = c.y - halfH, bottom = c.y + halfH;
+	int seen = 0;
+	for (auto& [id, item] : engine.items) {
+		if (item.layer != layer) continue;
+		const Quad& q = item.quad;
+		float slack = (q.stroke + 2) / c.zoom;
+		if (q.x + q.w < left - slack || q.x > right + slack || q.y + q.h < top - slack || q.y > bottom + slack) continue;
+		seen++;
+	}
+	return seen;
+}
 
 // Draw one layer: the items in view, in order, batched by texture. Returns how many were drawn.
 EMSCRIPTEN_KEEPALIVE int engine_frame(int layer) {
