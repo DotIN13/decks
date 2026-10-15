@@ -174,7 +174,30 @@ export function Properties(props: {
 	const edit = (ops: unknown[]) => {
 		if (ops.length) props.onEdit(ops);
 	};
-	const set = (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) => edit(nodes.map((node) => ({ op: "update", id: node.id, set: fields(node) })));
+	/*
+	 * What this panel has sent and the drawing does not have back yet, by item. An edit is built from
+	 * the item as it will be: two quick clicks, heads then dash, each rewrite an arrow's whole
+	 * metadata, and the second built from the item before the first came back undid the first.
+	 */
+	const sent = new Map<string, { fields: Record<string, unknown>; at: number }>();
+	const asSent = (node: PenNode): PenNode => {
+		const pending = sent.get(node.id);
+		if (!pending) return node;
+		const caughtUp = Object.entries(pending.fields).every(([field, value]) => JSON.stringify((node as unknown as Record<string, unknown>)[field] ?? null) === JSON.stringify(value ?? null));
+		if (caughtUp || performance.now() - pending.at > 5000) {
+			sent.delete(node.id);
+			return node;
+		}
+		return { ...node, ...pending.fields } as PenNode;
+	};
+	const set = (nodes: readonly PenNode[], fields: (node: PenNode) => Record<string, unknown>) =>
+		edit(
+			nodes.map((node) => {
+				const change = fields(asSent(node));
+				sent.set(node.id, { fields: { ...(sent.get(node.id)?.fields ?? {}), ...change }, at: performance.now() });
+				return { op: "update", id: node.id, set: change };
+			}),
+		);
 	/**
 	 * The same change, drawn on the stage and not saved: what a colour picker sends while the hand is
 	 * still down, so the colour follows the pointer and the file takes one edit when it lifts
