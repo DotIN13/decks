@@ -342,7 +342,8 @@ say("a double-click in a gap of the card opens it with a new line there, and no 
 await page.keyboard.press("Escape");
 await settle(page, 400);
 const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").startsWith("A new line"))?.id;
-const wordsBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId);
+// Waited for: the new line's layout comes back from the worker a moment after the file has it.
+const wordsBox = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
 await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
 await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 await page.keyboard.press("Home");

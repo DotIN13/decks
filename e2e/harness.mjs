@@ -137,17 +137,19 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * symptom was a panel that forgot its tab and its fold partway through a check, which
 	 * reads as a bug in the panel.
 	 */
-	await page.addInitScript(([wanted, renderer]) => {
+	await page.addInitScript(([wanted, renderer, engine]) => {
 		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
 			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
 			if (renderer) localStorage.setItem("decks.renderer", renderer);
+			// `DECKS_E2E_ENGINE=on` (or `webgl2`) runs a check with the C++ stage engine (`engine-stage.ts`).
+			if (engine) localStorage.setItem("decks:stage-engine", engine);
 		} catch {
 			/* private mode, or a page that has no storage access yet */
 		}
-	}, [scheme, process.env.DECKS_E2E_RENDERER ?? ""]);
+	}, [scheme, process.env.DECKS_E2E_RENDERER ?? "", process.env.DECKS_E2E_ENGINE ?? ""]);
 	/*
 	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
 	 * server remembers which agent each browser is on, so there is no address to name a place

@@ -37,6 +37,14 @@ import { BoxIndex, type Rect } from "../spatial.ts";
  * items and a hundred boards costs what the dozen in view cost.
  */
 
+/** A tile's side, in device pixels: a megabyte of pixels each. */
+const TILE = 512;
+/** Tiles drawn per frame at most, so a change on a big drawing never holds the worker for long. */
+const TILES_PER_FRAME = 12;
+const TILES_PER_FRAME_MOVING = 4;
+/** Tiles asked for at most; the page keeps up to 96 (`MAX_TILES` in `engine-stage.ts`). */
+const TILES_HELD = 48;
+
 /** How wide a news board's outline is on screen, in CSS px, when the sheet draws it (`paintNewsGpu`). */
 const NEWS_OUTLINE_PX = 1;
 /** How strong a news board's outline is: the writer's colour, faded, so it marks the board without framing it in ink. */
@@ -126,6 +134,10 @@ export type SceneInput =
 	| { type: "scroll"; scrolls: Array<[string, number]> }
 	/** The ink not yet in the drawing. An empty list with `warm` loads CanvasKit ahead of the first stroke. */
 	| { type: "ink"; strokes: LiveInk[]; warm?: boolean }
+	/** Draw the drawing as tiles for the page's engine (`canvas/engine-stage.ts`) rather than as a sheet. */
+	| { type: "tiles"; on: boolean }
+	/** The page let a tile go: draw it again when it is next in view. */
+	| { type: "tile-gone"; key: string }
 	| { type: "ack" }
 	/** Development only: switch parts off to find what a phone dies of, and report what the scene holds. */
 	| { type: "debug"; off: string[] }
@@ -153,13 +165,22 @@ export type SceneOutput =
 			seen?: number;
 			/** Drawn by CanvasKit, with the drawing in it; false while it loads, when only boards are drawn. */
 			gpu?: boolean;
+			/** Tile mode, mid-drag: the carried picture already on the page stays as it is. */
+			keepCarried?: true;
 	  }
 	/** A new layout of the drawing, after a change, for the page's hit tests. */
 	| { type: "layout"; seq: number; placed: Array<[string, Placed]>; bounds: Array<[string, Frame]>; cards: CardGeometry[]; partial?: true }
 	/** Which boards the sheet is drawing a picture of, as they change. */
 	| { type: "pictured"; paths: string[] }
 	/** Development only: what the scene holds, once a second after a `debug` message. */
-	| { type: "stats"; stats: Record<string, unknown> };
+	| { type: "stats"; stats: Record<string, unknown> }
+	/**
+	 * In tile mode (`tiles`), one square of the drawing at one zoom level, drawn because it changed or
+	 * came into view: `bitmap` is its pixels, or absent for a square with nothing drawn in it.
+	 */
+	| { type: "tile"; key: string; level: number; x: number; y: number; size: number; bitmap?: ImageBitmap }
+	/** In tile mode: the drawing is empty, every tile the page holds can go. */
+	| { type: "tiles-clear" };
 
 /** What the scene needs of where it runs. */
 export interface SceneHost {
@@ -200,6 +221,25 @@ const SMALL = [192, 480];
  */
 function drawsAnything(doc: PenDocument | undefined): boolean {
 	return !!doc && doc.children.some((child) => !(child.type === "browser" && (child.metadata as { type?: string } | undefined)?.type === "decks.board"));
+}
+
+/** The stage area some strokes of ink cover, read from their SVG paths' numbers; undefined for none. */
+function inkBounds(strokes: readonly LiveInk[]): Frame | undefined {
+	let left = Infinity;
+	let top = Infinity;
+	let right = -Infinity;
+	let bottom = -Infinity;
+	for (const stroke of strokes) {
+		const numbers = (stroke.d.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []).map(Number);
+		const pad = stroke.size + 2;
+		for (let i = 0; i + 1 < numbers.length; i += 2) {
+			left = Math.min(left, numbers[i]! - pad);
+			right = Math.max(right, numbers[i]! + pad);
+			top = Math.min(top, numbers[i + 1]! - pad);
+			bottom = Math.max(bottom, numbers[i + 1]! + pad);
+		}
+	}
+	return left === Infinity ? undefined : { x: left, y: top, w: right - left, h: bottom - top };
 }
 
 /** A picture's width from its header, without decoding it: WebP (the server's whole pictures) or JPEG; undefined for anything else. */
@@ -337,13 +377,25 @@ export class StageScene {
 	private holes: ReadonlySet<string> = new Set();
 	private scrolls = new Map<string, number>();
 	private ink: LiveInk[] = [];
+	/** Tile mode (`tiles` message): the drawing goes to the page as tiles, and no sheet is drawn. */
+	private tiles = false;
+	/** Device pixels per stage pixel the tiles are drawn at, a power of two, held through a zoom. */
+	private tileLevel = 0;
+	/** The tiles the page holds that show the drawing as it is now. */
+	private tileDrawn = new Set<string>();
+	/** Stage areas that changed since tiles were last drawn: the tiles over them are drawn again. */
+	private tileStale: Frame[] = [];
+	/** A canvas of one tile, with its own surface. */
+	private tileGpu: { canvas: OffscreenCanvas | HTMLCanvasElement; surface: Surface } | undefined;
+	/** Whether the page has been told the tiles are all drawn for what it last sent (`seen`). */
+	private tilesSaid = -1;
 	private readonly scrollOf = (id: string, index: number): number => this.scrolls.get(`${id}:${index}`) ?? 0;
 	/**
 	 * A move being dragged: the items it carries, drawn as one picture shifted each step; the items
 	 * left where they are are the ones already recorded, minus the carried ones. An item that is not
 	 * carried but holds one that is (a child picked out of a group) is recorded again without it.
 	 */
-	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture> } | undefined;
+	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture>; sent?: boolean } | undefined;
 	/** The boards a drag is carrying (`carry`). */
 	private carryBoards: ReadonlySet<string> = new Set();
 	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed>; source: PenDocument | undefined } | undefined;
@@ -480,10 +532,21 @@ export class StageScene {
 				this.scrolls = new Map(message.scrolls);
 				this.dirty = this.allDirty = true;
 				break;
+			case "tiles":
+				if (message.on === this.tiles) return;
+				this.tiles = message.on;
+				this.tileDrawn.clear();
+				break;
+			case "tile-gone":
+				this.tileDrawn.delete(message.key);
+				break;
 			case "ink":
 				if (message.strokes.length === 0 && this.ink.length === 0) {
 					if (message.warm) void this.start();
 					return;
+				}
+				if (this.tiles) {
+					for (const box of [inkBounds(this.ink), inkBounds(message.strokes)]) if (box) this.tileStale.push(box);
 				}
 				this.ink = message.strokes;
 				if (!this.ck) void this.start();
@@ -514,6 +577,175 @@ export class StageScene {
 		this.stillGen++;
 		this.wanted = true;
 		this.schedule();
+	}
+
+	// --- tiles -------------------------------------------------------------------------------
+
+	/**
+	 * Rebuild, and say which parts of the stage changed: every item whose recording is new, where it
+	 * was and where it is. A whole rebuild changes every item; a step of a drag, the moved ones.
+	 */
+	private rebuildMarkingTiles(): void {
+		const before = new Map(this.items.map((item) => [item.id, item.picture]));
+		const boundsBefore = this.bounds;
+		this.rebuild();
+		const after = new Set<string>();
+		for (const item of this.items) {
+			after.add(item.id);
+			if (before.get(item.id) === item.picture) continue;
+			const was = boundsBefore.get(item.id);
+			const now = this.bounds.get(item.id);
+			if (was) this.tileStale.push(was);
+			if (now) this.tileStale.push(now);
+		}
+		for (const id of before.keys()) {
+			if (after.has(id)) continue;
+			const was = boundsBefore.get(id);
+			if (was) this.tileStale.push(was);
+		}
+	}
+
+	/**
+	 * The drawing as tiles: the squares in view (and half a square round them) at the current level,
+	 * nearest the middle first, each drawn only if it changed or the page does not hold it. A few per
+	 * frame; the rest next frame. When all are drawn the page hears it with a frame that has no sheet.
+	 */
+	private async drawTiles(): Promise<void> {
+		const ck = this.ck;
+		if (!drawsAnything(this.doc) && this.ink.length === 0) {
+			if (this.tileDrawn.size > 0) {
+				this.tileDrawn.clear();
+				this.host.post({ type: "tiles-clear" });
+			}
+			this.sayTilesDrawn();
+			return;
+		}
+		if (!ck || !this.fonts) return;
+		const dpr = this.view.dpr;
+		const target = 2 ** Math.round(Math.log2(Math.max(1e-3, this.camera.zoom * dpr)));
+		// Held through a zoom, so its tiles are scaled rather than drawn again at every step; but not past
+		// the point where the window would need more of them than the page keeps (`MAX_TILES` there).
+		const across = (level: number) => Math.ceil((this.view.width / this.camera.zoom) / (TILE / level) + 1) * Math.ceil((this.view.height / this.camera.zoom) / (TILE / level) + 1);
+		if (!this.zooming || this.tileLevel === 0 || across(this.tileLevel) > TILES_HELD) this.tileLevel = target;
+		const level = this.tileLevel;
+		const size = TILE / level;
+		if (this.tileStale.length > 0) {
+			const stale = this.tileStale.map((box) => ({ x: box.x - ITEM_REACH, y: box.y - ITEM_REACH, w: box.w + 2 * ITEM_REACH, h: box.h + 2 * ITEM_REACH }));
+			this.tileStale = [];
+			for (const key of [...this.tileDrawn]) {
+				const [l, ix, iy] = key.split(":").map(Number) as [number, number, number];
+				const s = TILE / l;
+				const tile = { x: ix * s, y: iy * s, w: s, h: s };
+				if (stale.some((box) => box.x < tile.x + tile.w && tile.x < box.x + box.w && box.y < tile.y + tile.h && tile.y < box.y + box.h)) this.tileDrawn.delete(key);
+			}
+		}
+		// A drag's lifted items, once per drag, as one picture the page slides with the pointer (`layer.ts`).
+		const slide = this.slide?.ready && this.slide.carried ? this.slide : undefined;
+		if (slide && !slide.sent) {
+			slide.sent = true;
+			const cssW = Math.ceil(this.view.width * (1 + 2 * this.view.overscan));
+			const cssH = Math.ceil(this.view.height * (1 + 2 * this.view.overscan));
+			this.drawDpr = dpr;
+			const only = this.paintGpu([], this.camera, cssW, cssH, Math.max(1, Math.round(cssW * dpr)), Math.max(1, Math.round(cssH * dpr)), true);
+			if (only) {
+				this.awaiting = true;
+				const bitmap = await this.host.snapshot(only);
+				this.awaiting = false;
+				if (this.disposed) return bitmap.close();
+				this.host.post({ type: "frame", bitmap: undefined, camera: this.camera, width: cssW, height: cssH, seen: this.seen, gpu: true, carried: { bitmap, boards: [] } }, [bitmap]);
+			}
+		}
+		const { x, y, zoom } = this.camera;
+		const halfW = this.view.width / zoom / 2 + size / 2;
+		const halfH = this.view.height / zoom / 2 + size / 2;
+		const wanted: Array<{ ix: number; iy: number; d: number }> = [];
+		for (let iy = Math.floor((y - halfH) / size); iy <= Math.floor((y + halfH) / size); iy++)
+			for (let ix = Math.floor((x - halfW) / size); ix <= Math.floor((x + halfW) / size); ix++) {
+				const cx = (ix + 0.5) * size - x;
+				const cy = (iy + 0.5) * size - y;
+				wanted.push({ ix, iy, d: cx * cx + cy * cy });
+			}
+		wanted.sort((a, b) => a.d - b.d);
+		// Never more than the page keeps: the furthest would be let go of as soon as they arrived.
+		wanted.length = Math.min(wanted.length, TILES_HELD);
+		const limit = this.cameraMoving ? TILES_PER_FRAME_MOVING : TILES_PER_FRAME;
+		const ink = inkBounds(this.ink);
+		let drawn = 0;
+		let more = false;
+		this.awaiting = true;
+		try {
+			for (const { ix, iy } of wanted) {
+				const key = `${level}:${ix}:${iy}`;
+				if (this.tileDrawn.has(key)) continue;
+				// A newer change has arrived: take it first, since it may make these tiles stale anyway.
+				if (drawn >= limit || (drawn > 0 && this.wanted)) {
+					more = true;
+					break;
+				}
+				const rect = { x: ix * size, y: iy * size, w: size, h: size };
+				const reach = { x: rect.x - ITEM_REACH, y: rect.y - ITEM_REACH, w: rect.w + 2 * ITEM_REACH, h: rect.h + 2 * ITEM_REACH };
+				const hits = (this.itemIndex?.search(reach) ?? []).sort((a, b) => a - b);
+				const inked = !!ink && ink.x < rect.x + rect.w && rect.x < ink.x + ink.w && ink.y < rect.y + rect.h && rect.y < ink.y + ink.h;
+				this.tileDrawn.add(key);
+				if (hits.length === 0 && !inked) {
+					this.host.post({ type: "tile", key, level, x: rect.x, y: rect.y, size });
+					continue;
+				}
+				const bitmap = await this.paintTile(rect, level, hits);
+				if (this.disposed) {
+					bitmap?.close();
+					return;
+				}
+				if (!bitmap) continue;
+				this.host.post({ type: "tile", key, level, x: rect.x, y: rect.y, size, bitmap }, [bitmap]);
+				drawn++;
+			}
+		} finally {
+			this.awaiting = false;
+		}
+		if (more || this.wanted) {
+			this.wanted = true;
+			this.schedule();
+		} else this.sayTilesDrawn();
+	}
+
+	/** One tile: the items over it, recorded once, replayed into a square at the level's scale. */
+	private async paintTile(rect: Frame, level: number, hits: number[]): Promise<ImageBitmap | undefined> {
+		const ck = this.ck!;
+		if (!this.tileGpu) {
+			const canvas = this.host.canvas();
+			canvas.width = TILE;
+			canvas.height = TILE;
+			const handle = ck.GetWebGLContext(canvas as HTMLCanvasElement, { antialias: 0, preserveDrawingBuffer: 0, alpha: 1, premultipliedAlpha: 1 } as never);
+			const gr = handle ? (ck.MakeWebGLContext(handle) ?? undefined) : undefined;
+			const surface = (gr ? ck.MakeOnScreenGLSurface(gr, TILE, TILE, ck.ColorSpace.SRGB) : ck.MakeSWCanvasSurface(canvas as HTMLCanvasElement)) ?? undefined;
+			if (!surface) return undefined;
+			this.tileGpu = { canvas, surface };
+		}
+		const { canvas: element, surface } = this.tileGpu;
+		const canvas = surface.getCanvas();
+		canvas.clear(ck.TRANSPARENT);
+		canvas.save();
+		canvas.scale(level, level);
+		canvas.translate(-rect.x, -rect.y);
+		const slide = this.slide?.ready ? this.slide : undefined;
+		for (const at of hits) {
+			const item = this.items[at];
+			// What a drag lifts is the carried picture's, not the tiles'.
+			if (!item || slide?.ids.has(item.id)) continue;
+			canvas.drawPicture(slide?.replaced?.get(item.id) ?? item.picture);
+		}
+		this.paintInkGpu(canvas);
+		canvas.restore();
+		surface.flush();
+		return await this.host.snapshot(element);
+	}
+
+	/** The page hears that the tiles show everything it has sent so far, as a frame with no sheet. */
+	private sayTilesDrawn(): void {
+		if (this.tilesSaid === this.seen) return;
+		this.tilesSaid = this.seen;
+		this.host.post({ type: "frame", bitmap: undefined, camera: this.camera, width: 0, height: 0, seen: this.seen, gpu: !!this.ck, ...(this.slide?.sent ? { keepCarried: true as const } : {}) });
 	}
 
 	// --- the frame ------------------------------------------------------------------------
@@ -559,12 +791,17 @@ export class StageScene {
 		this.wanted = false;
 		if (this.dirty) {
 			this.dirty = false;
-			this.rebuild();
+			if (this.tiles) this.rebuildMarkingTiles();
+			else this.rebuild();
 		}
 		if (this.slide && !this.slide.ready) this.recordSlide();
 		this.frameNo++;
 		const { width, height, overscan } = this.view;
 		if (width === 0 || height === 0) return;
+		if (this.tiles) {
+			await this.drawTiles();
+			return;
+		}
 		// While zooming, larger and denser, so the next steps of the zoom are served by this frame (`covers`).
 		const band = this.zooming ? ZOOM_BAND : 1;
 		const dpr = this.view.dpr * band;
@@ -1189,6 +1426,11 @@ export class StageScene {
 	}
 
 	private dropSlide(): void {
+		if (this.tiles && this.slide?.ready) {
+			this.staleSlide(this.slide);
+			// The window-sized surface the carried picture was drawn on is only for the drag.
+			this.shrinkGpu();
+		}
 		this.slide?.carried?.delete();
 		for (const picture of this.slide?.replaced?.values() ?? []) picture.delete();
 		this.slide = undefined;
@@ -1232,6 +1474,16 @@ export class StageScene {
 		});
 		// Carried over everything, so what you are dragging is never hidden under a board.
 		slide.carried = this.record((canvas) => paintDocument(canvas, carried, ctx));
+		// In tile mode the tiles under what is lifted are drawn again without it.
+		if (this.tiles) this.staleSlide(slide);
+	}
+
+	/** The tiles over a drag's items and what holds them, drawn again when the drag starts or ends. */
+	private staleSlide(slide: { ids: ReadonlySet<string>; replaced?: Map<string, Picture> }): void {
+		for (const id of [...slide.ids, ...(slide.replaced?.keys() ?? [])]) {
+			const box = this.bounds.get(id);
+			if (box) this.tileStale.push(box);
+		}
 	}
 
 	/** What the document's words need from the font CDN; asked before the first layout, and again when it changes. */

@@ -16,6 +16,11 @@
  */
 import { createEngine, type Engine } from "@decks/engine";
 import type { SceneBoard } from "./pen/layer.ts";
+import type { SceneOutput } from "./pen/scene.ts";
+
+type TileMessage = Extract<SceneOutput, { type: "tile" | "tiles-clear" }>;
+/** Drawing tiles held at most, a megabyte each: about three screens' worth at 2x. */
+const MAX_TILES = 96;
 
 /**
  * Whether this browser is using the engine, read once: `?engine=on` uses WebGPU where there is one,
@@ -92,11 +97,25 @@ export class EngineStage {
 	private picturedNow: ReadonlySet<string> = new Set();
 	/** Which backend it is running on, once started: shown in the diagnostics. */
 	backend: string | undefined;
+	/** The drawing's tiles held on the card, by the worker's key (`pen/scene.ts`, `drawTiles`). */
+	private tiles = new Map<string, { level: number; x: number; y: number; size: number; used: number }>();
+	private tileLevel = 0;
+	private tileSettle: ReturnType<typeof setTimeout> | undefined;
+	/** Tell the worker a tile was let go of (`PenLayer.forgetTile`). */
+	forgetTile: ((key: string) => void) | undefined;
+	/** Called when no backend could start: the page goes back to the sheet. */
+	failed: (() => void) | undefined;
+	/** Tiles that arrived before the engine was ready, shown once it is. */
+	private early: TileMessage[] = [];
 
 	constructor(under: HTMLCanvasElement, over: HTMLCanvasElement) {
 		void createEngine({ under, over, ...(engineChoice() === "webgl2" ? { prefer: "webgl2" as const } : {}) }).then((engine) => {
 			if (!engine || this.disposed) {
 				engine?.dispose();
+				if (!engine && !this.disposed) {
+					for (const message of this.early.splice(0)) if (message.type === "tile") message.bitmap?.close();
+					this.failed?.();
+				}
 				return;
 			}
 			this.engine = engine;
@@ -104,8 +123,85 @@ export class EngineStage {
 			(globalThis as { __decksEngine?: EngineStage }).__decksEngine = this;
 			this.setView(this.view);
 			this.layout();
+			for (const message of this.early.splice(0)) this.tile(message);
 			this.draw();
+		}).catch((error: unknown) => {
+			console.error(`stage engine: could not start (${String((error as Error)?.message ?? error)}); the sheet draws instead`);
+			if (this.disposed) return;
+			for (const message of this.early.splice(0)) if (message.type === "tile") message.bitmap?.close();
+			this.failed?.();
 		});
+	}
+
+	/**
+	 * A tile of the drawing from the worker, onto the layer over the board pages. Tiles of the level
+	 * before a zoom stay under the new level's until a moment after the last new one arrives, so a
+	 * zoom never shows a gap; then they go.
+	 */
+	tile(message: TileMessage): void {
+		const engine = this.engine;
+		if (!engine) {
+			if (message.type === "tile" && this.early.length > 256) message.bitmap?.close();
+			else this.early.push(message);
+			return;
+		}
+		if (message.type === "tiles-clear") {
+			for (const key of this.tiles.keys()) this.dropTile(key, false);
+			this.draw();
+			return;
+		}
+		const { key, level, x, y, size, bitmap } = message;
+		if (level !== this.tileLevel) {
+			this.tileLevel = level;
+			// The previous level's tiles go under the new one's while the new ones arrive.
+			for (const [name, one] of this.tiles) engine.set(`tile:${name}`, { layer: 1, order: 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${name}` });
+		}
+		if (!bitmap) {
+			this.dropTile(key, false);
+		} else {
+			engine.texture(`tile:${key}`, bitmap, 1);
+			bitmap.close();
+			engine.set(`tile:${key}`, { layer: 1, order: 2, x, y, w: size, h: size, texture: `tile:${key}` });
+			this.tiles.set(key, { level, x, y, size, used: this.frame });
+			// Tiles of another level that this one covers whole go at once: after a zoom out, one coarse
+			// tile replaces many fine ones, which would otherwise wait for the zoom to go quiet.
+			for (const [name, one] of this.tiles)
+				if (one.level !== level && one.x >= x && one.y >= y && one.x + one.size <= x + size && one.y + one.size <= y + size) this.dropTile(name, true);
+			this.keepTilesToBudget();
+		}
+		this.draw();
+		clearTimeout(this.tileSettle);
+		this.tileSettle = setTimeout(() => this.dropOldLevels(), 300);
+	}
+
+	private dropTile(key: string, tell: boolean): void {
+		if (!this.tiles.has(key) && !tell) {
+			this.engine?.remove(`tile:${key}`);
+			return;
+		}
+		this.engine?.remove(`tile:${key}`);
+		this.engine?.forget(`tile:${key}`);
+		this.tiles.delete(key);
+		if (tell) this.forgetTile?.(key);
+	}
+
+	/** After a zoom has settled and its tiles are in: the levels before it go. */
+	private dropOldLevels(): void {
+		let dropped = false;
+		for (const [key, one] of this.tiles)
+			if (one.level !== this.tileLevel) {
+				this.dropTile(key, true);
+				dropped = true;
+			}
+		if (dropped) this.draw();
+	}
+
+	/** Past the budget, the tiles furthest from the window go, and the worker hears of each. */
+	private keepTilesToBudget(): void {
+		if (this.tiles.size <= MAX_TILES) return;
+		const { x, y } = this.camera;
+		const far = [...this.tiles.entries()].map(([key, one]) => ({ key, d: (one.x + one.size / 2 - x) ** 2 + (one.y + one.size / 2 - y) ** 2 })).sort((a, b) => b.d - a.d);
+		for (const { key } of far.slice(0, this.tiles.size - MAX_TILES)) this.dropTile(key, true);
 	}
 
 	setView(view: { width: number; height: number }): void {
@@ -152,6 +248,8 @@ export class EngineStage {
 		const engine = this.engine;
 		if (!engine) return;
 		engine.clear();
+		// Clearing took the tiles' items too: they go back as they were.
+		for (const [key, one] of this.tiles) engine.set(`tile:${key}`, { layer: 1, order: one.level === this.tileLevel ? 2 : 1, x: one.x, y: one.y, w: one.size, h: one.size, texture: `tile:${key}` });
 		const paper: [number, number, number, number] = this.scheme === "dark" ? [30, 30, 32, 1] : [255, 255, 255, 1];
 		let order = 0;
 		for (const board of this.boards) {
@@ -338,7 +436,9 @@ export class EngineStage {
 	}
 
 	/** What the diagnostics read: the backend, pictures held, and their bytes. */
-	stats(): { backend: string | undefined; pictures: number; bytes: number; items: number; drawn: [number, number] } {
+	stats(): { backend: string | undefined; pictures: number; bytes: number; items: number; drawn: [number, number]; tiles: number; levels: Record<string, number> } {
+		const levels: Record<string, number> = {};
+		for (const one of this.tiles.values()) levels[one.level] = (levels[one.level] ?? 0) + 1;
 		let bytes = 0;
 		let count = 0;
 		for (const one of this.pictures.values())
@@ -346,11 +446,13 @@ export class EngineStage {
 				bytes += one.bytes;
 				count++;
 			}
-		return { backend: this.backend, pictures: count, bytes, items: this.engine?.stats().items ?? 0, drawn: this.engine?.stats().drawn ?? [0, 0] };
+		return { backend: this.backend, pictures: count, bytes, items: this.engine?.stats().items ?? 0, drawn: this.engine?.stats().drawn ?? [0, 0], tiles: this.tiles.size, levels };
 	}
 
 	dispose(): void {
 		this.disposed = true;
+		clearTimeout(this.tileSettle);
+		for (const message of this.early.splice(0)) if (message.type === "tile") message.bitmap?.close();
 		this.engine?.dispose();
 		this.engine = undefined;
 	}

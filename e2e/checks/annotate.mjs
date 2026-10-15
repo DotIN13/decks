@@ -182,8 +182,10 @@ for (let i = 1; i <= 16; i++) await page.mouse.move(x0 + i * 7, y0 + Math.sin(i 
 const shownBefore = await page.evaluate(() => window.__decksSheet?.shown ?? 0);
 await page.mouse.move(x0 + 120, y0 + 10);
 await page.waitForFunction((n) => (window.__decksSheet?.shown ?? 0) > n, shownBefore, { timeout: 3000 }).catch(() => {});
-const mid = await page.evaluate(() => ({ ink: window.__decksSheet?.ink, shown: window.__decksSheet?.shown, hidden: document.querySelector(".stage-sheet")?.hidden, glass: document.querySelectorAll(".stage-ink g > path:not(.ink-loop)").length }));
-say("the stroke under the pen is drawn on the sheet, not on the glass", mid.ink === 1 && mid.shown > shownBefore && mid.hidden === false && mid.glass === 0, JSON.stringify(mid));
+const mid = await page.evaluate(() => ({ ink: window.__decksSheet?.ink, shown: window.__decksSheet?.shown, hidden: document.querySelector(".stage-sheet")?.hidden, glass: document.querySelectorAll(".stage-ink g > path:not(.ink-loop)").length, engine: window.__decksEngine?.stats?.() }));
+// With the C++ engine on (`DECKS_E2E_ENGINE`), live ink is drawn into the tiles on the canvas over the boards.
+const onSheet = mid.engine ? mid.engine.tiles > 0 && mid.engine.drawn[1] > 0 : mid.shown > shownBefore && mid.hidden === false;
+say("the stroke under the pen is drawn on the sheet, not on the glass", mid.ink === 1 && onSheet && mid.glass === 0, JSON.stringify(mid));
 await page.evaluate(() => window.__watchLift());
 await page.mouse.up();
 await settle(page, 900);

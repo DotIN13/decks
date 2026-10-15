@@ -630,11 +630,40 @@ export function Stage(props: {
 	 * their pages, and the sheet keeps the drawing only. Made when its canvas is, below.
 	 */
 	const useEngine = engineWanted();
-	let engineStage: EngineStage | undefined;
-	const startEngine = (under: HTMLCanvasElement) => {
-		engineStage = new EngineStage(under, document.createElement("canvas"));
-		engineStage.pictured = (paths) => picturedNow(paths);
-		onCleanup(() => engineStage?.dispose());
+	/** A signal, so the effects that feed it run again once it exists: it starts after its canvases do. */
+	const [engineStage, setEngineStage] = createSignal<EngineStage>();
+	/*
+	 * Two canvases: one under the world, for the boards' pictures, and one inside it after the board
+	 * pages and before the selection's outlines and handles, for the drawing as tiles. The second is
+	 * inside the world only to sit at that place in its order: `writeTransform` undoes the world's
+	 * transform on it, so both are the window's size and drawn with the camera.
+	 */
+	let engineUnder: HTMLCanvasElement | undefined;
+	let engineOver: HTMLCanvasElement | undefined;
+	const startEngine = () => {
+		if (!engineUnder || !engineOver || untrack(engineStage)) return;
+		const stage = new EngineStage(engineUnder, engineOver);
+		stage.pictured = (paths) => picturedNow(paths);
+		stage.forgetTile = (key) => penLayer.forgetTile(key);
+		stage.setCamera(localCamera);
+		// A browser where the engine cannot start keeps the sheet, pictures and all.
+		stage.failed = () => {
+			penLayer.setTiles(undefined);
+			penLayer.pictured = picturedNow;
+		};
+		penLayer.setTiles((message) => stage.tile(message));
+		placeEngineOver(localCamera);
+		setEngineStage(stage);
+		onCleanup(() => {
+			penLayer.setTiles(undefined);
+			stage.dispose();
+		});
+	};
+	/** The undoing of the world's transform on the over canvas, so it covers exactly the window. */
+	const placeEngineOver = (cam: Camera) => {
+		if (!engineOver) return;
+		const v = view();
+		engineOver.style.transform = `translate(${cam.x - v.width / 2 / cam.zoom}px, ${cam.y - v.height / 2 / cam.zoom}px) scale(${1 / cam.zoom})`;
 	};
 	/*
 	 * Edit mode loads the drawing's painter ahead of the first item. A stage of boards alone no longer
@@ -644,8 +673,8 @@ export function Stage(props: {
 	createEffect(() => {
 		if (props.mode === "edit") penLayer.ink([], true);
 	});
-	createEffect(() => engineStage?.setView(view()));
-	createEffect(() => engineStage?.setScheme(scheme()));
+	createEffect(() => engineStage()?.setView(view()));
+	createEffect(() => engineStage()?.setScheme(scheme()));
 	createEffect(() => {
 		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
@@ -793,11 +822,13 @@ export function Stage(props: {
 		const held = boardResize();
 		const resize = held && (!live.has(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
 		const sendBoards = (boards: SceneBoard[]) => {
-			// With the engine on, the boards are its; the sheet draws the drawing alone.
-			if (useEngine) {
-				engineStage?.setBoards(boards);
-				penLayer.setBoards([]);
-			} else penLayer.setBoards(boards);
+			/*
+			 * With the engine on, the boards' pictures are its to draw. The drawing still hears of every
+			 * board: an arrow follows the board it ends on, and a drawn item over a board gets the click
+			 * shape that lets it be pressed there (`PenLayer.writeHits`). In tile mode it paints none.
+			 */
+			if (useEngine) engineStage()?.setBoards(boards);
+			penLayer.setBoards(boards);
 		};
 		sendBoards(
 			props.boards
@@ -822,7 +853,7 @@ export function Stage(props: {
 		);
 	});
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
-	createEffect(() => engineStage?.setMoving(panning() || scaling() || moving() || gliding()));
+	createEffect(() => engineStage()?.setMoving(panning() || scaling() || moving() || gliding()));
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {
 		const drag = boardDrag();
@@ -2908,7 +2939,8 @@ export function Stage(props: {
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
-		engineStage?.setCamera(cam);
+		untrack(engineStage)?.setCamera(cam);
+		placeEngineOver(cam);
 		// And the title bars, which are in a layer of their own that does not zoom: the track moves, and the bars only when the zoom changes.
 		const track = barLayer();
 		if (track) {
@@ -4694,7 +4726,14 @@ export function Stage(props: {
 			 */}
 			{/* The engine's canvas, under the world: the boards' pictures, beneath their pages (`engine-stage.ts`). */}
 			<Show when={useEngine}>
-				<canvas class="stage-engine" aria-hidden="true" ref={startEngine} />
+				<canvas
+					class="stage-engine"
+					aria-hidden="true"
+					ref={(canvas) => {
+						engineUnder = canvas;
+						queueMicrotask(startEngine);
+					}}
+				/>
 			</Show>
 			<div class="world" data-sizing={sizingPaths().size > 0 ? "true" : undefined} data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
 				{/*
@@ -4741,6 +4780,16 @@ export function Stage(props: {
 					}}
 				</For>
 				<canvas class="stage-sheet" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
+				<Show when={useEngine}>
+					<canvas
+						class="stage-engine stage-engine-over"
+						aria-hidden="true"
+						ref={(canvas) => {
+							engineOver = canvas;
+							queueMicrotask(startEngine);
+						}}
+					/>
+				</Show>
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
 				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
 				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}

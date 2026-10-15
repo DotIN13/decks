@@ -651,6 +651,9 @@
 	left: 0;
 	pointer-events: none;
 }
+	.stage-engine-over {
+	transform-origin: 0 0;
+}
 	.stage[data-engine] .board-node[data-dormant] > .surface {
 	background: transparent;
 }

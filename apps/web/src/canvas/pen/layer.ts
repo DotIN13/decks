@@ -217,6 +217,10 @@ export class PenLayer {
 			return;
 		}
 		if (message.type === "frame") this.present(message);
+		else if (message.type === "tile" || message.type === "tiles-clear") {
+			if (this.tileSink) this.tileSink(message);
+			else if (message.type === "tile") message.bitmap?.close();
+		}
 		// Said when the frame that draws them is on screen (`present`), not when the worker decides to.
 		else if (message.type === "pictured") this.picturedNext = new Set(message.paths);
 		else if (message.type === "stats") Object.assign(sheetStats(), message.stats);
@@ -304,7 +308,9 @@ export class PenLayer {
 		this.takeLayout();
 		if (!frame.bitmap) {
 			if (sheet) sheet.hidden = true;
-			this.showCarried(frame, "");
+			// In tile mode a drag's carried picture comes with no sheet: placed as a sheet would be.
+			const { x, y, zoom } = frame.camera;
+			if (!frame.keepCarried) this.showCarried(frame, frame.carried ? `translate(${x - frame.width / 2 / zoom}px, ${y - frame.height / 2 / zoom}px) scale(${1 / zoom})` : "");
 			this.pictured?.(new Set());
 			this.presented?.();
 			return;
@@ -364,7 +370,9 @@ export class PenLayer {
 				this.carriedBitmaps = null;
 			}
 			const element = this.carriedEl;
-			if (element.previousElementSibling !== this.sheet) this.sheet.after(element);
+			// Over the drawing: after the sheet, or after the engine's canvas of tiles when it follows the sheet.
+			const over = this.sheet.nextElementSibling?.classList.contains("stage-engine-over") ? this.sheet.nextElementSibling : this.sheet;
+			if (element.previousElementSibling !== over) over.after(element);
 			this.carriedBitmaps ??= element.getContext("bitmaprenderer");
 			// A copy the page can read, for the ghost a drag over a card is cut from (`cutFromCarried`).
 			const copy = new OffscreenCanvas(carried.bitmap.width, carried.bitmap.height);
@@ -721,6 +729,26 @@ export class PenLayer {
 	}
 
 	/** Whether the camera is being moved: pictures wait for it to stop before changing size. */
+	/** Where the drawing's tiles go in tile mode (`setTiles`): the page's engine. */
+	private tileSink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" }>) => void) | undefined;
+
+	/**
+	 * Tile mode: the drawing is drawn as squares for `sink`, the engine on the page
+	 * (`canvas/engine-stage.ts`), and no sheet is drawn. The page says when it lets a tile go
+	 * (`forgetTile`), so the worker draws it again when it is next in view.
+	 */
+	setTiles(sink: ((message: Extract<SceneOutput, { type: "tile" | "tiles-clear" }>) => void) | undefined): void {
+		this.tileSink = sink;
+		this.send({ type: "tiles", on: !!sink });
+	}
+
+	forgetTile(key: string): void {
+		// Not kept to replay to a new worker, as other messages are: a new worker holds no tiles.
+		if (this.disposed) return;
+		this.port.post({ type: "tile-gone", key });
+		this.sent++;
+	}
+
 	setMoving(moving: boolean): void {
 		if (moving === this.moving) return;
 		this.moving = moving;
