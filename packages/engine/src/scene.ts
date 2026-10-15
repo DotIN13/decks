@@ -41,6 +41,12 @@ interface SceneModule {
 	_scene_card(handle: number, count: number, poolLength: number): void;
 	_scene_text(handle: number, length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, markdown: number): void;
 	HEAPU8: Uint8Array;
+	GL: { registerContext(context: unknown, attributes: Record<string, unknown>): number; makeContextCurrent(handle: number): boolean };
+	_paint_init(): void;
+	_paint_record(handle: number, at: number, count: number): void;
+	_paint_flags(handle: number, skip: number, hole: number): void;
+	_paint_scheme(dark: number): void;
+	_paint_tile(x: number, y: number, size: number, pixels: number): number;
 	_scene_layout(): number;
 	_scene_results(): number;
 }
@@ -62,12 +68,28 @@ export interface SceneLayout {
 			chain?: (family: string) => readonly string[];
 			/** With `chain`: a card's markdown, parsed and encoded for the scene (`card-wire.ts` in the app), so it measures cards too. */
 			card?: (text: string, style: TextStyle, node: PenNode) => { numbers: Float64Array; pool: Uint8Array };
+			/** An item's paint record (`paint-wire.ts` in the app), for the painter (`painter`). */
+			paint?: (node: PenNode, theme: ThemeState) => number[];
 		},
 	): Map<string, Placed>;
 	/** A font file for the scene's own measuring, as the page's font provider gets it. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
+	/**
+	 * The C++ painter (`cpp/paint.cpp`), drawing into a WebGL 2 canvas of its own: the items the last
+	 * layout placed, with the paint records `paint` gave. Undefined when the canvas has no WebGL 2.
+	 */
+	painter(canvas: OffscreenCanvas | HTMLCanvasElement): Painter | undefined;
 	/** What the last layout sent and measured, and how many items the scene holds. */
 	readonly last: { sent: number; measured: number; held: number };
+}
+
+export interface Painter {
+	/**
+	 * Paint the square at stage (x, y), `size` stage units wide, into the canvas, `pixels` square. False
+	 * when something there is beyond the painter yet, and the caller paints it some other way.
+	 * `skip`: items carried on a picture of their own; `holes`: items shown live under the drawing.
+	 */
+	tile(x: number, y: number, size: number, pixels: number, options: { dark: boolean; skip?: ReadonlySet<string>; holes?: ReadonlySet<string> }): boolean;
 }
 
 /** What the page last told the scene about one item. */
@@ -76,6 +98,7 @@ interface Known {
 	record: Float64Array;
 	words: string;
 	children: number[];
+	paint?: string;
 }
 
 const inNode = typeof (globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node === "string" && typeof (globalThis as { window?: unknown }).window === "undefined";
@@ -111,7 +134,31 @@ export async function loadScene(): Promise<SceneLayout> {
 	return {
 		last,
 		font: (bytes, family) => text.font(bytes, family),
-		layout(doc, nodes, { theme, measure, measureKey, chain, card }) {
+		painter(canvas) {
+			const gl = (canvas as OffscreenCanvas).getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
+			if (!gl) return undefined;
+			const handle = module.GL.registerContext(gl, { majorVersion: 2, minorVersion: 0, alpha: true, premultipliedAlpha: true, antialias: false });
+			module.GL.makeContextCurrent(handle);
+			module._paint_init();
+			let flagged: number[] = [];
+			return {
+				tile(x, y, size, pixels, { dark, skip, holes }) {
+					module.GL.makeContextCurrent(handle);
+					module._paint_scheme(dark ? 1 : 0);
+					for (const h of flagged) module._paint_flags(h, 0, 0);
+					flagged = [];
+					for (const [set, which] of [[skip, 0], [holes, 1]] as const)
+						for (const id of set ?? []) {
+							const entry = known.get(id);
+							if (!entry) continue;
+							module._paint_flags(entry.handle, which === 0 ? 1 : 0, which === 1 ? 1 : 0);
+							flagged.push(entry.handle);
+						}
+					return module._paint_tile(x, y, size, pixels) === 1;
+				},
+			};
+		},
+		layout(doc, nodes, { theme, measure, measureKey, chain, card, paint }) {
 			const measureText = measure ?? estimateText;
 			if (measureText !== lastMeasure || measureKey !== lastKey) {
 				module._scene_fonts();
@@ -163,6 +210,16 @@ export async function loadScene(): Promise<SceneLayout> {
 							module.HEAPU8.set(wire.pool, module._scene_bytes(wire.pool.length));
 							module._scene_card(entry.handle, wire.numbers.length, wire.pool.length);
 						}
+					}
+				}
+				if (paint) {
+					const numbers = paint(node, t);
+					const key = numbers.join(",");
+					if (key !== entry.paint) {
+						const at = module._scene_input(numbers.length);
+						module.HEAPF64.set(numbers, at >> 3);
+						module._paint_record(entry.handle, at, numbers.length);
+						entry.paint = key;
 					}
 				}
 				const children = (node.children ?? []).map((child) => send(child, t, node.id, node.type === "group" ? t : undefined));

@@ -1,10 +1,11 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
 import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import type { SceneLayout } from "@decks/engine/scene";
+import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
 import { encodeCard } from "./card-wire.ts";
+import { paintRecord } from "./paint-wire.ts";
 import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
 import { parseMarkdown, wordsOf } from "./markdown.ts";
 import { PenIcons } from "./icons.ts";
@@ -460,7 +461,7 @@ export class StageScene {
 			if (entry.decoding !== undefined) decoding++;
 		}
 		const heap = (this.ck as unknown as { HEAPU8?: Uint8Array } | undefined)?.HEAPU8?.buffer.byteLength;
-		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, words: this.wordsBy, pageMeasures: cppLayout?.last.measured, error: this.lastError };
+		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, words: this.wordsBy, pageMeasures: cppLayout?.last.measured, tiles: { ...this.tilesBy, painter: this.cppPainter === null ? "no webgl2" : this.cppPainter ? "ready" : "not made" }, error: this.lastError };
 		this.drawnSince = 0;
 		return out;
 	}
@@ -716,7 +717,7 @@ export class StageScene {
 					this.host.post({ type: "tile", key, level, x: rect.x, y: rect.y, size });
 					continue;
 				}
-				const bitmap = await this.paintTile(rect, level, hits);
+				const bitmap = await this.paintTile(rect, level, hits, inked);
 				if (this.disposed) {
 					bitmap?.close();
 					return;
@@ -741,7 +742,23 @@ export class StageScene {
 	}
 
 	/** One tile: the items over it, recorded once, replayed into a square at the level's scale. */
-	private async paintTile(rect: Frame, level: number, hits: number[]): Promise<ImageBitmap | undefined> {
+	private async paintTile(rect: Frame, level: number, hits: number[], inked = false): Promise<ImageBitmap | undefined> {
+		// With the engine on, our own painter first (`@decks/engine`, `cpp/paint.cpp`); a tile holding
+		// something it does not draw yet, or a pen's ink, is painted by CanvasKit below.
+		if (cppLayout && !inked && this.cppPainter !== null) {
+			if (!this.cppCanvas) {
+				this.cppCanvas = this.host.canvas();
+				this.cppCanvas.width = TILE;
+				this.cppCanvas.height = TILE;
+				this.cppPainter = cppLayout.painter(this.cppCanvas) ?? null;
+			}
+			const slide = this.slide?.ready ? this.slide : undefined;
+			if (this.cppPainter && this.cppPainter.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes })) {
+				this.tilesBy.cpp++;
+				return await this.host.snapshot(this.cppCanvas);
+			}
+		}
+		this.tilesBy.canvaskit++;
 		const ck = this.ck!;
 		if (!this.tileGpu) {
 			const canvas = this.host.canvas();
@@ -792,11 +809,17 @@ export class StageScene {
 			this.wordsBy = ownWords ? "c++" : "canvaskit";
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
 			const card = (text: string, style: TextStyle) => encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => fonts.images?.(url) });
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}) });
+			const scheme = this.scheme;
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);
 	}
+	/** The C++ painter's canvas and painter, once made; null when it could not be (no WebGL 2 in this worker). */
+	private cppCanvas: OffscreenCanvas | HTMLCanvasElement | undefined;
+	private cppPainter: Painter | null | undefined;
+	/** Tiles painted by each painter, for the diagnostics. */
+	private tilesBy = { cpp: 0, canvaskit: 0 };
 	/** Which layout drew the last frame, and what measured its plain words, for the diagnostics. */
 	private layoutBy: "c++" | "typescript" = "typescript";
 	private wordsBy: "c++" | "canvaskit" = "canvaskit";

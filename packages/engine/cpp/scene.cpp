@@ -99,6 +99,9 @@ std::vector<int> roots;
 std::vector<double> input(F_COUNT);
 // What the layout found, seven numbers per placed item: handle, x, y, w, h, parent, order.
 std::vector<double> results;
+// Each item's box from the last layout, by handle, for the painter (`paint.cpp`).
+struct Placement { double x, y, w, h; bool placed; };
+std::vector<Placement> placements;
 const double NaN = std::nan("");
 
 // A size as stated, or what an absent one means here.
@@ -455,9 +458,28 @@ EMSCRIPTEN_KEEPALIVE int scene_layout() {
 		Dim size = sizeOf(root);
 		place(root, nodes[root].x, nodes[root].y, size, -1);
 	}
+	placements.assign(nodes.size(), Placement{0, 0, 0, 0, false});
+	for (size_t k = 0; k + 6 < results.size(); k += 7) placements[size_t(results[k])] = Placement{results[k + 1], results[k + 2], results[k + 3], results[k + 4], true};
 	return int(results.size() / 7);
 }
 
 EMSCRIPTEN_KEEPALIVE double* scene_results() { return results.data(); }
 
 }  // extern "C"
+
+// What the painter reads of the scene: the top items, an item's children, an item's box.
+struct PaintBox { double x, y, w, h; bool placed; };
+int sceneRoots(const int** out) {
+	*out = roots.data();
+	return int(roots.size());
+}
+int sceneChildren(int handle, const int** out) {
+	if (handle < 0 || size_t(handle) >= nodes.size()) return 0;
+	if (out) *out = nodes[size_t(handle)].children.data();
+	return int(nodes[size_t(handle)].children.size());
+}
+PaintBox sceneBox(int handle) {
+	if (handle < 0 || size_t(handle) >= placements.size()) return {0, 0, 0, 0, false};
+	const Placement& p = placements[size_t(handle)];
+	return {p.x, p.y, p.w, p.h, p.placed};
+}
