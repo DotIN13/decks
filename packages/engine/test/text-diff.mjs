@@ -40,7 +40,13 @@ const mine = text.measure(chain);
 const mineLines = (t, style, maxWidth) => text.lines(t || " ", style, maxWidth, chain(style.fontFamily)).spans.map((x) => (t || " ").slice(x.from, x.to));
 
 let seed = Number(process.env.SEED ?? 5);
-const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+// mulberry32: an LCG multiplied in doubles loses bits past 2^53 and repeats within a few hundred numbers.
+const rand = () => {
+	seed = (seed + 0x6d2b79f5) | 0;
+	let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+	t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+	return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const pick = (list) => list[Math.floor(rand() * list.length)];
 const WORDS = ["the", "Decks", "canvas", "board", "a", "is", "agent's", "re-drawn", "well-known", "2026", "10:30", "$40", "75%", "(note)", "[draft]", "e.g.", "U.S.", "—", "–", "...", "…", "https://example.com/a/b", "path/to/file.md", "co-op", "naïve", "Łódź", "über", "→", "✓", "★", "中文", "汉字测试", "，", "。", "「引用」", "x²", "AVA", "WAVE", "Typography", "fi", "ffl", "longwordwithoutanybreaksatall", "C++", "#tag", "@name", "\"quoted\"", "'single'", "Hello!", "Why?", "a/b", "1/2", "3.14", "-5", "+1"];
 const sentence = () => {

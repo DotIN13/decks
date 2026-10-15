@@ -6,7 +6,13 @@ import { loadPicker } from "../src/pick.ts";
 
 const picker = await loadPicker();
 let seed = 3;
-const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+// mulberry32: an LCG multiplied in doubles loses bits past 2^53 and repeats within a few hundred numbers.
+const rand = () => {
+	seed = (seed + 0x6d2b79f5) | 0;
+	let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+	t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+	return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 // On a coarse grid, so edges, middles and gaps line up often.
 const g = () => Math.round(rand() * 40) * 10;
 const box = () => ({ x: g(), y: g(), w: 10 + g() / 2, h: 10 + g() / 2 });

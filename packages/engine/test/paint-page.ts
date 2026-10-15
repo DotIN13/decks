@@ -58,5 +58,23 @@ window.compare = async (doc, tile, scheme, pixels) => {
 		worst = Math.max(worst, d);
 		if (d > 24) differ++;
 	}
-	return { drawn, differ, worst: Math.round(worst), pixels: pixels * pixels, want: drawn && differ ? Array.from(want) : undefined, got: drawn && differ ? Array.from(got) : undefined };
+	// Misplaced: outside the range of the other picture's nine pixels around it (by more than 24), either
+	// way. An edge a fraction of a pixel aside lands between its neighbours; a dot in the wrong place does not.
+	let misplaced = 0;
+	const near = (from: Uint8Array | Uint8ClampedArray, to: Uint8Array | Uint8ClampedArray, x: number, y: number) => {
+		const b = over(to, (y * pixels + x) * 4);
+		const low = [255, 255, 255], high = [0, 0, 0];
+		for (let dy = -1; dy <= 1; dy++)
+			for (let dx = -1; dx <= 1; dx++) {
+				const qx = x + dx, qy = y + dy;
+				if (qx < 0 || qy < 0 || qx >= pixels || qy >= pixels) continue;
+				const a = over(from, (qy * pixels + qx) * 4);
+				for (let c = 0; c < 3; c++) (low[c] = Math.min(low[c]!, a[c]!)), (high[c] = Math.max(high[c]!, a[c]!));
+			}
+		return b.every((v, c) => v >= low[c]! - 24 && v <= high[c]! + 24);
+	};
+	if (differ)
+		for (let y = 0; y < pixels; y++)
+			for (let x = 0; x < pixels; x++) if (!near(want, got, x, y) || !near(got, want, x, y)) misplaced++;
+	return { drawn, differ, misplaced, worst: Math.round(worst), pixels: pixels * pixels, want: drawn && differ ? Array.from(want) : undefined, got: drawn && differ ? Array.from(got) : undefined };
 };

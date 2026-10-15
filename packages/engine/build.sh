@@ -22,7 +22,7 @@ ls -la wasm
 # FreeType, whose install fails on this disk, and HarfBuzz reads fonts without it.
 HB="${HARFBUZZ:-/mnt/data/decks-data/tools/harfbuzz-10.1.0}"
 if [ ! -f "$HB/harfbuzz.o" ]; then em++ -std=c++17 -O2 -DHB_NO_MT -fno-exceptions -fno-rtti -c "$HB/src/harfbuzz.cc" -o "$HB/harfbuzz.o"; fi
-em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp cpp/paint.cpp "$HB/harfbuzz.o" -I"$HB/src" -std=c++20 -O3 \
+em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp cpp/paint.cpp cpp/raster.cpp "$HB/harfbuzz.o" -I"$HB/src" -std=c++20 -O3 \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \

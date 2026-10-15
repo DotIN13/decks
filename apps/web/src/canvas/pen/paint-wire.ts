@@ -1,4 +1,4 @@
-import { bool, color, fillsOf, isCard, isMarkdown, mediaOf, num, radiiOf, resolve, strokeOf, withTheme, type Fill, type PenDocument, type PenNode, type Rgba, type ThemeState } from "@decks/pen";
+import { arrowLabel, arrowStyle, bool, color, fillsOf, isArrow, isCard, isMarkdown, mediaOf, num, pathBounds, radiiOf, resolve, strokeOf, withTheme, type Fill, type PenDocument, type PenNode, type Rgba, type ThemeState } from "@decks/pen";
 import { CARD_PALETTE } from "./markdown-layout.ts";
 
 /**
@@ -8,9 +8,36 @@ import { CARD_PALETTE } from "./markdown-layout.ts";
  * shadows. What the painter cannot draw yet is marked so (kind 99), and the tile goes to CanvasKit.
  */
 
-const NONE = 0, RECT = 1, ELLIPSE = 2, NOTE = 6, GROUP = 7, UNSUPPORTED = 99;
+const NONE = 0, RECT = 1, ELLIPSE = 2, PATH = 3, NOTE = 6, GROUP = 7, UNSUPPORTED = 99;
 const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
 const ALIGN = { inner: 0, center: 1, outer: 2 } as const;
+const CAP = { butt: 0, round: 1, square: 2 } as const;
+const JOIN = { miter: 0, round: 1, bevel: 2 } as const;
+
+/** `paint.ts`'s `dashOf`: a line in dashes or dots, from `strokeDash`. */
+function dashOf(node: PenNode, width: number): number[] {
+	const w = Math.max(1, width);
+	if (node.strokeDash === "dashed") return [w * 4, w * 3];
+	if (node.strokeDash === "dotted") return [0.01, w * 2.5];
+	return [];
+}
+
+/** SVG geometry and the viewBox it is fitted from, as `geometryPath` reads them: [x, y, w, h, length, ...char codes]. */
+function geometryOf(node: PenNode, geometry: string): number[] {
+	const vb = node.viewBox ?? (() => {
+		const b = pathBounds(geometry);
+		return b ? [b.x, b.y, b.w, b.h] : [0, 0, 0, 0];
+	})();
+	const codes: number[] = [];
+	for (let i = 0; i < geometry.length; i++) codes.push(geometry.charCodeAt(i) & 0x7f);
+	return [vb[0] ?? 0, vb[1] ?? 0, vb[2] ?? 0, vb[3] ?? 0, codes.length, ...codes];
+}
+
+/** A stroke the same width on every side, or none: a path's stroke has no sides to draw apart. */
+function uniformStroke(doc: PenDocument, node: PenNode, theme: ThemeState): boolean {
+	const w = strokeOf(doc, node, theme)?.widths;
+	return !w || (w[0] === w[1] && w[1] === w[2] && w[2] === w[3]);
+}
 
 /** A fill's colour when it is a plain colour that draws; `false` when it draws something else; undefined when it draws nothing. */
 function solid(doc: PenDocument, fill: Fill, theme: ThemeState): Rgba | false | undefined {
@@ -25,7 +52,7 @@ function solid(doc: PenDocument, fill: Fill, theme: ThemeState): Rgba | false | 
 export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, scheme: "light" | "dark"): number[] {
 	const head = [num(doc, node.opacity, theme, 1), num(doc, node.rotation, theme, 0), bool(doc, node.flipX, theme, false) ? 1 : 0, bool(doc, node.flipY, theme, false) ? 1 : 0];
 	const unsupported = () => [UNSUPPORTED, ...head];
-	const shape = (kind: number, paper: boolean, sound: boolean, paperColor: string, fillList: Fill[], radii: number[]) => {
+	const shape = (kind: number, paper: boolean, sound: boolean, paperColor: string, fillList: Fill[], radii: number[], tail: number[] = []) => {
 		const fills: Rgba[] = [];
 		for (const fill of fillList) {
 			const one = solid(doc, fill, theme);
@@ -35,7 +62,6 @@ export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, 
 		const stroke = strokeOf(doc, node, theme);
 		let strokeColor: Rgba | undefined;
 		if (stroke) {
-			if (node.strokeDash === "dashed" || node.strokeDash === "dotted") return unsupported();
 			for (const fill of stroke.fills) {
 				const one = solid(doc, fill, theme);
 				if (one === false) return unsupported();
@@ -53,6 +79,7 @@ export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, 
 			if (rgba) shadows.push([...rgba, num(doc, effect.blur, theme, 0), num(doc, effect.offset?.x, theme, 0), num(doc, effect.offset?.y, theme, 0)]);
 		}
 		const paperRgba = color(doc, paperColor, {}) ?? [1, 1, 1, 1];
+		const dash = stroke && !isArrow(node) ? dashOf(node, stroke.widths[0]) : [];
 		return [
 			kind, ...head,
 			bool(doc, node.clip, theme, false) ? 1 : 0, paper ? 1 : 0, sound ? 1 : 0, ...paperRgba,
@@ -60,6 +87,8 @@ export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, 
 			fills.length, ...fills.flat(),
 			strokeColor ? 1 : 0, ...(strokeColor ?? [0, 0, 0, 0]), ...(stroke?.widths ?? [0, 0, 0, 0]), stroke ? ALIGN[stroke.align] : 1,
 			shadows.length, ...shadows.flat(),
+			stroke ? CAP[stroke.cap] : 0, stroke ? JOIN[stroke.join] : 0, dash.length, ...dash,
+			...tail,
 		];
 	};
 	switch (node.type) {
@@ -72,10 +101,32 @@ export function paintRecord(doc: PenDocument, node: PenNode, theme: ThemeState, 
 			return shape(RECT, paper, false, CARD_PALETTE[scheme].paper, fillsOf(node.fill), radiiOf(doc, node, theme));
 		}
 		case "ellipse": {
-			const inner = num(doc, node.innerRadius, theme, 0);
-			const sweep = num(doc, node.sweepAngle, theme, 360);
-			if (inner > 0 || Math.abs(sweep) < 360) return unsupported();
-			return shape(ELLIPSE, false, false, "#ffffff", fillsOf(node.fill), [0, 0, 0, 0]);
+			const inner = Math.max(0, Math.min(1, num(doc, node.innerRadius, theme, 0)));
+			const start = num(doc, node.startAngle, theme, 0);
+			const sweep = Math.max(-360, Math.min(360, num(doc, node.sweepAngle, theme, 360)));
+			if (inner <= 0 && Math.abs(sweep) >= 360) return shape(ELLIPSE, false, false, "#ffffff", fillsOf(node.fill), [0, 0, 0, 0]);
+			if (!uniformStroke(doc, node, theme)) return unsupported();
+			// [path kind, even-odd, sides, corner radius, inner radius, start, sweep, arrow, dashed arrow, has a fill, geometries]
+			return shape(PATH, false, false, "#ffffff", fillsOf(node.fill), [0, 0, 0, 0], [2, inner > 0 && Math.abs(sweep) >= 360 ? 1 : 0, 3, 0, inner, start, sweep, 0, 0, 1, 0]);
+		}
+		case "polygon": {
+			if (!uniformStroke(doc, node, theme)) return unsupported();
+			const sides = Math.max(3, Math.round(num(doc, node.polygonCount, theme, 3)));
+			return shape(PATH, false, false, "#ffffff", fillsOf(node.fill), [0, 0, 0, 0], [1, 0, sides, radiiOf(doc, node, theme)[0] ?? 0, 0, 0, 360, 0, 0, 1, 0]);
+		}
+		case "path": {
+			if (typeof node.geometry !== "string" || !node.geometry.trim()) return [NONE, ...head];
+			// An arrow's words are text, which this painter does not draw yet.
+			const arrow = isArrow(node);
+			if (arrow && arrowLabel(node.metadata)) return unsupported();
+			const arrowDash = arrow && arrowStyle(node.metadata).dash;
+			const geometries = [geometryOf(node, node.geometry)];
+			if (arrowDash) {
+				const [line = "", ...heads] = node.geometry.split(/(?=M)/);
+				geometries.push(geometryOf(node, line), geometryOf(node, heads.join("")));
+			}
+			const hasFill = fillsOf(node.fill).length > 0;
+			return shape(PATH, false, false, "#ffffff", fillsOf(node.fill), [0, 0, 0, 0], [0, node.fillRule === "evenodd" ? 1 : 0, 3, 0, 0, 0, 360, arrow ? 1 : 0, arrowDash ? 1 : 0, hasFill ? 1 : 0, geometries.length, ...geometries.flat()]);
 		}
 		case "note":
 		case "prompt":

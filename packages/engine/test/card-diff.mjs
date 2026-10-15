@@ -70,7 +70,13 @@ console.log(`${seen.size} saved cards`);
 
 // Made-up cards with every block.
 let seed = Number(process.env.SEED ?? 3);
-const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+// mulberry32: an LCG multiplied in doubles loses bits past 2^53 and repeats within a few hundred numbers.
+const rand = () => {
+	seed = (seed + 0x6d2b79f5) | 0;
+	let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+	t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+	return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const pick = (list) => list[Math.floor(rand() * list.length)];
 const INLINE = ["plain words", "**bold words**", "*italic*", "`code()`", "[a link](https://example.com)", "~~struck~~", "==marked==", "x^2^", "H~2~O", "[[Wiki page]]", "[red words]{.red}", "[big words]{.large}", "[small]{.small}", "[serif words]{.serif}", "==highlight==", "{++added++}", "{--removed--}", "{>>a reason<<}", "😀 emoji", "中文字符", "naïve café", "→ arrows ✓", "a very long word supercalifragilisticexpialidocious", "![tiny](a.png)", "[^1]"];
 const inline = () => Array.from({ length: 1 + Math.floor(rand() * 6) }, () => pick(INLINE)).join(" ");

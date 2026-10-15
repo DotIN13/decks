@@ -28,7 +28,13 @@ for (const file of execSync("find /home/decks/data/decks /mnt/data/decks-data/wo
 	} catch {}
 }
 let seed = 7;
-const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+// mulberry32: an LCG multiplied in doubles loses bits past 2^53 and repeats within a few hundred numbers.
+const rand = () => {
+	seed = (seed + 0x6d2b79f5) | 0;
+	let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+	t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+	return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const pick = (list) => list[Math.floor(rand() * list.length)];
 const n = (k = 300) => Math.round(rand() * k * 10) / 10;
 const geometry = () =>
