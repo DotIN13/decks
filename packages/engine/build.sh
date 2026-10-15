@@ -22,11 +22,11 @@ ls -la wasm
 # FreeType, whose install fails on this disk, and HarfBuzz reads fonts without it.
 HB="${HARFBUZZ:-/mnt/data/decks-data/tools/harfbuzz-10.1.0}"
 if [ ! -f "$HB/harfbuzz.o" ]; then em++ -std=c++17 -O2 -DHB_NO_MT -fno-exceptions -fno-rtti -c "$HB/src/harfbuzz.cc" -o "$HB/harfbuzz.o"; fi
-em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp "$HB/harfbuzz.o" -I"$HB/src" -std=c++20 -O3 \
+em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp "$HB/harfbuzz.o" -I"$HB/src" -std=c++20 -O3 \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \
-	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_bytes,_scene_text,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results,_pick_io,_pick_add,_pick_remove,_pick_set,_pick_geometry,_pick_point,_pick_within,_pick_found,_snap_in,_snap_out,_snap_move,_snap_edges,_text_scratch,_text_answer,_text_lines,_text_font,_text_measure,_text_face_metrics \
+	-sEXPORTED_FUNCTIONS=_scene_input,_scene_reset,_scene_bytes,_scene_text,_scene_card,_text_card,_scene_add,_scene_set,_scene_children,_scene_words,_scene_fonts,_scene_remove,_scene_count,_scene_layout,_scene_results,_pick_io,_pick_add,_pick_remove,_pick_set,_pick_geometry,_pick_point,_pick_within,_pick_found,_snap_in,_snap_out,_snap_move,_snap_edges,_text_scratch,_text_answer,_text_lines,_text_font,_text_measure,_text_face_metrics \
 	-sEXPORTED_RUNTIME_METHODS=HEAPF64,HEAP32,HEAPU8 \
 	-sNO_EXIT_RUNTIME=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
 	-o wasm/scene.mjs

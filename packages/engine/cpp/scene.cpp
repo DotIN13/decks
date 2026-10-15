@@ -25,6 +25,8 @@ extern void scene_measure(int handle, double maxWidth, int withNode, double* out
 // Words measured in C++ (`text.cpp`), with the fonts it holds.
 int measureWords(const char* s, int length, const char* chainNames, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth, double* out);
 }
+// A markdown card's height (`card.cpp`).
+double cardHeight(const double* nums, size_t count, const char* pool, double width);
 
 namespace {
 
@@ -81,6 +83,10 @@ struct Node {
 	double fontSize = 14, letterSpacing = 0, lineHeight = NAN;
 	int weight = 400;
 	bool italic = false;
+	// A card's blocks, encoded as `card.cpp` reads them, when the page sent them (`scene_card`).
+	bool ownCard = false;
+	std::vector<double> card;
+	std::string cardPool;
 	// What its words measured, by the width asked and whether the item was passed along.
 	struct Measured { double maxWidth; int withNode; Dim size; };
 	std::vector<Measured> measured;
@@ -108,7 +114,11 @@ Dim measure(int handle, double maxWidth, bool withNode) {
 		if (one.withNode == int(withNode) && (one.maxWidth == maxWidth || (std::isnan(one.maxWidth) && std::isnan(maxWidth)))) return one.size;
 	const Node& n = nodes[handle];
 	Dim size{0, 0};
-	if (n.ownWords && !(n.markdown && withNode)) {
+	if (n.ownCard && n.markdown && withNode) {
+		// A card: as wide as asked (240 when not), as tall as its blocks, as `PenFonts.measure` has it.
+		const double w = std::isnan(maxWidth) ? 240 : maxWidth;
+		size = {w, cardHeight(n.card.data(), n.card.size(), n.cardPool.data(), std::max(1.0, w))};
+	} else if (n.ownWords && !(n.markdown && withNode)) {
 		// Plain words, measured here as the page's `PenFonts.measure` measures them: an empty text as one space.
 		double out[4] = {0, 0, 0, 0};
 		const std::string& words = n.text.empty() ? std::string(" ") : n.text;
@@ -399,6 +409,15 @@ EMSCRIPTEN_KEEPALIVE char* scene_bytes(int count) {
 	if (int(bytes.size()) < count) bytes.resize(count);
 	return bytes.data();
 }
+// An item's card: `count` numbers at `scene_input`, its strings `poolLength` bytes at `scene_bytes`.
+EMSCRIPTEN_KEEPALIVE void scene_card(int handle, int count, int poolLength) {
+	Node& n = nodes[handle];
+	n.ownCard = count > 0;
+	n.card.assign(input.begin(), input.begin() + count);
+	n.cardPool.assign(bytes.data(), size_t(poolLength));
+	n.measured.clear();
+}
+
 EMSCRIPTEN_KEEPALIVE void scene_text(int handle, int length, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, int markdown) {
 	Node& n = nodes[handle];
 	n.ownWords = true;

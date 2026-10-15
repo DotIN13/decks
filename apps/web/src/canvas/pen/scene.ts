@@ -1,9 +1,10 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState } from "@decks/pen";
+import { baseTheme, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import type { SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
+import { encodeCard } from "./card-wire.ts";
 import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
 import { parseMarkdown, wordsOf } from "./markdown.ts";
 import { PenIcons } from "./icons.ts";
@@ -459,7 +460,7 @@ export class StageScene {
 			if (entry.decoding !== undefined) decoding++;
 		}
 		const heap = (this.ck as unknown as { HEAPU8?: Uint8Array } | undefined)?.HEAPU8?.buffer.byteLength;
-		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, words: this.wordsBy, error: this.lastError };
+		const out = { mode: this.lastMode, sheet: this.lastSize, drawn: this.drawnSince, entries: this.entries.size, decoded, decodedMPx: +(decodedPx / 1e6).toFixed(2), blobs, blobMB: +(blobBytes / 1e6).toFixed(1), decoding, fetching: this.fetching, items: this.items.length, ck: !!this.ck, wasmMB: heap ? Math.round(heap / 1e6) : undefined, fonts: this.fonts?.loaded.map((f) => `${f.url} ${(f.bytes / 1e6).toFixed(1)}MB`), cards: (this.fonts as unknown as { cards?: Map<string, unknown> } | undefined)?.cards?.size, layout: this.layoutBy, words: this.wordsBy, pageMeasures: cppLayout?.last.measured, error: this.lastError };
 		this.drawnSince = 0;
 		return out;
 	}
@@ -790,7 +791,8 @@ export class StageScene {
 			const ownWords = fonts.files.length === fonts.loaded.length;
 			this.wordsBy = ownWords ? "c++" : "canvaskit";
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family) } : {}) });
+			const card = (text: string, style: TextStyle) => encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => fonts.images?.(url) });
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);

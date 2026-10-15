@@ -12,6 +12,7 @@ interface TextModule {
 	_text_scratch(bytes: number): number;
 	_text_answer(): number;
 	_text_lines(): number;
+	_text_card(count: number, poolLength: number, width: number): number;
 	_text_font(bytes: number, nameLength: number): number;
 	_text_measure(length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, maxWidth: number): number;
 }
@@ -21,6 +22,10 @@ export interface TextEngine {
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
 	/** One paragraph's numbers: its unbroken width (trailing spaces in), its longest line, its height and lines. */
 	lines(text: string, style: TextStyle, maxWidth: number | undefined, chain: readonly string[]): { unbroken: number; longest: number; height: number; lines: number; spans: Array<{ from: number; to: number; width: number }> };
+	/** A markdown card's height (`cpp/card.cpp`), from its encoding (`card-wire.ts` in the app), `width` wide. */
+	card(numbers: Float64Array, pool: Uint8Array, width: number): number;
+	/** The lines of the last paragraph measured, in UTF-8 bytes of its own text, for checking. */
+	lastLines(): Array<{ from: number; to: number; width: number }>;
 	/** The measure the layout takes, as `PenFonts.measure` gives it for plain words. */
 	measure(chain: (family: string) => readonly string[]): MeasureText;
 }
@@ -61,6 +66,22 @@ export function textOf(module: unknown): TextEngine {
 			const index = (b: number) => decoder.decode(bytes.subarray(0, b)).length;
 			const spans = Array.from({ length: lines }, (_, i) => ({ from: index(m.HEAPF64[l + i * 3]!), to: index(m.HEAPF64[l + i * 3 + 1]!), width: m.HEAPF64[l + i * 3 + 2]! }));
 			return { unbroken: m.HEAPF64[at]!, longest: m.HEAPF64[at + 1]!, height: m.HEAPF64[at + 2]!, lines, spans };
+		},
+		lastLines() {
+			const l = m._text_lines() >> 3;
+			const out: Array<{ from: number; to: number; width: number }> = [];
+			for (let i = 0; i < 64; i++) {
+				const from = m.HEAPF64[l + i * 3]!, to = m.HEAPF64[l + i * 3 + 1]!, width = m.HEAPF64[l + i * 3 + 2]!;
+				if (!(to > from) && i > 0) break;
+				out.push({ from, to, width });
+			}
+			return out;
+		},
+		card(numbers, pool, width) {
+			const at = m._text_scratch(numbers.length * 8 + pool.length);
+			new Float64Array(m.HEAPU8.buffer, at, numbers.length).set(numbers);
+			m.HEAPU8.set(pool, at + numbers.length * 8);
+			return m._text_card(numbers.length, pool.length, width);
 		},
 		measure(chain) {
 			return (text, style, maxWidth) => {

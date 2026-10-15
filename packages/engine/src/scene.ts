@@ -38,6 +38,7 @@ interface SceneModule {
 	_scene_remove(handle: number): void;
 	_scene_count(): number;
 	_scene_bytes(count: number): number;
+	_scene_card(handle: number, count: number, poolLength: number): void;
 	_scene_text(handle: number, length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, markdown: number): void;
 	HEAPU8: Uint8Array;
 	_scene_layout(): number;
@@ -51,7 +52,18 @@ export interface SceneLayout {
 	 * handed to `font`, each family followed by those `chain` names; `measure` is then asked only for
 	 * a card's markdown. Without it, `measure` is asked for all words, as before.
 	 */
-	layout(doc: PenDocument, nodes: readonly PenNode[], options: { theme: ThemeState; measure?: MeasureText; measureKey?: string; chain?: (family: string) => readonly string[] }): Map<string, Placed>;
+	layout(
+		doc: PenDocument,
+		nodes: readonly PenNode[],
+		options: {
+			theme: ThemeState;
+			measure?: MeasureText;
+			measureKey?: string;
+			chain?: (family: string) => readonly string[];
+			/** With `chain`: a card's markdown, parsed and encoded for the scene (`card-wire.ts` in the app), so it measures cards too. */
+			card?: (text: string, style: TextStyle, node: PenNode) => { numbers: Float64Array; pool: Uint8Array };
+		},
+	): Map<string, Placed>;
 	/** A font file for the scene's own measuring, as the page's font provider gets it. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
 	/** What the last layout sent and measured, and how many items the scene holds. */
@@ -99,7 +111,7 @@ export async function loadScene(): Promise<SceneLayout> {
 	return {
 		last,
 		font: (bytes, family) => text.font(bytes, family),
-		layout(doc, nodes, { theme, measure, measureKey, chain }) {
+		layout(doc, nodes, { theme, measure, measureKey, chain, card }) {
 			const measureText = measure ?? estimateText;
 			if (measureText !== lastMeasure || measureKey !== lastKey) {
 				module._scene_fonts();
@@ -131,7 +143,9 @@ export async function loadScene(): Promise<SceneLayout> {
 					entry.record.set(record);
 					sent++;
 				}
-				const words = texty ? JSON.stringify([node.type, content, style, node.metadata?.type, node.textAlign, !!chain]) : node.type;
+				const markdown = isMarkdown(node) || isMarkdownText(node);
+				// A card is encoded again when a font or a picture arrives, since a picture's size is part of it.
+				const words = texty ? JSON.stringify([node.type, content, style, node.metadata?.type, node.textAlign, !!chain, !!card, markdown && card ? measureKey : 0]) : node.type;
 				if (words !== entry.words) {
 					module._scene_words(entry.handle);
 					entry.words = words;
@@ -142,7 +156,13 @@ export async function loadScene(): Promise<SceneLayout> {
 						const at = module._scene_bytes(bytes.length + names.length);
 						module.HEAPU8.set(bytes, at);
 						module.HEAPU8.set(names, at + bytes.length);
-						module._scene_text(entry.handle, bytes.length, names.length, style.fontSize, roundWeight(style.fontWeight), style.fontStyle === "italic" ? 1 : 0, style.letterSpacing, style.lineHeight ?? NaN, isMarkdown(node) || isMarkdownText(node) ? 1 : 0);
+						module._scene_text(entry.handle, bytes.length, names.length, style.fontSize, roundWeight(style.fontWeight), style.fontStyle === "italic" ? 1 : 0, style.letterSpacing, style.lineHeight ?? NaN, markdown ? 1 : 0);
+						if (markdown && card) {
+							const wire = card(content, style, node);
+							module.HEAPF64.set(wire.numbers, module._scene_input(wire.numbers.length) >> 3);
+							module.HEAPU8.set(wire.pool, module._scene_bytes(wire.pool.length));
+							module._scene_card(entry.handle, wire.numbers.length, wire.pool.length);
+						}
 					}
 				}
 				const children = (node.children ?? []).map((child) => send(child, t, node.id, node.type === "group" ? t : undefined));

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -245,31 +246,42 @@ EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
 	return int(faces.size() - 1);
 }
 
-// Measure `length` bytes of UTF-8 at `text_scratch`, followed by the family chain, one name a line
-// (`chainLength` bytes). `maxWidth` NaN is one line per paragraph. Answers in `text_answer`: the
-// unbroken width (rounded to a hundredth, trailing spaces in), the longest line (trailing spaces
-// out), the height, and the number of lines.
-// The measure itself, for the layout (`scene.cpp`) and for `text_measure`: `length` bytes of UTF-8 at
-// `s`, the chain of family names one a line at `chainNames`. Answers in `out` as `text_measure` does.
-int measureWords(const char* s, int length, const char* chainNames, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth, double* out) {
-	double* answer = out;
-	// The chain, each family narrowed to its face for this weight and slant.
+}  // extern "C"
+
+// A font chain, each family named one a line, narrowed to its faces for a weight and a slant.
+std::vector<int> chainOf(const char* names, int length, int weight, bool italic) {
 	std::vector<int> chain;
-	{
-		std::string names(chainNames, size_t(chainLength));
-		size_t at = 0;
-		while (at <= names.size()) {
-			size_t nl = names.find('\n', at);
-			if (nl == std::string::npos) nl = names.size();
-			const int face = pickFace(names.substr(at, nl - at), weight, italic != 0);
-			if (face >= 0 && std::find(chain.begin(), chain.end(), face) == chain.end()) chain.push_back(face);
-			at = nl + 1;
-		}
+	std::string all(names, size_t(length));
+	size_t at = 0;
+	while (at <= all.size()) {
+		size_t nl = all.find('\n', at);
+		if (nl == std::string::npos) nl = all.size();
+		const int face = pickFace(all.substr(at, nl - at), weight, italic);
+		if (face >= 0 && std::find(chain.begin(), chain.end(), face) == chain.end()) chain.push_back(face);
+		at = nl + 1;
 	}
-	if (chain.empty()) {
-		answer[0] = answer[1] = answer[2] = answer[3] = 0;
-		return 0;
-	}
+	return chain;
+}
+
+// One run of words in one style: bytes [from, to) of the paragraph, its faces, size and spacing.
+struct Span {
+	size_t from, to;
+	std::vector<int> chain;
+	double size;
+	double letterSpacing;
+};
+
+// A paragraph shaped: everything about it that does not depend on the width it is laid out at.
+struct Shaped {
+	std::vector<uint32_t> cps;
+	std::vector<size_t> starts;
+	std::vector<int> sp, faceOf, glyphCount, scriptRun, glyphFrom, glyphTo, runOf;
+	std::vector<double> advance;
+	std::vector<char> clusterStart, canBreak;
+	std::vector<float> posAt;
+};
+
+void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& spans) {
 	// Code points, where each starts, and the font each comes from.
 	std::vector<uint32_t> cps;
 	std::vector<size_t> starts;
@@ -278,6 +290,12 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 		cps.push_back(decode(s, size_t(length), i));
 	}
 	const size_t n = cps.size();
+	// Which run each code point is in.
+	std::vector<int> sp(n, 0);
+	for (size_t i = 0, k = 0; i < n; i++) {
+		while (k + 1 < spans.size() && starts[i] >= spans[k].to) k++;
+		sp[i] = int(k);
+	}
 	/*
 	 * Shaped as Skia's paragraph shapes (`OneLineShaper`): all of it with the first font, keeping each
 	 * cluster that font draws, then what is left with the next font, and so on; what no font draws
@@ -288,7 +306,6 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	std::vector<double> advance(n, 0);
 	std::vector<char> clusterStart(n, 0);
 	std::vector<int> glyphCount(n, 0);
-	const double scaleFor = size;
 	// With letter spacing that pulls letters apart, they are not joined into ligatures, as Skia's paragraph shapes them.
 	static const hb_feature_t noLigatures[] = {{HB_TAG('l', 'i', 'g', 'a'), 0, 0, unsigned(-1)}, {HB_TAG('c', 'l', 'i', 'g'), 0, 0, unsigned(-1)}};
 	/*
@@ -321,6 +338,8 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	}
 	auto shapeWith = [&](int faceIndex, size_t from, size_t to, bool force) {
 		const Face& face = faces[size_t(faceIndex)];
+		const double scaleFor = spans[size_t(sp[from])].size;
+		const double letterSpacing = spans[size_t(sp[from])].letterSpacing;
 		hb_buffer_t* buffer = hb_buffer_create();
 		const size_t byteFrom = starts[from], byteTo = to < n ? starts[to] : size_t(length);
 		hb_buffer_add_utf8(buffer, s, length, unsigned(byteFrom), int(byteTo - byteFrom));
@@ -336,7 +355,8 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 		 * pixel: the size goes to FreeType in 64ths, its scale is rounded to 16.16, and each width is
 		 * rounded again as FreeType's linear advance. Kerning, which HarfBuzz adds, is scaled plainly.
 		 */
-		const long size64 = std::lround(scaleFor * 64);
+		// The size goes to FreeType in 64ths cut down, not rounded: 18.2 px is set as 18.1875.
+		const long size64 = long(scaleFor * 64);
 		const long xScale = std::lround(double(size64) * 65536.0 / face.upem);
 		size_t cp = from;
 		for (unsigned g = 0; g < count;) {
@@ -368,26 +388,28 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 		}
 		hb_buffer_destroy(buffer);
 	};
-	auto shapeUnresolved = [&](int faceIndex, bool force) {
+	auto shapeUnresolved = [&](int run, int faceIndex, bool force) {
 		for (size_t i = 0; i < n;) {
-			if (faceOf[i] >= 0 || cps[i] == '\n') {
+			if (sp[i] != run || faceOf[i] >= 0 || cps[i] == '\n') {
 				i++;
 				continue;
 			}
 			size_t j = i;
-			while (j < n && faceOf[j] < 0 && cps[j] != '\n' && scriptRun[j] == scriptRun[i]) j++;
+			while (j < n && sp[j] == run && faceOf[j] < 0 && cps[j] != '\n' && scriptRun[j] == scriptRun[i]) j++;
 			shapeWith(faceIndex, i, j, force);
 			i = j;
 		}
 	};
-	for (int face : chain) shapeUnresolved(face, false);
-	shapeUnresolved(chain[0], true);
+	for (int run = 0; run < int(spans.size()); run++) {
+		for (int face : spans[size_t(run)].chain) shapeUnresolved(run, face, false);
+		shapeUnresolved(run, spans[size_t(run)].chain[0], true);
+	}
 	for (size_t i = 0; i < n; i++)
-		if (faceOf[i] < 0) faceOf[i] = chain[0];
+		if (faceOf[i] < 0) faceOf[i] = spans[size_t(sp[i])].chain[0];
 	// Each cluster's glyphs, numbered within its run (the code points one font drew in a row): Skia's wrapper counts in these.
 	std::vector<int> glyphFrom(n, 0), glyphTo(n, 0);
 	for (size_t i = 0, counter = 0; i < n; i++) {
-		if (i == 0 || faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || scriptRun[i] != scriptRun[i - 1]) counter = 0;
+		if (i == 0 || faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || scriptRun[i] != scriptRun[i - 1] || sp[i] != sp[i - 1]) counter = 0;
 		if (!clusterStart[i]) continue;
 		glyphFrom[i] = int(counter);
 		counter += size_t(glyphCount[i]);
@@ -395,7 +417,7 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	}
 	// Letter spacing follows every glyph, so a letter drawn as two ("z" and its accent) is spaced twice, as Skia spaces it.
 	for (size_t i = 0; i < n; i++)
-		if (clusterStart[i]) advance[i] += letterSpacing * glyphCount[i];
+		if (clusterStart[i]) advance[i] += spans[size_t(sp[i])].letterSpacing * glyphCount[i];
 	/*
 	 * Where each cluster starts in its run, in single precision, the way Skia keeps glyph positions: a
 	 * line's width is then the difference of two of them, which far along a run is a hair off the sum of
@@ -404,7 +426,7 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	std::vector<float> posAt(n + 1, 0.f);
 	std::vector<int> runOf(n, 0);
 	for (size_t i = 0, run = 0; i < n; i++) {
-		if (i > 0 && (faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || cps[i] == '\n' || scriptRun[i] != scriptRun[i - 1])) run++;
+		if (i > 0 && (faceOf[i] != faceOf[i - 1] || cps[i - 1] == '\n' || cps[i] == '\n' || scriptRun[i] != scriptRun[i - 1] || sp[i] != sp[i - 1])) run++;
 		runOf[i] = int(run);
 	}
 	{
@@ -416,6 +438,78 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 			if (i + 1 == n || runOf[i + 1] != runOf[i]) posAt[n] = x;
 		}
 	}
+	std::vector<char> canBreak;
+	breaks(cps, canBreak);
+	out.cps = std::move(cps);
+	out.starts = std::move(starts);
+	out.sp = std::move(sp);
+	out.faceOf = std::move(faceOf);
+	out.glyphCount = std::move(glyphCount);
+	out.scriptRun = std::move(scriptRun);
+	out.glyphFrom = std::move(glyphFrom);
+	out.glyphTo = std::move(glyphTo);
+	out.runOf = std::move(runOf);
+	out.advance = std::move(advance);
+	out.clusterStart = std::move(clusterStart);
+	out.canBreak = std::move(canBreak);
+	out.posAt = std::move(posAt);
+}
+
+// Shaped paragraphs kept by their words and runs: a table's cell is shaped once and laid out at two
+// widths, and a card laid out again at a new width shapes nothing.
+std::unordered_map<std::string, Shaped> shapedCache;
+std::vector<std::string> shapedOrder;
+
+const Shaped& shapedFor(const char* s, int length, const std::vector<Span>& spans) {
+	std::string key(s, size_t(length));
+	key.push_back('\x01');
+	for (const Span& span : spans) {
+		key += std::to_string(span.from) + ',' + std::to_string(span.to) + ',' + std::to_string(span.size) + ',' + std::to_string(span.letterSpacing);
+		for (int face : span.chain) key += ':' + std::to_string(face);
+		key.push_back(';');
+	}
+	auto found = shapedCache.find(key);
+	if (found != shapedCache.end()) return found->second;
+	if (shapedOrder.size() >= 2048) {
+		for (size_t k = 0; k < 512; k++) shapedCache.erase(shapedOrder[k]);
+		shapedOrder.erase(shapedOrder.begin(), shapedOrder.begin() + 512);
+	}
+	Shaped& made = shapedCache[key];
+	shapeInto(made, s, length, spans);
+	shapedOrder.push_back(key);
+	return made;
+}
+
+/*
+ * A paragraph of styled runs, as Skia's paragraph sets one built with pushed styles: each run picks
+ * from its own font chain and is shaped on its own, so nothing kerns across a change of style, and a
+ * line is as tall as its tallest run. `base` is the paragraph's own style, which an empty line takes.
+ * Answers in `out`: the unbroken width (to a hundredth), the longest line, the height, the lines.
+ */
+int measureSpans(const char* s, int length, const std::vector<Span>& spans, const Span& base, double lineHeight, double maxWidth, double* out) {
+	double* answer = out;
+	for (const Span& span : spans)
+		if (span.chain.empty()) {
+			answer[0] = answer[1] = answer[2] = answer[3] = 0;
+			return 0;
+		}
+	if (base.chain.empty()) {
+		answer[0] = answer[1] = answer[2] = answer[3] = 0;
+		return 0;
+	}
+	const Shaped& S = shapedFor(s, length, spans);
+	const auto& cps = S.cps;
+	const auto& starts = S.starts;
+	const size_t n = cps.size();
+	const auto& sp = S.sp;
+	const auto& faceOf = S.faceOf;
+	const auto& glyphFrom = S.glyphFrom;
+	const auto& glyphTo = S.glyphTo;
+	const auto& runOf = S.runOf;
+	const auto& advance = S.advance;
+	const auto& clusterStart = S.clusterStart;
+	const auto& canBreak = S.canBreak;
+	const auto& posAt = S.posAt;
 	// The width of [a, b) as Skia's line measures it: run by run, the end position less the start.
 	auto spanWidth = [&](size_t a, size_t b) {
 		float w = 0;
@@ -434,12 +528,11 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 		}
 		return double(w);
 	};
-	std::vector<char> canBreak;
-	breaks(cps, canBreak);
+
 	const bool wrap = !std::isnan(maxWidth);
 	// Skia's paragraph lays out at the width rounded down to a whole pixel.
 	const double limit = wrap ? std::floor(maxWidth) : maxWidth;
-	double unbroken = 0, longest = 0, height = 0;
+	double unbroken = 0, longest = 0, height = 0, lastLineHeight = 0;
 	int lines = 0;
 	lineSpans.clear();
 	// One line's height, in whole pixels: its fonts' tallest ascent and tallest descent. A line height
@@ -449,7 +542,7 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	auto lineHeightOf = [&](size_t a, size_t b) {
 		float asc = 0, desc = 0;
 		bool first = true;
-		auto take = [&](const Face& f) {
+		auto take = [&](const Face& f, double size) {
 			// Skia's `Run::calculateMetrics`: the font's line gap split above and below, then the height asked for.
 			const float leading = float(f.lineGap) / float(f.upem) * float(size);
 			float fa = -float(f.ascender) / float(f.upem) * float(size) - leading * 0.5f;
@@ -464,8 +557,10 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 			if (first || fd > desc) desc = fd;
 			first = false;
 		};
-		for (size_t i = a; i < b; i++) take(faces[size_t(faceOf[i])]);
-		if (first) take(faces[size_t(chain[0])]);
+		for (size_t i = a; i < b; i++) take(faces[size_t(faceOf[i])], spans[size_t(sp[i])].size);
+		// An empty line is as tall as the style of the line break that makes it; an empty text, the paragraph's own.
+		if (first && b < n && cps[b] == '\n') take(faces[size_t(faceOf[b])], spans[size_t(sp[b])].size);
+		if (first) take(faces[size_t(base.chain[0])], base.size);
 		// The difference taken in double, as Skia's `InternalLineMetrics::height` takes it.
 		return std::round(double(desc) - double(asc));
 	};
@@ -536,7 +631,9 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 							if (first < 0) first = glyphFrom[k];
 							lastEnd = glyphTo[k];
 						}
-					const int onLine = first < 0 ? 0 : lastEnd - first;
+					// Skia subtracts these as unsigned positions: a word that starts far into one run and
+					// ends early in the next wraps round to a huge count, and so counts as long.
+					const size_t onLine = first < 0 ? 0 : size_t(lastEnd) - size_t(first);
 					bool tooLong = word > limit && (onLine > 1 || lastBreak == lineStart);
 					// A single cluster wider than the whole line goes on this one, after what is there.
 					size_t clusterEnd = i + 1;
@@ -554,7 +651,9 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 				width = next;
 			}
 			if (i == end) lineEnd = end;
-			// Spaces after a forced break hang on this line rather than starting the next.
+			// Spaces after a forced break hang on this line rather than starting the next, though they
+			// take no part in its height (Skia adds them as ghosts, after the line's metrics are set).
+			const size_t metricsEnd = lineEnd;
 			while (lineEnd < end && isSpace(lineEnd)) lineEnd++;
 			// The line's own width, without the spaces it ends in.
 			size_t visible = lineEnd;
@@ -564,7 +663,10 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 			lineSpans.push_back(double(starts.empty() || lineStart >= n ? size_t(length) : starts[lineStart]));
 			lineSpans.push_back(double(lineEnd >= n ? size_t(length) : starts[lineEnd]));
 			lineSpans.push_back(w);
-			height += lineHeightOf(lineStart, lineEnd);
+			// The empty line after a final line break keeps the line before's height: Skia does not clear its metrics there.
+			const double lineHeightHere = lineStart == end && end == n && n > 0 && cps[n - 1] == '\n' && lines > 0 ? lastLineHeight : lineHeightOf(lineStart, metricsEnd > lineStart ? metricsEnd : lineEnd);
+			lastLineHeight = lineHeightHere;
+			height += lineHeightHere;
 			lines++;
 			if (lineEnd >= end) break;
 			lineStart = lineEnd;
@@ -579,6 +681,19 @@ int measureWords(const char* s, int length, const char* chainNames, int chainLen
 	return lines;
 }
 
+// Plain words in one style, one run: for the layout (`scene.cpp`) and for `text_measure`. `length`
+// bytes of UTF-8 at `s`, the chain of family names one a line at `chainNames`.
+extern "C" int measureWords(const char* s, int length, const char* chainNames, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth, double* out) {
+	Span one{0, size_t(length), chainOf(chainNames, chainLength, weight, italic != 0), size, letterSpacing};
+	return measureSpans(s, length, std::vector<Span>{one}, one, lineHeight, maxWidth, out);
+}
+
+extern "C" {
+
+// Measure `length` bytes of UTF-8 at `text_scratch`, followed by the family chain, one name a line
+// (`chainLength` bytes). `maxWidth` NaN is one line per paragraph. Answers in `text_answer`: the
+// unbroken width (rounded to a hundredth, trailing spaces in), the longest line (trailing spaces
+// out), the height, and the number of lines.
 EMSCRIPTEN_KEEPALIVE int text_measure(int length, int chainLength, double size, int weight, int italic, double letterSpacing, double lineHeight, double maxWidth) {
 	return measureWords(scratch.data(), length, scratch.data() + length, chainLength, size, weight, italic, letterSpacing, lineHeight, maxWidth, answer);
 }
