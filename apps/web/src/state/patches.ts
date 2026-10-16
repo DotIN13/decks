@@ -38,8 +38,6 @@ import { send } from "./socket.ts";
 
 /** Revisions this browser caused, by path. */
 const selfRevs = new Map<string, number>();
-/** Boards this browser has just sized, before the write comes back (`sizedHere`). */
-const sizing = new Map<string, ReturnType<typeof setTimeout>>();
 /** Paths with a patch in flight, before the accepted rev is known. */
 const patching = new Set<string>();
 /** Edits made while a patch was in flight, per path — coalesced, and sent as one batch. */
@@ -211,24 +209,6 @@ export function patchAccepted(path: string, rev: number): void {
 	}
 }
 
-/**
- * The person has just sized a board by its handles, and the size is on its way to the file.
- *
- * A size is a number in the board's `<meta>` tag: the page on screen is already drawn at it,
- * since the frame is the box. So the write that comes back is ours and the frame stays pinned
- * to the document it has, as for any edit made on screen. Reloading it to show the same page
- * took a tenth of a second on a small board and dropped what had been pressed, scrolled and
- * typed in it. The claim covers the next change only, and lapses if none comes.
- */
-export function sizedHere(path: string): void {
-	if (!frameRevs[path]) {
-		const board = state.boards.find((candidate) => candidate.path === path);
-		if (board) setFrameRevs(path, board.rev);
-	}
-	clearTimeout(sizing.get(path));
-	sizing.set(path, setTimeout(() => sizing.delete(path), 5000));
-}
-
 /** The server refused one: drop the pin and the queue composed against the same lie. */
 export function patchRefused(path: string): void {
 	queued.delete(path);
@@ -245,13 +225,6 @@ export function patchRefused(path: string): void {
  */
 export function boardChanged(path: string, rev: number): "ours" | "adopted" | "theirs" {
 	if (selfRevs.get(path) === rev) return "ours";
-	const sized = sizing.get(path);
-	if (sized !== undefined) {
-		clearTimeout(sized);
-		sizing.delete(path);
-		selfRevs.set(path, rev);
-		return "adopted";
-	}
 	if (patching.has(path)) {
 		selfRevs.set(path, rev);
 		return "adopted";

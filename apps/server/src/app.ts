@@ -254,39 +254,10 @@ export class App {
 		this.thumbs = new ThumbService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
-			/*
-			 * The same guards as `board.extent` on the wire — the revision measured, and never a
-			 * deck — and one more: **a reader's browser outranks this one.**
-			 *
-			 * This measurement is taken in the server's own Chromium, with the server's fonts. A
-			 * reader's browser has theirs, and the same document comes to a different height in
-			 * the two: 1,149 px here against 1,221 px there on a board of tables, which is three
-			 * lines of wrapping. Both readings are honest and only one can be the board's. It has
-			 * to be the reader's, or the board is cut for the person actually looking at it.
-			 *
-			 * So this fills in a height nobody has reported yet — a board no browser has opened,
-			 * which is the reason the callback exists — and never overrules a frame's.
-			 */
 			boards: () => this.deck.boards,
 			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.boards(name).map((one) => one.path))),
-			measured: (path, rev, h) => {
-				const board = this.deck.board(path);
-				if (!board || board.format === "slides" || board.rev !== rev) return;
-				if (this.boards.extent(path, rev)) return;
-				const resized = this.deck.setHeight(path, h);
-				if (resized) this.send({ type: "board.sized", path, h: resized.h });
-			},
 		});
 		this.thumbs.indexLater();
-		/*
-		 * A board never measured at its revision since heights were kept starts at its file's floor; its
-		 * picture, taken at the measured height, says what it is. A page that loads measures it properly.
-		 */
-		for (const board of this.deck.boards) {
-			if (this.deck.measured(board.path)) continue;
-			const h = this.thumbs.heightFromPicture(board);
-			if (h !== undefined) this.deck.setHeight(board.path, h);
-		}
 		/*
 		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
 		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
@@ -872,7 +843,16 @@ export class App {
 		 */
 		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }), agent.inPlay);
 		for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
-		return state;
+		/*
+		 * And the size the stage draws each board at, which is its item's in the stage file: the one
+		 * record of it (`DeckAgent.setSize`). A board the stage does not hold keeps its file's size.
+		 */
+		const sizes = agent.boardSizes();
+		const boards = state.boards.map((board) => {
+			const size = sizes[board.path];
+			return size && (size.w !== board.w || size.h !== board.h) ? { ...board, w: size.w, h: size.h } : board;
+		});
+		return { ...state, boards };
 	}
 
 	/** What a board frame acts on: the stage of the conversation this browser is in. */

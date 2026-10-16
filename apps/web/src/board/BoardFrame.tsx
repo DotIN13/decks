@@ -757,9 +757,8 @@ export function BoardFrame(props: {
 
 	/*
 	 * A size from the stage's handles, given to the page as it is dragged, once a frame at most.
-	 * The page used to keep the width it loaded with until the file came back and the frame was
-	 * reloaded at the new one; now the words reflow under the handle, and the write that follows
-	 * leaves the page where it is (`state/patches.ts`, `sizedHere`). A deck sizes its slides itself.
+	 * The words reflow under the handle, and the size is kept in the stage file rather than the
+	 * board's, so no new revision comes back to reload the page. A deck sizes its slides itself.
 	 */
 	let sizeFrame = 0;
 	createEffect(() => {

@@ -67,14 +67,12 @@ export class Deck {
 	 */
 	private floors = new Map<string, number>();
 	/**
-	 * The last height measured for each board, at the revision it was measured for, kept in
-	 * `.decks/heights.json` (`setHeight`). A board's file states only a floor, so its real height is
-	 * known only once a page has laid it out; kept in memory alone, every restart sent boards back to
-	 * their stated floors, and a board whose picture was already taken was drawn cut short at it until
-	 * somebody zoomed in far enough to load its page.
+	 * Heights browsers read, at the revision they read them, from when a reading sized a board; kept in
+	 * `.decks/heights.json` and no longer written. A board's size is its stage's now (the stage file),
+	 * and a board joining a stage comes at its own file's; this answers only for a file that states no
+	 * height, at the revision it was read at.
 	 */
 	private heights = new Map<string, { rev: number; h: number }>();
-	private heightsTimer: ReturnType<typeof setTimeout> | undefined;
 	private resolved: ResolvedRoots;
 	readonly warnings: string[] = [];
 
@@ -85,24 +83,6 @@ export class Deck {
 			for (const [board, at] of Object.entries(saved)) if (Number.isFinite(at?.rev) && Number.isFinite(at?.h)) this.heights.set(board, at);
 		} catch {
 			/* none saved yet */
-		}
-	}
-
-	/** Whether a board's height has been measured at its current revision (`heights`). */
-	measured(boardPath: string): boolean {
-		const board = this.board(boardPath);
-		return !!board && this.heights.get(boardPath)?.rev === board.rev;
-	}
-
-	/** Write the measured heights (`heights`), for the next start. Called a moment after a change, and by tests. */
-	saveHeights(): void {
-		clearTimeout(this.heightsTimer);
-		this.heightsTimer = undefined;
-		try {
-			mkdirSync(join(this.path, ".decks"), { recursive: true });
-			writeFileSync(join(this.path, ".decks", "heights.json"), JSON.stringify(Object.fromEntries(this.heights)));
-		} catch {
-			/* a deck that cannot be written to measures again next time */
 		}
 	}
 
@@ -347,7 +327,6 @@ export class Deck {
 			return undefined;
 		}
 		const previous = this.boardsByPath.get(path);
-		const floorBefore = this.floors.get(path);
 		const board = this.describe(path);
 		if (previous) {
 			board.x = previous.x;
@@ -356,22 +335,8 @@ export class Deck {
 			board.lastWrittenBy = previous.lastWrittenBy;
 			board.namedAt = previous.namedAt;
 			board.seenAt = previous.seenAt;
-			/*
-			 * A board's height is its content's, and only a frame knows it: the reading the last look
-			 * produced is the best answer until the next look. Without this, editing a board shrank it to
-			 * the height in its file for a beat — and a board that jumps is the thing `refresh` exists to
-			 * avoid.
-			 *
-			 * Unless the file's own number moved, which is a drag or a `stage.fit` writing a new floor.
-			 * That one is deliberate and has to land now, or a fit that tightens a board would appear to do
-			 * nothing until something else reloaded it.
-			 *
-			 * A file that states no height keeps the reading outright. Taking the larger of it and the
-			 * placeholder made a board shorter than the placeholder (a new one, a title and nothing yet)
-			 * jump to it on every write and back down to its content a beat later.
-			 */
-			const floor = this.floors.get(path) ?? 0;
-			if (board.format !== "slides" && floorBefore === floor) board.h = floor > 0 ? Math.max(previous.h, floor) : previous.h;
+			// A file that states no height keeps the one the board had; one that does is that height.
+			if (board.format !== "slides" && (this.floors.get(path) ?? 0) === 0) board.h = previous.h;
 		} else {
 			autoPlace([board], this.boards);
 		}
@@ -409,42 +374,7 @@ export class Deck {
 		return existed;
 	}
 
-	/**
-	 * Keep a height a frame measured, for this session.
-	 *
-	 * The one number a board cannot state for itself: how tall its content came to, which only the
-	 * browser knows. Written nowhere — a height is a reading, and one recorded beside the board would
-	 * be a second answer to "how tall is this" that goes stale the moment the content changes, which is
-	 * exactly the shadowing this file used to do to a width. Kept on the board, so `deck.state` carries
-	 * it while the process is up, and re-measured on the next load.
-	 *
-	 * **Never below the floor the file states.** That number is what somebody dragged or what a fit
-	 * wrote, and a measurement that undercut it would take away the room under the last box a beat after
-	 * it was asked for. Above it the measurement always wins, which is what makes clipping impossible.
-	 *
-	 * Returns the board only when the number actually moved, which is what stops a measurement that
-	 * agrees with the board from broadcasting a `deck.state` and reloading the frame that produced it,
-	 * forever.
-	 */
-	setHeight(boardPath: string, h: number): Board | undefined {
-		const board = this.board(boardPath);
-		// A deck's height is its aspect's, not its content's.
-		if (!board || board.format === "slides") return undefined;
-		const measured = Number.isFinite(h) && h > 0 ? Math.round(h) : undefined;
-		if (measured === undefined) return undefined;
-		const height = Math.max(measured, this.floors.get(board.path) ?? 0);
-		const known = this.heights.get(board.path);
-		if (known?.rev !== board.rev || known.h !== measured) {
-			this.heights.set(board.path, { rev: board.rev, h: measured });
-			if (this.heightsTimer === undefined) {
-				this.heightsTimer = setTimeout(() => this.saveHeights(), 500);
-				this.heightsTimer.unref?.();
-			}
-		}
-		if (height === board.h) return undefined;
-		board.h = height;
-		return board;
-	}
+
 
 	private describe(path: string): Board {
 		const absolute = join(this.path, path);
@@ -486,9 +416,10 @@ export class Deck {
 		const floor = format === "slides" ? 0 : meta.h ?? 0;
 		this.floors.set(path, floor);
 		const rev = revisionOf(source);
-		// Measured before, at this revision (`heights`): that height, as a measurement now would give.
+		// Read before, at this revision, when browsers still sized boards (`heights`).
 		const known = format === "slides" ? undefined : this.heights.get(path);
-		const height = format === "slides" ? slideHeight(width, meta.aspect) : known?.rev === rev ? Math.max(known.h, floor) : floor || (shell === "foreign" ? FOREIGN_H : START_H);
+		// The file's own height when it states one, as its agent wrote it; an old reading only when it does not.
+		const height = format === "slides" ? slideHeight(width, meta.aspect) : floor || (known?.rev === rev ? known.h : shell === "foreign" ? FOREIGN_H : START_H);
 		return {
 			path,
 			// `.slides.html` before `.html`, or a deck with no title of its own is called

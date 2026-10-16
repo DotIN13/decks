@@ -134,6 +134,11 @@ export interface StageAgentHooks {
 	worked?(path: string): void;
 	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
 	acted?(what: ActKind, path: string): void;
+	/**
+	 * The agent sized a board (`fit`, `resize`): the size goes to its own stage, in the stage file,
+	 * which is the one record of how big a board is drawn there (`DeckAgent.setSize`).
+	 */
+	sized?(path: string, size: { w: number; h: number }): void;
 	/** The agent edited its stage's drawing: the canvas outlines what it touched (`agents/acts.ts`). */
 	drew?(stage: string, ids: string[], boxes: ActBox[]): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
@@ -548,6 +553,7 @@ export function createStageTool(deps: {
 		resize: async (path: string, size: { w?: number; h?: number }) => {
 			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
 			const board = service.resize(path, size);
+			agent.sized?.(board.path, { w: board.w, h: board.h });
 			agent.acted?.("resize", board.path);
 			return { path: board.path, w: board.w, h: board.h };
 		},
@@ -561,6 +567,7 @@ export function createStageTool(deps: {
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
 			const { board, content, reading, views } = await service.fit(path, options);
+			agent.sized?.(board.path, { w: board.w, h: board.h });
 			agent.worked?.(board.path);
 			agent.acted?.("resize", board.path);
 			/*

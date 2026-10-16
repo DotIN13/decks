@@ -120,15 +120,6 @@ export interface ThumbHost {
 	dir: string;
 	/** How long a changed board is left to settle. For tests; `SETTLE_MS` otherwise. */
 	settleMs?: number;
-	/**
-	 * A flow document's height, as the page laid it out (`measured` below), for the deck to keep.
-	 *
-	 * A flow board's height is its content's and the file cannot state it, so until a browser
-	 * has shown one on the canvas the record carries a 240px placeholder: a preview
-	 * showed the top 240px of a page and the picture was cut off the same way. The page that
-	 * takes the picture has laid the document out, which is the one thing a measurement needs.
-	 */
-	measured?: (path: string, rev: number, h: number) => void;
 	/** Every board in the deck, for the indexer (`index`) to keep pictures of. */
 	boards?: () => Board[];
 	/** The boards on any canvas: the indexer takes these first, since they are the ones looked at. */
@@ -775,10 +766,7 @@ export class ThumbService {
 				// else (`deck/loader.ts`), and a picture cropped under it would be a different
 				// board from the one on the canvas.
 				const h = Math.max(measured, job.board.h);
-				if (measured > 0 && h !== job.board.h) {
-					clip = clipOf({ w: job.board.w, h });
-					this.host.measured?.(job.board.path, job.board.rev, h);
-				}
+				if (measured > 0 && h !== job.board.h) clip = clipOf({ w: job.board.w, h });
 			}
 			const shot =
 				job.kind === "whole"

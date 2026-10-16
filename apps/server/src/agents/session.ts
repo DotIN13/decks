@@ -191,6 +191,12 @@ export class DeckAgent {
 	 * every board a place under this stage's own boards.
 	 */
 	private places: Record<string, { x: number; y: number }> = {};
+	/**
+	 * Each board's size **on this stage**: the width and height of its item in the stage file, which
+	 * is the one record of how big a board is drawn. Read back from the file with the places; a board
+	 * with none yet takes the size its own file states, as its agent wrote it, when it joins.
+	 */
+	private sizes: Record<string, { w: number; h: number }> = {};
 	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
 	private firstCanvas: ((self: string) => string | undefined) | undefined;
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
@@ -643,6 +649,10 @@ export class DeckAgent {
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
+			sized: (path: string, size: { w: number; h: number }) => {
+				this.setSize(path, size);
+				this.host.arranged?.();
+			},
 			drew: (stage: string, ids: string[], boxes: ActBox[]) => this.host.act?.(this.id, { kind: "draw", stage, ids, boxes }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 			stageName: () => this.stageName(true),
@@ -683,6 +693,27 @@ export class DeckAgent {
 	/** Where this stage has put its boards: what the client draws, and what a switch has to send. */
 	positions(): Record<string, { x: number; y: number }> {
 		return { ...this.places };
+	}
+
+	/** How big this stage draws its boards (`sizes`). */
+	boardSizes(): Record<string, { w: number; h: number }> {
+		return { ...this.sizes };
+	}
+
+	/**
+	 * Size one board **on this stage**, and write it into the stage file. Nothing else sizes a board:
+	 * a browser's measurement does not, and neither does a new revision of its file. `stage.fit` and
+	 * `stage.resize` call this for the agent's own stage, and a person's drag for the stage on screen.
+	 */
+	setSize(path: string, size: { w?: number; h?: number }): void {
+		const board = this.deck.board(path);
+		const now = this.sizes[path] ?? (board ? { w: board.w, h: board.h } : undefined);
+		if (!now) return;
+		const next = { w: Math.round(size.w ?? now.w), h: Math.round(size.h ?? now.h) };
+		if (!Number.isFinite(next.w) || !Number.isFinite(next.h) || next.w <= 0 || next.h <= 0) return;
+		this.sizes[path] = next;
+		this.save();
+		this.scheduleSyncOut();
 	}
 
 	/**
@@ -745,7 +776,7 @@ export class DeckAgent {
 				places: this.places,
 				size: (path) => {
 					const board = this.deck.board(path);
-					return board ? { w: board.w, h: board.h } : undefined;
+					return this.sizes[path] ?? (board ? { w: board.w, h: board.h } : undefined);
 				},
 				drawn: this.drawn(),
 			});
@@ -755,7 +786,9 @@ export class DeckAgent {
 		for (const path of this.playing) {
 			const at = this.places[path];
 			const board = this.deck.board(path);
-			if (at && board) wanted.push({ path, x: at.x, y: at.y, w: board.w, h: board.h, title: board.title });
+			// The stage's own size for the board; a board new to this stage comes at its file's.
+			const size = this.sizes[path] ?? (this.sizes[path] = { w: board?.w ?? 0, h: board?.h ?? 0 });
+			if (at && board) wanted.push({ path, x: at.x, y: at.y, w: size.w, h: size.h, title: board.title });
 		}
 		try {
 			pens.syncBoards(name, wanted);
@@ -782,6 +815,11 @@ export class DeckAgent {
 			const at = this.places[one.path];
 			if (!at || at.x !== one.x || at.y !== one.y) {
 				this.places[one.path] = { x: one.x, y: one.y };
+				changed = true;
+			}
+			const size = this.sizes[one.path];
+			if (!size || size.w !== one.w || size.h !== one.h) {
+				this.sizes[one.path] = { w: one.w, h: one.h };
 				changed = true;
 			}
 		}
@@ -818,7 +856,12 @@ export class DeckAgent {
 		this.stageFolder = name;
 		this.save();
 		const boards = pens.boards(name).filter((one) => this.deck.board(one.path));
-		for (const one of boards) this.places[one.path] = { x: one.x, y: one.y };
+		// Sizes are the stage's own: a board this stage does not hold yet comes at its file's size.
+		this.sizes = {};
+		for (const one of boards) {
+			this.places[one.path] = { x: one.x, y: one.y };
+			this.sizes[one.path] = { w: one.w, h: one.h };
+		}
 		const next = boards.map((one) => one.path);
 		for (const path of [...next].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = next;
@@ -843,6 +886,9 @@ export class DeckAgent {
 		const places: typeof this.places = {};
 		for (const [path, at] of Object.entries(this.places)) places[repoint(path)] = at;
 		this.places = places;
+		const sizes: typeof this.sizes = {};
+		for (const [path, size] of Object.entries(this.sizes)) sizes[repoint(path)] = size;
+		this.sizes = sizes;
 		this.save();
 		this.host.arranged?.();
 		this.publishContext();
@@ -864,6 +910,7 @@ export class DeckAgent {
 		const gone = (path: string) => path.startsWith(`${stageBoardsDir(name)}/`) || !this.deck.board(path);
 		this.held = this.held.filter((path) => !gone(path));
 		for (const path of Object.keys(this.places)) if (gone(path)) delete this.places[path];
+		this.sizes = {};
 		this.stageFolder = undefined;
 		this.playing = [];
 		this.save();
@@ -958,7 +1005,7 @@ export class DeckAgent {
 			places: this.places,
 			size: (path) => {
 				const board = this.deck.board(path);
-				return board ? { w: board.w, h: board.h } : undefined;
+				return this.sizes[path] ?? (board ? { w: board.w, h: board.h } : undefined);
 			},
 			drawn: this.drawn(),
 		});
@@ -990,6 +1037,7 @@ export class DeckAgent {
 		const was = this.playing.length;
 		this.playing = this.playing.filter((playing) => playing !== path);
 		delete this.places[path];
+		delete this.sizes[path];
 		if (this.playing.length !== was) this.scheduleSyncOut();
 		this.publishContext();
 		return true;
@@ -1634,6 +1682,8 @@ export class DeckAgent {
 			if (this.places[path]) {
 				this.places[target] = this.places[path]!;
 				delete this.places[path];
+				if (this.sizes[path]) this.sizes[target] = this.sizes[path]!;
+				delete this.sizes[path];
 			}
 			this.held = this.held.map((one) => (one === path ? target : one));
 			moved = true;

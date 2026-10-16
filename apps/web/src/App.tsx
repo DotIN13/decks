@@ -23,7 +23,7 @@ import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
-import { frameRevs, patchBoard, sizedHere } from "./state/patches.ts";
+import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start } from "./state/socket.ts";
 import { api } from "./connections/connection.ts";
@@ -1452,17 +1452,11 @@ export function App() {
 						}}
 						onMove={move}
 						/*
-						 * A resize is a write to the board's own file, so it goes to the server and
-						 * comes back as a `board.changed` — the frame reloads at the new size rather
-						 * than the app drawing a board it has not written. Nothing is previewed here
-						 * for that reason: the drag draws the box it is asking for, and the file
-						 * decides what is true.
+						 * A resize is the board's size on this stage, kept in the stage file; it comes back as a
+						 * `board.changed` at the same revision, so the page in the frame stays as it is. A deck's
+						 * slides take their width from the deck's own file, and reload at it.
 						 */
-						onResize={(path, size) => {
-							// A deck's slides are laid out from its width when it loads, so a deck takes the reload.
-							if (state.boards.find((board) => board.path === path)?.format !== "slides") sizedHere(path);
-							send({ type: "board.resize", path, ...size });
-						}}
+						onResize={(path, size) => send({ type: "board.resize", path, ...size })}
 						/*
 						 * A double-click on empty canvas makes a blank board, centred where it landed.
 						 * `files.boardAt` owns the request-and-hear-the-path dance, because the server

@@ -211,11 +211,10 @@ test("a deleted board's pictures are deleted with it", async () => {
 	thumbs.dispose();
 });
 
-test("a flow document is measured in the page, pictured to that height, and the deck is told", async () => {
+test("a flow document is measured in the page and pictured to that height, without changing the board's size", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const chrome = fake();
-	const told: Array<[string, number, number]> = [];
-	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, measured: (path, rev, h) => told.push([path, rev, h]) }, async () => chrome.browser);
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	// The record still carries the 240px placeholder; the page says 1234.
 	const flow = { ...board("boards/notes.html", 3, 720, 240), format: "board" } as Board;
 	const asked = thumbs.get(flow, "light");
@@ -224,7 +223,7 @@ test("a flow document is measured in the page, pictured to that height, and the 
 	await asked;
 	assert.deepEqual(chrome.opened[0]?.viewport, { width: 720, height: 540 }, "laid out in the tallest window a picture can be");
 	assert.deepEqual(chrome.clips, [540], "1234 is taller than 4:3 allows, so the picture is 4:3");
-	assert.deepEqual(told, [["boards/notes.html", 3, 1234]]);
+	assert.equal(flow.h, 240, "the board keeps the size its file states");
 	thumbs.dispose();
 });
 

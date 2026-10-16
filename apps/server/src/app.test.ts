@@ -29,7 +29,7 @@ function open() {
 
 const boardOf = (app: App) => app.stage.boards().find((one) => one.path === "boards/tall.html")!;
 
-test("a frame's measurement reaches the deck, and fit writes it back", async () => {
+test("a frame's measurement is reported but sizes nothing, and fit writes it back", async () => {
 	const { app, deck, cleanup } = open();
 	try {
 		const before = boardOf(app);
@@ -40,13 +40,12 @@ test("a frame's measurement reaches the deck, and fit writes it back", async () 
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
 		/*
-		 * The board was 400 tall and its content came to 690, and it is 690 now: a height in the
-		 * file is a floor the content raises, so there is no such thing as a board that clips
-		 * what is written on it. It used to be marked `clipped` and left at 400 until somebody
-		 * fitted it, which is the failure nobody sees.
+		 * A browser's reading never sizes a board: two browsers read a board a pixel or two apart, and
+		 * when both sized it they answered each other for ever. The board stays at its file's 400 and
+		 * says that its content is cut off, which is what the agent's fit is for.
 		 */
-		assert.equal(measured.h, 690, "the measurement raised the board past the number in its file");
-		assert.equal(measured.clipped, false, "and nothing is cut off, so nothing is marked");
+		assert.equal(measured.h, 400, "the reading left the board at the number in its file");
+		assert.equal(measured.clipped, true, "and says its content runs past it");
 
 		const { board: fitted } = await app.stage.fit("boards/tall.html");
 		assert.equal(fitted.h, 738, "the content plus the room a fit leaves under the last block");

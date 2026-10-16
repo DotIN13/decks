@@ -35,13 +35,12 @@ export const boards = {
 	/*
 	 * A board dragged to a new size, by the person holding the mouse.
 	 *
-	 * **The number goes into the board's own file**, through `boards.resize`, which records a
-	 * revision like every other write. Both dimensions: a width, and a height that is a *floor* —
-	 * the browser keeps measuring the content and raises the board above it whenever it needs more
-	 * room, so a drag adds space under the last box and can never take away a paragraph.
+	 * **The number goes into the stage file**, as the size of the board's item there (`setSize`),
+	 * which is the one record of how big a board is drawn on that stage. The board's own file keeps
+	 * the size its agent wrote, which is what it comes at when another stage takes it.
 	 *
 	 * A **slide** deck is the exception: its height follows from its aspect, so only the width is
-	 * taken. It goes to the file like every other size — the `<meta>` tag of an HTML deck,
+	 * taken, and it goes to the deck's own file — the `<meta>` tag of an HTML deck,
 	 * front-matter of a markdown one. `deck.json` used to keep it, which made a deck's width the one
 	 * number you could not read off the deck.
 	 *
@@ -70,13 +69,10 @@ export const boards = {
 				}
 				return;
 			}
-			const wanted = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
-			if (wanted.w === undefined && wanted.h === undefined) return;
-			// `writeBoard` inside broadcasts the new board, so this one needs no second message.
-			wire.boards.resize(message.path, wanted);
-			/* The person's own drag rewrote the file: said to be theirs, or its new time reads as
-			   somebody else's change and the board glows as news (`panel/board-news.ts`). */
-			wire.boards.wrote(message.path, "you");
+			// The size goes to the stage on screen, in its file; the board's own file is left as its agent wrote it.
+			wire.target().setSize(message.path, { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
+			const sized = wire.stageState().boards.find((one) => one.path === message.path);
+			if (sized) wire.send({ type: "board.changed", path: sized.path, rev: sized.rev, board: sized });
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 		}
@@ -95,31 +91,11 @@ export const boards = {
 			...(typeof message.overlaps === "number" ? { overlaps: message.overlaps } : {}),
 		});
 		/*
-		 * A board is as tall as its content, whatever its file says.
-		 *
-		 * The browser has just measured the only true answer, so the board takes it —
-		 * unless the file states a taller one, which `setHeight` treats as a floor. This
-		 * is what makes "the board clips and nobody notices" impossible: the measurement
-		 * can always raise the board, and the only thing it cannot do is take away room
-		 * somebody asked for.
-		 *
-		 * Three guards, and each one is a loop that was easy to write by accident:
-		 *
-		 * - `setHeight` returns nothing when the number already matches, so a measurement
-		 *   that agrees with the board neither broadcasts nor bumps `rev`, and the frame
-		 *   that produced it is not reloaded to be asked again;
-		 * - only the height is taken. The width is the user's, from a drag, and a
-		 *   measurement that also set it would fight the drag that caused it;
-		 * - the reading must be for the revision the board is actually at, or a
-		 *   measurement of a document that has since been rewritten sets the height
-		 *   of one that no longer exists.
+		 * Kept for the agent who asks (`stage.fit`, and what it reports) and nothing else. A browser's
+		 * reading never sizes a board: the size is the stage file's, set by `fit`, `resize` or a drag.
+		 * Two browsers with different fonts read the same board a pixel or two apart, and when both
+		 * readings sized it, each answered the other's for ever.
 		 */
-		const measured = wire.deck.board(message.path);
-		// A board `newBoard` has just made, before anything is written in it, keeps the size it was made at.
-		if (measured && measured.rev === message.rev && !wire.boards.stillBlank(message.path, message.rev)) {
-			const resized = wire.deck.setHeight(message.path, message.h);
-			if (resized) wire.send({ type: "board.sized", path: message.path, h: resized.h });
-		}
 	},
 
 	"board.patch": (message, reply, wire) => {

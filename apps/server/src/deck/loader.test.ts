@@ -344,91 +344,36 @@ test("the fallback layout measures itself against the canvas, not every board th
 });
 
 /*
- * The height rule, which is where the two board formats actually differed.
- *
- * One of them always stated a height and kept it; the other never stated one and was measured.
- * There is one rule now and the file chooses which half of it applies: **a stated height is a
- * floor**. The browser's measurement raises the board above it whenever the content needs more
- * room, which is what makes a board that clips impossible, and never lowers it below the number
- * somebody dragged out or a fit wrote, which is what keeps room under the last block.
+ * A board's own size is the one its file states, as its agent wrote it: what it comes at when a stage
+ * takes it. Nothing a browser reads changes it; on a stage, the stage file holds the size it is drawn at.
  */
-test("a stated height is a floor the content raises, and never a ceiling", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 900, 400));
-	const deck = Deck.open(root);
-	assert.equal(deck.board("boards/a.html")?.h, 400, "the file's number, before anybody has looked");
-
-	// Taller than the file says: the board grows, because the alternative is a cut paragraph.
-	assert.equal(deck.setHeight("boards/a.html", 690)?.h, 690);
-	assert.equal(deck.board("boards/a.html")?.h, 690);
-
-	// Shorter: the board comes back down to what the content needs, and stops at the floor —
-	// the room somebody asked for is still there, and nothing below it was ever promised.
-	assert.equal(deck.setHeight("boards/a.html", 300)?.h, 400);
-	assert.equal(deck.setHeight("boards/a.html", 380), undefined, "already at the floor, so nothing is broadcast");
-	assert.equal(deck.board("boards/a.html")?.h, 400);
-	rmSync(root, { recursive: true, force: true });
-});
-
-test("a board that states no height is exactly its content's", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
-	const deck = Deck.open(root);
-	const start = deck.board("boards/a.html")?.h ?? 0;
-	assert.ok(start > 0, "a placeholder to draw before the first measurement");
-
-	assert.equal(deck.setHeight("boards/a.html", 604)?.h, 604);
-	// And down again, which a floor would have refused: there is none to refuse it.
-	assert.equal(deck.setHeight("boards/a.html", 420)?.h, 420);
-	rmSync(root, { recursive: true, force: true });
-});
-
-test("a deck's height is its aspect's, and a measurement does not touch it", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "talk.slides.html"), slideDeck("Talk"));
-	const deck = Deck.open(root);
-	const before = deck.board("boards/talk.slides.html")?.h;
-	assert.equal(deck.setHeight("boards/talk.slides.html", 2000), undefined);
-	assert.equal(deck.board("boards/talk.slides.html")?.h, before);
-	rmSync(root, { recursive: true, force: true });
-});
-
-/*
- * Editing a board must not make it jump, and fitting one must not leave it stale. Those pull in
- * opposite directions, and the file's own number is what tells them apart: an edit that leaves it
- * alone keeps the height last measured, and a write that changes it is a new floor to take now.
- */
-test("an edit keeps the measured height, and a new floor in the file replaces it", () => {
+test("a board is the height its file states, through edits, and a new number in the file replaces it", () => {
 	const root = emptyDeck();
 	const file = join(root, "boards", "a.html");
 	writeFileSync(file, board("A", 900, 400));
 	const deck = Deck.open(root);
-	deck.setHeight("boards/a.html", 690);
+	assert.equal(deck.board("boards/a.html")?.h, 400);
 
-	// An ordinary edit: same floor, so the reading from the last look stands.
 	writeFileSync(file, board("A", 900, 400).replace("<body", "<body data-x=1"));
-	assert.equal(deck.refresh("boards/a.html")?.h, 690, "no jump to the number in the file");
+	assert.equal(deck.refresh("boards/a.html")?.h, 400, "an edit leaves it as it was");
 
-	// A fit or a drag: the file's number moved, so it is the board's now, down as well as up.
 	writeFileSync(file, withBoardSize("boards/a.html", readFileSync(file, "utf8"), { h: 500 }));
-	assert.equal(deck.refresh("boards/a.html")?.h, 500, "the new floor lands at once");
+	assert.equal(deck.refresh("boards/a.html")?.h, 500, "a fit or a resize lands at once");
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a measured height is kept for the next start, at the revision it was measured at", () => {
+test("an old reading answers only for a file that states no height, at the revision it was read at", () => {
 	const root = emptyDeck();
 	mkdirSync(join(root, ".decks"), { recursive: true });
-	writeFileSync(join(root, "boards", "a.html"), board("A", 1000, 259));
+	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	writeFileSync(join(root, "boards", "b.html"), board("B", 1000, 259));
+	const first = Deck.open(root);
+	const kept = { "boards/a.html": { rev: first.board("boards/a.html")!.rev, h: 418 }, "boards/b.html": { rev: first.board("boards/b.html")!.rev, h: 418 } };
+	writeFileSync(join(root, ".decks", "heights.json"), JSON.stringify(kept));
 	const deck = Deck.open(root);
-	assert.equal(deck.board("boards/a.html")?.h, 259);
-	assert.equal(deck.measured("boards/a.html"), false);
-	deck.setHeight("boards/a.html", 418);
-	deck.saveHeights();
-	const again = Deck.open(root);
-	assert.equal(again.board("boards/a.html")?.h, 418, "opened again, the board is as tall as it was measured");
-	assert.equal(again.measured("boards/a.html"), true);
-	// A different file is a different revision: its measurement is to be taken again, from the floor.
-	writeFileSync(join(root, "boards", "a.html"), board("A, edited", 1000, 259));
-	assert.equal(Deck.open(root).board("boards/a.html")?.h, 259);
+	assert.equal(deck.board("boards/a.html")?.h, 418, "no height in the file, so the old reading");
+	assert.equal(deck.board("boards/b.html")?.h, 259, "the file's own height wins");
+	writeFileSync(join(root, "boards", "a.html"), board("A, edited"));
+	assert.notEqual(Deck.open(root).board("boards/a.html")?.h, 418, "another revision is not what was read");
 	rmSync(root, { recursive: true, force: true });
 });

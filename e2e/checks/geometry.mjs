@@ -2,18 +2,13 @@
  * Board geometry, from the two gestures that change it: the resize handle, and the double-click
  * that makes a board.
  *
- * Both are the same subject — where a board's *size* comes from — and they answer it in opposite
- * directions. A resize is a write: the number lives in the board's own file, so the drag previews
- * the box it is asking for and the file decides what turns out to be true. A double-click is a
+ * Both are the same subject — where a board's *size* comes from. A resize is the board's size on
+ * this stage, kept in the stage file: the board is drawn at what the drag let go at, and its own
+ * file keeps the size its agent wrote, which is what another stage takes it at. A double-click is a
  * creation: a name the server mints, a place the browser picked, and a board whose centre ends up
  * where the pointer was.
- *
- * The size is checked **in the file** rather than on screen. The board's draggable box is drawn
- * from the board record, so asserting it would pass even if nothing had been written — and the
- * write is the whole feature. The record and the file are then compared to each other, which is
- * the one thing that could disagree without either looking wrong on its own.
  */
-import { boardPath, changed, flyToBoard, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, flyToBoard, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
 
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000, edit: true });
@@ -168,23 +163,20 @@ say(
 	`${componentMeta.w}x${componentMeta.h} → ${dragged.w}x${dragged.h}`,
 );
 
-await changed(component, wasComponent, { timeout: 8000 }).catch(() => {});
+await page.waitForTimeout(1500);
 const nowComponent = read(component);
-const afterMeta = metaOf(nowComponent);
+const drawnAt = (wanted) =>
+	page.evaluate((wanted) => {
+		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+		return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
+	}, wanted);
+const drawn = await drawnAt(componentPath);
 say(
-	"and letting go writes the size to the board's own file",
-	afterMeta !== null && afterMeta.w > componentMeta.w && afterMeta.h > componentMeta.h,
-	`${JSON.stringify(componentMeta)} → ${JSON.stringify(afterMeta)}`,
+	"letting go keeps the board at the size the drag let go at",
+	Math.abs(drawn.w - dragged.w) <= 2 && Math.abs(drawn.h - dragged.h) <= 2,
+	`drawn ${drawn.w}x${drawn.h}, dragged ${dragged.w}x${dragged.h}`,
 );
-const drawn = await page.evaluate((wanted) => {
-	const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
-	return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
-}, componentPath);
-say(
-	"…and the board on screen is that size, not the drag's",
-	drawn.w === afterMeta.w && drawn.h === afterMeta.h,
-	`drawn ${drawn.w}x${drawn.h}, file ${afterMeta.w}x${afterMeta.h}`,
-);
+say("…and leaves the board's own file as its agent wrote it", nowComponent === wasComponent, JSON.stringify(metaOf(nowComponent)));
 // The person's own resize is theirs: the board's new file time must not read as an agent's change.
 await page.waitForTimeout(600);
 const glows = await page.evaluate((wanted) => {
@@ -192,7 +184,6 @@ const glows = await page.evaluate((wanted) => {
 	return { glow: Boolean(node?.querySelector(".news-glow")) };
 }, componentPath);
 say("…and a board you resized does not glow as news", !glows.glow, JSON.stringify(glows));
-say("nothing else in the file moved", nowComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0') === wasComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0'), "the rest of the bytes are identical");
 
 // --- a board written as a document: both numbers are writable, and the height is a floor ---
 
@@ -216,21 +207,14 @@ say(
 	`${JSON.stringify(flowHandle)} vs the other board's ${JSON.stringify(both)}`,
 );
 
+const flowBefore = await drawnAt(flowPath);
 await dragHandle(flowPath, 120, 60);
-await changed(flow, wasFlow, { timeout: 8000 }).catch(() => {});
-const nowFlow = read(flow);
-const flowAfter = metaOf(nowFlow);
-/*
- * Both numbers, on every board. The height used to be dropped here because this board was a
- * *flow* document and its height was the browser's alone. It is one format now: what a drag
- * writes is a floor, and the content raises the board above it whenever it needs more room — so
- * dragging the bottom edge is how you keep space under the last block, and it can never cut a
- * paragraph off.
- */
+await page.waitForTimeout(1500);
+const flowDrawn = await drawnAt(flowPath);
 say(
-	"…so both numbers are written, and the height it gains is a floor under the content",
-	flowAfter !== null && flowAfter.w > flowMeta.w && flowAfter.h > 0,
-	`${JSON.stringify(flowMeta)} → ${JSON.stringify(flowAfter)}`,
+	"…and it takes both numbers, with the file left alone",
+	flowDrawn.w > flowBefore.w && flowDrawn.h > flowBefore.h && read(flow) === wasFlow,
+	`${flowBefore.w}x${flowBefore.h} → ${flowDrawn.w}x${flowDrawn.h}, ${JSON.stringify(flowMeta)}`,
 );
 
 // --- a double-click on a board's own bar is not a double-click on empty canvas ----------
