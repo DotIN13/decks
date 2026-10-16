@@ -26,6 +26,15 @@
 
 namespace {
 
+// The characters below U+1F000 that are emoji unless asked to be text (Unicode's Emoji_Presentation=Yes);
+// the ones above it have no plain form in a text font, so the chain finds the emoji font for them anyway.
+bool emojiByDefault(uint32_t c) {
+	static const uint32_t ranges[][2] = {{0x231A, 0x231B}, {0x23E9, 0x23EC}, {0x23F0, 0x23F0}, {0x23F3, 0x23F3}, {0x25FD, 0x25FE}, {0x2614, 0x2615}, {0x2648, 0x2653}, {0x267F, 0x267F}, {0x2693, 0x2693}, {0x26A1, 0x26A1}, {0x26AA, 0x26AB}, {0x26BD, 0x26BE}, {0x26C4, 0x26C5}, {0x26CE, 0x26CE}, {0x26D4, 0x26D4}, {0x26EA, 0x26EA}, {0x26F2, 0x26F3}, {0x26F5, 0x26F5}, {0x26FA, 0x26FA}, {0x26FD, 0x26FD}, {0x2705, 0x2705}, {0x270A, 0x270B}, {0x2728, 0x2728}, {0x274C, 0x274C}, {0x274E, 0x274E}, {0x2753, 0x2755}, {0x2757, 0x2757}, {0x2795, 0x2797}, {0x27B0, 0x27B0}, {0x27BF, 0x27BF}, {0x2B1B, 0x2B1C}, {0x2B50, 0x2B50}, {0x2B55, 0x2B55}};
+	for (const auto& r : ranges)
+		if (c >= r[0] && c <= r[1]) return true;
+	return false;
+}
+
 struct Face {
 	std::string family;
 	int weight = 400;
@@ -490,6 +499,33 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 		advance[i] = formula ? formula->width * spans[size_t(sp[i])].size : 0;
 		clusterStart[i] = 1;
 		glyphCount[i] = 1;
+	}
+	/*
+	 * A character asked for as an emoji, with the variation selector U+FE0F after it ("❤️"), is drawn by
+	 * the colour emoji font when the chain has one, as a browser draws it. Skia's paragraph gives it to
+	 * the first font that has the character, which for a heart or a check mark is a plain one.
+	 */
+	for (int run = 0; run < int(spans.size()); run++) {
+		int emoji = -1;
+		for (int face : spans[size_t(run)].chain)
+			if (faces[size_t(face)].family.find("Emoji") != std::string::npos) {
+				emoji = face;
+				break;
+			}
+		if (emoji < 0) continue;
+		for (size_t i = 0; i < n; i++) {
+			if (sp[i] != run || faceOf[i] >= 0) continue;
+			const bool asked = i + 1 < n && cps[i + 1] == 0xFE0F && sp[i + 1] == run;
+			// Or one that is an emoji unless asked otherwise (Emoji_Presentation), and not asked to be text.
+			const bool byDefault = emojiByDefault(cps[i]) && !(i + 1 < n && cps[i + 1] == 0xFE0E);
+			if (!asked && !byDefault) continue;
+			size_t j = i + (asked ? 2 : 1);
+			// A keycap or a joined sequence goes with it, as one cluster.
+			while (j < n && sp[j] == run && (cps[j] == 0x20E3 || cps[j] == 0x200D || cps[j] == 0xFE0F || (j > 0 && cps[j - 1] == 0x200D))) j++;
+			if (level[i] != level[j - 1] || scriptRun[i] != scriptRun[j - 1]) continue;
+			shapeWith(emoji, i, j, false);
+			i = j - 1;
+		}
 	}
 	for (int run = 0; run < int(spans.size()); run++) {
 		for (int face : spans[size_t(run)].chain) shapeUnresolved(run, face, false);
