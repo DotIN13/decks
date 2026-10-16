@@ -334,11 +334,14 @@ const agent = {
 			const outline = document.querySelector('.pen-selection[data-board="true"]')?.getBoundingClientRect();
 			const zoom = Number(document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 			const carried = document.querySelector(".stage-carried:not([hidden])")?.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
+			// With the C++ engine, the picture is the engine's, moved by the drag's offset (`engine-stage.ts`, `carry`).
+			const engine = globalThis.__decksEngine?.carried;
+			const engineCarries = engine?.paths.has(path) ? [Math.round(engine.dx * zoom), Math.round(engine.dy * zoom)] : null;
 			return {
 				hidden: element.hasAttribute("data-carried") && getComputedStyle(element.querySelector(".surface")).visibility === "hidden",
 				dx: outline ? Math.round(outline.left - node.left) : null,
 				dy: outline ? Math.round(outline.top - node.top) : null,
-				picture: carried ? [Math.round(Number(carried[1]) * zoom), Math.round(Number(carried[2]) * zoom)] : null,
+				picture: carried ? [Math.round(Number(carried[1]) * zoom), Math.round(Number(carried[2]) * zoom)] : engineCarries,
 				handles: document.querySelectorAll(".pen-handle[data-board]").length,
 			};
 		}, edge.path);

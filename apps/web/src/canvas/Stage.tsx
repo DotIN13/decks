@@ -651,10 +651,13 @@ export function Stage(props: {
 	 */
 	let engineUnder: HTMLCanvasElement | undefined;
 	let engineOver: HTMLCanvasElement | undefined;
+	/** Live boards a drag carries as the engine's pictures: their pages wait where they were, unseen. */
+	const [engineCarried, setEngineCarried] = createSignal<ReadonlySet<string>>(new Set());
 	const startEngine = () => {
 		if (!engineUnder || !engineOver || untrack(engineStage)) return;
 		const stage = new EngineStage(engineUnder, engineOver);
 		stage.pictured = (paths) => picturedNow(paths);
+		stage.carrying = setEngineCarried;
 		stage.forgetTile = (key) => penLayer.forgetTile(key);
 		stage.setCamera(localCamera);
 		// A browser where the engine cannot start keeps the sheet, pictures and all.
@@ -4544,7 +4547,7 @@ export function Stage(props: {
 							onDragging={(at) => setOwnDrag(at ? { path: board.path, ...at } : undefined)}
 							pictured={onSheet().has(board.path)}
 							covering={sleepOnZoom()}
-							carried={carriedPages().has(board.path)}
+							carried={carriedPages().has(board.path) || engineCarried().has(board.path)}
 							asleep={!alone && props.renderer === "dom" && props.editing?.path !== board.path && props.focus !== board.path && props.presenting !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
 							{...(!alone && shotAdaptor().capture ? { capture: (frame: HTMLIFrameElement) => shotAdaptor().capture!(frame, board) } : {})}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}

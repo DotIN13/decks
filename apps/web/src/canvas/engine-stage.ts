@@ -264,11 +264,18 @@ export class EngineStage {
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
 		const was = this.carried;
 		const next = { paths: new Set(paths), dx: offset.dx, dy: offset.dy };
-		if (was.dx === next.dx && was.dy === next.dy && was.paths.size === next.paths.size && paths.every((path) => was.paths.has(path))) return;
+		const samePaths = was.paths.size === next.paths.size && paths.every((path) => was.paths.has(path));
+		if (was.dx === next.dx && was.dy === next.dy && samePaths) return;
 		this.carried = next;
-		for (const path of new Set([...was.paths, ...next.paths])) this.placeBoard(path);
+		// A live board picked up or put down changes what is drawn of it, its picture or nothing: laid out again.
+		if (!samePaths) this.layout();
+		else for (const path of next.paths) this.placeBoard(path);
 		this.draw();
 	}
+
+	/** Called with the live boards whose picture the engine is carrying: their pages wait, unseen (`Stage`). */
+	carrying: ((paths: ReadonlySet<string>) => void) | undefined;
+	private carryingNow: ReadonlySet<string> = new Set();
 
 	/** One board's items at its place, shifted when a drag carries it. */
 	private placeBoard(path: string): void {
@@ -285,6 +292,7 @@ export class EngineStage {
 		if (!engine) return;
 		engine.clear();
 		this.boardItems.clear();
+		const carrying = new Set<string>();
 		// Clearing took the tiles' items too: they go back as they were.
 		for (const [key, one] of this.tiles) if (one.level === this.tileLevel) this.placeTile(key);
 		const paper: [number, number, number, number] = this.scheme === "dark" ? [30, 30, 32, 1] : [255, 255, 255, 1];
@@ -293,11 +301,14 @@ export class EngineStage {
 			const radius = 12;
 			const items: Array<[string, Item]> = [];
 			const put = (id: string, item: Item) => items.push([id, item]);
-			if (!board.live) {
-				const picture = this.pictures.get(board.path);
-				const shown = picture?.ready && picture.url === board.picture;
+			const picture = this.pictures.get(board.path);
+			const shown = !!picture?.ready && picture.url === board.picture;
+			// A live board being dragged is drawn as its picture, once there is one, and its page waits.
+			const carriedLive = board.live && shown && this.carried.paths.has(board.path);
+			if (carriedLive) carrying.add(board.path);
+			if (!board.live || carriedLive) {
 				put(`paper:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h: board.h, color: paper, radius });
-				if (shown && picture.w > 0) {
+				if (shown && picture && picture.w > 0) {
 					// The whole board was pictured: a picture taller than the box is cut at its foot, a shorter one ends early.
 					const tall = (picture.h / picture.w) * board.w;
 					const h = Math.min(board.h, tall);
@@ -311,6 +322,11 @@ export class EngineStage {
 			if (items.length === 0) continue;
 			this.boardItems.set(board.path, items);
 			this.placeBoard(board.path);
+		}
+		const was = this.carryingNow;
+		if (was.size !== carrying.size || [...carrying].some((path) => !was.has(path))) {
+			this.carryingNow = carrying;
+			this.carrying?.(carrying);
 		}
 		this.reportPictured();
 	}
@@ -360,7 +376,8 @@ export class EngineStage {
 		if (!this.engine || this.disposed) return;
 		const dpr = Math.min(2, window.devicePixelRatio || 1);
 		for (const board of this.inView()) {
-			if (!board.picture || board.live) continue;
+			// A live board is its page, and its picture is fetched only when asked to be kept ready, for a drag to carry.
+			if (!board.picture || (board.live && !board.ready)) continue;
 			let picture = this.pictures.get(board.path);
 			if (!picture || picture.url !== board.picture) {
 				if (picture?.ready) this.engine.forget(board.path);
