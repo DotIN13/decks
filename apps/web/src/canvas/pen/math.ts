@@ -1,6 +1,7 @@
 /**
- * Formulas in a drawing's words: TeX between `$…$` (in a line) and `$$…$$` (on a line of its own), as
- * Obsidian and GitHub read them, typeset by MathJax into outlines the C++ engine fills like any shape.
+ * Formulas in a drawing's words: TeX between `$…$` (in a line) and `$$…$$` (set as a display formula:
+ * on a line of its own in a card, in place in a plain text), as Obsidian and GitHub read them, typeset by
+ * MathJax into outlines the C++ engine fills like any shape.
  *
  * A formula travels in text as one character from Unicode's private-use plane, U+F0000 plus its number
  * (`formulaText`), so the words of a text or a card carry it wherever they go: the engine measures that
@@ -73,8 +74,8 @@ export function handFormulas(text: string, engine: { math(formula: Formula): voi
 }
 
 /**
- * A text's words with each formula in them turned into its character: `$$…$$` shown as a block and
- * `$…$` in the line, read as Obsidian reads them, so "$5 and $10" stays money: the opening `$` is
+ * A text's words with each formula in them turned into its character: `$$…$$` set as a display formula
+ * and `$…$` in the line, read as Obsidian reads them, so "$5 and $10" stays money: the opening `$` is
  * followed by something other than a space, the closing one follows something other than a space and
  * is not followed by a digit, and `\$` is a dollar sign.
  */
