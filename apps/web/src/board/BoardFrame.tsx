@@ -385,10 +385,13 @@ export function BoardFrame(props: {
 		return false;
 	}, false);
 	let readying: ReturnType<typeof setTimeout> | undefined;
+	/** `liveNow` as a signal, for the one thing drawn from it: whether the page is still waking (`data-waking`). */
+	const [shownLive, setShownLive] = createSignal(false);
 	const setLiveNow = (on: boolean) => {
 		if (!on) clearTimeout(readying);
 		if (on === liveNow) return;
 		liveNow = on;
+		setShownLive(on);
 		props.onLive?.(on);
 	};
 	/*
@@ -1275,6 +1278,8 @@ export function BoardFrame(props: {
 			data-selected={props.selected}
 			data-inert={inert()}
 			data-dormant={dormant() ? "" : undefined}
+			// A page up but not yet drawn, over the engine's picture of it (`canvas.css`, `[data-waking]`).
+			data-waking={props.onLive && hasPage() && !dormant() && !shownLive() ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			data-sizing={props.sizing ? "true" : undefined}
 			data-path={props.board.path}

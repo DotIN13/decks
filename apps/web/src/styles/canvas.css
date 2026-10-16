@@ -657,6 +657,16 @@
 	.stage[data-engine] .board-node[data-dormant] > .surface {
 	background: transparent;
 }
+	/*
+	 * Nor does a page that is up but has not said it is drawn: with the engine its picture is under the
+	 * page, not over it as the sheet's is, so a page coming up on a zoom-in covered the picture with its
+	 * empty paper until it drew, and the board flashed white. Kept painted (`will-change`) and unseen,
+	 * it shows in the frame the engine lets the picture go (`BoardFrame`'s `data-waking`).
+	 */
+	.stage[data-engine][data-renderer="dom"] .board-node[data-waking] {
+	opacity: 0;
+	will-change: opacity;
+}
 	/* Nor does a board with no page in it: one mounted only to be dragged covered the picture it carries. */
 	.stage[data-engine] .board-node > .surface:not(:has(> iframe)) {
 	background: transparent;
