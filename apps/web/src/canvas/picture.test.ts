@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { drawScale, MAX_SIDE, needsRedraw, pictureSize } from "./picture.ts";
+import { clickableWhereDrawn, drawScale, MAX_SIDE, needsRedraw, pictureSize } from "./picture.ts";
 
 describe("pictureSize", () => {
 	it("is the board's size in device pixels at the zoom it is seen at", () => {
@@ -62,5 +62,22 @@ describe("needsRedraw", () => {
 		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 110, h: 100 }), true, "10% soft is");
 		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 80, h: 80 }), false, "a little too large is fine");
 		assert.equal(needsRedraw({ w: 100, h: 100 }, { w: 40, h: 40 }), true, "six times the pixels is memory");
+	});
+});
+
+describe("clickableWhereDrawn", () => {
+	it("maps the page's whole box onto the whole canvas, in the canvas's pixels", () => {
+		const calls: unknown[] = [];
+		const canvas = { width: 600, height: 450, updateElementGeometry: (element: unknown, options: unknown) => calls.push([element, options]) } as unknown as HTMLCanvasElement;
+		const frame = { offsetWidth: 1200, offsetHeight: 900 } as HTMLElement;
+		clickableWhereDrawn(canvas, frame);
+		assert.deepEqual(calls, [[frame, { canvasTransform: { a: 0.5, b: 0, c: 0, d: 0.5, e: 0, f: 0 } }]]);
+	});
+	it("does nothing where the browser has no such call, or nothing is laid out yet", () => {
+		const frame = { offsetWidth: 1200, offsetHeight: 900 } as HTMLElement;
+		clickableWhereDrawn({ width: 600, height: 450 } as HTMLCanvasElement, frame);
+		let called = false;
+		clickableWhereDrawn({ width: 600, height: 450, updateElementGeometry: () => (called = true) } as unknown as HTMLCanvasElement, { offsetWidth: 0, offsetHeight: 0 } as HTMLElement);
+		assert.equal(called, false);
 	});
 });

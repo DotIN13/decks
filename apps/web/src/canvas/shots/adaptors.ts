@@ -2,7 +2,7 @@ import { api } from "../../connections/connection.ts";
 import type { Board } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { thumbUrl } from "../../lib/api.ts";
-import { canvasPixelRatio, drawScale, elementContext } from "../picture.ts";
+import { canvasPixelRatio, drawScale, elementContext, hasElementGeometry } from "../picture.ts";
 import { snapshotOf } from "./snapshot.ts";
 
 /**
@@ -154,7 +154,9 @@ export async function takeInCanvas(frame: HTMLIFrameElement, board: Board): Prom
 	const scale = ratio && drawScale({ w: width, h: height }, frame.getBoundingClientRect(), ratio);
 	if (!scale) return undefined;
 	ctx.setTransform(scale.x, 0, 0, scale.y, 0, 0);
-	ctx.drawElementImage(frame, 0, 0);
+	// A picture for elsewhere: where the page can be clicked stays where the board shows it.
+	if (hasElementGeometry(canvas)) ctx.drawElementImage(frame, 0, 0, { preserveElementGeometry: true });
+	else ctx.drawElementImage(frame, 0, 0);
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	return new Promise<Blob | undefined>((resolve) => canvas.toBlob((blob) => resolve(blob ?? undefined), "image/png"));
 }

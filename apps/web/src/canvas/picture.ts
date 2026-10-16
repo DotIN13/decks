@@ -114,7 +114,38 @@ export function drawScale(target: { w: number; h: number }, element: { width: nu
  * hands back a context only when the method is there to call.
  */
 export interface ElementDrawingContext extends CanvasRenderingContext2D {
-	drawElementImage(element: Element, dx: number, dy: number): void;
+	drawElementImage(element: Element, dx: number, dy: number, options?: { preserveElementGeometry?: boolean }): void;
+}
+
+/** The part of the API that says where a drawn element can be clicked; Chrome 154 has it, 153 does not. */
+interface GeometryCanvas extends HTMLCanvasElement {
+	updateElementGeometry?(element: Element, options?: { canvasTransform?: DOMMatrixInit }): void;
+}
+
+/** Whether this browser places a drawn element's click area itself (`clickableWhereDrawn`). */
+export function hasElementGeometry(canvas: HTMLCanvasElement): boolean {
+	return typeof (canvas as GeometryCanvas).updateElementGeometry === "function";
+}
+
+/**
+ * Make a canvas's child clickable where it is drawn: its whole box over the whole canvas, which is
+ * how the Canvas renderer draws a board's page. Up to Chrome 153 a child of a `layoutsubtree` canvas
+ * was clicked at its own layout box, which is that same place, and this does nothing. From Chrome
+ * 154 a child can be clicked only where its geometry says it is drawn, and a board with none set
+ * took no clicks, typing or scrolling at all: every press landed on the canvas.
+ */
+export function clickableWhereDrawn(canvas: HTMLCanvasElement, element: HTMLElement): void {
+	const geometry = canvas as GeometryCanvas;
+	if (typeof geometry.updateElementGeometry !== "function") return;
+	const w = element.offsetWidth;
+	const h = element.offsetHeight;
+	if (!(w > 0) || !(h > 0) || !(canvas.width > 0) || !(canvas.height > 0)) return;
+	try {
+		// From the element's own box, in CSS pixels, to the canvas's pixels.
+		geometry.updateElementGeometry(element, { canvasTransform: { a: canvas.width / w, b: 0, c: 0, d: canvas.height / h, e: 0, f: 0 } });
+	} catch {
+		/* not yet laid out, or a version that takes something else: the next draw tries again */
+	}
 }
 
 export interface PaintEvent extends Event {

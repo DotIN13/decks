@@ -31,7 +31,7 @@ import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
-import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "../canvas/picture.ts";
+import { canvasPixelRatio, clickableWhereDrawn, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "../canvas/picture.ts";
 
 /**
  * One board on the stage: a title above it, and the document itself in a frame.
@@ -795,6 +795,8 @@ export function BoardFrame(props: {
 		frames?.detach();
 		frames = frame.contentWindow ? holdFrames(frame.contentWindow) : undefined;
 		frames?.hold(untrack(cameraMoving));
+		// In the Canvas renderer, a page newly in its canvas is clickable before it is first drawn.
+		if (canvasEl && frame.parentElement === canvasEl) clickableWhereDrawn(canvasEl, frame);
 		/*
 		 * A press inside a board selects that board — **every** format, either mode.
 		 *
@@ -1036,6 +1038,7 @@ export function BoardFrame(props: {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			ctx.setTransform(scale.x, 0, 0, scale.y, 0, 0);
 			ctx.drawElementImage(frame, 0, 0);
+			clickableWhereDrawn(canvas, frame);
 			if (keep && isEmpty(canvas)) {
 				// An empty snapshot: the page is not painted yet. Put the old picture back, stretched to
 				// the new size if there is one, and draw again at the page's next paint.
@@ -1057,6 +1060,8 @@ export function BoardFrame(props: {
 		// Chrome has a snapshot of this document, which is the only thing that makes a draw
 		// safe: before it, a draw throws and the resize that preceded it has already cleared.
 		drawable = true;
+		// Clickable from now, even if the draw itself waits for the camera to rest.
+		if (canvasEl && frameEl) clickableWhereDrawn(canvasEl, frameEl);
 		// While the scale is moving the picture is being stretched; a draw now would be at
 		// the old size and thrown away at rest anyway. Remembered rather than dropped, so a
 		// board that finished rendering during a zoom is drawn once the zoom rests.
