@@ -68,6 +68,24 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 	return changed;
 }
 
+/**
+ * Whether moving the items `ids` (and what they hold) bends an arrow that is not itself moved: one
+ * with an end on any of them. Such a move cannot be shown by sliding a picture of what is carried.
+ */
+export function bendsArrow(doc: PenDocument, ids: ReadonlySet<string>): boolean {
+	const carried = new Set<string>();
+	for (const node of walk(doc.children)) if (ids.has(node.id)) for (const inner of walk([node])) carried.add(inner.id);
+	for (const node of walk(doc.children)) {
+		if (!isArrow(node) || carried.has(node.id)) continue;
+		const meta = node.metadata as { from?: unknown; to?: unknown };
+		for (const end of [meta.from, meta.to]) {
+			const item = arrowEndItem(end);
+			if (item !== undefined && carried.has(item)) return true;
+		}
+	}
+	return false;
+}
+
 type Point = [number, number];
 
 export type ArrowRoute = "straight" | "curved" | "elbow";

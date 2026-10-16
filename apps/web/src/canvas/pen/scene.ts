@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, estimateText, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
+import { baseTheme, bendsArrow, estimateText, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
@@ -1565,7 +1565,12 @@ export class StageScene {
 	 * is laid out and recorded again. Returns whether anything is to be drawn again.
 	 */
 	private preview(moving: ReadonlyMap<string, PenPreview> | undefined): boolean {
-		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
+		/*
+		 * Slid only when nothing left behind has to change with it: an arrow joined to a carried item
+		 * bends at every step, so a move that drags one along is laid out and drawn as a resize is. The
+		 * page makes the same choice (`layer.ts`, `preview`), as it slides what the worker carries.
+		 */
+		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined) && !(this.doc && bendsArrow(this.doc, new Set(moving.keys())));
 		if (slide) {
 			const key = [...moving!.keys()].sort().join("|");
 			if (this.slide?.key === key) return false;
@@ -1655,14 +1660,41 @@ export class StageScene {
 		}
 	}
 
+	/**
+	 * Boxes as the page should hold them during a move that is drawn rather than slid (one that bends an
+	 * arrow): the carried items where they rest, since the page adds the drag's offset itself, for their
+	 * outline and for snapping, as it does when the move is slid. Everything else, the arrows included,
+	 * as laid out.
+	 */
+	private movedBack(): <T extends Frame | Placed>(entries: Array<[string, T]>) => Array<[string, T]> {
+		const moving = this.moving;
+		const shifts = new Map<string, { dx: number; dy: number }>();
+		if (moving && this.doc)
+			for (const node of walk(this.doc.children)) {
+				const change = moving.get(node.id);
+				if (!change || change.w !== undefined || change.h !== undefined || change.radius !== undefined || change.set !== undefined) continue;
+				for (const inner of walk([node])) shifts.set(inner.id, { dx: change.dx, dy: change.dy });
+			}
+		return (entries) =>
+			shifts.size === 0
+				? entries
+				: entries.map(([id, value]) => {
+						const by = shifts.get(id);
+						if (!by) return [id, value];
+						const at = (box: Frame): Frame => ({ ...box, x: box.x - by.dx, y: box.y - by.dy });
+						return [id, ("box" in value ? { ...value, box: at(value.box) } : at(value)) as typeof value];
+					});
+	}
+
 	private sendLayout(cards: CardGeometry[], only?: ReadonlySet<string>): void {
+		const back = this.movedBack();
 		if (!only) {
-			this.host.post({ type: "layout", seq: this.docSeq, placed: [...this.placed], bounds: [...this.bounds], cards });
+			this.host.post({ type: "layout", seq: this.docSeq, placed: back([...this.placed]), bounds: back([...this.bounds]), cards });
 			return;
 		}
 		// A step of a gesture: only the items drawn again, which the page lays over what it has.
-		const placed = [...this.placed].filter(([id]) => only.has(id));
-		const bounds = [...this.bounds].filter(([id]) => only.has(id));
+		const placed = back([...this.placed].filter(([id]) => only.has(id)));
+		const bounds = back([...this.bounds].filter(([id]) => only.has(id)));
 		this.host.post({ type: "layout", seq: this.docSeq, placed, bounds, cards, partial: true });
 	}
 

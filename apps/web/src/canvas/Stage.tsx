@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -1643,6 +1643,13 @@ export function Stage(props: {
 		return false;
 	};
 
+	/** The path of an arrow being drawn, curved as the arrow it makes will be. */
+	const draftCurve = (draft: { x1: number; y1: number; x2: number; y2: number }) => {
+		const points = arrowRoute({ x: draft.x1, y: draft.y1, w: 0, h: 0 }, { x: draft.x2, y: draft.y2, w: 0, h: 0 }, "curved");
+		const [a, ...rest] = points;
+		return points.length === 4 ? `M${a![0]} ${a![1]}C${rest.map((p) => `${p[0]} ${p[1]}`).join(" ")}` : `M${points.map((p) => `${p[0]} ${p[1]}`).join("L")}`;
+	};
+
 	const armPenTool = (tool: PenTool) => {
 		// The board palette's tool goes down first: picking one of its tools puts this one down.
 		if (tool !== "select") props.onTool?.("select");
@@ -2761,7 +2768,7 @@ export function Stage(props: {
 					const from = fromJoin ? endOf(fromJoin) : pointEnd(at);
 					const to = toJoin && toJoin.name !== fromJoin?.name ? endOf(toJoin) : pointEnd(end);
 					if (!moved && (!fromJoin || !toJoin || fromJoin.name === toJoin.name)) return void setPenDraft(undefined);
-					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to } } }]);
+					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to, route: "curved" } } }]);
 					keepDraftFor(id);
 					selectMade([id]);
 					return;
@@ -5124,7 +5131,8 @@ export function Stage(props: {
 							when={draft().tool !== "arrow"}
 							fallback={
 								<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-									<line x1={draft().x1} y1={draft().y1} x2={draft().x2} y2={draft().y2} stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
+									{/* The curve a new arrow is drawn with (`route: "curved"`), between the two points. */}
+									<path d={draftCurve(draft())} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
 								</svg>
 							}
 						>

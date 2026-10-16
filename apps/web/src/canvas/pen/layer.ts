@@ -1,4 +1,4 @@
-import { indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { bendsArrow, indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { isFile, isLiveFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
 import type { Picker } from "@decks/engine/pick";
@@ -620,9 +620,10 @@ export class PenLayer {
 		/*
 		 * A carried move, which the sheet shows by sliding the picture it already drew rather than
 		 * drawing anything again. A rounding cannot take that path: it changes the shape, and no
-		 * slide of the old pixels is the new ones.
+		 * slide of the old pixels is the new ones. Nor can a move that bends an arrow joined to what
+		 * it carries: the arrow is redrawn at every step, as the worker decides too (`scene.ts`).
 		 */
-		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
+		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined) && !(this.doc && bendsArrow(this.doc, new Set(changes.map(([id]) => id))));
 		if (slide) {
 			const first = changes![0]![1];
 			this.slideCarried(first.dx, first.dy);
