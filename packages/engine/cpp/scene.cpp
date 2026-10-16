@@ -193,15 +193,16 @@ Dim sizeOf(int handle, double forcedW, double forcedH) {
 		return {has(forcedW) ? forcedW : fixedOr(ws, bw), has(forcedH) ? forcedH : fixedOr(hs, bh)};
 	}
 	if (n.kind == FRAME) {
+		// A hug's number is its floor, as in pen/layout.ts: as big as what it holds, never smaller.
 		Size ws = orMissing(n.w, hug()), hs = orMissing(n.h, hug());
 		Content inner = frameContent(handle, ws.kind == FIXED ? ws.value : forcedW, hs.kind == FIXED ? hs.value : forcedH);
 		double w = has(forcedW) ? forcedW
 			: ws.kind == FIXED ? ws.value
-			: ws.kind == HUG ? (inner.count == 0 && ws.hasFallback() ? ws.fallback : inner.w)
+			: ws.kind == HUG ? (!ws.hasFallback() ? inner.w : inner.count == 0 ? ws.fallback : std::max(ws.fallback, inner.w))
 			: (ws.hasFallback() ? ws.fallback : inner.w);
 		double h = has(forcedH) ? forcedH
 			: hs.kind == FIXED ? hs.value
-			: hs.kind == HUG ? (inner.count == 0 && hs.hasFallback() ? hs.fallback : inner.h)
+			: hs.kind == HUG ? (!hs.hasFallback() ? inner.h : inner.count == 0 ? hs.fallback : std::max(hs.fallback, inner.h))
 			: (hs.hasFallback() ? hs.fallback : inner.h);
 		return {w, h};
 	}

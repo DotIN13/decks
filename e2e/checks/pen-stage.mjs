@@ -308,7 +308,8 @@ if (spot) {
 		const card = onDisk().children.find((n) => n.id === cardId);
 		return card && card.width !== wasCard?.width ? card : undefined;
 	});
-	say("dragging its side sets its width, and leaves its height to its words", !!widened && widened.height === undefined, JSON.stringify({ width: widened?.width, height: widened?.height }));
+	// Its words decide its height: no number in the file, only the floor it was made with (`fit_content(48)`).
+	say("dragging its side sets its width, and leaves its height to its words", !!widened && (widened.height === undefined || /^fit_content(\(\d+(\.\d+)?\))?$/.test(String(widened.height))), JSON.stringify({ width: widened?.width, height: widened?.height }));
 	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
 	const tall = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
 	const south = await page.evaluate(() => {

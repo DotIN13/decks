@@ -186,8 +186,10 @@ values —
 `layout: "none"` lets each child sit at its own `x`, `y`. `gap` is the space between, `padding` a
 number or `[vertical, horizontal]` or `[top, right, bottom, left]`, `justifyContent` `"start" |
 "center" | "end" | "space_between" | "space_around"`, `alignItems` `"start" | "center" | "end"`.
-A width or height is a number, `"fit_content"` (hug the children; a frame's default) or
-`"fill_container"` (take the room the parent has left). A child with `layoutPosition: "absolute"`
+A width or height is a number, `"fit_content"` (hug the children; a frame's default),
+`"fit_content(120)"` (hug them, but never less than 120) or `"fill_container"` (take the room the
+parent has left). A frame you insert with a `box` hugs what it holds, and the box's height is its floor;
+give a plain number in `height` only when it should stay that tall whatever it holds. A child with `layoutPosition: "absolute"`
 leaves the layout and sits at its own `x`, `y`. Want five notes in a tidy column? A frame with
 `layout: "vertical", gap: 16` and the notes inside: no coordinates at all.
 

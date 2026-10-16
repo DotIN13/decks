@@ -406,3 +406,20 @@ test("a colour is stored in pen's own hex, whatever it was written as", () => {
 	assert.deepEqual(stored({ effect: { type: "shadow", color: "rgba(0,0,0,0.2)", blur: 4 } }).effect, { type: "shadow", color: "#00000033", blur: 4 });
 	assert.deepEqual(stored({ fill: { type: "gradient", colors: [{ color: "white", position: 0 }] } }).fill, { type: "gradient", colors: [{ color: "#ffffff", position: 0 }] });
 });
+
+test("a hug's number is its floor: an empty frame is that tall, a full one as tall as what it holds", () => {
+	const frame = (children: PenDocument["children"]) => ({ version: "2.6", children: [{ id: "f", type: "frame", layout: "vertical", width: 200, height: "fit_content(120)", children }] }) as PenDocument;
+	const height = (doc: PenDocument) => layout(doc, expand(doc), light).get("f")!.box.h;
+	assert.equal(height(frame([])), 120, "empty: the floor");
+	assert.equal(height(frame([{ id: "a", type: "rectangle", width: 50, height: 40 }])), 120, "holding less: still the floor");
+	assert.equal(height(frame([{ id: "a", type: "rectangle", width: 50, height: 300 }])), 300, "holding more: as tall as it");
+});
+
+test("a frame inserted with a box hugs, the box's height its floor; a number in its own height fixes it", () => {
+	const doc = emptyDocument();
+	const theme = { theme: baseTheme(doc, "light") };
+	const made = apply(doc, [{ op: "insert", node: { type: "frame", id: "f" }, box: { x1: 0, y1: 0, x2: 200, y2: 140 } }], theme).doc;
+	assert.equal(made.children[0]!.height, "fit_content(140)");
+	const fixed = apply(doc, [{ op: "insert", node: { type: "frame", id: "f", height: 140 }, box: { x1: 0, y1: 0, x2: 200, y2: 140 } }], theme).doc;
+	assert.equal(fixed.children[0]!.height, 140);
+});

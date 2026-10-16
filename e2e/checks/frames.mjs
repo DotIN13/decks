@@ -211,7 +211,8 @@ if (spot) {
 		say("a frame drawn with the tool is a column", made?.layout === "vertical", JSON.stringify(made && { layout: made.layout, gap: made.gap, padding: made.padding, radius: made.cornerRadius, height: made.height }));
 		// Its corner is a card's 12 plus its own padding, so a card dropped in sits concentric with it.
 		say("…padded 18, with a corner that nests a card's inside it", made?.padding === 18 && made?.cornerRadius === 30, JSON.stringify({ padding: made?.padding, radius: made?.cornerRadius }));
-		say("…with a height in pixels, so an empty one is something to drop into", typeof made?.height === "number" && made.height > 0, JSON.stringify(made?.height));
+		// It hugs what it holds, with the height it was drawn at as its floor, so an empty one is still there to drop into.
+		say("…with the height it was drawn at as its floor, so an empty one is something to drop into", /^fit_content\(\d+(\.\d+)?\)$/.test(String(made?.height)) && Number(/\((.*)\)/.exec(made.height)[1]) > 0, JSON.stringify(made?.height));
 		if (made) {
 			await page.keyboard.press("Escape");
 			await settle(page, 200);

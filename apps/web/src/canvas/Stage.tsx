@@ -2271,6 +2271,20 @@ export function Stage(props: {
 
 	/** The eight handles round a single selection, by the edges each one moves. */
 	const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+	/**
+	 * A double-click on a frame's or a card's top or bottom handle: it hugs what it holds again, with
+	 * the floor it had (`fit_content(N)`), or 120 for a frame and 48 for a card when it had none. A
+	 * drag of either edge is what fixed its height; this undoes it.
+	 */
+	const hugAgain = (handle: (typeof HANDLES)[number]) => {
+		if (handle !== "n" && handle !== "s") return;
+		const id = penHandles()?.id;
+		const node = id ? penNode(id) : undefined;
+		if (!id || !node || node.type !== "frame" || isShape(node)) return;
+		const had = typeof node.height === "string" ? /^fit_content\(\s*([\d.]+)\s*\)$/.exec(node.height)?.[1] : undefined;
+		const floor = had ? Number(had) : isCard(node) ? 48 : 120;
+		penEdit([{ op: "update", id, set: { height: `fit_content(${floor})` } }]);
+	};
 	const resizeFrom = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
 		const box = penHandles();
 		if (event.button !== 0 || !box) return;
@@ -2571,17 +2585,18 @@ export function Stage(props: {
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 		/*
 		 * A frame made by hand is a column, because that is what a frame is for: things in an order,
-		 * arranged for you. Its height is a number rather than fit-content, so an empty one is a
-		 * 300 px target you can drop into, and a half-full one keeps room under its last child.
+		 * arranged for you. It hugs what it holds, and the height it is drawn at is its floor
+		 * (`fit_content(h)`, written by the insert in `@decks/pen`'s `ops.ts`): an empty one is still
+		 * something to drop into, and it grows as things go in.
 		 */
-		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 300 },
+		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 120 },
 		// A text's words are markdown, as a card's blocks are, typed into with the card's toolbar.
 		text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 		/*
 		 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
 		 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
 		 */
-		card: { node: { type: "frame", name: "Card" }, w: 320, h: 0 },
+		card: { node: { type: "frame", name: "Card" }, w: 320, h: 48 },
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
@@ -2790,9 +2805,8 @@ export function Stage(props: {
 				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
 				const parent = frameAt(at);
 				// A text grows with its words unless a width was drawn for it; its height is always its words'.
-				// A card is as tall as its words, so only its width is taken, drawn or not.
-				const box =
-					tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
+				// A card or a frame is as tall as its words, and the height drawn is the least it is.
+				const box = tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				const node = madeNode(tool, id, { w, h });
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
@@ -2816,7 +2830,7 @@ export function Stage(props: {
 		const x1 = Math.round(centred ? at.x - made.w / 2 : at.x);
 		const y1 = Math.round(centred ? at.y - made.h / 2 : at.y);
 		const parent = frameAt(at);
-		const box = tool === "note" ? { x1, y1 } : tool === "card" || tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
+		const box = tool === "note" ? { x1, y1 } : tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
 		const node = madeNode(tool, id, made);
 		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 		selectMade([id]);
@@ -5045,6 +5059,7 @@ export function Stage(props: {
 												"border-width": `${1.5 / props.camera.zoom}px`,
 											}}
 											onPointerDown={(event) => resizeFrom(event, handle)}
+											onDblClick={() => hugAgain(handle)}
 										/>
 									);
 								}}

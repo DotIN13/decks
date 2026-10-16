@@ -12,7 +12,8 @@ import { bool, fontWeightOf, num, paddingOf, resolve, type ThemeState, withTheme
  *   not at all (`"none"`, where each child sits at its own `x`, `y` from the frame's corner);
  * - `gap`, `padding`, `justifyContent` and `alignItems` mean what they mean in CSS;
  * - a size is a number, `fit_content` (hug the children; a frame's default), or `fill_container`
- *   (take the parent's room; only inside a layout). Either may carry a fallback, `fit_content(100)`;
+ *   (take the parent's room; only inside a layout). Either may carry a number, `fit_content(100)`:
+ *   for a hug it is a floor, the least it is however little it holds, and for a fill a fallback;
  * - a child with `layoutPosition: "absolute"` leaves the flow and sits at its `x`, `y`;
  * - a `group` has no size of its own: it is the box around its children;
  * - text sizes itself by `textGrowth`: `auto` is one line as long as it is, `fixed-width` wraps at
@@ -219,8 +220,10 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 			const ws = sizing(doc, node.width, t, { kind: "hug" });
 			const hs = sizing(doc, node.height, t, { kind: "hug" });
 			const inner = frameContent(node, t, ws.kind === "fixed" ? ws.value : forcedW, hs.kind === "fixed" ? hs.value : forcedH);
-			const w = forcedW ?? (ws.kind === "fixed" ? ws.value : ws.kind === "hug" ? (inner.count === 0 && ws.fallback !== undefined ? ws.fallback : inner.w) : (ws.fallback ?? inner.w));
-			const h = forcedH ?? (hs.kind === "fixed" ? hs.value : hs.kind === "hug" ? (inner.count === 0 && hs.fallback !== undefined ? hs.fallback : inner.h) : (hs.fallback ?? inner.h));
+			// A hug's number is its floor: as big as what it holds, and never smaller than that.
+			const hug = (s: { fallback?: number }, size: number) => (s.fallback === undefined ? size : inner.count === 0 ? s.fallback : Math.max(s.fallback, size));
+			const w = forcedW ?? (ws.kind === "fixed" ? ws.value : ws.kind === "hug" ? hug(ws, inner.w) : (ws.fallback ?? inner.w));
+			const h = forcedH ?? (hs.kind === "fixed" ? hs.value : hs.kind === "hug" ? hug(hs, inner.h) : (hs.fallback ?? inner.h));
 			return { w, h };
 		}
 		// Rectangles, ellipses, polygons, browsers, icons, scripts, placeholders: the box they state.
