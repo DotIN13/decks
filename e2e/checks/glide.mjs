@@ -62,7 +62,8 @@ const same = (a, b) => a.x === b.x && a.y === b.y && a.zoom === b.zoom;
 
 // --- a row in the panel -----------------------------------------------------------------
 
-const panel = await watched(row("risks.html"), 700);
+// 900 ms, not the glide's own length: frames a slow machine draws 45 ms apart left too few after the stop to see it.
+const panel = await watched(row("risks.html"), 900);
 const from = panel.samples[0];
 const to = panel.samples.at(-1);
 const flying = panel.samples.filter((sample) => sample.gliding);
