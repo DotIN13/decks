@@ -197,11 +197,19 @@ export class EngineStage {
 		this.draw();
 	}
 
-	/** Past the budget, the tiles furthest from the window go, and the worker hears of each. */
+	/**
+	 * Past the budget, the tiles furthest from the window go, and the worker hears of each. A tile of the
+	 * level on screen that the window touches is never one of them: it would be drawn again at once.
+	 */
 	private keepTilesToBudget(): void {
 		if (this.tiles.size <= MAX_TILES) return;
-		const { x, y } = this.camera;
-		const far = [...this.tiles.entries()].map(([key, one]) => ({ key, d: (one.x + one.size / 2 - x) ** 2 + (one.y + one.size / 2 - y) ** 2 })).sort((a, b) => b.d - a.d);
+		const { x, y, zoom } = this.camera;
+		const w = this.view.width / zoom / 2;
+		const h = this.view.height / zoom / 2;
+		const far = [...this.tiles.entries()]
+			.filter(([, one]) => !(one.level === this.tileLevel && Math.abs(one.x + one.size / 2 - x) < w + one.size / 2 && Math.abs(one.y + one.size / 2 - y) < h + one.size / 2))
+			.map(([key, one]) => ({ key, d: (one.x + one.size / 2 - x) ** 2 + (one.y + one.size / 2 - y) ** 2 }))
+			.sort((a, b) => b.d - a.d);
 		for (const { key } of far.slice(0, this.tiles.size - MAX_TILES)) this.dropTile(key, true);
 	}
 

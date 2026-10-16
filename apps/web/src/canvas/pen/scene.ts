@@ -570,7 +570,11 @@ export class StageScene {
 				}
 				break;
 			case "tile-gone":
-				this.tileDrawn.delete(message.key);
+				// A tile the page let go of while it is still wanted is drawn again; others wait to be in view.
+				if (this.tileDrawn.delete(message.key) && message.key.startsWith(`${this.tileLevel}:`)) {
+					this.wanted = true;
+					this.schedule();
+				}
 				break;
 			case "ink":
 				if (message.strokes.length === 0 && this.ink.length === 0) {
@@ -659,11 +663,16 @@ export class StageScene {
 		 * the sheet drew them; a power of two was up to 30% under it, and stretched words read mushy.
 		 * Rounded only so a camera at rest keeps one key for its tiles.
 		 */
-		const target = Math.round(Math.max(1e-3, this.camera.zoom * dpr) * 1000) / 1000;
-		// Held through a zoom, so its tiles are scaled rather than drawn again at every step; but not past
-		// the point where the window would need more of them than the page keeps (`MAX_TILES` there).
-		const across = (level: number) => Math.ceil((this.view.width / this.camera.zoom) / (TILE / level) + 1) * Math.ceil((this.view.height / this.camera.zoom) / (TILE / level) + 1);
-		if (!this.zooming || this.tileLevel === 0 || across(this.tileLevel) > TILES_HELD) this.tileLevel = target;
+		const exact = Math.max(1e-3, this.camera.zoom * dpr);
+		/*
+		 * While zooming, a power of two at or under the screen's scale: it changes once each time the
+		 * zoom halves or doubles, and between those its tiles are scaled rather than drawn again. Held
+		 * at the exact scale instead, a zoom out needed more tiles than the window keeps at the first
+		 * step, so every step started a new scale and drew every tile again (328 tiles at 22 scales
+		 * for one pinch). At rest, the exact scale, so words are as sharp as the sheet drew them.
+		 */
+		const target = this.zooming ? 2 ** Math.floor(Math.log2(exact)) : Math.round(exact * 1000) / 1000;
+		this.tileLevel = target;
 		const level = this.tileLevel;
 		const size = TILE / level;
 		if (this.tileStale.length > 0) {
@@ -695,16 +704,25 @@ export class StageScene {
 		const { x, y, zoom } = this.camera;
 		const halfW = this.view.width / zoom / 2 + size / 2;
 		const halfH = this.view.height / zoom / 2 + size / 2;
-		const wanted: Array<{ ix: number; iy: number; d: number }> = [];
+		const wanted: Array<{ ix: number; iy: number; d: number; seen: boolean }> = [];
+		const seenW = this.view.width / zoom / 2;
+		const seenH = this.view.height / zoom / 2;
 		for (let iy = Math.floor((y - halfH) / size); iy <= Math.floor((y + halfH) / size); iy++)
 			for (let ix = Math.floor((x - halfW) / size); ix <= Math.floor((x + halfW) / size); ix++) {
 				const cx = (ix + 0.5) * size - x;
 				const cy = (iy + 0.5) * size - y;
-				wanted.push({ ix, iy, d: cx * cx + cy * cy });
+				const seen = Math.abs(cx) < seenW + size / 2 && Math.abs(cy) < seenH + size / 2;
+				wanted.push({ ix, iy, d: cx * cx + cy * cy, seen });
 			}
-		wanted.sort((a, b) => a.d - b.d);
-		// Never more than the page keeps: the furthest would be let go of as soon as they arrived.
-		wanted.length = Math.min(wanted.length, TILES_HELD);
+		// The tiles the window touches first, nearest the middle first; then the border round it.
+		wanted.sort((a, b) => Number(b.seen) - Number(a.seen) || a.d - b.d);
+		/*
+		 * The border round the window only as far as the page keeps tiles: the furthest would be let go of
+		 * as soon as they arrived. Every tile the window touches is drawn, however many: cutting those at
+		 * 48 left a large window's corners blank until a pan.
+		 */
+		const seenCount = wanted.filter((one) => one.seen).length;
+		wanted.length = Math.min(wanted.length, Math.max(TILES_HELD, seenCount));
 		const limit = this.cameraMoving ? TILES_PER_FRAME_MOVING : TILES_PER_FRAME;
 		const ink = inkBounds(this.ink);
 		let drawn = 0;
