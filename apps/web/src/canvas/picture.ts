@@ -134,12 +134,21 @@ export function hasElementGeometry(canvas: HTMLCanvasElement): boolean {
  * 154 a child can be clicked only where its geometry says it is drawn, and a board with none set
  * took no clicks, typing or scrolling at all: every press landed on the canvas.
  */
+const placedAs = new WeakMap<HTMLElement, string>();
 export function clickableWhereDrawn(canvas: HTMLCanvasElement, element: HTMLElement): void {
 	const geometry = canvas as GeometryCanvas;
 	if (typeof geometry.updateElementGeometry !== "function") return;
 	const w = element.offsetWidth;
 	const h = element.offsetHeight;
 	if (!(w > 0) || !(h > 0) || !(canvas.width > 0) || !(canvas.height > 0)) return;
+	/*
+	 * Only when the mapping changes. Setting it is a change to the element that Chrome reports with a
+	 * `paint` event, and a paint draws the board again (`BoardFrame.tsx`), which set it again: a board
+	 * redrew itself without end, and its picture flickered.
+	 */
+	const key = `${canvas.width}x${canvas.height}:${w}x${h}`;
+	if (placedAs.get(element) === key) return;
+	placedAs.set(element, key);
 	try {
 		// From the element's own box, in CSS pixels, to the canvas's pixels.
 		geometry.updateElementGeometry(element, { canvasTransform: { a: canvas.width / w, b: 0, c: 0, d: canvas.height / h, e: 0, f: 0 } });
