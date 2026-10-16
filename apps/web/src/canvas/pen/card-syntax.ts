@@ -165,8 +165,41 @@ const hiddenBlock: TokenizerExtension = {
 	},
 };
 
+export interface MathToken extends Tokens.Generic { type: "math"; tex: string; display: boolean }
+
+/**
+ * `$…$` in a line, as Obsidian reads it: the opening `$` is followed by something other than a space,
+ * the closing one follows something other than a space and is not followed by a digit, so "$5 and $10"
+ * stays money. `$$…$$` inside a line is a formula shown as a block, in place.
+ */
+const math: TokenizerExtension = {
+	name: "math",
+	level: "inline",
+	start: (src) => src.indexOf("$"),
+	tokenizer(src) {
+		const display = /^\$\$([^$]+?)\$\$/.exec(src);
+		if (display && display[1]!.trim()) return { type: "math", raw: display[0], tex: display[1]!.trim(), display: true } satisfies MathToken;
+		const inline = /^\$(?=\S)((?:\\.|[^$\\\n])*?\S)\$(?!\d)/.exec(src);
+		return inline ? ({ type: "math", raw: inline[0], tex: inline[1]!, display: false } satisfies MathToken) : undefined;
+	},
+};
+
+/** `$$` opening a block of its own, closed by the next `$$`: a formula shown on its own line. */
+const mathBlock: TokenizerExtension = {
+	name: "mathBlock",
+	level: "block",
+	start: (src) => {
+		const m = /^\$\$/m.exec(src);
+		return m ? m.index : -1;
+	},
+	tokenizer(src) {
+		const m = /^\$\$([\s\S]+?)\$\$[ \t]*(?:\n+|$)/.exec(src);
+		return m && m[1]!.trim() ? ({ type: "math", raw: m[0], tex: m[1]!.trim(), display: true } satisfies MathToken) : undefined;
+	},
+};
+
 /** The one reader of a card's markdown. */
-export const cardMarked = (): Marked => new Marked({ gfm: true, breaks: false }, { extensions: [hiddenBlock, hidden, critic, wiki, colour, highlight] });
+export const cardMarked = (): Marked => new Marked({ gfm: true, breaks: false }, { extensions: [hiddenBlock, mathBlock, hidden, math, critic, wiki, colour, highlight] });
 
 /** An image's alt with Obsidian's `|240` or `|240x120` taken off: its words and its width. */
 export function sizedAlt(alt: string): { alt: string; width?: number } {

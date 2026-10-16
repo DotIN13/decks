@@ -5,6 +5,7 @@ import { estimateText, isMarkdown, isMarkdownText, type MeasureText } from "@dec
 import { loadText, type TextEngine } from "@decks/engine/text";
 import { encodeCard } from "../../../web/src/canvas/pen/card-wire.ts";
 import { fontChain, fontFiles, MONO_FAMILY, textNeeds, type FontFile } from "../../../web/src/canvas/pen/font-files.ts";
+import { formulaText, handFormulas } from "../../../web/src/canvas/pen/math.ts";
 
 /**
  * Words measured on the server as the page measures them: the same C++ text as the page's engine
@@ -77,8 +78,14 @@ class ServerText {
 		if (markdown) {
 			const w = maxWidth ?? 240;
 			const wire = encodeCard(text, style, { chain: fontChain, mono: MONO_FAMILY, scheme: "light", image: noPicture }, align);
+			// A card's formulas, as the page's scene is handed them (`math.ts`).
+			handFormulas(new TextDecoder().decode(wire.pool), this.engine);
 			size = { w, h: this.engine.card(wire.numbers, wire.pool, Math.max(1, w)) };
-		} else size = this.plain!(text, style, maxWidth);
+		} else {
+			const shown = formulaText(text);
+			handFormulas(shown, this.engine);
+			size = this.plain!(shown, style, maxWidth);
+		}
 		if (this.sizes.size >= 8192) this.sizes.delete(this.sizes.keys().next().value!);
 		// Measured with the files there were: a file that lands later starts a new generation, and so new sizes.
 		this.sizes.set(JSON.stringify([this.generation, markdown, align, maxWidth === undefined ? -1 : Math.round(maxWidth * 10), style, text]), size);

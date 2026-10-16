@@ -1,5 +1,6 @@
 import type { TextStyle } from "@decks/pen";
 import { highlight } from "./highlight.ts";
+import { formulaChar } from "./math.ts";
 import { parseMarkdown, type Block, type Run } from "./markdown.ts";
 import { ALERTS, CARD_PALETTE, INK, MARK, SUGGEST } from "./markdown-layout.ts";
 
@@ -57,7 +58,8 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv, align =
 	const runs = (list: readonly Run[]) => {
 		numbers.push(list.length);
 		list.forEach((run, i) => {
-			ref(run.image ? `🖼 ${run.image.alt || "image"}` : run.text + (run.reason && list[i + 1]?.reason !== run.reason ? " 💬" : ""));
+			// A formula as the character it travels as (`math.ts`): the engine draws it typeset.
+			ref(run.math ? formulaChar(run.math.tex, run.math.display) : run.image ? `🖼 ${run.image.alt || "image"}` : run.text + (run.reason && list[i + 1]?.reason !== run.reason ? " 💬" : ""));
 			ref(chain(run.code ? env.mono : (run.face ?? style.fontFamily)));
 			numbers.push((run.code ? 1 : 0) | (run.sup ? 2 : 0) | (run.bold ? 4 : 0) | (run.italic ? 8 : 0), run.size ? SIZE_SCALE[run.size] : 1);
 			// How it is drawn, as `para` in markdown-layout.ts styles it: ink, background, lines and their colour.
@@ -133,6 +135,11 @@ export function encodeCard(text: string, style: TextStyle, env: CardEnv, align =
 			}
 			case "rule":
 				numbers.push(9);
+				return;
+			case "math":
+				// A formula on its own line: a paragraph of it, centred (`card.cpp`, kind 11).
+				numbers.push(11);
+				runs([{ text: block.tex, math: { tex: block.tex, display: true } }]);
 				return;
 			case "footnotes":
 				numbers.push(10, block.items.length);

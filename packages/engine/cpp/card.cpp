@@ -289,6 +289,10 @@ private:
 				const auto list = runs(int(next()));
 				return y + para(list, f, x, y, w, true).height;
 			}
+			case 11: {  // a formula on its own line (`math.h`): a paragraph of it, centred
+				const auto list = runs(int(next()));
+				return y + para(list, f, x, y, w, true, 1.5, NAN, NAN, 2).height;
+			}
 			case 3: {  // image: [has picture, its width, its height, the width asked for or NaN, words, picture id or -1]
 				const bool has = next() != 0;
 				const double iw0 = next(), ih0 = next(), asked = next();

@@ -1,5 +1,5 @@
 import type { Token, Tokens } from "marked";
-import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Size, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
+import { CALLOUTS, cardMarked, sizedAlt, type Colour, type ColourToken, type Size, type CriticToken, type HighlightToken, type MathToken, type WikiToken } from "./card-syntax.ts";
 
 /**
  * The markdown a card on the stage is written in: Obsidian's, with coloured words and an agent's
@@ -44,6 +44,8 @@ export interface Run {
 	added?: true;
 	removed?: true;
 	reason?: string;
+	/** A formula, `$…$` (or `$$…$$` in a line): its TeX. The run's words are the formula as written, which CanvasKit shows; the engine draws it typeset (`math.ts`). */
+	math?: { tex: string; display: boolean };
 }
 
 /** A callout's colour (`CALLOUTS`): Obsidian folds its two dozen types onto these. */
@@ -61,7 +63,9 @@ export type Block =
 	| { kind: "code"; lang: string; text: string }
 	| { kind: "table"; align: Align[]; header: Run[][]; rows: Run[][][] }
 	| { kind: "rule" }
-	| { kind: "footnotes"; items: Array<{ number: number; blocks: Block[] }> };
+	| { kind: "footnotes"; items: Array<{ number: number; blocks: Block[] }> }
+	/** `$$…$$` on lines of its own: a formula shown as a block, centred. */
+	| { kind: "math"; tex: string };
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", copy: "©", reg: "®", trade: "™", hellip: "…", mdash: "—", ndash: "–", larr: "←", rarr: "→", uarr: "↑", darr: "↓", times: "×", middot: "·", bull: "•", deg: "°" };
 export function decodeEntities(text: string): string {
@@ -181,6 +185,9 @@ function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[]
 				break;
 			case "hidden":
 				break; // %% a hidden comment %%
+			case "math":
+				out.push({ kind: "math", tex: (token as MathToken).tex });
+				break;
 			case "html": {
 				// Raw HTML is shown as the words in it, a <br> as a break and a block tag as a new paragraph.
 				const text = decodeEntities(token.raw.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d|tr|summary|details)>/gi, "\n").replace(/<[^>]+>/g, "")).trim();
@@ -248,6 +255,11 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 				out.push({ text: alt || "image", ...style, image: { url: t.href, alt, ...(width ? { width } : {}) } });
 				break;
 			}
+			case "math": {
+				const t = token as MathToken;
+				out.push({ text: t.raw, ...style, math: { tex: t.tex, display: t.display } });
+				break;
+			}
 			case "highlight": {
 				const t = token as HighlightToken;
 				out.push(...runsOf(t.tokens as Token[], notes, { ...style, mark: t.colour ?? "default" }));
@@ -302,7 +314,8 @@ function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>
 	const merged: Run[] = [];
 	for (const run of out) {
 		const last = merged.at(-1);
-		if (last && !last.image && !run.image && sameStyle(last, run)) last.text += run.text;
+		// A picture or a formula is a run of its own.
+		if (last && !last.image && !run.image && !last.math && !run.math && sameStyle(last, run)) last.text += run.text;
 		else merged.push({ ...run });
 	}
 	return merged;

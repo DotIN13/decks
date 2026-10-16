@@ -21,6 +21,7 @@
 
 #include "text.h"
 #include "bidi.h"
+#include "math.h"
 #include <vector>
 
 namespace {
@@ -114,9 +115,10 @@ void breaks(const std::vector<uint32_t>& cps, std::vector<char>& out) {
 	std::vector<char> attached(n, 0);
 	for (size_t i = 0; i < n; i++) {
 		const Prop p = propOf(cps[i]);
-		raw[i] = p.cls;
-		cls[i] = p.cls;
-		fl[i] = p.flags;
+		// A formula (`math.h`) takes a break on either side, as an ideograph does.
+		raw[i] = isMath(cps[i]) ? uint8_t(ID) : p.cls;
+		cls[i] = raw[i];
+		fl[i] = isMath(cps[i]) ? 0 : p.flags;
 		// LB9: a mark or a joiner after anything but a space or a break is part of it, and takes its class.
 		if (isCM(p.cls) && i > 0 && !isHard(cls[i - 1]) && cls[i - 1] != SP && cls[i - 1] != ZW) {
 			cls[i] = cls[i - 1];
@@ -388,7 +390,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 		// back in left-to-right text, is; Arabic's own digits (level 2) are not.
 		const hb_script_t sc = level[i] > 0 ? runScript[size_t(scriptRun[i])] : HB_SCRIPT_COMMON;
 		const bool joins = sc == HB_SCRIPT_ARABIC || sc == HB_SCRIPT_SYRIAC || sc == HB_SCRIPT_MONGOLIAN || sc == HB_SCRIPT_NKO || sc == HB_SCRIPT_MANDAIC || sc == HB_SCRIPT_ADLAM || sc == HB_SCRIPT_HANIFI_ROHINGYA || sc == HB_SCRIPT_SOGDIAN || sc == HB_SCRIPT_PSALTER_PAHLAVI || sc == HB_SCRIPT_MANICHAEAN || sc == HB_SCRIPT_PHAGS_PA;
-		spacing[i] = joins ? 0.f : float(spans[size_t(sp[i])].letterSpacing);
+		spacing[i] = joins || isMath(cps[i]) ? 0.f : float(spans[size_t(sp[i])].letterSpacing);
 	}
 	auto shapeWith = [&](int faceIndex, size_t from, size_t to, bool force) {
 		const Face& face = faces[size_t(faceIndex)];
@@ -475,6 +477,15 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 			i = j;
 		}
 	};
+	// A formula is a cluster of its own, as wide as it is set, with nothing for a font to shape.
+	for (size_t i = 0; i < n; i++) {
+		if (!isMath(cps[i])) continue;
+		const MathObject* formula = mathOf(cps[i]);
+		faceOf[i] = spans[size_t(sp[i])].chain.empty() ? 0 : spans[size_t(sp[i])].chain[0];
+		advance[i] = formula ? formula->width * spans[size_t(sp[i])].size : 0;
+		clusterStart[i] = 1;
+		glyphCount[i] = 1;
+	}
 	for (int run = 0; run < int(spans.size()); run++) {
 		for (int face : spans[size_t(run)].chain) shapeUnresolved(run, face, false);
 		shapeUnresolved(run, spans[size_t(run)].chain[0], true);
@@ -508,7 +519,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	std::vector<float> posAt(n + 1, 0.f);
 	std::vector<int> runOf(n, 0);
 	for (size_t i = 0, run = 0; i < n; i++) {
-		if (i > 0 && (faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || level[i] != level[i - 1] || otherFont(i))) run++;
+		if (i > 0 && (faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || level[i] != level[i - 1] || isMath(cps[i]) || isMath(cps[i - 1]) || otherFont(i))) run++;
 		runOf[i] = int(run);
 	}
 	{
@@ -692,7 +703,15 @@ int layoutSpans(const char* s, int length, const std::vector<Span>& spans, const
 			if (first || fd > desc) desc = fd;
 			first = false;
 		};
-		for (size_t i = a; i < b; i++) take(faces[size_t(faceOf[i])], spans[size_t(sp[i])].size);
+		for (size_t i = a; i < b; i++) {
+			take(faces[size_t(faceOf[i])], spans[size_t(sp[i])].size);
+			// A formula taller or deeper than the words makes room for itself.
+			if (const MathObject* formula = isMath(cps[i]) ? mathOf(cps[i]) : nullptr) {
+				const double size = spans[size_t(sp[i])].size;
+				asc = std::min(asc, float(-formula->ascent * size));
+				desc = std::max(desc, float(formula->descent * size));
+			}
+		}
 		// An empty line is as tall as the style of the line break that makes it; an empty text, the paragraph's own.
 		if (first && b < n && cps[b] == '\n') take(faces[size_t(faceOf[b])], spans[size_t(sp[b])].size);
 		if (first) take(faces[size_t(base.chain[0])], base.size);
@@ -886,6 +905,8 @@ int placeGlyphs(const char* s, int length, const std::vector<Span>& spans, const
 				// Letter spacing puts half its gap before each letter of a left-aligned line (`Run::addSpacesEvenly`
 				// starts at half); a centred or right-aligned line starts at its aligned edge, as CanvasKit draws them.
 				const float half = shift == 0 && align == 0 ? S->spacing[c] / 2 : 0;
+				// A formula: face -1, and the character it is carried as for its number (`math.h`).
+				if (isMath(S->cps[c])) glyphs.push_back({-1, S->cps[c], double(at), baseline, spans[size_t(S->sp[c])].size, S->sp[c]});
 				for (const ClusterGlyph& g : S->glyphs[c]) glyphs.push_back({S->faceOf[c], g.id, double(at + half + g.dx), baseline + g.dy, spans[size_t(S->sp[c])].size, S->sp[c]});
 			}
 			// A run can hold several spans of one font (a colour change); each is its own piece.

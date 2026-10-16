@@ -30,6 +30,7 @@
 #include <unordered_map>
 
 #include "card.h"
+#include "math.h"
 #include "raster.h"
 #include "text.h"
 
@@ -1082,6 +1083,19 @@ void paintParagraph(const std::string& text, const std::vector<Span>& spans, con
 	std::vector<Ink> inks;
 	for (const PlacedGlyph& g : glyphs) {
 		const Rgba colour = resolved(paintOf(g.span).ink, own);
+		if (g.face < 0) {
+			// A formula (`math.h`): its paths, in ems from its spot on the baseline, scaled by the words' size.
+			const MathObject* formula = mathOf(g.id);
+			if (!formula) continue;
+			const Affine saved = painter.m;
+			painter.m = Affine{g.size, 0, 0, g.size, ox + g.x, oy + g.y}.then(saved);
+			for (const MathPath& p : formula->paths) {
+				const Rgba fill = p.rgba[3] < 0 ? colour : Rgba{p.rgba[0], p.rgba[1], p.rgba[2], p.rgba[3] * colour.a};
+				drawMask(coverage(flat(p.path), false), fill);
+			}
+			painter.m = saved;
+			continue;
+		}
 		const double dx = m.a * (ox + g.x) + m.c * (oy + g.y) + m.e, dy = m.b * (ox + g.x) + m.d * (oy + g.y) + m.f;
 		const double qx = upright ? std::floor(dx + 0.5) : std::floor((dx + 0.125) * 4) / 4;
 		const double qy = level ? std::floor(dy + 0.5) : std::floor((dy + 0.125) * 4) / 4;

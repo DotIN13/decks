@@ -3,6 +3,7 @@ import type { IconShape } from "./icons.ts";
 import { clockOf, filmLayout, playTriangle, SOUND_INK, soundLayout, waveBars } from "./media-look.ts";
 import { fontChain } from "./fonts.ts";
 import { CARD_PALETTE } from "./markdown-layout.ts";
+import { formulaText } from "./math.ts";
 
 /**
  * An item's paint record for the C++ painter (`packages/engine/cpp/paint.cpp`): what `paint.ts` would
@@ -58,7 +59,8 @@ function wordsOf(doc: PenDocument, node: PenNode, theme: ThemeState, scheme: "li
 		const effects = node.effect === undefined ? [] : Array.isArray(node.effect) ? node.effect : [node.effect];
 		if (effects.some((e) => e && e.type === "shadow" && e.shadowType !== "inner" && bool(doc, e.enabled, theme, true))) return false;
 	}
-	const bytes = encoder.encode(content);
+	// Formulas as the characters they travel as, which the scene was handed when it measured these words (`math.ts`).
+	const bytes = encoder.encode(formulaText(content));
 	const chain = encoder.encode(fontChain(style.fontFamily).join("\n"));
 	return [
 		1, pad, ...rgba, ALIGN_TEXT[align]!, VERTICAL[node.textAlignVertical ?? "top"] ?? 0, bool(doc, node.underline, theme, false) ? 1 : 0, bool(doc, node.strikethrough, theme, false) ? 1 : 0,

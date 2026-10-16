@@ -6,6 +6,7 @@ import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts } from "./fonts.ts";
 import { fontNeeds } from "./font-files.ts";
 import { encodeCard } from "./card-wire.ts";
+import { formulaText, handFormulas } from "./math.ts";
 import { inkOps, opsOf, paintRecord } from "./paint-wire.ts";
 import { CARD_PALETTE, type MarkdownLayout } from "./markdown-layout.ts";
 import { PenIcons } from "./icons.ts";
@@ -836,6 +837,8 @@ export class StageScene {
 		if (this.tiles && cppLayout && this.fonts) {
 			this.layoutBy = "c++";
 			const fonts = this.fonts;
+			const scene = cppLayout;
+			const decoder = new TextDecoder();
 			// The C++ measures plain words itself, with the font files CanvasKit was given, in the order it got them.
 			for (const file of fonts.files)
 				if (file.bytes) {
@@ -846,16 +849,26 @@ export class StageScene {
 			const ownWords = fonts.files.length === fonts.loaded.length;
 			this.wordsBy = ownWords ? "c++" : "canvaskit";
 			// The scene keeps what words measured until this changes: a font or a card's picture arrived, or light and dark swapped.
-			const card = (text: string, style: TextStyle, node: PenNode) =>
-				encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => {
+			const card = (text: string, style: TextStyle, node: PenNode) => {
+				const wire = encodeCard(text, style, { chain: (family) => fonts.chain(family), mono: MONO_FAMILY, scheme: fonts.scheme, image: (url) => {
 					// The browser's copy, which the painter draws; or CanvasKit's, for its size, while CanvasKit draws.
 					const picture = this.picture(url);
 					if (picture) return { width: () => picture.width, height: () => picture.height, id: picture.id };
 					const image = fonts.images?.(url);
 					return image ? { width: () => image.width(), height: () => image.height() } : undefined;
 				} }, node.textAlign ?? "left");
+				// The formulas the card's words carry, for the scene to measure and draw (`math.ts`).
+				handFormulas(decoder.decode(wire.pool), scene);
+				return wire;
+			};
 			const scheme = this.scheme;
-			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme, { picture: (url) => this.picture(url) }), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
+			// A text's formulas, as the characters they travel as, handed to the scene before it measures them.
+			const words = (text: string) => {
+				const shown = formulaText(text);
+				handFormulas(shown, scene);
+				return shown;
+			};
+			return cppLayout.layout(doc, nodes, { ...options, measureKey: `${fonts.generation}:${fonts.imageVersion}:${fonts.scheme}:${ownWords}`, ...(ownWords ? { chain: (family: string) => fonts.chain(family), words, card } : {}), paint: (node, theme) => paintRecord(doc, node, theme, scheme, { picture: (url) => this.picture(url) }), ops: (node, theme, box) => opsOf(doc, node, theme, scheme, box, { icon: (library, name, weight) => this.icons.get(library, name, weight) }) });
 		}
 		this.layoutBy = "typescript";
 		return layout(doc, nodes, options);

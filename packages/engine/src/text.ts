@@ -14,12 +14,28 @@ interface TextModule {
 	_text_lines(): number;
 	_text_card(count: number, poolLength: number, width: number): number;
 	_text_font(bytes: number, nameLength: number): number;
+	_text_math(count: number, poolLength: number): void;
 	_text_measure(length: number, chainLength: number, size: number, weight: number, italic: number, letterSpacing: number, lineHeight: number, maxWidth: number): number;
+}
+
+/**
+ * A formula typeset by the app (`math.ts`), carried in text as U+F0000 plus its number: its box in ems
+ * (its width, and how far it rises above the baseline and drops below it) and the paths that draw it,
+ * each with its map to ems (y down from the baseline) and its own colour, or alpha -1 for the words'.
+ */
+export interface Formula {
+	number: number;
+	width: number;
+	ascent: number;
+	descent: number;
+	paths: ReadonlyArray<{ m: readonly number[]; rgba: readonly number[]; d: string }>;
 }
 
 export interface TextEngine {
 	/** A font file for a family, its weight and slant read from the file. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
+	/** A formula, for the text that carries it to be measured and drawn (`cpp/math.cpp`). */
+	math(formula: Formula): void;
 	/** One paragraph's numbers: its unbroken width (trailing spaces in), its longest line, its height and lines. */
 	lines(text: string, style: TextStyle, maxWidth: number | undefined, chain: readonly string[]): { unbroken: number; longest: number; height: number; lines: number; spans: Array<{ from: number; to: number; width: number }> };
 	/** A markdown card's height (`cpp/card.cpp`), from its encoding (`card-wire.ts` in the app), `width` wide. */
@@ -51,6 +67,25 @@ export function textOf(module: unknown): TextEngine {
 			const name = encoder.encode(family);
 			write([data, name]);
 			m._text_font(data.length, name.length);
+		},
+		math(formula) {
+			const numbers: number[] = [formula.number, formula.width, formula.ascent, formula.descent, formula.paths.length];
+			const parts: Uint8Array[] = [];
+			let at = 0;
+			for (const path of formula.paths) {
+				const d = encoder.encode(path.d);
+				numbers.push(...path.m.slice(0, 6), ...path.rgba.slice(0, 4), at, d.length);
+				parts.push(d);
+				at += d.length;
+			}
+			const start = m._text_scratch(numbers.length * 8 + at);
+			new Float64Array(m.HEAPU8.buffer, start, numbers.length).set(numbers);
+			let k = start + numbers.length * 8;
+			for (const part of parts) {
+				m.HEAPU8.set(part, k);
+				k += part.length;
+			}
+			m._text_math(numbers.length, at);
 		},
 		lines(text, style, maxWidth, chain) {
 			const words = encoder.encode(text);

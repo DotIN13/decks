@@ -13,7 +13,7 @@
  */
 import { bool, estimateText, isMarkdown, isMarkdownText, MISSING, num, paddingOf, pathBounds, resolve, textStyleOf, withTheme, type MeasureText, type PenDocument, type PenNode, type Placed, type TextStyle, type ThemeState } from "@decks/pen";
 import createSceneModule from "../wasm/scene.mjs";
-import { textOf } from "./text.ts";
+import { textOf, type Formula } from "./text.ts";
 
 /** The record the scene reads for one item, in `cpp/scene.cpp`'s `Field` order. */
 const FIELDS = ["parent", "kind", "visible", "visibleInParent", "x", "y", "wKind", "wValue", "wFallback", "hKind", "hValue", "hFallback", "layout", "padT", "padR", "padB", "padL", "gap", "justify", "align", "absolute", "growth", "fallback", "pathW", "pathH"] as const;
@@ -76,6 +76,8 @@ export interface SceneLayout {
 			measure?: MeasureText;
 			measureKey?: string;
 			chain?: (family: string) => readonly string[];
+			/** With `chain`: a text's words as the scene measures them, its formulas turned into the characters they travel as (`math.ts` in the app). */
+			words?: (text: string, node: PenNode) => string;
 			/** With `chain`: a card's markdown, parsed and encoded for the scene (`card-wire.ts` in the app), so it measures cards too. */
 			card?: (text: string, style: TextStyle, node: PenNode) => { numbers: Float64Array; pool: Uint8Array };
 			/** An item's paint record (`paint-wire.ts` in the app), for the painter (`painter`). */
@@ -86,6 +88,8 @@ export interface SceneLayout {
 	): Map<string, Placed>;
 	/** A font file for the scene's own measuring, as the page's font provider gets it. */
 	font(bytes: ArrayBuffer | Uint8Array, family: string): void;
+	/** A formula for the words that carry it (`text.ts`, `Formula`). */
+	math(formula: Formula): void;
 	/** A card's links and wide tables laid out `width` wide, as `layoutMarkdown` reports them; undefined for an item with no card. */
 	cardGeometry(id: string, width: number): { links: Array<{ x: number; y: number; w: number; h: number; href: string; scroller?: number }>; scrollers: Array<{ x: number; y: number; w: number; h: number; content: number }> } | undefined;
 	/** How big the engine's memory has grown, in bytes (it never shrinks). */
@@ -178,6 +182,7 @@ export async function loadScene(): Promise<SceneLayout> {
 	return {
 		last,
 		font: (bytes, family) => text.font(bytes, family),
+		math: (formula) => text.math(formula),
 		cardGeometry(id, width) {
 			const entry = known.get(id);
 			if (!entry?.cardPool) return undefined;
@@ -292,7 +297,7 @@ export async function loadScene(): Promise<SceneLayout> {
 			};
 			return painter;
 		},
-		layout(doc, nodes, { theme, measure, measureKey, chain, card, paint, ops }) {
+		layout(doc, nodes, { theme, measure, measureKey, chain, words: shown, card, paint, ops }) {
 			const measureText = measure ?? estimateText;
 			if (measureText !== lastMeasure || measureKey !== lastKey) {
 				module._scene_fonts();
@@ -332,7 +337,7 @@ export async function loadScene(): Promise<SceneLayout> {
 					entry.words = words;
 					// The words themselves, for the scene to measure: all but a card's markdown, which the page lays out.
 					if (texty && chain && style) {
-						const bytes = encoder.encode(content);
+						const bytes = encoder.encode(shown && !markdown ? shown(content, node) : content);
 						const names = encoder.encode(chain(style.fontFamily).join("\n"));
 						const at = module._scene_bytes(bytes.length + names.length);
 						module.HEAPU8.set(bytes, at);

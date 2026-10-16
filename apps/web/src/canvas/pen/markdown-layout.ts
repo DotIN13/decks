@@ -97,6 +97,8 @@ export function firstLine(block: Block | undefined, size: number, lineHeight?: n
 			return { top: 0, height: size * 0.45 * 2 + line(size * 0.9) };
 		case "rule":
 			return { top: 0, height: size + 1 };
+		case "math":
+			return { top: 0, height: line(size) };
 		case "image":
 		case "embed":
 			return { top: 0, height: size * 3 };
@@ -297,6 +299,9 @@ export function layoutMarkdown(env: MarkdownEnv, blocks: readonly Block[], style
 			case "rule":
 				ops.push({ kind: "box", x, y: y + f.size * 0.5, w, h: 1, colour: C.line });
 				return y + f.size + 1;
+			case "math":
+				// CanvasKit shows a formula as it is written; only the engine typesets it (`math.ts`).
+				return y + para([{ text: `$$${block.tex}$$` }], f, w).place(x, y);
 			case "footnotes": {
 				ops.push({ kind: "box", x, y, w, h: 1, colour: C.line });
 				y += f.size * 0.75;

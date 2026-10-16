@@ -20,6 +20,7 @@
     "highlight.js": "^11.12.0",
     "lucide-solid": "^1.37.0",
     "marked": "^15.0.12",
+    "mathjax-full": "^3.2.2",
     "solid-js": "^1.9.14"
   },
   "devDependencies": {

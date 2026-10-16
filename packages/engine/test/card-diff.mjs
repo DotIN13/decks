@@ -34,8 +34,14 @@ const fakeImage = (url) => {
 const env = { ck, provider, chain, image: fakeImage, mono: "JetBrains Mono", scheme: "light" };
 const wireEnv = { chain, mono: "JetBrains Mono", scheme: "light", image: fakeImage };
 
-let failed = 0, compared = 0;
+let failed = 0, compared = 0, formulas = 0;
+// A card with a formula in it is typeset by the engine and shown as written by CanvasKit (`math.ts`), so its heights differ by design.
+const hasMath = (blocks) => blocks.some((b) => b.kind === "math" || (b.runs ?? []).some((r) => r.math) || hasMath(b.blocks ?? []) || (b.items ?? []).some((i) => hasMath(i.blocks)) || [b.header ?? [], ...(b.rows ?? [])].some((row) => row.some((cell) => (cell ?? []).some((r) => r.math))));
 const check = (name, md, style, width) => {
+	if (hasMath(parseMarkdown(md))) {
+		formulas++;
+		return;
+	}
 	const want = layoutMarkdown(env, parseMarkdown(md), style, Math.max(1, width));
 	const wantHeight = want.height;
 	want.delete();
@@ -102,5 +108,5 @@ for (let i = 0; i < made; i++) {
 	const st = style({ fontFamily: pick(["Inter", "Inter", "Lora", "JetBrains Mono"]), fontSize: pick([12, 14, 14, 16, 18, 24]), fontWeight: pick([400, 400, 500, 600]), letterSpacing: pick([0, 0, 0.5, -0.2]), lineHeight: pick([undefined, undefined, 1.3, 1.6]) });
 	check("made-up", md, st, pick([120, 160, 208, 240, 300, 480]));
 }
-console.log(`${compared} card layouts compared: ${failed ? `${failed} differ` : "all the same"}`);
+console.log(`${compared} card layouts compared: ${failed ? `${failed} differ` : "all the same"}; ${formulas} with a formula left out (typeset by the engine, written out by CanvasKit)`);
 process.exit(failed ? 1 : 0);
