@@ -784,7 +784,13 @@ export class StageScene {
 				this.uploadPictures();
 			}
 			const slide = this.slide?.ready ? this.slide : undefined;
-			const drawn = this.cppPainter?.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(slide ? { skip: slide.ids } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) });
+			/*
+			 * Left out: what a drag carries on a picture of its own, and what is hidden while a delete is on its
+			 * way to the server. The painter draws its whole scene, which still holds a hidden item; drawn here,
+			 * the tile kept the item after the server's answer, since by then nothing marked the tile stale.
+			 */
+			const skip = slide && this.hidden.size > 0 ? new Set([...slide.ids, ...this.hidden]) : (slide?.ids ?? (this.hidden.size > 0 ? this.hidden : undefined));
+			const drawn = this.cppPainter?.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(skip ? { skip } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) });
 			// Without CanvasKit there is nothing to fall back to: the engine's tile is the tile, all it could draw.
 			if (this.cppPainter && (drawn || this.native)) {
 				this.tilesBy.cpp++;

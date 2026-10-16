@@ -88,6 +88,26 @@ try {
 	say("a press on a drawn square selects it", !!picked, String(await handles()));
 	const picking = await page.evaluate(() => globalThis.__decksSheet?.picking);
 	say("and the C++ scene answered it", typeof picking === "string" && picking.startsWith("c++"), String(picking));
+	/*
+	 * Delete takes it off the screen at once, with the camera still: it used to stay drawn until the
+	 * next pan or zoom. Read off a screenshot, since the engine's canvas keeps no buffer to read.
+	 */
+	const blueAt = async (x, y) => {
+		const png = (await page.screenshot({ clip: { x, y, width: 1, height: 1 } })).toString("base64");
+		const [r, g, b] = await page.evaluate(async (data) => {
+			const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
+			const canvas = new OffscreenCanvas(1, 1);
+			const context = canvas.getContext("2d");
+			context.drawImage(bitmap, 0, 0);
+			return [...context.getImageData(0, 0, 1, 1).data];
+		}, png);
+		return b > 200 && r < 215 && b - r > 25 ? `blue ${r},${g},${b}` : "";
+	};
+	const before = await blueAt(560, 360);
+	await page.keyboard.press("Delete");
+	await settle(page, 800);
+	const after = await blueAt(560, 360);
+	say("Delete takes a drawn square off the screen without a pan", !!before && !after, `before ${before || "not blue"}, after ${after || "gone"}`);
 	await page.keyboard.press("Escape");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "e2e-pick-square" }, { op: "delete", id: "e2e-pick-line" }] });
 	await settle(page, 600);
