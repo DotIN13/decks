@@ -107,7 +107,7 @@ export interface WireContext {
 	 * The seeding is the other half: what `Deck.arrange` computes is a *frontier* answer, and a board
 	 * that is re-placed on every send chases whatever was moved last (see `Deck.arrange`).
 	 */
-	stageState(): DeckState;
+	stageState(asked?: DeckAgent): DeckState;
 
 	/** Tell every browser what stages exist and who is on them (`app.stagesMessage`). */
 	publishStages(): void;

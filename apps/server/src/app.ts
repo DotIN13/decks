@@ -134,8 +134,6 @@ export class App {
 		this.boards = new BoardService(deck, {
 			send: (message) => {
 				this.send(message);
-				// A board's size is its file's; every stage showing it carries that size in its own file.
-				if (message.type === "board.changed" && !message.removed) for (const agent of this.agents?.all() ?? []) agent.boardResized(message.path);
 			},
 			/*
 			 * The arrangement, not the deck — `BoardService` broadcasts a board on every write, and the
@@ -842,7 +840,11 @@ export class App {
 		 * visible anywhere in it.
 		 */
 		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }), agent.inPlay);
-		for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
+		/*
+		 * A board on a canvas file always has its place there, so nothing is seeded and building a view
+		 * never writes the file. Only a session with no canvas file keeps the places it worked out.
+		 */
+		if (!agent.canvasName()) for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
 		/*
 		 * And the size the stage draws each board at, which is its item's in the stage file: the one
 		 * record of it (`DeckAgent.setSize`). A board the stage does not hold keeps its file's size.
@@ -915,7 +917,7 @@ export class App {
 			case "board.changed": {
 				if (!message.board) return message;
 				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
-				return placed ? { ...message, board: { ...message.board, x: placed.x, y: placed.y } } : message;
+				return placed ? { ...message, board: { ...message.board, x: placed.x, y: placed.y, w: placed.w, h: placed.h } } : message;
 			}
 			default:
 				return message;

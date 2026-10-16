@@ -25,7 +25,7 @@ import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
 import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
-import { on, send, start } from "./state/socket.ts";
+import { on, send, setOnScreen, start } from "./state/socket.ts";
 import { api } from "./connections/connection.ts";
 import { can } from "./connections/backend.ts";
 import { Icon } from "./ui/icons.tsx";
@@ -487,6 +487,8 @@ export function App() {
 	 * frames into the whole window and then never runs again.
 	 */
 	onMount(() => watchInsets());
+	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
+	setOnScreen(() => stageOf(state.focused)?.name);
 
 	/*
 	 * One reading at startup, so an agent knows the canvas before anybody pans.

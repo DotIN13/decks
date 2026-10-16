@@ -101,6 +101,11 @@ export class StagePens {
 	}
 
 	/** Every stage folder, drawn on or only claimed. */
+	/** Whether a stage of this name exists, without listing them all. */
+	has(name: string): boolean {
+		return !!name && !name.includes("/") && existsSync(join(this.dir, name));
+	}
+
 	names(): string[] {
 		if (!existsSync(this.dir)) return [];
 		return readdirSync(this.dir, { withFileTypes: true })
@@ -652,6 +657,84 @@ export class StagePens {
 		if (ops.length === 0) return false;
 		this.edit(name, ops);
 		return true;
+	}
+
+	/*
+	 * Boards on a stage, changed one at a time in its file. These are the only writes of boards to a
+	 * stage: whoever asks, a person on the canvas or an agent on its own stage, names the stage and
+	 * the board, and nothing else in the file is touched. There is no copy of the stage anywhere else
+	 * to fall out of step with it.
+	 */
+
+	/** Each board's item in a stage, by path. */
+	private boardItems(name: string): Map<string, PenNode> {
+		const present = new Map<string, PenNode>();
+		for (const node of walk(this.get(name).doc.children)) {
+			const path = boardOf(node);
+			if (path && !present.has(path)) present.set(path, node);
+		}
+		return present;
+	}
+
+	/** Put boards on a stage, each at its corner and size; one already there keeps its place and size. */
+	placeBoards(name: string, spots: readonly BoardSpot[]): void {
+		const entry = this.get(name);
+		if (entry.error) return;
+		const present = this.boardItems(name);
+		const taken = ids(entry.doc);
+		const ops: Op[] = [];
+		for (const spot of spots) {
+			const node = present.get(spot.path);
+			if (node) {
+				if (node.name !== spot.title) ops.push({ op: "update", id: node.id, set: { name: spot.title } });
+				continue;
+			}
+			const base = slug(spot.path.replace(/^boards\//, "").replace(/\.[^.]+$/, ""), 40) || "board";
+			let id = base;
+			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+			taken.add(id);
+			ops.push({ op: "insert", node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: BOARD_ITEM, path: spot.path } }, box: { x1: spot.x, y1: spot.y } });
+		}
+		if (ops.length) this.edit(name, ops);
+	}
+
+	/** Move one board on a stage, its corner to `x y`. False when the stage does not hold it. */
+	moveBoard(name: string, path: string, x: number, y: number): boolean {
+		const node = this.boardItems(name).get(path);
+		if (!node) return false;
+		const box = this.placedOf(name).get(node.id)?.box;
+		if (box && Math.round(box.x) === Math.round(x) && Math.round(box.y) === Math.round(y)) return true;
+		this.edit(name, [{ op: "update", id: node.id, set: {}, box: { x1: Math.round(x), y1: Math.round(y) } }]);
+		return true;
+	}
+
+	/** Size one board on a stage. False when the stage does not hold it. */
+	sizeBoard(name: string, path: string, size: { w?: number; h?: number }): boolean {
+		const node = this.boardItems(name).get(path);
+		if (!node) return false;
+		const set: Record<string, unknown> = {};
+		if (size.w !== undefined && node.width !== Math.round(size.w)) set.width = Math.round(size.w);
+		if (size.h !== undefined && node.height !== Math.round(size.h)) set.height = Math.round(size.h);
+		if (Object.keys(set).length) this.edit(name, [{ op: "update", id: node.id, set }]);
+		return true;
+	}
+
+	/** Take boards off a stage. */
+	removeBoards(name: string, paths: readonly string[]): void {
+		const present = this.boardItems(name);
+		const ops: Op[] = [];
+		for (const path of paths) {
+			const node = present.get(path);
+			if (node) ops.push({ op: "delete", id: node.id });
+		}
+		if (ops.length) this.edit(name, ops);
+	}
+
+	/** Point a board's item at another file (a board copied into the stage's own folder), in the same place. */
+	repointBoard(name: string, from: string, to: string): void {
+		const node = this.boardItems(name).get(from);
+		if (!node) return;
+		this.edit(name, [{ op: "update", id: node.id, set: { url: `../../${to}`, metadata: { ...(node.metadata ?? {}), type: BOARD_ITEM, path: to } } }]);
 	}
 
 	/**

@@ -17,7 +17,7 @@ import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
-import { runAsCaller } from "./stage/caller-run.ts";
+import { conversationFor, runAsCaller } from "./stage/caller-run.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -840,7 +840,7 @@ export function createHttpApp(app: App): Express {
 			}
 			const key = `apps/${name}`;
 			if (!app.evalTrust.allows(key)) {
-				const answer = await app.agents.focused().bridge.choose({
+				const answer = await conversationFor(app, { board: app.apps.state(name).board }).bridge.choose({
 					title: "Let this app run stage code?",
 					message: `The app ${name} wants to run code with the stage API inside the Decks server, so it can do anything the server can: read files, write boards, move the canvas, message agents.`,
 					options: [

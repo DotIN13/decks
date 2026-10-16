@@ -82,3 +82,32 @@ test("two agents on one stage: a save by one does not put back a size or a place
 		cleanup();
 	}
 });
+
+test("a person's change goes to the canvas it names, not to the agent last focused", async () => {
+	const { app, cleanup } = open();
+	try {
+		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		one.setInPlay([PATH], { place: true });
+		const first = one.stageName()!;
+		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
+		two.newStage("Another canvas");
+		two.setInPlay([PATH], { place: true });
+		const second = two.stageName()!;
+		app.agents.focus(two.id);
+		const on = (name: string) => app.pens.boards(name).find((board) => board.path === PATH);
+		const before = on(second)!;
+
+		app.handle({ type: "board.move", path: PATH, x: 4000, y: 3000, stage: first }, () => {});
+		app.handle({ type: "board.resize", path: PATH, h: 777, stage: first }, () => {});
+		await settle();
+		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
+		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
+
+		app.handle({ type: "board.hide", path: PATH, stage: first }, () => {});
+		await settle();
+		assert.equal(on(first), undefined, "a hide takes it off the named canvas");
+		assert.ok(on(second), "and leaves it on the other");
+	} finally {
+		cleanup();
+	}
+});

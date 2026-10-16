@@ -43,15 +43,28 @@ export interface CallerRunSpec {
 	 * API, as the person decided when they let it run. A board's button may not (`board-actor.ts`).
 	 */
 	mayCreate?: boolean;
+	/** The canvas the press came from, when the browser names it. */
+	stage?: string;
 }
 
-/** The conversation a run acts for: the one in front of the person, minted if nobody has spoken yet. */
-export function focusedConversation(context: CallerRun): DeckAgent {
-	return context.agents.focused();
+/**
+ * The conversation a run acts for: one on the board's own canvas. That is the canvas the press came
+ * from when the browser names it, or else one holding the board, the agent on screen first; only a
+ * board on no agent's canvas falls back to the focused conversation, minted if nobody has spoken yet.
+ * Never simply the last agent any browser touched, which may be on another canvas entirely.
+ */
+export function conversationFor(context: Pick<CallerRun, "agents">, on: { board: string; stage?: string }): DeckAgent {
+	const looking = context.agents.looking();
+	const all = looking ? [looking, ...context.agents.all().filter((one) => one !== looking)] : [...context.agents.all()];
+	if (on.stage) {
+		const there = all.find((one) => one.stageName() === on.stage);
+		if (there) return there;
+	}
+	return all.find((one) => one.inPlay.includes(on.board)) ?? context.agents.focused();
 }
 
 export async function runAsCaller(context: CallerRun, spec: CallerRunSpec): Promise<EvalOutcome> {
-	const focused = focusedConversation(context);
+	const focused = conversationFor(context, { board: spec.board, ...(spec.stage ? { stage: spec.stage } : {}) });
 	const conversation = {
 		id: focused.id,
 		context: () => [...focused.context],

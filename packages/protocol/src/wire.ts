@@ -72,7 +72,7 @@ import type { WebStatus } from "./web.ts";
 import type { PenDocument } from "@decks/pen";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
-	| { type: "board.move"; path: string; x: number; y: number }
+	| { type: "board.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
 	/**
 	 * A board dragged to a new size by the person holding the mouse.
 	 *
@@ -81,7 +81,7 @@ export type ClientMessage =
 	 * aspect instead. Either dimension on its own is allowed, and a height written there is a
 	 * floor — the content raises it when it needs more room, and never clips.
 	 */
-	| { type: "board.resize"; path: string; w?: number; h?: number }
+	| { type: "board.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
 	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
 	/**
 	 * How much room this board's content takes, measured in the frame that is showing it.
@@ -110,7 +110,7 @@ export type ClientMessage =
 	 * Nothing about the run comes back down this socket: the code does what it does through
 	 * `stage`, and the focused conversation gets one notice saying a board ran.
 	 */
-	| { type: "board.eval"; path: string; id: string; value?: unknown }
+	| { type: "board.eval"; path: string; id: string; value?: unknown; stage?: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	/**
 	 * Put a live view of one agent's conversation on the canvas.
@@ -121,10 +121,10 @@ export type ClientMessage =
 	 */
 	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */
 	| { type: "agent.mirror"; agentId: string; request?: string }
-	| { type: "board.play"; path: string }
+	| { type: "board.play"; path: string; /** The stage on screen. */ stage?: string }
 	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */
 	| { type: "board.seen"; path: string }
-	| { type: "board.hide"; path: string }
+	| { type: "board.hide"; path: string; /** The stage on screen. */ stage?: string }
 	/**
 	 * A new, empty board, put on the canvas.
 	 *
@@ -156,7 +156,7 @@ export type ClientMessage =
 	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
 	 */
 	/** `document` names a file to open as a page you type into; the board made for it opens it. */
-	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
+	| { type: "board.create"; /** The stage on screen, which the new board joins. */ stage?: string; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *
@@ -176,7 +176,7 @@ export type ClientMessage =
 	 * same pen operations an agent sends through `stage.pen.edit` (`@decks/pen`'s `Op`). Applied to
 	 * the stage the named agent has open, together or not at all.
 	 */
-	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	| { type: "stage.pen.edit"; agentId: string; ops: unknown[]; /** The stage on screen, whose drawing is edited; else the agent's. */ stage?: string }
 	/**
 	 * Put an agent on a stage — the person's half of `stage.open`, from the manager.
 	 *
@@ -191,7 +191,7 @@ export type ClientMessage =
 	/** Delete a stage from the manager, with its drawing and the boards kept in its folder. */
 	| { type: "stage.delete"; name: string }
 	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
-	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo" }
+	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo"; /** The stage on screen. */ stage?: string }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *

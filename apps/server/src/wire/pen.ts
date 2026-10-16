@@ -15,7 +15,8 @@ export const pen = {
 		const agent = wire.agents.get(message.agentId);
 		const pens = wire.stage.pens;
 		if (!agent || !pens || !Array.isArray(message.ops)) return;
-		const name = agent.stageName(true);
+		// The drawing on screen, named by the browser; an older one names only the agent.
+		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(true);
 		if (!name) return;
 		try {
 			pens.edit(name, message.ops as Op[], undefined, { undoable: true });
@@ -98,7 +99,7 @@ export const pen = {
 		const agent = wire.agents.get(message.agentId);
 		const pens = wire.stage.pens;
 		if (!agent || !pens) return;
-		const name = agent.stageName(false);
+		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(false);
 		if (!name) return;
 		try {
 			pens.step(name, message.direction === "redo" ? "redo" : "undo");
