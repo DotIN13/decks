@@ -86,9 +86,9 @@ const chipMenu = await page.evaluate(() => ({
 	agents: [...document.querySelectorAll(".popover [data-row][data-agent]")].map((row) => row.querySelector(".row-label")?.textContent?.trim()),
 	current: document.querySelector('.popover [data-row][data-agent][data-current="true"] .row-label')?.textContent?.trim(),
 	dispatcher: document.querySelectorAll(".popover .dock-to-dispatcher").length,
-	fresh: [...document.querySelectorAll(".popover [data-row]")].some((row) => row.textContent?.includes("New ")),
+	fresh: [...document.querySelectorAll(".popover [data-row]")].at(-1)?.textContent?.includes("New ") ?? false,
 }));
-say("the chip opens the agent list, the focused agent marked, no New agent row and no dispatcher", chipMenu.agents.length >= 1 && chipMenu.current === agentName && !chipMenu.fresh && chipMenu.dispatcher === 0, JSON.stringify(chipMenu));
+say("the chip opens the agent list, the focused agent marked, New agent at the foot and no dispatcher", chipMenu.agents.length >= 1 && chipMenu.current === agentName && chipMenu.fresh && chipMenu.dispatcher === 0, JSON.stringify(chipMenu));
 await page.keyboard.press("Escape");
 await settle(page, 300);
 
@@ -152,12 +152,12 @@ await page.mouse.up();
 await settle(page, 800);
 const away = await page.evaluate(() => {
 	const dock = document.querySelector(".dock");
-	const tab = dock?.querySelector(".dock-stowtab")?.getBoundingClientRect();
+	const tab = dock?.querySelector(":scope > .stowtab")?.getBoundingClientRect();
 	return { stowed: dock?.hasAttribute("data-stowed") ?? false, left: dock?.getBoundingClientRect().left ?? 0, tabRight: tab?.right ?? 0, inert: Boolean(dock?.querySelector(".composer-box")?.closest("[inert]")), width: window.innerWidth };
 });
 say("a hard throw at the right edge puts the composer away", away.stowed && away.left > away.width - 60, JSON.stringify(away));
 say("what is left on screen is its tab, against the edge, and the box is out of reach", Math.abs(away.tabRight - away.width) < 2 && away.inert, JSON.stringify(away));
-await page.click(".dock-stowtab");
+await page.click(".dock > .stowtab");
 await settle(page, 900);
 say("the tab brings it back to where it was", (await page.getAttribute(".dock", "data-stowed")) === null && (await page.getAttribute(".dock", "data-floating")) === null);
 
