@@ -2,8 +2,10 @@ import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, Sla
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Paperclip from "lucide-solid/icons/paperclip";
+import Pencil from "lucide-solid/icons/pencil";
+import X from "lucide-solid/icons/x";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { carriesFiles } from "../../board/file-drop.ts";
 import type { BoardComment } from "../../markup/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
@@ -60,6 +62,15 @@ export function Composer(props: {
 	onMode: (mode: AgentMode) => void;
 	/** The typed words, and the ids of the comments whose pills were in the field with them. */
 	onSend: (text: string, comments: string[]) => void;
+	/**
+	 * Ctrl+Enter (⌘+Enter on a Mac) while the agent works: the words wait for the turn to end
+	 * (`DeckAgent.queueMine`). Enter still steers the turn; with nothing running both just send.
+	 */
+	onQueue?: (text: string, comments: string[]) => void;
+	/** What is queued for this agent, oldest first, and whether Stop is holding it. */
+	queued?: { items: Array<{ id: string; text: string }>; held: boolean };
+	/** A queued row's buttons: take it off, send it now as a steer, or send a held queue. */
+	onQueueAction?: (action: "remove" | "send" | "release", item?: string) => void;
 	/**
 	 * The comments kept for this agent's next message (`state/comments.ts`). Each is a pill in
 	 * the field; this list is what a pill's id stands for, and what puts the pills back after a
@@ -332,7 +343,7 @@ export function Composer(props: {
 	};
 	const sendable = () => !draftIsEmpty(nodes());
 
-	const send = () => {
+	const send = (queue = false) => {
 		if (atOpen()) {
 			const chosen = atMatches()[atIndex()] ?? atMatches()[0];
 			if (chosen) {
@@ -353,7 +364,8 @@ export function Composer(props: {
 		if (draftIsEmpty(nodes())) return;
 		// The comments go as ids beside the words: what the agent reads for each is composed
 		// from the comment itself (`commentBlock`), not from what its pill happens to show.
-		props.onSend(draftForAgent(nodes()), draftComments(nodes()));
+		if (queue && props.busy && props.onQueue) props.onQueue(draftForAgent(nodes()), draftComments(nodes()));
+		else props.onSend(draftForAgent(nodes()), draftComments(nodes()));
 		// `put` forgets the page's parked copy with it, or switching away and back would bring
 		// back a prompt that has already been sent.
 		put([]);
@@ -417,6 +429,51 @@ export function Composer(props: {
 					onHover={setMenuIndex}
 					onPick={pick}
 				/>
+			</Show>
+
+			{/* What you queued with Ctrl+Enter, on top of the box: sent one per turn as each ends. */}
+			<Show when={props.queued?.items.length ? props.queued : undefined}>
+				{(queued) => (
+					<div class="composer-queue" role="list" aria-label="Queued messages">
+						<div class="composer-queue-head">
+							<span>{queued().held ? "Held by Stop" : "Queued, sent one per turn when this one ends"}</span>
+							<Show when={queued().held}>
+								<button type="button" class="composer-queue-release" onClick={() => props.onQueueAction?.("release")}>
+									Send queued
+								</button>
+							</Show>
+						</div>
+						<For each={queued().items}>
+							{(item, index) => (
+								<div class="composer-queue-row" role="listitem" data-item={item.id}>
+									<span class="composer-queue-n">{index() + 1}</span>
+									<span class="composer-queue-text" title={item.text}>
+										{item.text}
+									</span>
+									<button
+										type="button"
+										class="icon-button"
+										aria-label="Edit"
+										title="Put it back in the box"
+										onClick={() => {
+											props.onQueueAction?.("remove", item.id);
+											put([...nodes(), { type: "text", text: (draftIsEmpty(nodes()) ? "" : " ") + item.text }]);
+											field?.focus();
+										}}
+									>
+										<Icon of={Pencil} size={14} />
+									</button>
+									<button type="button" class="icon-button" aria-label="Send now" title="Send now, as a steer" onClick={() => props.onQueueAction?.("send", item.id)}>
+										<Icon of={ArrowUp} size={14} />
+									</button>
+									<button type="button" class="icon-button" aria-label="Remove" title="Remove" onClick={() => props.onQueueAction?.("remove", item.id)}>
+										<Icon of={X} size={14} />
+									</button>
+								</div>
+							)}
+						</For>
+					</div>
+				)}
 			</Show>
 
 			{/* 10 / 10 / 8: the bottom is short because the controls row has its own gap to
@@ -540,7 +597,8 @@ export function Composer(props: {
 						}
 						if (event.key === "Enter" && !event.shiftKey) {
 							event.preventDefault();
-							send();
+							// Ctrl or ⌘ with Enter queues for the turn's end; Enter alone steers it.
+							send(event.ctrlKey || event.metaKey);
 						}
 					}}
 				/>
@@ -603,7 +661,7 @@ export function Composer(props: {
 								disabled={!sendable()}
 								title={props.busy ? "Steer this turn" : "Send"}
 								aria-label={props.busy ? "Steer this turn" : "Send"}
-								onClick={send}
+								onClick={() => send()}
 							>
 								<Icon of={ArrowUp} size={15} />
 							</button>
@@ -646,7 +704,7 @@ export function Composer(props: {
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
 			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
-				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} />
+				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
 				<span class="flex-1" />
 				<ContextDial usage={props.usage} onUsage={props.onUsage} />
 			</div>

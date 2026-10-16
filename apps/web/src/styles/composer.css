@@ -28,4 +28,60 @@
 	outline: 2px dashed var(--accent, #3b82f6);
 	outline-offset: 2px;
 }
+	/*
+	 * What you queued with Ctrl+Enter (`Composer`), as a tab on top of the box: one row per message,
+	 * in the order they will go, each with edit, send now and remove.
+	 */
+	.composer-queue {
+		margin: 0 14px;
+		padding: 4px 6px;
+		border: 1px solid var(--line-strong);
+		border-bottom: none;
+		border-radius: 14px 14px 0 0;
+		background: var(--panel);
+	}
+	.composer-queue-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 2px 6px 4px;
+		font-size: var(--type-note);
+		color: var(--muted);
+	}
+	.composer-queue-release {
+		font: inherit;
+		color: var(--color-accent);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+	}
+	.composer-queue-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 4px;
+		font-size: var(--type-ui);
+		color: var(--fg);
+	}
+	.composer-queue-n {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		font-size: var(--type-micro);
+		font-weight: 700;
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+	}
+	.composer-queue-text {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 }

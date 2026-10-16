@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
+import { queuedFor } from "./state/queued.ts";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
@@ -220,7 +221,7 @@ export function App() {
 			agents: state.chats.map((chat) => ({ id: chat.id, name: agentName(chat.id) })),
 		};
 	};
-	const sendFromBar = (typed: string, commentIds: string[] = []) => {
+	const sendFromBar = (typed: string, commentIds: string[] = [], queue = false) => {
 		const dest = destination(typed, barContext());
 		/*
 		 * The comments whose pills were in the field go in front of the words, whoever the words
@@ -236,7 +237,9 @@ export function App() {
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
 				if (dest.id === state.focused) clearMarks(dest.id);
-				send({ type: "agent.prompt", id: dest.id, text: line });
+				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
+				if (queue) send({ type: "agent.queue", id: dest.id, action: "add", text: line });
+				else send({ type: "agent.prompt", id: dest.id, text: line });
 				return;
 			}
 			case "note":
@@ -2070,6 +2073,12 @@ export function App() {
 						mode={focusedChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
 						onSend={sendFromBar}
+						onQueue={(text, comments) => sendFromBar(text, comments, true)}
+						{...(queuedFor(state.focused) ? { queued: queuedFor(state.focused)! } : {})}
+						onQueueAction={(action, item) => {
+							const id = state.focused;
+							if (id) send({ type: "agent.queue", id, action, ...(item ? { item } : {}) });
+						}}
 						comments={waitingComments(state.focused)}
 						onCommentsGone={(ids) => {
 							for (const id of ids) if (state.focused) removeComment(state.focused, id);

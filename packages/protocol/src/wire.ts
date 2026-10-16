@@ -247,6 +247,11 @@ export type ClientMessage =
 	| { type: "agent.workspace"; id: string; workspace: string | null }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
+	/**
+	 * Your own queue for an agent that is working (`DeckAgent.queueMine`): `add` a message to send when
+	 * this turn ends, `remove` one, `send` one now as a steer, or `release` a queue that Stop held.
+	 */
+	| { type: "agent.queue"; id: string; action: "add" | "remove" | "send" | "release"; text?: string; item?: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
@@ -385,6 +390,8 @@ export type ServerMessage =
 	 * browser made carry no flag: it already has the panel open.
 	 */
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
+	/** The messages you queued for an agent, oldest first, and whether Stop is holding them. */
+	| { type: "agent.queued"; agentId: string; items: Array<{ id: string; text: string }>; held: boolean }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	/**
 	 * The conversation as the browser should open it: the tail, and whether there is more.

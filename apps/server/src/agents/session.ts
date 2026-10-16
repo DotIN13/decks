@@ -233,6 +233,13 @@ export class DeckAgent {
 	 * timer cannot fire under any of them.
 	 */
 	private drainTimer: ReturnType<typeof setTimeout> | undefined;
+	/**
+	 * What you queued with Ctrl+Enter while the agent was working, oldest first: sent one per turn,
+	 * each as the turn before it ends, and before any work another agent handed over. `mineHeld` is
+	 * Stop's: a stopped turn holds the queue until you send it.
+	 */
+	private mine: Array<{ id: string; text: string }> = [];
+	private mineHeld = false;
 
 	constructor(
 		private readonly deck: Deck,
@@ -463,8 +470,10 @@ export class DeckAgent {
 					// The queue's whole clock. Going idle starts the countdown; anything else
 					// stops it, which is how "quiet for ten seconds" stays true rather than
 					// becoming "ten seconds after the last time it happened to be idle".
-					if (message.state === "idle") this.armDrain();
-					else this.cancelDrain();
+					if (message.state === "idle") {
+						// Your queue first, at once; then, after the quiet period, work handed over.
+						if (!this.sendNextMine()) this.armDrain();
+					} else this.cancelDrain();
 				}
 				// Rows leave trimmed: no arguments, and only a preview of a long output (`wire.ts`).
 				this.emit(message.type === "chat.item" ? { ...message, item: forBrowser(message.item) } : message);
@@ -1413,7 +1422,58 @@ export class DeckAgent {
 		return this.work.length;
 	}
 
+	// --- what you queued yourself (Ctrl+Enter) ------------------------------------------
+
+	/** Queue a message for when this turn ends; with no turn running, it is simply sent. */
+	queueMine(text: string): void {
+		const said = text.trim();
+		if (!said) return;
+		if (this.state === "idle" && this.mine.length === 0) {
+			void this.prompt(said);
+			return;
+		}
+		this.mine.push({ id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, text: said });
+		this.sayMine();
+	}
+
+	unqueueMine(item: string): void {
+		const before = this.mine.length;
+		this.mine = this.mine.filter((one) => one.id !== item);
+		if (this.mine.length === 0) this.mineHeld = false;
+		if (this.mine.length !== before) this.sayMine();
+	}
+
+	/** One queued message, now: a steer of the turn running, or a turn of its own if none is. */
+	sendMineNow(item: string): void {
+		const found = this.mine.find((one) => one.id === item);
+		if (!found) return;
+		this.unqueueMine(item);
+		void this.prompt(found.text);
+	}
+
+	/** A queue Stop held, let go: the next message goes now if nothing is running. */
+	releaseMine(): void {
+		this.mineHeld = false;
+		this.sayMine();
+		if (this.state === "idle") this.sendNextMine();
+	}
+
+	/** Send the next queued message, if there is one and Stop is not holding them. Says whether it did. */
+	private sendNextMine(): boolean {
+		if (this.mineHeld || this.mine.length === 0) return false;
+		const next = this.mine.shift()!;
+		this.sayMine();
+		void this.prompt(next.text);
+		return true;
+	}
+
+	private sayMine(): void {
+		this.emit({ type: "agent.queued", agentId: this.id, items: this.mine.map((one) => ({ ...one })), held: this.mineHeld });
+	}
+
 	private armDrain(): void {
+		// Work handed over waits behind what you queued yourself.
+		if (this.mine.length > 0 && !this.mineHeld) return;
 		if (this.drainTimer || this.work.length === 0 || this.state !== "idle") return;
 		this.drainTimer = setTimeout(() => {
 			this.drainTimer = undefined;
@@ -1669,8 +1729,12 @@ export class DeckAgent {
 
 	async abort(): Promise<void> {
 		// Stopping work is also a statement that now is not the moment for more of it: the
-		// countdown starts again from the return to idle below.
+		// countdown starts again from the return to idle below, and your queue waits for you.
 		this.cancelDrain();
+		if (this.mine.length > 0 && !this.mineHeld) {
+			this.mineHeld = true;
+			this.sayMine();
+		}
 		await this.backend?.abort();
 		this.translator.setState("idle");
 	}
@@ -2028,6 +2092,7 @@ export class DeckAgent {
 	 */
 	greet(reply: (message: ServerMessage) => void): void {
 		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", agentId: this.id, prompt });
+		if (this.mine.length > 0) reply({ type: "agent.queued", agentId: this.id, items: this.mine.map((one) => ({ ...one })), held: this.mineHeld });
 	}
 
 	answerDialog(...args: Parameters<ExtensionUiBridge["answer"]>): void {

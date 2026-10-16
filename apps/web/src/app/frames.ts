@@ -1,4 +1,5 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
+import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
 import { handsOn } from "../camera/touched.ts";
 import { seenPicture } from "../canvas/shots/adaptors.ts";
@@ -354,6 +355,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * open it. That is `/cost`: the person asked in the composer, so the panel has
 				 * to appear rather than wait for a reading nobody is looking at.
 				 */
+				// Your own queue for an agent, as the server holds it (`state/queued.ts`).
+				case "agent.queued":
+					receiveQueued(message);
+					return;
+
 				case "agent.report": {
 					if (message.show) setUsagePanel(message.id);
 					// Kept for this agent whether or not its panel is still open — a panel closed
