@@ -391,6 +391,24 @@ export function Stage(props: {
 		onCleanup(() => {
 			for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.removeEventListener(kind, touchedCanvas, { capture: true });
 		});
+		/*
+		 * A pinch over anything floating on the canvas zooms the canvas, as it does in Figma. The
+		 * toolbars, the composer, the conversation and the panels are siblings of the stage, so their
+		 * wheel events never reach `onWheel`, and a pinch begun over one did nothing; one paused and
+		 * taken up again with the pointer over one stopped zooming. Only a pinch (`ctrlKey`), only
+		 * over the stage while it is on screen, and not over a dialog.
+		 */
+		const pinchOver = (event: WheelEvent) => {
+			if (!event.ctrlKey || element.contains(event.target as Node | null)) return;
+			if ((event.target as Element | null)?.closest?.("dialog, [role='dialog'], [aria-modal='true']")) return;
+			if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return;
+			const box = element.getBoundingClientRect();
+			if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) return;
+			touchedCanvas();
+			onWheel(event);
+		};
+		window.addEventListener("wheel", pinchOver, { capture: true, passive: false });
+		onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
 		const measure = () => {
 			const viewport = { width: element.clientWidth, height: element.clientHeight };
 			setView(viewport);

@@ -219,6 +219,8 @@ export function Stream(props: {
 	 */
 	onMount(() => {
 		const wheel = (event: WheelEvent) => {
+			// A pinch is the canvas zooming, wherever it is (`Stage.tsx`, `pinchOver`); it never scrolls the conversation.
+			if (event.ctrlKey) return;
 			if (!historyShown() || !column || !scroller) return;
 			const box = column.getBoundingClientRect();
 			if (event.clientX < box.left || event.clientX > box.right) return;
