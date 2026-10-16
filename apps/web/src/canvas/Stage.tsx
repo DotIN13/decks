@@ -3280,6 +3280,8 @@ export function Stage(props: {
 	 * `frame-gestures.ts`, because a wheel event inside an iframe never reaches this
 	 * document at all. Positions arrive already in stage coordinates.
 	 */
+	/** Scroll units of a trackpad pinch per e-fold of zoom: smaller zooms faster (see `wheel`). */
+	const PINCH_TRAVEL = 100;
 	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean }) => {
 		/*
 		 * A wheel over the page is the page's, in both senses.
@@ -3291,7 +3293,7 @@ export function Stage(props: {
 		 */
 		if (props.focus) {
 			if (gesture.zooming) {
-				const factor = Math.min(1.2, Math.max(1 / 1.2, Math.exp(-gesture.deltaY / 120)));
+				const factor = Math.min(1.2, Math.max(1 / 1.2, Math.exp(-gesture.deltaY / PINCH_TRAVEL)));
 				setFocusZoom((zoom) => Math.min(4, Math.max(0.1, zoom * factor)));
 			} else if (focusEl) {
 				focusEl.scrollTop += gesture.deltaY;
@@ -3307,11 +3309,11 @@ export function Stage(props: {
 			 * The divisor is how far a finger has to travel for a given zoom, and it is the
 			 * pinch's alone: a wheel notch is past the clamp at any of these numbers, so
 			 * changing it moves the trackpad and leaves the mouse where it was. It has been
-			 * turned twice, both times because a Mac trackpad felt slow — 300 barely doubled
-			 * the zoom across a whole pinch, 200 was still short. At 120 that pinch is about
-			 * 3.8×, which is the neighbourhood the Mac's own apps zoom in.
+			 * turned three times, each time because a Mac trackpad felt slow — 300 barely doubled
+			 * the zoom across a whole pinch, 200 was still short, 120 (about 3.8×) a little short.
+			 * At 100 that pinch is about 5× (`PINCH_TRAVEL`).
 			 */
-			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / 120)));
+			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / PINCH_TRAVEL)));
 			pushCamera(zoomAbout(localCamera, view(), { x: gesture.x, y: gesture.y }, factor));
 			return;
 		}
