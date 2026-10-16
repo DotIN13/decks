@@ -520,11 +520,19 @@ export function BoardFrame(props: {
 	 * — that is the whole point of the patch path — so a board being edited would keep
 	 * reporting the size it had when it last loaded, and `clipped` would go quiet exactly
 	 * while somebody is adding the paragraph that overflows it.
+	 *
+	 * On a new revision only. The board arrives as a new object whenever any of its numbers moves,
+	 * its height among them, so reading `props.board.rev` in the effect re-measured on every
+	 * `board.sized` too. Two browsers whose fonts lay a board out a pixel or two apart then answered
+	 * each other's height for ever, and the board's height switched between theirs several times a
+	 * second on every screen.
 	 */
-	createEffect(() => {
-		const rev = props.board.rev;
-		if (frameEl) reportExtent(frameEl, rev);
-	});
+	const rev = createMemo(() => props.board.rev);
+	createEffect(
+		on(rev, (now) => {
+			if (frameEl) reportExtent(frameEl, now);
+		}),
+	);
 
 	const [dragging, setDragging] = createSignal(false);
 
