@@ -176,7 +176,9 @@ await editMode(page, true);
 await frame().locator('a[href="risks.html"]').click({ force: true });
 await settle(page, 1200);
 const edited = await onCanvas();
-say("in edit mode a link is part of the component, and does nothing", !edited.includes(LINKED), edited.join(" "));
+// Nor does the browser's own default: the board's page is still the board, not the file it links to.
+const stayed = await frame().locator("body").evaluate(() => location.pathname);
+say("in edit mode a link is part of the component, and does nothing", !edited.includes(LINKED) && stayed.endsWith("/plan.html"), `${edited.join(" ")} | page ${stayed}`);
 
 // --- and from a presented board ---------------------------------------------------------
 

@@ -1286,6 +1286,8 @@ export function App() {
 		send({ type: "board.play", path });
 		setSelected(path);
 		setComponent(undefined);
+		// The board lands on the canvas, under a presentation if one is up: that ends it.
+		if (presenting()) setPresenting(undefined);
 		flyToBoards([board], { animate: true });
 		return true;
 	};
