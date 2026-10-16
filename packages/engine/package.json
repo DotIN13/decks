@@ -6,7 +6,8 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./scene": "./src/scene.ts",
-		"./pick": "./src/pick.ts"
+		"./pick": "./src/pick.ts",
+		"./text": "./src/text.ts"
 	},
 	"scripts": {
 		"build:wasm": "bash build.sh",

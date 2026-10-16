@@ -2,51 +2,17 @@ import type { CanvasKit, Image, Paragraph, TypefaceFontProvider } from "canvaski
 import { isMarkdown, isMarkdownText, type MeasureText, type TextStyle } from "@decks/pen";
 import { parseMarkdown } from "./markdown.ts";
 import { layoutMarkdown, type MarkdownLayout } from "./markdown-layout.ts";
+import { FALLBACK_FAMILY, FONT_CDN, fontChain, fontFiles, fontsourceId, MONO_FAMILY, roundWeight, type FontNeed } from "./font-files.ts";
 
-/** The face a card's `code` is set in. */
-export const MONO_FAMILY = "JetBrains Mono";
-
-
+export { fontChain, MONO_FAMILY, type FontNeed } from "./font-files.ts";
 
 /**
- * Fonts for the drawing, fetched when a text needs them.
+ * Fonts for the drawing, fetched when a text needs them (`font-files.ts` says which).
  *
  * CanvasKit draws text with fonts it has been handed as bytes, not with the browser's, so a family
- * a `.pen` names has to be fetched. They come from Fontsource's CDN, which serves every Google
- * font as TrueType — the one format this CanvasKit build reads; WOFF2 fails silently, measuring
- * every string as zero wide.
- *
- * The fallback chain is the family asked for, then Inter (pen.dev's default), then Noto Sans SC for
- * Chinese and Japanese, the Noto symbol fonts for arrows and ticks, and Noto Color Emoji. Each is
- * fetched only when a text uses it. A family Fontsource does not have falls through to Inter.
+ * a `.pen` names has to be fetched, as TrueType: the one format this CanvasKit build reads; WOFF2
+ * fails silently, measuring every string as zero wide.
  */
-
-const CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
-const FALLBACK = "Inter";
-const CJK_FAMILY = "Noto Sans SC";
-const CJK = /[　-ヿ㐀-䶿一-鿿豈-﫿＀-￯]/;
-/** Arrows, ticks, stars and the other signs Inter does not draw. */
-const SYMBOL_FAMILIES = ["Noto Sans Symbols 2", "Noto Sans Symbols"];
-const SYMBOLS = /[\u2190-\u21ff\u2300-\u23ff\u2460-\u27bf\u2900-\u2bff]/;
-const EMOJI_FAMILY = "Noto Color Emoji";
-/** Added to a face's name for its extended-Latin file (`chain`). */
-const EXT = " Ext";
-const EMOJI = /\p{Extended_Pictographic}/u;
-
-/** The families a paragraph in `family` asks for, in order (`PenFonts.chain`). */
-export function fontChain(family: string): string[] {
-	return [...new Set([family, `${family}${EXT}`, FALLBACK, `${FALLBACK}${EXT}`, CJK_FAMILY, ...SYMBOL_FAMILIES, EMOJI_FAMILY])];
-}
-
-export interface FontNeed {
-	family: string;
-	weight: number;
-	italic: boolean;
-	text: string;
-}
-
-const fontsourceId = (family: string) => family.trim().toLowerCase().replace(/\s+/g, "-");
-const roundWeight = (weight: number) => Math.min(900, Math.max(100, Math.round(weight / 100) * 100));
 
 export class PenFonts {
 	/** CanvasKit's font provider; none when the engine draws everything and CanvasKit is never loaded. */
@@ -84,26 +50,7 @@ export class PenFonts {
 
 	/** Fetch whatever these texts need; true when anything new arrived. */
 	async need(needs: readonly FontNeed[]): Promise<boolean> {
-		const wanted = new Map<string, { family: string; url: string; fallback?: string }>();
-		const want = (family: string, subset: string, weight: number, italic: boolean) => {
-			const id = fontsourceId(family);
-			const style = italic ? "italic" : "normal";
-			const key = `${id}/${subset}/${weight}/${style}`;
-			const name = subset === "latin-ext" ? `${family}${EXT}` : family;
-			if (!wanted.has(key)) wanted.set(key, { family: name, url: `${CDN}/${id}@latest/${subset}-${weight}-${style}.ttf`, ...(weight !== 400 || italic ? { fallback: `${CDN}/${id}@latest/${subset}-400-normal.ttf` } : {}) });
-		};
-		want(FALLBACK, "latin", 400, false);
-		for (const need of needs) {
-			const weight = roundWeight(need.weight);
-			for (const family of new Set([need.family, FALLBACK])) {
-				want(family, "latin", weight, need.italic);
-				// Letters past plain Latin that are still Latin: ā, ł, ő, ș, ẞ and the rest.
-				if (/[\u0100-\u024f\u1e00-\u1eff]/.test(need.text)) want(family, "latin-ext", weight, need.italic);
-			}
-			if (CJK.test(need.text)) want(CJK_FAMILY, "chinese-simplified", weight >= 600 ? 700 : 400, false);
-			if (SYMBOLS.test(need.text)) for (const family of SYMBOL_FAMILIES) want(family, "symbols", 400, false);
-			if ([...need.text].some((ch) => EMOJI.test(ch) && !SYMBOLS.test(ch))) want(EMOJI_FAMILY, "emoji", 400, false);
-		}
+		const wanted = fontFiles(needs).map((font) => [font.key, font] as const);
 		const results = await Promise.all(
 			[...wanted].map(([key, font]) => {
 				let settled = this.settled.get(key);
@@ -237,7 +184,7 @@ export function pageFont(family: string, weight: number, italic: boolean): strin
 			const id = fontsourceId(name);
 			const load = async () => {
 				{
-					const font = new FontFace(`Pen ${name}`, `url(${CDN}/${id}@latest/latin-${w}-${style}.woff2)`, { weight: String(w), style });
+					const font = new FontFace(`Pen ${name}`, `url(${FONT_CDN}/${id}@latest/latin-${w}-${style}.woff2)`, { weight: String(w), style });
 					try {
 						document.fonts.add(await font.load());
 					} catch {
@@ -249,6 +196,6 @@ export function pageFont(family: string, weight: number, italic: boolean): strin
 		}
 	};
 	face(family);
-	face(FALLBACK);
-	return `"Pen ${family}", "Pen ${FALLBACK}", system-ui, sans-serif`;
+	face(FALLBACK_FAMILY);
+	return `"Pen ${family}", "Pen ${FALLBACK_FAMILY}", system-ui, sans-serif`;
 }

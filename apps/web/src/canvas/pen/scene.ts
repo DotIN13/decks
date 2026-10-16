@@ -3,11 +3,11 @@ import { baseTheme, estimateText, expand, fitShapes, shapeRadius, indexOf, isArr
 import type { Camera } from "@decks/protocol";
 import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
-import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
+import { MONO_FAMILY, PenFonts } from "./fonts.ts";
+import { fontNeeds } from "./font-files.ts";
 import { encodeCard } from "./card-wire.ts";
 import { inkOps, opsOf, paintRecord } from "./paint-wire.ts";
-import { CARD_PALETTE, SERIF_FAMILY, type MarkdownLayout } from "./markdown-layout.ts";
-import { parseMarkdown, wordsOf } from "./markdown.ts";
+import { CARD_PALETTE, type MarkdownLayout } from "./markdown-layout.ts";
 import { PenIcons } from "./icons.ts";
 import { NOTE_RADIUS, paintDocument } from "./paint.ts";
 import { boundsOf } from "./bounds.ts";
@@ -1637,30 +1637,6 @@ export class StageScene {
 		}
 	}
 
-	/** What the document's words need from the font CDN; asked before the first layout, and again when it changes. */
-	private fontsFor(nodes: readonly PenNode[], doc: PenDocument, theme: ReturnType<typeof baseTheme>): FontNeed[] {
-		const needs: FontNeed[] = [];
-		for (const node of walk(nodes)) {
-			if (typeof node.content !== "string" || !node.content) continue;
-			const style = textStyleOf(doc, node, theme);
-			needs.push({ family: style.fontFamily, weight: style.fontWeight, italic: style.fontStyle === "italic", text: node.content });
-			// A markdown card sets headings and bold heavier, emphasis in italic and code in a monospace face.
-			if (isMarkdown(node) || isMarkdownText(node)) {
-				// The picture sign only for a card that has a picture: it is an emoji, and the emoji font is 25MB
-				// of a phone's memory for a card that never shows it.
-				const pictured = /!\[|<img\b/i.test(node.content);
-				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: `${wordsOf(parseMarkdown(node.content))}◦▪${pictured ? "🖼" : ""}` });
-				needs.push({ family: style.fontFamily, weight: 700, italic: false, text: node.content }, { family: style.fontFamily, weight: 600, italic: false, text: node.content }, { family: style.fontFamily, weight: style.fontWeight, italic: true, text: node.content });
-				if (/`|^( {4}|\t)|<code|<pre|\.mono\b/m.test(node.content)) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content }, { family: MONO_FAMILY, weight: 700, italic: false, text: node.content });
-				// Words in a font of their own, `[words]{font="Lora"}` or `.serif`, in its upright, bold and italic.
-				const faces = new Set([...node.content.matchAll(/font=(?:"([^"]+)"|([\w-]+))/g)].map((m) => (m[1] ?? m[2])!));
-				if (/\.serif\b/.test(node.content)) faces.add(SERIF_FAMILY);
-				for (const family of faces) needs.push({ family, weight: 400, italic: false, text: node.content }, { family, weight: 700, italic: false, text: node.content }, { family, weight: 400, italic: true, text: node.content });
-			}
-		}
-		return needs;
-	}
-
 	private sendLayout(cards: CardGeometry[], only?: ReadonlySet<string>): void {
 		if (!only) {
 			this.host.post({ type: "layout", seq: this.docSeq, placed: [...this.placed], bounds: [...this.bounds], cards });
@@ -1841,7 +1817,7 @@ export class StageScene {
 		const sameWords = partial && [...(this.moving?.values() ?? [])].every((change) => change.set === undefined);
 		const generation = fonts.generation;
 		if (!sameWords)
-			void fonts.need(this.fontsFor(nodes, doc, theme)).then((fresh) => {
+			void fonts.need(fontNeeds(nodes, doc, theme)).then((fresh) => {
 				// A font landed after this picture was drawn without it: lay out and draw again.
 				if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
 			});

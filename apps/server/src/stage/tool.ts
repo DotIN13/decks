@@ -10,6 +10,7 @@ import type { Stage } from "../../../../runtime/stage.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
+import { serverText } from "./text.ts";
 import { runEval, safeJson } from "./eval.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { StageService, WebTarget } from "./service.ts";
@@ -1098,7 +1099,7 @@ export function createStageTool(deps: {
 				// Checked by `apply`, which answers a malformed edit with a sentence naming it.
 				const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
 				const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path));
-				const placed = placements(pens.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light") });
+				const placed = placements(pens.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
 				const answered = results.map((result) => {
 					const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
 					return { ...result, ...(box ? { box } : {}) };

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
 import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
@@ -60,6 +61,9 @@ export interface PenEntry {
 	text?: string;
 }
 
+/** Words measured as the page measures them (`text.ts`). */
+const measure = serverText.measure;
+
 const FILE = "stage.pen";
 /** How many of the person's edits each stage can take back. */
 const HISTORY = 100;
@@ -74,7 +78,13 @@ export class StagePens {
 	constructor(
 		private deckPath: string,
 		private readonly changed: (name: string, entry: PenEntry) => void,
-	) {}
+	) {
+		// Boxes worked out while words were estimated are worked out again once their fonts are here.
+		serverText.onFonts(() => {
+			for (const entry of this.cache.values()) entry.placed = undefined;
+		});
+		void serverText.start();
+	}
 
 	get dir(): string {
 		return join(this.deckPath, "stages");
@@ -236,8 +246,8 @@ export class StagePens {
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
 		const theme = baseTheme(current.doc, "light");
-		const { doc, results } = apply(current.doc, ops, { theme });
-		const placed = placements(this.withImported(name, doc), { theme });
+		const { doc, results } = apply(current.doc, ops, { theme, measure });
+		const placed = placements(this.withImported(name, doc), { theme, measure });
 		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path));
 		const before = current.text ?? serialize(current.doc);
 		const entry = this.write(name, doc);
@@ -298,7 +308,7 @@ export class StagePens {
 		const current = this.get(name);
 		if (current.error || !existsSync(this.fileOf(name))) return;
 		const doc = structuredClone(current.doc);
-		const placed = placements(this.withImported(name, doc), { theme: baseTheme(doc, "light") });
+		const placed = placements(this.withImported(name, doc), { theme: baseTheme(doc, "light"), measure });
 		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path))) this.write(name, doc);
 	}
 
@@ -465,7 +475,7 @@ export class StagePens {
 		const target = this.penFile(path);
 		if (target.stage) return { doc: this.withImported(target.stage, this.get(target.stage).doc), base: `${fileUrl(join(this.dir, target.stage))}/`, stage: target.stage };
 		const doc = this.withImportedAt(dirname(target.file), this.loadPen(target.file, target.shown));
-		const placed = placements(doc, { theme: baseTheme(doc, "light") });
+		const placed = placements(doc, { theme: baseTheme(doc, "light"), measure });
 		const boxes = doc.children.map((node) => placed.get(node.id)?.box).filter((box): box is NonNullable<typeof box> => !!box);
 		const box = boxes.length
 			? { x1: Math.min(...boxes.map((b) => b.x)), y1: Math.min(...boxes.map((b) => b.y)), x2: Math.max(...boxes.map((b) => b.x + b.w)), y2: Math.max(...boxes.map((b) => b.y + b.h)) }
@@ -478,7 +488,7 @@ export class StagePens {
 		const target = this.penFile(path);
 		if (target.stage) return { ...this.read(target.stage), file: target.shown };
 		const doc = this.loadPen(target.file, target.shown);
-		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: baseTheme(doc, "light") }) };
+		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: baseTheme(doc, "light"), measure }) };
 	}
 
 	/** The same edits as a stage takes, on any .pen file; a frame's change reaches every stage that uses it. */
@@ -487,14 +497,14 @@ export class StagePens {
 		const theme = (doc: PenDocument) => baseTheme(doc, "light");
 		if (target.stage) {
 			const { entry, results } = this.edit(target.stage, ops);
-			const placed = placements(this.withImported(target.stage, entry.doc), { theme: theme(entry.doc) });
+			const placed = placements(this.withImported(target.stage, entry.doc), { theme: theme(entry.doc), measure });
 			return { file: target.shown, results: results.map((result) => withBox(result, placed)) };
 		}
 		const current = this.loadPen(target.file, target.shown);
-		const { doc, results } = apply(current, ops, { theme: theme(current) });
+		const { doc, results } = apply(current, ops, { theme: theme(current), measure });
 		this.writePen(target.file, doc);
 		if (target.ref) this.resendFrame(target.ref);
-		const placed = placements(this.withImportedAt(dirname(target.file), doc), { theme: theme(doc) });
+		const placed = placements(this.withImportedAt(dirname(target.file), doc), { theme: theme(doc), measure });
 		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), results: results.map((result) => withBox(result, placed)) };
 	}
 
@@ -563,7 +573,7 @@ export class StagePens {
 	/** Where everything in a stage is, laid out once per version of the file. */
 	placedOf(name: string): Map<string, Placed> {
 		const entry = this.get(name);
-		entry.placed ??= placements(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light") });
+		entry.placed ??= placements(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light"), measure });
 		return entry.placed;
 	}
 
@@ -672,7 +682,7 @@ export class StagePens {
 	/** What an agent reads: the file's items, each with its box on the stage. */
 	read(name: string) {
 		const entry = this.get(name);
-		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light") }) };
+		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light"), measure }) };
 	}
 
 	private write(name: string, doc: PenDocument): PenEntry {
