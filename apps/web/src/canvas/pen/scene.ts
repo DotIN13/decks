@@ -500,8 +500,13 @@ export class StageScene {
 				this.boards = message.boards;
 				this.boardIndex = new BoxIndex(message.boards);
 				this.boardFrames = new Map(message.boards.map((b) => [b.path, { x: b.x, y: b.y, w: b.w, h: b.h }]));
-				// An arrow may end on a board, and follows it when it moves.
-				if (hadArrows && moved) this.dirty = true;
+				/*
+				 * An arrow may end on a board, and follows it when it moves. Not while a drag's picture is
+				 * still out: a drop moves its boards here before the server's answer moves its items, and
+				 * laying out then let go of that picture and drew the items from the document as it was,
+				 * where the drag began, until the answer came. The answer lays everything out, arrows too.
+				 */
+				if (hadArrows && moved && !this.slide) this.dirty = true;
 				this.forgetGone();
 				break;
 			}
