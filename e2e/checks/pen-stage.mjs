@@ -255,6 +255,8 @@ if (spot) {
 	const home = await rectBox();
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
+	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
+	const quiet = await page.addStyleTag({ content: ".stage > .board-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
@@ -275,6 +277,7 @@ if (spot) {
 		`${JSON.stringify(parked)} -> ${JSON.stringify(rounding)}`,
 	);
 	await page.mouse.up();
+	await quiet.evaluate((tag) => tag.remove());
 	const round = await until(() => {
 		const r = onDisk().children.find((n) => n.id === drawnId)?.cornerRadius;
 		return typeof r === "number" && r > 8 ? r : undefined;

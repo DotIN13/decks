@@ -257,7 +257,7 @@ export function App() {
 		const target = commenting();
 		const agentId = state.focused;
 		if (!target || !agentId) return;
-		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}) };
+		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) };
 		if (how === "keep") {
 			addComment(agentId, note);
 			if (target.range) markComment(note.id, target.range);

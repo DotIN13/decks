@@ -1095,6 +1095,10 @@
 	margin: 0 2px;
 	background: var(--line-strong);
 }
+	/* Delete, on drawn items: the one action that cannot be put back with Show. */
+	.stage > .board-callout > .icon-button.callout-danger {
+	color: var(--color-danger);
+}
 	@keyframes board-callout-in {
 	from {
 		opacity: 0;

@@ -16,6 +16,12 @@ export interface BoardComment {
 	board: string;
 	/** The `data-id` of the component the selection was in, when it was in one. */
 	component?: string;
+	/**
+	 * Drawn items on a canvas, by id, when the comment is on them rather than on a board: `board` is
+	 * then the canvas's file (`canvases/<name>/canvas.pen`) and `quote` their words, so the agent finds
+	 * them with `stage.pen.read()`.
+	 */
+	items?: string[];
 	/** The selected words, spaces collapsed, cut at `QUOTE_LIMIT`. */
 	quote: string;
 	text: string;
@@ -39,10 +45,17 @@ export function quoteOf(selected: string): string {
  */
 export function commentBlock(comments: BoardComment[]): string {
 	if (comments.length === 0) return "";
-	const head = comments.length === 1 ? "A comment on a board. The quoted words are what I selected:" : `${comments.length} comments on boards. The quoted words are what I selected:`;
+	const drawn = comments.every((comment) => comment.items?.length);
+	const head = drawn
+		? comments.length === 1 ? "A comment on items drawn on a canvas:" : `${comments.length} comments on items drawn on a canvas:`
+		: comments.length === 1 ? "A comment on a board. The quoted words are what I selected:" : `${comments.length} comments on boards. The quoted words are what I selected:`;
 	const items = comments.map((comment, index) => {
-		const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
 		const said = comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n");
+		if (comment.items?.length) {
+			const named = comment.items.map((id) => `"${id}"`).join(", ");
+			return `${index + 1}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}\n${said}`;
+		}
+		const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
 		// No quote: a comment on the whole board, from its pill.
 		if (!comment.quote) return `${index + 1}. ${where}, the whole board\n${said}`;
 		return `${index + 1}. ${where}\n   > ${comment.quote}\n${said}`;

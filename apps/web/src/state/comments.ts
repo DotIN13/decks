@@ -26,6 +26,8 @@ export interface CommentTarget {
 	title?: string;
 	/** Open straight to the box: the press that made it already said "comment". */
 	open?: boolean;
+	/** Drawn items commented on, by id; `path` is then the canvas's file (`BoardComment.items`). */
+	items?: string[];
 }
 
 const [commenting, setCommenting] = createSignal<CommentTarget | undefined>(undefined);

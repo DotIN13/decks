@@ -385,6 +385,22 @@ export function Stage(props: {
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), canvasBox(view()));
 
+	/** A press is held on the canvas (not on a pill): the drawn items' pill steps aside until it lets go. */
+	const [pressHeld, setPressHeld] = createSignal(false);
+	onMount(() => {
+		const press = (event: PointerEvent) => {
+			if (!(event.target as Element | null)?.closest?.(".board-callout")) setPressHeld(true);
+		};
+		const release = () => setPressHeld(false);
+		element.addEventListener("pointerdown", press, { capture: true, passive: true });
+		window.addEventListener("pointerup", release, true);
+		window.addEventListener("pointercancel", release, true);
+		onCleanup(() => {
+			element.removeEventListener("pointerdown", press, { capture: true });
+			window.removeEventListener("pointerup", release, true);
+			window.removeEventListener("pointercancel", release, true);
+		});
+	});
 	onMount(() => {
 		// A hand on the canvas holds the view against an agent's show (`camera/touched.ts`).
 		for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.addEventListener(kind, touchedCanvas, { capture: true, passive: true });
@@ -703,7 +719,6 @@ export function Stage(props: {
 	 */
 	/** The board the action pill is for: the selected one, while it is on the canvas. */
 	const calloutBoard = createMemo(() => (props.selected ? props.boards.find((board) => board.path === props.selected) : undefined));
-
 	/**
 	 * Boards whose documents are showing, by how many of their frames say so: the sheet is a hole
 	 * over each of them, and the board's picture everywhere else. A count and not a set, so a frame
@@ -1594,6 +1609,27 @@ export function Stage(props: {
 		props.onSelect(path);
 	};
 
+	/** The words an item shows, its own or its children's, on one line: what a comment on it quotes. */
+	const quoteOf = (node: PenNode | undefined): string => {
+		if (!node) return "";
+		const said: string[] = [];
+		for (const one of walk([node])) if (typeof one.content === "string" && one.content.trim()) said.push(one.content.trim());
+		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
+	};
+	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
+	const penDeleteSelected = () => {
+		const selected = penSelection();
+		if (!selected.length) return;
+		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
+		penLayer.hide(new Set(selected));
+		const mark = penLayer.mark();
+		penEdit(selected.map((id) => ({ op: "delete", id })));
+		const clear = () => setPenSelection((now) => (now === selected ? [] : now));
+		afterFrame.push({ mark, run: clear });
+		// A sheet that shows no frame (nothing painting) does not keep the outline.
+		setTimeout(clear, 250);
+	};
+
 	/** The keys of the drawing, in edit mode; true when the key was one of them. */
 	const penKey = (event: KeyboardEvent): boolean => {
 		const selected = penSelection();
@@ -1604,14 +1640,7 @@ export function Stage(props: {
 			return true;
 		}
 		if (selected.length && (key === "Delete" || key === "Backspace")) {
-			// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
-			penLayer.hide(new Set(selected));
-			const mark = penLayer.mark();
-			penEdit(selected.map((id) => ({ op: "delete", id })));
-			const clear = () => setPenSelection((now) => (now === selected ? [] : now));
-			afterFrame.push({ mark, run: clear });
-			// A sheet that shows no frame (nothing painting) does not keep the outline.
-			setTimeout(clear, 250);
+			penDeleteSelected();
 			return true;
 		}
 		if (key === "Escape" && (selected.length || boardPicks().length || penTool() !== "select")) {
@@ -2471,6 +2500,23 @@ export function Stage(props: {
 		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
 		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
 		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
+	});
+	/**
+	 * The drawn items the same pill is for, when no board has it: the selection's box together, and what
+	 * to call it. Not while one is typed into (its editor has its own toolbar) or drawn with the pen.
+	 */
+	const calloutItems = createMemo(() => {
+		if (props.selected || props.drawing || !props.onPenEdit || penText()) return undefined;
+		const outlines = penOutlines().filter((one) => one.id && !one.id.startsWith("board:"));
+		if (!outlines.length || outlines.length !== penSelection().length) return undefined;
+		const x = Math.min(...outlines.map((one) => one.x));
+		const y = Math.min(...outlines.map((one) => one.y));
+		const box = { x, y, w: Math.max(...outlines.map((one) => one.x + one.w)) - x, h: Math.max(...outlines.map((one) => one.y + one.h)) - y };
+		const ids = outlines.map((one) => one.id);
+		const words = ids.map((id) => quoteOf(penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
+		const first = penLayer.placed.get(ids[0]!)?.node;
+		const name = ids.length > 1 ? `${ids.length} items` : (words || (typeof first?.name === "string" ? first.name : first?.type) || "item");
+		return { box, ids, words, name };
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
@@ -5348,6 +5394,8 @@ export function Stage(props: {
 				{(board) => (
 					<BoardCallout
 						board={board}
+						box={boxOf(board)}
+						label={`${board.title}: board actions`}
 						hidden={moving() || panning() || scaling() || gliding() || !!boardDrag() || !!boardResize() || !!ownDrag()}
 						camera={props.camera}
 						view={view()}
@@ -5365,6 +5413,32 @@ export function Stage(props: {
 								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
 							})
 						}
+					/>
+				)}
+			</Show>
+			<Show when={!props.focus ? calloutItems() : undefined}>
+				{(items) => (
+					<BoardCallout
+						box={items().box}
+						label={`${items().name}: actions`}
+						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || penDrag().dx !== 0 || penDrag().dy !== 0 || !!penResize()}
+						camera={props.camera}
+						view={view()}
+						onOpen={() => pushCamera(frame([items().box]))}
+						onComment={() =>
+							setCommenting({
+								// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
+								path: stagePenPath() ?? "the canvas",
+								items: items().ids,
+								quote: items().words,
+								title: items().name,
+								open: true,
+								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+							})
+						}
+						onDuplicate={() => penDuplicate()}
+						onProperties={() => setPenSheet(true)}
+						onDelete={() => penDeleteSelected()}
 					/>
 				)}
 			</Show>

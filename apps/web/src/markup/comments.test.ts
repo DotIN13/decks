@@ -58,3 +58,10 @@ test("a comment on the whole board has no quote, and says so", () => {
 		"A comment on a board. The quoted words are what I selected:\n\n1. boards/plan.html, the whole board\n   Two sentences, please.",
 	);
 });
+
+test("a comment on drawn items names the canvas file, the items by id, and their words", () => {
+	const note: BoardComment = { id: "c1", board: "canvases/plan/canvas.pen", items: ["term-1"], quote: "Program start", text: "make this green", at: 1 };
+	const block = commentBlock([note]);
+	assert.match(block, /^A comment on items drawn on a canvas:/);
+	assert.match(block, /on canvases\/plan\/canvas\.pen, item "term-1" \("Program start"\)\n   make this green/);
+});

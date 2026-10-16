@@ -385,6 +385,45 @@ if (diagonal) {
 	await settle(page, 300);
 }
 
+/*
+ * The board's pill, over a selected drawn item, with what makes sense for one (`BoardCallout`): zoom to
+ * it, comment, duplicate, properties and delete. Its Duplicate selects the copy, and its Delete takes
+ * that copy away, leaving the first.
+ */
+{
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
+	// A fresh shape where the screen is, so what this selects does not depend on where the checks above left the camera.
+	const at = await page.evaluate(() => {
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const sx = stage.left + stage.width * 0.45, sy = stage.top + stage.height * 0.4;
+		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
+	});
+	const w = Math.round(200 / at.zoom), h = Math.round(120 / at.zoom);
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "pill-shape", name: "Process", width: w, height: h, layout: "vertical", metadata: { type: "decks.shape", kind: "Process" }, children: [{ type: "path", id: "pill-shape-o", layoutPosition: "absolute", x: 0, y: 0, width: w, height: h, viewBox: [0, 0, w, h], geometry: `M0 0H${w}V${h}H0Z`, fill: "#fde68a", stroke: "#1f2328" }] }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }] });
+	await until(() => onDisk().children.find((n) => n.id === "pill-shape"));
+	await settle(page, 800);
+	const target = onDisk().children.find((n) => n.id === "pill-shape");
+	const middle = await page.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); return r && r.width > 4 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }, target?.id);
+	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
+	if (middle) {
+		await page.mouse.click(middle.x, middle.y);
+		const labels = await until(() => page.evaluate(() => [...document.querySelectorAll(".stage > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
+		say("a selected shape gets the pill: zoom, comment, duplicate, properties and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Properties", "Delete"]), JSON.stringify(labels));
+		const before = onDisk().children.length;
+		await page.locator('.stage > .board-callout [aria-label="Duplicate"]').click();
+		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
+		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
+		// The copy is selected once the drawing has it: the outline moves onto it.
+		await until(() => page.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
+		await settle(page, 300);
+		await page.locator('.stage > .board-callout:not([data-hidden]) [aria-label="Delete"]').click();
+		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
+		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);
+	}
+}
+
 say("no errors in the page", errors.length === 0, errors.join(" | "));
 link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.metadata?.type === "decks.shape" || n.metadata?.type === "decks.arrow" || n.id === "shapes-anchor").map((n) => ({ op: "delete", id: n.id })) });
 await settle(page, 400);
