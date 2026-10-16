@@ -80,7 +80,10 @@ say("…276 px wide, and it never scrolls sideways", across.panel === 276 && acr
 await page.locator('.props-panel select[aria-label="Kind of shape"]').selectOption("Terminator");
 const swapped = await until(() => {
 	const now = onDisk().children.find((n) => n.id === made?.id);
-	return now?.metadata?.kind === "Terminator" && now.children.find((n) => n.type === "path")?.geometry.includes("A22") ? now : undefined;
+	// Built at the shape's own size (`@decks/pen`, `build`): its viewBox is the frame's, and its ends are half circles.
+	const outline = now?.children.find((n) => n.type === "path");
+	const r = typeof now?.height === "number" && typeof now?.width === "number" ? Math.min(now.width, now.height) / 2 : NaN;
+	return now?.metadata?.kind === "Terminator" && outline?.viewBox?.[2] === now.width && outline.geometry.includes(`A${Math.round(r * 100) / 100} ${Math.round(r * 100) / 100}`) ? now : undefined;
 });
 say("its kind swaps the outline and keeps the shape", !!swapped, JSON.stringify(onDisk().children.find((n) => n.id === made?.id)?.metadata));
 const words = page.locator('.props-panel input[placeholder="Double-click the shape, or type here"]');

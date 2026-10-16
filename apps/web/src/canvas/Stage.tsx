@@ -2466,7 +2466,8 @@ export function Stage(props: {
 		if (most < 2) return undefined;
 		const shape = shapeRadius(node);
 		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
-		if (node.type !== "rectangle" && node.type !== "frame") return undefined;
+		// A library shape with no corners to round (a terminator, an arrow) has no handle: its outline would ignore it.
+		if (isShape(node) || (node.type !== "rectangle" && node.type !== "frame")) return undefined;
 		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
 		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
 		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };

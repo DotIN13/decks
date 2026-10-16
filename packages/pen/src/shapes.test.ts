@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, pathBounds, reroute, shapeKind, shapeOutline, SHAPES, sidedRoute, type PenDocument } from "./index.ts";
+import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, pathBounds, reroute, shapeKind, shapeOutline, shapeRadius, SHAPES, sidedRoute, type PenDocument } from "./index.ts";
 
 const theme = baseTheme(emptyDocument(), "light");
 const diamond = shapeKind("Decision")!;
@@ -84,4 +84,21 @@ test("every library shape is drawn inside its own viewBox", () => {
 		assert.ok(box, kind.name);
 		assert.ok(box.x >= -0.01 && box.y >= -0.01 && box.x + box.w <= 100.01 && box.y + box.h <= 100.01, `${kind.name} covers ${JSON.stringify(box)}`);
 	}
+});
+
+test("a shape pulled wide is built at its size: a terminator's ends stay half circles, an arrow's head keeps its run", () => {
+	const at = (name: string, w: number, h: number) => makeShape(shapeKind(name)!, { frame: "f", outline: "o" }, { w, h }).children![0]!;
+	const terminator = at("Terminator", 300, 100);
+	assert.deepEqual(terminator.viewBox, [0, 0, 300, 100]);
+	assert.match(terminator.geometry as string, /A50 50 /);
+	const head = (w: number) => {
+		const xs = [...(at("Arrow right", w, 100).geometry as string).matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+		return w - Math.min(...xs.filter((x) => x > 0 && x < w));
+	};
+	assert.equal(head(300), head(600), "the head is as long at 600 wide as at 300");
+});
+
+test("only shapes with corners to round have a radius: Rectangle, Process, Rounded and Speech", () => {
+	const rounded = SHAPES.filter((kind) => shapeRadius(makeShape(kind, { frame: "f", outline: "o" }, { w: 200, h: 100 })) !== undefined).map((kind) => kind.name);
+	assert.deepEqual(rounded.sort(), ["Process", "Rectangle", "Rounded", "Speech"]);
 });

@@ -38,15 +38,114 @@ export interface ShapeKind {
 	line?: boolean;
 	fillRule?: "evenodd";
 	/**
-	 * Corners the person can round, given as a radius in the 100 by 100 box for a new shape. Such a
-	 * shape is not drawn by stretching its geometry: `fitShapes` rebuilds it in the frame's own
-	 * pixels, so a corner stays a circle however wide the shape is pulled (`roundedGeometry`).
+	 * Corners the person can round, given as a radius in the 100 by 100 box for a new shape (0 for
+	 * square ones that can still be rounded). Only such a shape shows a radius handle.
 	 */
 	rounded?: number;
+	/**
+	 * The outline built at a size, in the frame's own pixels, with the corner radius `r` for a kind
+	 * that has one: `fitShapes` and `makeShape` use it instead of stretching `geometry`, so a curve
+	 * stays a circle and a head keeps its angle however the shape is pulled. `geometry` is then the
+	 * outline at 100 by 100, for the picker.
+	 */
+	build?: (w: number, h: number, r: number) => string;
 }
 
-export const SHAPES: readonly ShapeKind[] = [
-	{ group: "Basic", name: "Rectangle", geometry: "M0 0H100V100H0Z" },
+const n = (value: number) => Math.round(value * 100) / 100;
+/** A path from points: `[x, y]` pairs joined by straight lines and closed. */
+const poly = (points: Array<[number, number]>) => `M${points.map(([x, y]) => `${n(x)} ${n(y)}`).join("L")}Z`;
+/** A point's depth, the run of a head or a cut, kept to its share of the side it sits on. */
+const depth = (along: number, across: number, share: number, cap = 0.45) => Math.min(along * share, across * cap);
+
+/** Built at size: the shapes whose curves or heads would distort if their 100 by 100 outline were stretched. */
+const BUILT: Record<string, (w: number, h: number, r: number) => string> = {
+	Rectangle: (w, h, r) => roundedGeometry(w, h, r),
+	Process: (w, h, r) => roundedGeometry(w, h, r),
+	Rounded: (w, h, r) => roundedGeometry(w, h, r),
+	// A capsule: its ends half circles, however long.
+	Terminator: (w, h) => roundedGeometry(w, h, maxRadius(w, h)),
+	Delay: (w, h) => {
+		const ry = h / 2;
+		const rx = Math.min(ry, w);
+		return `M0 0H${n(w - rx)}A${n(rx)} ${n(ry)} 0 0 1 ${n(w - rx)} ${n(h)}H0Z`;
+	},
+	Database: (w, h) => {
+		const rx = w / 2;
+		const ry = Math.min(w * 0.12, h / 4);
+		return `M0 ${n(ry)}A${n(rx)} ${n(ry)} 0 0 1 ${n(w)} ${n(ry)}V${n(h - ry)}A${n(rx)} ${n(ry)} 0 0 1 0 ${n(h - ry)}ZM${n(w)} ${n(ry)}A${n(rx)} ${n(ry)} 0 0 1 0 ${n(ry)}`;
+	},
+	Document: (w, h) => {
+		const a = Math.min(h * 0.18, w * 0.12);
+		const base = h - a;
+		return `M0 0H${n(w)}V${n(base)}C${n(w * 0.75)} ${n(base - a * 0.9)} ${n(w * 0.25)} ${n(h)} 0 ${n(base)}Z`;
+	},
+	"Arrow right": (w, h) => {
+		const head = depth(h, w, 0.4, 0.6);
+		return poly([[0, h * 0.3], [w - head, h * 0.3], [w - head, h * 0.06], [w, h / 2], [w - head, h * 0.94], [w - head, h * 0.7], [0, h * 0.7]]);
+	},
+	"Arrow both": (w, h) => {
+		const head = depth(h, w, 0.26, 0.4);
+		return poly([[0, h / 2], [head, h * 0.14], [head, h * 0.34], [w - head, h * 0.34], [w - head, h * 0.14], [w, h / 2], [w - head, h * 0.86], [w - head, h * 0.66], [head, h * 0.66], [head, h * 0.86]]);
+	},
+	Chevron: (w, h) => {
+		const d = depth(h, w, 0.26, 0.4);
+		return poly([[0, 0], [w - d, 0], [w, h / 2], [w - d, h], [0, h], [d, h / 2]]);
+	},
+	Preparation: (w, h) => {
+		const d = depth(h, w, 0.22, 0.4);
+		return poly([[d, 0], [w - d, 0], [w, h / 2], [w - d, h], [d, h], [0, h / 2]]);
+	},
+	Hexagon: (w, h) => {
+		const d = depth(h, w, 0.29, 0.4);
+		return poly([[d, 0], [w - d, 0], [w, h / 2], [w - d, h], [d, h], [0, h / 2]]);
+	},
+	Octagon: (w, h) => {
+		const c = Math.min(w, h) * 0.3;
+		return poly([[c, 0], [w - c, 0], [w, c], [w, h - c], [w - c, h], [c, h], [0, h - c], [0, c]]);
+	},
+	"Off-page": (w, h) => {
+		const p = Math.min(w * 0.32, h * 0.5);
+		return poly([[0, 0], [w, 0], [w, h - p], [w / 2, h], [0, h - p]]);
+	},
+	Parallelogram: (w, h) => {
+		const s = depth(h, w, 0.22);
+		return poly([[s, 0], [w, 0], [w - s, h], [0, h]]);
+	},
+	Data: (w, h) => {
+		const s = depth(h, w, 0.22);
+		return poly([[s, 0], [w, 0], [w - s, h], [0, h]]);
+	},
+	Trapezoid: (w, h) => {
+		const s = depth(h, w, 0.2);
+		return poly([[s, 0], [w - s, 0], [w, h], [0, h]]);
+	},
+	"Manual input": (w, h) => {
+		const t = Math.min(h * 0.28, w * 0.2);
+		return poly([[0, t], [w, 0], [w, h], [0, h]]);
+	},
+	Card: (w, h) => {
+		const c = Math.min(w, h) * 0.24;
+		return poly([[c, 0], [w, 0], [w, h], [0, h], [0, c]]);
+	},
+	Predefined: (w, h) => {
+		const b = Math.min(w * 0.12, h * 0.2);
+		return `M0 0H${n(w)}V${n(h)}H0ZM${n(b)} 0V${n(h)}M${n(w - b)} 0V${n(h)}`;
+	},
+	// Rounded corners, and a tail that keeps its size however wide the bubble is.
+	Speech: (w, h, r) => {
+		const tail = Math.min(h * 0.26, 28);
+		const body = h - tail;
+		const k = Math.max(0, Math.min(r, maxRadius(w, body)));
+		const b1 = Math.min(w * 0.26, 60);
+		const b2 = b1 + Math.min(w * 0.16, 24);
+		const tip = Math.max(0, b1 - Math.min(w * 0.06, 10));
+		const arc = (x: number, y: number) => (k > 0 ? `A${n(k)} ${n(k)} 0 0 1 ${n(x)} ${n(y)}` : `L${n(x)} ${n(y)}`);
+		return `M${n(k)} 0H${n(w - k)}${arc(w, k)}V${n(body - k)}${arc(w - k, body)}H${n(b2)}L${n(tip)} ${n(h)}L${n(b1)} ${n(body)}H${n(k)}${arc(0, body - k)}V${n(k)}${arc(k, 0)}Z`;
+	},
+};
+
+export const SHAPES: readonly ShapeKind[] = (<ShapeKind[]>[
+	{ group: "Basic", name: "Rectangle", geometry: "M0 0H100V100H0Z", rounded: 0 },
 	{ group: "Basic", name: "Rounded", geometry: "M14 0H86Q100 0 100 14V86Q100 100 86 100H14Q0 100 0 86V14Q0 0 14 0Z", rounded: 14 },
 	{ group: "Basic", name: "Ellipse", geometry: "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z" },
 	{ group: "Basic", name: "Triangle", geometry: "M50 0L100 100H0Z" },
@@ -60,7 +159,7 @@ export const SHAPES: readonly ShapeKind[] = [
 	{ group: "Basic", name: "Plus", geometry: "M35 0H65V35H100V65H65V100H35V65H0V35H35Z" },
 	{ group: "Basic", name: "Ring", geometry: "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0ZM50 28A22 22 0 1 0 50 72A22 22 0 1 0 50 28Z", fillRule: "evenodd" },
 	{ group: "Basic", name: "Heart", geometry: "M50 96C20 74 0 56 0 30C0 12 13 0 28 0C38 0 46 6 50 14C54 6 62 0 72 0C87 0 100 12 100 30C100 56 80 74 50 96Z" },
-	{ group: "Flowchart", name: "Process", geometry: "M0 0H100V100H0Z" },
+	{ group: "Flowchart", name: "Process", geometry: "M0 0H100V100H0Z", rounded: 0 },
 	{ group: "Flowchart", name: "Decision", geometry: "M50 0L100 50L50 100L0 50Z" },
 	{ group: "Flowchart", name: "Terminator", geometry: "M22 0H78A22 50 0 0 1 78 100H22A22 50 0 0 1 22 0Z" },
 	{ group: "Flowchart", name: "Document", geometry: "M0 0H100V82C75 66 25 100 0 82Z" },
@@ -81,10 +180,10 @@ export const SHAPES: readonly ShapeKind[] = [
 	{ group: "Arrows and callouts", name: "Arrow right", geometry: "M0 30H60V6L100 50L60 94V70H0Z" },
 	{ group: "Arrows and callouts", name: "Arrow both", geometry: "M0 50L26 14V34H74V14L100 50L74 86V66H26V86Z" },
 	{ group: "Arrows and callouts", name: "Chevron", geometry: "M0 0H74L100 50L74 100H0L26 50Z" },
-	{ group: "Arrows and callouts", name: "Speech", geometry: "M8 0H92Q100 0 100 8V64Q100 72 92 72H42L20 98L26 72H8Q0 72 0 64V8Q0 0 8 0Z" },
+	{ group: "Arrows and callouts", name: "Speech", geometry: "M8 0H92Q100 0 100 8V64Q100 72 92 72H42L20 98L26 72H8Q0 72 0 64V8Q0 0 8 0Z", rounded: 8 },
 	{ group: "Arrows and callouts", name: "Cloud", geometry: "M26 88C6 88 0 66 12 56C4 36 24 22 38 30C46 8 76 8 82 30C100 28 106 56 90 66C98 84 78 94 64 88Z" },
 	{ group: "Arrows and callouts", name: "Brace", geometry: "M34 0Q18 0 18 16V40Q18 50 2 50Q18 50 18 60V84Q18 100 34 100", line: true },
-];
+]).map((kind) => (BUILT[kind.name] ? { ...kind, build: BUILT[kind.name] } : kind));
 
 export const SHAPE_GROUPS: readonly ShapeGroup[] = ["Basic", "Flowchart", "Arrows and callouts"];
 
@@ -119,7 +218,7 @@ export function maxRadius(w: number, h: number): number {
  */
 export function shapeRadius(node: PenNode): number | undefined {
 	const kind = isShape(node) ? shapeKind(node.metadata?.kind) : undefined;
-	if (!kind?.rounded) return undefined;
+	if (kind?.rounded === undefined) return undefined;
 	const w = typeof node.width === "number" ? node.width : 0;
 	const h = typeof node.height === "number" ? node.height : 0;
 	const saved = node.metadata?.radius;
@@ -153,7 +252,7 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 	const w = Math.max(8, Math.round(size.w));
 	const h = Math.max(8, Math.round(size.h));
 	// A shape with corners to round starts at the kind's own radius, in this shape's pixels.
-	const radius = kind.rounded ? Math.round(Math.min((kind.rounded / 100) * Math.min(w, h), maxRadius(w, h))) : undefined;
+	const radius = kind.rounded !== undefined ? Math.round(Math.min((kind.rounded / 100) * Math.min(w, h), maxRadius(w, h))) : undefined;
 	return {
 		type: "frame",
 		id: ids.frame,
@@ -175,8 +274,9 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 				y: 0,
 				width: w,
 				height: h,
-				viewBox: radius === undefined ? [0, 0, 100, 100] : [0, 0, w, h],
-				geometry: radius === undefined ? kind.geometry : roundedGeometry(w, h, radius),
+				// Built at its size when the kind can be (`build`); stretched from 100 by 100 when it cannot.
+				viewBox: kind.build ? [0, 0, w, h] : [0, 0, 100, 100],
+				geometry: kind.build ? kind.build(w, h, radius ?? 0) : kind.geometry,
 				...(kind.fillRule ? { fillRule: kind.fillRule } : {}),
 				...(kind.line ? {} : { fill: "#ffffff" }),
 				stroke: "#1f2328",
@@ -197,9 +297,9 @@ export function makeLabel(id: string, content = ""): PenNode {
  * Every shape's outline set to its frame's size, at its corner. Returns whether anything changed.
  * A frame whose size is not a number (one hugging its words) is left alone.
  *
- * A shape with corners the person can round is also redrawn here, in the frame's own pixels rather
- * than stretched from a 100 by 100 box: stretched, a wide rounded rectangle had wide flat corners
- * instead of round ones.
+ * A shape that can be built at a size (`build`) is also redrawn here, in the frame's own pixels
+ * rather than stretched from a 100 by 100 box: stretched, a wide terminator had flattened ends and a
+ * wide arrow a flattened head.
  */
 export function fitShapes(doc: PenDocument): boolean {
 	let changed = false;
@@ -213,9 +313,9 @@ export function fitShapes(doc: PenDocument): boolean {
 			Object.assign(outline, want, { layoutPosition: "absolute" });
 			changed = true;
 		}
-		const radius = shapeRadius(node);
-		if (radius === undefined) continue;
-		const geometry = roundedGeometry(node.width, node.height, radius);
+		const build = shapeKind(node.metadata?.kind)?.build;
+		if (!build) continue;
+		const geometry = build(node.width, node.height, shapeRadius(node) ?? 0);
 		const viewBox: [number, number, number, number] = [0, 0, node.width, node.height];
 		if (outline.geometry === geometry && Array.isArray(outline.viewBox) && outline.viewBox.every((v, i) => v === viewBox[i])) continue;
 		Object.assign(outline, { geometry, viewBox });
