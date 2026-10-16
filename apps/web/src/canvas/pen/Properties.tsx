@@ -1,4 +1,4 @@
-import { arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isCard, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
+import { arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isCard, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
 import type { LucideIcon } from "lucide-solid";
 import AlignCenterHorizontal from "lucide-solid/icons/align-center-horizontal";
 import AlignCenterVertical from "lucide-solid/icons/align-center-vertical";
@@ -409,6 +409,13 @@ export function Properties(props: {
 		if (!node || !item) return;
 		arrowSet({ [which]: side === "auto" ? item : { item, side } });
 	};
+	/** A join slid along its side (`at`) put back in the side's middle. */
+	const joinToMiddle = (which: "from" | "to") => {
+		const end = arrows()[0]?.metadata?.[which];
+		const item = arrowEndItem(end);
+		const side = arrowEndSide(end);
+		if (item && side) arrowSet({ [which]: { item, side } });
+	};
 
 	const title = () => {
 		const node = single();
@@ -722,6 +729,15 @@ export function Properties(props: {
 									onChange={(event) => arrowSet({ label: event.currentTarget.value.trim() || undefined })}
 								/>
 							</div>
+							<Show when={arrows().some((node) => arrowBend(node.metadata) !== undefined)}>
+								<div class="props-row">
+									<span class="props-label">Bend</span>
+									<span class="props-endname">Custom</span>
+									<button type="button" class="props-reset" title="Back to the automatic route" onClick={() => arrowSet({ bend: undefined })}>
+										Automatic
+									</button>
+								</div>
+							</Show>
 							<Show when={arrows().length === 1}>
 								<For each={["from", "to"] as const}>
 									{(which) => {
@@ -738,6 +754,12 @@ export function Properties(props: {
 														<option value="bottom">Bottom</option>
 														<option value="left">Left</option>
 													</select>
+												</Show>
+												{/* A join slid off the middle of its side, and the way back to it. */}
+												<Show when={arrowEndAt(end()) !== undefined}>
+													<button type="button" class="props-reset" title="Join at the middle of the side" onClick={() => joinToMiddle(which)}>
+														Middle
+													</button>
 												</Show>
 											</div>
 										);

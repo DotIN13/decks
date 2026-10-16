@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMiddle, arrowPoints, arrowRoute, arrowShape, arrowStyle, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -2386,7 +2386,11 @@ export function Stage(props: {
 			},
 			(moved) => {
 				setGuides([]);
-				if (!moved) return;
+				if (!moved) {
+					// Two presses on a frame's top or bottom handle: it hugs what it holds again (`hugAgain`).
+					if (secondTap(`size:${id}:${handle}`)) hugAgain(handle);
+					return;
+				}
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
 				// A card still following its words: its width alone, and no height written.
@@ -2725,8 +2729,64 @@ export function Stage(props: {
 		const drag = shownDrag();
 		const [fx, fy] = points[0]!;
 		const [tx, ty] = points[points.length - 1]!;
-		return { id: node.id, from: { x: fx + drag.dx, y: fy + drag.dy }, to: { x: tx + drag.dx, y: ty + drag.dy } };
+		const route = arrowStyle(node.metadata).route;
+		const [mx, my] = arrowMiddle(points, route);
+		// What each end joins, and on which side, for a join that slides along it (`dragArrowEnd`).
+		const joined = (end: unknown, x: number, y: number) => {
+			const item = arrowEndItem(end);
+			const box = item ? (penLayer.placed.get(item)?.box ?? boards(item)) : undefined;
+			if (!item || !box) return undefined;
+			const side = arrowEndSide(end) ?? onSide(box, x, y);
+			return { item, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side, at: arrowEndAt(end) };
+		};
+		// The middle handle, where an elbow has a middle segment to slide or a line or curve a middle to pull.
+		const bendable = route !== "elbow" || points.length === 4;
+		return {
+			id: node.id,
+			route,
+			from: { x: fx + drag.dx, y: fy + drag.dy },
+			to: { x: tx + drag.dx, y: ty + drag.dy },
+			fromJoin: joined((node.metadata as { from?: unknown }).from, fx, fy),
+			toJoin: joined((node.metadata as { to?: unknown }).to, tx, ty),
+			...(bendable ? { middle: { x: mx + drag.dx, y: my + drag.dy } } : {}),
+			bent: arrowBend(node.metadata) !== undefined,
+		};
 	});
+	/** The side of a box a point on its edge lies on: the nearest. */
+	const onSide = (box: Box, x: number, y: number): ArrowSide => {
+		const d: Array<[ArrowSide, number]> = [["top", Math.abs(y - box.y)], ["bottom", Math.abs(y - (box.y + box.h))], ["left", Math.abs(x - box.x)], ["right", Math.abs(x - (box.x + box.w))]];
+		return d.sort((a, b) => a[1] - b[1])[0]![0];
+	};
+	/** A new route for an arrow, drawn dashed while one of its handles is dragged (`dragArrowEnd`, `dragArrowBend`). */
+	const [routeDraft, setRouteDraft] = createSignal<string | undefined>();
+	const draftOf = (metadata: Record<string, unknown>, node: PenNode) => {
+		const boards = (name: string) => props.boards.find((board) => board.path === name);
+		const points = arrowPoints(metadata, penLayer.placed, boards);
+		if (!points) return undefined;
+		const shape = arrowShape(points, typeof node.strokeWidth === "number" ? node.strokeWidth : 2, arrowStyle(metadata));
+		return { d: shape.geometry, x: shape.x, y: shape.y };
+	};
+	const [routeDraftAt, setRouteDraftAt] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
+	/** Within this many screen pixels of the side it joins, an end's drag slides the join; further, it re-attaches. */
+	const SLIDE_PX = 18;
+	/** A slid join clicks to a corner or the middle within this many screen pixels, unless Alt is held. */
+	const JOIN_SNAP_PX = 8;
+	const slideAt = (box: Box, side: ArrowSide, point: { x: number; y: number }, free: boolean) => {
+		const along = side === "top" || side === "bottom";
+		const length = along ? box.w : box.h;
+		let at = length > 0 ? ((along ? point.x - box.x : point.y - box.y) / length) : 0.5;
+		at = Math.max(0, Math.min(1, at));
+		if (!free) for (const stop of [0, 0.5, 1]) if (Math.abs(at - stop) * length * localCamera.zoom <= JOIN_SNAP_PX) at = stop;
+		return Math.round(at * 1000) / 1000;
+	};
+	const nearSide = (box: Box, side: ArrowSide, point: { x: number; y: number }) => {
+		const reach = SLIDE_PX / localCamera.zoom;
+		const along = side === "top" || side === "bottom";
+		const line = side === "top" ? box.y : side === "bottom" ? box.y + box.h : side === "left" ? box.x : box.x + box.w;
+		const off = Math.abs((along ? point.y : point.x) - line);
+		const within = along ? point.x >= box.x - reach && point.x <= box.x + box.w + reach : point.y >= box.y - reach && point.y <= box.y + box.h + reach;
+		return off <= reach && within;
+	};
 
 	/**
 	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
@@ -2741,10 +2801,26 @@ export function Stage(props: {
 		const node = penNode(ends.id);
 		if (!node?.metadata) return;
 		const stays = which === "from" ? ends.to : ends.from;
+		const own = which === "from" ? ends.fromJoin : ends.toJoin;
+		/* Along the side the end joins, the drag slides the join; away from it, it picks the end up. */
+		let slid: { item: string; side: ArrowSide; at: number } | undefined;
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
+				slid = own && nearSide(own.box, own.side, now) ? { item: own.item, side: own.side, at: slideAt(own.box, own.side, now, e.altKey) } : undefined;
+				if (slid) {
+					const draft = draftOf({ ...node.metadata!, [which]: slid }, node);
+					batch(() => {
+						setEndDraft(undefined);
+						setJoinHint([own!.box]);
+						setSideHint([]);
+						setRouteDraft(draft?.d);
+						if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+					});
+					return;
+				}
+				setRouteDraft(undefined);
 				const join = joinAt(now, ends.id);
 				batch(() => {
 					setEndDraft(which === "from" ? { x1: now.x, y1: now.y, x2: stays.x, y2: stays.y } : { x1: stays.x, y1: stays.y, x2: now.x, y2: now.y });
@@ -2757,8 +2833,16 @@ export function Stage(props: {
 					setEndDraft(undefined);
 					setJoinHint([]);
 					setSideHint([]);
+					setRouteDraft(undefined);
 				});
-				if (!moved) return;
+				if (!moved) {
+					if (secondTap(`end:${ends.id}:${which}`)) resetArrowEnd(which);
+					return;
+				}
+				if (slid) {
+					penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: slid } } }]);
+					return;
+				}
 				const now = worldAt(e);
 				const other = arrowEndItem(node.metadata![which === "from" ? "to" : "from"]);
 				const join = joinAt(now, ends.id);
@@ -2767,6 +2851,87 @@ export function Stage(props: {
 				penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: end } } }]);
 			},
 		);
+	};
+
+	/**
+	 * A second press on the same handle, without a drag, within 400 ms: a handle's double-click. Told
+	 * from its pointer events rather than from `dblclick`, which a handle that captures the pointer
+	 * and is drawn again in between does not reliably get.
+	 */
+	let handleTap: { key: string; at: number } | undefined;
+	const secondTap = (key: string) => {
+		const now = performance.now();
+		const again = handleTap?.key === key && now - handleTap.at < 400;
+		handleTap = again ? undefined : { key, at: now };
+		return again;
+	};
+	/** A double-click on a joined end: the join goes back to the middle of its side, the automatic place. */
+	const resetArrowEnd = (which: "from" | "to") => {
+		const ends = arrowEnds();
+		const node = ends ? penNode(ends.id) : undefined;
+		const end = node?.metadata?.[which];
+		if (!ends || !node?.metadata || !end || typeof end !== "object" || Array.isArray(end) || !("at" in end)) return;
+		const { at: _at, ...kept } = end as Record<string, unknown>;
+		penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: kept } } }]);
+	};
+
+	/**
+	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run (`bend`, 0 to
+	 * 1 from start to end), a curve's middle is pulled (`bend: [dx, dy]`), and a straight line pulled there
+	 * becomes a curve. A double-click puts it back on the automatic route.
+	 */
+	const dragArrowBend = (event: PointerEvent) => {
+		const ends = arrowEnds();
+		if (event.button !== 0 || !ends?.middle) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const node = penNode(ends.id);
+		if (!node?.metadata) return;
+		const boards = (name: string) => props.boards.find((board) => board.path === name);
+		const { bend: _was, ...unbent } = node.metadata as Record<string, unknown>;
+		const route = ends.route;
+		const auto = arrowPoints(unbent, penLayer.placed, boards);
+		if (!auto) return;
+		let next: Record<string, unknown> | undefined;
+		const bendAt = (now: { x: number; y: number }): Record<string, unknown> => {
+			if (route === "elbow") {
+				const [p, q] = [auto[0]!, auto[auto.length - 1]!];
+				// The middle segment runs down when its two points share an x, so it slides across.
+				const across = auto.length === 4 && auto[1]![0] === auto[2]![0];
+				const span = across ? q[0] - p[0] : q[1] - p[1];
+				const turn = span === 0 ? 0.5 : ((across ? now.x - p[0] : now.y - p[1]) / span);
+				return { ...unbent, bend: Math.round(Math.max(0, Math.min(1, turn)) * 1000) / 1000 };
+			}
+			const [mx, my] = arrowMiddle(route === "curved" ? auto : [auto[0]!, auto[auto.length - 1]!], route === "curved" ? "curved" : "straight");
+			return { ...unbent, route: "curved", bend: [Math.round(now.x - mx), Math.round(now.y - my)] };
+		};
+		follow(
+			event,
+			(e) => {
+				next = bendAt(worldAt(e));
+				const draft = draftOf(next, node);
+				batch(() => {
+					setRouteDraft(draft?.d);
+					if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+				});
+			},
+			(moved) => {
+				setRouteDraft(undefined);
+				if (!moved) {
+					if (secondTap(`bend:${ends.id}`)) resetArrowBend();
+					return;
+				}
+				if (!next) return;
+				penEdit([{ op: "update", id: ends.id, set: { metadata: next } }]);
+			},
+		);
+	};
+	const resetArrowBend = () => {
+		const ends = arrowEnds();
+		const node = ends ? penNode(ends.id) : undefined;
+		if (!ends || !node?.metadata || !("bend" in node.metadata)) return;
+		const { bend: _bend, ...kept } = node.metadata as Record<string, unknown>;
+		penEdit([{ op: "update", id: ends.id, set: { metadata: kept } }]);
 	};
 
 	/**
@@ -5063,16 +5228,21 @@ export function Stage(props: {
 							{(which) => {
 								// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
 								const size = () => (coarse ? 18 : 11) / props.camera.zoom;
+								// A joined end is a diamond, which slides along the side it joins; a free end is a dot.
+								const joined = () => !!(which === "from" ? ends().fromJoin : ends().toJoin);
 								return (
 									<div
 										class="pen-handle"
 										data-end={which}
+										data-joined={joined() ? "true" : undefined}
+										title={joined() ? "Slide along the side, or drag off to join something else; double-click for the middle" : "Drag onto something to join it"}
 										style={{
 											left: `${ends()[which].x - size() / 2}px`,
 											top: `${ends()[which].y - size() / 2}px`,
 											width: `${size()}px`,
 											height: `${size()}px`,
-											"border-radius": "50%",
+											"border-radius": joined() ? `${2 / props.camera.zoom}px` : "50%",
+											transform: joined() ? "rotate(45deg)" : undefined,
 											"border-width": `${1.5 / props.camera.zoom}px`,
 										}}
 										onPointerDown={(event) => dragArrowEnd(event, which)}
@@ -5080,6 +5250,35 @@ export function Stage(props: {
 								);
 							}}
 						</For>
+					)}
+				</Show>
+				<Show when={arrowEnds()?.middle}>
+					{(middle) => {
+						const size = () => (coarse ? 18 : 12) / props.camera.zoom;
+						return (
+							<div
+								class="pen-handle"
+								data-bend={arrowEnds()?.route}
+								title="Drag to bend the arrow; double-click for its automatic route"
+								style={{
+									left: `${middle().x - size() / 2}px`,
+									top: `${middle().y - size() / 2}px`,
+									width: `${size()}px`,
+									height: `${size()}px`,
+									"border-radius": "50%",
+									"border-width": `${1.5 / props.camera.zoom}px`,
+									"box-shadow": arrowEnds()?.bent ? `inset 0 0 0 ${2.5 / props.camera.zoom}px var(--color-accent)` : undefined,
+								}}
+								onPointerDown={dragArrowBend}
+							/>
+						);
+					}}
+				</Show>
+				<Show when={routeDraft()}>
+					{(d) => (
+						<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
+							<path transform={`translate(${routeDraftAt().x} ${routeDraftAt().y})`} d={d()} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
+						</svg>
 					)}
 				</Show>
 				<Show when={endDraft()}>
@@ -5106,7 +5305,6 @@ export function Stage(props: {
 												"border-width": `${1.5 / props.camera.zoom}px`,
 											}}
 											onPointerDown={(event) => resizeFrom(event, handle)}
-											onDblClick={() => hugAgain(handle)}
 										/>
 									);
 								}}

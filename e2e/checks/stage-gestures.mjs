@@ -359,7 +359,7 @@ let ITEM_WASH = "";
 	// A line is shown by its ends, not by a rectangle round it: no box and no sizing handles.
 	const boxed = await page.evaluate(() => ({
 		selection: document.querySelectorAll(".pen-selection:not([data-board])").length,
-		sizers: document.querySelectorAll(".pen-handle:not([data-end])").length,
+		sizers: document.querySelectorAll(".pen-handle:not([data-end]):not([data-bend])").length,
 	}));
 	say("…and no box round it, since a box round a line says nothing", boxed.selection === 0 && boxed.sizers === 0, JSON.stringify(boxed));
 	if (end && arrow) {

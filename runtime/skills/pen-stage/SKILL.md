@@ -269,14 +269,18 @@ that stops on bare canvas, which the person makes by letting an arrow go there. 
 keep to one side of what it joins — `{ item: "check", side: "right" }`, with `"top"`, `"right"`,
 `"bottom"` or `"left"` — and then leaves the middle of that side, square to it, however things
 move; a flowchart reads best that way (out of a decision's right and bottom, into the next box's
-top or left). An end with no side meets whichever edge faces the other end. A point end stays
+top or left). A sided end can sit elsewhere on its side with `at`, from 0 (the side's top or left
+end) to 1: `{ item: "check", side: "right", at: 0.25 }`. An end with no side meets whichever edge
+faces the other end. A point end stays
 where it is on the stage, so to move such an arrow shift its points in `metadata` along with its
 `x` and `y`, or the next redraw puts it back.
 
 Its style is three more `metadata` fields, each optional: `route` is `"straight"` (the default),
 `"curved"` (leaves and arrives square to the two edges) or `"elbow"` (right angles); `heads` is
 `"end"` (the default), `"both"` or `"none"`, for a plain connector; and `dash: true` dashes the
-line. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
+line. `bend` moves an arrow off its automatic route and is kept when things move: on an elbow, where
+its turn sits from start (0) to end (1), `bend: 0.3`; on a curve, how far its middle is pulled in
+stage pixels, `bend: [0, -40]`. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
 the path is redrawn for you. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default. Words on the line — "yes", "no", "then" — are `label` in its metadata,
 drawn on the middle of the line.

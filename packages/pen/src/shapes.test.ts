@@ -102,3 +102,22 @@ test("only shapes with corners to round have a radius: Rectangle, Process, Round
 	const rounded = SHAPES.filter((kind) => shapeRadius(makeShape(kind, { frame: "f", outline: "o" }, { w: 200, h: 100 })) !== undefined).map((kind) => kind.name);
 	assert.deepEqual(rounded.sort(), ["Process", "Rectangle", "Rounded", "Speech"]);
 });
+
+test("an arrow keeps where it joins and how it bends: `at` slides a join along its side, `bend` moves the turn or pulls the middle", () => {
+	const doc: PenDocument = { version: "2.6", children: [
+		{ id: "a", type: "rectangle", x: 0, y: 0, width: 100, height: 100 },
+		{ id: "b", type: "rectangle", x: 300, y: 200, width: 100, height: 100 },
+	] } as PenDocument;
+	const placed = layout(doc, doc.children, { theme });
+	const at = arrowPoints({ from: { item: "a", side: "right", at: 0.25 }, to: { item: "b", side: "left" } }, placed)!;
+	assert.deepEqual(at[0], [100, 25], "a quarter of the way down the right side");
+	const elbow = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "elbow", bend: 0.25 }, placed)!;
+	assert.equal(elbow[1]![0], 150, "the turn a quarter of the way across, from 100 to 300");
+	const flat = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "curved" }, placed)!;
+	const pulled = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "curved", bend: [0, 60] }, placed)!;
+	const middle = (p: number[][]) => [(p[0]![1]! + 3 * p[1]![1]! + 3 * p[2]![1]! + p[3]![1]!) / 8];
+	assert.ok(Math.abs(middle(pulled)[0]! - middle(flat)[0]! - 60) < 1e-9, "the middle pulled down 60");
+	const placedB = { ...doc, children: [{ ...doc.children[0]!, x: 40 }, doc.children[1]!] } as PenDocument;
+	const moved = arrowPoints({ from: { item: "a", side: "right", at: 0.25 }, to: { item: "b", side: "left" }, route: "elbow", bend: 0.25 }, layout(placedB, placedB.children, { theme }))!;
+	assert.deepEqual(moved[0], [140, 25], "an item that moves keeps its join's fraction");
+});

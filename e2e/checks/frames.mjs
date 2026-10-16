@@ -214,6 +214,26 @@ if (spot) {
 		// It hugs what it holds, with the height it was drawn at as its floor, so an empty one is still there to drop into.
 		say("…with the height it was drawn at as its floor, so an empty one is something to drop into", /^fit_content\(\d+(\.\d+)?\)$/.test(String(made?.height)) && Number(/\((.*)\)/.exec(made.height)[1]) > 0, JSON.stringify(made?.height));
 		if (made) {
+			// Its bottom edge dragged fixes a height; two presses on that handle make it hug again (`hugAgain`).
+			const south = await until(() => page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }));
+			if (south) {
+				await page.mouse.move(south.x, south.y);
+				await page.mouse.down();
+				await page.mouse.move(south.x, south.y + 20, { steps: 3 });
+				await page.mouse.move(south.x, south.y + 40, { steps: 3 });
+				await page.mouse.up();
+				const fixed = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "number" ? h : undefined; });
+				say("dragging its bottom edge fixes its height", typeof fixed === "number", String(fixed));
+				await settle(page, 500);
+				const again = await page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+				await page.mouse.click(again.x, again.y);
+				await page.mouse.click(again.x, again.y);
+				const hugs = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "string" ? h : undefined; });
+				say("…and a double-click on that handle makes it hug again, with a floor", /^fit_content\(\d+\)$/.test(String(hugs)), String(hugs));
+				// As it was drawn, for what follows.
+				link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: made.id, set: { height: made.height } }] });
+				await settle(page, 300);
+			}
 			await page.keyboard.press("Escape");
 			await settle(page, 200);
 			link.send({

@@ -6,5 +6,5 @@ export { apply, type Op, type OpResult } from "./ops.ts";
 export { boxOf, placements, read, type ReadItem } from "./read.ts";
 export { pathBounds } from "./geometry.ts";
 export * from "./values.ts";
-export { ARROW, ARROW_SIDES, bendsArrow, bentArrows, arrowEnd, arrowEndItem, arrowEndSide, arrowLabel, arrowPoints, arrowRoute, arrowShape, arrowStyle, isArrow, isPointEnd, moveArrowEnds, reroute, sidedRoute, sidePoint, type ArrowHeads, type ArrowRoute, type ArrowSide, type ArrowStyle } from "./arrows.ts";
+export { ARROW, ARROW_SIDES, bendsArrow, bentArrows, arrowBend, arrowEnd, arrowEndAt, arrowMiddle, arrowEndItem, arrowEndSide, arrowLabel, arrowPoints, arrowRoute, arrowShape, arrowStyle, isArrow, isPointEnd, moveArrowEnds, reroute, sidedRoute, sidePoint, type ArrowHeads, type ArrowRoute, type ArrowSide, type ArrowStyle } from "./arrows.ts";
 export { fitShapes, isShape, makeLabel, makeShape, maxRadius, roundedGeometry, SHAPE, SHAPE_GROUPS, SHAPES, shapeKind, shapeLabel, shapeOutline, shapeRadius, type ShapeGroup, type ShapeKind } from "./shapes.ts";
