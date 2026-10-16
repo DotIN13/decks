@@ -33,6 +33,12 @@ export interface BoardSpot {
 	w: number;
 	h: number;
 	title: string;
+	/**
+	 * Whether the writer moved or sized the board itself. `false` leaves the item's place or size as the
+	 * file has it, which another session on the stage may have changed; left out, the spot is the truth.
+	 */
+	moved?: boolean;
+	sized?: boolean;
 }
 
 /**
@@ -634,11 +640,11 @@ export class StagePens {
 				continue;
 			}
 			const set: Record<string, unknown> = {};
-			if (node.width !== spot.w) set.width = spot.w;
-			if (node.height !== spot.h) set.height = spot.h;
+			if (spot.sized !== false && node.width !== spot.w) set.width = spot.w;
+			if (spot.sized !== false && node.height !== spot.h) set.height = spot.h;
 			if (node.name !== spot.title) set.name = spot.title;
 			const box = placed.get(node.id)?.box;
-			const moved = !!box && (Math.round(box.x) !== spot.x || Math.round(box.y) !== spot.y);
+			const moved = spot.moved !== false && !!box && (Math.round(box.x) !== spot.x || Math.round(box.y) !== spot.y);
 			if (Object.keys(set).length > 0 || moved) ops.push({ op: "update", id: node.id, set, ...(moved ? { box: { x1: spot.x, y1: spot.y } } : {}) });
 		}
 		const keep = new Set(wanted.map((spot) => spot.path));

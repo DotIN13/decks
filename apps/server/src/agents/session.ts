@@ -197,6 +197,13 @@ export class DeckAgent {
 	 * with none yet takes the size its own file states, as its agent wrote it, when it joins.
 	 */
 	private sizes: Record<string, { w: number; h: number }> = {};
+	/**
+	 * The boards this session moved or sized itself since it last wrote the stage file. Only those are
+	 * written: several sessions can hold one stage, and each one writing its whole copy put back the
+	 * places and sizes another had just changed. A fit undone that way left a board at its blank height.
+	 */
+	private movedHere = new Set<string>();
+	private sizedHere = new Set<string>();
 	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
 	private firstCanvas: ((self: string) => string | undefined) | undefined;
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
@@ -712,6 +719,7 @@ export class DeckAgent {
 		const next = { w: Math.round(size.w ?? now.w), h: Math.round(size.h ?? now.h) };
 		if (!Number.isFinite(next.w) || !Number.isFinite(next.h) || next.w <= 0 || next.h <= 0) return;
 		this.sizes[path] = next;
+		this.sizedHere.add(path);
 		this.save();
 		this.scheduleSyncOut();
 	}
@@ -727,6 +735,7 @@ export class DeckAgent {
 	setPosition(path: string, x: number, y: number): void {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 		this.places[path] = { x: Math.round(x), y: Math.round(y) };
+		this.movedHere.add(path);
 		this.save();
 		this.scheduleSyncOut();
 	}
@@ -780,7 +789,10 @@ export class DeckAgent {
 				},
 				drawn: this.drawn(),
 			});
-			for (const [path, spot] of Object.entries(spots)) this.places[path] = spot;
+			for (const [path, spot] of Object.entries(spots)) {
+				this.places[path] = spot;
+				this.movedHere.add(path);
+			}
 		}
 		const wanted: BoardSpot[] = [];
 		for (const path of this.playing) {
@@ -788,8 +800,10 @@ export class DeckAgent {
 			const board = this.deck.board(path);
 			// The stage's own size for the board; a board new to this stage comes at its file's.
 			const size = this.sizes[path] ?? (this.sizes[path] = { w: board?.w ?? 0, h: board?.h ?? 0 });
-			if (at && board) wanted.push({ path, x: at.x, y: at.y, w: size.w, h: size.h, title: board.title });
+			if (at && board) wanted.push({ path, x: at.x, y: at.y, w: size.w, h: size.h, title: board.title, moved: this.movedHere.has(path), sized: this.sizedHere.has(path) });
 		}
+		this.movedHere.clear();
+		this.sizedHere.clear();
 		try {
 			pens.syncBoards(name, wanted);
 		} catch (error) {
@@ -1011,7 +1025,10 @@ export class DeckAgent {
 		});
 		const entries = Object.entries(spots);
 		if (entries.length === 0) return;
-		for (const [path, spot] of entries) this.places[path] = spot;
+		for (const [path, spot] of entries) {
+			this.places[path] = spot;
+			this.movedHere.add(path);
+		}
 		this.save();
 		/*
 		 * The browser draws a board where the deck state says it is, so a place worked out here

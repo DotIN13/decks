@@ -52,3 +52,33 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		cleanup();
 	}
 });
+
+test("two agents on one stage: a save by one does not put back a size or a place the other set", async () => {
+	const { app, cleanup } = open();
+	try {
+		writeFileSync(join(app.deck.path, "boards", "notes.html"), `<!doctype html><html><head><title>Notes</title><meta name="board" content='{"w":600,"h":300}' /></head><body class="board"></body></html>`);
+		app.deck.refresh("boards/notes.html");
+		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		one.setInPlay([PATH, "boards/notes.html"], { place: true });
+		await settle();
+		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
+		two.openStage(one.stageName()!);
+		await settle();
+		// One sizes and moves the plan, and Two moves the notes a moment later: Two's write is already
+		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
+		const before = app.stage.boards(one.id).find((board) => board.path === PATH)!;
+		const notes = app.stage.boards(two.id).find((board) => board.path === "boards/notes.html")!;
+		one.setSize(PATH, { h: 640 });
+		one.setPosition(PATH, before.x + 500, before.y);
+		two.setPosition("boards/notes.html", notes.x, notes.y + 900);
+		await settle();
+		await settle();
+		const item = app.pens.boards(one.stageName()!).find((board) => board.path === PATH);
+		assert.equal(item?.h, 640, "the plan keeps the height One gave it");
+		assert.equal(item?.x, before.x + 500, "and the place");
+		const moved = app.pens.boards(one.stageName()!).find((board) => board.path === "boards/notes.html");
+		assert.equal(moved?.y, notes.y + 900, "while Two's own move is written");
+	} finally {
+		cleanup();
+	}
+});
