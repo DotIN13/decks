@@ -382,7 +382,9 @@ export async function loadScene(): Promise<SceneLayout> {
 				return measureText(item.content, item.style!, Number.isNaN(maxWidth) ? undefined : maxWidth, withNode ? item.node : undefined);
 			};
 			const count = module._scene_layout();
-			const out = module.HEAPF64.subarray(module._scene_results() >> 3, (module._scene_results() >> 3) + count * 7);
+			// Copied, not viewed: the loop below calls into the scene, which can grow its memory and so
+			// detach a view of the old one, leaving every later read undefined.
+			const out = module.HEAPF64.slice(module._scene_results() >> 3, (module._scene_results() >> 3) + count * 7);
 			const placed = new Map<string, Placed>();
 			for (let i = 0; i < count; i++) {
 				const item = items[out[i * 7]!]!;

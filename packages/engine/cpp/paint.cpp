@@ -921,6 +921,58 @@ const raster::Mask& glyphMask(int face, uint32_t id, const double A[4], int step
 }
 
 /*
+ * A colour glyph, an emoji's picture: the font's own bitmap at its largest size, as a texture with
+ * smaller copies, since it is drawn at a fraction of that size. Its box is in ems from the pen's spot
+ * on the baseline (y down), so a glyph at any size is that box times the size. Kept by face and glyph.
+ */
+struct ColourGlyph { int picture; double left, top, w, h; };
+std::unordered_map<uint64_t, ColourGlyph> colourGlyphs;
+int nextColourPicture = -1;  // below zero: the page's own pictures count up from zero
+
+bool colourGlyph(int face, uint32_t id, ColourGlyph* out) {
+	const uint64_t key = (uint64_t(uint32_t(face)) << 32) | id;
+	if (auto hit = colourGlyphs.find(key); hit != colourGlyphs.end()) {
+		*out = hit->second;
+		return hit->second.picture != 0;
+	}
+	ColourGlyph none{0, 0, 0, 0, 0};
+	colourGlyphs[key] = none;
+	FT_Face f = ftFace(face);
+	if (!f || !FT_HAS_COLOR(f) || f->num_fixed_sizes <= 0) return false;
+	int best = 0;
+	for (int i = 1; i < f->num_fixed_sizes; i++)
+		if (f->available_sizes[i].height > f->available_sizes[best].height) best = i;
+	if (FT_Select_Size(f, best) || FT_Load_Glyph(f, id, FT_LOAD_COLOR)) return false;
+	const FT_GlyphSlot slot = f->glyph;
+	const FT_Bitmap& b = slot->bitmap;
+	if (slot->format != FT_GLYPH_FORMAT_BITMAP || b.pixel_mode != FT_PIXEL_MODE_BGRA || b.width == 0 || b.rows == 0) return false;
+	const double ppem = f->size->metrics.y_ppem > 0 ? double(f->size->metrics.y_ppem) : double(f->available_sizes[best].height);
+	// FreeType's BGRA, premultiplied, to the RGBA a texture takes.
+	std::vector<uint8_t> rgba(size_t(b.width) * b.rows * 4);
+	for (unsigned y = 0; y < b.rows; y++)
+		for (unsigned x = 0; x < b.width; x++) {
+			const uint8_t* p = b.buffer + long(y) * b.pitch + x * 4;
+			uint8_t* q = &rgba[(size_t(y) * b.width + x) * 4];
+			q[0] = p[2], q[1] = p[1], q[2] = p[0], q[3] = p[3];
+		}
+	GLuint tex = 0;
+	glGenTextures(1, &tex);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, int(b.width), int(b.rows), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	const int picture = nextColourPicture--;
+	pictures[picture] = Picture{tex, int(b.width), int(b.rows)};
+	const ColourGlyph made{picture, slot->bitmap_left / ppem, -slot->bitmap_top / ppem, b.width / ppem, b.rows / ppem};
+	colourGlyphs[key] = made;
+	*out = made;
+	return true;
+}
+
+/*
  * Skia's text gamma (`SkTMaskGamma`, as CanvasKit is built: contrast 0.5, the paint's and the device's
  * gamma both sRGB's curve): eight tables, one for each eighth of the text colour's luminance, that make
  * a glyph's edge coverage darker for light text and lighter for dark, so it reads as the same weight.
@@ -1044,11 +1096,27 @@ void paintParagraph(const std::string& text, const std::vector<Span>& spans, con
 		const double A[4] = {m.a * g.size, m.b * g.size, (m.a * k + m.c) * g.size, (m.b * k + m.d) * g.size};
 		const bool hinted = (A[1] == 0 && A[2] == 0) || (A[0] == 0 && A[3] == 0);
 		bool drawable = true;
-		const raster::Mask& mask = glyphMask(g.face, g.id, A, stepX, stepY, hinted, fakeBold, &drawable);
-		if (!drawable) {
-			// A glyph with no outline (a colour emoji's picture): CanvasKit draws it, this painter does not.
-			refuse("a glyph with no outline (colour emoji)");
-			return;
+		// A face of colour pictures (an emoji font) has no outlines to draw: FreeType loads its glyphs as empty ones.
+		FT_Face pictured = ftFace(g.face);
+		const bool colourFace = pictured && FT_HAS_COLOR(pictured) && FT_HAS_FIXED_SIZES(pictured) && !FT_IS_SCALABLE(pictured);
+		static const raster::Mask nothing;
+		const raster::Mask& mask = colourFace ? nothing : glyphMask(g.face, g.id, A, stepX, stepY, hinted, fakeBold, &drawable);
+		if (colourFace || !drawable) {
+			// A glyph with no outline: a colour emoji's picture, drawn as a picture at the glyph's place.
+			ColourGlyph picture;
+			if (!colourGlyph(g.face, g.id, &picture)) {
+				refuse("a glyph with no outline and no picture");
+				return;
+			}
+			const double box[4] = {ox + g.x + picture.left * g.size, oy + g.y + picture.top * g.size, picture.w * g.size, picture.h * g.size};
+			const double none[4] = {0, 0, 0, 0};
+			Grad fill;
+			fill.kind = 3;
+			fill.image = picture.picture;
+			fill.mode = 2;
+			Using u(fill, box);
+			drawShape(box, none, Rgba{1, 1, 1, colour.a}, 0);
+			continue;
 		}
 		if (mask.w <= 0 || mask.h <= 0) continue;
 		const int mx = ix + mask.x, my = iy + mask.y;

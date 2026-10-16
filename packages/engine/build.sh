@@ -23,16 +23,17 @@ ls -la wasm
 HB="${HARFBUZZ:-/mnt/data/decks-data/tools/harfbuzz-10.1.0}"
 if [ ! -f "$HB/harfbuzz.o" ]; then em++ -std=c++17 -O2 -DHB_NO_MT -fno-exceptions -fno-rtti -c "$HB/src/harfbuzz.cc" -o "$HB/harfbuzz.o"; fi
 # FreeType, likewise built once from its own source, with only the modules the engine draws glyphs with
-# (TrueType, CFF, the auto-hinter, the smooth rasteriser): see the commands below the scene's.
+# (TrueType, CFF, the auto-hinter, the smooth rasteriser), and PNG for colour emoji, whose glyphs are
+# pictures: see the commands below the scene's.
 FT="${FREETYPE:-/mnt/data/decks-data/tools/freetype-2.14.3}"
-if [ ! -f "$FT/libfreetype.a" ]; then
+if [ ! -f "$FT/libfreetype-png.a" ]; then
 	mkdir -p "$FT/obj"
 	for src in src/base/ftsystem.c src/base/ftinit.c src/base/ftdebug.c src/base/ftbase.c src/base/ftbitmap.c src/base/ftmm.c src/autofit/autofit.c src/truetype/truetype.c src/cff/cff.c src/psaux/psaux.c src/pshinter/pshinter.c src/psnames/psnames.c src/sfnt/sfnt.c src/smooth/smooth.c src/gzip/ftgzip.c; do
-		emcc -O2 -DFT2_BUILD_LIBRARY '-DFT_CONFIG_MODULES_H="ftmodule-decks.h"' -I "$PWD/cpp" -I "$FT/include" -c "$FT/$src" -o "$FT/obj/$(basename "$src" .c).o"
+		emcc -O2 -DFT2_BUILD_LIBRARY -DFT_CONFIG_OPTION_USE_PNG -sUSE_LIBPNG=1 -sUSE_ZLIB=1 '-DFT_CONFIG_MODULES_H="ftmodule-decks.h"' -I "$PWD/cpp" -I "$FT/include" -c "$FT/$src" -o "$FT/obj/$(basename "$src" .c).o"
 	done
-	emar rcs "$FT/libfreetype.a" "$FT"/obj/*.o
+	emar rcs "$FT/libfreetype-png.a" "$FT"/obj/*.o
 fi
-em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/card.cpp cpp/paint.cpp cpp/raster.cpp "$HB/harfbuzz.o" "$FT/libfreetype.a" -I"$HB/src" -I"$FT/include" -std=c++20 -O3 \
+em++ cpp/scene.cpp cpp/pick.cpp cpp/snap.cpp cpp/text.cpp cpp/bidi.cpp cpp/card.cpp cpp/paint.cpp cpp/raster.cpp "$HB/harfbuzz.o" "$FT/libfreetype-png.a" -sUSE_LIBPNG=1 -sUSE_ZLIB=1 -I"$HB/src" -I"$FT/include" -std=c++20 -O3 \
 	--js-library cpp/scene-library.js \
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createSceneModule -sENVIRONMENT=web,worker,node \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=2MB \

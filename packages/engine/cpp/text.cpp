@@ -20,6 +20,7 @@
 #include <unordered_map>
 
 #include "text.h"
+#include "bidi.h"
 #include <vector>
 
 namespace {
@@ -239,6 +240,10 @@ EMSCRIPTEN_KEEPALIVE char* text_scratch(int bytes) {
 EMSCRIPTEN_KEEPALIVE double* text_answer() { return answer; }
 EMSCRIPTEN_KEEPALIVE double* text_lines() { return lineSpans.data(); }
 
+// Chains already resolved, by their names, weight and slant: a chain is a few hundred family names
+// (every fallback a text might need) and is asked for at every measure. Cleared when a font arrives.
+std::unordered_map<std::string, std::vector<int>> chainCache;
+
 // A font file, `bytes` long at `text_scratch`, for a family named by `nameLength` bytes after it.
 // Its weight and slant come from the file, as Skia's provider reads them. Returns its number.
 EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
@@ -263,6 +268,7 @@ EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
 	f.descender = extents.descender;
 	f.lineGap = extents.line_gap;
 	faces.push_back(f);
+	chainCache.clear();
 	return int(faces.size() - 1);
 }
 
@@ -270,6 +276,11 @@ EMSCRIPTEN_KEEPALIVE int text_font(int bytes, int nameLength) {
 
 // A font chain, each family named one a line, narrowed to its faces for a weight and a slant.
 std::vector<int> chainOf(const char* names, int length, int weight, bool italic) {
+	std::string key(names, size_t(length));
+	key += '\x1f';
+	key += std::to_string(weight);
+	key += italic ? 'i' : 'n';
+	if (auto hit = chainCache.find(key); hit != chainCache.end()) return hit->second;
 	std::vector<int> chain;
 	std::string all(names, size_t(length));
 	size_t at = 0;
@@ -280,6 +291,8 @@ std::vector<int> chainOf(const char* names, int length, int weight, bool italic)
 		if (face >= 0 && std::find(chain.begin(), chain.end(), face) == chain.end()) chain.push_back(face);
 		at = nl + 1;
 	}
+	if (chainCache.size() > 4096) chainCache.clear();
+	chainCache.emplace(std::move(key), chain);
 	return chain;
 }
 
@@ -300,6 +313,10 @@ struct Shaped {
 	std::vector<double> advance;
 	std::vector<char> clusterStart, canBreak;
 	std::vector<float> posAt;
+	// Each code point's bidirectional level (`bidi.h`): odd is right to left.
+	std::vector<uint8_t> level;
+	// The letter spacing each code point takes: its span's, or none in a script whose letters join.
+	std::vector<float> spacing;
 };
 
 void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& spans) {
@@ -311,6 +328,9 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 		cps.push_back(decode(s, size_t(length), i));
 	}
 	const size_t n = cps.size();
+	// Right-to-left text, by Unicode's rules: shaped in its own runs and drawn in its own order.
+	std::vector<uint8_t> level;
+	bidiLevels(cps, level);
 	// Which run each code point is in.
 	std::vector<int> sp(n, 0);
 	for (size_t i = 0, k = 0; i < n; i++) {
@@ -358,16 +378,29 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 			scriptRun[i] = run;
 		}
 	}
+	/*
+	 * Letter spacing as Skia's paragraph gives it: none in right-to-left text of a script whose letters
+	 * join (Arabic and its kin), where a gap would break them apart, and the span's own everywhere else.
+	 */
+	std::vector<float> spacing(n, 0.f);
+	for (size_t i = 0; i < n; i++) {
+		// Inside the right-to-left text only: a space between Arabic words is not spaced, one after them,
+		// back in left-to-right text, is; Arabic's own digits (level 2) are not.
+		const hb_script_t sc = level[i] > 0 ? runScript[size_t(scriptRun[i])] : HB_SCRIPT_COMMON;
+		const bool joins = sc == HB_SCRIPT_ARABIC || sc == HB_SCRIPT_SYRIAC || sc == HB_SCRIPT_MONGOLIAN || sc == HB_SCRIPT_NKO || sc == HB_SCRIPT_MANDAIC || sc == HB_SCRIPT_ADLAM || sc == HB_SCRIPT_HANIFI_ROHINGYA || sc == HB_SCRIPT_SOGDIAN || sc == HB_SCRIPT_PSALTER_PAHLAVI || sc == HB_SCRIPT_MANICHAEAN || sc == HB_SCRIPT_PHAGS_PA;
+		spacing[i] = joins ? 0.f : float(spans[size_t(sp[i])].letterSpacing);
+	}
 	auto shapeWith = [&](int faceIndex, size_t from, size_t to, bool force) {
 		const Face& face = faces[size_t(faceIndex)];
 		const double scaleFor = spans[size_t(sp[from])].size;
-		const double letterSpacing = spans[size_t(sp[from])].letterSpacing;
+		const double letterSpacing = spacing[from];
 		hb_buffer_t* buffer = hb_buffer_create();
 		const size_t byteFrom = starts[from], byteTo = to < n ? starts[to] : size_t(length);
 		hb_buffer_add_utf8(buffer, s, length, unsigned(byteFrom), int(byteTo - byteFrom));
 		hb_buffer_set_script(buffer, runScript[size_t(scriptRun[from])] == HB_SCRIPT_COMMON ? HB_SCRIPT_LATIN : runScript[size_t(scriptRun[from])]);
 		hb_buffer_guess_segment_properties(buffer);
-		hb_buffer_set_direction(buffer, HB_DIRECTION_LTR);
+		const bool rtl = level[from] % 2 == 1;
+		hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
 		hb_shape(face.font, buffer, letterSpacing > 0 ? noLigatures : nullptr, letterSpacing > 0 ? 2 : 0);
 		unsigned count = 0;
 		hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, &count);
@@ -380,20 +413,31 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 		// The size goes to FreeType in 64ths cut down, not rounded: 18.2 px is set as 18.1875.
 		const long size64 = long(scaleFor * 64);
 		const long xScale = std::lround(double(size64) * 65536.0 / face.upem);
-		size_t cp = from;
+		/*
+		 * HarfBuzz's clusters: the glyphs sharing a cluster value, each with the code points up to the
+		 * next. Right-to-left text comes back in the order it is drawn, last letter first, so its
+		 * clusters are read from the end, in the order the letters are written.
+		 */
+		std::vector<std::pair<unsigned, unsigned>> groups;
 		for (unsigned g = 0; g < count;) {
-			// One HarfBuzz cluster: the glyphs sharing a cluster value, and the code points up to the next.
 			unsigned h = g;
+			while (h < count && info[h].cluster == info[g].cluster) h++;
+			groups.push_back({g, h});
+			g = h;
+		}
+		if (rtl) std::reverse(groups.begin(), groups.end());
+		size_t cp = from;
+		for (size_t gi = 0; gi < groups.size(); gi++) {
+			const unsigned g = groups[gi].first, h = groups[gi].second;
 			bool drawn = true;
 			double width = 0;
-			while (h < count && info[h].cluster == info[g].cluster) {
-				if (info[h].codepoint == 0) drawn = false;
-				const hb_position_t plain = hb_font_get_glyph_h_advance(face.font, info[h].codepoint);
-				width += double(std::llround(double(plain) * double(xScale) / 64.0)) / 65536.0 + double(pos[h].x_advance - plain) / face.upem * scaleFor;
-				h++;
+			for (unsigned k = g; k < h; k++) {
+				if (info[k].codepoint == 0) drawn = false;
+				const hb_position_t plain = hb_font_get_glyph_h_advance(face.font, info[k].codepoint);
+				width += double(std::llround(double(plain) * double(xScale) / 64.0)) / 65536.0 + double(pos[k].x_advance - plain) / face.upem * scaleFor;
 			}
 			while (cp + 1 < to && starts[cp + 1] <= info[g].cluster) cp++;
-			const unsigned endByte = h < count ? info[h].cluster : unsigned(byteTo);
+			const unsigned endByte = gi + 1 < groups.size() ? info[groups[gi + 1].first].cluster : unsigned(byteTo);
 			size_t last = cp;
 			while (last + 1 < to && starts[last + 1] < endByte) last++;
 			if (drawn || force) {
@@ -416,7 +460,6 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 					at += float(own + letterSpacing);
 				}
 			}
-			g = h;
 		}
 		hb_buffer_destroy(buffer);
 	};
@@ -427,7 +470,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 				continue;
 			}
 			size_t j = i;
-			while (j < n && sp[j] == run && faceOf[j] < 0 && cps[j] != '\n' && scriptRun[j] == scriptRun[i]) j++;
+			while (j < n && sp[j] == run && faceOf[j] < 0 && cps[j] != '\n' && scriptRun[j] == scriptRun[i] && level[j] == level[i]) j++;
 			shapeWith(faceIndex, i, j, force);
 			i = j;
 		}
@@ -446,7 +489,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	// Each cluster's glyphs, numbered within its run (the code points one font drew in a row): Skia's wrapper counts in these.
 	std::vector<int> glyphFrom(n, 0), glyphTo(n, 0);
 	for (size_t i = 0, counter = 0; i < n; i++) {
-		if (i == 0 || faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || otherFont(i)) counter = 0;
+		if (i == 0 || faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || level[i] != level[i - 1] || otherFont(i)) counter = 0;
 		// A line break is shaped as a glyph of its run, so it is counted, though it is never drawn.
 		if (cps[i] == '\n' && !clusterStart[i]) counter++;
 		if (!clusterStart[i]) continue;
@@ -456,7 +499,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	}
 	// Letter spacing follows every glyph, so a letter drawn as two ("z" and its accent) is spaced twice, as Skia spaces it.
 	for (size_t i = 0; i < n; i++)
-		if (clusterStart[i]) advance[i] += spans[size_t(sp[i])].letterSpacing * glyphCount[i];
+		if (clusterStart[i]) advance[i] += spacing[i] * glyphCount[i];
 	/*
 	 * Where each cluster starts in its run, in single precision, the way Skia keeps glyph positions: a
 	 * line's width is then the difference of two of them, which far along a run is a hair off the sum of
@@ -465,7 +508,7 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	std::vector<float> posAt(n + 1, 0.f);
 	std::vector<int> runOf(n, 0);
 	for (size_t i = 0, run = 0; i < n; i++) {
-		if (i > 0 && (faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || otherFont(i))) run++;
+		if (i > 0 && (faceOf[i] != faceOf[i - 1] || scriptRun[i] != scriptRun[i - 1] || level[i] != level[i - 1] || otherFont(i))) run++;
 		runOf[i] = int(run);
 	}
 	{
@@ -477,10 +520,10 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 		float fallbackX = 0;
 		bool inFallback = false;
 		for (size_t i = 0; i < n; i++) {
-			if (i > 0 && scriptRun[i] != scriptRun[i - 1]) x = 0, shift = 0;
+			if (i > 0 && (scriptRun[i] != scriptRun[i - 1] || level[i] != level[i - 1])) x = 0, shift = 0;
 			const auto& chain = spans[size_t(sp[i])].chain;
 			const bool fallback = faceOf[i] >= 0 && !chain.empty() && faces[size_t(faceOf[i])].family != faces[size_t(chain[0])].family;
-			const float ls = clusterStart[i] ? float(spans[size_t(sp[i])].letterSpacing) : 0.f;
+			const float ls = clusterStart[i] ? spacing[i] : 0.f;
 			const float own = float(advance[i] - double(ls) * glyphCount[i]);
 			if (fallback) {
 				if (!inFallback || (i > 0 && runOf[i] != runOf[i - 1])) fallbackX = x;
@@ -516,6 +559,8 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	out.clusterStart = std::move(clusterStart);
 	out.canBreak = std::move(canBreak);
 	out.posAt = std::move(posAt);
+	out.level = std::move(level);
+	out.spacing = std::move(spacing);
 }
 
 // Shaped paragraphs kept by their words and runs: a table's cell is shaped once and laid out at two
@@ -800,37 +845,60 @@ int placeGlyphs(const char* s, int length, const std::vector<Span>& spans, const
 		// Skia's paragraph draws a line's glyphs at its top plus its ascent rounded to a whole pixel.
 		const double baseline = line.top + std::floor(-double(line.ascent) + 0.5);
 		lines.push_back({double(shift), baseline, line.width, line.top, line.height});
-		float runX = shift;
+		/*
+		 * The line's runs in the order they are written, then in the order they are drawn: right-to-left
+		 * runs reversed by Unicode's rule L2 (`bidiOrder`), and inside one, each cluster set from the run's
+		 * right edge. A line with no right-to-left text is drawn in the order it is written.
+		 */
+		struct Run { size_t k, e; float endPos; };
+		std::vector<Run> runs;
+		std::vector<uint8_t> levels;
 		for (size_t k = line.start; k < line.visible;) {
-			// One run's piece of this line.
 			size_t e = k;
 			while (e < line.visible && S->runOf[e] == S->runOf[k]) e++;
-			for (size_t c = k; c < e; c++) {
-				if (!S->clusterStart[c]) continue;
-				const float at = runX + (S->posAt[c] - S->posAt[k]);
-				// Letter spacing puts half its gap before each letter of a left-aligned line (`Run::addSpacesEvenly`
-				// starts at half); a centred or right-aligned line starts at its aligned edge, as CanvasKit draws them.
-				const float half = shift == 0 && align == 0 ? float(spans[size_t(S->sp[c])].letterSpacing) / 2 : 0;
-				for (const ClusterGlyph& g : S->glyphs[c]) glyphs.push_back({S->faceOf[c], g.id, double(at + half + g.dx), baseline + g.dy, spans[size_t(S->sp[c])].size, S->sp[c]});
-			}
 			float endPos;
 			if (e < S->cps.size() && S->runOf[e] == S->runOf[k]) endPos = S->posAt[e];
 			else {
 				size_t last = e - 1;
 				endPos = S->posAt[last] + float(S->advance[last]);
 			}
-			const float next = runX + (endPos - S->posAt[k]);
+			runs.push_back({k, e, endPos});
+			levels.push_back(S->level[k]);
+			k = e;
+		}
+		std::vector<size_t> order;
+		bidiOrder(levels, order);
+		float runX = shift;
+		for (size_t r : order) {
+			const size_t k = runs[r].k, e = runs[r].e;
+			const float endPos = runs[r].endPos;
+			const float runWidth = endPos - S->posAt[k];
+			const bool rtl = levels[r] % 2 == 1;
+			// Where a stretch of the run starts and ends on the line, from its place in the written order.
+			auto placed = [&](float from, float to) { return rtl ? std::pair<float, float>{runX + runWidth - to, runX + runWidth - from} : std::pair<float, float>{runX + from, runX + to}; };
+			for (size_t c = k; c < e; c++) {
+				if (!S->clusterStart[c]) continue;
+				size_t d = c + 1;
+				while (d < e && !S->clusterStart[d]) d++;
+				const float from = S->posAt[c] - S->posAt[k];
+				const float to = (d < e ? S->posAt[d] : endPos) - S->posAt[k];
+				const float at = placed(from, to).first;
+				// Letter spacing puts half its gap before each letter of a left-aligned line (`Run::addSpacesEvenly`
+				// starts at half); a centred or right-aligned line starts at its aligned edge, as CanvasKit draws them.
+				const float half = shift == 0 && align == 0 ? S->spacing[c] / 2 : 0;
+				for (const ClusterGlyph& g : S->glyphs[c]) glyphs.push_back({S->faceOf[c], g.id, double(at + half + g.dx), baseline + g.dy, spans[size_t(S->sp[c])].size, S->sp[c]});
+			}
 			// A run can hold several spans of one font (a colour change); each is its own piece.
 			for (size_t a = k; pieces && a < e;) {
 				size_t b = a;
 				while (b < e && S->sp[b] == S->sp[a]) b++;
-				const float from = runX + (S->posAt[a] - S->posAt[k]);
-				const float to = b < e ? runX + (S->posAt[b] - S->posAt[k]) : next;
-				pieces->push_back({S->sp[a], S->faceOf[a], double(from), double(to), line.top, line.height, line.top + line.height - double(line.descent)});
+				const float from = S->posAt[a] - S->posAt[k];
+				const float to = (b < e ? S->posAt[b] : endPos) - S->posAt[k];
+				const auto [x1, x2] = placed(from, to);
+				pieces->push_back({S->sp[a], S->faceOf[a], double(x1), double(x2), line.top, line.height, line.top + line.height - double(line.descent)});
 				a = b;
 			}
-			runX = next;
-			k = e;
+			runX += runWidth;
 		}
 	}
 	return count;

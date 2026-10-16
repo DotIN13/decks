@@ -11,7 +11,7 @@ import { baseTheme, expand, layout, parse } from "@decks/pen";
 
 const dir = process.env.FONTS ?? new URL("../../../_scratch/fonts/", import.meta.url).pathname;
 const family = (file) => {
-	const fam = file.startsWith("inter") ? "Inter" : file.startsWith("noto-sans-sc") ? "Noto Sans SC" : file.startsWith("noto-sans-symbols-2") ? "Noto Sans Symbols 2" : file.startsWith("noto-sans-symbols") ? "Noto Sans Symbols" : file.startsWith("jetbrains") ? "JetBrains Mono" : "Lora";
+	const fam = file.startsWith("inter") ? "Inter" : file.startsWith("noto-color-emoji") ? "Noto Color Emoji" : file.startsWith("noto-sans-arabic") ? "Noto Sans Arabic" : file.startsWith("noto-sans-hebrew") ? "Noto Sans Hebrew" : file.startsWith("noto-sans-sc") ? "Noto Sans SC" : file.startsWith("noto-sans-symbols-2") ? "Noto Sans Symbols 2" : file.startsWith("noto-sans-symbols") ? "Noto Sans Symbols" : file.startsWith("jetbrains") ? "JetBrains Mono" : "Lora";
 	return file.includes("latin-ext") ? `${fam} Ext` : fam;
 };
 const ck = await CanvasKitInit({ locateFile: (f) => new URL(`../../../node_modules/canvaskit-wasm/bin/${f}`, import.meta.url).pathname });
@@ -22,7 +22,7 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith(".ttf")).sort()) {
 	provider.registerFont(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), family(file));
 	text.font(new Uint8Array(bytes), family(file));
 }
-const chain = (fam) => [...new Set([fam, `${fam} Ext`, "Inter", "Inter Ext", "Noto Sans SC", "Noto Sans Symbols 2", "Noto Sans Symbols", "Noto Color Emoji"])];
+const chain = (fam) => [...new Set([fam, `${fam} Ext`, "Inter", "Inter Ext", "Noto Sans Arabic", "Noto Sans Hebrew", "Noto Sans SC", "Noto Sans Symbols 2", "Noto Sans Symbols", "Noto Color Emoji"])];
 const roundWeight = (w) => Math.min(900, Math.max(100, Math.round(w / 100) * 100));
 // fonts.ts's measure, word for word, for plain text.
 const reference = (t, style, maxWidth) => {
@@ -48,7 +48,7 @@ const rand = () => {
 	return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 const pick = (list) => list[Math.floor(rand() * list.length)];
-const WORDS = ["the", "Decks", "canvas", "board", "a", "is", "agent's", "re-drawn", "well-known", "2026", "10:30", "$40", "75%", "(note)", "[draft]", "e.g.", "U.S.", "—", "–", "...", "…", "https://example.com/a/b", "path/to/file.md", "co-op", "naïve", "Łódź", "über", "→", "✓", "★", "中文", "汉字测试", "，", "。", "「引用」", "x²", "AVA", "WAVE", "Typography", "fi", "ffl", "longwordwithoutanybreaksatall", "C++", "#tag", "@name", "\"quoted\"", "'single'", "Hello!", "Why?", "a/b", "1/2", "3.14", "-5", "+1"];
+const WORDS = ["the", "Decks", "canvas", "board", "a", "is", "agent's", "re-drawn", "well-known", "2026", "10:30", "$40", "75%", "(note)", "[draft]", "e.g.", "U.S.", "—", "–", "...", "…", "https://example.com/a/b", "path/to/file.md", "co-op", "naïve", "Łódź", "über", "→", "✓", "★", "中文", "汉字测试", "，", "。", "「引用」", "x²", "AVA", "WAVE", "Typography", "fi", "ffl", "longwordwithoutanybreaksatall", "C++", "#tag", "@name", "\"quoted\"", "'single'", "Hello!", "Why?", "a/b", "1/2", "3.14", "-5", "+1", "مرحبا", "السلام عليكم", "٣٤٥", "שלום", "עברית 123", "(שלום)", "abc مرحبا def"];
 const sentence = () => {
 	const n = 1 + Math.floor(rand() * 14);
 	let out = "";

@@ -7,6 +7,7 @@ import * as wire from "../../../apps/web/src/canvas/pen/paint-wire.ts";
 const { paintRecord } = wire;
 import { loadScene } from "../src/scene.ts";
 import { fontChain, MONO_FAMILY, PenFonts } from "../../../apps/web/src/canvas/pen/fonts.ts";
+import { registeredName } from "../../../apps/web/src/canvas/pen/font-files.ts";
 import { encodeCard } from "../../../apps/web/src/canvas/pen/card-wire.ts";
 
 declare global {
@@ -22,8 +23,15 @@ let painter: ReturnType<Awaited<typeof sceneReady>["painter"]>;
 
 // The fonts `text-diff.mjs` uses, named as `ck-ref.mjs` names them, handed to both painters in one order.
 let fontsReady: Promise<PenFonts> | undefined;
+/** A test font file (`<id>_latest_<subset>-<weight>-<style>.ttf`) by the name the app's chain gives it, if the app has one. */
+const appName = (file: string) => {
+	const m = file.match(/^(.+?)_latest_(.+?)-\d+-(?:normal|italic)\.ttf$/);
+	return m ? registeredName(m[1]!, m[2]!) : undefined;
+};
 const familyOf = (file: string) => {
-	const fam = file.startsWith("inter") ? "Inter" : file.startsWith("noto-sans-sc") ? "Noto Sans SC" : file.startsWith("noto-sans-symbols-2") ? "Noto Sans Symbols 2" : file.startsWith("noto-sans-symbols") ? "Noto Sans Symbols" : file.startsWith("jetbrains") ? "JetBrains Mono" : "Lora";
+	const named = appName(file);
+	if (named && !/^(inter|lora|jetbrains)/.test(file)) return named;
+	const fam = file.startsWith("inter") ? "Inter" : file.startsWith("noto-color-emoji") ? "Noto Color Emoji" : file.startsWith("noto-sans-arabic") ? "Noto Sans Arabic" : file.startsWith("noto-sans-hebrew") ? "Noto Sans Hebrew" : file.startsWith("noto-sans-sc") ? "Noto Sans SC" : file.startsWith("noto-sans-symbols-2") ? "Noto Sans Symbols 2" : file.startsWith("noto-sans-symbols") ? "Noto Sans Symbols" : file.startsWith("jetbrains") ? "JetBrains Mono" : "Lora";
 	return file.includes("latin-ext") ? `${fam} Ext` : fam;
 };
 async function loadFonts(ck: Awaited<typeof ckReady>, scene: Awaited<typeof sceneReady>): Promise<PenFonts> {
