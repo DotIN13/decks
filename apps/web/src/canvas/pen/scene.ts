@@ -754,8 +754,17 @@ export class StageScene {
 				}
 				const bitmap = await this.paintTile(rect, level, hits, inked);
 				if (this.disposed) {
-					bitmap?.close();
+					if (bitmap !== "wait") bitmap?.close();
 					return;
+				}
+				/*
+				 * Words whose font is still on its way: the tile is left as the page holds it and drawn once the
+				 * fonts are in, rather than drawn without its words and drawn again a moment later.
+				 */
+				if (bitmap === "wait") {
+					this.tileDrawn.delete(key);
+					this.tilesWaiting = true;
+					continue;
 				}
 				if (!bitmap) continue;
 				this.host.post({ type: "tile", key, level, x: rect.x, y: rect.y, size, bitmap }, [bitmap]);
@@ -777,7 +786,11 @@ export class StageScene {
 	}
 
 	/** One tile: the items over it, recorded once, replayed into a square at the level's scale. */
-	private async paintTile(rect: Frame, level: number, hits: number[], inked = false): Promise<ImageBitmap | undefined> {
+	/** Font requests not answered yet, and whether a tile is waiting for them (`drawTiles`). */
+	private fontsPending = 0;
+	private tilesWaiting = false;
+
+	private async paintTile(rect: Frame, level: number, hits: number[], inked = false): Promise<ImageBitmap | undefined | "wait"> {
 		// With the engine on, our own painter first (`@decks/engine`, `cpp/paint.cpp`); a tile holding
 		// something it does not draw yet, or a pen's ink, is painted by CanvasKit below.
 		if (cppLayout && this.cppPainter !== null) {
@@ -799,6 +812,7 @@ export class StageScene {
 			// Without CanvasKit there is nothing to fall back to: the engine's tile is the tile, all it could draw.
 			if (this.cppPainter && (drawn || this.native)) {
 				this.tilesBy.cpp++;
+				if (!drawn && this.cppPainter.why === "words with no font" && this.fontsPending > 0) return "wait";
 				if (!drawn) {
 					this.tilesBy.short = (this.tilesBy.short ?? 0) + 1;
 					const why = this.cppPainter.why || "?";
@@ -1891,10 +1905,21 @@ export class StageScene {
 		const sameWords = partial && [...(this.moving?.values() ?? [])].every((change) => change.set === undefined);
 		const generation = fonts.generation;
 		if (!sameWords)
-			void fonts.need(fontNeeds(nodes, doc, theme)).then((fresh) => {
-				// A font landed after this picture was drawn without it: lay out and draw again.
-				if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
-			});
+			this.fontsPending++;
+			void fonts
+				.need(fontNeeds(nodes, doc, theme))
+				.then((fresh) => {
+					// A font landed after this picture was drawn without it: lay out and draw again.
+					if (fresh && fonts.generation !== generation && !this.disposed) this.redraw();
+				})
+				.finally(() => {
+					this.fontsPending--;
+					// Tiles held back for these fonts are drawn now, with them or, if none came, without.
+					if (this.fontsPending === 0 && this.tilesWaiting && !this.disposed) {
+						this.tilesWaiting = false;
+						this.again();
+					}
+				});
 		const placed = this.layout(doc, nodes, { theme, measure });
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
