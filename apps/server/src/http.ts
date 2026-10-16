@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { sttReady, transcribe } from "./stt.ts";
 import { readFile } from "node:fs/promises";
 import { renderShell } from "./boards/shell.ts";
 import { LIB_FOREVER, libVersion, splitLibVersion, versionLibRefs } from "./deck/lib-version.ts";
@@ -631,6 +632,35 @@ export function createHttpApp(app: App): Express {
 			});
 			res.setHeader("Cache-Control", "no-store");
 			res.type(pictureType(shot)).send(shot);
+		}),
+	);
+
+	/*
+	 * Speech to text for the composer's mic (`stt.ts`): whether this server can, and a recording's words.
+	 * The recording is the body, as an upload's file is, and nothing of it is kept.
+	 */
+	api.get("/stt", (_req, res) => {
+		res.json({ server: sttReady() });
+	});
+	api.post(
+		"/stt",
+		express.raw({ type: () => true, limit: "25mb" }),
+		asyncRoute(async (req, res) => {
+			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			if (!sttReady()) {
+				res.status(503).json({ error: "No speech recogniser on this server." });
+				return;
+			}
+			const audio = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+			if (audio.length === 0) {
+				res.status(400).json({ error: "No recording was sent." });
+				return;
+			}
+			try {
+				res.json({ text: await transcribe(audio, String(req.headers["content-type"] ?? "audio/webm")) });
+			} catch (error) {
+				res.status(502).json({ error: (error as Error).message });
+			}
 		}),
 	);
 

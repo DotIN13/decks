@@ -1,11 +1,14 @@
 import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import MessageSquare from "lucide-solid/icons/message-square";
+import Mic from "lucide-solid/icons/mic";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Pencil from "lucide-solid/icons/pencil";
 import X from "lucide-solid/icons/x";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
+import { micMissing, startRecording, type Recording } from "./voice.ts";
+import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../board/file-drop.ts";
 import type { BoardComment } from "../../markup/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
@@ -343,6 +346,89 @@ export function Composer(props: {
 	};
 	const sendable = () => !draftIsEmpty(nodes());
 
+	/*
+	 * Voice (`voice.ts`): the mic records, and what was said goes in at the caret when it stops, to be
+	 * edited and sent like anything typed. Ctrl+M starts and stops it; Esc throws it away.
+	 */
+	const [recording, setRecording] = createSignal<Recording | undefined>();
+	const [listening, setListening] = createSignal(false);
+	const [transcribing, setTranscribing] = createSignal(false);
+	const [levels, setLevels] = createSignal<number[]>([]);
+	const [heard, setHeard] = createSignal("");
+	const [since, setSince] = createSignal(0);
+	const [now, setNow] = createSignal(0);
+	let clock: ReturnType<typeof setInterval> | undefined;
+	const stopClock = () => {
+		clearInterval(clock);
+		clock = undefined;
+		setListening(false);
+		setLevels([]);
+		setHeard("");
+	};
+	const startVoice = async () => {
+		if (listening() || transcribing()) return;
+		setListening(true);
+		try {
+			const started = await startRecording({
+				onLevel: (level) => setLevels((was) => [...was.slice(-12), level]),
+				onHeard: setHeard,
+			});
+			setRecording(started);
+			setSince(Date.now());
+			setNow(Date.now());
+			clock = setInterval(() => setNow(Date.now()), 250);
+		} catch (error) {
+			stopClock();
+			notice("warn", (error as Error).message);
+		}
+	};
+	const stopVoice = async () => {
+		const running = recording();
+		if (!running) return;
+		setRecording(undefined);
+		stopClock();
+		setTranscribing(true);
+		try {
+			const words = await running.stop();
+			if (words) {
+				field?.focus();
+				field?.insertText(words);
+			}
+		} catch (error) {
+			notice("warn", (error as Error).message);
+		} finally {
+			setTranscribing(false);
+		}
+	};
+	const cancelVoice = () => {
+		recording()?.cancel();
+		setRecording(undefined);
+		stopClock();
+	};
+	const toggleVoice = () => (recording() ? void stopVoice() : void startVoice());
+	onMount(() => {
+		const key = (event: KeyboardEvent) => {
+			if (event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === "m") {
+				event.preventDefault();
+				toggleVoice();
+			} else if (event.key === "Escape" && recording()) {
+				// Only the recording goes: the field's own Escape would clear what was typed too.
+				event.preventDefault();
+				event.stopPropagation();
+				cancelVoice();
+			}
+		};
+		document.addEventListener("keydown", key, true);
+		onCleanup(() => {
+			document.removeEventListener("keydown", key, true);
+			cancelVoice();
+		});
+	});
+	const clockText = () => {
+		const seconds = Math.max(0, Math.floor((now() - since()) / 1000));
+		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+	};
+
 	const send = (queue = false) => {
 		if (atOpen()) {
 			const chosen = atMatches()[atIndex()] ?? atMatches()[0];
@@ -640,6 +726,37 @@ export function Composer(props: {
 					/>
 
 					<span class="flex-1" />
+
+					{/* The mic, left of send: recording shows how loud, how long, and a stop. */}
+					<Show
+						when={recording()}
+						fallback={
+							<button
+								class="icon-button composer-mic"
+								type="button"
+								data-busy={transcribing() || listening() ? "true" : undefined}
+								disabled={transcribing()}
+								title={micMissing() ?? (transcribing() ? "Turning it into words…" : "Speak instead of typing (Ctrl+M)")}
+								aria-label="Speak"
+								onClick={() => void startVoice()}
+							>
+								<Icon of={Mic} size={15} />
+							</button>
+						}
+					>
+						<span class="composer-voice" role="status" aria-label="Recording">
+							<Show when={heard()}>
+								<span class="composer-heard">{heard()}</span>
+							</Show>
+							<span class="composer-wave" aria-hidden="true">
+								<For each={levels()}>{(level) => <i style={{ height: `${Math.round(4 + level * 18)}px` }} />}</For>
+							</span>
+							<span class="composer-clock">{clockText()}</span>
+						</span>
+						<button class="send-button composer-mic-stop" type="button" title="Stop and put the words in the box (Esc throws them away)" aria-label="Stop recording" onClick={() => void stopVoice()}>
+							<Icon of={Square} size={11} class="fill-current" />
+						</button>
+					</Show>
 
 					{/*
 					 * Stop is what an **empty** box offers while a turn is running. The moment
