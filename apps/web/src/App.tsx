@@ -38,6 +38,7 @@ import { destination, destinationLabel, stripMention } from "./app/send-from-bar
 import { makeFloat } from "./chrome/float.ts";
 import { isNews } from "./panel/board-news.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
+import { engineChoice, type EngineChoice, saveEngineChoice } from "./canvas/engine-stage.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./board/inspect.ts";
 import { Inspector } from "./board/Inspector.tsx";
@@ -106,6 +107,14 @@ export function App() {
 		setRendererChoice(choice);
 		saveRenderer(choice);
 	};
+	/** Whether the C++ engine draws the stage (`canvas/engine-stage.ts`), kept for this browser. */
+	const [engine, setEngineSignal] = createSignal<EngineChoice>(engineChoice());
+	const setEngine = (choice: EngineChoice) => {
+		saveEngineChoice(choice);
+		setEngineSignal(choice);
+	};
+	/* What the stage is built for: a new renderer or engine builds it again (`Show keyed` below). */
+	const stageBuild = createMemo(() => ({ renderer: renderer(), engine: engine() }), undefined, { equals: (a, b) => a.renderer === b.renderer && a.engine === b.engine });
 
 	/*
 	 * The alerts: a cue, a banner and a badge, and the three conditions behind them
@@ -1324,16 +1333,17 @@ export function App() {
 
 			<div class="work">
 				{/*
-				 * Keyed on the renderer, so changing it in Settings rebuilds the stage: a board's
-				 * document lives in a different element under each renderer, and moving an iframe
-				 * reloads it anyway, so a clean remount is the honest version of the same cost.
+				 * Keyed on the renderer and the engine, so changing either in Settings rebuilds the stage: a
+				 * board's document lives in a different element under each renderer, and moving an iframe
+				 * reloads it anyway, so a clean remount is the honest version of the same cost. The engine
+				 * is read once as the stage is built (`Stage.tsx`, `useEngine`).
 				 */}
 				<div class="surface" data-surface="stage">
 					<div class="surface-layer" data-layer="stage">
-				<Show when={renderer()} keyed>
+				<Show when={stageBuild()} keyed>
 					{(current) => (
 					<Stage
-						renderer={current}
+						renderer={current.renderer}
 						/*
 						 * Where the canvas opens, decided here rather than in the canvas.
 						 *
@@ -1932,6 +1942,8 @@ export function App() {
 						}}
 						renderer={rendererChoice()}
 						onRenderer={setRenderer}
+						engine={engine()}
+						onEngine={setEngine}
 						canvasApi={canvasApi}
 						onClose={() => setSettings(false)}
 					/>

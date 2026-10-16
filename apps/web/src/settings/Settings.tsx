@@ -4,6 +4,7 @@ import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
+import { ENGINES, type EngineChoice } from "../canvas/engine-stage.ts";
 import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
 import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
@@ -77,6 +78,9 @@ export function Settings(props: {
 	/** How boards are drawn (`lib/renderer.ts`), and whether this browser can do the canvas ones. */
 	renderer: RendererChoice;
 	onRenderer: (choice: RendererChoice) => void;
+	/** Whether the C++ engine draws the stage (`canvas/engine-stage.ts`). */
+	engine: EngineChoice;
+	onEngine: (choice: EngineChoice) => void;
 	canvasApi: boolean;
 	onClose: () => void;
 }) {
@@ -194,7 +198,7 @@ export function Settings(props: {
 					</section>
 
 					<TimeSettings />
-					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
+					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} engine={props.engine} onEngine={props.onEngine} />
 					<OtherDecks />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
@@ -590,7 +594,7 @@ function TimeSettings() {
 	);
 }
 
-function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: RendererChoice) => void; canvasApi: boolean }) {
+function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: RendererChoice) => void; canvasApi: boolean; engine: EngineChoice; onEngine: (choice: EngineChoice) => void }) {
 	const running = () => (props.canvasApi || props.renderer === "dom" ? props.renderer : "dom");
 	const note = () => {
 		const chosen = RENDERERS.find((option) => option.id === props.renderer);
@@ -621,6 +625,22 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 								title={option.note}
 								onClick={() => props.onChange(option.id)}
 							>
+								{option.label}
+							</button>
+						)}
+					</For>
+				</span>
+			</div>
+			{/* Who draws the stage: the C++ engine, or CanvasKit on the worker's sheet (`canvas/engine-stage.ts`). */}
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">Engine</span>
+					<span class="row-note">{ENGINES.find((one) => one.id === props.engine)?.note}</span>
+				</span>
+				<span class="segmented set-engine" role="radiogroup" aria-label="Engine">
+					<For each={ENGINES}>
+						{(option) => (
+							<button type="button" role="radio" aria-checked={props.engine === option.id} data-on={props.engine === option.id} title={option.note} onClick={() => props.onEngine(option.id)}>
 								{option.label}
 							</button>
 						)}
