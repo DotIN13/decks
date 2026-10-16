@@ -353,43 +353,48 @@ void shapeInto(Shaped& out, const char* s, int length, const std::vector<Span>& 
 	// With letter spacing that pulls letters apart, they are not joined into ligatures, as Skia's paragraph shapes them.
 	static const hb_feature_t noLigatures[] = {{HB_TAG('l', 'i', 'g', 'a'), 0, 0, unsigned(-1)}, {HB_TAG('c', 'l', 'i', 'g'), 0, 0, unsigned(-1)}};
 	/*
-	 * Script runs, as Skia's shaper makes them: a run takes the script of its first letter that has one,
-	 * and spaces, punctuation and marks stay in the run they follow. So in "中 [d" the bracket shapes with
-	 * the Chinese, and "[" and "d" are never kerned as a pair.
+	 * Script runs, as Skia's paragraph makes them: it shapes each run of one direction apart, and finds
+	 * the scripts in it afresh (`SkUnicodeHbScriptRunIterator`). A run takes the script of its first
+	 * letter that has one, and spaces, punctuation, digits and marks stay in the run they are in. So in
+	 * "中 [d" the bracket shapes with the Chinese, and "[" and "d" are never kerned as a pair; and "123"
+	 * after Hebrew is a run of its own direction with no script, kerned as it is anywhere else.
+	 * Digits that touch, European and Arabic ones together, stay in one run, as Skia keeps them.
 	 */
 	std::vector<int> scriptRun(n, 0);
 	std::vector<hb_script_t> runScript;
 	{
 		hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_get_default();
-		hb_script_t current = HB_SCRIPT_COMMON;
-		int run = 0;
-		runScript.push_back(HB_SCRIPT_COMMON);
-		for (size_t i = 0; i < n; i++) {
-			const hb_script_t sc = hb_unicode_script(ufuncs, cps[i]);
-			const bool neutral = sc == HB_SCRIPT_COMMON || sc == HB_SCRIPT_INHERITED || sc == HB_SCRIPT_UNKNOWN;
-			if (!neutral) {
-				if (current == HB_SCRIPT_COMMON) {
-					current = sc;
-					runScript[size_t(run)] = sc;
-				} else if (sc != current) {
-					current = sc;
-					runScript.push_back(sc);
-					run++;
+		auto neutral = [](hb_script_t sc) { return sc == HB_SCRIPT_COMMON || sc == HB_SCRIPT_INHERITED || sc == HB_SCRIPT_UNKNOWN; };
+		auto digit = [&](size_t i) { return hb_unicode_general_category(ufuncs, cps[i]) == HB_UNICODE_GENERAL_CATEGORY_DECIMAL_NUMBER; };
+		for (size_t from = 0; from < n;) {
+			size_t to = from + 1;
+			while (to < n && (level[to] == level[from] || (digit(to - 1) && digit(to)))) to++;
+			for (size_t a = from; a < to;) {
+				hb_script_t current = hb_unicode_script(ufuncs, cps[a]);
+				size_t b = a + 1;
+				for (; b < to; b++) {
+					const hb_script_t sc = hb_unicode_script(ufuncs, cps[b]);
+					if (sc == current) continue;
+					if (neutral(current)) current = sc;
+					else if (!neutral(sc)) break;
 				}
+				runScript.push_back(neutral(current) ? HB_SCRIPT_COMMON : current);
+				for (size_t i = a; i < b; i++) scriptRun[i] = int(runScript.size() - 1);
+				a = b;
 			}
-			scriptRun[i] = run;
+			from = to;
 		}
+		if (runScript.empty()) runScript.push_back(HB_SCRIPT_COMMON);
 	}
 	/*
-	 * Letter spacing as Skia's paragraph gives it: none in right-to-left text of a script whose letters
-	 * join (Arabic and its kin), where a gap would break them apart, and the span's own everywhere else.
+	 * Letter spacing as Skia's paragraph gives it (`Run::isCursiveScript`): none in a run whose script is
+	 * one whose letters join (Arabic and its kin), the span's own everywhere else. So Arabic's own digits
+	 * are never spaced, and a space after Arabic words, back in left-to-right text, is.
 	 */
 	std::vector<float> spacing(n, 0.f);
 	for (size_t i = 0; i < n; i++) {
-		// Inside the right-to-left text only: a space between Arabic words is not spaced, one after them,
-		// back in left-to-right text, is; Arabic's own digits (level 2) are not.
-		const hb_script_t sc = level[i] > 0 ? runScript[size_t(scriptRun[i])] : HB_SCRIPT_COMMON;
-		const bool joins = sc == HB_SCRIPT_ARABIC || sc == HB_SCRIPT_SYRIAC || sc == HB_SCRIPT_MONGOLIAN || sc == HB_SCRIPT_NKO || sc == HB_SCRIPT_MANDAIC || sc == HB_SCRIPT_ADLAM || sc == HB_SCRIPT_HANIFI_ROHINGYA || sc == HB_SCRIPT_SOGDIAN || sc == HB_SCRIPT_PSALTER_PAHLAVI || sc == HB_SCRIPT_MANICHAEAN || sc == HB_SCRIPT_PHAGS_PA;
+		const hb_script_t sc = runScript[size_t(scriptRun[i])];
+		const bool joins = sc == HB_SCRIPT_ARABIC || sc == HB_SCRIPT_HANIFI_ROHINGYA || sc == HB_SCRIPT_MANDAIC || sc == HB_SCRIPT_MONGOLIAN || sc == HB_SCRIPT_NKO || sc == HB_SCRIPT_PHAGS_PA || sc == HB_SCRIPT_SYRIAC;
 		spacing[i] = joins || isMath(cps[i]) ? 0.f : float(spans[size_t(sp[i])].letterSpacing);
 	}
 	auto shapeWith = [&](int faceIndex, size_t from, size_t to, bool force) {

@@ -68,7 +68,7 @@ for (let i = 0; i < cases; i++) {
 	if (Math.abs(want.h - got.h) > 0.01) hDiff++;
 	if (bad) {
 		failed++;
-		if (failed <= 12) console.log(`differs: ${JSON.stringify(t)} ${JSON.stringify(style)} width ${maxWidth}: CanvasKit ${JSON.stringify({ w: want.w, h: want.h })} lines ${JSON.stringify(want.lines)}, C++ ${JSON.stringify(got)} lines ${JSON.stringify(mineLines(t, style, maxWidth))}`);
+		if (failed <= Number(process.env.SHOW ?? 12)) console.log(`differs: ${JSON.stringify(t)} ${JSON.stringify(style)} width ${maxWidth}: CanvasKit ${JSON.stringify({ w: want.w, h: want.h })} lines ${JSON.stringify(want.lines)}, C++ ${JSON.stringify(got)} lines ${JSON.stringify(mineLines(t, style, maxWidth))}`);
 	}
 }
 console.log(`${cases} measures: ${failed} differ (${wDiff} in width, ${hDiff} in height)`);
