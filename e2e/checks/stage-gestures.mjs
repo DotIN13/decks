@@ -92,7 +92,7 @@ link.send({
 	],
 });
 const frame = await until(() => link.received.filter((msg) => msg.type === "stage.pen" && msg.agentId === agentId && msg.doc.children.some((n) => n.id === "g-b")).at(-1));
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 // The last whole read: a read that lands while the server is writing sees half a file.
 let lastRead = { children: [] };
 const onDisk = () => {
@@ -600,7 +600,7 @@ let ITEM_WASH = "";
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
-await page.click('[aria-label="Draw on the stage"]');
+await page.click('[aria-label="Draw on the canvas"]');
 await page.waitForSelector(".stage-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));

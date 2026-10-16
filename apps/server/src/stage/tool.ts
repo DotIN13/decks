@@ -1,3 +1,4 @@
+import { canvasFile } from "./canvas-files.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { identityReminder } from "../agents/identity-reminder.ts";
 import { canvasNameReminder } from "./canvas-name.ts";
@@ -1024,8 +1025,9 @@ export function createStageTool(deps: {
 			const name = needStage();
 			if (title !== undefined) {
 				if (typeof title !== "string" || !title.trim()) throw new Error('title takes the canvas\'s new name, as in stage.title("Launch plan"); stage.title() reads it.');
-				pens.setTitle(name, title);
+				const folder = service.retitle(name, title);
 				service.stagesChanged?.();
+				return { stage: folder, title: pens.titleOf(folder) };
 			}
 			return { stage: name, title: pens.titleOf(name) };
 		},
@@ -1093,12 +1095,12 @@ export function createStageTool(deps: {
 		},
 
 		pen: {
-			file: async () => `stages/${needStage()}/stage.pen`,
+			file: async () => canvasFile(needStage()),
 			read: async (path?: string) => {
 				// Any .pen file by its path (relative to frames/, or absolute in the deck); the stage's own without one.
 				if (path !== undefined) return needPens().readFile(path);
 				const { file: _file, ...view } = needPens().read(needStage());
-				return { ...view, file: `stages/${view.stage}/stage.pen` };
+				return { ...view, file: canvasFile(view.stage) };
 			},
 			edit: async (ops: readonly unknown[], options?: { path?: string }) => {
 				const pens = needPens();

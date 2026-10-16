@@ -1,6 +1,6 @@
 /**
  * The stage as a pen.dev file: boards as `browser` items, a drawing under them, edits from the
- * wire, from the file and by hand, all ending in the same `stages/<name>/stage.pen`.
+ * wire, from the file and by hand, all ending in the same `canvases/<name>/canvas.pen`.
  *
  * Needs no model: the edits an agent would make with `stage.pen.edit` go over the wire as
  * `stage.pen.edit`, which is the same operation through the same server path.
@@ -51,7 +51,7 @@ link.send({
 });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
 say("an edit comes back as a stage.pen frame", !!frame);
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
  * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good

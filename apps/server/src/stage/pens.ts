@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { CANVAS_DIR, CANVAS_FILE, CANVAS_META, migrateStages, movedPath } from "./canvas-files.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
 import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { serverText } from "./text.ts";
@@ -70,12 +71,19 @@ export interface PenEntry {
 /** Words measured as the page measures them (`text.ts`). */
 const measure = serverText.measure;
 
-const FILE = "stage.pen";
+const FILE = CANVAS_FILE;
 /** How many of the person's edits each stage can take back. */
 const HISTORY = 100;
 
 export class StagePens {
 	private readonly cache = new Map<string, PenEntry & { mtime: number; text: string }>();
+	/** The folders each canvas had before, since this server started (`rename`). */
+	private readonly former = new Map<string, string[]>();
+
+	/** The folders a canvas had before it was moved to this one. */
+	formerly(name: string): string[] {
+		return this.former.get(name) ?? [];
+	}
 	private watcher: FSWatcher | undefined;
 	private framesWatchers = new Map<string, FSWatcher>();
 	private pending = new Map<string, NodeJS.Timeout>();
@@ -93,7 +101,7 @@ export class StagePens {
 	}
 
 	get dir(): string {
-		return join(this.deckPath, "stages");
+		return join(this.deckPath, CANVAS_DIR);
 	}
 
 	fileOf(name: string): string {
@@ -147,12 +155,12 @@ export class StagePens {
 	 */
 	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
 		try {
-			const parsed = JSON.parse(readFileSync(join(this.dir, name, "stage.json"), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
+			const parsed = JSON.parse(readFileSync(join(this.dir, name, CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
 			const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : undefined;
 			const boards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
 			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(boards ? { boards } : {}) };
 		} catch {
-			/* no stage.json, or one that does not parse: no name but the folder's */
+			/* no canvas.json, or one that does not parse: no name but the folder's */
 			return { provisional: false };
 		}
 	}
@@ -162,10 +170,10 @@ export class StagePens {
 	 * where they are. The boards on it now are written down with the name, as what it was named for.
 	 */
 	setTitle(name: string, title: string, options: { provisional?: boolean } = {}): string {
-		if (!this.names().includes(name)) throw new Error(`No stage "${name}".`);
+		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
 		const clean = title.replace(/\s+/g, " ").trim().slice(0, 80);
-		if (!clean) throw new Error("A stage's name cannot be empty.");
-		const file = join(this.dir, name, "stage.json");
+		if (!clean) throw new Error("A canvas's name cannot be empty.");
+		const file = join(this.dir, name, CANVAS_META);
 		let kept: Record<string, unknown> = {};
 		try {
 			kept = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -189,9 +197,11 @@ export class StagePens {
 	 * place, so their ids — and any arrow joined to them — stay as they were.
 	 */
 	rename(from: string, to: string, repoint: (path: string) => string): void {
-		if (!this.names().includes(from)) throw new Error(`No stage "${from}".`);
-		if (this.names().includes(to)) throw new Error(`A stage called "${to}" already exists.`);
+		if (!this.names().includes(from)) throw new Error(`No canvas "${from}".`);
+		if (this.names().includes(to)) throw new Error(`A canvas called "${to}" already exists.`);
 		renameSync(join(this.dir, from), join(this.dir, to));
+		this.former.set(to, [...(this.former.get(from) ?? []), from]);
+		this.former.delete(from);
 		this.cache.delete(from);
 		const history = this.history.get(from);
 		this.history.delete(from);
@@ -208,7 +218,7 @@ export class StagePens {
 
 	/** Delete a stage: its folder, its drawing and any boards kept in it. */
 	remove(name: string): void {
-		if (!this.names().includes(name)) throw new Error(`No stage "${name}".`);
+		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
 		rmSync(join(this.dir, name), { recursive: true, force: true });
 		this.cache.delete(name);
 		this.history.delete(name);
@@ -434,20 +444,22 @@ export class StagePens {
 
 	/**
 	 * A `.pen` file named by an agent: relative to the deck, as a board's path is (`"frames/ui/button"`,
-	 * `"stages/wren/stage.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the stage it is when it is a
+	 * `"canvases/research-notes/canvas.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the stage it is when it is a
 	 * stage's own file, and the ref that places it when it is a frame.
 	 */
 	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string } {
 		const asked = typeof path === "string" ? path.trim() : "";
-		if (!asked) throw new PenError("A .pen file needs a path relative to the deck, such as \"frames/agent-card\" or \"stages/wren/stage.pen\", or an absolute one.");
-		let file = isAbsolute(asked) ? resolvePath(asked) : resolvePath(this.deckPath, asked.replace(/^\.?\/+/, ""));
+		if (!asked) throw new PenError("A .pen file needs a path relative to the deck, such as \"frames/agent-card\" or \"canvases/research-notes/canvas.pen\", or an absolute one.");
+		// A path written before canvases moved out of stages/ still finds its canvas (`canvas-files.ts`).
+		const relativeAsked = movedPath(asked.replace(/^\.?\/+/, ""), new Map());
+		let file = isAbsolute(asked) ? resolvePath(asked) : resolvePath(this.deckPath, relativeAsked);
 		if (!/\.[^/\\.]+$/.test(file)) file += ".pen";
 		if (!file.endsWith(".pen")) throw new PenError(`${asked} is not a .pen file.`);
 		// Shown relative to the deck when it is inside it, and as its full path when it is not.
 		const inside = relative(this.deckPath, file);
 		const outside = !inside || inside.startsWith("..") || isAbsolute(inside);
 		const shown = outside ? file : inside.split(sep).join("/");
-		const stageMatch = /^stages\/([^/]+)\/stage\.pen$/.exec(shown);
+		const stageMatch = /^canvases\/([^/]+)\/canvas\.pen$/.exec(shown);
 		if (stageMatch) return { file, shown, stage: stageMatch[1]! };
 		// A file in frames/ or boards/ is placed by its path; the path is its ref, so it keeps to what a ref can say.
 		const ref = !outside && /^(?:frames|boards)\//.test(shown) ? shown.replace(/\.pen$/, "") : undefined;
@@ -525,7 +537,7 @@ export class StagePens {
 	 */
 	createFile(path: string, item?: Partial<PenNode>): { file: string; ref?: string; id: string } {
 		const target = this.penFile(path);
-		if (target.stage) throw new PenError(`${target.shown} is a stage; make one with stage.newStage.`);
+		if (target.stage) throw new PenError(`${target.shown} is a canvas; make one with stage.newStage.`);
 		if (existsSync(target.file)) throw new PenError(`${target.shown} is already there: read it, or edit it with { path: "${path}" }.`);
 		const id = slug(basename(target.file, ".pen"), 60) || "frame";
 		const node = { type: "frame", layout: "vertical", width: 320, height: "fit_content", children: [], ...(item ?? {}), id, reusable: true } as PenNode;
@@ -820,6 +832,7 @@ export class StagePens {
 	}
 
 	setDeck(deckPath: string): void {
+		migrateStages(deckPath);
 		this.deckPath = deckPath;
 		this.cache.clear();
 		this.importCache.clear();

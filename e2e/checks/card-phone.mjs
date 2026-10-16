@@ -22,9 +22,9 @@ const until = async (test, ms = 8000) => {
 };
 const deck = await deckState();
 const cardNode = () => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const card = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === "phone-card");
+			const card = (JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8")).children ?? []).find((n) => n.id === "phone-card");
 			if (card) return card;
 		} catch {
 			/* being written */

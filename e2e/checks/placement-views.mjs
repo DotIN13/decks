@@ -20,7 +20,7 @@ const deck = await deckState();
 const link = await socket();
 const agentA = await until(() => link.last("agents")?.focused);
 const stageName = await until(() => link.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentA))?.name);
-const file = stageName ? join(deck.path, "stages", stageName, "stage.pen") : "";
+const file = stageName ? join(deck.path, "canvases", stageName, "canvas.pen") : "";
 const doc = () => JSON.parse(readFileSync(file, "utf8"));
 const boards = () => doc().children.filter((n) => n.type === "browser").map((n) => ({ path: n.metadata.path, x: n.x, y: n.y, w: n.width, h: n.height }));
 say("agent A's stage file", existsSync(file), file);

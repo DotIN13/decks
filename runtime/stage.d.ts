@@ -104,7 +104,7 @@ export interface Stage {
 		stop(): Promise<void>;
 	};
 	/**
-	 * Stages are files, `stages/<name>/stage.pen`, and you work on one at a time: its boards are the
+	 * Stages are files, `canvases/<name>/canvas.pen`, and you work on one at a time: its boards are the
 	 * ones you show, hide and move, and the person sees it when talking to you. `stages` lists every
 	 * stage and who has it open; `open` moves you to one; `newStage` makes an empty one and opens it.
 	 * Two agents on one stage share its boards and its drawing. A stage's `name` is its folder, which
@@ -126,7 +126,7 @@ export interface Stage {
 	 * You see it in this call's result; it is also saved to `file`. `of` is an item's id (one inside a
 	 * placed frame by its id path, `"card-1/title"`), a board's path, a list of them, or a box on the
 	 * stage; nothing is the whole stage. A `.pen` file's path (`"frames/ui/button.pen"`, another stage's
-	 * `"stages/<name>/stage.pen"`) pictures that file whole, placed on no stage. Check your drawing with
+	 * `"canvases/<name>/canvas.pen"`) pictures that file whole, placed on no stage. Check your drawing with
 	 * it after a big change. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
 	 *
 	 * One board's path alone is that board as the person's browser has it now, with what they did on
@@ -146,7 +146,7 @@ export interface Stage {
 		file(): Promise<string>;
 		/**
 		 * Your stage's items, or with `path` any .pen file's: relative to the deck, as a board's path is
-		 * (`"frames/ui/button"`, `"stages/wren/stage.pen"`; `.pen` may be left off), or absolute anywhere.
+		 * (`"frames/ui/button"`, `"canvases/research-notes/canvas.pen"`; `.pen` may be left off), or absolute anywhere.
 		 * A file in `frames/` also answers the `ref` that places it.
 		 */
 		read(path?: string): Promise<{ stage?: string; file: string; ref?: string; version: string; error?: string; children: Array<PenItem & { box: Box }> }>;

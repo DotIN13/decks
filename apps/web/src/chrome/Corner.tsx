@@ -306,8 +306,8 @@ export function Corner(props: {
 					data-writes
 					data-on={props.isolated ? "true" : undefined}
 					aria-pressed={props.isolated === true}
-					title={props.isolated ? "Isolated: this agent sees only the boards on its stage. Press to let it see the deck." : "Isolate: let this agent see only the boards on its stage"}
-					aria-label={props.isolated ? "Isolated — press to end" : "Isolate this agent to its stage"}
+					title={props.isolated ? "Isolated: this agent sees only the boards on its canvas. Press to let it see the deck." : "Isolate: let this agent see only the boards on its canvas"}
+					aria-label={props.isolated ? "Isolated — press to end" : "Isolate this agent to its canvas"}
 					onClick={() => props.onIsolate?.()}
 				>
 					<Icon of={Lock} size={15} />

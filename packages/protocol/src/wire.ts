@@ -52,7 +52,7 @@ export interface BackendInfo {
 export interface StageRow {
 	/** The folder: the stage's id, which agents open it by and never changes. */
 	name: string;
-	/** What it is called, which the person can change freely (`stage.json` beside the drawing). */
+	/** What it is called, which the person can change freely (`canvas.json` beside the drawing). */
 	title: string;
 	/** When its drawing last changed, in ms since the epoch: the manager's order and its "2 h ago". */
 	changedAt?: number;
@@ -65,6 +65,11 @@ export interface StageRow {
 	isolated?: true;
 	/** Copied back from an isolated stage when isolation ended: badged in the manager. */
 	fromIsolation?: true;
+	/**
+	 * The folders it had before, since this server started: the first name chosen for a canvas names
+	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
+	 */
+	formerly?: string[];
 }
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
@@ -424,7 +429,7 @@ export type ServerMessage =
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *
-	 * A stage is a folder — `stages/<name>/stage.pen` — and which one a chat is on is one field
+	 * A stage is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
 	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and
 	 * whenever the set or who is on it changes; `rev` is the drawing's revision, which is what
 	 * makes a stage's picture cacheable for a year and still current.

@@ -17,7 +17,7 @@ test("an edit writes a native .pen file, answers with results, and announces the
 		assert.equal(pens.claim("Wren"), "wren-2");
 		const { entry, results } = pens.edit(name, [{ op: "insert", node: { type: "note", id: "n", content: "hi" }, box: { x1: 10, y1: 20 } }]);
 		assert.deepEqual(results, [{ op: "insert", id: "n" }]);
-		const saved = JSON.parse(readFileSync(join(dir, "stages", "wren", "stage.pen"), "utf8"));
+		const saved = JSON.parse(readFileSync(join(dir, "canvases", "wren", "canvas.pen"), "utf8"));
 		assert.equal(saved.version, "2.14");
 		assert.deepEqual(saved.children, [{ type: "note", id: "n", content: "hi", x: 10, y: 20 }]);
 		assert.equal(heard.length, 1);
@@ -189,7 +189,7 @@ test("a stage's imports are read from inside the deck, used for its boxes and it
 		assert.deepEqual(view.children[0]!.box, { x1: 10, y1: 20, x2: 130, y2: 60 }, "the imported card's own size");
 		const frame = pens.frame("agent", name) as unknown as { doc: Record<string, unknown> };
 		assert.deepEqual(Object.keys((frame.doc["decks.imported"] ?? {}) as object), ["deck", "far"], "a file outside the deck is read too");
-		const saved = readFileSync(join(dir, "stages", name, "stage.pen"), "utf8");
+		const saved = readFileSync(join(dir, "canvases", name, "canvas.pen"), "utf8");
 		assert.equal(saved.includes("decks.imported"), false);
 		rmSync(outside, { recursive: true, force: true });
 	} finally {
@@ -212,7 +212,7 @@ test("an item saved as a frame goes to frames/, any stage places it by frames/<n
 		assert.equal(file.children[0].id, "agent-card");
 		assert.equal(file.children[0].reusable, true);
 		assert.equal(file.children[0].x, undefined, "where it sat on the stage is not part of the frame");
-		const onStage = JSON.parse(readFileSync(join(dir, "stages", one, "stage.pen"), "utf8")).children[0];
+		const onStage = JSON.parse(readFileSync(join(dir, "canvases", one, "canvas.pen"), "utf8")).children[0];
 		assert.deepEqual(onStage, { type: "ref", id: "card", ref: "frames/agent-card", x: 40, y: 50 });
 		assert.deepEqual(pens.read(one).children[0]!.box, { x1: 40, y1: 50, x2: 240, y2: 130 });
 
@@ -256,8 +256,8 @@ test("any .pen file by path: create one in frames/, read and edit it by path, an
 		assert.equal(inside.find((item) => item.id === "b1/label")?.content, "Stop");
 
 		// A stage's own file, by its path in the deck or absolutely, is the stage.
-		assert.equal(pens.readFile(`stages/${stage}/stage.pen`).children[0]!.id, "b1");
-		const absolute = join(dir, "stages", stage, "stage.pen");
+		assert.equal(pens.readFile(`canvases/${stage}/canvas.pen`).children[0]!.id, "b1");
+		const absolute = join(dir, "canvases", stage, "canvas.pen");
 		assert.equal(pens.readFile(absolute).children[0]!.id, "b1");
 		pens.editFile(absolute, [{ op: "update", id: "b1", box: { x1: 300, y1: 100 } }]);
 		assert.equal(pens.read(stage).children[0]!.box.x1, 300);

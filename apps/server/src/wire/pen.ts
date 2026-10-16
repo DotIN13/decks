@@ -1,5 +1,5 @@
 import type { Op } from "@decks/pen";
-import { deleteStage } from "../stage/stage-admin.ts";
+import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
 
 /**
@@ -71,7 +71,7 @@ export const pen = {
 		const pens = wire.stage.pens;
 		if (!pens || typeof message.name !== "string" || typeof message.to !== "string") return;
 		try {
-			pens.setTitle(message.name, message.to);
+			titleCanvas({ deck: wire.deck, pens, agents: wire.agents.all() }, message.name, message.to);
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 			return;

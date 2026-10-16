@@ -1108,7 +1108,7 @@ export function App() {
 	   what is there, which is near but not always on screen when the middle is taken. */
 	const newBoard = (format?: "board" | "slides") => {
 		if (!state.focused) {
-			notice("info", "Make an agent first: a board is made on an agent's stage.");
+			notice("info", "Make an agent first: a board is made on an agent's canvas.");
 			return;
 		}
 		void files
@@ -1201,6 +1201,12 @@ export function App() {
 		const was = onCanvas;
 		onCanvas = { agent, stage };
 		if (!agent || was.agent !== agent || was.stage === undefined || was.stage === stage) return;
+		/*
+		 * The same canvas in a new folder: its first name was chosen, and named the folder too. The
+		 * view stays as it is, kept under the new name, rather than landing as on a canvas arrived at.
+		 */
+		const renamed = untrack(() => stageOf(agent)?.formerly?.includes(was.stage!) === true);
+		if (renamed) return void untrack(() => views().keep(agent, stage, viewToPark(camera(), selected())));
 		untrack(() => {
 			views().keep(agent, was.stage, viewToPark(camera(), selected()));
 			landOnStage(views().of(agent, stage), stage);

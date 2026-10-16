@@ -933,7 +933,7 @@ export function LeftPanel(props: {
 												{(pen) => (
 													/* A .pen file among the boards: not a page, so a press places it on the stage as a ref. Named by its file, as a board's row is. */
 													<div class="board-act">
-														<button class="board-row" type="button" data-row data-pen={pen().path} title={`${pen().title}, ${pen().path}: place it on the stage`} onClick={() => props.onPlacePen?.(pen())}>
+														<button class="board-row" type="button" data-row data-pen={pen().path} title={`${pen().title}, ${pen().path}: place it on the canvas`} onClick={() => props.onPlacePen?.(pen())}>
 															<span class="board-thumb" aria-hidden="true" />
 															<span class="row-name">{basenameOf(pen().path)}</span>
 														</button>

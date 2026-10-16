@@ -56,6 +56,8 @@ export interface StageHost {
 	broadcast(message: ServerMessage): void;
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
 	stagesChanged?(): void;
+	/** Give a canvas a name; the first name anyone chooses names its folder too (`stage-admin.ts`). Returns the folder. */
+	retitle?(name: string, title: string): string;
 	/** The camera the browser last reported for one agent's canvas. */
 	camera(agentId: string): Camera;
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
@@ -156,6 +158,13 @@ export class StageService {
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
 	stagesChanged(): void {
 		this.host.stagesChanged?.();
+	}
+
+	/** Name a canvas (`StageHost.retitle`); without a host that can, only its title changes. */
+	retitle(name: string, title: string): string {
+		if (this.host.retitle) return this.host.retitle(name, title);
+		this.pens?.setTitle(name, title);
+		return name;
 	}
 
 	setDeck(deck: Deck): void {

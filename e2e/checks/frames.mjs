@@ -30,7 +30,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "frames-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "frames-anchor")).at(-1));
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
  * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good

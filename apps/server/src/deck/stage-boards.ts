@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Boards a stage keeps for itself: `stages/<name>/boards/`.
+ * Boards a canvas keeps for itself: `canvases/<name>/boards/`.
  *
  * A board normally lives in the deck's `boards/`. When an agent is isolated
  * (`agents/isolation.ts`) its stage's boards are copied into the stage's own folder and the stage
@@ -12,12 +12,12 @@ import { join } from "node:path";
 
 /** The deck-relative folder a stage keeps its own boards in. */
 export function stageBoardsDir(stage: string): string {
-	return `stages/${stage}/boards`;
+	return `canvases/${stage}/boards`;
 }
 
-/** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `stages/<name>/boards/…`. */
+/** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `canvases/<name>/boards/…`. */
 export function inBoardFolder(path: string): boolean {
-	return /^(?:boards|frames)\/.+/.test(path) || /^stages\/[^/]+\/boards\/.+/.test(path);
+	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/boards\/.+/.test(path);
 }
 
 /**
@@ -27,7 +27,7 @@ export function inBoardFolder(path: string): boolean {
 export function boardFolders(deck: string): string[] {
 	const folders = ["boards"];
 	if (existsSync(join(deck, "frames"))) folders.push("frames");
-	const stages = join(deck, "stages");
+	const stages = join(deck, "canvases");
 	if (!existsSync(stages)) return folders;
 	for (const entry of readdirSync(stages, { withFileTypes: true })) {
 		if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "boards"))) folders.push(stageBoardsDir(entry.name));

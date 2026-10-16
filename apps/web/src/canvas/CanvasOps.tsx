@@ -91,7 +91,7 @@ function pointerGroups(): Group[] {
 				{ keys: "the speech-bubble button", what: "the conversation, opened and closed" },
 				{ keys: "click a turn on the right spine", what: "the conversation at that turn" },
 				{ keys: "/", what: "commands, in the input bar" },
-				{ keys: "@Name", what: "send the line to that agent, without leaving this stage" },
+				{ keys: "@Name", what: "send the line to that agent, without leaving this canvas" },
 			],
 		},
 	];
@@ -142,7 +142,7 @@ function touchGroups(): Group[] {
 				{ keys: "swipe the conversation right", what: "put it away" },
 				{ keys: "the two title-bar buttons", what: "the same two panels, either way" },
 				{ keys: "/", what: "commands, in the input bar" },
-				{ keys: "@Name", what: "send the line to that agent, without leaving this stage" },
+				{ keys: "@Name", what: "send the line to that agent, without leaving this canvas" },
 			],
 		},
 	];

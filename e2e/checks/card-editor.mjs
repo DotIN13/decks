@@ -47,9 +47,9 @@ const SOURCE = [
 
 const deck = await deckState();
 const onDisk = () => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const doc = JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8"));
+			const doc = JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8"));
 			const card = (doc.children ?? []).find((n) => n.id === "card-editor");
 			// A note card from before is saved as a card frame, its blocks one item each.
 			if (card) return card.type === "frame" ? (card.children ?? []).map((n) => (n.metadata?.type === "decks.file" ? `![[${n.metadata.path}]]` : n.content)).join("\n\n") : card.content;
@@ -127,9 +127,9 @@ await page.keyboard.press("Control+Enter");
 const accepted = await until(() => onDisk() === SOURCE.replace("{~~Arashiyama~>Ohara~~}{>>quieter in November<<}", "Ohara"));
 say("accepting a suggestion changes those words and leaves every other byte as it was", !!accepted, JSON.stringify(onDisk()?.split("\n").slice(4, 7)));
 const frame = (() => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const card = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
+			const card = (JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
 			if (card) return card;
 		} catch {
 			/* being written */
@@ -217,9 +217,9 @@ say("…and the file says so, with the untouched table, hidden note and code as 
 
 // A table is typed into cell by cell and a callout's title in place; the save touches only those two items.
 const cardNode = () => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const card = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
+			const card = (JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8")).children ?? []).find((n) => n.id === "card-editor");
 			if (card) return card;
 		} catch {
 			/* being written */
@@ -373,9 +373,9 @@ await settle(page, 400);
 
 // A picture beside the card goes into it with the frame's own drop, between two blocks, and out again.
 const where = (id) => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const doc = JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8"));
+			const doc = JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8"));
 			const card = (doc.children ?? []).find((n) => n.id === "card-editor");
 			if (card) return { inCard: (card.children ?? []).map((n) => n.id).indexOf(id), top: doc.children.some((n) => n.id === id), kids: (card.children ?? []).map((n) => n.id) };
 		} catch {
@@ -464,9 +464,9 @@ if (grip) {
 	await page.mouse.up();
 }
 const outside = await until(() => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const top = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.id === blockId);
+			const top = (JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8")).children ?? []).find((n) => n.id === blockId);
 			if (top) return top;
 		} catch {
 			/* being written */
@@ -495,9 +495,9 @@ if (freeAt) {
 	await page.keyboard.press("Control+Enter");
 }
 const words = await until(() => {
-	for (const stage of readdirSync(`${deck.path}/stages`)) {
+	for (const stage of readdirSync(`${deck.path}/canvases`)) {
 		try {
-			const made = (JSON.parse(readFileSync(`${deck.path}/stages/${stage}/stage.pen`, "utf8")).children ?? []).find((n) => n.type === "text" && n.content === "A **bold** idea");
+			const made = (JSON.parse(readFileSync(`${deck.path}/canvases/${stage}/canvas.pen`, "utf8")).children ?? []).find((n) => n.type === "text" && n.content === "A **bold** idea");
 			if (made) return made;
 		} catch {
 			/* being written */

@@ -4670,7 +4670,7 @@ export function Stage(props: {
 			if (known && known.path === path && known.x === at.x && known.y === at.y) return points;
 			return { ...points, [agentId]: { path, x: at.x, y: at.y } };
 		});
-	const stagePenPath = () => (props.stageName ? `stages/${props.stageName}/stage.pen` : undefined);
+	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
 	const cursorAgents = createMemo<string[]>((seen) => {
 		const ids = Object.keys(props.acts ?? {}).filter((id) => props.acts?.[id] && !seen.includes(id));
 		return ids.length > 0 ? [...seen, ...ids] : seen;

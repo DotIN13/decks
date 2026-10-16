@@ -57,7 +57,7 @@ export function numberedName(pens: StagePens, base: string): string {
  * original stage and its boards are only read. Returns the new stage's board paths.
  */
 export function copyStage(deck: Deck, pens: StagePens, from: string, to: string, options: { isolated: boolean; origin?: string; back?: boolean }): string[] {
-	if (pens.names().includes(to)) throw new Error(`A stage called ${to} already exists.`);
+	if (pens.names().includes(to)) throw new Error(`A canvas called ${to} already exists.`);
 	const folder = stageBoardsDir(to);
 	mkdirSync(join(deck.path, folder), { recursive: true });
 	if (existsSync(pens.fileOf(from))) writeFileSync(pens.fileOf(to), readFileSync(pens.fileOf(from)));

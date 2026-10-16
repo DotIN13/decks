@@ -95,6 +95,9 @@ function cleanPlaces(raw: unknown): Record<string, { x: number; y: number }> | u
  * That matters because the browser draws the composer immediately and a person
  * types faster than a model runtime starts.
  */
+/** What a canvas is called until somebody names it; the first name it is given names its folder too. */
+const UNTITLED = "Untitled canvas";
+
 export class DeckAgent {
 	/** Kept across restarts when the agent was restored: the avatar file is addressed by it. */
 	readonly id: string;
@@ -674,8 +677,8 @@ export class DeckAgent {
 		// A new agent joins the latest canvas of its workspace; with none, it gets one of its own.
 		const joined = this.isolatedOn ? undefined : this.firstCanvas?.(this.id);
 		this.firstCanvas = undefined;
-		// Named after the agent until it names the canvas for what is on it (`stage/canvas-name.ts`).
-		this.stageFolder = joined && pens.names().includes(joined) ? joined : pens.claim(this.identity.name, { provisional: true });
+		// A placeholder until the canvas is named for what is on it, which names its folder too (`stage/stage-admin.ts`).
+		this.stageFolder = joined && pens.names().includes(joined) ? joined : pens.claim(UNTITLED, { provisional: true });
 		this.save();
 		return this.stageFolder;
 	}
@@ -831,7 +834,7 @@ export class DeckAgent {
 		this.loosePlaying = [];
 		this.save();
 		const pens = this.stage.pens;
-		if (pens) this.newStage(this.identity.name);
+		if (pens) this.newStage("");
 		else this.publishContext();
 	}
 
@@ -839,7 +842,7 @@ export class DeckAgent {
 	newStage(title: string, options: { provisional?: boolean } = {}): string {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
-		const name = pens.claim(title.trim() || this.identity.name, { provisional: options.provisional === true || !title.trim() });
+		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
 		// Made while isolated, it is isolated, and comes back as an ordinary stage with the rest.
 		if (this.isolatedOn) markIsolated(pens, name);
 		this.openStage(name);
@@ -1062,7 +1065,8 @@ export class DeckAgent {
 			color: this.identity.color,
 			...(this.parentId ? { parentId: this.parentId } : {}),
 			context: [...this.held],
-			inPlay: [...this.playing],
+			// What is on a canvas is its file's; only a session with no canvas file keeps its own list.
+			inPlay: this.canvasName() ? [] : [...this.loosePlaying],
 			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
 			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
 			...(this.stageFolder ? { stage: this.stageFolder } : {}),

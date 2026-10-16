@@ -5,7 +5,7 @@ description: Your stage is a native pen.dev .pen file — its boards, and notes,
 
 # Drawing on the stage
 
-Your stage is one file, `stages/<name>/stage.pen`, in **pen.dev's own format**: it opens in pen.dev
+Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
 - **Boards**: the HTML pages you write. Each one on the stage is a pen `browser` item pointing at
@@ -42,7 +42,7 @@ its boards and its drawing. Make a new stage for a new piece of work; open an ol
 ```ts
 const drawing = await stage.pen.read();   // every item as saved, plus its box on the stage
 await stage.pen.edit([ /* edits */ ]);    // applied together, or not at all
-const file = await stage.pen.file();      // "stages/<name>/stage.pen", to edit by hand instead
+const file = await stage.pen.file();      // "canvases/<name>/canvas.pen", to edit by hand instead
 ```
 
 - `read()` returns `{ stage, file, version, variables?, themes?, children }`. Each item is exactly
@@ -208,7 +208,7 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
 Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
 with nothing to declare. `stage.pen.read("frames/ui/agent-card")` reads it and `stage.pen.edit([...],
 { path: "frames/ui/agent-card" })` edits it with the same edits a stage takes; every stage using it
-shows the change. A path is relative to the deck, as a board's is, so `"stages/<name>/stage.pen"`
+shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
 reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of

@@ -1,7 +1,7 @@
 /**
  * The stage manager: what stages there are, and moving between them.
  *
- * A stage is a folder of work — `stages/<name>/stage.pen`, its boards and its drawing — and
+ * A stage is a folder of work — `canvases/<name>/canvas.pen`, its boards and its drawing — and
  * until this the browser was never told any existed. An agent could already list them and open
  * one (`stage.stages`, `stage.open`); the person had no surface at all, so two stages looked
  * like one canvas that had changed.
@@ -57,11 +57,11 @@ say("the server tells the browser what stages exist", !!listed && listed.length 
 
 // --- the pill names it, and opens the manager -------------------------------------------------
 
-const pillStage = () => page.evaluate(() => document.querySelector(".pill [aria-label^='Stages']")?.textContent?.trim() ?? null);
+const pillStage = () => page.evaluate(() => document.querySelector(".pill [aria-label^='Canvases']")?.textContent?.trim() ?? null);
 const mine = await until(async () => (await pillStage()) || undefined);
 say("the pill names the stage this conversation is on", !!mine, String(mine));
 
-await page.locator(".pill [aria-label^='Stages']").click();
+await page.locator(".pill [aria-label^='Canvases']").click();
 await page.waitForSelector(".stage-manager", { timeout: 6000 });
 const cards = () =>
 	page.evaluate(() =>
@@ -85,7 +85,7 @@ say("…each card with boards asks for the stage's own picture, by revision, and
 // One whose name no other card's contains, so a search for it matches it alone: checks that ran
 // before this one in the same deck may have left agent-2, agent-2-2 and so on.
 const wanted = (wall.find((one) => !one.here && !wall.some((other) => other !== one && other.name.includes(one.name))) ?? wall.find((one) => !one.here))?.name ?? "";
-/* The pill says a stage's name as the person reads it (`stage.json`); the folder is the card's id. */
+/* The pill says a stage's name as the person reads it (`canvas.json`); the folder is the card's id. */
 const wantedTitle = wall.find((one) => one.name === wanted)?.title ?? wanted;
 await page.fill(".stage-manager input", wanted);
 await settle(page, 400);
@@ -114,7 +114,7 @@ say("…and says nothing about it: a toast for a thing you just did is noise", (
 
 // --- and Escape leaves everything as it was -----------------------------------------------------
 
-await page.locator(".pill [aria-label^='Stages']").click();
+await page.locator(".pill [aria-label^='Canvases']").click();
 await page.waitForSelector(".stage-manager", { timeout: 6000 });
 await page.keyboard.press("Escape");
 await settle(page, 500);

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { titleCanvas } from "./stage/stage-admin.ts";
+import { migrateStages } from "./stage/canvas-files.ts";
 import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -67,7 +69,7 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly stage: StageService;
-	/** Every agent's stage drawing, as `.pen` files under `stages/` (`stage/pens.ts`). */
+	/** Every agent's stage drawing, as `.pen` files under `canvases/` (`stage/pens.ts`). */
 	readonly pens: StagePens;
 	/** The ports agents have forwarded through this server (`ports.ts`). */
 	readonly forwards: Forwards;
@@ -195,6 +197,7 @@ export class App {
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
+			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
 			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
 			agents: () => this.agents.summaries(),
 		});
@@ -518,6 +521,9 @@ export class App {
 	 * pointing at it.
 	 */
 	static open(config: Config): App {
+		// Canvases kept in `stages/` move to `canvases/` once, before anything reads either (`stage/canvas-files.ts`).
+		const moved = migrateStages(config.deck);
+		if (moved.size) console.log(`[decks] moved ${moved.size} canvases from stages/ to canvases/`);
 		const existing = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"));
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
@@ -941,7 +947,7 @@ export class App {
 	/**
 	 * Every stage in the deck, and who is on it: the manager's whole list (`protocol/StageRow`).
 	 *
-	 * Built from two records that already exist — the folders under `stages/`, and each session's
+	 * Built from two records that already exist — the folders under `canvases/`, and each session's
 	 * own stage field — because a stage nobody has open is still a stage, and an agent with a stage
 	 * that has never been drawn on still has one. A server with no stage files answers with nothing,
 	 * and the manager draws nothing rather than an empty room.
@@ -966,6 +972,7 @@ export class App {
 				words,
 				...(isIsolatedStage(pens, name) ? { isolated: true as const } : {}),
 				...(fromIsolation(pens, name) ? { fromIsolation: true as const } : {}),
+				...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
 				agents: everyone
 					.filter((agent) => agent.stageName() === name)
 					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),

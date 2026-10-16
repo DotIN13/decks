@@ -32,7 +32,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 // The stage's file, found from the frame the server sends after the first edit.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "shapes-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "shapes-anchor")).at(-1));
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 const onDisk = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { children: [] });
 const shapesNow = () => onDisk().children.filter((n) => n.metadata?.type === "decks.shape");
 say("the stage has a file to draw in", existsSync(file), file);

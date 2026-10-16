@@ -138,7 +138,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 			</Show>
 
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="icon-button" title="Undo your last change to the stage (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
+			<button type="button" class="icon-button" title="Undo your last change to the canvas (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
 				<Icon of={Undo2} size={15} />
 			</button>
 			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>

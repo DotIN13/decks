@@ -35,7 +35,7 @@ export type EngineChoice = "off" | "on" | "webgl2";
 /** The choices Settings offers (`settings/Settings.tsx`), with what each does. */
 export const ENGINES: ReadonlyArray<{ id: EngineChoice; label: string; note: string }> = [
 	{ id: "off", label: "Off", note: "The drawing and the boards' pictures are painted by CanvasKit, on a worker's sheet." },
-	{ id: "on", label: "On", note: "The C++ engine draws the stage, on WebGPU where the browser has it and WebGL 2 where it does not." },
+	{ id: "on", label: "On", note: "The C++ engine draws the canvas, on WebGPU where the browser has it and WebGL 2 where it does not." },
 	{ id: "webgl2", label: "WebGL 2", note: "The C++ engine, kept on WebGL 2 even where WebGPU is there." },
 ];
 
