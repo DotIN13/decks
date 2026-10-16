@@ -148,6 +148,13 @@ export class EngineStage {
 			this.layout();
 			for (const message of this.early.splice(0)) this.tile(message);
 			this.draw();
+			/*
+			 * And the pictures of the boards already here. Everything that asks for them (`setBoards`,
+			 * `setCamera`) came while the engine was starting and did nothing, so a page opened on a
+			 * still camera fetched none and drew every board as blank paper until something moved.
+			 */
+			this.reportPictured();
+			this.want();
 		}).catch((error: unknown) => {
 			console.error(`stage engine: could not start (${String((error as Error)?.message ?? error)}); the sheet draws instead`);
 			if (this.disposed) return;
