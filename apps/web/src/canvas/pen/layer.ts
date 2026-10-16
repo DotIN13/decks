@@ -1,4 +1,4 @@
-import { bendsArrow, indexOf, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { arrowPoints, arrowShape, arrowStyle, bentArrows, indexOf, walk, isCard, isMarkdownText, isShape, pathBounds, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { isFile, isLiveFile } from "./card-frame.ts";
 import type { Camera } from "@decks/protocol";
 import type { Picker } from "@decks/engine/pick";
@@ -136,6 +136,16 @@ export class PenLayer {
 	private carriedCopy: OffscreenCanvas | undefined;
 	private carriedBy = { dx: 0, dy: 0 };
 	private carriedKey = "";
+	/**
+	 * The arrows a slid drag bends, drawn here at each step while the worker leaves them out of its
+	 * tiles (`scene.ts`, `slide.skip`): an SVG over the drawing, in stage units like the click shapes.
+	 */
+	private bentEl: SVGSVGElement | undefined;
+	private bent: PenNode[] = [];
+	/** Taken down with the carried picture, when the frame that draws the dropped items has come. */
+	private bentDropped = false;
+	/** Each board's box, for an arrow with an end on a board. */
+	private boardFrames = new Map<string, Frame>();
 	private boardsCarried = "";
 	/** Called with the boards whose carried picture is on screen, when that changes: their pages hide. */
 	carrying: ((paths: ReadonlySet<string>) => void) | undefined;
@@ -398,6 +408,11 @@ export class PenLayer {
 	 */
 	private showCarried(frame: Extract<SceneOutput, { type: "frame" }>, at: string): void {
 		const carried = frame.carried;
+		if (!carried && this.bentDropped) {
+			this.bentDropped = false;
+			this.bent = [];
+			this.bentEl?.replaceChildren();
+		}
 		if (!carried) {
 			this.carriedCopy = undefined;
 			if (this.carriedEl && !this.carriedEl.hidden) {
@@ -623,17 +638,23 @@ export class PenLayer {
 		 * slide of the old pixels is the new ones. Nor can a move that bends an arrow joined to what
 		 * it carries: the arrow is redrawn at every step, as the worker decides too (`scene.ts`).
 		 */
-		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined) && !(this.doc && bendsArrow(this.doc, new Set(changes.map(([id]) => id))));
+		const slide = !!changes && changes.every(([, change]) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
 		if (slide) {
 			const first = changes![0]![1];
 			this.slideCarried(first.dx, first.dy);
 			const key = changes!.map(([id]) => id).sort().join("|");
+			if (key !== this.carriedKey) this.bent = this.doc ? bentArrows(this.doc, new Set(changes!.map(([id]) => id))) : [];
+			this.bentDropped = false;
+			// The arrows the move bends, which the worker leaves out of its tiles (`scene.ts`, `preview`).
+			this.drawBent(first.dx, first.dy, new Set(changes!.map(([id]) => id)));
 			if (key === this.carriedKey) return;
 			this.carriedKey = key;
 			this.pendCarry(true);
 		} else {
 			this.carriedKey = "";
 			this.pendCarry(false);
+			// A drop: the bent arrows stay up until the frame that draws them in their place has come.
+			if (this.bent.length) this.bentDropped = true;
 		}
 		this.send({ type: "preview", moving: changes });
 	}
@@ -687,6 +708,58 @@ export class PenLayer {
 		this.onCarryPending?.(on);
 	}
 
+	/**
+	 * The arrows a drag bends, where they are at this step: each laid out from its ends, with the carried
+	 * items and everything in them moved by the drag, and drawn as the worker would (`arrowShape`).
+	 */
+	private drawBent(dx: number, dy: number, carriedIds: ReadonlySet<string>): void {
+		const el = this.bentEl;
+		if (!el) return;
+		if (this.bent.length === 0) {
+			if (el.firstChild) el.replaceChildren();
+			return;
+		}
+		const moved = new Set<string>();
+		if (this.doc) for (const node of walk(this.doc.children)) if (carriedIds.has(node.id)) for (const inner of walk([node])) moved.add(inner.id);
+		const placed = {
+			get: (id: string) => {
+				const one = this.placed.get(id);
+				if (!one || !moved.has(id)) return one;
+				return { ...one, box: { ...one.box, x: one.box.x + dx, y: one.box.y + dy } };
+			},
+		} as ReadonlyMap<string, Placed>;
+		const extra = (name: string) => {
+			const box = this.boardFrames.get(name);
+			return box && carriedIds.has(name) ? { ...box, x: box.x + dx, y: box.y + dy } : box;
+		};
+		const NS = "http://www.w3.org/2000/svg";
+		const paths: SVGPathElement[] = [];
+		for (const node of this.bent) {
+			const points = arrowPoints(node.metadata, placed, extra);
+			if (!points) continue;
+			const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
+			const style = arrowStyle(node.metadata);
+			const shape = arrowShape(points, stroke, style);
+			// A dashed arrow is dashed on its line and solid at its heads, as the drawing paints it (`paint.ts`).
+			const [line = "", ...heads] = shape.geometry.split(/(?=M)/);
+			for (const [d, dashed] of style.dash ? ([[line, true], [heads.join(""), false]] as const) : ([[shape.geometry, false]] as const)) {
+				if (!d) continue;
+				const path = document.createElementNS(NS, "path");
+				path.setAttribute("d", d);
+				path.setAttribute("transform", `translate(${shape.x} ${shape.y})`);
+				path.setAttribute("fill", "none");
+				path.setAttribute("stroke", typeof node.stroke === "string" ? node.stroke : "#8a8f98");
+				path.setAttribute("stroke-width", String(stroke));
+				path.setAttribute("stroke-linecap", typeof node.strokeLinecap === "string" ? node.strokeLinecap : "round");
+				path.setAttribute("stroke-linejoin", typeof node.strokeLinejoin === "string" ? node.strokeLinejoin : "round");
+				if (typeof node.opacity === "number") path.setAttribute("opacity", String(node.opacity));
+				if (dashed) path.setAttribute("stroke-dasharray", `${stroke * 3} ${stroke * 2.5}`);
+				paths.push(path);
+			}
+		}
+		el.replaceChildren(...paths);
+	}
+
 	private slideCarried(dx: number, dy: number): void {
 		this.carriedBy = { dx, dy };
 		if (this.carriedEl && !this.carriedEl.hidden) this.carriedEl.style.transform = `translate(${dx}px, ${dy}px) ${this.carriedAt}`;
@@ -731,6 +804,14 @@ export class PenLayer {
 	/** The SVG the click shapes are written into, among the boards and over the sheet. */
 	attachHits(svg: SVGSVGElement): void {
 		this.hits = svg;
+		if (!this.bentEl) {
+			this.bentEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+			this.bentEl.setAttribute("class", "pen-bent");
+			this.bentEl.setAttribute("aria-hidden", "true");
+			this.bentEl.setAttribute("width", "1");
+			this.bentEl.setAttribute("height", "1");
+		}
+		svg.after(this.bentEl);
 		this.writeHits();
 	}
 
@@ -752,6 +833,7 @@ export class PenLayer {
 		if (key === this.boardKey) return;
 		this.boardKey = key;
 		this.send({ type: "boards", boards: boards.map((b) => ({ ...b })) });
+		this.boardFrames = new Map(boards.map((b) => [b.path, { x: b.x, y: b.y, w: b.w, h: b.h }]));
 		const boxes = boards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
 		if (boxes !== this.boardBoxes) {
 			this.boardBoxes = boxes;

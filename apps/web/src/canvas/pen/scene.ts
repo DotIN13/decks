@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, GrDirectContext, Image, Paint, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, bendsArrow, estimateText, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
+import { baseTheme, bentArrows, estimateText, expand, fitShapes, shapeRadius, indexOf, isArrow, isMarkdown, isMarkdownText, layout, NOTE_PAD, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed, type MeasureText, type ThemeState, type TextStyle } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import type { Painter, SceneLayout } from "@decks/engine/scene";
 import { canvasKit } from "./canvaskit.ts";
@@ -420,7 +420,12 @@ export class StageScene {
 	 * left where they are are the ones already recorded, minus the carried ones. An item that is not
 	 * carried but holds one that is (a child picked out of a group) is recorded again without it.
 	 */
-	private slide: { key: string; ids: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture | undefined>; sent?: boolean; carriedIds?: string[] } | undefined;
+	/**
+	 * A drag's move, slid rather than drawn: `ids` are what it carries, on a picture of their own; `skip`
+	 * is those and the arrows the move bends, all left out of the tiles until the drag ends. The page
+	 * draws the bent arrows itself at each step (`layer.ts`, `drawBent`).
+	 */
+	private slide: { key: string; ids: Set<string>; skip: Set<string>; ready?: boolean; carried?: Picture; replaced?: Map<string, Picture | undefined>; sent?: boolean; carriedIds?: string[] } | undefined;
 	/** The boards a drag is carrying (`carry`). */
 	private carryBoards: ReadonlySet<string> = new Set();
 	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed>; source: PenDocument | undefined } | undefined;
@@ -807,7 +812,7 @@ export class StageScene {
 			 * way to the server. The painter draws its whole scene, which still holds a hidden item; drawn here,
 			 * the tile kept the item after the server's answer, since by then nothing marked the tile stale.
 			 */
-			const skip = slide && this.hidden.size > 0 ? new Set([...slide.ids, ...this.hidden]) : (slide?.ids ?? (this.hidden.size > 0 ? this.hidden : undefined));
+			const skip = slide && this.hidden.size > 0 ? new Set([...slide.skip, ...this.hidden]) : (slide?.skip ?? (this.hidden.size > 0 ? this.hidden : undefined));
 			const drawn = this.cppPainter?.tile(rect.x, rect.y, rect.w, TILE, { dark: this.scheme === "dark", ...(skip ? { skip } : {}), holes: this.holes, mute: this.muted, scrolls: this.scrolls, ...(inked ? { overlay: inkOps(this.ink, this.doc ?? { version: "2.6", children: [] }, baseTheme(this.doc ?? { version: "2.6", children: [] }, this.scheme)) } : {}) });
 			// Without CanvasKit there is nothing to fall back to: the engine's tile is the tile, all it could draw.
 			if (this.cppPainter && (drawn || this.native)) {
@@ -843,7 +848,7 @@ export class StageScene {
 		for (const at of hits) {
 			const item = this.items[at];
 			// What a drag lifts is the carried picture's, not the tiles'.
-			if (!item || slide?.ids.has(item.id)) continue;
+			if (!item || slide?.skip.has(item.id)) continue;
 			const picture = slide?.replaced?.get(item.id) ?? item.picture;
 			if (picture) canvas.drawPicture(picture);
 		}
@@ -1240,7 +1245,7 @@ export class StageScene {
 		} else {
 			const inView = (this.itemIndex?.search(this.sheetRect(cssW, cssH)) ?? []).map((at) => this.items[at]!);
 			const draw = (item: DrawnItem) => {
-				if (slide?.ids.has(item.id)) return;
+				if (slide?.skip.has(item.id)) return;
 				const picture = slide?.replaced?.get(item.id) ?? item.picture;
 				if (picture) canvas.drawPicture(picture);
 			};
@@ -1604,16 +1609,18 @@ export class StageScene {
 	 */
 	private preview(moving: ReadonlyMap<string, PenPreview> | undefined): boolean {
 		/*
-		 * Slid only when nothing left behind has to change with it: an arrow joined to a carried item
-		 * bends at every step, so a move that drags one along is laid out and drawn as a resize is. The
-		 * page makes the same choice (`layer.ts`, `preview`), as it slides what the worker carries.
+		 * Every move is slid: what it carries goes on a picture of its own. An arrow joined to a carried
+		 * item bends at every step, so it is left out of the tiles too, and the page draws it at each step
+		 * (`layer.ts`, `preview`): drawing the tiles under it again at every step was a drag's whole cost.
 		 */
-		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined) && !(this.doc && bendsArrow(this.doc, new Set(moving.keys())));
+		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined && change.radius === undefined && change.set === undefined);
 		if (slide) {
 			const key = [...moving!.keys()].sort().join("|");
 			if (this.slide?.key === key) return false;
 			this.dropSlide();
-			this.slide = { key, ids: new Set(moving!.keys()) };
+			const ids = new Set(moving!.keys());
+			const bent = this.doc ? bentArrows(this.doc, ids).map((node) => node.id) : [];
+			this.slide = { key, ids, skip: new Set([...ids, ...bent]) };
 			return true;
 		}
 		if (!moving && !this.slide && !this.moving) return false;
@@ -1660,8 +1667,8 @@ export class StageScene {
 			// again without it, and the engine draws what is lifted when it is sent (`paintCarried`).
 			slide.replaced = new Map();
 			for (const node of painted.nodes) {
-				if (slide.ids.has(node.id)) continue;
-				for (const inner of walk([node])) if (inner !== node && slide.ids.has(inner.id)) slide.replaced.set(node.id, undefined);
+				if (slide.skip.has(node.id)) continue;
+				for (const inner of walk([node])) if (inner !== node && slide.skip.has(inner.id)) slide.replaced.set(node.id, undefined);
 			}
 			slide.carriedIds = [...slide.ids].filter((id) => painted.placed.has(id));
 			slide.ready = true;
@@ -1674,10 +1681,10 @@ export class StageScene {
 		const ctx = { ...this.paintContext(painted.doc, painted.placed), holes: this.holes };
 		slide.replaced = new Map();
 		for (const node of painted.nodes) {
-			if (slide.ids.has(node.id)) continue;
+			if (slide.skip.has(node.id)) continue;
 			let holds = false;
-			for (const inner of walk([node])) if (inner !== node && slide.ids.has(inner.id)) holds = true;
-			if (holds) slide.replaced.set(node.id, this.record((canvas) => paintDocument(canvas, [node], { ...ctx, skip: slide.ids })));
+			for (const inner of walk([node])) if (inner !== node && slide.skip.has(inner.id)) holds = true;
+			if (holds) slide.replaced.set(node.id, this.record((canvas) => paintDocument(canvas, [node], { ...ctx, skip: slide.skip })));
 		}
 		slide.ready = true;
 		const carried = [...slide.ids].flatMap((id) => {
@@ -1691,8 +1698,8 @@ export class StageScene {
 	}
 
 	/** The tiles over a drag's items and what holds them, drawn again when the drag starts or ends. */
-	private staleSlide(slide: { ids: ReadonlySet<string>; replaced?: Map<string, Picture | undefined> }): void {
-		for (const id of [...slide.ids, ...(slide.replaced?.keys() ?? [])]) {
+	private staleSlide(slide: { skip: ReadonlySet<string>; replaced?: Map<string, Picture | undefined> }): void {
+		for (const id of [...slide.skip, ...(slide.replaced?.keys() ?? [])]) {
 			const box = this.bounds.get(id);
 			if (box) this.tileStale.push(box);
 		}

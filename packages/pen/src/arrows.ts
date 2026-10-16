@@ -73,17 +73,26 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
  * with an end on any of them. Such a move cannot be shown by sliding a picture of what is carried.
  */
 export function bendsArrow(doc: PenDocument, ids: ReadonlySet<string>): boolean {
+	return bentArrows(doc, ids).length > 0;
+}
+
+/**
+ * The arrows that moving the items `ids` (and what they hold) bends: each one not itself moved with an
+ * end on any of them. A drag slides what it carries and draws only these again at each step.
+ */
+export function bentArrows(doc: PenDocument, ids: ReadonlySet<string>): PenNode[] {
 	const carried = new Set<string>();
 	for (const node of walk(doc.children)) if (ids.has(node.id)) for (const inner of walk([node])) carried.add(inner.id);
+	const bent: PenNode[] = [];
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node) || carried.has(node.id)) continue;
 		const meta = node.metadata as { from?: unknown; to?: unknown };
-		for (const end of [meta.from, meta.to]) {
+		if ([meta.from, meta.to].some((end) => {
 			const item = arrowEndItem(end);
-			if (item !== undefined && carried.has(item)) return true;
-		}
+			return item !== undefined && carried.has(item);
+		})) bent.push(node);
 	}
-	return false;
+	return bent;
 }
 
 type Point = [number, number];
