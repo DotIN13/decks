@@ -1,8 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AgentRecord } from "../agents/store.ts";
 
 /**
- * What a shared canvas held, read back for a chat whose record points at one.
+ * 2026-09-22: shared canvases (`.decks/canvases/<name>.json`) are gone, and each chat keeps its own.
+ *
+ * Runs on read (`agents/registry.ts`, as each chat is restored), once per record: the record is
+ * written back without `fromCanvas`, so it never comes here again.
  *
  * For a while boards lived on canvases (`.decks/canvases/<name>.json`) that several agents
  * shared, and a chat's record named its canvas instead of carrying its own boards. Each agent
@@ -37,4 +41,25 @@ export function readCanvasStage(deckPath: string, id: string): { boards: string[
 		}
 	}
 	return undefined;
+}
+
+/**
+ * A restored record that still names a shared canvas, given that canvas's boards and places as its
+ * own and written straight back, so the canvas file is never needed again. Every chat that was on
+ * one canvas gets its own copy of it. `exists` says which boards the deck still has.
+ */
+export function fromSharedCanvas(record: AgentRecord, deckPath: string, exists: (path: string) => boolean, write: (record: AgentRecord) => void): AgentRecord {
+	if (!record.fromCanvas) return record;
+	const { fromCanvas, ...rest } = record;
+	const canvas = rest.inPlay.length === 0 && !rest.positions ? readCanvasStage(deckPath, fromCanvas) : undefined;
+	if (!canvas) {
+		write(rest);
+		return rest;
+	}
+	const boards = canvas.boards.filter(exists);
+	const context = [...boards, ...rest.context.filter((path) => !boards.includes(path))];
+	const places = Object.fromEntries(Object.entries(canvas.places).filter(([path]) => context.includes(path)));
+	const next: AgentRecord = { ...rest, context, inPlay: boards, ...(Object.keys(places).length > 0 ? { positions: places } : {}) };
+	write(next);
+	return next;
 }

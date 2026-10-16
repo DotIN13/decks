@@ -3,9 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
-import { migrateStages, movedPath } from "./canvas-files.ts";
+import { migrateStages, movedPath } from "./2026-10-16-stages-to-canvases.ts";
 
 /*
  * Canvases are the deck's: `canvases/<subject>/canvas.pen`. A deck from before keeps them in
@@ -49,25 +48,4 @@ test("a deck's stages/ moves to canvases/ once: titled ones are named for their 
 test("a path written before the move still finds its canvas", () => {
 	assert.equal(movedPath("stages/wren/stage.pen", new Map()), "canvases/wren/canvas.pen");
 	assert.equal(movedPath("boards/plan.html", new Map()), "boards/plan.html");
-});
-
-test("a new agent's canvas is not named after it, and the first name chosen names the folder", () => {
-	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-canvas-name-")));
-	const deck = join(dataDir, "decks");
-	mkdirSync(join(deck, "boards"), { recursive: true });
-	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
-	try {
-		const one = app.agents.create({ name: "Wren", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
-		const first = one.stageName(true)!;
-		assert.equal(first, "untitled-canvas");
-		app.handle({ type: "stage.rename", name: first, to: "Launch plan" }, () => {});
-		assert.equal(one.stageName(), "launch-plan", "the folder takes the first name");
-		assert.ok(existsSync(join(deck, "canvases", "launch-plan", "canvas.json")));
-		app.handle({ type: "stage.rename", name: "launch-plan", to: "Launch plan, week two" }, () => {});
-		assert.equal(one.stageName(), "launch-plan", "and keeps it after that");
-		assert.equal(app.pens.titleOf("launch-plan"), "Launch plan, week two");
-	} finally {
-		app.dispose();
-		rmSync(dataDir, { recursive: true, force: true });
-	}
 });

@@ -83,7 +83,7 @@ export interface AgentRecord {
 	 * The canvas a record written while boards lived on shared canvases pointed at, by id.
 	 *
 	 * Read once and never written: `restore` copies that canvas's boards and places onto this
-	 * chat's own stage (`agents/from-canvas.ts`), and the next write stores them here instead.
+	 * chat's own stage (`migrations/2026-09-22-shared-canvases-to-agents.ts`), and the next write stores them here instead.
 	 */
 	fromCanvas?: string;
 	/** The deck's dispatcher, which no longer exists: its record is read so it can be skipped. */

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { recordedBoardsToAdopt } from "../migrations/2026-10-16-board-lists-into-canvas-files.ts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -770,11 +771,13 @@ export class DeckAgent {
 		if (!this.stage.pens) return;
 		const restored = this.restoredPlaying;
 		this.restoredPlaying = undefined;
-		if (this.onCanvas().length > 0 || !restored?.length) {
+		// `migrations/2026-10-16-board-lists-into-canvas-files.ts`
+		const adopt = recordedBoardsToAdopt(this.onCanvas().length, restored);
+		if (adopt.length === 0) {
 			if (this.canvasName()) this.penChanged();
 			return;
 		}
-		this.setInPlay(restored);
+		this.setInPlay(adopt);
 	}
 
 	/** Work on another stage: the browser is sent its drawing, and its boards are the ones this agent sees. */

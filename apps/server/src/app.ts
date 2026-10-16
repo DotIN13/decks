@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { titleCanvas } from "./stage/stage-admin.ts";
-import { migrateStages } from "./stage/canvas-files.ts";
+import { runAtOpen } from "./migrations/index.ts";
 import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -521,9 +521,8 @@ export class App {
 	 * pointing at it.
 	 */
 	static open(config: Config): App {
-		// Canvases kept in `stages/` move to `canvases/` once, before anything reads either (`stage/canvas-files.ts`).
-		const moved = migrateStages(config.deck);
-		if (moved.size) console.log(`[decks] moved ${moved.size} canvases from stages/ to canvases/`);
+		// A deck kept in an older shape is moved to this one before anything reads it (`migrations/`).
+		for (const line of runAtOpen(config.deck)) console.log(`[decks] ${line}`);
 		const existing = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"));
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
