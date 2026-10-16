@@ -695,6 +695,13 @@ export function CardEditor(props: CardEditorProps) {
 	 * the board pill does (`placing`).
 	 */
 	let wanted = false;
+	/*
+	 * Shown once a selection stops changing, not while it is being made: a pointer selecting words
+	 * shows the bar when it lifts, and a selection the keyboard grows shows it after a short pause.
+	 */
+	let selecting = false;
+	let settleBar: ReturnType<typeof setTimeout> | undefined;
+	const SELECTION_PAUSE_MS = 300;
 	function placeBar() {
 		if (!bar.isConnected || !wanted || !sel().rangeCount) return;
 		const r = sel().getRangeAt(0).getBoundingClientRect();
@@ -717,7 +724,7 @@ export function CardEditor(props: CardEditorProps) {
 		const s = sel();
 		const was = wanted;
 		// Shown while words are selected, as before; a press inside the bar keeps the selection, so it stays.
-		wanted = !dragging && s.rangeCount > 0 && !s.isCollapsed && ed.contains(s.anchorNode);
+		wanted = !dragging && !selecting && s.rangeCount > 0 && !s.isCollapsed && ed.contains(s.anchorNode);
 		bar.toggleAttribute("data-off", !wanted);
 		if (!wanted) closeMenus();
 		if (!wanted) return;
@@ -1260,15 +1267,40 @@ export function CardEditor(props: CardEditorProps) {
 		placing = requestAnimationFrame(keep);
 		onCleanup(() => cancelAnimationFrame(placing));
 		const move = (event: PointerEvent) => onPointerMove(event);
-		const up = () => endDrag(false);
-		const cancel = () => endDrag(true);
-		const selection = () => showBar();
+		const up = () => {
+			endDrag(false);
+			if (selecting) {
+				selecting = false;
+				showBar();
+			}
+		};
+		const cancel = () => {
+			endDrag(true);
+			selecting = false;
+		};
+		// A press in the words starts a selection; the bar waits for the lift (`up`).
+		const press = (event: PointerEvent) => {
+			if (event.button !== 0 || !ed.contains(event.target as Node)) return;
+			selecting = true;
+			clearTimeout(settleBar);
+			showBar();
+		};
+		const selection = () => {
+			clearTimeout(settleBar);
+			if (selecting) return;
+			// Up already: it follows the selection. Not up yet: it waits until the selection rests.
+			if (!bar.hasAttribute("data-off")) showBar();
+			else settleBar = setTimeout(showBar, SELECTION_PAUSE_MS);
+		};
+		document.addEventListener("pointerdown", press, true);
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);
 		document.addEventListener("selectionchange", selection);
 		onCleanup(() => {
 			watch.disconnect();
+			clearTimeout(settleBar);
+			document.removeEventListener("pointerdown", press, true);
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);

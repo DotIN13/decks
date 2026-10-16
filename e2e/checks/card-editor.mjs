@@ -141,6 +141,22 @@ say("…and the note card from before is now a card frame, one markdown item per
 await settle(page, 400);
 await openCard();
 await settle(page, 300);
+// Swept with the pointer, the bar waits for the lift: none while the words are still being chosen.
+{
+	const words = await page.evaluate(() => {
+		const r = document.querySelector(".pce-body > p").getBoundingClientRect();
+		return { x: r.x + 3, y: r.y + Math.min(r.height / 2, 10), w: Math.min(r.width - 6, 140) };
+	});
+	await page.mouse.move(words.x, words.y);
+	await page.mouse.down();
+	await page.mouse.move(words.x + words.w / 2, words.y, { steps: 4 });
+	await page.mouse.move(words.x + words.w, words.y, { steps: 4 });
+	await page.waitForTimeout(500);
+	const during = await page.evaluate(() => ({ off: document.querySelector(".pce-bar").hasAttribute("data-off"), selected: !getSelection().isCollapsed }));
+	await page.mouse.up();
+	const after = await until(() => page.evaluate(() => !document.querySelector(".pce-bar").hasAttribute("data-off")), 1500);
+	say("words swept with the pointer get the style bar when it lifts, not while sweeping", during.selected && during.off && !!after, JSON.stringify(during));
+}
 await page.evaluate(() => {
 	const text = document.querySelector(".pce-body > p").firstChild;
 	const range = document.createRange();
