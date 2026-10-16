@@ -657,6 +657,10 @@
 	.stage[data-engine] .board-node[data-dormant] > .surface {
 	background: transparent;
 }
+	/* Nor does a board with no page in it: one mounted only to be dragged covered the picture it carries. */
+	.stage[data-engine] .board-node > .surface:not(:has(> iframe)) {
+	background: transparent;
+}
 	/* --- a board on the stage ---------------------------------------------------- */
 
 .board-node {

@@ -14,7 +14,7 @@
  * the graphics card and let go of on the page: a picture lives once, as a texture. Past the budget,
  * the pictures drawn longest ago go first.
  */
-import { createEngine, type Engine } from "@decks/engine";
+import { createEngine, type Engine, type Item } from "@decks/engine";
 import type { SceneBoard } from "./pen/layer.ts";
 import type { SceneOutput } from "./pen/scene.ts";
 
@@ -108,6 +108,10 @@ export class EngineStage {
 	failed: (() => void) | undefined;
 	/** Tiles that arrived before the engine was ready, shown once it is. */
 	private early: TileMessage[] = [];
+	/** Each board's items as laid out, where the board is, so a drag can move them without laying out every board. */
+	private boardItems = new Map<string, Array<[string, Item]>>();
+	/** The boards a drag carries, and how far: drawn that far from where they are until it lets go (`carry`). */
+	private carried: { paths: ReadonlySet<string>; dx: number; dy: number } = { paths: new Set(), dx: 0, dy: 0 };
 
 	constructor(under: HTMLCanvasElement, over: HTMLCanvasElement) {
 		void createEngine({ under, over, ...(engineChoice() === "webgl2" ? { prefer: "webgl2" as const } : {}) }).then((engine) => {
@@ -252,32 +256,61 @@ export class EngineStage {
 		this.want();
 	}
 
+	/**
+	 * Boards being dragged, drawn `dx dy` from where they are until the drag lets go. The stage keeps a
+	 * dragged board where it was picked up until then, and the sheet carries the pictures of the ones it
+	 * draws; with the engine on, the pictures are the engine's, and without this they stayed behind.
+	 */
+	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
+		const was = this.carried;
+		const next = { paths: new Set(paths), dx: offset.dx, dy: offset.dy };
+		if (was.dx === next.dx && was.dy === next.dy && was.paths.size === next.paths.size && paths.every((path) => was.paths.has(path))) return;
+		this.carried = next;
+		for (const path of new Set([...was.paths, ...next.paths])) this.placeBoard(path);
+		this.draw();
+	}
+
+	/** One board's items at its place, shifted when a drag carries it. */
+	private placeBoard(path: string): void {
+		const engine = this.engine;
+		const items = this.boardItems.get(path);
+		if (!engine || !items) return;
+		const shift = this.carried.paths.has(path) ? this.carried : undefined;
+		for (const [id, item] of items) engine.set(id, shift ? { ...item, x: item.x + shift.dx, y: item.y + shift.dy } : item);
+	}
+
 	/** Every board as the engine's items: its paper, its picture over it, its news outline. */
 	private layout(): void {
 		const engine = this.engine;
 		if (!engine) return;
 		engine.clear();
+		this.boardItems.clear();
 		// Clearing took the tiles' items too: they go back as they were.
 		for (const [key, one] of this.tiles) if (one.level === this.tileLevel) this.placeTile(key);
 		const paper: [number, number, number, number] = this.scheme === "dark" ? [30, 30, 32, 1] : [255, 255, 255, 1];
 		let order = 0;
 		for (const board of this.boards) {
 			const radius = 12;
+			const items: Array<[string, Item]> = [];
+			const put = (id: string, item: Item) => items.push([id, item]);
 			if (!board.live) {
 				const picture = this.pictures.get(board.path);
 				const shown = picture?.ready && picture.url === board.picture;
-				engine.set(`paper:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h: board.h, color: paper, radius });
+				put(`paper:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h: board.h, color: paper, radius });
 				if (shown && picture.w > 0) {
 					// The whole board was pictured: a picture taller than the box is cut at its foot, a shorter one ends early.
 					const tall = (picture.h / picture.w) * board.w;
 					const h = Math.min(board.h, tall);
-					engine.set(`picture:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h, texture: board.path, uv: [0, 0, 1, h / tall], radius });
+					put(`picture:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h, texture: board.path, uv: [0, 0, 1, h / tall], radius });
 				}
 			}
 			if (board.glow && board.news) {
 				const colour = parseColour(board.news);
-				if (colour) engine.set(`news:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h: board.h, color: [colour[0], colour[1], colour[2], 0.6], radius, stroke: 1.5 });
+				if (colour) put(`news:${board.path}`, { layer: 0, order: order++, x: board.x, y: board.y, w: board.w, h: board.h, color: [colour[0], colour[1], colour[2], 0.6], radius, stroke: 1.5 });
 			}
+			if (items.length === 0) continue;
+			this.boardItems.set(board.path, items);
+			this.placeBoard(board.path);
 		}
 		this.reportPictured();
 	}

@@ -111,6 +111,61 @@ try {
 	await page.keyboard.press("Escape");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "e2e-pick-square" }, { op: "delete", id: "e2e-pick-line" }] });
 	await settle(page, 600);
+
+	/*
+	 * Boards picked by a box and dragged go with the pointer as pictures: the engine draws them, and a
+	 * board mounted only to be dragged had paper of its own over the picture it carried, while the
+	 * pictures stayed where the drag began until it let go.
+	 */
+	const colourAt = async (x, y) => {
+		const png = (await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } })).toString("base64");
+		return page.evaluate(async (data) => {
+			const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
+			const context = new OffscreenCanvas(1, 1).getContext("2d");
+			context.drawImage(bitmap, 0, 0);
+			return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).join(",");
+		}, png);
+	};
+	// Opened again at this zoom, so the boards are pictures that never had a page, as when a canvas is opened zoomed out.
+	await page.reload();
+	await settle(page, 3000);
+	await page.mouse.move(800, 450);
+	await page.keyboard.down("Control");
+	for (let i = 0; i < 10; i++) {
+		await page.mouse.wheel(0, 120);
+		await settle(page, 60);
+	}
+	await page.keyboard.up("Control");
+	await settle(page, 2500);
+	const pictured = await page.evaluate(() => window.__decksBoards().map((b) => ({ path: b.path, r: b.rect })).filter((b) => b.r.width > 24 && b.r.x > 340 && b.r.x + b.r.width < 1150 && b.r.y > 100 && b.r.y + b.r.height < 760));
+	say("there is a board picture to drag", pictured.length > 0, JSON.stringify(await page.evaluate(() => window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]))));
+	if (pictured.length > 0) {
+		const one = pictured[0].r;
+		const ground = await colourAt(1250, 760);
+		const from = { x: one.x + one.width / 2, y: one.y + one.height / 2 };
+		const shift = { x: one.width + 40, y: 0 };
+		await page.mouse.move(one.x - 12, one.y - 12);
+		await page.mouse.down();
+		await page.mouse.move(one.x + one.width + 6, one.y + one.height + 6, { steps: 6 });
+		await page.mouse.up();
+		await settle(page, 400);
+		await page.mouse.move(from.x, from.y);
+		await page.mouse.down();
+		for (let i = 1; i <= 8; i++) await page.mouse.move(from.x + (shift.x * i) / 8, from.y, { steps: 2 });
+		await settle(page, 400);
+		const left = await colourAt(from.x, from.y);
+		const carried = await colourAt(from.x + shift.x, from.y);
+		const held = await page.evaluate((path) => {
+			const carry = globalThis.__decksEngine?.carried;
+			const papers = [...document.querySelectorAll('.board-node[data-dragging="true"] > .surface')].filter((surface) => !surface.querySelector(":scope > iframe")).map((surface) => getComputedStyle(surface).backgroundColor);
+			return { carrying: !!carry && carry.paths.has(path) && carry.dx !== 0, papers };
+		}, pictured[0].path);
+		await page.mouse.up();
+		await settle(page, 600);
+		say("a box-picked board's picture goes with the drag, and nothing stays where it was", left === ground && carried !== ground, `ground ${ground}, where it was ${left}, where it went ${carried}`);
+		say("…the engine carries it, and a dragged board with no page paints no paper over it", held.carrying && held.papers.every((paint) => paint === "rgba(0, 0, 0, 0)"), JSON.stringify(held));
+		await page.keyboard.press("Escape");
+	}
 	link.close();
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

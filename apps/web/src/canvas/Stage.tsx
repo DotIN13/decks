@@ -870,8 +870,11 @@ export function Stage(props: {
 		const drag = boardDrag();
 		const held = ownDrag();
 		const board = held ? props.boards.find((one) => one.path === held.path) : undefined;
-		const carried = props.renderer !== "dom" ? undefined : drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
+		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
+		const carried = props.renderer !== "dom" ? undefined : moving;
 		penLayer.carry(carried?.paths ?? [], carried ?? { dx: 0, dy: 0 });
+		// With the engine on, the boards' pictures are its own, and go with the drag there.
+		engineStage()?.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
 	/** The boards whose carried picture is on screen: their pages hide where they were picked up (`BoardFrame`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
