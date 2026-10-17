@@ -1,0 +1,14 @@
+{
+	"name": "@decks/stage",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The stage engine, in Rust, built to WebAssembly: the page's engine and the render worker's (crates/web)",
+	"exports": {
+		".": "./pkg/stage_web.js"
+	},
+	"types": "./pkg/stage_web.d.ts",
+	"scripts": {
+		"build:wasm": "bash build-web.sh"
+	}
+}

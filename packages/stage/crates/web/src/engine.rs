@@ -95,6 +95,23 @@ impl Page {
 		Some((changes, applied.generation))
 	}
 
+	/// The server's edits (`stage.pen.delta`), applied and laid out where they reached.
+	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
+		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
+		self.scene.update(&self.doc, Some(&applied), &self.text);
+		Ok(())
+	}
+
+	/// The whole drawing, as the server sent it: worked out as edits from the one held, so only what
+	/// changed is laid out again.
+	pub fn set_document(&mut self, text: &str) -> Result<(), String> {
+		let next = Document::parse(text).map_err(|e| e.0)?;
+		self.history = History::default();
+		self.doc = next;
+		self.scene = Scene::new(&self.doc, self.scene.dark, &self.text);
+		Ok(())
+	}
+
 	/// A font file arrived: words are measured again, so everything is laid out again.
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.text.add_font(name, bytes, fallback);
@@ -326,6 +343,14 @@ impl Worker {
 			return Err(format!("batch {generation} after {}: send the whole document", self.doc.generation));
 		}
 		let applied = self.doc.apply(changes).map_err(|e| e.0)?;
+		let updated = self.scene.update(&self.doc, Some(&applied), &self.text);
+		self.invalidate(&updated);
+		Ok(())
+	}
+
+	/// The server's edits, applied; the tiles they reach are painted again.
+	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
+		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
 		let updated = self.scene.update(&self.doc, Some(&applied), &self.text);
 		self.invalidate(&updated);
 		Ok(())

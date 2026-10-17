@@ -16,6 +16,7 @@
     "@decks/engine": "*",
     "@decks/pen": "*",
     "@decks/protocol": "*",
+    "@decks/stage": "*",
     "canvaskit-wasm": "^0.42.0",
     "highlight.js": "^11.12.0",
     "lucide-solid": "^1.37.0",

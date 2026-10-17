@@ -28,6 +28,7 @@ pub fn parse(text_in: &str) -> Result<Vec<Change>, String> {
 					list: v.get("list").and_then(Value::as_bool).unwrap_or(false),
 				},
 				"remove" => Change::Remove { id: text(v, "id")? },
+				"set" if v.get("key").and_then(Value::as_str) == Some("children") => Change::List { id: text(v, "id")?, on: v.get("value").is_some() },
 				"set" => Change::Set { id: text(v, "id")?, key: text(v, "key")?, value: v.get("value").cloned() },
 				"place" => Change::Place { id: text(v, "id")?, parent: parent(v), pos: text(v, "pos")? },
 				"meta" => Change::SetMeta { key: text(v, "key")?, value: v.get("value").cloned() },
@@ -43,6 +44,8 @@ pub fn write(changes: &[Change]) -> String {
 		.map(|c| match c {
 			Change::Insert { id, parent, pos, props, list } => json!({ "op": "insert", "id": id, "parent": parent, "pos": pos, "props": Value::Object(props.clone()), "list": list }),
 			Change::Remove { id } => json!({ "op": "remove", "id": id }),
+			Change::List { id, on: true } => json!({ "op": "set", "id": id, "key": "children", "value": [] }),
+			Change::List { id, on: false } => json!({ "op": "set", "id": id, "key": "children" }),
 			Change::Set { id, key, value } => {
 				let mut m = Map::new();
 				m.insert("op".into(), "set".into());

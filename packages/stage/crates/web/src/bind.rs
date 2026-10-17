@@ -76,6 +76,11 @@ fn icon_shape(json: &str) -> Option<stage_paint::painter::IconShape> {
 	serde_json::from_str(json).ok()
 }
 
+fn parse_edits(json: &str) -> Result<Vec<stage_doc::edits::Edit>, String> {
+	let list: Vec<serde_json::Value> = serde_json::from_str(json).map_err(|e| e.to_string())?;
+	list.iter().map(stage_doc::edits::Edit::from_json).collect()
+}
+
 fn ids(json: &str) -> Vec<String> {
 	serde_json::from_str(json).unwrap_or_default()
 }
@@ -117,6 +122,18 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = addFont)]
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.page.add_font(name, bytes, fallback);
+	}
+
+	/// The server's edits (`stage.pen.delta` `edits`, as JSON).
+	#[wasm_bindgen(js_name = applyEdits)]
+	pub fn apply_edits(&mut self, edits: &str) -> Result<(), JsError> {
+		self.page.apply_edits(&parse_edits(edits).map_err(err)?).map_err(err)
+	}
+
+	/// The whole drawing (`stage.pen` `doc`, as JSON text).
+	#[wasm_bindgen(js_name = setDocument)]
+	pub fn set_document(&mut self, text: &str) -> Result<(), JsError> {
+		self.page.set_document(text).map_err(err)
 	}
 
 	/// Apply a batch of changes (JSON); `mine` when this session made it. Returns its generation.
@@ -351,6 +368,12 @@ impl WorkerEngine {
 	#[wasm_bindgen(js_name = addFont)]
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.worker.add_font(name, bytes, fallback);
+	}
+
+	/// The server's edits (`stage.pen.delta` `edits`, as JSON).
+	#[wasm_bindgen(js_name = applyEdits)]
+	pub fn apply_edits(&mut self, edits: &str) -> Result<(), JsError> {
+		self.worker.apply_edits(&parse_edits(edits).map_err(err)?).map_err(err)
 	}
 
 	/// The page's batch number `generation`; an error asks for the whole document.
