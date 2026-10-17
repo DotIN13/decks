@@ -953,7 +953,13 @@ const PRESS_EVERY_CONTROL = `(async () => {
 	return { controls: controls.length, opening, views };
 })()`;
 
+/**
+ * WebGPU, which headless Chromium has only when asked: the stage's engine draws with it in a stage
+ * picture (`stage/shots.ts`). On a Mac through Metal; elsewhere SwiftShader stands in for a card.
+ */
+const WEBGPU = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
+
 async function launchChromium(): Promise<Browser> {
 	const playwright: Playwright = await import("playwright");
-	return playwright.chromium.launch();
+	return playwright.chromium.launch({ args: WEBGPU });
 }

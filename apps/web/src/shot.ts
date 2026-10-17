@@ -1,12 +1,12 @@
 import type { PenDocument } from "@decks/pen";
-import { PenLayer } from "./canvas/pen/layer.ts";
+import { StageEngine } from "./stage/engine.ts";
 
 /**
  * One stage, drawn for a picture: the page the server's Chromium loads to take `stage.screenshot`
  * and the drawing's Export (`server/stage/shots.ts`).
  *
- * The same pieces as the canvas, and nothing else: the stage's one sheet from `PenLayer`, over
- * the boards as live frames (a hole over each), framed on the box in the address. No socket, no chrome,
+ * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its two
+ * canvases, with the boards as live frames between them, framed on the box in the address. No socket, no chrome,
  * no camera to move. When the boards say they are ready and the drawing has stopped redrawing for
  * fonts, icons and images, `window.__shotReady` is set and the picture is taken.
  */
@@ -36,8 +36,7 @@ async function main(): Promise<void> {
 	const world = document.getElementById("world")!;
 	world.style.transform = `translate(${view.width / 2}px, ${view.height / 2}px) scale(${zoom}) translate(${-camera.x}px, ${-camera.y}px)`;
 
-	// The boards in the box, as the frames the canvas would show; before the sheet, so under it.
-	const over = world.querySelector("canvas.sheet")!;
+	// The boards in the box, as the frames the canvas would show, between the engine's two canvases.
 	const inView = boards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
 	const ready = inView.map(
 		(board) =>
@@ -46,7 +45,7 @@ async function main(): Promise<void> {
 				frame.src = `/api/board/${board.path.split("/").map(encodeURIComponent).join("/")}`;
 				frame.setAttribute("scrolling", "no");
 				Object.assign(frame.style, { left: `${board.x}px`, top: `${board.y}px`, width: `${board.w}px`, height: `${board.h}px` });
-				world.insertBefore(frame, over);
+				world.append(frame);
 				const started = performance.now();
 				const wait = () => {
 					const ready = (frame.contentWindow as (Window & { __boardReady?: boolean }) | null)?.__boardReady;
@@ -57,32 +56,33 @@ async function main(): Promise<void> {
 			}),
 	);
 
-	const layer = new PenLayer();
-	let lastDrawn = 0;
-	let drawnOnce = doc.children.length === 0;
-	layer.drawn = () => {
-		lastDrawn = performance.now();
-		drawnOnce = true;
-	};
-	// A frame on the sheet is drawing too: the picture is taken once they have both gone quiet.
-	layer.presented = () => {
+	const engine = new StageEngine();
+	let lastDrawn = performance.now();
+	engine.drawn = () => {
 		lastDrawn = performance.now();
 	};
-	layer.attach(over as HTMLCanvasElement);
-	layer.setView(view);
-	layer.setScheme(scheme);
-	// Every board is a live frame here, so the sheet is a hole over each and fetches no pictures.
-	layer.setBoards(boards.map((board) => ({ ...board, live: true })));
-	layer.setDoc(doc, base);
-	layer.setCamera(camera);
+	// A frame drawn is drawing too: the picture is taken once fonts, tiles and pictures have all gone quiet.
+	engine.presented = () => {
+		lastDrawn = performance.now();
+	};
+	let failed: string | undefined;
+	engine.failed = (why) => (failed = why);
+	engine.setView(view);
+	engine.setScheme(scheme);
+	engine.attachCanvas("under", document.querySelector("canvas.under") as HTMLCanvasElement);
+	engine.attachCanvas("over", document.querySelector("canvas.over") as HTMLCanvasElement);
+	// Every board is a live frame here, so the engine leaves a hole over each and fetches no pictures.
+	engine.setBoards(boards.map((board) => ({ ...board, live: true })));
+	engine.setDoc(doc, base);
+	engine.setCamera(camera);
 
 	await Promise.all(ready);
 	const started = performance.now();
 	for (;;) {
 		await new Promise((resolve) => setTimeout(resolve, 100));
-		// A drawing waits for a frame CanvasKit drew: until it has loaded, the sheet shows the boards alone.
-		const drawingShown = doc.children.length === 0 || layer.drewDrawing;
-		if (drawnOnce && drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
+		if (failed) throw new Error(`the stage engine did not start: ${failed}`);
+		const drawingShown = doc.children.length === 0 || engine.tileCount() > 0;
+		if (drawingShown && performance.now() - lastDrawn > QUIET_MS) break;
 		if (performance.now() - started > BOARD_MS) break;
 	}
 	// Two frames, so the last picture is on the screen and not only recorded.

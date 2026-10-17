@@ -672,6 +672,11 @@ export class StageEngine {
 		this.draw();
 	}
 
+	/** Tiles the page holds: none until the worker's first ones arrive. */
+	tileCount(): number {
+		return this.page?.tileCount() ?? 0;
+	}
+
 	/** A mark for what has been sent so far: `shows(mark)` once a frame painted after all of it is on screen. */
 	mark(): number {
 		return this.sent;

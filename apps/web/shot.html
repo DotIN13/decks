@@ -36,18 +36,22 @@
 				background: #fff;
 				box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
 			}
-			#world > canvas.sheet {
+			/* The engine's two canvases, the window's size and drawn with the camera: under the boards and over them. */
+			#stage > canvas {
 				position: absolute;
 				top: 0;
 				left: 0;
+			}
+			#stage > canvas.over {
 				z-index: 1;
-				transform-origin: 0 0;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="stage">
-			<div id="world"><canvas class="sheet"></canvas></div>
+			<canvas class="under"></canvas>
+			<div id="world"></div>
+			<canvas class="over"></canvas>
 		</div>
 		<script type="module" src="/src/shot.ts"></script>
 	</body>
