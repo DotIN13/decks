@@ -102,12 +102,14 @@ fn layers_clips_gradients_shadows_and_meshes() {
 fn real_stages_draw() {
 	let Some(mut g) = gpu() else { return };
 	let Ok(root) = std::env::var("STAGE_FIXTURES") else { return };
-	let names = ["herobrine", "rotary"];
+	let names = ["herobrine", "rotary", "md-edit-test"];
 	for name in names {
 		let path = format!("{root}/{name}/stage.pen");
 		let Ok(text) = std::fs::read_to_string(&path) else { continue };
 		let doc = stage_doc::Document::parse(&text).unwrap();
-		let scene = stage_scene::Scene::new(&doc, false, &stage_scene::layout::Estimate);
+		let words = fonts();
+		let scene = stage_scene::Scene::new(&doc, false, &words);
+		let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
 		// The drawing only: boards are drawn by the page, not into tiles.
 		let Some(extent) = scene.roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b)) else { continue };
 		// The whole stage in at most 2048 pixels across.
@@ -117,7 +119,7 @@ fn real_stages_draw() {
 		let mut grid = Grid::new(1024, 100);
 		let skip = std::collections::HashSet::new();
 		let none = |_: &str| None;
-		let ctx = Context::new(&scene, &skip, &none);
+		let ctx = Context::new(&scene, &skip, &none).with_text(&words, &atlas);
 		let started = std::time::Instant::now();
 		let mut out = vec![0u8; (w * h * 4) as usize];
 		let todo = grid.to_paint(&keys, keys.len());
@@ -125,6 +127,7 @@ fn real_stages_draw() {
 			let list = paint_area(&ctx, key.area(), key.scale(), Color([0.98, 0.98, 0.98, 1.0]));
 			let texture = grid.painted(*key, 1);
 			g.texture(texture, TextureKind::Color, TILE, TILE, None);
+			stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
 			g.draw(Target::Texture(texture), &list);
 			let tile = g.read(texture).unwrap();
 			// Copy the tile into the stitched picture.
@@ -146,4 +149,51 @@ fn real_stages_draw() {
 		eprintln!("{name}: {} tiles in {:.0} ms (with read-back)", todo.len(), started.elapsed().as_secs_f64() * 1000.0);
 		save(&format!("stage-{name}"), &out, w, h);
 	}
+}
+
+fn fonts() -> stage_text::Text {
+	let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts");
+	let mut t = stage_text::Text::new();
+	for f in ["inter_latest_latin-400-normal.ttf", "inter_latest_latin-700-normal.ttf", "inter_latest_latin-600-normal.ttf", "inter_latest_latin-400-italic.ttf"] {
+		if let Ok(bytes) = std::fs::read(format!("{dir}/{f}")) {
+			t.add_font("Inter", bytes, false);
+		}
+	}
+	if let Ok(bytes) = std::fs::read(format!("{dir}/noto-sans-sc_latest_chinese-simplified-400-normal.ttf")) {
+		t.add_font("Noto Sans SC", bytes, true);
+	}
+	t
+}
+
+/// Words, upright at three sizes and turned, drawn and read back.
+#[test]
+fn words_are_crisp() {
+	let Some(mut g) = gpu() else { return };
+	let words = fonts();
+	if !words.has_fonts() {
+		return;
+	}
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"text","id":"a","x":10,"y":10,"content":"Crisp words at 14 px, 你好","fontSize":14},
+		{"type":"text","id":"b","x":10,"y":40,"content":"Bold and bigger","fontSize":28,"fontWeight":700,"fill":"#3b5cf6"},
+		{"type":"text","id":"c","x":10,"y":90,"content":"Underlined, and struck","fontSize":16,"underline":true},
+		{"type":"text","id":"d","x":300,"y":60,"content":"Turned","fontSize":20,"rotation":30},
+		{"type":"note","id":"n","x":10,"y":130,"width":260,"content":"A note wraps its words inside its paper, as pen.dev draws it."}
+	]})).unwrap();
+	let scene = stage_scene::Scene::new(&doc, false, &words);
+	let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
+	let skip = std::collections::HashSet::new();
+	let none = |_: &str| None;
+	let ctx = Context::new(&scene, &skip, &none).with_text(&words, &atlas);
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 400.0, h: 256.0 };
+	let list = paint_area(&ctx, area, 2.0, Color([1.0, 1.0, 1.0, 1.0]));
+	assert!(list.ops.iter().filter(|o| matches!(o, Op::Glyphs { .. })).count() >= 5);
+	g.texture(1, TextureKind::Color, 800, 512, None);
+	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+	g.draw(Target::Texture(1), &list);
+	let p = g.read(1).unwrap();
+	save("words", &p, 800, 512);
+	// Somewhere in the first line there is solid ink, not only grey smears.
+	let darkest = (20..40).flat_map(|y| (20..300).map(move |x| (x, y))).map(|(x, y)| px(&p, 800, x, y)[0]).min().unwrap();
+	assert!(darkest < 60, "darkest {darkest}");
 }

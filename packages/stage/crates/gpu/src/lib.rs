@@ -388,7 +388,7 @@ impl Built {
 		}
 	}
 
-	fn build(list: &DrawList, next_layer: &mut u32) -> Built {
+	fn build(list: &DrawList, next_layer: &mut u32, sizes: &HashMap<u32, (u32, u32)>) -> Built {
 		let mut b = Built::default();
 		b.passes.push(Pass { layer: None, depth: 0, clear: Some(list.clear), cmds: Vec::new() });
 		let mut clips: Vec<f32> = Vec::new();
@@ -442,8 +442,17 @@ impl Built {
 					let (p, texture) = b.paint(&Paint::Image { texture: *texture, opacity: *opacity, uv: *uv });
 					b.push_shape(&Shape { w: *w, h: *h, radii: [0.0; 4], ellipse: false }, &[1.0, 0.0, 0.0, 1.0, *x, *y], [3.0, 0.0, 0.0, 0.0], [0.0, 0.0, p, clip], texture);
 				}
-				// Words come with the text step's glyph pipeline.
-				Op::Glyphs { .. } => {}
+				Op::Glyphs { texture, quads, color, transform, colored } => {
+					let (p, _) = b.paint(&Paint::Solid(*color));
+					let (tw, th) = sizes.get(texture).copied().unwrap_or((1, 1));
+					let (tw, th) = (tw as f32, th as f32);
+					let mode = if *colored { 5.0 } else { 4.0 };
+					for q in quads {
+						let xf = transform.then(&stage_paint::list::Affine::translate(q.x, q.y));
+						let uv = [q.u / tw, q.v / th, (q.u + q.w) / tw, (q.v + q.h) / th];
+						b.push_shape(&Shape { w: q.w, h: q.h, radii: uv, ellipse: false }, &xf.0, [mode, 0.0, 0.0, 0.0], [0.0, 0.0, p, clip], Some(*texture));
+					}
+				}
 				Op::PushClip(c) => {
 					// Only the innermost clip holds for now; clips inside clips are rare on a stage.
 					let index = b.clip(c);
@@ -550,7 +559,12 @@ impl Backend for Gpu {
 				(Some(frame), view, config.width, config.height, config.format)
 			}
 		};
-		let mut built = Built::build(list, &mut self.next_layer);
+		let sizes: HashMap<u32, (u32, u32)> = list
+			.ops
+			.iter()
+			.filter_map(|op| if let Op::Glyphs { texture, .. } = op { self.textures.get(texture).map(|t| (*texture, (t.width, t.height))) } else { None })
+			.collect();
+		let mut built = Built::build(list, &mut self.next_layer, &sizes);
 		for inst in built.instances.iter_mut() {
 			if inst.xf0[0].is_nan() {
 				inst.xf0 = [width as f32, 0.0, 0.0, height as f32];

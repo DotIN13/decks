@@ -73,3 +73,16 @@ impl Recording {
 }
 
 pub const CLEAR: Color = Color::TRANSPARENT;
+
+/// Hand the glyph texture's new glyphs to the card, making its two textures the first time.
+pub fn flush_glyphs(atlas: &mut stage_text::atlas::Atlas, backend: &mut dyn Backend) {
+	use stage_text::atlas::{COLOR_TEXTURE, MASK_TEXTURE, SIZE};
+	if !atlas.made {
+		backend.texture(MASK_TEXTURE, TextureKind::Mask, SIZE, SIZE, None);
+		backend.texture(COLOR_TEXTURE, TextureKind::Color, SIZE, SIZE, None);
+		atlas.made = true;
+	}
+	for (texture, x, y, w, h, pixels) in atlas.uploads.drain(..) {
+		backend.write(texture, x, y, w, h, &pixels);
+	}
+}

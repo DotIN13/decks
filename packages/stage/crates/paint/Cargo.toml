@@ -10,3 +10,4 @@ stage-scene = { path = "../scene" }
 serde_json.workspace = true
 kurbo = "0.12"
 lyon_tessellation = "1"
+stage-text = { path = "../text" }

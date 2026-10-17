@@ -17,8 +17,10 @@ use stage_scene::{Rect, Root, Scene, geometry::Mat};
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use crate::list::{Affine, Align, Clip, Color, DrawList, Op, Paint, Shape};
+use crate::list::{Affine, Align, Clip, Color, DrawList, GlyphQuad, Op, Paint, Shape};
 use crate::mesh;
+use stage_text::atlas::{Atlas, COLOR_TEXTURE, MASK_TEXTURE};
+use stage_text::{Laid, Span, Text};
 
 pub const NOTE_RADIUS: f32 = 12.0;
 
@@ -32,11 +34,20 @@ pub struct Context<'a> {
 	pub image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>,
 	/// Pictures asked for that have no texture yet, to load.
 	pub wanted: RefCell<Vec<String>>,
+	/// Words: set by `text`, drawn from `atlas`. Without them words are not drawn.
+	pub text: Option<&'a Text>,
+	pub atlas: Option<&'a RefCell<Atlas>>,
 }
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()) }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None }
+	}
+
+	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
+		self.text = Some(text);
+		self.atlas = Some(atlas);
+		self
 	}
 }
 
@@ -167,7 +178,7 @@ fn fade(op: Op, alpha: f32) -> Op {
 		Op::Shape { shape, transform, paint: p, stroke } => Op::Shape { shape, transform, paint: paint(p), stroke },
 		Op::Mesh { vertices, indices, transform, paint: p } => Op::Mesh { vertices, indices, transform, paint: paint(p) },
 		Op::Shadow { shape, transform, color, blur, spread } => Op::Shadow { shape, transform, color: Color(color.0.map(|v| v * alpha)), blur, spread },
-		Op::Glyphs { texture, quads, color } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)) },
+		Op::Glyphs { texture, quads, color, transform, colored } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)), transform, colored },
 		Op::Picture { texture, x, y, w, h, uv, opacity } => Op::Picture { texture, x, y, w, h, uv, opacity: opacity * alpha },
 		other => other,
 	}
@@ -434,18 +445,34 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			let shape = Shape { w: w as f32, h: h as f32, radii: [NOTE_RADIUS; 4], ellipse: false };
 			card_paper_colour(ctx.dark, shape, transform, parse_color(paper).unwrap_or([1.0; 4]), ops);
 			card_edge(ctx.dark, shape, transform, ops);
-			let _ = NOTE_PAD;
+			let ink = if markdown && ctx.dark { [0.9, 0.9, 0.9, 1.0] } else { parse_color("#1f2328").unwrap_or([0.0, 0.0, 0.0, 1.0]) };
+			words(ctx, item, theme, w, h, NOTE_PAD, ink, &m, ops);
+			// A prompt names the model it is for: small, in the top padding's right corner.
+			if item.kind() == "prompt" {
+				if let Some(model) = item.get("model").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+					let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 11.0, weight: 500.0, italic: false, letter_spacing: 0.0, line_height: None };
+					label(ctx, model, &style, (NOTE_PAD, 2.0), (w - NOTE_PAD * 2.0).max(20.0), stage_text::Align::Right, [0.25, 0.2, 0.45, 0.75], &m, ops);
+				}
+			}
 		}
-		// Words, icons and films come with their own steps.
-		"text" | "icon" | "icon_font" | "browser" => {}
+		"text" => {
+			let ink = text_ink(ctx, item, theme);
+			words(ctx, item, theme, w, h, 0.0, ink, &m, ops);
+		}
+		// Icons and films come with their own steps.
+		"icon" | "icon_font" | "browser" => {}
 		kind => {
 			// Anything this build cannot draw, and broken refs, as a dashed outline that says so.
 			let missing = kind == MISSING;
 			let c = if missing { [0.86, 0.2, 0.2, 0.9] } else { [0.5, 0.5, 0.55, 0.8] };
 			let rect = mesh::rounded_rect_path(w, h, 6.0);
-			if let Some(m) = mesh::stroke(&rect, 1.5, lyon_tessellation::LineCap::Butt, lyon_tessellation::LineJoin::Miter, Some(&[6.0, 4.0]), pixels) {
-				ops.push(Op::Mesh { vertices: m.0, indices: m.1, transform, paint: Paint::Solid(Color::straight(c, 1.0)) });
+			if let Some(mesh) = mesh::stroke(&rect, 1.5, lyon_tessellation::LineCap::Butt, lyon_tessellation::LineJoin::Miter, Some(&[6.0, 4.0]), pixels) {
+				ops.push(Op::Mesh { vertices: mesh.0, indices: mesh.1, transform, paint: Paint::Solid(Color::straight(c, 1.0)) });
 			}
+			let said = if missing { format!("missing: {}", item.get("why").and_then(Value::as_str).unwrap_or(&item.id)) } else { kind.to_owned() };
+			let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 13.0, weight: 400.0, italic: false, letter_spacing: 0.0, line_height: None };
+			let grey = if ctx.dark { [0.75, 0.75, 0.78, 1.0] } else { [0.4, 0.4, 0.45, 1.0] };
+			label(ctx, &said, &style, (8.0, 8.0), (w - 16.0).max(20.0), stage_text::Align::Left, grey, &m, ops);
 		}
 	}
 }
@@ -532,4 +559,112 @@ fn card_paper_colour(dark: bool, shape: Shape, transform: Affine, paper: [f32; 4
 fn card_edge(dark: bool, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
 	let edge = if dark { [1.0, 1.0, 1.0, 0.12] } else { [0.0, 0.0, 0.0, 0.1] };
 	ops.push(Op::Shape { shape, transform, paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, Align::Outside)) });
+}
+
+/// A text item's colour: its fill, or the scheme's ink.
+fn text_ink(ctx: &Context, item: &Item, theme: &Theme) -> [f32; 4] {
+	let vars = &ctx.scene.vars;
+	let own = fills_of(item.get("fill")).into_iter().find_map(|f| {
+		if f.is_string() {
+			color(vars, Some(f), theme)
+		} else if f.get("type").and_then(Value::as_str) == Some("color") {
+			color(vars, f.get("color"), theme)
+		} else {
+			None
+		}
+	});
+	own.unwrap_or(if ctx.dark { [0.902, 0.902, 0.902, 1.0] } else { [0.122, 0.137, 0.157, 1.0] })
+}
+
+/// An item's own words inside `pad`, aligned as it says, in `ink`.
+#[allow(clippy::too_many_arguments)]
+fn words(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, pad: f64, ink: [f32; 4], m: &Mat, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let vars = &ctx.scene.vars;
+	let content = match vars.resolve(item.get("content"), theme) {
+		Some(Value::String(s)) => s.clone(),
+		Some(Value::Null) | None => return,
+		Some(other) => other.to_string(),
+	};
+	if content.is_empty() {
+		return;
+	}
+	let style = stage_scene::layout::text_style(item, vars, theme);
+	let align = match item.get("textAlign").and_then(Value::as_str) {
+		Some("center") => stage_text::Align::Center,
+		Some("right") => stage_text::Align::Right,
+		Some("justify") => stage_text::Align::Justify,
+		_ => stage_text::Align::Left,
+	};
+	let width = (w - pad * 2.0).max(1.0);
+	let auto = item.kind() == "text" && item.get("textGrowth").and_then(Value::as_str).unwrap_or("auto") == "auto";
+	// One more pixel than measured, so a line measured to fit does not wrap on rounding.
+	let max = if auto { width + 1.0 } else { width };
+	let span = Span { text: &content, style: &style, brush: 0, underline: vars.bool(item.get("underline"), theme, false), strike: vars.bool(item.get("strikethrough"), theme, false) };
+	let laid = text.lay(&[span], Some(max as f32), align);
+	let inner = h - pad * 2.0;
+	let offset = match item.get("textAlignVertical").and_then(Value::as_str) {
+		Some("middle") => (inner - laid.height as f64) / 2.0,
+		Some("bottom") => inner - laid.height as f64,
+		_ => 0.0,
+	};
+	draw_laid(ctx, &laid, (pad, pad + offset.max(0.0)), &[Color::straight(ink, 1.0)], m, ops);
+}
+
+/// A line of the app's own words (a label), not an item's.
+#[allow(clippy::too_many_arguments)]
+fn label(ctx: &Context, words: &str, style: &stage_scene::layout::TextStyle, at: (f64, f64), width: f64, align: stage_text::Align, ink: [f32; 4], m: &Mat, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let laid = text.lay(&[Span { text: words, style, brush: 0, underline: false, strike: false }], Some(width as f32), align);
+	draw_laid(ctx, &laid, at, &[Color::straight(ink, 1.0)], m, ops);
+}
+
+/// Glyphs bigger than this are drawn at this size and stretched: a glyph texture holds only so much.
+const MAX_GLYPH_PX: f64 = 192.0;
+
+/// A set paragraph's glyphs and rules, its top-left at `origin` in the item's own space. `brushes`
+/// are the colours its spans name.
+pub fn draw_laid(ctx: &Context, laid: &Laid, origin: (f64, f64), brushes: &[Color], m: &Mat, ops: &mut Vec<Op>) {
+	let Some(atlas) = ctx.atlas else { return };
+	let mut atlas = atlas.borrow_mut();
+	let [a, b, c, d, e, f] = m.0;
+	let upright = b == 0.0 && c == 0.0 && a > 0.0 && (a - d).abs() < 1e-9;
+	let scale = if upright { a } else { (a * a + b * b).sqrt() };
+	let biggest = laid.runs.iter().map(|r| r.size as f64).fold(0.0, f64::max);
+	// The scale glyphs are cut at; when it is not the target's own, a transform takes them there.
+	let raster = if biggest * scale > MAX_GLYPH_PX { MAX_GLYPH_PX / biggest.max(1.0) } else { scale };
+	let direct = upright && raster == scale;
+	let (ox, oy, transform) = if direct {
+		(e + a * origin.0, f + d * origin.1, Affine::IDENTITY)
+	} else {
+		let back = Mat([1.0 / raster, 0.0, 0.0, 1.0 / raster, 0.0, 0.0]);
+		(origin.0 * raster, origin.1 * raster, Affine(m.then(&back).0.map(|v| v as f32)))
+	};
+	let mut groups: Vec<((u32, u32), Vec<GlyphQuad>)> = Vec::new();
+	for run in &laid.runs {
+		let px = (run.size as f64 * raster) as f32;
+		for &(g, gx, gy) in &run.glyphs {
+			let x = ox + raster * gx as f64;
+			let y = oy + raster * gy as f64;
+			let fl = x.floor();
+			let Some((slot, carry)) = atlas.glyph(run, g, px, (x - fl) as f32) else { continue };
+			let quad = GlyphQuad { x: (fl + carry as f64) as f32 + slot.left as f32, y: y.round() as f32 - slot.top as f32, w: slot.w as f32, h: slot.h as f32, u: slot.u as f32, v: slot.v as f32 };
+			let texture = if slot.color { COLOR_TEXTURE } else { MASK_TEXTURE };
+			let key = (texture, run.brush);
+			match groups.iter_mut().find(|(k, _)| *k == key) {
+				Some((_, quads)) => quads.push(quad),
+				None => groups.push((key, vec![quad])),
+			}
+		}
+	}
+	let brush = |i: u32| brushes.get(i as usize).or(brushes.first()).copied().unwrap_or(Color([0.0, 0.0, 0.0, 1.0]));
+	for ((texture, b), quads) in groups {
+		let colored = texture == COLOR_TEXTURE;
+		ops.push(Op::Glyphs { texture, quads, color: brush(b), transform, colored });
+	}
+	let local = Affine(m.0.map(|v| v as f32));
+	for rule in &laid.rules {
+		let shape = Shape { w: rule.w, h: rule.h, radii: [0.0; 4], ellipse: false };
+		ops.push(Op::Shape { shape, transform: local.then(&Affine::translate(origin.0 as f32 + rule.x, origin.1 as f32 + rule.y)), paint: Paint::Solid(brush(rule.brush)), stroke: None });
+	}
 }

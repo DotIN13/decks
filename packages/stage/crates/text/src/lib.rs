@@ -1,0 +1,251 @@
+//! Words: set with parley in the app's own font files, measured for layout, and drawn as glyphs
+//! cut at the exact pixel size into a glyph texture, so text is crisp at every zoom at rest.
+//!
+//! The app fetches the font files (`font-files.ts` decides which) and hands each to [`Text::add_font`]
+//! under the name its fallback chain uses. A paragraph asks for its family, then the chain: the
+//! family's extended-Latin file, Inter, and every fallback in the order the app lists them.
+
+pub mod atlas;
+
+use parley::fontique::{Blob, FontInfoOverride};
+use parley::{Alignment, AlignmentOptions, FontContext, FontFamily, FontFamilyName, FontStyle, FontWeight, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty};
+use stage_scene::layout::{Estimate, Measure, TextStyle};
+use stage_scene::tree::Item;
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+pub const FALLBACK: &str = "Inter";
+const EXT: &str = " Ext";
+
+/// A run of words in one style, the brush naming its colour in the caller's own table.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Span<'a> {
+	pub text: &'a str,
+	pub style: &'a TextStyle,
+	pub brush: u32,
+	pub underline: bool,
+	pub strike: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Align {
+	Left,
+	Center,
+	Right,
+	Justify,
+}
+
+/// A font as glyphs need it: its file and its index in the file.
+#[derive(Clone)]
+pub struct Font {
+	pub id: u64,
+	pub data: Arc<dyn AsRef<[u8]> + Send + Sync>,
+	pub index: u32,
+}
+
+impl std::fmt::Debug for Font {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Font({}, {})", self.id, self.index)
+	}
+}
+
+/// One run of glyphs in one font, size and colour; positions from the paragraph's top-left.
+#[derive(Clone, Debug)]
+pub struct GlyphRun {
+	pub font: Font,
+	pub size: f32,
+	pub brush: u32,
+	pub embolden: bool,
+	pub skew: f32,
+	pub coords: Vec<i16>,
+	pub glyphs: Vec<(u32, f32, f32)>,
+}
+
+/// A line drawn under or through words: `x, y, w, h` from the paragraph's top-left.
+#[derive(Clone, Copy, Debug)]
+pub struct Rule {
+	pub x: f32,
+	pub y: f32,
+	pub w: f32,
+	pub h: f32,
+	pub brush: u32,
+}
+
+/// A paragraph set and ready to draw.
+#[derive(Clone, Debug, Default)]
+pub struct Laid {
+	pub width: f32,
+	pub height: f32,
+	pub runs: Vec<GlyphRun>,
+	pub rules: Vec<Rule>,
+	/// Each line's top, height and baseline, for carets and for cards.
+	pub lines: Vec<(f32, f32, f32)>,
+}
+
+struct BlobData(Blob<u8>);
+
+impl AsRef<[u8]> for BlobData {
+	fn as_ref(&self) -> &[u8] {
+		self.0.as_ref()
+	}
+}
+
+pub struct Text {
+	fcx: RefCell<FontContext>,
+	lcx: RefCell<LayoutContext<u32>>,
+	/// Fallback names, in the order they were registered.
+	fallbacks: Vec<String>,
+	families: Vec<String>,
+	measured: RefCell<HashMap<(String, u64), (f64, f64)>>,
+	/// Bumped when a font arrives: everything measured or drawn before it is stale.
+	pub generation: u64,
+}
+
+impl Default for Text {
+	fn default() -> Self {
+		Text::new()
+	}
+}
+
+impl Text {
+	pub fn new() -> Text {
+		let collection = parley::fontique::Collection::new(parley::fontique::CollectionOptions { shared: false, system_fonts: false });
+		let fcx = FontContext { collection, source_cache: Default::default() };
+		Text { fcx: RefCell::new(fcx), lcx: RefCell::new(LayoutContext::new()), fallbacks: Vec::new(), families: Vec::new(), measured: RefCell::new(HashMap::new()), generation: 0 }
+	}
+
+	/// Register a font file under `name`, the name the app's chains use. `fallback` files are tried,
+	/// in the order they arrive, for characters the family and Inter do not have.
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		let blob = Blob::new(Arc::new(bytes));
+		self.fcx.borrow_mut().collection.register_fonts(blob, Some(FontInfoOverride { family_name: Some(name), ..Default::default() }));
+		let list = if fallback { &mut self.fallbacks } else { &mut self.families };
+		if !list.iter().any(|n| n == name) {
+			list.push(name.to_owned());
+		}
+		self.measured.borrow_mut().clear();
+		self.generation += 1;
+	}
+
+	pub fn has_fonts(&self) -> bool {
+		!self.families.is_empty() || !self.fallbacks.is_empty()
+	}
+
+	/// The families a paragraph asks for, in order.
+	fn chain(&self, family: &str) -> Vec<FontFamilyName<'static>> {
+		let mut names: Vec<String> = vec![family.to_owned(), format!("{family}{EXT}"), FALLBACK.to_owned(), format!("{FALLBACK}{EXT}")];
+		names.extend(self.fallbacks.iter().cloned());
+		let mut seen = std::collections::HashSet::new();
+		names.into_iter().filter(|n| seen.insert(n.clone())).map(|n| FontFamilyName::Named(Cow::Owned(n))).collect()
+	}
+
+	/// Set spans of words in a box `max_width` wide (`None`: one line per paragraph).
+	pub fn lay(&self, spans: &[Span], max_width: Option<f32>, align: Align) -> Laid {
+		let text: String = spans.iter().map(|s| s.text).collect();
+		let mut fcx = self.fcx.borrow_mut();
+		let mut lcx = self.lcx.borrow_mut();
+		let mut builder = lcx.ranged_builder(&mut fcx, &text, 1.0, false);
+		if let Some(style) = spans.first().map(|s| s.style) {
+			builder.push_default(StyleProperty::LineHeight(match style.line_height {
+				Some(m) => LineHeight::FontSizeRelative(m as f32),
+				None => LineHeight::MetricsRelative(1.0),
+			}));
+		}
+		let mut at = 0;
+		for span in spans {
+			let range = at..at + span.text.len();
+			at = range.end;
+			let s = span.style;
+			builder.push(StyleProperty::FontFamily(FontFamily::List(Cow::Owned(self.chain(&s.family)))), range.clone());
+			builder.push(StyleProperty::FontSize(s.size as f32), range.clone());
+			builder.push(StyleProperty::FontWeight(FontWeight::new(s.weight as f32)), range.clone());
+			builder.push(StyleProperty::FontStyle(if s.italic { FontStyle::Italic } else { FontStyle::Normal }), range.clone());
+			builder.push(StyleProperty::LetterSpacing(s.letter_spacing as f32), range.clone());
+			builder.push(StyleProperty::Brush(span.brush), range.clone());
+			if span.underline {
+				builder.push(StyleProperty::Underline(true), range.clone());
+			}
+			if span.strike {
+				builder.push(StyleProperty::Strikethrough(true), range.clone());
+			}
+		}
+		let mut layout: Layout<u32> = builder.build(&text);
+		drop(lcx);
+		drop(fcx);
+		layout.break_all_lines(max_width);
+		let a = match align {
+			Align::Left => Alignment::Left,
+			Align::Center => Alignment::Center,
+			Align::Right => Alignment::Right,
+			Align::Justify => Alignment::Justify,
+		};
+		layout.align(a, AlignmentOptions::default());
+		let mut laid = Laid { width: layout.width(), height: layout.height(), ..Default::default() };
+		for line in layout.lines() {
+			let m = line.metrics();
+			laid.lines.push((m.block_min_coord, m.line_height, m.baseline));
+			for item in line.items() {
+				let PositionedLayoutItem::GlyphRun(run) = item else { continue };
+				let style = run.style();
+				let r = run.run();
+				let fd = r.font();
+				let synth = r.synthesis();
+				let glyphs: Vec<(u32, f32, f32)> = run.positioned_glyphs().map(|g| (g.id, g.x, g.y)).collect();
+				let metrics = r.font_metrics();
+				let x0 = run.offset();
+				let w = run.advance();
+				let baseline = run.baseline();
+				if let Some(u) = &style.underline {
+					let size = u.size.unwrap_or(metrics.underline_size).max(1.0);
+					laid.rules.push(Rule { x: x0, y: baseline - u.offset.unwrap_or(metrics.underline_offset), w, h: size, brush: u.brush });
+				}
+				if let Some(s) = &style.strikethrough {
+					let size = s.size.unwrap_or(metrics.strikethrough_size).max(1.0);
+					laid.rules.push(Rule { x: x0, y: baseline - s.offset.unwrap_or(metrics.strikethrough_offset), w, h: size, brush: s.brush });
+				}
+				laid.runs.push(GlyphRun {
+					font: Font { id: fd.data.id(), data: Arc::new(BlobData(fd.data.clone())), index: fd.index },
+					size: r.font_size(),
+					brush: style.brush,
+					embolden: synth.embolden(),
+					skew: synth.skew().unwrap_or(0.0),
+					coords: r.normalized_coords().iter().map(|c| c.to_bits()).collect(),
+					glyphs,
+				});
+			}
+		}
+		laid
+	}
+}
+
+fn style_key(text: &str, style: &TextStyle) -> String {
+	format!("{}|{}|{}|{}|{}|{:?}|{}", style.family, style.size, style.weight, style.italic, style.letter_spacing, style.line_height, text)
+}
+
+impl Measure for Text {
+	fn measure(&self, text: &str, style: &TextStyle, max_width: Option<f64>, item: &Item) -> (f64, f64) {
+		if !self.has_fonts() {
+			return Estimate.measure(text, style, max_width, item);
+		}
+		let key = (style_key(text, style), max_width.map_or(u64::MAX, f64::to_bits));
+		if let Some(hit) = self.measured.borrow().get(&key) {
+			return *hit;
+		}
+		let span = Span { text, style, brush: 0, underline: false, strike: false };
+		// Half a pixel more than measured, so words measured to fit do not wrap on rounding.
+		let laid = self.lay(&[span], max_width.map(|w| w as f32 + 0.5), Align::Left);
+		let mut h = laid.height as f64;
+		if text.is_empty() || laid.lines.is_empty() {
+			h = style.size * style.line_height.unwrap_or(1.2);
+		}
+		let w = laid.width as f64;
+		let out = (max_width.map_or(w, |m| w.min(m)).ceil(), h);
+		self.measured.borrow_mut().insert(key, out);
+		out
+	}
+}
+
+#[cfg(test)]
+mod tests;

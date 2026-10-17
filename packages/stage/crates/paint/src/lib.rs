@@ -7,7 +7,7 @@ pub mod mesh;
 pub mod painter;
 pub mod tiles;
 
-pub use backend::{Backend, Recording, Target, TextureKind};
+pub use backend::{Backend, Recording, Target, TextureKind, flush_glyphs};
 pub use list::{Affine, Align, Clip, Color, DrawList, GlyphQuad, Op, Paint, Shape};
 
 #[cfg(test)]

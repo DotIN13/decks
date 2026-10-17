@@ -64,7 +64,7 @@ fn vs_shape(@builtin(vertex_index) v: u32, inst: Instance) -> ShapeOut {
 	let size = inst.xf1.zw;
 	// Room past the box: a pixel and a half for the soft edge, the stroke's reach, the shadow's blur.
 	var grow = 1.5 / max(scale, 1e-6);
-	if (inst.params.x == 3.0) {
+	if (inst.params.x >= 3.0) {
 		grow = 0.0;
 	}
 	if (inst.params.x == 1.0) {
@@ -199,8 +199,8 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 		coverage = shadow(in.local + vec2<f32>(spread), size, in.extra.x, max(in.radii.x, 0.0) + spread);
 	} else {
 		let d = sd_shape(in.local, in.size, in.radii, in.params.w) * in.scale;
-		if (mode == 3.0) {
-			// A picture with hard edges: the quad is exactly its box.
+		if (mode >= 3.0) {
+			// A picture or a glyph with hard edges: the quad is exactly its box.
 			coverage = 1.0;
 		} else if (mode == 1.0) {
 			let w = in.params.y * in.scale;
@@ -219,6 +219,16 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 	}
 	if (mode == 2.0) {
 		return paints[i32(in.extra.z)].color * coverage;
+	}
+	if (mode == 4.0 || mode == 5.0) {
+		// A glyph: its part of the glyph texture, carried in `radii` as a uv rectangle.
+		let uv = mix(in.radii.xy, in.radii.zw, in.local / max(in.size, vec2<f32>(1e-6)));
+		let texel = textureSampleLevel(picture, smooth_sampler, uv, 0.0);
+		let color = paints[i32(in.extra.z)].color;
+		if (mode == 4.0) {
+			return color * texel.r * coverage;
+		}
+		return texel * color.a * coverage;
 	}
 	return paint_at(i32(in.extra.z), in.local, in.size) * coverage;
 }

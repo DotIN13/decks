@@ -107,8 +107,10 @@ pub enum Op {
 	Shadow { shape: Shape, transform: Affine, color: Color, blur: f32, spread: f32 },
 	/// Triangles in an item's own space, filled with one paint: paths, strokes of paths, polygons.
 	Mesh { vertices: Vec<[f32; 2]>, indices: Vec<u32>, transform: Affine, paint: Paint },
-	/// Glyphs: quads cut from a glyph texture, already placed in target pixels, in one colour.
-	Glyphs { texture: u32, quads: Vec<GlyphQuad>, color: Color },
+	/// Glyphs: quads cut from a glyph texture, placed in glyph space and taken to the target by
+	/// `transform` (a translation for upright words, so each glyph lands on whole pixels). A mask
+	/// texture is tinted with `color`; a colour texture (emoji) is laid at `color`'s opacity.
+	Glyphs { texture: u32, quads: Vec<GlyphQuad>, color: Color, transform: Affine, colored: bool },
 	/// A picture laid on target pixels with hard edges, for tiles that meet edge to edge: no soft
 	/// rim, so no seam. `x, y, w, h` in target pixels; `uv` the part of the texture shown.
 	Picture { texture: u32, x: f32, y: f32, w: f32, h: f32, uv: [f32; 4], opacity: f32 },
