@@ -1,0 +1,10 @@
+[package]
+name = "stage-scene"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+stage-doc = { path = "../doc" }
+serde_json.workspace = true
+kurbo = "0.12"
