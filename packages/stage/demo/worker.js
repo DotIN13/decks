@@ -12,6 +12,12 @@ async function paint() {
 	try {
 		const tiles = engine.paint(camera.x, camera.y, camera.zoom, camera.dpr, camera.width, camera.height, camera.moving, camera.moving ? 4 : 12);
 		if (tiles.length) postMessage({ type: "tiles", tiles }, tiles.map((t) => t.bitmap));
+		const discarded = JSON.parse(engine.discarded());
+		if (discarded.length) postMessage({ type: "discarded", keys: discarded });
+		const landed = JSON.parse(engine.landed());
+		if (landed.length) postMessage({ type: "landed", ids: landed });
+		const wanted = JSON.parse(engine.wantedPictures());
+		if (wanted.length) postMessage({ type: "wanted", urls: wanted });
 		// More to paint: carry on after the page has had a turn.
 		if (tiles.length) setTimeout(() => { busy = false; paint(); }, 0);
 		else busy = false;
@@ -46,6 +52,16 @@ onmessage = async ({ data }) => {
 		paint();
 	} else if (data.type === "reload") {
 		engine.reload(data.text, data.dark);
+		paint();
+	} else if (data.type === "lift") {
+		engine.lift(JSON.stringify(data.ids));
+		busy = false;
+		paint();
+	} else if (data.type === "drop") {
+		engine.dropItems(JSON.stringify(data.ids));
+		paint();
+	} else if (data.type === "picture") {
+		engine.putPicture(data.url, data.bitmap);
 		paint();
 	} else if (data.type === "font") {
 		engine.addFont(data.name, data.bytes, data.fallback);

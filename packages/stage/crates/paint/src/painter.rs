@@ -37,11 +37,13 @@ pub struct Context<'a> {
 	/// Words: set by `text`, drawn from `atlas`. Without them words are not drawn.
 	pub text: Option<&'a Text>,
 	pub atlas: Option<&'a RefCell<Atlas>>,
+	/// Draw only these top-level items (the lifted ones, on the page), whatever `skip` says.
+	pub only: Option<&'a HashSet<String>>,
 }
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None }
 	}
 
 	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
@@ -67,12 +69,13 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 	let mut stack: Vec<Scope> = Vec::new();
 	for (r, i) in ctx.scene.query(&area) {
 		let root = &ctx.scene.roots[r as usize];
-		let item = &root.tree.items[i as usize];
-		if item.kind() == "browser" {
+		if ctx.only.is_some_and(|only| !only.contains(&root.id)) {
 			continue;
 		}
+		let item = &root.tree.items[i as usize];
 		let chain = ancestors(root, i);
-		if chain.iter().chain([&i]).any(|&a| ctx.skip.contains(&root.tree.items[a as usize].id) || opacity(ctx, root, a) <= 0.0) {
+		let skipped = |a: u32| ctx.only.is_none() && ctx.skip.contains(&root.tree.items[a as usize].id);
+		if chain.iter().chain([&i]).any(|&a| skipped(a) || opacity(ctx, root, a) <= 0.0) {
 			continue;
 		}
 		// Close what this item is not inside, then open what it is inside and is not open yet.
@@ -363,6 +366,29 @@ fn meta_type(item: &Item) -> Option<&str> {
 	item.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str)
 }
 
+/// The stroke still under the pen: an SVG path in stage units, filled or stroked `size` wide.
+#[derive(Clone, Debug)]
+pub struct LiveInk {
+	pub d: String,
+	pub filled: bool,
+	pub color: [f32; 4],
+	pub size: f32,
+	pub opacity: f32,
+}
+
+/// Live strokes, drawn with `target` (stage units to target pixels).
+pub fn paint_ink(strokes: &[LiveInk], target: &Mat, ops: &mut Vec<Op>) {
+	let transform = to_affine(target);
+	let pixels = transform.scale_factor().max(1e-3);
+	for stroke in strokes {
+		let Ok(path) = kurbo::BezPath::from_svg(&stroke.d) else { continue };
+		let mesh = if stroke.filled { mesh::fill(&path, false, pixels) } else { mesh::stroke(&path, stroke.size, lyon_tessellation::LineCap::Round, lyon_tessellation::LineJoin::Round, None, pixels) };
+		if let Some((vertices, indices)) = mesh {
+			ops.push(Op::Mesh { vertices, indices, transform, paint: Paint::Solid(Color::straight(stroke.color, stroke.opacity)) });
+		}
+	}
+}
+
 /// The ops an item draws of its own (its children are drawn after): `ops` now, `closing` after its
 /// children, when it has any.
 fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &mut Vec<Op>, closing: &mut Vec<Op>) {
@@ -467,8 +493,14 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			let ink = text_ink(ctx, item, theme);
 			words(ctx, item, theme, w, h, 0.0, ink, &m, ops);
 		}
-		// Icons and films come with their own steps.
-		"icon" | "icon_font" | "browser" => {}
+		// A board: its page (or its picture) is under the drawing, so the drawing has a hole for it
+		// here, in its place in the order. What comes later draws over the board.
+		"browser" => {
+			let shape = rrect(vars, item, theme, w, h);
+			ops.push(Op::Erase { shape, transform });
+		}
+		// Icons come with their own step.
+		"icon" | "icon_font" => {}
 		kind => {
 			// Anything this build cannot draw, and broken refs, as a dashed outline that says so.
 			let missing = kind == MISSING;

@@ -49,12 +49,13 @@ struct Tex {
 
 struct Pipelines {
 	shape: wgpu::RenderPipeline,
+	erase: wgpu::RenderPipeline,
 	mesh: wgpu::RenderPipeline,
 }
 
 /// What a pass draws, in order.
 enum Cmd {
-	Shapes { range: std::ops::Range<u32>, texture: Option<u32> },
+	Shapes { range: std::ops::Range<u32>, texture: Option<u32>, erase: bool },
 	Mesh { range: std::ops::Range<u32>, texture: Option<u32> },
 }
 
@@ -69,7 +70,7 @@ struct Pass {
 pub struct Gpu {
 	pub device: wgpu::Device,
 	pub queue: wgpu::Queue,
-	surface: Option<(wgpu::Surface<'static>, wgpu::SurfaceConfiguration)>,
+	surfaces: Vec<(wgpu::Surface<'static>, wgpu::SurfaceConfiguration)>,
 	textures: HashMap<u32, Tex>,
 	pipelines: HashMap<wgpu::TextureFormat, Pipelines>,
 	frame_layout: wgpu::BindGroupLayout,
@@ -146,7 +147,7 @@ impl Gpu {
 		Gpu {
 			device,
 			queue,
-			surface: None,
+			surfaces: Vec::new(),
 			textures: HashMap::new(),
 			pipelines: HashMap::new(),
 			frame_layout,
@@ -163,8 +164,14 @@ impl Gpu {
 		}
 	}
 
-	/// Draw to the screen through this surface from now on.
+	/// Draw to the screen through this surface from now on, as the first screen surface.
 	pub fn set_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) {
+		self.surfaces.clear();
+		self.add_surface(surface, adapter, width, height);
+	}
+
+	/// One more screen surface on the same device; returns its number for `Target::Surface`.
+	pub fn add_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) -> u32 {
 		let caps = surface.get_capabilities(adapter);
 		let format = caps.formats.iter().copied().find(|f| matches!(f, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm)).unwrap_or(caps.formats[0]);
 		// The stage canvas lies over the boards' pages, so what it leaves clear must show through.
@@ -182,7 +189,8 @@ impl Gpu {
 			color_space: wgpu::SurfaceColorSpace::Auto,
 		};
 		surface.configure(&self.device, &config);
-		self.surface = Some((surface, config));
+		self.surfaces.push((surface, config));
+		(self.surfaces.len() - 1) as u32
 	}
 
 	fn ensure_pipelines(&mut self, format: wgpu::TextureFormat) {
@@ -209,6 +217,25 @@ impl Gpu {
 			multiview_mask: None,
 			cache: None,
 		});
+		// Erasing keeps what is drawn only where the shape does not cover: dst × (1 − coverage).
+		let clear = wgpu::BlendComponent { src_factor: wgpu::BlendFactor::Zero, dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha, operation: wgpu::BlendOperation::Add };
+		let erase_target = [Some(wgpu::ColorTargetState { format, blend: Some(wgpu::BlendState { color: clear, alpha: clear }), write_mask: wgpu::ColorWrites::ALL })];
+		let erase = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+			label: Some("erase"),
+			layout: Some(&self.pipeline_layout),
+			vertex: wgpu::VertexState {
+				module: &self.module,
+				entry_point: Some("vs_shape"),
+				compilation_options: Default::default(),
+				buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<Instance>() as u64, step_mode: wgpu::VertexStepMode::Instance, attributes: &instance_attrs })],
+			},
+			fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: Some("fs_shape"), compilation_options: Default::default(), targets: &erase_target }),
+			primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleStrip, ..Default::default() },
+			depth_stencil: None,
+			multisample,
+			multiview_mask: None,
+			cache: None,
+		});
 		let vertex_attrs = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x2, 3 => Float32x2];
 		let mesh = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 			label: Some("meshes"),
@@ -226,7 +253,7 @@ impl Gpu {
 			multiview_mask: None,
 			cache: None,
 		});
-		self.pipelines.insert(format, Pipelines { shape, mesh });
+		self.pipelines.insert(format, Pipelines { shape, erase, mesh });
 	}
 
 	fn msaa_view(&mut self, width: u32, height: u32, format: wgpu::TextureFormat, depth: usize) -> wgpu::TextureView {
@@ -379,12 +406,16 @@ impl Built {
 	}
 
 	fn push_shape(&mut self, shape: &Shape, xf: &[f32; 6], params: [f32; 4], extra: [f32; 4], texture: Option<u32>) {
+		self.push_instance(shape, xf, params, extra, texture, false);
+	}
+
+	fn push_instance(&mut self, shape: &Shape, xf: &[f32; 6], params: [f32; 4], extra: [f32; 4], texture: Option<u32>, erase: bool) {
 		let at = self.instances.len() as u32;
 		self.instances.push(Instance { xf0: [xf[0], xf[1], xf[2], xf[3]], xf1: [xf[4], xf[5], shape.w, shape.h], radii: shape.radii, params, extra });
 		let pass = self.passes.last_mut().expect("a pass is open");
 		match pass.cmds.last_mut() {
-			Some(Cmd::Shapes { range, texture: t }) if *t == texture && range.end == at => range.end = at + 1,
-			_ => pass.cmds.push(Cmd::Shapes { range: at..at + 1, texture }),
+			Some(Cmd::Shapes { range, texture: t, erase: e }) if *t == texture && *e == erase && range.end == at => range.end = at + 1,
+			_ => pass.cmds.push(Cmd::Shapes { range: at..at + 1, texture, erase }),
 		}
 	}
 
@@ -437,6 +468,10 @@ impl Built {
 						Some(Cmd::Mesh { range, texture: t }) if *t == texture && range.end == start => range.end = end,
 						_ => pass.cmds.push(Cmd::Mesh { range: start..end, texture }),
 					}
+				}
+				Op::Erase { shape, transform } => {
+					let (p, _) = b.paint(&Paint::Solid(Color([0.0, 0.0, 0.0, 1.0])));
+					b.push_instance(shape, &transform.0, [0.0, 0.0, 0.0, shape.ellipse as u8 as f32], [0.0, 0.0, p, clip], None, true);
 				}
 				Op::Picture { texture, x, y, w, h, uv, opacity } => {
 					let (p, texture) = b.paint(&Paint::Image { texture: *texture, opacity: *opacity, uv: *uv });
@@ -535,7 +570,7 @@ impl Backend for Gpu {
 	}
 
 	fn resize(&mut self, width: u32, height: u32) {
-		if let Some((surface, config)) = &mut self.surface {
+		for (surface, config) in self.surfaces.iter_mut() {
 			config.width = width.max(1);
 			config.height = height.max(1);
 			surface.configure(&self.device, config);
@@ -549,8 +584,9 @@ impl Backend for Gpu {
 				let Some(tex) = self.textures.get(&id) else { return };
 				(None, tex.view.clone(), tex.width, tex.height, wgpu::TextureFormat::Rgba8Unorm)
 			}
-			Target::Screen => {
-				let Some((surface, config)) = &self.surface else { return };
+			Target::Screen | Target::Surface(_) => {
+				let index = if let Target::Surface(i) = target { i as usize } else { 0 };
+				let Some((surface, config)) = self.surfaces.get(index) else { return };
 				let frame = match surface.get_current_texture() {
 					wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
 					_ => return,
@@ -638,8 +674,8 @@ impl Backend for Gpu {
 			for cmd in &pass.cmds {
 				let picture = |t: &Option<u32>| t.and_then(|id| self.textures.get(&id)).map_or(&self.white, |tex| &tex.picture);
 				match cmd {
-					Cmd::Shapes { range, texture } => {
-						rp.set_pipeline(&pipelines.shape);
+					Cmd::Shapes { range, texture, erase } => {
+						rp.set_pipeline(if *erase { &pipelines.erase } else { &pipelines.shape });
 						rp.set_bind_group(1, picture(texture), &[]);
 						rp.set_vertex_buffer(0, instances.as_ref().expect("shapes have instances").slice(..));
 						rp.draw(0..4, range.clone());

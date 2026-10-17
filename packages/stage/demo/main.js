@@ -1,6 +1,6 @@
 // The page: owns the document through the Rust page engine, sends the render worker numbered
 // batches and the camera, and in one animation frame moves the boards' pages and lays the tiles.
-import init, { PageEngine, openCanvas } from "./pkg/stage_web.js";
+import init, { PageEngine, openStage } from "./pkg/stage_web.js";
 
 const params = new URLSearchParams(location.search);
 const name = params.get("stage") ?? "herobrine";
@@ -8,6 +8,7 @@ const dark = params.get("dark") === "1";
 const stageUrl = `/deck/stages/${name}/stage.pen`;
 
 const canvas = document.getElementById("stage");
+const under = document.getElementById("under");
 const world = document.getElementById("world");
 const hud = document.getElementById("hud");
 
@@ -78,15 +79,25 @@ function frame(now) {
 	const { dpr, width, height } = size();
 	const w = Math.round(width * dpr);
 	const h = Math.round(height * dpr);
-	if (canvas.width !== w || canvas.height !== h) {
-		canvas.width = w;
-		canvas.height = h;
+	for (const c of [canvas, under]) {
+		if (c.width !== w || c.height !== h) {
+			c.width = w;
+			c.height = h;
+		}
+	}
+	// Board pages wake when there is room to read them; asleep, the engine draws their picture.
+	const awake = camera.zoom >= 0.3;
+	const live = [];
+	for (const frame of world.children) {
+		frame.classList.toggle("asleep", !awake);
+		if (awake) live.push(frame.dataset.id);
 	}
 	// Whole device pixels, as the tiles are laid.
 	const tx = Math.round(-camera.x * camera.zoom * dpr) / dpr;
 	const ty = Math.round(-camera.y * camera.zoom * dpr) / dpr;
 	world.style.transform = `translate(${tx}px, ${ty}px) scale(${camera.zoom})`;
-	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height);
+	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height, moving, JSON.stringify(live));
+	loadPictures(JSON.parse(engine.wantedPictures()));
 	const ms = performance.now() - t0;
 	stats.pageMs.push(ms);
 	if (stats.pageMs.length > 120) stats.pageMs.shift();
@@ -102,17 +113,64 @@ function toStage(e) {
 	return { x: camera.x + e.clientX / camera.zoom, y: camera.y + e.clientY / camera.zoom };
 }
 
+// Pictures by address, loaded once for both engines: relative to the stage's file.
+const asked = new Set();
+async function loadPictures(urls) {
+	for (const url of urls) {
+		if (asked.has(url)) continue;
+		asked.add(url);
+		try {
+			const blob = await (await fetch(new URL(url, new URL(stageUrl, location.href)))).blob();
+			const forPage = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+			const forWorker = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+			engine.putPicture(url, forPage);
+			worker.postMessage({ type: "picture", url, bitmap: forWorker }, [forWorker]);
+			dirty = true;
+		} catch (e) {
+			stats.errors.push(`picture ${url}: ${e}`);
+		}
+	}
+}
+
+// The pen (press P): the stroke under it is drawn by the page each frame, then kept as a path.
+let pen = false;
+let stroke;
+addEventListener("keydown", (e) => {
+	if (e.key === "p" && !e.metaKey && !e.ctrlKey) {
+		pen = !pen;
+		dirty = true;
+	}
+});
+const strokeD = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join("");
+
 let drag;
 canvas.addEventListener("pointerdown", (e) => {
 	canvas.setPointerCapture(e.pointerId);
 	const p = toStage(e);
+	if (pen) {
+		stroke = [p];
+		engine.setInk(JSON.stringify([{ d: strokeD(stroke), filled: false, color: "#e5484d", size: 3 }]));
+		dirty = true;
+		return;
+	}
 	const hit = JSON.parse(engine.pick(p.x, p.y, 4 / camera.zoom));
 	const top = hit?.path?.[0];
 	const box = top && JSON.parse(engine.boxOf(top));
-	if (top && box && !e.altKey) drag = { kind: "item", id: top, start: p, from: { x: box[0], y: box[1] } };
+	if (top && box && !e.altKey) {
+		drag = { kind: "item", id: top, start: p, from: { x: box[0], y: box[1] } };
+		// Lifted: the worker paints the tiles without it, and the page draws it each frame.
+		engine.lift(JSON.stringify([top]));
+		worker.postMessage({ type: "lift", ids: [top] });
+	}
 	else drag = { kind: "pan", sx: e.clientX, sy: e.clientY, cx: camera.x, cy: camera.y };
 });
 canvas.addEventListener("pointermove", (e) => {
+	if (stroke) {
+		stroke.push(toStage(e));
+		engine.setInk(JSON.stringify([{ d: strokeD(stroke), filled: false, color: "#e5484d", size: 3 }]));
+		dirty = true;
+		return;
+	}
 	if (!drag) return;
 	if (drag.kind === "pan") {
 		camera.x = drag.cx - (e.clientX - drag.sx) / camera.zoom;
@@ -126,7 +184,25 @@ canvas.addEventListener("pointermove", (e) => {
 		]);
 	}
 });
-canvas.addEventListener("pointerup", () => (drag = undefined));
+canvas.addEventListener("pointerup", () => {
+	if (stroke) {
+		// Kept as a path in the stage's own box, as Decks keeps ink.
+		const xs = stroke.map((p) => p.x);
+		const ys = stroke.map((p) => p.y);
+		const x = Math.floor(Math.min(...xs) - 3);
+		const y = Math.floor(Math.min(...ys) - 3);
+		const local = stroke.map((p) => ({ x: p.x - x, y: p.y - y }));
+		const width = Math.ceil(Math.max(...xs) + 3) - x;
+		const height = Math.ceil(Math.max(...ys) + 3) - y;
+		edit([{ op: "insert", id: engine.newId(), parent: null, pos: `z${Date.now().toString(36)}`, props: { type: "path", x, y, width, height, viewBox: [0, 0, width, height], geometry: strokeD(local), stroke: "#e5484d", strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: "decks.ink", tool: "pen", color: "red", size: 3 } } }]);
+		engine.setInk("[]");
+		stroke = undefined;
+		dirty = true;
+		return;
+	}
+	if (drag?.kind === "item") worker.postMessage({ type: "drop", ids: [drag.id] });
+	drag = undefined;
+});
 canvas.addEventListener(
 	"wheel",
 	(e) => {
@@ -192,7 +268,9 @@ async function start() {
 	const { dpr, width, height } = size();
 	canvas.width = Math.round(width * dpr);
 	canvas.height = Math.round(height * dpr);
-	engine.setGpu(await openCanvas(canvas, canvas.width, canvas.height));
+	under.width = canvas.width;
+	under.height = canvas.height;
+	engine.setGpu(await openStage(canvas, under, canvas.width, canvas.height));
 	worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 	worker.onmessage = ({ data }) => {
 		if (data.type === "tiles") {
@@ -201,6 +279,14 @@ async function start() {
 			const gone = JSON.parse(engine.evict());
 			if (gone.length) worker.postMessage({ type: "dropped", keys: gone });
 			dirty = true;
+		} else if (data.type === "discarded") {
+			engine.forgetTiles(JSON.stringify(data.keys));
+			dirty = true;
+		} else if (data.type === "landed") {
+			engine.landed(JSON.stringify(data.ids));
+			dirty = true;
+		} else if (data.type === "wanted") {
+			loadPictures(data.urls);
 		} else if (data.type === "resync") {
 			worker.postMessage({ type: "reload", text: engine.text(), dark });
 		} else if (data.type === "error") {
@@ -214,7 +300,7 @@ async function start() {
 	loadFonts();
 	if (params.get("boards") !== "0") placeBoards();
 	requestAnimationFrame(frame);
-	window.__stage = { engine, camera, stats, edit, changed: () => changed(false), pick: (x, y) => engine.pick(x, y, 0) };
+	window.__stage = { engine, camera, stats, edit, changed: () => changed(false), pick: (x, y) => engine.pick(x, y, 0), worker };
 }
 
 start().catch((e) => {

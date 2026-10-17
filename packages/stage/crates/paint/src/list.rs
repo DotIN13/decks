@@ -114,6 +114,8 @@ pub enum Op {
 	/// A picture laid on target pixels with hard edges, for tiles that meet edge to edge: no soft
 	/// rim, so no seam. `x, y, w, h` in target pixels; `uv` the part of the texture shown.
 	Picture { texture: u32, x: f32, y: f32, w: f32, h: f32, uv: [f32; 4], opacity: f32 },
+	/// Clear what is under a shape: where a board's page shows through the drawing.
+	Erase { shape: Shape, transform: Affine },
 	PushClip(Clip),
 	PopClip,
 	/// What follows until the matching pop is drawn on its own and laid down at this opacity.

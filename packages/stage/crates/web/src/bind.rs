@@ -33,6 +33,40 @@ async fn open(target: wgpu::SurfaceTarget<'static>, width: u32, height: u32) -> 
 	Ok(GpuHandle { gpu })
 }
 
+/// The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
+/// surface) and `under` them (board pictures).
+#[wasm_bindgen(js_name = openStage)]
+pub async fn open_stage(over: web_sys::HtmlCanvasElement, under: web_sys::HtmlCanvasElement, width: u32, height: u32) -> Result<GpuHandle, JsError> {
+	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::BROWSER_WEBGPU, ..wgpu::InstanceDescriptor::new_without_display_handle() });
+	let top = instance.create_surface(wgpu::SurfaceTarget::Canvas(over)).map_err(err)?;
+	let bottom = instance.create_surface(wgpu::SurfaceTarget::Canvas(under)).map_err(err)?;
+	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&top), ..Default::default() }).await.map_err(err)?;
+	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(err)?;
+	let mut gpu = Gpu::new(device, queue);
+	gpu.set_surface(top, &adapter, width, height);
+	gpu.add_surface(bottom, &adapter, width, height);
+	Ok(GpuHandle { gpu })
+}
+
+/// Copy a picture into texture `id`, made the picture's size, and let the picture go.
+fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>) {
+	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
+	if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h) {
+		gpu.texture(id, TextureKind::Color, w, h, None);
+	}
+	let texture = gpu.texture_handle(id).expect("just made").clone();
+	gpu.queue.copy_external_image_to_texture(
+		&wgpu::CopyExternalImageSourceInfo { source: wgpu::ExternalImageSource::ImageBitmap(bitmap.clone()), origin: wgpu::Origin2d::ZERO, flip_y: false },
+		wgpu::CopyExternalImageDestInfo { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha: true },
+		wgpu::Extent3d { width: bitmap.width().min(w), height: bitmap.height().min(h), depth_or_array_layers: 1 },
+	);
+	bitmap.close();
+}
+
+fn ids(json: &str) -> Vec<String> {
+	serde_json::from_str(json).unwrap_or_default()
+}
+
 #[wasm_bindgen(js_name = openCanvas)]
 pub async fn open_canvas(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32) -> Result<GpuHandle, JsError> {
 	open(wgpu::SurfaceTarget::Canvas(canvas), width, height).await
@@ -120,6 +154,21 @@ impl PageEngine {
 		self.page.boards().to_string()
 	}
 
+	/// Every top-level item: `[{ id, type, x, y, w, h }]`, its box as laid out.
+	pub fn roots(&self) -> String {
+		let list: Vec<serde_json::Value> = self
+			.page
+			.scene
+			.roots
+			.iter()
+			.map(|r| {
+				let b = r.placed[0].rect;
+				serde_json::json!({ "id": r.id, "type": r.tree.items[0].kind(), "x": b.x, "y": b.y, "w": b.w, "h": b.h })
+			})
+			.collect();
+		serde_json::Value::Array(list).to_string()
+	}
+
 	/// The box round everything on the stage, `[x, y, w, h]`.
 	pub fn extent(&self) -> String {
 		let all = self.page.scene.roots.iter().map(|r| r.extent).reduce(|a, b| a.union(&b)).unwrap_or_default();
@@ -143,32 +192,84 @@ impl PageEngine {
 	pub fn put_tile(&mut self, scale: u32, x: i32, y: i32, bitmap: web_sys::ImageBitmap) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let id = self.page.tile_texture(key(scale, x, y));
-		if gpu.texture_handle(id).is_none() {
-			gpu.texture(id, TextureKind::Color, TILE_SIZE, TILE_SIZE, None);
-		}
-		let texture = gpu.texture_handle(id).expect("just made").clone();
-		let (w, h) = (bitmap.width().min(TILE_SIZE), bitmap.height().min(TILE_SIZE));
-		gpu.queue.copy_external_image_to_texture(
-			&wgpu::CopyExternalImageSourceInfo { source: wgpu::ExternalImageSource::ImageBitmap(bitmap.clone()), origin: wgpu::Origin2d::ZERO, flip_y: false },
-			wgpu::CopyExternalImageDestInfo { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha: true },
-			wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
-		);
-		bitmap.close();
+		copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)));
 	}
 
-	/// Draw the screen for a camera. Call it in the same animation frame that moves the boards.
-	/// Returns how many tiles it laid.
-	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64) -> u32 {
+	/// A picture by its address (an image fill's `url`, or `board:<id>`).
+	#[wasm_bindgen(js_name = putPicture)]
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap) {
+		let Some(gpu) = &mut self.gpu else { return };
+		let (w, h) = (bitmap.width(), bitmap.height());
+		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
+		copy_in(gpu, id, &bitmap, None);
+		self.page.picture(url, id, w, h);
+	}
+
+	/// Pictures asked for since the last call, to load: `["url", …]`.
+	#[wasm_bindgen(js_name = wantedPictures)]
+	pub fn wanted_pictures(&self) -> String {
+		serde_json::to_string(&self.page.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
+	}
+
+	/// Lift top-level items for a drag (`["id", …]`): drawn here from now on.
+	pub fn lift(&mut self, items: &str) {
+		self.page.lift(&ids(items));
+	}
+
+	/// The worker's tiles have them again (`["id", …]`): stop drawing them here.
+	pub fn landed(&mut self, items: &str) {
+		self.page.landed(&ids(items));
+	}
+
+	/// The stroke under the pen, `[{ d, filled, color, size, opacity }]`, in stage units; `[]` ends it.
+	#[wasm_bindgen(js_name = setInk)]
+	pub fn set_ink(&mut self, strokes: &str) {
+		let list: Vec<serde_json::Value> = serde_json::from_str(strokes).unwrap_or_default();
+		self.page.ink = list
+			.iter()
+			.filter_map(|v| {
+				Some(stage_paint::painter::LiveInk {
+					d: v.get("d")?.as_str()?.to_owned(),
+					filled: v.get("filled").and_then(|f| f.as_bool()).unwrap_or(false),
+					color: stage_scene::values::parse_color(v.get("color").and_then(|c| c.as_str()).unwrap_or("#000"))?,
+					size: v.get("size").and_then(|s| s.as_f64()).unwrap_or(2.0) as f32,
+					opacity: v.get("opacity").and_then(|s| s.as_f64()).unwrap_or(1.0) as f32,
+				})
+			})
+			.collect();
+	}
+
+	/// Draw the screen for a camera, under and over the boards' pages. Call it in the same
+	/// animation frame that moves the pages. `live` names the boards whose pages are showing.
+	/// Returns how many draw operations it made.
+	#[allow(clippy::too_many_arguments)]
+	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, live: &str) -> u32 {
 		let Some(gpu) = &mut self.gpu else { return 0 };
 		let size = ((width * dpr).round() as u32, (height * dpr).round() as u32);
 		if size != self.size {
 			gpu.resize(size.0, size.1);
 			self.size = size;
 		}
-		let list = self.page.frame(Camera { x, y, zoom }, dpr, width, height);
-		let n = list.ops.len() as u32;
-		gpu.draw(Target::Screen, &list);
+		let live: std::collections::HashSet<String> = ids(live).into_iter().collect();
+		let (under, over) = self.page.frame(Camera { x, y, zoom }, dpr, width, height, moving, &live);
+		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
+		let n = (under.ops.len() + over.ops.len()) as u32;
+		gpu.draw(Target::Surface(1), &under);
+		gpu.draw(Target::Screen, &over);
 		n
+	}
+
+	/// The worker discarded these tiles, `[[scale, x, y], …]`.
+	#[wasm_bindgen(js_name = forgetTiles)]
+	pub fn forget_tiles(&mut self, keys: &str) {
+		let list: Vec<(u32, i32, i32)> = serde_json::from_str(keys).unwrap_or_default();
+		let keys: Vec<Key> = list.into_iter().map(|(s, x, y)| key(s, x, y)).collect();
+		let gone = self.page.forget_tiles(&keys);
+		if let Some(gpu) = &mut self.gpu {
+			for t in gone {
+				gpu.forget(t);
+			}
+		}
 	}
 
 	/// Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
@@ -253,6 +354,40 @@ impl WorkerEngine {
 			self.worker.sent(key);
 		}
 		out
+	}
+
+	pub fn lift(&mut self, items: &str) {
+		self.worker.lift(&ids(items));
+	}
+
+	#[wasm_bindgen(js_name = dropItems)]
+	pub fn drop_items(&mut self, items: &str) {
+		self.worker.drop_items(&ids(items));
+	}
+
+	/// Stale tiles at other scales the worker let go of since the last call: `[[scale, x, y], …]`.
+	pub fn discarded(&mut self) -> String {
+		let list: Vec<String> = self.worker.discarded.drain(..).map(|k| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
+		format!("[{}]", list.join(","))
+	}
+
+	/// Items put down whose tiles are all painted again: `["id", …]`.
+	pub fn landed(&mut self) -> String {
+		serde_json::to_string(&self.worker.landed()).unwrap_or_else(|_| "[]".into())
+	}
+
+	#[wasm_bindgen(js_name = putPicture)]
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap) {
+		let Some(gpu) = &mut self.gpu else { return };
+		let (w, h) = (bitmap.width(), bitmap.height());
+		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
+		copy_in(gpu, id, &bitmap, None);
+		self.worker.picture(url, id, w, h);
+	}
+
+	#[wasm_bindgen(js_name = wantedPictures)]
+	pub fn wanted_pictures(&self) -> String {
+		serde_json::to_string(&self.worker.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
 	}
 
 	/// The page let go of a tile.

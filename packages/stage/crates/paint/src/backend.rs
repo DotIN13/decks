@@ -7,7 +7,11 @@ use crate::list::{Color, DrawList};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
 	Texture(u32),
+	/// The first screen surface.
 	Screen,
+	/// Another screen surface, by the order it was added: the page has one under its boards' pages
+	/// and one over them.
+	Surface(u32),
 }
 
 /// What a texture is for, which decides its format.
