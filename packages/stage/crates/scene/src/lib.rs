@@ -15,7 +15,7 @@ use stage_doc::{Applied, Document, Handle};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use geometry::Turn;
+use geometry::Mat;
 use index::Index;
 use layout::{Measure, Placed};
 use tree::{Sources, Tree};
@@ -66,8 +66,8 @@ pub struct Root {
 	pub id: String,
 	pub tree: Tree,
 	pub placed: Vec<Placed>,
-	/// Each item's turn, and its box on the stage once turned.
-	pub turns: Vec<Turn>,
+	/// Each item's own space to the stage: its place, its turn and flips, and its parents'.
+	pub world: Vec<Mat>,
 	pub bounds: Vec<Rect>,
 	/// Everything this root draws, turned boxes included.
 	pub extent: Rect,
@@ -194,18 +194,34 @@ impl Scene {
 	fn build(&self, sources: &Sources, handle: Handle, measure: &dyn Measure) -> Root {
 		let tree = sources.tree(handle);
 		let placed = layout::layout(&tree, &self.vars, &self.base, measure);
-		let mut turns = Vec::with_capacity(tree.items.len());
+		let mut world: Vec<Mat> = Vec::with_capacity(tree.items.len());
 		let mut bounds = Vec::with_capacity(tree.items.len());
 		let mut extent: Option<Rect> = None;
 		let mut reusable = false;
 		for (item, place) in tree.items.iter().zip(&placed) {
 			reusable |= item.get("reusable").and_then(Value::as_bool).unwrap_or(false);
-			let turn = Turn::degrees(self.vars.num(item.get("rotation"), &place.theme, 0.0));
-			let b = turn.bounds(&place.rect);
+			let r = place.rect;
+			let t = &place.theme;
+			// Its own: placed, turned about its corner, mirrored about its middle.
+			let (fx, fy) = (self.vars.bool(item.get("flipX"), t, false), self.vars.bool(item.get("flipY"), t, false));
+			let mut own = Mat::translate(r.x, r.y).then(&Mat::turn(self.vars.num(item.get("rotation"), t, 0.0)));
+			if fx || fy {
+				let flip = Mat::translate(r.w / 2.0, r.h / 2.0).then(&Mat::scale(if fx { -1.0 } else { 1.0 }, if fy { -1.0 } else { 1.0 })).then(&Mat::translate(-r.w / 2.0, -r.h / 2.0));
+				own = own.then(&flip);
+			}
+			// A parent's turn and flips carry its children with it, about the parent's own corner.
+			let m = match item.parent {
+				Some(p) => {
+					let pr = placed[p as usize].rect;
+					world[p as usize].then(&Mat::translate(-pr.x, -pr.y)).then(&own)
+				}
+				None => own,
+			};
+			let b = m.bounds(r.w, r.h);
 			if place.visible {
 				extent = Some(extent.map_or(b, |e| e.union(&b)));
 			}
-			turns.push(turn);
+			world.push(m);
 			bounds.push(b);
 		}
 		let index = Index::build(placed.iter().zip(&bounds).enumerate().filter(|(_, (p, _))| p.visible).map(|(i, (_, b))| (i as u32, *b)));
@@ -214,7 +230,7 @@ impl Scene {
 			id: tree.items.first().map(|i| i.id.clone()).unwrap_or_default(),
 			tree,
 			placed,
-			turns,
+			world,
 			bounds,
 			extent: extent.unwrap_or_default(),
 			index,
@@ -270,8 +286,9 @@ impl Scene {
 	fn hits(&self, root: &Root, i: u32, x: f64, y: f64, slop: f64) -> bool {
 		let item = &root.tree.items[i as usize];
 		let r = root.placed[i as usize].rect;
-		// Into the item's own frame: from its corner, turned back.
-		let (lx, ly) = root.turns[i as usize].invert(x - r.x, y - r.y);
+		// Into the item's own space.
+		let Some(back) = root.world[i as usize].invert() else { return false };
+		let (lx, ly) = back.apply(x, y);
 		let local = Rect { x: -slop, y: -slop, w: r.w + slop * 2.0, h: r.h + slop * 2.0 };
 		if !local.contains(lx, ly) {
 			return false;

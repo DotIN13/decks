@@ -115,6 +115,8 @@ fn picking_takes_the_topmost_and_respects_shapes_and_turns() {
 	// Turned ninety degrees counter-clockwise about its corner, it stands up from (200, 100).
 	assert_eq!(s.pick(205.0, 50.0, 0.0).unwrap().id, "turned");
 	assert!(s.pick(250.0, 105.0, 0.0).is_none());
+	let marquee_all = s.within(&Rect { x: -1.0, y: -1.0, w: 400.0, h: 400.0 });
+	assert_eq!(marquee_all.len(), 4);
 	let marquee = s.within(&Rect { x: 15.0, y: 15.0, w: 70.0, h: 70.0 });
 	assert_eq!(marquee.len(), 2);
 }
@@ -152,4 +154,15 @@ fn collect(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
 			}
 		}
 	}
+}
+
+#[test]
+fn a_turned_frame_turns_its_children() {
+	let d = doc(json!({"children":[{"type":"frame","id":"f","x":100,"y":100,"width":100,"height":20,"rotation":90,"layout":"none","children":[
+		{"type":"rectangle","id":"r","x":80,"y":0,"width":20,"height":20}
+	]}]}));
+	let s = Scene::new(&d, false, &Estimate);
+	// The child's far end is 90 units along the frame, which now points up from (100, 100).
+	assert_eq!(s.pick(110.0, 15.0, 0.0).unwrap().id, "r");
+	assert_eq!(s.pick(110.0, 95.0, 0.0).unwrap().id, "f");
 }

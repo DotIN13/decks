@@ -14,39 +14,64 @@ pub fn path_bounds(d: &str) -> Option<Rect> {
 	Some(Rect { x: b.x0, y: b.y0, w: b.width(), h: b.height() })
 }
 
-/// An item's turn: degrees counter-clockwise about its top-left corner, as pen.dev draws it.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Turn {
-	pub cos: f64,
-	pub sin: f64,
+/// A 2-D affine map, `(x, y)` → `(a·x + c·y + e, b·x + d·y + f)`: an item's own space to the stage.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Mat(pub [f64; 6]);
+
+impl Default for Mat {
+	fn default() -> Self {
+		Mat::IDENTITY
+	}
 }
 
-impl Turn {
-	pub fn degrees(d: f64) -> Turn {
-		let r = d.to_radians();
-		Turn { cos: r.cos(), sin: r.sin() }
+impl Mat {
+	pub const IDENTITY: Mat = Mat([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+
+	pub fn translate(x: f64, y: f64) -> Mat {
+		Mat([1.0, 0.0, 0.0, 1.0, x, y])
 	}
 
-	pub fn is_none(&self) -> bool {
-		self.sin == 0.0 && self.cos == 1.0
+	/// A turn of `degrees` counter-clockwise, as pen.dev turns an item, on a screen whose y grows down.
+	pub fn turn(degrees: f64) -> Mat {
+		let r = degrees.to_radians();
+		let (s, c) = (r.sin(), r.cos());
+		Mat([c, -s, s, c, 0.0, 0.0])
 	}
 
-	/// A point of the item (from its corner) as it lands on the stage (from the corner too).
-	/// Counter-clockwise on a screen whose y grows downwards.
+	pub fn scale(x: f64, y: f64) -> Mat {
+		Mat([x, 0.0, 0.0, y, 0.0, 0.0])
+	}
+
+	/// `self` after `first`: a point goes through `first`, then `self`.
+	pub fn then(&self, first: &Mat) -> Mat {
+		let [a, b, c, d, e, f] = self.0;
+		let [a2, b2, c2, d2, e2, f2] = first.0;
+		Mat([a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f])
+	}
+
 	pub fn apply(&self, x: f64, y: f64) -> (f64, f64) {
-		(x * self.cos + y * self.sin, -x * self.sin + y * self.cos)
+		let [a, b, c, d, e, f] = self.0;
+		(a * x + c * y + e, b * x + d * y + f)
 	}
 
-	pub fn invert(&self, x: f64, y: f64) -> (f64, f64) {
-		(x * self.cos - y * self.sin, x * self.sin + y * self.cos)
-	}
-
-	/// The box on the stage round a rectangle turned about its own corner.
-	pub fn bounds(&self, r: &Rect) -> Rect {
-		if self.is_none() {
-			return *r;
+	pub fn invert(&self) -> Option<Mat> {
+		let [a, b, c, d, e, f] = self.0;
+		let det = a * d - b * c;
+		if det.abs() < 1e-12 {
+			return None;
 		}
-		let corners = [(0.0, 0.0), (r.w, 0.0), (0.0, r.h), (r.w, r.h)].map(|(x, y)| self.apply(x, y));
+		let (ia, ib, ic, id) = (d / det, -b / det, -c / det, a / det);
+		Some(Mat([ia, ib, ic, id, -(ia * e + ic * f), -(ib * e + id * f)]))
+	}
+
+	pub fn is_translation(&self) -> bool {
+		let [a, b, c, d, ..] = self.0;
+		a == 1.0 && b == 0.0 && c == 0.0 && d == 1.0
+	}
+
+	/// The box on the stage round a `w` × `h` box in the map's own space.
+	pub fn bounds(&self, w: f64, h: f64) -> Rect {
+		let corners = [(0.0, 0.0), (w, 0.0), (0.0, h), (w, h)].map(|(x, y)| self.apply(x, y));
 		let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
 		for (x, y) in corners {
 			x0 = x0.min(x);
@@ -54,7 +79,7 @@ impl Turn {
 			x1 = x1.max(x);
 			y1 = y1.max(y);
 		}
-		Rect { x: r.x + x0, y: r.y + y0, w: x1 - x0, h: y1 - y0 }
+		Rect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 	}
 }
 
@@ -71,14 +96,13 @@ mod tests {
 	}
 
 	#[test]
-	fn turn_round_trips() {
-		let t = Turn::degrees(30.0);
-		let (x, y) = t.apply(10.0, 4.0);
-		let (bx, by) = t.invert(x, y);
+	fn turns_invert() {
+		let m = Mat::translate(5.0, 7.0).then(&Mat::turn(30.0));
+		let (x, y) = m.apply(10.0, 4.0);
+		let (bx, by) = m.invert().unwrap().apply(x, y);
 		assert!((bx - 10.0).abs() < 1e-9 && (by - 4.0).abs() < 1e-9);
 		// Ninety degrees counter-clockwise: the right edge goes up.
-		let q = Turn::degrees(90.0);
-		let (x, y) = q.apply(10.0, 0.0);
+		let (x, y) = Mat::turn(90.0).apply(10.0, 0.0);
 		assert!(x.abs() < 1e-9 && (y + 10.0).abs() < 1e-9);
 	}
 }
