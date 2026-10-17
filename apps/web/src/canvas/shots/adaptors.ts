@@ -99,7 +99,7 @@ const heightOf = (doc: Document, board: Board) => Math.min(MAX_H, Math.max(board
 export const serverAdaptor: ShotAdaptor = {
 	id: "server",
 	label: "Server",
-	note: "Taken by the server's Chrome from each board's file, as it is when opened fresh.",
+	note: "The server's Chrome, from each board's file.",
 	picture: serverPicture,
 };
 
@@ -117,7 +117,7 @@ export async function takeSnapshot(frame: HTMLIFrameElement, board: Board): Prom
 export const snapshotAdaptor: ShotAdaptor = {
 	id: "snapshot",
 	label: "Snapshot",
-	note: "The page as you left it, drawn by the server, else the server's own.",
+	note: "The page as you left it, else the server's.",
 	picture: takenOrServer,
 	capture: (frame, board) => keep("snapshot", board, () => takeSnapshot(frame, board)),
 };
@@ -164,7 +164,7 @@ export async function takeInCanvas(frame: HTMLIFrameElement, board: Board): Prom
 export const canvasAdaptor: ShotAdaptor = {
 	id: "canvas",
 	label: "Canvas",
-	note: "Chrome draws the live page (Canvas renderer and flag), else a snapshot, else the server's.",
+	note: "Chrome draws the live page, else a snapshot.",
 	picture: takenOrServer,
 	capture: (frame, board) => keep(canDrawInCanvas(frame) ? "canvas" : "snapshot", board, () => canvasOrSnapshot(frame, board)),
 };

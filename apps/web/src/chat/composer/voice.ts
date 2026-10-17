@@ -7,9 +7,9 @@ import { api } from "../../connections/connection.ts";
  */
 export type Recogniser = "auto" | "server" | "browser";
 export const RECOGNISERS: ReadonlyArray<{ id: Recogniser; label: string; note: string }> = [
-	{ id: "auto", label: "Automatic", note: "The server's when it has a key, the browser's when it has not." },
-	{ id: "server", label: "Server", note: "OpenAI's transcriber, through this server: any browser, any mix of languages." },
-	{ id: "browser", label: "Browser", note: "Free and heard as you speak, but one language at a time; Chrome sends the audio to Google." },
+	{ id: "auto", label: "Automatic", note: "The server's if it has a key, else this browser's." },
+	{ id: "server", label: "Server", note: "OpenAI, through this server: any language." },
+	{ id: "browser", label: "Browser", note: "Free and live, one language at a time." },
 ];
 /** The languages offered for the browser's recogniser; empty is the browser's own language. */
 export const VOICE_LANGS: ReadonlyArray<{ id: string; label: string }> = [

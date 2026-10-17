@@ -43,9 +43,9 @@ export const ALERT_KINDS: AlertKind[] = ["done", "ask", "problem"];
 
 /** How each kind is described in Settings. The wording is the feature's documentation. */
 export const ALERT_LABELS: Record<AlertKind, { label: string; note: string }> = {
-	done: { label: "An agent finishes", note: "It stopped working and left you something to read." },
-	ask: { label: "An agent asks you something", note: "A question over the input bar. Nothing moves until you answer." },
-	problem: { label: "Something goes wrong", note: "A turn failed, or the deck refused an edit." },
+	done: { label: "An agent finishes", note: "It left you something to read." },
+	ask: { label: "An agent asks you something", note: "It waits until you answer." },
+	problem: { label: "Something goes wrong", note: "A turn failed, or an edit was refused." },
 };
 
 export interface AlertPrefs {

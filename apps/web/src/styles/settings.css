@@ -73,6 +73,20 @@
 	font-size: var(--type-note);
 }
 	/*
+	 * Every explanation in Settings is one line: a sentence that does not fit is cut with an ellipsis
+	 * and shown whole on hover (`Settings`). The wording is written to fit, so a cut is the exception.
+	 */
+	.settings :is(.set-note, .set-k > .row-note, .row-note) {
+	display: block;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+	.settings .set-k {
+	min-width: 0;
+}
+	/*
  * One row: what it is on the left, the one control that changes it on the right.
  *
  * The hairline is a top `box-shadow` rather than a border so it does not add a pixel to the

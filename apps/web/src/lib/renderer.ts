@@ -24,11 +24,11 @@
 export type RendererChoice = "dom" | "canvas-per-board";
 
 export const RENDERERS: Array<{ id: RendererChoice; label: string; note: string }> = [
-	{ id: "dom", label: "Documents", note: "Each board is a live document under one transform. Works everywhere." },
+	{ id: "dom", label: "Documents", note: "Each board a live page. Works everywhere." },
 	{
 		id: "canvas-per-board",
 		label: "Canvas",
-		note: "Each board is drawn into its own canvas and redrawn when the camera rests. Boards stay clickable.",
+		note: "Each board drawn into its own canvas.",
 	},
 ];
 

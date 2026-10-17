@@ -32,9 +32,9 @@ export interface DeckSettings {
 
 /** The server's speech recognisers to choose from in Settings, cheapest first. */
 export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string }> = [
-	{ id: "gpt-4o-mini-transcribe", label: "GPT-4o mini Transcribe", note: "About $0.003 a minute. Quick, and good with Chinese and English mixed." },
-	{ id: "gpt-4o-transcribe", label: "GPT-4o Transcribe", note: "About $0.006 a minute. The most accurate, for accents and noisy rooms." },
-	{ id: "whisper-1", label: "Whisper", note: "About $0.006 a minute. The older model; one language at a time." },
+	{ id: "gpt-4o-mini-transcribe", label: "GPT-4o mini Transcribe", note: "$0.003 a minute; mixes languages well." },
+	{ id: "gpt-4o-transcribe", label: "GPT-4o Transcribe", note: "$0.006 a minute; the most accurate." },
+	{ id: "whisper-1", label: "Whisper", note: "$0.006 a minute; the older model." },
 ];
 
 export interface Board {
