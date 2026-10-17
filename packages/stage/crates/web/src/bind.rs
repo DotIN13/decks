@@ -81,6 +81,43 @@ fn parse_edits(json: &str) -> Result<Vec<stage_doc::edits::Edit>, String> {
 	list.iter().map(stage_doc::edits::Edit::from_json).collect()
 }
 
+/// A gesture's previews from the app's `PenPreview`s: a size, a corner and fields become fields.
+fn previews(json: &str) -> Option<Vec<(String, crate::engine::Preview)>> {
+	let list: Vec<(String, serde_json::Value)> = serde_json::from_str(json).ok()?;
+	Some(
+		list.into_iter()
+			.map(|(id, p)| {
+				let n = |k: &str| p.get(k).and_then(serde_json::Value::as_f64);
+				let mut set: Vec<(String, Option<serde_json::Value>)> = Vec::new();
+				if let Some(w) = n("w") {
+					set.push(("width".into(), Some(w.into())));
+				}
+				if let Some(h) = n("h") {
+					set.push(("height".into(), Some(h.into())));
+				}
+				match p.get("radius") {
+					Some(serde_json::Value::Null) => set.push(("cornerRadius".into(), None)),
+					Some(r) if r.is_number() => set.push(("cornerRadius".into(), Some(r.clone()))),
+					_ => {}
+				}
+				if let Some(serde_json::Value::Object(fields)) = p.get("set") {
+					for (k, v) in fields {
+						set.push((k.clone(), if v.is_null() { None } else { Some(v.clone()) }));
+					}
+				}
+				(id, crate::engine::Preview { dx: n("dx").unwrap_or(0.0), dy: n("dy").unwrap_or(0.0), set })
+			})
+			.collect(),
+	)
+}
+
+fn view_state(json: &str) -> crate::engine::ViewState {
+	let v: serde_json::Value = serde_json::from_str(json).unwrap_or_default();
+	let set = |k: &str| v.get(k).and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+	let scrolls = v.get("scrolls").and_then(|s| s.as_object()).map(|m| m.iter().filter_map(|(k, x)| Some((k.clone(), x.as_f64()?))).collect()).unwrap_or_default();
+	crate::engine::ViewState { hidden: set("hidden"), mute: set("mute"), holes: set("holes"), scrolls }
+}
+
 fn ids(json: &str) -> Vec<String> {
 	serde_json::from_str(json).unwrap_or_default()
 }
@@ -256,6 +293,87 @@ impl PageEngine {
 		}
 	}
 
+	/// A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
+	#[wasm_bindgen(js_name = setPreview)]
+	pub fn set_preview(&mut self, moving: &str) -> Result<(), JsError> {
+		self.page.preview(previews(moving)).map_err(err)
+	}
+
+	/// What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
+	#[wasm_bindgen(js_name = setView)]
+	pub fn set_view(&mut self, view: &str) {
+		self.page.view = view_state(view);
+	}
+
+	/// The stage's boards: `[{ path, x, y, w, h, live, news?, glow? }]`.
+	#[wasm_bindgen(js_name = setBoards)]
+	pub fn set_boards(&mut self, boards: &str) {
+		let list: Vec<serde_json::Value> = serde_json::from_str(boards).unwrap_or_default();
+		self.page.boards = list
+			.iter()
+			.filter_map(|b| {
+				let n = |k: &str| b.get(k).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+				Some(crate::engine::BoardPlace {
+					path: b.get("path")?.as_str()?.to_owned(),
+					x: n("x"),
+					y: n("y"),
+					w: n("w"),
+					h: n("h"),
+					live: b.get("live").and_then(serde_json::Value::as_bool).unwrap_or(false),
+					news: b.get("news").and_then(serde_json::Value::as_str).and_then(stage_scene::values::parse_color),
+					glow: b.get("glow").and_then(serde_json::Value::as_bool).unwrap_or(false),
+				})
+			})
+			.collect();
+	}
+
+	/// Boards a drag carries (`["path", …]`), and how far.
+	pub fn carry(&mut self, paths: &str, dx: f64, dy: f64) {
+		self.page.carry = (ids(paths).into_iter().collect(), dx, dy);
+	}
+
+	/// The boards drawn as their picture in the last frame.
+	pub fn pictured(&self) -> String {
+		serde_json::to_string(&self.page.pictured).unwrap_or_else(|_| "[]".into())
+	}
+
+	/// The live boards a drag carries as their picture, whose pages wait unseen.
+	pub fn carrying(&self) -> String {
+		serde_json::to_string(&self.page.carrying).unwrap_or_else(|_| "[]".into())
+	}
+
+	/// Forget a board's picture (it changed): asked for again when next drawn.
+	#[wasm_bindgen(js_name = forgetPicture)]
+	pub fn forget_picture(&mut self, url: &str) {
+		if let Some((texture, _, _)) = self.page.pictures.held.remove(url) {
+			if let Some(gpu) = &mut self.gpu {
+				gpu.forget(texture);
+			}
+		}
+	}
+
+	/// Every item as laid out: `[[id, x, y, w, h, parent, order, theme], …]`.
+	pub fn layout(&self) -> String {
+		self.page.layout_json().to_string()
+	}
+
+	/// Every item under a stage point, topmost first.
+	#[wasm_bindgen(js_name = pickAll)]
+	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> String {
+		self.page.pick_all(x, y, slop).to_string()
+	}
+
+	/// Each markdown card's links and wide tables.
+	pub fn cards(&self) -> String {
+		self.page.cards_json().to_string()
+	}
+
+	/// The words and faces on the stage, for fonts.
+	#[wasm_bindgen(js_name = fontNeeds)]
+	pub fn font_needs(&self) -> String {
+		self.page.font_needs().to_string()
+	}
+
 	/// Lift top-level items for a drag (`["id", …]`): drawn here from now on.
 	pub fn lift(&mut self, items: &str) {
 		self.page.lift(&ids(items));
@@ -285,18 +403,16 @@ impl PageEngine {
 	}
 
 	/// Draw the screen for a camera, under and over the boards' pages. Call it in the same
-	/// animation frame that moves the pages. `live` names the boards whose pages are showing.
-	/// Returns how many draw operations it made.
+	/// animation frame that moves the pages. Returns how many draw operations it made.
 	#[allow(clippy::too_many_arguments)]
-	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, live: &str) -> u32 {
+	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool) -> u32 {
 		let Some(gpu) = &mut self.gpu else { return 0 };
 		let size = ((width * dpr).round() as u32, (height * dpr).round() as u32);
 		if size != self.size {
 			gpu.resize(size.0, size.1);
 			self.size = size;
 		}
-		let live: std::collections::HashSet<String> = ids(live).into_iter().collect();
-		let (under, over) = self.page.frame(Camera { x, y, zoom }, dpr, width, height, moving, &live);
+		let (under, over) = self.page.frame(Camera { x, y, zoom }, dpr, width, height, moving);
 		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
 		let n = (under.ops.len() + over.ops.len()) as u32;
 		gpu.draw(Target::Surface(1), &under);
@@ -409,6 +525,11 @@ impl WorkerEngine {
 
 	pub fn lift(&mut self, items: &str) {
 		self.worker.lift(&ids(items));
+	}
+
+	#[wasm_bindgen(js_name = setView)]
+	pub fn set_view(&mut self, view: &str) {
+		self.worker.set_view(view_state(view));
 	}
 
 	#[wasm_bindgen(js_name = dropItems)]

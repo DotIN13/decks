@@ -66,11 +66,19 @@ pub struct Context<'a> {
 	pub only: Option<&'a HashSet<String>>,
 	/// Icons by key (`icon_key`), once they have arrived.
 	pub icons: Option<&'a std::collections::HashMap<String, IconShape>>,
+	/// Items drawn moved by an offset (a drag in progress), with everything in them.
+	pub offsets: Option<&'a std::collections::HashMap<String, (f64, f64)>>,
+	/// Items whose words are not drawn: an editor is open over them.
+	pub mute: Option<&'a HashSet<String>>,
+	/// Items drawn as holes: something live shows under the drawing in their place.
+	pub holes: Option<&'a HashSet<String>>,
+	/// How far each card's wide tables are scrolled, by `id:index`.
+	pub scrolls: Option<&'a std::collections::HashMap<String, f64>>,
 }
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None, offsets: None, mute: None, holes: None, scrolls: None }
 	}
 
 	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
@@ -94,14 +102,21 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 	let target = Mat([scale, 0.0, 0.0, scale, -area.x * scale, -area.y * scale]);
 	let mut list = DrawList::new(clear);
 	let mut stack: Vec<Scope> = Vec::new();
-	for (r, i) in ctx.scene.query(&area) {
+	// Items drawn moved are found where they were: the area is widened by the largest move.
+	let reach = ctx.offsets.map_or(0.0, |o| o.values().fold(0.0f64, |m, (dx, dy)| m.max(dx.abs()).max(dy.abs())));
+	let query = Rect { x: area.x - reach, y: area.y - reach, w: area.w + reach * 2.0, h: area.h + reach * 2.0 };
+	for (r, i) in ctx.scene.query(&query) {
 		let root = &ctx.scene.roots[r as usize];
-		if ctx.only.is_some_and(|only| !only.contains(&root.id)) {
-			continue;
-		}
 		let item = &root.tree.items[i as usize];
 		let chain = ancestors(root, i);
-		let skipped = |a: u32| ctx.only.is_none() && ctx.skip.contains(&root.tree.items[a as usize].id);
+		let id_of = |a: u32| root.tree.items[a as usize].id.as_str();
+		// On the page, only lifted items (and what is in them) are drawn.
+		if let Some(only) = ctx.only {
+			if !chain.iter().chain([&i]).any(|&a| only.contains(id_of(a))) {
+				continue;
+			}
+		}
+		let skipped = |a: u32| ctx.only.is_none() && ctx.skip.contains(id_of(a));
 		if chain.iter().chain([&i]).any(|&a| skipped(a) || opacity(ctx, root, a) <= 0.0) {
 			continue;
 		}
@@ -112,11 +127,26 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 			}
 			close(stack.pop().expect("a scope is open"), &mut list);
 		}
-		for &a in &chain {
+		// An item moved by a drag, or inside one, is drawn that far away.
+		let moved = |upto: usize| -> Mat {
+			let ids = chain.iter().take(upto).chain(std::iter::once(&i).filter(|_| upto == chain.len()));
+			let mut off = None;
+			for &a in ids {
+				if let Some(o) = ctx.offsets.and_then(|m| m.get(id_of(a))) {
+					off = Some(*o);
+				}
+			}
+			match off {
+				Some((dx, dy)) => target.then(&Mat::translate(dx, dy)),
+				None => target,
+			}
+		};
+		for (k, &a) in chain.iter().enumerate() {
 			if !stack.iter().any(|s| s.root == r && s.item == a) {
-				open(ctx, root, r, a, &target, false, &mut stack, &mut list);
+				open(ctx, root, r, a, &moved(k + 1).then(&Mat::IDENTITY), false, &mut stack, &mut list);
 			}
 		}
+		let target = moved(chain.len());
 		if item.children.is_empty() {
 			let mut ops = Vec::new();
 			let mut closing = Vec::new();
@@ -426,6 +456,11 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 	let (w, h) = (placed.rect.w, placed.rect.h);
 	let m = target.then(&root.world[i as usize]);
 	let transform = to_affine(&m);
+	// Something live shows here, under the drawing: a hole, in the item's place in the order.
+	if ctx.holes.is_some_and(|h| h.contains(&item.id)) {
+		ops.push(Op::Erase { shape: rrect(vars, item, theme, w, h), transform });
+		return;
+	}
 	// How many target pixels a unit of the item's own space is: what curves are flattened to.
 	let pixels = transform.scale_factor().max(1e-3);
 	match item.kind() {
@@ -646,6 +681,9 @@ fn text_ink(ctx: &Context, item: &Item, theme: &Theme) -> [f32; 4] {
 #[allow(clippy::too_many_arguments)]
 fn words(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, pad: f64, ink: [f32; 4], m: &Mat, ops: &mut Vec<Op>) {
 	let Some(text) = ctx.text else { return };
+	if ctx.mute.is_some_and(|m| m.contains(&item.id)) {
+		return;
+	}
 	let vars = &ctx.scene.vars;
 	let content = match vars.resolve(item.get("content"), theme) {
 		Some(Value::String(s)) => s.clone(),
@@ -738,6 +776,9 @@ pub fn draw_laid(ctx: &Context, laid: &Laid, origin: (f64, f64), brushes: &[Colo
 /// A card's markdown, laid out as it was measured, inside `pad`.
 fn card_words(ctx: &Context, item: &Item, theme: &Theme, w: f64, pad: f64, m: &Mat, ops: &mut Vec<Op>) {
 	let Some(text) = ctx.text else { return };
+	if ctx.mute.is_some_and(|m| m.contains(&item.id)) {
+		return;
+	}
 	let vars = &ctx.scene.vars;
 	let Some(Value::String(content)) = vars.resolve(item.get("content"), theme) else { return };
 	if content.is_empty() {
@@ -750,10 +791,10 @@ fn card_words(ctx: &Context, item: &Item, theme: &Theme, w: f64, pad: f64, m: &M
 		_ => stage_text::Align::Left,
 	};
 	let card = text.card(content, &style, (w - pad * 2.0).max(1.0) as f32, align);
-	draw_card(ctx, &card.ops, (pad, pad), m, ops);
+	draw_card(ctx, &item.id, &card.ops, (pad, pad), m, ops);
 }
 
-fn draw_card(ctx: &Context, card_ops: &[stage_text::card::CardOp], origin: (f64, f64), m: &Mat, ops: &mut Vec<Op>) {
+fn draw_card(ctx: &Context, id: &str, card_ops: &[stage_text::card::CardOp], origin: (f64, f64), m: &Mat, ops: &mut Vec<Op>) {
 	use stage_text::card::CardOp;
 	let local = |x: f32, y: f32| Affine(m.0.map(|v| v as f32)).then(&Affine::translate(origin.0 as f32 + x, origin.1 as f32 + y));
 	let rect = |w: f32, h: f32, r: f32| Shape { w, h, radii: [r; 4], ellipse: false };
@@ -796,15 +837,18 @@ fn draw_card(ctx: &Context, card_ops: &[stage_text::card::CardOp], origin: (f64,
 					ctx.wanted.borrow_mut().push(url.clone());
 				}
 			}
-			CardOp::Scroll { x, y, w, h, content, ops: inner, .. } => {
-				// Wide tables show from their start; scrolling them comes with the page's input.
+			CardOp::Scroll { index, x, y, w, h, content, ops: inner } => {
+				// A wide table, cut to the card and moved by how far it is scrolled.
+				let max = (content - w).max(0.0);
+				let offset = ctx.scrolls.and_then(|s| s.get(&format!("{id}:{index}"))).copied().unwrap_or(0.0).clamp(0.0, max as f64) as f32;
 				ops.push(Op::PushClip(Clip { shape: rect(*w, *h, 0.0), transform: local(*x, *y) }));
-				draw_card(ctx, inner, origin, m, ops);
+				draw_card(ctx, id, inner, (origin.0 - offset as f64, origin.1), m, ops);
 				ops.push(Op::PopClip);
 				let (track, thumb) = stage_text::card::bar_colours(ctx.dark);
 				ops.push(Op::Shape { shape: rect(*w, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(track, 1.0)), stroke: None });
 				let tw = (w / content * w).max(24.0);
-				ops.push(Op::Shape { shape: rect(tw, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(thumb, 1.0)), stroke: None });
+				let at = if max > 0.0 { offset / max * (w - tw) } else { 0.0 };
+				ops.push(Op::Shape { shape: rect(tw, 3.0, 1.5), transform: local(x + at, y + h - 3.0), paint: Paint::Solid(Color::straight(thumb, 1.0)), stroke: None });
 			}
 		}
 	}

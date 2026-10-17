@@ -31,6 +31,18 @@ export class PageEngine {
      */
     boxOf(id: string): string;
     /**
+     * Each markdown card's links and wide tables.
+     */
+    cards(): string;
+    /**
+     * Boards a drag carries (`["path", …]`), and how far.
+     */
+    carry(paths: string, dx: number, dy: number): void;
+    /**
+     * The live boards a drag carries as their picture, whose pages wait unseen.
+     */
+    carrying(): string;
+    /**
      * Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
      */
     evict(): string;
@@ -39,20 +51,31 @@ export class PageEngine {
      */
     extent(): string;
     /**
+     * The words and faces on the stage, for fonts.
+     */
+    fontNeeds(): string;
+    /**
+     * Forget a board's picture (it changed): asked for again when next drawn.
+     */
+    forgetPicture(url: string): void;
+    /**
      * The worker discarded these tiles, `[[scale, x, y], …]`.
      */
     forgetTiles(keys: string): void;
     /**
      * Draw the screen for a camera, under and over the boards' pages. Call it in the same
-     * animation frame that moves the pages. `live` names the boards whose pages are showing.
-     * Returns how many draw operations it made.
+     * animation frame that moves the pages. Returns how many draw operations it made.
      */
-    frame(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, live: string): number;
+    frame(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean): number;
     generation(): number;
     /**
      * The worker's tiles have them again (`["id", …]`): stop drawing them here.
      */
     landed(items: string): void;
+    /**
+     * Every item as laid out: `[[id, x, y, w, h, parent, order, theme], …]`.
+     */
+    layout(): string;
     /**
      * Lift top-level items for a drag (`["id", …]`): drawn here from now on.
      */
@@ -63,7 +86,15 @@ export class PageEngine {
      */
     newId(): string;
     constructor(text: string, dark: boolean, session: string);
+    /**
+     * Every item under a stage point, topmost first.
+     */
+    pickAll(x: number, y: number, slop: number): string;
     pick(x: number, y: number, slop: number): string;
+    /**
+     * The boards drawn as their picture in the last frame.
+     */
+    pictured(): string;
     /**
      * An icon's shapes, as `parseIcon` gives them, by the key the engine asked for (after `icon:`).
      */
@@ -82,6 +113,10 @@ export class PageEngine {
      */
     roots(): string;
     /**
+     * The stage's boards: `[{ path, x, y, w, h, live, news?, glow? }]`.
+     */
+    setBoards(boards: string): void;
+    /**
      * The whole drawing (`stage.pen` `doc`, as JSON text).
      */
     setDocument(text: string): void;
@@ -94,6 +129,14 @@ export class PageEngine {
      * Read cards with the app's own reader: `(source) => JSON of blocks`.
      */
     setMarkdownReader(read: Function): void;
+    /**
+     * A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
+     */
+    setPreview(moving: string): void;
+    /**
+     * What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
+     */
+    setView(view: string): void;
     /**
      * The document as `.pen` text.
      */
@@ -149,6 +192,7 @@ export class WorkerEngine {
      */
     setGpu(handle: GpuHandle, canvas: OffscreenCanvas): void;
     setMarkdownReader(read: Function): void;
+    setView(view: string): void;
     static tileSize(): number;
     wantedPictures(): string;
 }
@@ -180,26 +224,37 @@ export interface InitOutput {
     readonly pageengine_applyEdits: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_boards: (a: number) => [number, number];
     readonly pageengine_boxOf: (a: number, b: number, c: number) => [number, number];
+    readonly pageengine_cards: (a: number) => [number, number];
+    readonly pageengine_carry: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly pageengine_carrying: (a: number) => [number, number];
     readonly pageengine_evict: (a: number) => [number, number];
     readonly pageengine_extent: (a: number) => [number, number];
+    readonly pageengine_fontNeeds: (a: number) => [number, number];
+    readonly pageengine_forgetPicture: (a: number, b: number, c: number) => void;
     readonly pageengine_forgetTiles: (a: number, b: number, c: number) => void;
-    readonly pageengine_frame: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
+    readonly pageengine_frame: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
     readonly pageengine_generation: (a: number) => number;
     readonly pageengine_landed: (a: number, b: number, c: number) => void;
+    readonly pageengine_layout: (a: number) => [number, number];
     readonly pageengine_lift: (a: number, b: number, c: number) => void;
     readonly pageengine_lost: (a: number) => number;
     readonly pageengine_new: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly pageengine_newId: (a: number) => [number, number];
     readonly pageengine_pick: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly pageengine_pictured: (a: number) => [number, number];
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_putPicture: (a: number, b: number, c: number, d: any) => void;
     readonly pageengine_putTile: (a: number, b: number, c: number, d: number, e: any) => void;
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
+    readonly pageengine_setBoards: (a: number, b: number, c: number) => void;
     readonly pageengine_setDocument: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setGpu: (a: number, b: number) => void;
     readonly pageengine_setInk: (a: number, b: number, c: number) => void;
     readonly pageengine_setMarkdownReader: (a: number, b: any) => void;
+    readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number];
+    readonly pageengine_setView: (a: number, b: number, c: number) => void;
     readonly pageengine_text: (a: number) => [number, number];
     readonly pageengine_tileCount: (a: number) => number;
     readonly pageengine_undo: (a: number) => [number, number];
@@ -221,13 +276,14 @@ export interface InitOutput {
     readonly workerengine_reload: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_setGpu: (a: number, b: number, c: any) => void;
     readonly workerengine_setMarkdownReader: (a: number, b: any) => void;
+    readonly workerengine_setView: (a: number, b: number, c: number) => void;
     readonly workerengine_tileSize: () => number;
     readonly workerengine_wantedPictures: (a: number) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__55: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__56: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__67: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__68: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

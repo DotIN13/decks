@@ -48,10 +48,22 @@ pub struct Page {
 	pub text: Text,
 	pub atlas: RefCell<Atlas>,
 	pub pictures: Pictures,
-	/// Top-level items being moved: drawn here each frame, left out of the worker's tiles.
+	/// Items being moved: drawn here each frame, left out of the worker's tiles.
 	pub lifted: HashSet<String>,
+	/// How far each item in a drag has moved, drawn that far away until the drag lets go.
+	pub offsets: HashMap<String, (f64, f64)>,
+	/// What undoes the fields a gesture is showing (a size, a corner, a colour) before it is saved.
+	preview_undo: Vec<Change>,
+	/// Items hidden (the eraser), muted (an editor over their words), drawn as holes (live files).
+	pub view: ViewState,
 	/// The stroke still under the pen.
 	pub ink: Vec<LiveInk>,
+	/// The stage's boards, as the app places them; and the ones a drag carries, and how far.
+	pub boards: Vec<BoardPlace>,
+	pub carry: (HashSet<String>, f64, f64),
+	/// The boards drawn as their picture in the last frame, and the live ones carried as one.
+	pub pictured: Vec<String>,
+	pub carrying: Vec<String>,
 	pub doc: Document,
 	pub scene: Scene,
 	pub history: History,
@@ -68,7 +80,7 @@ impl Page {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
 		let words = Text::new();
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		Ok(Page { boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -95,8 +107,10 @@ impl Page {
 		Some((changes, applied.generation))
 	}
 
-	/// The server's edits (`stage.pen.delta`), applied and laid out where they reached.
+	/// The server's edits (`stage.pen.delta`), applied and laid out where they reached. A gesture's
+	/// shown fields are taken back first: the saved drawing is what is drawn from now on.
 	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
+		self.unpreview_fields();
 		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
 		self.scene.update(&self.doc, Some(&applied), &self.text);
 		Ok(())
@@ -116,6 +130,83 @@ impl Page {
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.text.add_font(name, bytes, fallback);
 		self.scene.update(&self.doc, None, &self.text);
+	}
+
+	/// Every item as laid out, in paint order: `[id, x, y, w, h, parent, order, theme]`.
+	pub fn layout_json(&self) -> Value {
+		let mut out = Vec::new();
+		let mut order = 0u32;
+		for root in &self.scene.roots {
+			for (item, place) in root.tree.items.iter().zip(&root.placed) {
+				order += 1;
+				if !place.visible {
+					continue;
+				}
+				let r = place.rect;
+				let parent = item.parent.map(|p| root.tree.items[p as usize].id.as_str());
+				let theme: serde_json::Map<String, Value> = place.theme.0.iter().map(|(k, v)| (k.clone(), Value::String(v.clone()))).collect();
+				out.push(json!([item.id, r.x, r.y, r.w, r.h, parent, order, theme]));
+			}
+		}
+		Value::Array(out)
+	}
+
+	/// The ids of every item under a stage point, topmost first.
+	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> Value {
+		let ids: Vec<&str> = self.scene.pick_all(x, y, slop).into_iter().map(|(r, i)| self.scene.roots[r as usize].tree.items[i as usize].id.as_str()).collect();
+		json!(ids)
+	}
+
+	/// Each markdown card's links and wide tables, for a press to be answered with: `{ id, order,
+	/// box, pad, links, scrollers }`, the links and tables from the card's words' top-left.
+	pub fn cards_json(&self) -> Value {
+		let vars = &self.scene.vars;
+		let mut out = Vec::new();
+		let mut order = 0u32;
+		for root in &self.scene.roots {
+			for (item, place) in root.tree.items.iter().zip(&root.placed) {
+				order += 1;
+				if !place.visible || !stage_text::is_markdown(item) {
+					continue;
+				}
+				let Some(Value::String(content)) = vars.resolve(item.get("content"), &place.theme) else { continue };
+				let pad = if item.kind() == "text" { 0.0 } else { stage_scene::layout::NOTE_PAD };
+				let style = stage_scene::layout::text_style(item, vars, &place.theme);
+				let card = self.text.card(content, &style, (place.rect.w - pad * 2.0).max(1.0) as f32, stage_text::Align::Left);
+				let r = place.rect;
+				let links: Vec<Value> = card.links.iter().map(|(x, y, w, h, href, s)| json!({ "x": x, "y": y, "w": w, "h": h, "href": href, "scroller": s })).collect();
+				let scrollers: Vec<Value> = card.scrollers.iter().map(|(x, y, w, h, c)| json!({ "x": x, "y": y, "w": w, "h": h, "content": c })).collect();
+				out.push(json!({ "id": item.id, "order": order, "box": { "x": r.x, "y": r.y, "w": r.w, "h": r.h }, "pad": pad, "links": links, "scrollers": scrollers }));
+			}
+		}
+		Value::Array(out)
+	}
+
+	/// The words on the stage and the faces they are set in, for the app to fetch fonts for:
+	/// `[{ family, weight, italic, text }]`. A card's words may be bold, italic or code too.
+	pub fn font_needs(&self) -> Value {
+		let vars = &self.scene.vars;
+		let mut out = Vec::new();
+		for root in &self.scene.roots {
+			for (item, place) in root.tree.items.iter().zip(&root.placed) {
+				if !matches!(item.kind(), "text" | "note" | "prompt" | "context") {
+					continue;
+				}
+				let text = match vars.resolve(item.get("content"), &place.theme) {
+					Some(Value::String(s)) => s.clone(),
+					_ => continue,
+				};
+				let style = stage_scene::layout::text_style(item, vars, &place.theme);
+				out.push(json!({ "family": style.family, "weight": style.weight, "italic": style.italic, "text": text }));
+				if stage_text::is_markdown(item) {
+					for (weight, italic) in [(600.0, false), (700.0, false), (400.0, true)] {
+						out.push(json!({ "family": style.family, "weight": weight, "italic": italic, "text": text }));
+					}
+					out.push(json!({ "family": stage_text::card::MONO, "weight": 400, "italic": false, "text": text }));
+				}
+			}
+		}
+		Value::Array(out)
 	}
 
 	/// The topmost item under a stage point, as its id path.
@@ -160,12 +251,12 @@ impl Page {
 	/// The two layers the screen shows for a camera, in one frame with the board pages:
 	///
 	/// - under the pages, each board that has no live page: its picture, or its paper until the
-	///   picture comes (`live` names the boards whose pages are showing);
+	///   picture comes;
 	/// - over them, the worker's tiles, coarse ones first so the sharpest of each place lies on top,
 	///   then the lifted items and the stroke under the pen, drawn fresh.
 	///
 	/// Tiles and pictures lie on whole device pixels.
-	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, live: &HashSet<String>) -> (DrawList, DrawList) {
+	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> (DrawList, DrawList) {
 		self.frame += 1;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		let s = camera.zoom * dpr;
@@ -176,31 +267,42 @@ impl Page {
 			let y1 = ((r.bottom() - camera.y) * s).round();
 			(x0 as f32, y0 as f32, (x1 - x0) as f32, (y1 - y0) as f32)
 		};
-		// Under: the boards.
+		// Under: the boards with no live page (and those a drag carries): picture, or paper until it comes.
 		let mut under = DrawList::new(Color::TRANSPARENT);
-		for root in &self.scene.roots {
-			if !root.extent.meets(&view) {
+		let paper = if self.scene.dark { [0.118, 0.118, 0.125, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
+		let mut pictured = Vec::new();
+		let mut carrying = Vec::new();
+		for board in &self.boards {
+			let carried = self.carry.0.contains(&board.path);
+			let picture = self.pictures.get(&format!("board:{}", board.path));
+			if board.live && !(carried && picture.is_some()) {
 				continue;
 			}
-			for (item, place) in root.tree.items.iter().zip(&root.placed) {
-				if item.kind() != "browser" || !place.visible || live.contains(&item.id) || self.lifted.contains(&root.id) {
-					continue;
-				}
-				let (x, y, w, h) = snap(&place.rect);
-				match self.pictures.get(&format!("board:{}", item.id)) {
-					Some((texture, _, _)) => under.push(Op::Picture { texture, x, y, w, h, uv: [0.0, 0.0, 1.0, 1.0], opacity: 1.0 }),
-					None => {
-						let paper = if self.scene.dark { [0.141, 0.141, 0.141, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
-						under.push(Op::Shape {
-							shape: stage_paint::list::Shape { w, h, radii: [0.0; 4], ellipse: false },
-							transform: stage_paint::list::Affine::translate(x, y),
-							paint: stage_paint::list::Paint::Solid(Color(paper)),
-							stroke: None,
-						});
-					}
+			let (dx, dy) = if carried { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
+			let place = Rect { x: board.x + dx, y: board.y + dy, w: board.w, h: board.h };
+			if !place.meets(&view) {
+				continue;
+			}
+			let (x, y, w, h) = snap(&place);
+			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii: [12.0 * s as f32; 4], ellipse: false };
+			under.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
+			if let Some((texture, pw, ph)) = picture {
+				// The whole board was pictured: one taller than the box is cut at its foot.
+				let tall = ph as f32 / pw.max(1) as f32 * w;
+				let shown = h.min(tall);
+				under.push(Op::Shape { shape: shape(w, shown), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, shown / tall] }, stroke: None });
+				if board.live {
+					carrying.push(board.path.clone());
+				} else {
+					pictured.push(board.path.clone());
 				}
 			}
+			if let Some(colour) = board.news.filter(|_| board.glow) {
+				under.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
+			}
 		}
+		self.pictured = pictured;
+		self.carrying = carrying;
 		// Over: the tiles, one per place. Each place shows the sharpest tile held for it; where the
 		// tile at the scale asked for has not come yet, the part of a coarser one that covers it.
 		// Never two layered: tiles are clear where nothing is drawn, so a stale one under a fresh
@@ -240,6 +342,8 @@ impl Page {
 			let mut ctx = Context::new(&self.scene, &skip, &image).with_text(&self.text, &self.atlas);
 			ctx.only = Some(&self.lifted);
 			ctx.icons = Some(&self.icons);
+			ctx.offsets = Some(&self.offsets);
+			self.view.apply(&mut ctx);
 			let lifted = paint_area(&ctx, view, s, Color::TRANSPARENT);
 			self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
 			over.ops.extend(lifted.ops);
@@ -251,9 +355,55 @@ impl Page {
 		(under, over)
 	}
 
-	/// Lift top-level items for a drag: the worker leaves them out of its tiles from now on.
+	/// Lift items for a drag: the worker leaves them out of its tiles from now on.
 	pub fn lift(&mut self, ids: &[String]) {
 		self.lifted.extend(ids.iter().cloned());
+	}
+
+	/// A gesture in progress: each item moved by `dx dy` and, while resizing or restyling, with these
+	/// fields, shown here only, until the gesture ends (`None`) or the saved drawing arrives. Lifts
+	/// what it names. Returns the items whose layout changed, for the stage's outlines.
+	pub fn preview(&mut self, moving: Option<Vec<(String, Preview)>>) -> Result<(), String> {
+		self.unpreview();
+		let Some(moving) = moving else { return Ok(()) };
+		let mut changes = Vec::new();
+		for (id, p) in &moving {
+			if p.dx != 0.0 || p.dy != 0.0 {
+				self.offsets.insert(id.clone(), (p.dx, p.dy));
+			}
+			for (key, value) in &p.set {
+				changes.push(Change::Set { id: id.clone(), key: key.clone(), value: value.clone() });
+			}
+			self.lifted.insert(id.clone());
+		}
+		// Fields that no longer apply (an item that went) are left out rather than failing the gesture.
+		changes.retain(|c| matches!(c, Change::Set { id, .. } if self.doc.handle(id).is_some()));
+		if !changes.is_empty() {
+			let applied = self.doc.apply(&changes).map_err(|e| e.0)?;
+			self.preview_undo = applied.undo.clone();
+			self.scene.update(&self.doc, Some(&applied), &self.text);
+		}
+		Ok(())
+	}
+
+	fn unpreview_fields(&mut self) {
+		if !self.preview_undo.is_empty() {
+			let undo = std::mem::take(&mut self.preview_undo);
+			if let Ok(applied) = self.doc.apply(&undo) {
+				self.scene.update(&self.doc, Some(&applied), &self.text);
+			}
+		}
+	}
+
+	/// Take a gesture's shown fields and offsets back.
+	fn unpreview(&mut self) {
+		self.offsets.clear();
+		if !self.preview_undo.is_empty() {
+			let undo = std::mem::take(&mut self.preview_undo);
+			if let Ok(applied) = self.doc.apply(&undo) {
+				self.scene.update(&self.doc, Some(&applied), &self.text);
+			}
+		}
 	}
 
 	/// Put them down: drawn here until the worker's tiles with them arrive (`landed`).
@@ -304,6 +454,7 @@ pub struct Worker {
 	pub pictures: Pictures,
 	/// Items the page is moving: left out of the tiles until they land.
 	pub lifted: HashSet<String>,
+	pub view: ViewState,
 	/// Items put down whose tiles are being painted with them: the page hears when they all are.
 	landing: Vec<(Vec<String>, Rect)>,
 	/// The scale tiles were last asked for at.
@@ -324,7 +475,7 @@ impl Worker {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
 		let words = Text::new();
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Worker { icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
+		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
 	}
 
 	/// Start again from the whole document: after a lost batch, or a theme change.
@@ -367,10 +518,6 @@ impl Worker {
 	fn invalidate(&mut self, updated: &Updated) {
 		self.version += 1;
 		for (handle, before) in &updated.roots {
-			// A lifted item is drawn by the page while it moves: its tiles do not change.
-			if self.scene.root(*handle).is_some_and(|r| self.lifted.contains(&r.id)) {
-				continue;
-			}
 			if let Some(b) = before {
 				self.grid.invalidate(b);
 			}
@@ -395,12 +542,30 @@ impl Worker {
 		}
 	}
 
+	/// What the stage hides, mutes or shows live changed: the tiles those items are on are painted again.
+	pub fn set_view(&mut self, next: ViewState) {
+		let changed: Vec<String> = next.differs(&self.view);
+		self.view = next;
+		self.version += 1;
+		for id in changed {
+			if let Some(area) = self.scene.extent_of(&id) {
+				self.grid.invalidate(&area);
+			} else if id.contains(':') {
+				// A table's scroll: the card's id is before the colon.
+				if let Some(area) = id.split(':').next().and_then(|c| self.scene.extent_of(c)) {
+					self.grid.invalidate(&area);
+				}
+			}
+		}
+		self.discard_stale();
+	}
+
 	/// The page lifted these items: paint their tiles without them.
 	pub fn lift(&mut self, ids: &[String]) {
 		self.version += 1;
 		for id in ids {
-			if let Some(root) = self.scene.roots.iter().find(|r| &r.id == id) {
-				self.grid.invalidate(&root.extent);
+			if let Some(area) = self.scene.extent_of(id) {
+				self.grid.invalidate(&area);
 			}
 			self.lifted.insert(id.clone());
 		}
@@ -413,9 +578,9 @@ impl Worker {
 		let mut area: Option<Rect> = None;
 		for id in ids {
 			self.lifted.remove(id);
-			if let Some(root) = self.scene.roots.iter().find(|r| &r.id == id) {
-				self.grid.invalidate(&root.extent);
-				area = Some(area.map_or(root.extent, |a| a.union(&root.extent)));
+			if let Some(extent) = self.scene.extent_of(id) {
+				self.grid.invalidate(&extent);
+				area = Some(area.map_or(extent, |a| a.union(&extent)));
 			}
 		}
 		self.discard_stale();
@@ -464,8 +629,10 @@ impl Worker {
 		let keys = self.grid.to_paint(&wanted, limit);
 		let pictures = &self.pictures;
 		let image = |url: &str| pictures.get(url);
-		let mut ctx = Context::new(&self.scene, &self.lifted, &image).with_text(&self.text, &self.atlas);
+		let skip: HashSet<String> = self.lifted.union(&self.view.hidden).cloned().collect();
+		let mut ctx = Context::new(&self.scene, &skip, &image).with_text(&self.text, &self.atlas);
 		ctx.icons = Some(&self.icons);
+		self.view.apply(&mut ctx);
 		let clear = Color::TRANSPARENT;
 		let out = keys.into_iter().map(|k| (k, paint_area(&ctx, k.area(), k.scale(), clear))).collect();
 		self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
@@ -524,24 +691,86 @@ mod tests {
 		assert_eq!(page.pick(1150.0, 50.0, 0.0)["id"], "a");
 		// A missed batch is noticed.
 		assert!(worker.apply(&changes, generation + 5).is_err());
-		let (under, over) = page.frame(cam, 1.0, 1200.0, 800.0, false, &HashSet::new());
+		let (under, over) = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
-		// The board has no live page and no picture yet: its paper, under the pages.
-		assert_eq!(under.ops.len(), 1);
+		// No boards placed yet: nothing under the pages.
+		assert!(under.ops.is_empty());
 		// A drag: the worker repaints without the square, the page draws it.
 		page.lift(&["a".into()]);
 		worker.lift(&["a".into()]);
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 1);
-		let moved = crate::wire::parse(r#"[{"op":"set","id":"a","key":"x","value":1150}]"#).unwrap();
-		let generation = page.apply(&moved, true).unwrap();
-		worker.apply(&moved, generation).unwrap();
+		// The drag's moves are the page's alone: the worker paints nothing.
+		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 0, "moving a lifted item paints no tiles");
-		let (_, over) = page.frame(cam, 1.0, 1200.0, 800.0, false, &HashSet::new());
+		let (_, over) = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().any(|op| matches!(op, Op::Shape { .. })), "the page draws it");
+		// Let go: saved, and the saved drawing is what both draw.
+		let saved = crate::wire::parse(r#"[{"op":"set","id":"a","key":"x","value":1150}]"#).unwrap();
+		page.preview(None).unwrap();
+		let generation = page.apply(&saved, true).unwrap();
+		worker.apply(&saved, generation).unwrap();
 		worker.drop_items(&["a".into()]);
 		assert!(worker.landed().is_empty());
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 1);
 		assert_eq!(worker.landed(), vec!["a".to_owned()]);
 		assert_eq!(page.boards()[0]["id"], "board");
 	}
+}
+
+/// A gesture's preview of one item (`PenPreview` in the app): moved by `dx dy`, and fields shown.
+#[derive(Clone, Debug, Default)]
+pub struct Preview {
+	pub dx: f64,
+	pub dy: f64,
+	pub set: Vec<(String, Option<Value>)>,
+}
+
+/// What the stage asks the drawing to leave out or change, besides the document.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ViewState {
+	/// Hidden: being erased, deleted until the server says so.
+	pub hidden: HashSet<String>,
+	/// Their words are not drawn: an editor is open over them.
+	pub mute: HashSet<String>,
+	/// Drawn as holes: a live file shows under the drawing there.
+	pub holes: HashSet<String>,
+	/// Wide tables' scroll, by `id:index`.
+	pub scrolls: HashMap<String, f64>,
+}
+
+impl ViewState {
+	fn apply<'a>(&'a self, ctx: &mut Context<'a>) {
+		ctx.mute = Some(&self.mute);
+		ctx.holes = Some(&self.holes);
+		ctx.scrolls = Some(&self.scrolls);
+	}
+
+	/// The ids whose look changes between two states (for a scroll, `id:index`).
+	fn differs(&self, other: &ViewState) -> Vec<String> {
+		let mut out: Vec<String> = Vec::new();
+		for (a, b) in [(&self.hidden, &other.hidden), (&self.mute, &other.mute), (&self.holes, &other.holes)] {
+			out.extend(a.symmetric_difference(b).cloned());
+		}
+		for key in self.scrolls.keys().chain(other.scrolls.keys()) {
+			if self.scrolls.get(key) != other.scrolls.get(key) {
+				out.push(key.clone());
+			}
+		}
+		out
+	}
+}
+
+/// A board as the app places it (`SceneBoard`).
+#[derive(Clone, Debug, Default)]
+pub struct BoardPlace {
+	pub path: String,
+	pub x: f64,
+	pub y: f64,
+	pub w: f64,
+	pub h: f64,
+	/// Its page is showing: nothing is drawn for it here.
+	pub live: bool,
+	/// The writer's colour when the board is news, and whether to draw its outline here.
+	pub news: Option<[f32; 4]>,
+	pub glow: bool,
 }

@@ -246,6 +246,26 @@ impl Scene {
 		}
 	}
 
+	/// Where an item is: its root's index and its index in that root's tree, by id.
+	pub fn find(&self, id: &str) -> Option<(usize, u32)> {
+		self.roots.iter().enumerate().find_map(|(r, root)| root.tree.items.iter().position(|it| it.id == id).map(|i| (r, i as u32)))
+	}
+
+	/// What an item and everything in it paint on: the union of their ink boxes.
+	pub fn extent_of(&self, id: &str) -> Option<Rect> {
+		let (r, i) = self.find(id)?;
+		let root = &self.roots[r];
+		let mut out = root.ink[i as usize];
+		let mut stack = root.tree.items[i as usize].children.clone();
+		while let Some(c) = stack.pop() {
+			if root.placed[c as usize].visible {
+				out = out.union(&root.ink[c as usize]);
+			}
+			stack.extend(root.tree.items[c as usize].children.iter().copied());
+		}
+		Some(out)
+	}
+
 	pub fn root(&self, handle: Handle) -> Option<&Root> {
 		self.at.get(&handle).map(|&i| &self.roots[i])
 	}
@@ -283,6 +303,12 @@ impl Scene {
 			}
 		}
 		None
+	}
+
+	/// Every visible item under a point, topmost first, as `(root index, item index)`.
+	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> Vec<(u32, u32)> {
+		let area = Rect { x: x - slop, y: y - slop, w: slop * 2.0, h: slop * 2.0 };
+		self.query(&area).into_iter().rev().filter(|&(r, i)| self.hits(&self.roots[r as usize], i, x, y, slop)).collect()
 	}
 
 	/// Items whose whole box is inside `area`: what a marquee selects.

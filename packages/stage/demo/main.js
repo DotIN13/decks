@@ -16,6 +16,7 @@ const camera = { x: Number(params.get("x") ?? 0), y: Number(params.get("y") ?? 0
 const stats = { frames: 0, pageMs: [], tiles: 0, painted: 0, lastFrame: 0, fps: 0, errors: [] };
 let engine;
 let worker;
+let boardsKey = "";
 let dirty = true;
 let moving = false;
 let settle = 0;
@@ -96,7 +97,11 @@ function frame(now) {
 	const tx = Math.round(-camera.x * camera.zoom * dpr) / dpr;
 	const ty = Math.round(-camera.y * camera.zoom * dpr) / dpr;
 	world.style.transform = `translate(${tx}px, ${ty}px) scale(${camera.zoom})`;
-	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height, moving, JSON.stringify(live));
+	if (boardsKey !== `${awake}`) {
+		boardsKey = `${awake}`;
+		engine.setBoards(JSON.stringify(JSON.parse(engine.boards()).map((b) => ({ path: b.id, x: b.x, y: b.y, w: b.w, h: b.h, live: awake }))));
+	}
+	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height, moving);
 	loadPictures(JSON.parse(engine.wantedPictures()));
 	const ms = performance.now() - t0;
 	stats.pageMs.push(ms);
