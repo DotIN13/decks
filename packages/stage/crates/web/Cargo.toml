@@ -4,4 +4,20 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
+stage-doc = { path = "../doc" }
+stage-scene = { path = "../scene" }
+stage-paint = { path = "../paint" }
+stage-gpu = { path = "../gpu" }
+serde_json.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "std"] }
+wasm-bindgen = "0.2.129"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "OffscreenCanvas", "ImageBitmap", "console"] }
+console_error_panic_hook = "0.1"

@@ -82,10 +82,13 @@ impl Grid {
 		keys
 	}
 
-	/// Mark every tile meeting `area` stale, at every scale.
+	/// Mark every tile `area` paints on stale, at every scale: half a pixel of soft edge included.
 	pub fn invalidate(&mut self, area: &Rect) {
 		for (key, tile) in self.tiles.iter_mut() {
-			if key.area().meets(area) {
+			let edge = 0.5 / key.scale();
+			let a = key.area();
+			let grown = Rect { x: area.x - edge, y: area.y - edge, w: area.w + edge * 2.0, h: area.h + edge * 2.0 };
+			if grown.x < a.right() && a.x < grown.right() && grown.y < a.bottom() && a.y < grown.bottom() {
 				tile.dirty = true;
 			}
 		}
@@ -129,6 +132,15 @@ impl Grid {
 		};
 		self.tiles.insert(key, Tile { texture: Some(texture), painted: version, dirty: false, used: frame });
 		texture
+	}
+
+	/// The page let go of a tile's picture: paint it again when it is wanted.
+	pub fn forget(&mut self, key: &Key) -> Option<u32> {
+		let tile = self.tiles.remove(key)?;
+		if let Some(t) = tile.texture {
+			self.free.push(t);
+		}
+		tile.texture
 	}
 
 	/// Let go of the tiles past the budget that are used longest ago and not in `keep`; returns

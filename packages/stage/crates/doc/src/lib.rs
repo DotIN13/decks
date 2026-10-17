@@ -547,21 +547,22 @@ impl History {
 		!self.redo.is_empty()
 	}
 
-	pub fn undo(&mut self, doc: &mut Document) -> Option<Applied> {
+	/// Undo this session's last batch that still applies: the changes applied, and what they did.
+	pub fn undo(&mut self, doc: &mut Document) -> Option<(Vec<Change>, Applied)> {
 		while let Some(batch) = self.undo.pop() {
 			if let Ok(applied) = doc.apply(&batch) {
 				self.redo.push(applied.undo.clone());
-				return Some(applied);
+				return Some((batch, applied));
 			}
 		}
 		None
 	}
 
-	pub fn redo(&mut self, doc: &mut Document) -> Option<Applied> {
+	pub fn redo(&mut self, doc: &mut Document) -> Option<(Vec<Change>, Applied)> {
 		while let Some(batch) = self.redo.pop() {
 			if let Ok(applied) = doc.apply(&batch) {
 				self.undo.push(applied.undo.clone());
-				return Some(applied);
+				return Some((batch, applied));
 			}
 		}
 		None

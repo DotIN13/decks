@@ -168,6 +168,7 @@ fn fade(op: Op, alpha: f32) -> Op {
 		Op::Mesh { vertices, indices, transform, paint: p } => Op::Mesh { vertices, indices, transform, paint: paint(p) },
 		Op::Shadow { shape, transform, color, blur, spread } => Op::Shadow { shape, transform, color: Color(color.0.map(|v| v * alpha)), blur, spread },
 		Op::Glyphs { texture, quads, color } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)) },
+		Op::Picture { texture, x, y, w, h, uv, opacity } => Op::Picture { texture, x, y, w, h, uv, opacity: opacity * alpha },
 		other => other,
 	}
 }

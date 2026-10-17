@@ -69,7 +69,9 @@ pub struct Root {
 	/// Each item's own space to the stage: its place, its turn and flips, and its parents'.
 	pub world: Vec<Mat>,
 	pub bounds: Vec<Rect>,
-	/// Everything this root draws, turned boxes included.
+	/// What each item paints on: its box grown by its stroke, shadows and card paper.
+	pub ink: Vec<Rect>,
+	/// Everything this root paints, turned boxes, strokes and shadows included.
 	pub extent: Rect,
 	pub index: Index,
 	/// Whether it holds reusable items: a change in it can change instances anywhere.
@@ -196,6 +198,7 @@ impl Scene {
 		let placed = layout::layout(&tree, &self.vars, &self.base, measure);
 		let mut world: Vec<Mat> = Vec::with_capacity(tree.items.len());
 		let mut bounds = Vec::with_capacity(tree.items.len());
+		let mut ink = Vec::with_capacity(tree.items.len());
 		let mut extent: Option<Rect> = None;
 		let mut reusable = false;
 		for (item, place) in tree.items.iter().zip(&placed) {
@@ -218,13 +221,16 @@ impl Scene {
 				None => own,
 			};
 			let b = m.bounds(r.w, r.h);
+			let reach = reach(&self.vars, item, t);
+			let k = Rect { x: b.x - reach, y: b.y - reach, w: b.w + reach * 2.0, h: b.h + reach * 2.0 };
 			if place.visible {
-				extent = Some(extent.map_or(b, |e| e.union(&b)));
+				extent = Some(extent.map_or(k, |e| e.union(&k)));
 			}
 			world.push(m);
 			bounds.push(b);
+			ink.push(k);
 		}
-		let index = Index::build(placed.iter().zip(&bounds).enumerate().filter(|(_, (p, _))| p.visible).map(|(i, (_, b))| (i as u32, *b)));
+		let index = Index::build(placed.iter().zip(&ink).enumerate().filter(|(_, (p, _))| p.visible).map(|(i, (_, b))| (i as u32, *b)));
 		Root {
 			handle,
 			id: tree.items.first().map(|i| i.id.clone()).unwrap_or_default(),
@@ -232,6 +238,7 @@ impl Scene {
 			placed,
 			world,
 			bounds,
+			ink,
 			extent: extent.unwrap_or_default(),
 			index,
 			reusable,
@@ -307,6 +314,37 @@ impl Scene {
 			_ => true,
 		}
 	}
+}
+
+/// How far past its box an item paints: its stroke, its shadows, a card's paper shadow.
+fn reach(vars: &Vars, item: &tree::Item, theme: &Theme) -> f64 {
+	let mut r: f64 = 0.0;
+	if item.get("stroke").is_some_and(|s| !s.is_null()) {
+		let w = match item.get("strokeWidth").or_else(|| item.get("stroke").and_then(|s| s.get("thickness"))) {
+			Some(Value::Object(sides)) => sides.values().map(|v| vars.num(Some(v), theme, 0.0)).fold(0.0, f64::max),
+			other => vars.num(other, theme, 1.0),
+		};
+		// A mitred corner of a path reaches further than half the width; four widths covers it.
+		r = r.max(if item.kind() == "path" { w * 4.0 } else { w });
+	}
+	let effects = match item.get("effect") {
+		Some(Value::Array(list)) => list.iter().collect(),
+		Some(one) => vec![one],
+		None => vec![],
+	};
+	for e in effects {
+		if e.get("type").and_then(Value::as_str) == Some("shadow") {
+			let off = e.get("offset");
+			let dx = vars.num(off.and_then(|o| o.get("x")), theme, 0.0).abs();
+			let dy = vars.num(off.and_then(|o| o.get("y")), theme, 0.0).abs();
+			r = r.max(dx.max(dy) + vars.num(e.get("blur"), theme, 0.0) * 1.5 + vars.num(e.get("spread"), theme, 0.0).max(0.0));
+		}
+	}
+	let card = item.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str) == Some("decks.card");
+	if matches!(item.kind(), "note" | "prompt" | "context") || card {
+		r = r.max(6.0 + 18.0 * 1.5);
+	}
+	r
 }
 
 fn is_reusable(doc: &Document, root: Handle) -> bool {

@@ -167,7 +167,9 @@ impl Gpu {
 	pub fn set_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) {
 		let caps = surface.get_capabilities(adapter);
 		let format = caps.formats.iter().copied().find(|f| matches!(f, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm)).unwrap_or(caps.formats[0]);
-		let alpha = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) { wgpu::CompositeAlphaMode::PreMultiplied } else { caps.alpha_modes[0] };
+		// The stage canvas lies over the boards' pages, so what it leaves clear must show through.
+		// wgpu's browser backend lists only "opaque" among its modes but configures "premultiplied".
+		let alpha = if cfg!(target_arch = "wasm32") || caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) { wgpu::CompositeAlphaMode::PreMultiplied } else { caps.alpha_modes[0] };
 		let config = wgpu::SurfaceConfiguration {
 			usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 			format,
@@ -435,6 +437,10 @@ impl Built {
 						Some(Cmd::Mesh { range, texture: t }) if *t == texture && range.end == start => range.end = end,
 						_ => pass.cmds.push(Cmd::Mesh { range: start..end, texture }),
 					}
+				}
+				Op::Picture { texture, x, y, w, h, uv, opacity } => {
+					let (p, texture) = b.paint(&Paint::Image { texture: *texture, opacity: *opacity, uv: *uv });
+					b.push_shape(&Shape { w: *w, h: *h, radii: [0.0; 4], ellipse: false }, &[1.0, 0.0, 0.0, 1.0, *x, *y], [3.0, 0.0, 0.0, 0.0], [0.0, 0.0, p, clip], texture);
 				}
 				// Words come with the text step's glyph pipeline.
 				Op::Glyphs { .. } => {}

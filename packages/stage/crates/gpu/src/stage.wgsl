@@ -64,6 +64,9 @@ fn vs_shape(@builtin(vertex_index) v: u32, inst: Instance) -> ShapeOut {
 	let size = inst.xf1.zw;
 	// Room past the box: a pixel and a half for the soft edge, the stroke's reach, the shadow's blur.
 	var grow = 1.5 / max(scale, 1e-6);
+	if (inst.params.x == 3.0) {
+		grow = 0.0;
+	}
 	if (inst.params.x == 1.0) {
 		grow += inst.params.y * (0.5 + 0.5 * max(inst.params.z, 0.0)) + inst.params.y * 0.5;
 	}
@@ -196,7 +199,10 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 		coverage = shadow(in.local + vec2<f32>(spread), size, in.extra.x, max(in.radii.x, 0.0) + spread);
 	} else {
 		let d = sd_shape(in.local, in.size, in.radii, in.params.w) * in.scale;
-		if (mode == 1.0) {
+		if (mode == 3.0) {
+			// A picture with hard edges: the quad is exactly its box.
+			coverage = 1.0;
+		} else if (mode == 1.0) {
 			let w = in.params.y * in.scale;
 			let align = in.params.z;
 			// Where the outline's outer and inner edges sit from the shape's edge, in pixels.

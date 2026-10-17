@@ -31,6 +31,7 @@ fn kinds(list: &DrawList) -> Vec<&'static str> {
 			Op::Shadow { .. } => "shadow",
 			Op::Mesh { .. } => "mesh",
 			Op::Glyphs { .. } => "glyphs",
+			Op::Picture { .. } => "picture",
 			Op::PushClip(_) => "clip",
 			Op::PopClip => "/clip",
 			Op::PushLayer { .. } => "layer",

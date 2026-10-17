@@ -109,6 +109,9 @@ pub enum Op {
 	Mesh { vertices: Vec<[f32; 2]>, indices: Vec<u32>, transform: Affine, paint: Paint },
 	/// Glyphs: quads cut from a glyph texture, already placed in target pixels, in one colour.
 	Glyphs { texture: u32, quads: Vec<GlyphQuad>, color: Color },
+	/// A picture laid on target pixels with hard edges, for tiles that meet edge to edge: no soft
+	/// rim, so no seam. `x, y, w, h` in target pixels; `uv` the part of the texture shown.
+	Picture { texture: u32, x: f32, y: f32, w: f32, h: f32, uv: [f32; 4], opacity: f32 },
 	PushClip(Clip),
 	PopClip,
 	/// What follows until the matching pop is drawn on its own and laid down at this opacity.
