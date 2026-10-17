@@ -36,7 +36,9 @@ impl Key {
 /// The scale tiles are painted at: exact at rest, the next power of two above while zooming.
 pub fn scale_for(zoom_times_dpr: f64, moving: bool) -> f32 {
 	let s = zoom_times_dpr.clamp(1.0 / 256.0, 256.0);
-	if moving { 2f64.powf(s.log2().ceil()) as f32 } else { s as f32 }
+	// Moving, the nearest power of two: never more than √2 off, so a zoom keeps few scales in flight
+	// and at most a quarter of the tiles rounding up would have asked for.
+	if moving { 2f64.powf(s.log2().round()) as f32 } else { s as f32 }
 }
 
 /// The overview's scale: the whole stage in at most four tiles a side, a power of two. Its tiles are
@@ -202,9 +204,11 @@ mod tests {
 	}
 
 	#[test]
-	fn zooming_uses_powers_of_two() {
-		assert_eq!(scale_for(1.3, true), 2.0);
-		assert_eq!(scale_for(0.3, true), 0.5);
+	fn zooming_uses_the_nearest_power_of_two() {
+		assert_eq!(scale_for(1.3, true), 1.0);
+		assert_eq!(scale_for(1.5, true), 2.0);
+		assert_eq!(scale_for(2.13, true), 2.0);
+		assert_eq!(scale_for(0.3, true), 0.25);
 		assert_eq!(scale_for(1.3, false), 1.3);
 	}
 }

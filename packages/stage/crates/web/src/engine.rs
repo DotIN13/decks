@@ -43,6 +43,9 @@ impl Pictures {
 
 /// The page's engine: owns the document, answers the pointer, and lays the worker's tiles on the
 /// screen in the same frame as the board pages.
+/// The fewest tiles the page keeps, whatever the screen.
+const MIN_TILES: usize = 160;
+
 pub struct Page {
 	/// Draw the lifted items and nothing else over the pages, for one frame: a drag's ghost.
 	pub only_lifted: bool,
@@ -274,6 +277,11 @@ impl Page {
 	/// again for it. Tiles and pictures lie on whole device pixels.
 	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> DrawList {
 		self.frame += 1;
+		// Room for three windows of tiles at this screen's size, with the ring round them, and never
+		// under the floor: a 2x screen needs far more than a 1x one.
+		let across = (width * dpr / TILE as f64).ceil() as usize + 2;
+		let down = (height * dpr / TILE as f64).ceil() as usize + 2;
+		self.budget = (3 * across * down).max(MIN_TILES);
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		let s = camera.zoom * dpr;
 		let snap = |r: &Rect| {
@@ -500,14 +508,16 @@ impl Page {
 		}
 	}
 
-	/// Tiles past the budget, drawn longest ago: forget their textures and tell the worker. The
-	/// overview's are kept (`overview_scale`).
+	/// Tiles past the budget, drawn longest ago: forget their textures and tell the worker. Never
+	/// one drawn in the last frame, nor the overview's (`overview_scale`): the budget is passed
+	/// rather than leave a hole on screen.
 	pub fn evict(&mut self) -> Vec<(Key, u32)> {
 		if self.tiles.len() <= self.budget {
 			return Vec::new();
 		}
-		let overview = self.scene.extent().map(|e| overview_scale(&e).to_bits());
-		let mut old: Vec<(u64, Key)> = self.tiles.iter().filter(|(k, _)| Some(k.scale) != overview).map(|(k, (_, used))| (*used, *k)).collect();
+		let overview: HashSet<Key> = self.scene.extent().map(|e| Grid::covering(&e, overview_scale(&e), 0).into_iter().collect()).unwrap_or_default();
+		let shown = self.frame;
+		let mut old: Vec<(u64, Key)> = self.tiles.iter().filter(|(k, (_, used))| !overview.contains(k) && *used < shown).map(|(k, (_, used))| (*used, *k)).collect();
 		old.sort();
 		let excess = (self.tiles.len() - self.budget).min(old.len());
 		old.into_iter().take(excess).filter_map(|(_, k)| self.tiles.remove(&k).map(|(t, _)| (k, t))).collect()
@@ -810,6 +820,29 @@ mod tests {
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		assert!(page.pictured.is_empty());
+	}
+
+	#[test]
+	fn a_tile_on_screen_is_never_evicted() {
+		let mut page = Page::new(STAGE, false, "s").unwrap();
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		// The window's own tiles, drawn in a frame.
+		for key in Grid::covering(&Rect { x: 0.0, y: 0.0, w: 1200.0, h: 800.0 }, 1.0, 0) {
+			page.tile_texture(key);
+		}
+		let on_screen = page.tiles.len();
+		page.frame(cam, 1.0, 1200.0, 800.0, false);
+		// Far more tiles than the budget arrive elsewhere.
+		for x in 0..400 {
+			page.tile_texture(Key { scale: 1f32.to_bits(), x: 100 + x, y: 50 });
+		}
+		page.frame(Camera { x: 0.0, y: 0.0, zoom: 1.0 }, 1.0, 1200.0, 800.0, false);
+		let gone = page.evict();
+		assert!(!gone.is_empty());
+		for key in Grid::covering(&Rect { x: 0.0, y: 0.0, w: 1200.0, h: 800.0 }, 1.0, 0) {
+			assert!(page.tiles.contains_key(&key), "a tile on screen was evicted");
+		}
+		assert!(on_screen > 0);
 	}
 
 	#[test]
