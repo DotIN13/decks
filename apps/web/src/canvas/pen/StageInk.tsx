@@ -3,8 +3,8 @@ import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../../state/ink.ts";
 import { inkItem } from "./ink.ts";
-import type { PenLayer, PenPreview } from "./layer.ts";
-import type { LiveInk } from "./scene.ts";
+import type { StageEngine } from "../../stage/engine.ts";
+import type { LiveInk, PenPreview } from "../../stage/types.ts";
 import { scheme } from "../../lib/theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
@@ -16,7 +16,7 @@ export const STAGE_INK = "stage";
  * What is drawn goes into the stage's `.pen` file as ink (`ink.ts`), one pen `path` per stroke,
  * through the same edits an agent sends. All ink is drawn on the stage's one sheet (`scene.ts`):
  * the strokes in the file as items, and the stroke under the pen, before it is in the file, handed
- * to the sheet as it grows (`PenLayer.ink`). This glass draws nothing of the ink itself; it takes
+ * to the engine as it grows (`StageEngine.ink`). This glass draws nothing of the ink itself; it takes
  * the pointer, and shows the lasso's loop and the box round what the lasso took.
  *
  * **Which pointer draws.** A pen always does, with its pressure. A mouse does. A finger does until
@@ -29,7 +29,7 @@ export function StageInk(props: {
 	toStage: (event: PointerEvent) => { x: number; y: number };
 	/** The ink on the stage now, each stroke in stage pixels. */
 	strokes: () => InkStroke[];
-	layer: PenLayer;
+	layer: StageEngine;
 	/** A new stroke's pen items, and the edits before it that it needs (the ink colour). */
 	onEdit: (ops: unknown[]) => void;
 	/** The edit that defines the ink colour, when the stage does not have it yet. */

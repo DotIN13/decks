@@ -112,8 +112,8 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * change the browser every check runs in. `renderers.mjs` was the only check that needed
 	 * it and has been cut, so neither canvas renderer is exercised now.
 	 */
-	// WebGPU, for the Rust stage engine (`DECKS_E2E_ENGINE=rust`): headless Chromium has it only when asked.
-	const gpu = process.env.DECKS_E2E_ENGINE === "rust" ? ["--enable-unsafe-webgpu", "--use-angle=metal", "--enable-features=Vulkan"] : [];
+	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
+	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
 	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
@@ -140,19 +140,17 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * symptom was a panel that forgot its tab and its fold partway through a check, which
 	 * reads as a bug in the panel.
 	 */
-	await page.addInitScript(([wanted, renderer, engine]) => {
+	await page.addInitScript(([wanted, renderer]) => {
 		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
 			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
 			if (renderer) localStorage.setItem("decks.renderer", renderer);
-			// `DECKS_E2E_ENGINE=on` (or `webgl2`) runs a check with the C++ stage engine (`engine-stage.ts`).
-			if (engine) localStorage.setItem("decks:stage-engine", engine);
 		} catch {
 			/* private mode, or a page that has no storage access yet */
 		}
-	}, [scheme, process.env.DECKS_E2E_RENDERER ?? "", process.env.DECKS_E2E_ENGINE ?? ""]);
+	}, [scheme, process.env.DECKS_E2E_RENDERER ?? ""]);
 	/*
 	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
 	 * server remembers which agent each browser is on, so there is no address to name a place

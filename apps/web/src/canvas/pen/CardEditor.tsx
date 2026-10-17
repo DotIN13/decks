@@ -18,7 +18,7 @@ import Table from "lucide-solid/icons/table";
 import TextQuote from "lucide-solid/icons/text-quote";
 import Underline from "lucide-solid/icons/underline";
 import Undo2 from "lucide-solid/icons/undo-2";
-import { pageFont } from "./fonts.ts";
+import { pageFont } from "./look.ts";
 import type { Token, Tokens } from "marked";
 import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
 

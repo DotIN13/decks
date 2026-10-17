@@ -95,7 +95,7 @@ say("…and the arrow that ends on it follows", !!followed);
 
 // --- the drawing is drawn --------------------------------------------------------------------------
 const drawn = await until(() => page.evaluate(() => {
-	// With the C++ engine on (`DECKS_E2E_ENGINE`), the drawing is its tiles, on the canvas over the boards.
+	// The drawing is the engine's tiles, on its canvas over the boards.
 	const engine = globalThis.__decksEngine?.stats?.();
 	if (engine) return engine.tiles > 0 && engine.drawn[1] > 0;
 	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.

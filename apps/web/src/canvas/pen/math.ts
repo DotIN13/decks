@@ -12,7 +12,14 @@
  * Nothing here touches a page: MathJax runs on its own small DOM, so this works in the worker and on the
  * server alike, and both measure a formula the same.
  */
-import type { Formula } from "@decks/engine/text";
+/** A formula typeset: its box from the baseline, and its outlines with their placement and colour. */
+export interface Formula {
+	number: number;
+	width: number;
+	ascent: number;
+	descent: number;
+	paths: ReadonlyArray<{ m: readonly number[]; rgba: readonly number[]; d: string }>;
+}
 import { mathjax } from "mathjax-full/js/mathjax.js";
 import { TeX } from "mathjax-full/js/input/tex.js";
 import { SVG } from "mathjax-full/js/output/svg.js";
