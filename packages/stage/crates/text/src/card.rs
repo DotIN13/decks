@@ -166,11 +166,15 @@ impl Setter<'_> {
 		let mut texts: Vec<String> = Vec::with_capacity(runs.len());
 		let mut brushes: Vec<Brush> = vec![Brush { ink: f.colour, back: None }];
 		let mut meta: Vec<(u32, bool, bool, Option<u32>)> = Vec::new();
+		let mut maths: Vec<Option<bool>> = Vec::with_capacity(runs.len());
 		let mut links = Vec::new();
 		let mut at = 0;
 		for (i, run) in runs.iter().enumerate() {
 			// A suggestion's reason is a 💬 after it; the words are in the card's markdown.
+			// A formula's run is its TeX, typeset in its place when there is a typesetter (`math.rs`).
+			let math = run.math.as_ref().filter(|m| self.text.formula(&m.tex, m.display).is_some()).map(|m| m.display);
 			let text = match &run.image {
+				_ if math.is_some() => run.math.as_ref().map(|m| m.tex.clone()).unwrap_or_default(),
 				Some(img) => format!("🖼 {}", if img.alt.is_empty() { "image" } else { &img.alt }),
 				None => {
 					let reason_ends = run.reason.is_some() && runs.get(i + 1).and_then(|r| r.reason.as_ref()) != run.reason.as_ref();
@@ -244,14 +248,19 @@ impl Setter<'_> {
 			if let Some(l) = &run.link {
 				links.push((at, at + text.len(), l.clone()));
 			}
-			at += text.len();
+			// A typeset formula is no words in the paragraph's text, so it moves no link after it.
+			if math.is_none() {
+				at += text.len();
+			}
+			maths.push(math);
 			texts.push(text);
 		}
 		let spans: Vec<Span> = texts
 			.iter()
 			.zip(&styles)
 			.zip(&meta)
-			.map(|((t, s), (brush, underline, strike, deco))| Span { text: t, style: s, brush: *brush, underline: *underline, strike: *strike, deco: *deco })
+			.zip(&maths)
+			.map(|(((t, s), (brush, underline, strike, deco)), math)| Span { text: t, style: s, brush: *brush, underline: *underline, strike: *strike, deco: *deco, math: *math })
 			.collect();
 		let laid = self.text.lay(&spans, Some(w.max(1.0)), o.align.unwrap_or(self.align));
 		Para { laid, brushes, links }
@@ -391,8 +400,13 @@ impl Setter<'_> {
 				y + f.size + 1.0
 			}
 			Block::Math { tex } => {
-				let words = [Run { text: format!("$${tex}$$"), ..Default::default() }];
-				let para = self.para(&words, f, w, Opts::default());
+				// A display formula on a line of its own, in the middle; its TeX as written with no typesetter.
+				let words = if self.text.formula(tex, true).is_some() {
+					[Run { text: tex.clone(), math: Some(crate::markdown::RunMath { tex: tex.clone(), display: true }), ..Default::default() }]
+				} else {
+					[Run { text: format!("$${tex}$$"), ..Default::default() }]
+				};
+				let para = self.para(&words, f, w, Opts { align: Some(Align::Center), ..Default::default() });
 				y + self.place(para, x, y)
 			}
 			Block::Footnotes { items } => {

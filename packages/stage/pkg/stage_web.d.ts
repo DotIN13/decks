@@ -139,6 +139,10 @@ export class PageEngine {
      */
     setMarkdownReader(read: Function): void;
     /**
+     * The app's typesetter for `$…$` formulas in words and cards.
+     */
+    setMath(typeset: Function): void;
+    /**
      * A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
      */
     setPreview(moving: string): void;
@@ -182,6 +186,7 @@ export class TextMeasure {
     measure(text: string, style: string, max_width: number, markdown: boolean, align: string): Float64Array;
     constructor();
     setMarkdownReader(read: Function): void;
+    setMath(typeset: Function): void;
 }
 
 export class WorkerEngine {
@@ -223,6 +228,7 @@ export class WorkerEngine {
      */
     setGpu(handle: GpuHandle, canvas: OffscreenCanvas): void;
     setMarkdownReader(read: Function): void;
+    setMath(typeset: Function): void;
     setView(view: string): void;
     static tileSize(): number;
     wantedPictures(): string;
@@ -287,6 +293,7 @@ export interface InitOutput {
     readonly pageengine_setGpu: (a: number, b: number) => void;
     readonly pageengine_setInk: (a: number, b: number, c: number) => void;
     readonly pageengine_setMarkdownReader: (a: number, b: any) => void;
+    readonly pageengine_setMath: (a: number, b: any) => void;
     readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setView: (a: number, b: number, c: number) => void;
     readonly pageengine_showLifted: (a: number, b: number) => void;
@@ -300,6 +307,7 @@ export interface InitOutput {
     readonly textmeasure_measure: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly textmeasure_new: () => number;
     readonly textmeasure_setMarkdownReader: (a: number, b: any) => void;
+    readonly textmeasure_setMath: (a: number, b: any) => void;
     readonly workerengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly workerengine_apply: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_applyEdits: (a: number, b: number, c: number) => [number, number];
@@ -315,14 +323,15 @@ export interface InitOutput {
     readonly workerengine_reload: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_setGpu: (a: number, b: number, c: any) => void;
     readonly workerengine_setMarkdownReader: (a: number, b: any) => void;
+    readonly workerengine_setMath: (a: number, b: any) => void;
     readonly workerengine_setView: (a: number, b: number, c: number) => void;
     readonly workerengine_tileSize: () => number;
     readonly workerengine_wantedPictures: (a: number) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__74: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__75: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__77: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__78: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

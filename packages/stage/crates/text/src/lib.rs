@@ -8,6 +8,7 @@
 pub mod atlas;
 pub mod card;
 pub mod markdown;
+pub mod math;
 
 use parley::fontique::{Blob, FontInfoOverride};
 use parley::{Alignment, AlignmentOptions, FontContext, FontFamily, FontFamilyName, FontStyle, FontWeight, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty};
@@ -31,11 +32,13 @@ pub struct Span<'a> {
 	pub strike: bool,
 	/// The colour of the line under or through it, when not its words' own.
 	pub deco: Option<u32>,
+	/// A formula: `text` is its TeX, set as a display formula when true (`math.rs`).
+	pub math: Option<bool>,
 }
 
 impl<'a> Span<'a> {
 	pub fn plain(text: &'a str, style: &'a TextStyle) -> Span<'a> {
-		Span { text, style, brush: 0, underline: false, strike: false, deco: None }
+		Span { text, style, brush: 0, underline: false, strike: false, deco: None, math: None }
 	}
 }
 
@@ -98,6 +101,8 @@ pub struct Laid {
 	pub rules: Vec<Rule>,
 	/// Each line's top, height and baseline, for carets and for cards.
 	pub lines: Vec<(f32, f32, f32)>,
+	/// The formulas in it, typeset, where they sit.
+	pub formulas: Vec<math::PlacedFormula>,
 }
 
 struct BlobData(Blob<u8>);
@@ -121,6 +126,9 @@ pub struct Text {
 	reader: Option<Box<dyn Fn(&str) -> Option<Vec<markdown::Block>>>>,
 	/// Pictures' sizes, once they have arrived, so a card can make room for them.
 	pub images: RefCell<HashMap<String, (f32, f32)>>,
+	/// Typesets a formula's TeX (`math.rs`): the app's MathJax, when it gave it.
+	typeset: Option<Box<dyn Fn(&str, bool) -> Option<math::Formula>>>,
+	formulas: RefCell<HashMap<(bool, String), Option<std::rc::Rc<math::Formula>>>>,
 	/// The scheme cards are set for.
 	pub dark: bool,
 	/// Bumped when a font arrives: everything measured or drawn before it is stale.
@@ -145,6 +153,8 @@ impl Text {
 			measured: RefCell::new(HashMap::new()),
 			cards: RefCell::new(HashMap::new()),
 			reader: None,
+			typeset: None,
+			formulas: RefCell::new(HashMap::new()),
 			images: RefCell::new(HashMap::new()),
 			dark: false,
 			generation: 0,
@@ -176,6 +186,32 @@ impl Text {
 		self.forget();
 	}
 
+	/// The app's typesetter for formulas: TeX in, outlines out. Words carrying `$…$` are laid out
+	/// with each formula in its place from then on.
+	pub fn set_math(&mut self, typeset: Box<dyn Fn(&str, bool) -> Option<math::Formula>>) {
+		self.typeset = Some(typeset);
+		self.formulas.borrow_mut().clear();
+		self.forget();
+	}
+
+	/// A formula typeset, once; none without a typesetter or for TeX it cannot read.
+	pub fn formula(&self, tex: &str, display: bool) -> Option<std::rc::Rc<math::Formula>> {
+		let key = (display, tex.to_owned());
+		if let Some(hit) = self.formulas.borrow().get(&key) {
+			return hit.clone();
+		}
+		let made = self.typeset.as_ref().and_then(|t| t(tex, display)).filter(|f| f.width > 0.0).map(std::rc::Rc::new);
+		self.formulas.borrow_mut().insert(key, made.clone());
+		made
+	}
+
+	/// A text's words in one style, with any formulas in them in their places.
+	pub fn lay_words(&self, words: &str, style: &TextStyle, max_width: Option<f32>, align: Align, underline: bool, strike: bool) -> Laid {
+		let parts = if self.typeset.is_some() { math::split(words) } else { vec![(words.to_owned(), None)] };
+		let spans: Vec<Span> = parts.iter().map(|(text, math)| Span { underline, strike, math: *math, ..Span::plain(text, style) }).collect();
+		self.lay(&spans, max_width, align)
+	}
+
 	/// A card's markdown laid out `width` wide: cached, so measuring and drawing share one layout.
 	pub fn card(&self, source: &str, style: &TextStyle, width: f32, align: Align) -> std::rc::Rc<card::Card> {
 		let key = (format!("{}|{:?}", style_key(source, style), align), (width as f64).to_bits(), self.dark);
@@ -205,7 +241,9 @@ impl Text {
 
 	/// Set spans of words in a box `max_width` wide (`None`: one line per paragraph).
 	pub fn lay(&self, spans: &[Span], max_width: Option<f32>, align: Align) -> Laid {
-		let text: String = spans.iter().map(|s| s.text).collect();
+		// A formula is not words: it is left out of the text and stands in its place as a box its size.
+		let typeset: Vec<Option<std::rc::Rc<math::Formula>>> = spans.iter().map(|s| s.math.and_then(|display| self.formula(s.text, display))).collect();
+		let text: String = spans.iter().zip(&typeset).map(|(s, f)| if f.is_some() { "" } else { s.text }).collect();
 		let mut fcx = self.fcx.borrow_mut();
 		let mut lcx = self.lcx.borrow_mut();
 		let mut builder = lcx.ranged_builder(&mut fcx, &text, 1.0, false);
@@ -216,7 +254,22 @@ impl Text {
 			}));
 		}
 		let mut at = 0;
-		for span in spans {
+		let mut boxes: Vec<(std::rc::Rc<math::Formula>, f32, u32)> = Vec::new();
+		for (span, formula) in spans.iter().zip(&typeset) {
+			if let Some(f) = formula {
+				let size = span.style.size as f32;
+				builder.push_inline_box(parley::InlineBox {
+					id: boxes.len() as u64,
+					kind: parley::InlineBoxKind::InFlow,
+					index: at,
+					width: f.width * size,
+					height: (f.ascent + f.descent) * size,
+					baseline: Some(f.ascent * size),
+					vertical_align: parley::style::VerticalAlign::BASELINE,
+				});
+				boxes.push((f.clone(), size, span.brush));
+				continue;
+			}
 			let range = at..at + span.text.len();
 			at = range.end;
 			let s = span.style;
@@ -255,7 +308,16 @@ impl Text {
 			let m = line.metrics();
 			laid.lines.push((m.block_min_coord, m.line_height, m.baseline));
 			for item in line.items() {
-				let PositionedLayoutItem::GlyphRun(run) = item else { continue };
+				let run = match item {
+					PositionedLayoutItem::GlyphRun(run) => run,
+					PositionedLayoutItem::InlineBox(b) => {
+						if let Some((formula, size, brush)) = boxes.get(b.id as usize) {
+							let baseline = b.y + b.baseline.unwrap_or(b.height);
+							laid.formulas.push(math::PlacedFormula { formula: formula.clone(), x: b.x, baseline, size: *size, brush: *brush });
+						}
+						continue;
+					}
+				};
 				let style = run.style();
 				let r = run.run();
 				let fd = r.font();
@@ -311,11 +373,10 @@ impl Measure for Text {
 		if let Some(hit) = self.measured.borrow().get(&key) {
 			return *hit;
 		}
-		let span = Span::plain(text, style);
 		// Half a pixel more than measured, so words measured to fit do not wrap on rounding.
-		let laid = self.lay(&[span], max_width.map(|w| w as f32 + 0.5), Align::Left);
+		let laid = self.lay_words(text, style, max_width.map(|w| w as f32 + 0.5), Align::Left, false, false);
 		let mut h = laid.height as f64;
-		if text.is_empty() || laid.lines.is_empty() {
+		if (text.is_empty() || laid.lines.is_empty()) && laid.formulas.is_empty() {
 			h = style.size * style.line_height.unwrap_or(1.2);
 		}
 		let w = laid.width as f64;

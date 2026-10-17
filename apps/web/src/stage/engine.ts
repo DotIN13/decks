@@ -19,7 +19,7 @@ import { isFile, isLiveFile } from "../canvas/pen/card-frame.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
 import { boundsOf } from "../canvas/pen/bounds.ts";
 import { BoxIndex, type Rect } from "../canvas/spatial.ts";
-import { cardReader } from "./reader.ts";
+import { cardReader, mathTypesetter } from "./reader.ts";
 import type { CardGeometry, FromWorker, LiveInk, PenHit, PenPreview, SceneBoard, ToWorker } from "./types.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
@@ -134,6 +134,7 @@ export class StageEngine {
 		this.page = new PageEngine(doc, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
+		this.page.setMath(mathTypesetter());
 		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		this.post({ type: "init", doc, dark: this.scheme === "dark" });

@@ -5,7 +5,7 @@
  * same frame as the board pages, so the two cannot drift (`engine.ts`).
  */
 import init, { WorkerEngine, openOffscreen } from "@decks/stage";
-import { cardReader } from "./reader.ts";
+import { cardReader, mathTypesetter } from "./reader.ts";
 import type { FromWorker, ToWorker } from "./types.ts";
 
 interface Scope {
@@ -55,6 +55,7 @@ async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void
 	engine = new WorkerEngine(message.doc, message.dark);
 	engine.setGpu(gpu, canvas);
 	engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
+	engine.setMath(mathTypesetter());
 	for (const one of early.splice(0)) take(one);
 	scope.postMessage({ type: "ready" });
 	paint();

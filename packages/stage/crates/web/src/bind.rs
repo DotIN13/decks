@@ -72,6 +72,15 @@ fn reader(read: js_sys::Function) -> Box<dyn Fn(&str) -> Option<Vec<stage_text::
 	})
 }
 
+/// The app's typesetter (`math.ts`): TeX and whether it is a display formula in, the formula's
+/// outlines as JSON out, or null.
+fn typesetter(typeset: js_sys::Function) -> Box<dyn Fn(&str, bool) -> Option<stage_text::math::Formula>> {
+	Box::new(move |tex: &str, display: bool| {
+		let out = typeset.call2(&JsValue::NULL, &JsValue::from_str(tex), &JsValue::from_bool(display)).ok()?;
+		serde_json::from_str(&out.as_string()?).ok()
+	})
+}
+
 fn icon_shape(json: &str) -> Option<stage_paint::painter::IconShape> {
 	serde_json::from_str(json).ok()
 }
@@ -288,6 +297,13 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = setMarkdownReader)]
 	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
 		self.page.text.set_reader(reader(read));
+		self.page.scene.update(&self.page.doc, None, &self.page.text);
+	}
+
+	/// The app's typesetter for `$…$` formulas in words and cards.
+	#[wasm_bindgen(js_name = setMath)]
+	pub fn set_math(&mut self, typeset: js_sys::Function) {
+		self.page.text.set_math(typesetter(typeset));
 		self.page.scene.update(&self.page.doc, None, &self.page.text);
 	}
 
@@ -593,6 +609,14 @@ impl WorkerEngine {
 		let _ = self.worker.reload(&text, dark);
 	}
 
+	#[wasm_bindgen(js_name = setMath)]
+	pub fn set_math(&mut self, typeset: js_sys::Function) {
+		self.worker.text.set_math(typesetter(typeset));
+		let text = self.worker.doc.to_text();
+		let dark = self.worker.dark;
+		let _ = self.worker.reload(&text, dark);
+	}
+
 	#[wasm_bindgen(js_name = putIcon)]
 	pub fn put_icon(&mut self, key: &str, json: &str) {
 		if let Some(shape) = icon_shape(json) {
@@ -628,6 +652,11 @@ impl TextMeasure {
 	#[wasm_bindgen(js_name = setMarkdownReader)]
 	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
 		self.text.set_reader(reader(read));
+	}
+
+	#[wasm_bindgen(js_name = setMath)]
+	pub fn set_math(&mut self, typeset: js_sys::Function) {
+		self.text.set_math(typesetter(typeset));
 	}
 
 	/// `[w, h]` of words in a style (`{ fontFamily, fontSize, fontWeight, fontStyle, letterSpacing,

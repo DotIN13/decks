@@ -1,13 +1,13 @@
 /**
  * Formulas in a drawing's words: TeX between `$…$` (in a line) and `$$…$$` (set as a display formula:
  * on a line of its own in a card, in place in a plain text), as Obsidian and GitHub read them, typeset by
- * MathJax into outlines the C++ engine fills like any shape.
+ * MathJax into outlines the stage's engine fills like any shape.
  *
- * A formula travels in text as one character from Unicode's private-use plane, U+F0000 plus its number
- * (`formulaText`), so the words of a text or a card carry it wherever they go: the engine measures that
- * character as the formula's box and draws its paths there (`packages/engine/cpp/math.cpp`). An engine is
- * handed each formula once (`handFormulas`) before it measures words that carry it. Only the engine draws
- * formulas; CanvasKit shows their TeX as it is written.
+ * The engine finds the formulas in words itself (`packages/stage/crates/text/src/math.rs`, the same
+ * rules as `formulaText`) and asks for each one once (`typesetFormula`, handed over in
+ * `stage/reader.ts`); it sets each as a box its size on the line's baseline. `formulaText` turns
+ * each formula into one private-use character, U+F0000 plus its number, for code that needs a formula
+ * to travel in a string.
  *
  * Nothing here touches a page: MathJax runs on its own small DOM, so this works in the worker and on the
  * server alike, and both measure a formula the same.
@@ -57,6 +57,12 @@ export function formulaChar(tex: string, display: boolean): string {
 		formulas.set(number, typeset(number, tex, display));
 	}
 	return String.fromCodePoint(MATH_FIRST + number);
+}
+
+/** A formula typeset, once: what the stage's engine is handed for `$…$` (`stage/reader.ts`). */
+export function typesetFormula(tex: string, display: boolean): Formula | undefined {
+	const char = formulaChar(tex, display);
+	return formulaOf(char.codePointAt(0)!);
 }
 
 /** The formula a character stands for, if it is one. */

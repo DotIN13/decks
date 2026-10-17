@@ -5,8 +5,7 @@ import { estimateText, isMarkdown, isMarkdownText, type MeasureText } from "@dec
 import { fileURLToPath } from "node:url";
 import { initSync, TextMeasure } from "@decks/stage";
 import { fontFiles, isFallbackFamily, textNeeds, type FontFile } from "../../../web/src/canvas/pen/font-files.ts";
-import { formulaText } from "../../../web/src/canvas/pen/math.ts";
-import { cardReader } from "../../../web/src/stage/reader.ts";
+import { cardReader, mathTypesetter } from "../../../web/src/stage/reader.ts";
 
 /**
  * Words measured on the server as the page measures them: the same Rust text crate as the page's
@@ -29,6 +28,7 @@ function loadText(): Promise<TextMeasure> {
 		initSync({ module: readFileSync(fileURLToPath(new URL("stage_web_bg.wasm", import.meta.resolve("@decks/stage")))) });
 		const engine = new TextMeasure();
 		engine.setMarkdownReader(cardReader("light"));
+		engine.setMath(mathTypesetter());
 		return engine;
 	});
 }
@@ -79,7 +79,7 @@ class ServerText {
 		let ready = true;
 		for (const file of fontFiles(textNeeds(text, style, markdown))) if (!this.have(file)) ready = false;
 		if (!ready) return estimateText(text, style, maxWidth, node);
-		const [w = 0, h = 0] = this.engine.measure(markdown ? text : formulaText(text), JSON.stringify(style), markdown ? (maxWidth ?? 240) : (maxWidth ?? -1), markdown, align);
+		const [w = 0, h = 0] = this.engine.measure(text, JSON.stringify(style), markdown ? (maxWidth ?? 240) : (maxWidth ?? -1), markdown, align);
 		const size = { w, h };
 		if (this.sizes.size >= 8192) this.sizes.delete(this.sizes.keys().next().value!);
 		// Measured with the files there were: a file that lands later starts a new generation, and so new sizes.

@@ -704,8 +704,7 @@ fn words(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, pad: f64, in
 	let auto = item.kind() == "text" && item.get("textGrowth").and_then(Value::as_str).unwrap_or("auto") == "auto";
 	// One more pixel than measured, so a line measured to fit does not wrap on rounding.
 	let max = if auto { width + 1.0 } else { width };
-	let span = Span { underline: vars.bool(item.get("underline"), theme, false), strike: vars.bool(item.get("strikethrough"), theme, false), ..Span::plain(&content, &style) };
-	let laid = text.lay(&[span], Some(max as f32), align);
+	let laid = text.lay_words(&content, &style, Some(max as f32), align, vars.bool(item.get("underline"), theme, false), vars.bool(item.get("strikethrough"), theme, false));
 	let inner = h - pad * 2.0;
 	let offset = match item.get("textAlignVertical").and_then(Value::as_str) {
 		Some("middle") => (inner - laid.height as f64) / 2.0,
@@ -770,6 +769,21 @@ pub fn draw_laid(ctx: &Context, laid: &Laid, origin: (f64, f64), brushes: &[Colo
 	for rule in &laid.rules {
 		let shape = Shape { w: rule.w, h: rule.h, radii: [0.0; 4], ellipse: false };
 		ops.push(Op::Shape { shape, transform: local.then(&Affine::translate(origin.0 as f32 + rule.x, origin.1 as f32 + rule.y)), paint: Paint::Solid(brush(rule.brush)), stroke: None });
+	}
+	// Formulas: MathJax's outlines, in ems from the formula's left end on its baseline, filled in place.
+	for placed in &laid.formulas {
+		let at = local.then(&Affine::translate(origin.0 as f32 + placed.x, origin.1 as f32 + placed.baseline)).then(&Affine::scale(placed.size));
+		let words = brush(placed.brush);
+		for part in &placed.formula.paths {
+			let Ok(path) = kurbo::BezPath::from_svg(&part.d) else { continue };
+			let [pa, pb, pc, pd, pe, pf] = part.m;
+			let place = Affine([pa as f32, pb as f32, pc as f32, pd as f32, pe as f32, pf as f32]);
+			let px = (scale * placed.size as f64 * (pa * pd - pb * pc).abs().sqrt()) as f32;
+			let colour = if part.rgba[3] < 0.0 { words } else { Color::straight([part.rgba[0], part.rgba[1], part.rgba[2], 1.0], part.rgba[3]) };
+			if let Some((vertices, indices)) = mesh::fill(&path, false, px.max(0.01)) {
+				ops.push(Op::Mesh { vertices, indices, transform: at.then(&place), paint: Paint::Solid(colour) });
+			}
+		}
 	}
 }
 
