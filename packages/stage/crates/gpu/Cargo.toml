@@ -5,3 +5,13 @@ version.workspace = true
 license.workspace = true
 
 [dependencies]
+stage-paint = { path = "../paint" }
+wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "metal", "std"] }
+bytemuck = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+pollster = "1"
+png = "0.18"
+stage-doc = { path = "../doc" }
+stage-scene = { path = "../scene" }
+serde_json.workspace = true
