@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
-import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, diff } from "@decks/pen";
 import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
@@ -671,7 +671,29 @@ export class StagePens {
 	/** The `stage.pen` frame for one agent looking at this stage. */
 	frame(agentId: string, name: string): ServerMessage {
 		const entry = this.get(name);
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc: this.withImported(name, entry.doc), base: `${fileUrl(join(this.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+		const doc = this.withImported(name, entry.doc);
+		this.sent.set(name, { rev: entry.rev, doc });
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(join(this.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+	}
+
+	/** The version of each stage last sent to browsers, whole or as edits: what the next edits are from. */
+	private readonly sent = new Map<string, { rev: number; doc: PenDocument }>();
+
+	/**
+	 * What changed since the version last sent, as `stage.pen.delta` frames for these agents, or the
+	 * whole drawing when nothing was sent before or the file does not read. Whatever made the change
+	 * (an edit, arrows rerouting, undo, the file written by hand), the edits are worked out from the
+	 * two versions, so they are always right.
+	 */
+	changes(agentIds: readonly string[], name: string): ServerMessage[] {
+		const entry = this.get(name);
+		const before = this.sent.get(name);
+		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name));
+		const doc = this.withImported(name, entry.doc);
+		const edits = diff(before.doc, doc);
+		this.sent.set(name, { rev: entry.rev, doc });
+		const base = `${fileUrl(join(this.dir, name))}/`;
+		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base }));
 	}
 
 	/** Replace the document whole, from text that must parse. */

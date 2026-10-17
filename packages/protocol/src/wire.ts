@@ -69,7 +69,7 @@ export interface StageRow {
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { WebStatus } from "./web.ts";
-import type { PenDocument } from "@decks/pen";
+import type { PenDocument, PenEdit } from "@decks/pen";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
@@ -177,6 +177,8 @@ export type ClientMessage =
 	 * the stage the named agent has open, together or not at all.
 	 */
 	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	/** The whole drawing again: the browser missed a revision of `stage.pen.delta`. */
+	| { type: "stage.pen.get"; agentId: string }
 	/**
 	 * Put an agent on a stage — the person's half of `stage.open`, from the manager.
 	 *
@@ -421,6 +423,11 @@ export type ServerMessage =
 	 * which an image fill's relative `url` is read against.
 	 */
 	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string }
+	/**
+	 * What changed in a stage drawing from revision `from` to `rev` (`@decks/pen` `diff`): sent in place
+	 * of the whole drawing to a browser that holds `from`. One that does not asks again (`stage.pen.get`).
+	 */
+	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string }
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *

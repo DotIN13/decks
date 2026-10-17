@@ -8,6 +8,7 @@
 //! The saved form is still pen.dev's `.pen` JSON. [`Document::parse`] reads it into the map and
 //! [`Document::to_json`] writes it back as it was: every field kept, in its order, unknown ones too.
 
+pub mod edits;
 pub mod frac;
 
 use serde_json::{Map, Value};
@@ -56,6 +57,8 @@ pub enum Change {
 	Place { id: String, parent: Option<String>, pos: String },
 	/// One of the document's own fields (`version`, `variables`, `themes`, …).
 	SetMeta { key: String, value: Option<Value> },
+	/// Give an item a `children` list (`true`), or take its empty one away.
+	List { id: String, on: bool },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -293,9 +296,16 @@ impl Document {
 
 	/// Apply a batch: all of it or, at the first change that cannot apply, none of it.
 	pub fn apply(&mut self, changes: &[Change]) -> Result<Applied, DocError> {
+		self.apply_each(changes.len(), |_, i| Ok(changes[i].clone()))
+	}
+
+	/// Apply `count` changes, each made by `make` from the document as the ones before it left it:
+	/// all of them, or none.
+	pub(crate) fn apply_each(&mut self, count: usize, mut make: impl FnMut(&Document, usize) -> Result<Change, DocError>) -> Result<Applied, DocError> {
 		let mut applied = Applied::default();
-		for (index, change) in changes.iter().enumerate() {
-			if let Err(e) = self.apply_one(change, &mut applied) {
+		for index in 0..count {
+			let made = make(self, index);
+			if let Err(e) = made.and_then(|change| self.apply_one(&change, &mut applied)) {
 				let undo = std::mem::take(&mut applied.undo);
 				for back in undo.iter().rev() {
 					self.apply_one(back, &mut Applied::default()).expect("an undo applies");
@@ -418,6 +428,22 @@ impl Document {
 				self.children.entry(new_parent).or_default().insert(at, handle);
 				applied.reshaped = true;
 				applied.undo.push(undo);
+			}
+			Change::List { id, on } => {
+				let handle = self.find(id)?;
+				let has = self.has_children(handle);
+				if *on && !has {
+					self.children.insert(Some(handle), Vec::new());
+				} else if !*on && has {
+					if !self.child_list(Some(handle)).is_empty() {
+						return fail(format!("\"{id}\" still has items in it"));
+					}
+					self.children.remove(&Some(handle));
+				} else {
+					return Ok(());
+				}
+				applied.touched.push(handle);
+				applied.undo.push(Change::List { id: id.clone(), on: !*on });
 			}
 			Change::SetMeta { key, value } => {
 				if key == "children" {

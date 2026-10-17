@@ -25,6 +25,13 @@ export const pen = {
 			reply(pens.frame(agent.id, name));
 		}
 	},
+	/** The whole drawing again, for a browser that missed a revision of the edits. */
+	"stage.pen.get": (message, reply, wire) => {
+		const agent = wire.agents.get(message.agentId);
+		const name = agent?.stageName();
+		if (!agent || !name || !wire.stage.pens) return;
+		reply(wire.stage.pens.frame(agent.id, name));
+	},
 	/**
 	 * Put an agent on a stage, because the person picked it in the manager.
 	 *

@@ -927,11 +927,10 @@ export class App {
 	 * browser is sent it once per agent whose stage it is.
 	 */
 	private publishPen(name: string, _entry: PenEntry): void {
-		for (const agent of this.agents?.all() ?? []) {
-			if (agent.stageName() !== name) continue;
-			agent.penChanged();
-			this.send(this.pens.frame(agent.id, name));
-		}
+		const on = (this.agents?.all() ?? []).filter((agent) => agent.stageName() === name);
+		for (const agent of on) agent.penChanged();
+		// What changed, not the whole drawing: a browser that missed a revision asks for it whole.
+		for (const message of this.pens.changes(on.map((agent) => agent.id), name)) this.send(message);
 		// The manager lists what each stage holds, and this is the moment that changed.
 		this.publishStages();
 	}
