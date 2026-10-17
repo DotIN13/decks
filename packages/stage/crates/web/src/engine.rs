@@ -6,7 +6,7 @@ use stage_doc::{Change, Document, History, Ids};
 use stage_paint::list::{Color, DrawList, Op};
 use stage_paint::painter::{Context, IconShape, LiveInk, paint_area, paint_ink};
 use stage_scene::geometry::Mat;
-use stage_paint::tiles::{Grid, Key, TILE, scale_for};
+use stage_paint::tiles::{Grid, Key, TILE, overview_scale, scale_for};
 use stage_scene::{Rect, Scene, Updated};
 use stage_text::Text;
 use stage_text::atlas::Atlas;
@@ -318,9 +318,10 @@ impl Page {
 		self.pictured = pictured;
 		self.carrying = carrying;
 		// Over: the tiles, one per place. Each place shows the sharpest tile held for it; where the
-		// tile at the scale asked for has not come yet, the part of a coarser one that covers it.
-		// Never two layered: tiles are clear where nothing is drawn, so a stale one under a fresh
-		// one would show through.
+		// tile at the scale asked for has not come yet, the part of a coarser one that covers it, and
+		// failing that the sharper tiles of one scale that lie in it, drawn smaller (a zoom out holds
+		// only sharper ones). Never two scales layered in a place: tiles are clear where nothing is
+		// drawn, so a stale one under a fresh one would show through.
 		let mut over = DrawList::new(Color::TRANSPARENT);
 		let want = scale_for(camera.zoom * dpr, moving);
 		let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).collect::<HashSet<_>>().into_iter().collect();
@@ -341,7 +342,10 @@ impl Page {
 				(a.x <= place.x + 1e-6 && a.y <= place.y + 1e-6 && a.right() >= place.right() - 1e-6 && a.bottom() >= place.bottom() - 1e-6).then_some(())?;
 				self.tiles.get(&k).map(|(t, _)| (k, *t))
 			});
-			let Some((k, texture)) = found else { continue };
+			let Some((k, texture)) = found else {
+				self.sharper_in(&place, &scales, want, &snap, &mut over);
+				continue;
+			};
 			let a = k.area();
 			let uv = [((place.x - a.x) / a.w) as f32, ((place.y - a.y) / a.h) as f32, ((place.right() - a.x) / a.w) as f32, ((place.bottom() - a.y) / a.h) as f32];
 			let (x, y, w, h) = snap(&place);
@@ -451,14 +455,56 @@ impl Page {
 		keys.iter().filter_map(|k| self.tiles.remove(k).map(|(t, _)| t)).collect()
 	}
 
-	/// Tiles past the budget, drawn longest ago: forget their textures and tell the worker.
+	/// A place no tile of its scale or coarser covers: the sharper tiles of the one scale nearest
+	/// its own that has any there, each cut to the place. A scale whose tiles would be too many to
+	/// look up for one place is passed over.
+	fn sharper_in(&mut self, place: &Rect, scales: &[u32], want: f32, snap: &dyn Fn(&Rect) -> (f32, f32, f32, f32), over: &mut DrawList) {
+		for &sc in scales {
+			let s = f32::from_bits(sc);
+			if s <= want {
+				continue;
+			}
+			let side = TILE as f64 / s as f64;
+			let (x0, y0) = ((place.x / side).floor() as i32, (place.y / side).floor() as i32);
+			let (x1, y1) = ((place.right() / side).ceil() as i32, (place.bottom() / side).ceil() as i32);
+			if ((x1 - x0) as i64) * ((y1 - y0) as i64) > 256 {
+				continue;
+			}
+			let mut drew = false;
+			for y in y0..y1 {
+				for x in x0..x1 {
+					let k = Key { scale: sc, x, y };
+					let Some((texture, used)) = self.tiles.get_mut(&k) else { continue };
+					*used = self.frame;
+					let a = k.area();
+					let cx = a.x.max(place.x);
+					let cy = a.y.max(place.y);
+					let cut = Rect { x: cx, y: cy, w: a.right().min(place.right()) - cx, h: a.bottom().min(place.bottom()) - cy };
+					if cut.w <= 0.0 || cut.h <= 0.0 {
+						continue;
+					}
+					let uv = [((cut.x - a.x) / a.w) as f32, ((cut.y - a.y) / a.h) as f32, ((cut.right() - a.x) / a.w) as f32, ((cut.bottom() - a.y) / a.h) as f32];
+					let (px, py, pw, ph) = snap(&cut);
+					over.push(Op::Picture { texture: *texture, x: px, y: py, w: pw, h: ph, uv, opacity: 1.0 });
+					drew = true;
+				}
+			}
+			if drew {
+				return;
+			}
+		}
+	}
+
+	/// Tiles past the budget, drawn longest ago: forget their textures and tell the worker. The
+	/// overview's are kept (`overview_scale`).
 	pub fn evict(&mut self) -> Vec<(Key, u32)> {
 		if self.tiles.len() <= self.budget {
 			return Vec::new();
 		}
-		let mut old: Vec<(u64, Key)> = self.tiles.iter().map(|(k, (_, used))| (*used, *k)).collect();
+		let overview = self.scene.extent().map(|e| overview_scale(&e).to_bits());
+		let mut old: Vec<(u64, Key)> = self.tiles.iter().filter(|(k, _)| Some(k.scale) != overview).map(|(k, (_, used))| (*used, *k)).collect();
 		old.sort();
-		let excess = self.tiles.len() - self.budget;
+		let excess = (self.tiles.len() - self.budget).min(old.len());
 		old.into_iter().take(excess).filter_map(|(_, k)| self.tiles.remove(&k).map(|(t, _)| (k, t))).collect()
 	}
 }
@@ -553,7 +599,8 @@ impl Worker {
 	/// stand-in they would show what was there before.
 	fn discard_stale(&mut self) {
 		let current = self.scale.to_bits();
-		let stale: Vec<Key> = self.grid.tiles.iter().filter(|(k, t)| t.dirty && k.scale != current).map(|(k, _)| *k).collect();
+		let overview = self.scene.extent().map(|e| overview_scale(&e).to_bits());
+		let stale: Vec<Key> = self.grid.tiles.iter().filter(|(k, t)| t.dirty && k.scale != current && Some(k.scale) != overview).map(|(k, _)| *k).collect();
 		for k in stale {
 			self.grid.forget(&k);
 			self.discarded.push(k);
@@ -644,7 +691,14 @@ impl Worker {
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		let wanted = Grid::covering(&view, scale, if moving { 0 } else { 1 });
-		let keys = self.grid.to_paint(&wanted, limit);
+		let mut keys = self.grid.to_paint(&wanted, limit);
+		// Once the view has all it needs, the overview: the whole stage at one small scale.
+		if keys.len() < limit {
+			if let Some(extent) = self.scene.extent() {
+				let overview = Grid::covering(&extent, overview_scale(&extent), 0);
+				keys.extend(self.grid.to_paint(&overview, limit - keys.len()));
+			}
+		}
 		let pictures = &self.pictures;
 		let image = |url: &str| pictures.get(url);
 		let skip: HashSet<String> = self.lifted.union(&self.view.hidden).cloned().collect();
@@ -704,8 +758,8 @@ mod tests {
 		let changes = crate::wire::parse(r#"[{"op":"set","id":"a","key":"x","value":1100}]"#).unwrap();
 		let generation = page.apply(&changes, true).unwrap();
 		worker.apply(&changes, generation).unwrap();
-		// The tile the square left and the tile it went to.
-		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
+		// The tile the square left, the tile it went to, and the overview's tile under both.
+		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 3);
 		assert_eq!(page.pick(1150.0, 50.0, 0.0)["id"], "a");
 		// A missed batch is noticed.
 		assert!(worker.apply(&changes, generation + 5).is_err());
@@ -713,10 +767,10 @@ mod tests {
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		// No boards placed yet: nothing under the pages.
 		assert!(under.ops.is_empty());
-		// A drag: the worker repaints without the square, the page draws it.
+		// A drag: the worker repaints without the square (its tile and the overview's), the page draws it.
 		page.lift(&["a".into()]);
 		worker.lift(&["a".into()]);
-		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 1);
+		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
 		// The drag's moves are the page's alone: the worker paints nothing.
 		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 0, "moving a lifted item paints no tiles");
@@ -729,9 +783,26 @@ mod tests {
 		worker.apply(&saved, generation).unwrap();
 		worker.drop_items(&["a".into()]);
 		assert!(worker.landed().is_empty());
-		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 1);
+		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
 		assert_eq!(worker.landed(), vec!["a".to_owned()]);
 		assert_eq!(page.boards()[0]["id"], "board");
+	}
+
+	#[test]
+	fn a_zoom_out_shows_the_sharper_tiles_until_its_own_come() {
+		let mut page = Page::new(STAGE, false, "s").unwrap();
+		let mut worker = Worker::new(STAGE, false).unwrap();
+		let near = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		for (key, _) in worker.next(near, 1.0, 1200.0, 800.0, false, 64) {
+			if key.scale() == 1.0 {
+				page.tile_texture(key);
+			}
+		}
+		// Zoomed out to a fifth: no tile at that scale or coarser is held, only the ones at 1.
+		let far = Camera { x: -2000.0, y: -2000.0, zoom: 0.2 };
+		let (_, over) = page.frame(far, 1.0, 1200.0, 800.0, true);
+		let pictures = over.ops.iter().filter(|op| matches!(op, Op::Picture { .. })).count();
+		assert!(pictures >= 6, "the sharper tiles stand in: {pictures}");
 	}
 }
 

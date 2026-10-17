@@ -39,6 +39,13 @@ pub fn scale_for(zoom_times_dpr: f64, moving: bool) -> f32 {
 	if moving { 2f64.powf(s.log2().ceil()) as f32 } else { s as f32 }
 }
 
+/// The overview's scale: the whole stage in at most four tiles a side, a power of two. Its tiles are
+/// painted once the view's are done and never let go, so a zoom out always has something to show.
+pub fn overview_scale(extent: &Rect) -> f32 {
+	let side = extent.w.max(extent.h).max(1.0);
+	2f64.powf((4.0 * TILE as f64 / side).log2().floor()).clamp(1.0 / 256.0, 1.0) as f32
+}
+
 #[derive(Clone, Debug)]
 pub struct Tile {
 	/// The texture holding its picture, once painted.

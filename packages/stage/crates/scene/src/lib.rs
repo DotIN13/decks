@@ -252,6 +252,15 @@ impl Scene {
 	}
 
 	/// What an item and everything in it paint on: the union of their ink boxes.
+	/// What the whole stage covers, everything drawn on it.
+	pub fn extent(&self) -> Option<Rect> {
+		self.roots.iter().map(|r| r.extent).filter(|r| r.w > 0.0 || r.h > 0.0).reduce(|a, b| {
+			let x = a.x.min(b.x);
+			let y = a.y.min(b.y);
+			Rect { x, y, w: a.right().max(b.right()) - x, h: a.bottom().max(b.bottom()) - y }
+		})
+	}
+
 	pub fn extent_of(&self, id: &str) -> Option<Rect> {
 		let (r, i) = self.find(id)?;
 		let root = &self.roots[r];
