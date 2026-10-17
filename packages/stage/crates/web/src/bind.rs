@@ -63,6 +63,19 @@ fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(
 	bitmap.close();
 }
 
+
+/// The app's markdown reader, a JavaScript function from a card's source to its blocks as JSON.
+fn reader(read: js_sys::Function) -> Box<dyn Fn(&str) -> Option<Vec<stage_text::markdown::Block>>> {
+	Box::new(move |source: &str| {
+		let out = read.call1(&JsValue::NULL, &JsValue::from_str(source)).ok()?;
+		stage_text::markdown::from_json(&out.as_string()?).ok()
+	})
+}
+
+fn icon_shape(json: &str) -> Option<stage_paint::painter::IconShape> {
+	serde_json::from_str(json).ok()
+}
+
 fn ids(json: &str) -> Vec<String> {
 	serde_json::from_str(json).unwrap_or_default()
 }
@@ -209,6 +222,21 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = wantedPictures)]
 	pub fn wanted_pictures(&self) -> String {
 		serde_json::to_string(&self.page.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
+	}
+
+	/// Read cards with the app's own reader: `(source) => JSON of blocks`.
+	#[wasm_bindgen(js_name = setMarkdownReader)]
+	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
+		self.page.text.set_reader(reader(read));
+		self.page.scene.update(&self.page.doc, None, &self.page.text);
+	}
+
+	/// An icon's shapes, as `parseIcon` gives them, by the key the engine asked for (after `icon:`).
+	#[wasm_bindgen(js_name = putIcon)]
+	pub fn put_icon(&mut self, key: &str, json: &str) {
+		if let Some(shape) = icon_shape(json) {
+			self.page.icons.insert(key.to_owned(), shape);
+		}
 	}
 
 	/// Lift top-level items for a drag (`["id", …]`): drawn here from now on.
@@ -388,6 +416,21 @@ impl WorkerEngine {
 	#[wasm_bindgen(js_name = wantedPictures)]
 	pub fn wanted_pictures(&self) -> String {
 		serde_json::to_string(&self.worker.pictures.take_wanted()).unwrap_or_else(|_| "[]".into())
+	}
+
+	#[wasm_bindgen(js_name = setMarkdownReader)]
+	pub fn set_markdown_reader(&mut self, read: js_sys::Function) {
+		self.worker.text.set_reader(reader(read));
+		let text = self.worker.doc.to_text();
+		let dark = self.worker.dark;
+		let _ = self.worker.reload(&text, dark);
+	}
+
+	#[wasm_bindgen(js_name = putIcon)]
+	pub fn put_icon(&mut self, key: &str, json: &str) {
+		if let Some(shape) = icon_shape(json) {
+			self.worker.icon(key, shape);
+		}
 	}
 
 	/// The page let go of a tile.

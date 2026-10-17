@@ -24,6 +24,31 @@ use stage_text::{Laid, Span, Text};
 
 pub const NOTE_RADIUS: f32 = 12.0;
 
+/// An icon's shapes, as the app's reader (`icons.ts`, `parseIcon`) gives them.
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IconShape {
+	pub view_box: [f64; 4],
+	pub parts: Vec<IconPart>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IconPart {
+	pub d: String,
+	pub fill: bool,
+	pub stroke: bool,
+	pub stroke_width: f32,
+	pub cap: String,
+	pub join: String,
+	pub even_odd: bool,
+}
+
+/// An icon's key: what the app fetches it by.
+pub fn icon_key(library: &str, name: &str, weight: f64) -> String {
+	format!("{library}|{name}|{}", weight.round())
+}
+
 /// What the painter is told besides the scene.
 pub struct Context<'a> {
 	pub scene: &'a Scene,
@@ -39,11 +64,13 @@ pub struct Context<'a> {
 	pub atlas: Option<&'a RefCell<Atlas>>,
 	/// Draw only these top-level items (the lifted ones, on the page), whatever `skip` says.
 	pub only: Option<&'a HashSet<String>>,
+	/// Icons by key (`icon_key`), once they have arrived.
+	pub icons: Option<&'a std::collections::HashMap<String, IconShape>>,
 }
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None }
 	}
 
 	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
@@ -499,8 +526,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			let shape = rrect(vars, item, theme, w, h);
 			ops.push(Op::Erase { shape, transform });
 		}
-		// Icons come with their own step.
-		"icon" | "icon_font" => {}
+		"icon" | "icon_font" => icon(ctx, item, theme, w, h, transform, pixels, ops),
 		kind => {
 			// Anything this build cannot draw, and broken refs, as a dashed outline that says so.
 			let missing = kind == MISSING;
@@ -779,6 +805,56 @@ fn draw_card(ctx: &Context, card_ops: &[stage_text::card::CardOp], origin: (f64,
 				ops.push(Op::Shape { shape: rect(*w, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(track, 1.0)), stroke: None });
 				let tw = (w / content * w).max(24.0);
 				ops.push(Op::Shape { shape: rect(tw, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(thumb, 1.0)), stroke: None });
+			}
+		}
+	}
+}
+
+/// An icon from a named library, fitted and centred in its box, in its first colour fill.
+#[allow(clippy::too_many_arguments)]
+fn icon(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, transform: Affine, pixels: f32, ops: &mut Vec<Op>) {
+	let vars = &ctx.scene.vars;
+	let font = item.kind() == "icon_font";
+	let library = vars.str(item.get(if font { "iconFontFamily" } else { "library" }), theme).unwrap_or("lucide");
+	let Some(name) = vars.str(item.get(if font { "iconFontName" } else { "icon" }), theme).filter(|n| !n.is_empty()) else { return };
+	let weight = vars.num(item.get("weight"), theme, 400.0);
+	let key = icon_key(library, name, weight);
+	let Some(shape) = ctx.icons.and_then(|icons| icons.get(&key)) else {
+		ctx.wanted.borrow_mut().push(format!("icon:{key}"));
+		return;
+	};
+	let ink = text_ink(ctx, item, theme);
+	let [vx, vy, vw, vh] = shape.view_box;
+	if vw <= 0.0 || vh <= 0.0 {
+		return;
+	}
+	let scale = (w / vw).min(h / vh);
+	let fit = transform
+		.then(&Affine::translate(((w - vw * scale) / 2.0) as f32, ((h - vh * scale) / 2.0) as f32))
+		.then(&Affine::scale(scale as f32))
+		.then(&Affine::translate(-vx as f32, -vy as f32));
+	let px = pixels * scale as f32;
+	for part in &shape.parts {
+		let Ok(path) = kurbo::BezPath::from_svg(&part.d) else { continue };
+		let paint = Paint::Solid(Color::straight(ink, 1.0));
+		if part.fill {
+			if let Some((vertices, indices)) = mesh::fill(&path, part.even_odd, px) {
+				ops.push(Op::Mesh { vertices, indices, transform: fit, paint: paint.clone() });
+			}
+		}
+		if part.stroke {
+			let cap = match part.cap.as_str() {
+				"round" => lyon_tessellation::LineCap::Round,
+				"square" => lyon_tessellation::LineCap::Square,
+				_ => lyon_tessellation::LineCap::Butt,
+			};
+			let join = match part.join.as_str() {
+				"round" => lyon_tessellation::LineJoin::Round,
+				"bevel" => lyon_tessellation::LineJoin::Bevel,
+				_ => lyon_tessellation::LineJoin::Miter,
+			};
+			if let Some((vertices, indices)) = mesh::stroke(&path, part.stroke_width, cap, join, None, px) {
+				ops.push(Op::Mesh { vertices, indices, transform: fit, paint });
 			}
 		}
 	}

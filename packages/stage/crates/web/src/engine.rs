@@ -4,7 +4,7 @@
 use serde_json::{Value, json};
 use stage_doc::{Change, Document, History, Ids};
 use stage_paint::list::{Color, DrawList, Op};
-use stage_paint::painter::{Context, LiveInk, paint_area, paint_ink};
+use stage_paint::painter::{Context, IconShape, LiveInk, paint_area, paint_ink};
 use stage_scene::geometry::Mat;
 use stage_paint::tiles::{Grid, Key, TILE, scale_for};
 use stage_scene::{Rect, Scene, Updated};
@@ -44,6 +44,7 @@ impl Pictures {
 /// The page's engine: owns the document, answers the pointer, and lays the worker's tiles on the
 /// screen in the same frame as the board pages.
 pub struct Page {
+	pub icons: HashMap<String, IconShape>,
 	pub text: Text,
 	pub atlas: RefCell<Atlas>,
 	pub pictures: Pictures,
@@ -67,7 +68,7 @@ impl Page {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
 		let words = Text::new();
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		Ok(Page { icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -221,6 +222,7 @@ impl Page {
 			let image = |url: &str| pictures.get(url);
 			let mut ctx = Context::new(&self.scene, &skip, &image).with_text(&self.text, &self.atlas);
 			ctx.only = Some(&self.lifted);
+			ctx.icons = Some(&self.icons);
 			let lifted = paint_area(&ctx, view, s, Color::TRANSPARENT);
 			self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
 			over.ops.extend(lifted.ops);
@@ -280,6 +282,7 @@ impl Page {
 
 /// The worker's engine: the same document, kept by the same numbered batches, painted as tiles.
 pub struct Worker {
+	pub icons: HashMap<String, IconShape>,
 	pub text: Text,
 	pub pictures: Pictures,
 	/// Items the page is moving: left out of the tiles until they land.
@@ -304,7 +307,7 @@ impl Worker {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
 		let words = Text::new();
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Worker { text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
+		Ok(Worker { icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
 	}
 
 	/// Start again from the whole document: after a lost batch, or a theme change.
@@ -420,6 +423,13 @@ impl Worker {
 		self.grid.invalidate_all();
 	}
 
+	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere).
+	pub fn icon(&mut self, key: &str, shape: IconShape) {
+		self.icons.insert(key.to_owned(), shape);
+		self.version += 1;
+		self.grid.invalidate_all();
+	}
+
 	/// The next tiles to paint for a view, with their draw lists: missing ones first, the middle first.
 	pub fn next(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize) -> Vec<(Key, DrawList)> {
 		let scale = scale_for(camera.zoom * dpr, moving);
@@ -429,7 +439,8 @@ impl Worker {
 		let keys = self.grid.to_paint(&wanted, limit);
 		let pictures = &self.pictures;
 		let image = |url: &str| pictures.get(url);
-		let ctx = Context::new(&self.scene, &self.lifted, &image).with_text(&self.text, &self.atlas);
+		let mut ctx = Context::new(&self.scene, &self.lifted, &image).with_text(&self.text, &self.atlas);
+		ctx.icons = Some(&self.icons);
 		let clear = Color::TRANSPARENT;
 		let out = keys.into_iter().map(|k| (k, paint_area(&ctx, k.area(), k.scale(), clear))).collect();
 		self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
