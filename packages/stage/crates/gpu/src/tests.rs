@@ -197,3 +197,34 @@ fn words_are_crisp() {
 	let darkest = (20..40).flat_map(|y| (20..300).map(move |x| (x, y))).map(|(x, y)| px(&p, 800, x, y)[0]).min().unwrap();
 	assert!(darkest < 60, "darkest {darkest}");
 }
+
+/// A markdown card with every kind of block, drawn as a note.
+#[test]
+fn cards_are_drawn() {
+	let Some(mut g) = gpu() else { return };
+	let mut words = fonts();
+	if !words.has_fonts() {
+		return;
+	}
+	if let Ok(bytes) = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts/jetbrains-mono_latest_latin-400-normal.ttf")) {
+		words.add_font("JetBrains Mono", bytes, false);
+	}
+	let md = "# A card\n\nWords with **bold**, *italic*, `code` and a [link](https://x).\n\n- one\n- two\n  - nested\n\n- [x] done\n- [ ] to do\n\n> A quote, behind its bar.\n\n```\nfn main() {}\n```\n\n| Name | Value |\n|:-|-:|\n| frames | 120 |\n| page ms | 0.3 |\n\n---\n\nThe end.";
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"note","id":"n","x":10,"y":10,"width":380,"content":md,"metadata":{"type":"decks.markdown"}}
+	]})).unwrap();
+	let scene = stage_scene::Scene::new(&doc, false, &words);
+	let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
+	let skip = std::collections::HashSet::new();
+	let none = |_: &str| None;
+	let ctx = Context::new(&scene, &skip, &none).with_text(&words, &atlas);
+	let h = scene.roots[0].placed[0].rect.h;
+	assert!(h > 400.0, "the note grew to hold its card: {h}");
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 400.0, h: h + 20.0 };
+	let list = paint_area(&ctx, area, 2.0, Color([0.96, 0.96, 0.96, 1.0]));
+	let (w, hh) = (800, ((h + 20.0) * 2.0) as u32);
+	g.texture(1, TextureKind::Color, w, hh, None);
+	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+	g.draw(Target::Texture(1), &list);
+	save("card", &g.read(1).unwrap(), w, hh);
+}

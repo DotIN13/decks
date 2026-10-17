@@ -6,8 +6,10 @@ use stage_doc::{Change, Document, History, Ids};
 use stage_paint::list::{Color, DrawList, Op};
 use stage_paint::painter::{Context, paint_area};
 use stage_paint::tiles::{Grid, Key, TILE, scale_for};
-use stage_scene::layout::Estimate;
 use stage_scene::{Rect, Scene, Updated};
+use stage_text::Text;
+use stage_text::atlas::Atlas;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 /// Where the stage is looking: the stage point at the window's corner, and CSS pixels per stage unit.
@@ -21,6 +23,7 @@ pub struct Camera {
 /// The page's engine: owns the document, answers the pointer, and lays the worker's tiles on the
 /// screen in the same frame as the board pages.
 pub struct Page {
+	pub text: Text,
 	pub doc: Document,
 	pub scene: Scene,
 	pub history: History,
@@ -35,8 +38,9 @@ pub struct Page {
 impl Page {
 	pub fn new(text: &str, dark: bool, session: &str) -> Result<Page, String> {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
-		let scene = Scene::new(&doc, dark, &Estimate);
-		Ok(Page { doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		let words = Text::new();
+		let scene = Scene::new(&doc, dark, &words);
+		Ok(Page { text: words, doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -46,21 +50,27 @@ impl Page {
 		if mine {
 			self.history.record(&applied);
 		}
-		self.scene.update(&self.doc, Some(&applied), &Estimate);
+		self.scene.update(&self.doc, Some(&applied), &self.text);
 		Ok(applied.generation)
 	}
 
 	/// Undo this session's last batch: the changes that did it, to send on, and their generation.
 	pub fn undo(&mut self) -> Option<(Vec<Change>, u64)> {
 		let (changes, applied) = self.history.undo(&mut self.doc)?;
-		self.scene.update(&self.doc, Some(&applied), &Estimate);
+		self.scene.update(&self.doc, Some(&applied), &self.text);
 		Some((changes, applied.generation))
 	}
 
 	pub fn redo(&mut self) -> Option<(Vec<Change>, u64)> {
 		let (changes, applied) = self.history.redo(&mut self.doc)?;
-		self.scene.update(&self.doc, Some(&applied), &Estimate);
+		self.scene.update(&self.doc, Some(&applied), &self.text);
 		Some((changes, applied.generation))
+	}
+
+	/// A font file arrived: words are measured again, so everything is laid out again.
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.text.add_font(name, bytes, fallback);
+		self.scene.update(&self.doc, None, &self.text);
 	}
 
 	/// The topmost item under a stage point, as its id path.
@@ -139,6 +149,8 @@ impl Page {
 
 /// The worker's engine: the same document, kept by the same numbered batches, painted as tiles.
 pub struct Worker {
+	pub text: Text,
+	pub atlas: RefCell<Atlas>,
 	pub doc: Document,
 	pub scene: Scene,
 	pub grid: Grid,
@@ -150,15 +162,16 @@ pub struct Worker {
 impl Worker {
 	pub fn new(text: &str, dark: bool) -> Result<Worker, String> {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
-		let scene = Scene::new(&doc, dark, &Estimate);
-		Ok(Worker { doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
+		let words = Text::new();
+		let scene = Scene::new(&doc, dark, &words);
+		Ok(Worker { text: words, atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
 	}
 
 	/// Start again from the whole document: after a lost batch, or a theme change.
 	pub fn reload(&mut self, text: &str, dark: bool) -> Result<(), String> {
 		self.doc = Document::parse(text).map_err(|e| e.0)?;
 		self.dark = dark;
-		self.scene = Scene::new(&self.doc, dark, &Estimate);
+		self.scene = Scene::new(&self.doc, dark, &self.text);
 		self.grid.invalidate_all();
 		Ok(())
 	}
@@ -170,9 +183,17 @@ impl Worker {
 			return Err(format!("batch {generation} after {}: send the whole document", self.doc.generation));
 		}
 		let applied = self.doc.apply(changes).map_err(|e| e.0)?;
-		let updated = self.scene.update(&self.doc, Some(&applied), &Estimate);
+		let updated = self.scene.update(&self.doc, Some(&applied), &self.text);
 		self.invalidate(&updated);
 		Ok(())
+	}
+
+	/// A font file arrived: lay out again and repaint every tile.
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.text.add_font(name, bytes, fallback);
+		self.scene.update(&self.doc, None, &self.text);
+		self.version += 1;
+		self.grid.invalidate_all();
 	}
 
 	fn invalidate(&mut self, updated: &Updated) {
@@ -198,7 +219,7 @@ impl Worker {
 		let keys = self.grid.to_paint(&wanted, limit);
 		let skip = HashSet::new();
 		let none = |_: &str| None;
-		let ctx = Context::new(&self.scene, &skip, &none);
+		let ctx = Context::new(&self.scene, &skip, &none).with_text(&self.text, &self.atlas);
 		let clear = Color::TRANSPARENT;
 		let out = keys.into_iter().map(|k| (k, paint_area(&ctx, k.area(), k.scale(), clear))).collect();
 		out

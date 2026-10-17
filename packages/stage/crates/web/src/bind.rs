@@ -66,6 +66,12 @@ impl PageEngine {
 		self.gpu = Some(handle.gpu);
 	}
 
+	/// A font file, under the name the app's chains use; `fallback` for the files tried last.
+	#[wasm_bindgen(js_name = addFont)]
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.page.add_font(name, bytes, fallback);
+	}
+
 	/// Apply a batch of changes (JSON); `mine` when this session made it. Returns its generation.
 	pub fn apply(&mut self, changes: &str, mine: bool) -> Result<f64, JsError> {
 		let changes = wire::parse(changes).map_err(err)?;
@@ -213,6 +219,11 @@ impl WorkerEngine {
 		TILE_SIZE
 	}
 
+	#[wasm_bindgen(js_name = addFont)]
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.worker.add_font(name, bytes, fallback);
+	}
+
 	/// The page's batch number `generation`; an error asks for the whole document.
 	pub fn apply(&mut self, changes: &str, generation: f64) -> Result<(), JsError> {
 		let changes = wire::parse(changes).map_err(err)?;
@@ -229,6 +240,7 @@ impl WorkerEngine {
 		let out = js_sys::Array::new();
 		let (Some(gpu), Some(canvas)) = (&mut self.gpu, &self.canvas) else { return out };
 		for (key, list) in self.worker.next(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize) {
+			stage_paint::flush_glyphs(&mut self.worker.atlas.borrow_mut(), gpu);
 			gpu.draw(Target::Screen, &list);
 			let Ok(bitmap) = canvas.transfer_to_image_bitmap() else { break };
 			let tile = js_sys::Object::new();

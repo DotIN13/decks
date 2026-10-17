@@ -6,6 +6,8 @@
 //! family's extended-Latin file, Inter, and every fallback in the order the app lists them.
 
 pub mod atlas;
+pub mod card;
+pub mod markdown;
 
 use parley::fontique::{Blob, FontInfoOverride};
 use parley::{Alignment, AlignmentOptions, FontContext, FontFamily, FontFamilyName, FontStyle, FontWeight, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty};
@@ -27,6 +29,14 @@ pub struct Span<'a> {
 	pub brush: u32,
 	pub underline: bool,
 	pub strike: bool,
+	/// The colour of the line under or through it, when not its words' own.
+	pub deco: Option<u32>,
+}
+
+impl<'a> Span<'a> {
+	pub fn plain(text: &'a str, style: &'a TextStyle) -> Span<'a> {
+		Span { text, style, brush: 0, underline: false, strike: false, deco: None }
+	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +71,12 @@ pub struct GlyphRun {
 	pub skew: f32,
 	pub coords: Vec<i16>,
 	pub glyphs: Vec<(u32, f32, f32)>,
+	/// Where the run starts and how far it goes, and its line's top and height: for a highlight
+	/// behind its words.
+	pub x: f32,
+	pub w: f32,
+	pub line_top: f32,
+	pub line_height: f32,
 }
 
 /// A line drawn under or through words: `x, y, w, h` from the paragraph's top-left.
@@ -99,6 +115,14 @@ pub struct Text {
 	fallbacks: Vec<String>,
 	families: Vec<String>,
 	measured: RefCell<HashMap<(String, u64), (f64, f64)>>,
+	/// Cards laid out, by their words, style, width and scheme: measured once, drawn from the same.
+	cards: RefCell<HashMap<(String, u64, bool), std::rc::Rc<card::Card>>>,
+	/// Reads a card's markdown; the app's reader when it gave one, this crate's otherwise.
+	reader: Option<Box<dyn Fn(&str) -> Option<Vec<markdown::Block>>>>,
+	/// Pictures' sizes, once they have arrived, so a card can make room for them.
+	pub images: RefCell<HashMap<String, (f32, f32)>>,
+	/// The scheme cards are set for.
+	pub dark: bool,
 	/// Bumped when a font arrives: everything measured or drawn before it is stale.
 	pub generation: u64,
 }
@@ -113,7 +137,18 @@ impl Text {
 	pub fn new() -> Text {
 		let collection = parley::fontique::Collection::new(parley::fontique::CollectionOptions { shared: false, system_fonts: false });
 		let fcx = FontContext { collection, source_cache: Default::default() };
-		Text { fcx: RefCell::new(fcx), lcx: RefCell::new(LayoutContext::new()), fallbacks: Vec::new(), families: Vec::new(), measured: RefCell::new(HashMap::new()), generation: 0 }
+		Text {
+			fcx: RefCell::new(fcx),
+			lcx: RefCell::new(LayoutContext::new()),
+			fallbacks: Vec::new(),
+			families: Vec::new(),
+			measured: RefCell::new(HashMap::new()),
+			cards: RefCell::new(HashMap::new()),
+			reader: None,
+			images: RefCell::new(HashMap::new()),
+			dark: false,
+			generation: 0,
+		}
 	}
 
 	/// Register a font file under `name`, the name the app's chains use. `fallback` files are tried,
@@ -125,8 +160,35 @@ impl Text {
 		if !list.iter().any(|n| n == name) {
 			list.push(name.to_owned());
 		}
+		self.forget();
+	}
+
+	/// Everything measured is stale: a font, a picture or the scheme changed.
+	pub fn forget(&mut self) {
 		self.measured.borrow_mut().clear();
+		self.cards.borrow_mut().clear();
 		self.generation += 1;
+	}
+
+	/// The app's markdown reader: source in, blocks out.
+	pub fn set_reader(&mut self, reader: Box<dyn Fn(&str) -> Option<Vec<markdown::Block>>>) {
+		self.reader = Some(reader);
+		self.forget();
+	}
+
+	/// A card's markdown laid out `width` wide: cached, so measuring and drawing share one layout.
+	pub fn card(&self, source: &str, style: &TextStyle, width: f32, align: Align) -> std::rc::Rc<card::Card> {
+		let key = (format!("{}|{:?}", style_key(source, style), align), (width as f64).to_bits(), self.dark);
+		if let Some(hit) = self.cards.borrow().get(&key) {
+			return hit.clone();
+		}
+		let blocks = self.reader.as_ref().and_then(|r| r(source)).unwrap_or_else(|| markdown::parse(source));
+		let images = self.images.borrow();
+		let size = |url: &str| images.get(url).copied();
+		let laid = std::rc::Rc::new(card::layout(self, &blocks, style, width, align, self.dark, &size));
+		drop(images);
+		self.cards.borrow_mut().insert(key, laid.clone());
+		laid
 	}
 
 	pub fn has_fonts(&self) -> bool {
@@ -166,9 +228,15 @@ impl Text {
 			builder.push(StyleProperty::Brush(span.brush), range.clone());
 			if span.underline {
 				builder.push(StyleProperty::Underline(true), range.clone());
+				if let Some(d) = span.deco {
+					builder.push(StyleProperty::UnderlineBrush(Some(d)), range.clone());
+				}
 			}
 			if span.strike {
 				builder.push(StyleProperty::Strikethrough(true), range.clone());
+				if let Some(d) = span.deco {
+					builder.push(StyleProperty::StrikethroughBrush(Some(d)), range.clone());
+				}
 			}
 		}
 		let mut layout: Layout<u32> = builder.build(&text);
@@ -213,6 +281,10 @@ impl Text {
 					skew: synth.skew().unwrap_or(0.0),
 					coords: r.normalized_coords().iter().map(|c| c.to_bits()).collect(),
 					glyphs,
+					x: x0,
+					w,
+					line_top: m.block_min_coord,
+					line_height: m.line_height,
 				});
 			}
 		}
@@ -229,11 +301,17 @@ impl Measure for Text {
 		if !self.has_fonts() {
 			return Estimate.measure(text, style, max_width, item);
 		}
+		// A card's words are markdown: its height is the card's.
+		if is_markdown(item) {
+			let width = max_width.unwrap_or(f64::from(u16::MAX)) as f32;
+			let card = self.card(text, style, width, Align::Left);
+			return (width as f64, card.height as f64);
+		}
 		let key = (style_key(text, style), max_width.map_or(u64::MAX, f64::to_bits));
 		if let Some(hit) = self.measured.borrow().get(&key) {
 			return *hit;
 		}
-		let span = Span { text, style, brush: 0, underline: false, strike: false };
+		let span = Span::plain(text, style);
 		// Half a pixel more than measured, so words measured to fit do not wrap on rounding.
 		let laid = self.lay(&[span], max_width.map(|w| w as f32 + 0.5), Align::Left);
 		let mut h = laid.height as f64;
@@ -249,3 +327,8 @@ impl Measure for Text {
 
 #[cfg(test)]
 mod tests;
+
+/// Whether an item's words are a card's markdown (`decks.markdown`), a note's or one block's.
+pub fn is_markdown(item: &Item) -> bool {
+	item.get("metadata").and_then(|m| m.get("type")).and_then(|t| t.as_str()) == Some("decks.markdown")
+}

@@ -154,6 +154,30 @@ addEventListener("resize", () => changed(false));
 
 // --- start -----------------------------------------------------------------------------------
 
+// The fonts the app's chain starts with, from the same CDN (`font-files.ts`); the app proper asks
+// `font-files.ts` for exactly the files a stage's words need.
+const CDN = "https://cdn.jsdelivr.net/fontsource/fonts";
+const FONTS = [
+	["Inter", "inter@latest/latin-400-normal", false],
+	["Inter", "inter@latest/latin-500-normal", false],
+	["Inter", "inter@latest/latin-600-normal", false],
+	["Inter", "inter@latest/latin-700-normal", false],
+	["Inter", "inter@latest/latin-400-italic", false],
+	["JetBrains Mono", "jetbrains-mono@latest/latin-400-normal", false],
+	["Noto Sans SC", "noto-sans-sc@latest/chinese-simplified-400-normal", true],
+];
+
+async function loadFonts() {
+	await Promise.all(
+		FONTS.map(async ([name, file, fallback]) => {
+			const bytes = new Uint8Array(await (await fetch(`${CDN}/${file}.ttf`)).arrayBuffer());
+			engine.addFont(name, bytes, fallback);
+			worker.postMessage({ type: "font", name, bytes, fallback });
+			dirty = true;
+		}),
+	);
+}
+
 async function start() {
 	await init();
 	const text = await (await fetch(stageUrl)).text();
@@ -187,6 +211,7 @@ async function start() {
 		}
 	};
 	worker.postMessage({ type: "init", text, dark });
+	loadFonts();
 	if (params.get("boards") !== "0") placeBoards();
 	requestAnimationFrame(frame);
 	window.__stage = { engine, camera, stats, edit, changed: () => changed(false), pick: (x, y) => engine.pick(x, y, 0) };

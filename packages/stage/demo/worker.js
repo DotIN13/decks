@@ -47,6 +47,9 @@ onmessage = async ({ data }) => {
 	} else if (data.type === "reload") {
 		engine.reload(data.text, data.dark);
 		paint();
+	} else if (data.type === "font") {
+		engine.addFont(data.name, data.bytes, data.fallback);
+		paint();
 	} else if (data.type === "dropped") {
 		for (const [s, x, y] of data.keys) engine.dropped(s, x, y);
 	}

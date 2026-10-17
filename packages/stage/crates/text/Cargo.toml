@@ -9,3 +9,5 @@ stage-scene = { path = "../scene" }
 parley = { version = "0.12", default-features = false, features = ["std"] }
 swash = "0.2"
 serde_json.workspace = true
+serde.workspace = true
+pulldown-cmark = { version = "0.13", default-features = false }

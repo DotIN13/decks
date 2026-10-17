@@ -33,14 +33,14 @@ fn words_are_measured_and_wrapped() {
 	let bold = TextStyle { weight: 700.0, ..style(14.0) };
 	assert!(t.measure("Hello, world", &bold, None, &item).0 > w, "bold is wider");
 	// Chinese from the fallback file.
-	let laid = t.lay(&[Span { text: "你好 hi", style: &style(14.0), brush: 0, underline: false, strike: false }], None, Align::Left);
+	let laid = t.lay(&[Span::plain("你好 hi", &style(14.0))], None, Align::Left);
 	assert!(laid.runs.len() >= 2, "{}", laid.runs.len());
 }
 
 #[test]
 fn glyphs_go_into_the_atlas_once() {
 	let Some(t) = with_fonts() else { return };
-	let laid = t.lay(&[Span { text: "Hallo", style: &style(20.0), brush: 0, underline: true, strike: false }], None, Align::Left);
+	let laid = t.lay(&[Span { underline: true, ..Span::plain("Hallo", &style(20.0)) }], None, Align::Left);
 	assert_eq!(laid.rules.len(), 1);
 	let mut atlas = atlas::Atlas::new();
 	let run = &laid.runs[0];

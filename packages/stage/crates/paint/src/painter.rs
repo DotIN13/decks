@@ -445,8 +445,12 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			let shape = Shape { w: w as f32, h: h as f32, radii: [NOTE_RADIUS; 4], ellipse: false };
 			card_paper_colour(ctx.dark, shape, transform, parse_color(paper).unwrap_or([1.0; 4]), ops);
 			card_edge(ctx.dark, shape, transform, ops);
-			let ink = if markdown && ctx.dark { [0.9, 0.9, 0.9, 1.0] } else { parse_color("#1f2328").unwrap_or([0.0, 0.0, 0.0, 1.0]) };
-			words(ctx, item, theme, w, h, NOTE_PAD, ink, &m, ops);
+			if markdown {
+				card_words(ctx, item, theme, w, NOTE_PAD, &m, ops);
+			} else {
+				let ink = parse_color("#1f2328").unwrap_or([0.0, 0.0, 0.0, 1.0]);
+				words(ctx, item, theme, w, h, NOTE_PAD, ink, &m, ops);
+			}
 			// A prompt names the model it is for: small, in the top padding's right corner.
 			if item.kind() == "prompt" {
 				if let Some(model) = item.get("model").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
@@ -454,6 +458,10 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 					label(ctx, model, &style, (NOTE_PAD, 2.0), (w - NOTE_PAD * 2.0).max(20.0), stage_text::Align::Right, [0.25, 0.2, 0.45, 0.75], &m, ops);
 				}
 			}
+		}
+		"text" if stage_text::is_markdown(item) => {
+			// One block of a card, drawn as the card draws it, with no paper of its own.
+			card_words(ctx, item, theme, w, 0.0, &m, ops);
 		}
 		"text" => {
 			let ink = text_ink(ctx, item, theme);
@@ -600,7 +608,7 @@ fn words(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, pad: f64, in
 	let auto = item.kind() == "text" && item.get("textGrowth").and_then(Value::as_str).unwrap_or("auto") == "auto";
 	// One more pixel than measured, so a line measured to fit does not wrap on rounding.
 	let max = if auto { width + 1.0 } else { width };
-	let span = Span { text: &content, style: &style, brush: 0, underline: vars.bool(item.get("underline"), theme, false), strike: vars.bool(item.get("strikethrough"), theme, false) };
+	let span = Span { underline: vars.bool(item.get("underline"), theme, false), strike: vars.bool(item.get("strikethrough"), theme, false), ..Span::plain(&content, &style) };
 	let laid = text.lay(&[span], Some(max as f32), align);
 	let inner = h - pad * 2.0;
 	let offset = match item.get("textAlignVertical").and_then(Value::as_str) {
@@ -615,7 +623,7 @@ fn words(ctx: &Context, item: &Item, theme: &Theme, w: f64, h: f64, pad: f64, in
 #[allow(clippy::too_many_arguments)]
 fn label(ctx: &Context, words: &str, style: &stage_scene::layout::TextStyle, at: (f64, f64), width: f64, align: stage_text::Align, ink: [f32; 4], m: &Mat, ops: &mut Vec<Op>) {
 	let Some(text) = ctx.text else { return };
-	let laid = text.lay(&[Span { text: words, style, brush: 0, underline: false, strike: false }], Some(width as f32), align);
+	let laid = text.lay(&[Span::plain(words, style)], Some(width as f32), align);
 	draw_laid(ctx, &laid, at, &[Color::straight(ink, 1.0)], m, ops);
 }
 
@@ -666,5 +674,80 @@ pub fn draw_laid(ctx: &Context, laid: &Laid, origin: (f64, f64), brushes: &[Colo
 	for rule in &laid.rules {
 		let shape = Shape { w: rule.w, h: rule.h, radii: [0.0; 4], ellipse: false };
 		ops.push(Op::Shape { shape, transform: local.then(&Affine::translate(origin.0 as f32 + rule.x, origin.1 as f32 + rule.y)), paint: Paint::Solid(brush(rule.brush)), stroke: None });
+	}
+}
+
+/// A card's markdown, laid out as it was measured, inside `pad`.
+fn card_words(ctx: &Context, item: &Item, theme: &Theme, w: f64, pad: f64, m: &Mat, ops: &mut Vec<Op>) {
+	let Some(text) = ctx.text else { return };
+	let vars = &ctx.scene.vars;
+	let Some(Value::String(content)) = vars.resolve(item.get("content"), theme) else { return };
+	if content.is_empty() {
+		return;
+	}
+	let style = stage_scene::layout::text_style(item, vars, theme);
+	let align = match item.get("textAlign").and_then(Value::as_str) {
+		Some("center") => stage_text::Align::Center,
+		Some("right") => stage_text::Align::Right,
+		_ => stage_text::Align::Left,
+	};
+	let card = text.card(content, &style, (w - pad * 2.0).max(1.0) as f32, align);
+	draw_card(ctx, &card.ops, (pad, pad), m, ops);
+}
+
+fn draw_card(ctx: &Context, card_ops: &[stage_text::card::CardOp], origin: (f64, f64), m: &Mat, ops: &mut Vec<Op>) {
+	use stage_text::card::CardOp;
+	let local = |x: f32, y: f32| Affine(m.0.map(|v| v as f32)).then(&Affine::translate(origin.0 as f32 + x, origin.1 as f32 + y));
+	let rect = |w: f32, h: f32, r: f32| Shape { w, h, radii: [r; 4], ellipse: false };
+	for op in card_ops {
+		match op {
+			CardOp::Text { laid, x, y, brushes } => {
+				// What lies behind words (a highlight, code's tint) goes under them.
+				for run in &laid.runs {
+					if let Some(back) = brushes.get(run.brush as usize).and_then(|b| b.back) {
+						ops.push(Op::Shape { shape: rect(run.w, run.line_height, 3.0), transform: local(x + run.x, y + run.line_top), paint: Paint::Solid(Color::straight(back, 1.0)), stroke: None });
+					}
+				}
+				let colours: Vec<Color> = brushes.iter().map(|b| Color::straight(b.ink, 1.0)).collect();
+				draw_laid(ctx, laid, (origin.0 + *x as f64, origin.1 + *y as f64), &colours, m, ops);
+			}
+			CardOp::Box { x, y, w, h, color, r } => {
+				ops.push(Op::Shape { shape: rect(*w, *h, *r), transform: local(*x, *y), paint: Paint::Solid(Color::straight(*color, 1.0)), stroke: None });
+			}
+			CardOp::Check { x, y, size, checked } => {
+				let (accent, paper, edge) = stage_text::card::check_colours(ctx.dark);
+				let shape = rect(*size, *size, size * 0.25);
+				ops.push(Op::Shape { shape, transform: local(*x, *y), paint: Paint::Solid(Color::straight(if *checked { accent } else { paper }, 1.0)), stroke: None });
+				if *checked {
+					let s = *size as f64;
+					let mut tick = kurbo::BezPath::new();
+					tick.move_to((s * 0.26, s * 0.52));
+					tick.line_to((s * 0.43, s * 0.69));
+					tick.line_to((s * 0.75, s * 0.33));
+					if let Some((vertices, indices)) = mesh::stroke(&tick, size * 0.14, lyon_tessellation::LineCap::Round, lyon_tessellation::LineJoin::Round, None, local(0.0, 0.0).scale_factor()) {
+						ops.push(Op::Mesh { vertices, indices, transform: local(*x, *y), paint: Paint::Solid(Color([1.0; 4])) });
+					}
+				} else {
+					ops.push(Op::Shape { shape, transform: local(*x, *y), paint: Paint::Solid(Color::straight(edge, 1.0)), stroke: Some((1.0, Align::Inside)) });
+				}
+			}
+			CardOp::Image { url, x, y, w, h } => {
+				if let Some((texture, _, _)) = (ctx.image)(url) {
+					ops.push(Op::Shape { shape: rect(*w, *h, 0.0), transform: local(*x, *y), paint: Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, 1.0] }, stroke: None });
+				} else {
+					ctx.wanted.borrow_mut().push(url.clone());
+				}
+			}
+			CardOp::Scroll { x, y, w, h, content, ops: inner, .. } => {
+				// Wide tables show from their start; scrolling them comes with the page's input.
+				ops.push(Op::PushClip(Clip { shape: rect(*w, *h, 0.0), transform: local(*x, *y) }));
+				draw_card(ctx, inner, origin, m, ops);
+				ops.push(Op::PopClip);
+				let (track, thumb) = stage_text::card::bar_colours(ctx.dark);
+				ops.push(Op::Shape { shape: rect(*w, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(track, 1.0)), stroke: None });
+				let tw = (w / content * w).max(24.0);
+				ops.push(Op::Shape { shape: rect(tw, 3.0, 1.5), transform: local(*x, y + h - 3.0), paint: Paint::Solid(Color::straight(thumb, 1.0)), stroke: None });
+			}
+		}
 	}
 }
