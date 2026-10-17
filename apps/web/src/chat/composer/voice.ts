@@ -1,4 +1,54 @@
+import { createSignal } from "solid-js";
 import { api } from "../../connections/connection.ts";
+
+/**
+ * This browser's choices for the mic, from Settings: which recogniser, and what language the browser's
+ * own listens for. Kept in this browser; the server's model is the deck's (`DeckSettings.sttModel`).
+ */
+export type Recogniser = "auto" | "server" | "browser";
+export const RECOGNISERS: ReadonlyArray<{ id: Recogniser; label: string; note: string }> = [
+	{ id: "auto", label: "Automatic", note: "The server's when it has a key, the browser's when it has not." },
+	{ id: "server", label: "Server", note: "OpenAI's transcriber, through this server: any browser, any mix of languages." },
+	{ id: "browser", label: "Browser", note: "Free and heard as you speak, but one language at a time; Chrome sends the audio to Google." },
+];
+/** The languages offered for the browser's recogniser; empty is the browser's own language. */
+export const VOICE_LANGS: ReadonlyArray<{ id: string; label: string }> = [
+	{ id: "", label: "This browser's language" },
+	{ id: "en-US", label: "English (US)" },
+	{ id: "en-GB", label: "English (UK)" },
+	{ id: "zh-CN", label: "中文（普通话）" },
+	{ id: "zh-TW", label: "中文（台灣）" },
+	{ id: "ja-JP", label: "日本語" },
+	{ id: "es-ES", label: "Español" },
+	{ id: "fr-FR", label: "Français" },
+	{ id: "de-DE", label: "Deutsch" },
+];
+const stored = (key: string) => {
+	try {
+		return localStorage.getItem(key) ?? "";
+	} catch {
+		return "";
+	}
+};
+const [recogniser, setRecogniserSignal] = createSignal<Recogniser>((["auto", "server", "browser"] as const).find((one) => one === stored("decks.voice.recogniser")) ?? "auto");
+const [voiceLang, setVoiceLangSignal] = createSignal(stored("decks.voice.lang"));
+export { recogniser, voiceLang };
+export function setRecogniser(choice: Recogniser): void {
+	setRecogniserSignal(choice);
+	try {
+		localStorage.setItem("decks.voice.recogniser", choice);
+	} catch {
+		/* a browser with storage switched off keeps it for this page */
+	}
+}
+export function setVoiceLang(lang: string): void {
+	setVoiceLangSignal(lang);
+	try {
+		localStorage.setItem("decks.voice.lang", lang);
+	} catch {
+		/* as above */
+	}
+}
 
 /**
  * The composer's mic: speech turned into words you can edit before sending (`Composer`).
@@ -64,8 +114,12 @@ export function micMissing(): string | undefined {
 export async function startRecording(options: VoiceOptions = {}): Promise<Recording> {
 	const missing = micMissing();
 	if (missing) throw new Error(missing);
-	const onServer = await serverTranscribes();
+	const choice = recogniser();
+	const serverHas = choice === "browser" ? false : await serverTranscribes();
 	const Recogniser = browserRecogniser();
+	if (choice === "server" && !serverHas) throw new Error("This server has no speech recogniser: set OPENAI_API_KEY in its environment, or pick the browser's in Settings.");
+	if (choice === "browser" && !Recogniser) throw new Error("This browser has no speech recogniser: pick the server's in Settings.");
+	const onServer = serverHas;
 	if (!onServer && !Recogniser) throw new Error("This server has no speech recogniser, and nor has this browser: set OPENAI_API_KEY on the server.");
 	let stream: MediaStream;
 	try {
@@ -111,7 +165,7 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 	}
 
 	const recognition = new Recogniser!();
-	recognition.lang = options.lang ?? navigator.language ?? "en-US";
+	recognition.lang = options.lang ?? (voiceLang() || navigator.language || "en-US");
 	recognition.continuous = true;
 	recognition.interimResults = true;
 	let finals = "";

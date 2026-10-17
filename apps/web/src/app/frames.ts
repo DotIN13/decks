@@ -603,6 +603,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setTimeZone(message.settings.timezone);
 					setState("settings", reconcile(message.settings));
 					setState("machineZone", message.machineZone);
+					setState("sttKey", message.sttKey === true);
 					return;
 				case "web.status":
 					setState("web", { status: message.status, code: message.code ?? state.web?.code });

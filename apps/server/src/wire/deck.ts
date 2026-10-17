@@ -21,8 +21,12 @@ export const deck = {
 
 	/** The deck's timezone, from Settings. */
 	"settings.set": (message, reply, wire) => {
-		const outcome = wire.setTimezone(message.timezone);
-		if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
+		// Each field is changed only when the frame names it: a timezone, a speech model, or both.
+		for (const outcome of [
+			message.timezone !== undefined ? wire.setTimezone(message.timezone) : undefined,
+			message.sttModel !== undefined ? wire.setSttModel(message.sttModel) : undefined,
+		])
+			if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
 	},
 
 	"stage.result": (message, _reply, wire) => {

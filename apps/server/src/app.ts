@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sttReady } from "./stt.ts";
 import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
@@ -766,7 +767,15 @@ export class App {
 	}
 
 	settingsMessage(): ServerMessage {
-		return { type: "settings", settings: this.settings.get(), machineZone: this.settings.machineZone() };
+		return { type: "settings", settings: this.settings.get(), machineZone: this.settings.machineZone(), sttKey: sttReady() };
+	}
+
+	/** Choose the server recogniser's model; every browser hears it. */
+	setSttModel(model: string | null): { error: string } | undefined {
+		const outcome = this.settings.setSttModel(model);
+		if ("error" in outcome) return outcome;
+		this.send(this.settingsMessage());
+		return undefined;
 	}
 
 	/** Choose the deck's timezone. The clock moves at once, and every browser hears it. */

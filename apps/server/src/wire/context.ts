@@ -129,6 +129,8 @@ export interface WireContext {
 	/** Point the whole app at another data directory (§2). */
 	openDeck(path: string): void;
 
+	/** Choose the server recogniser's model, or `null` for its default. Returns a sentence when it is not one. */
+	setSttModel(model: string | null): { error: string } | undefined;
 	/** Choose the deck's timezone, or `null` for the machine's. Returns a sentence when it is not one. */
 	setTimezone(zone: string | null): { error: string } | undefined;
 

@@ -35,3 +35,22 @@ test("a recording goes to the transcriber with the key and the model, and its wo
 	}
 	assert.equal(sttReady(), !!process.env.OPENAI_API_KEY);
 });
+
+test("the server's speech model is a deck setting: a known one is kept in settings.json, anything else is refused", async () => {
+	const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { SettingsStore } = await import("./settings.ts");
+	const deck = mkdtempSync(join(tmpdir(), "decks-stt-"));
+	try {
+		const store = new SettingsStore(deck);
+		assert.deepEqual(store.setSttModel("gpt-4o-transcribe"), { sttModel: "gpt-4o-transcribe" });
+		assert.equal(JSON.parse(readFileSync(join(deck, ".decks", "settings.json"), "utf8")).sttModel, "gpt-4o-transcribe");
+		assert.ok("error" in store.setSttModel("not-a-model"));
+		assert.equal(new SettingsStore(deck).get().sttModel, "gpt-4o-transcribe", "read back on the next start");
+		store.setSttModel(null);
+		assert.equal(new SettingsStore(deck).get().sttModel, undefined);
+	} finally {
+		rmSync(deck, { recursive: true, force: true });
+	}
+});

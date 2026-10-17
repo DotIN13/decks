@@ -316,7 +316,7 @@ export type ClientMessage =
 	/** Detach from the shared tab — the Stop button on the status board. */
 	| { type: "web.stop" }
 	/** Choose the deck's timezone, or `null` to go back to the machine's. */
-	| { type: "settings.set"; timezone: string | null }
+	| { type: "settings.set"; timezone?: string | null; sttModel?: string | null }
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
@@ -489,7 +489,7 @@ export type ServerMessage =
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
 	| { type: "web.status"; status: WebStatus; code?: string }
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
-	| { type: "settings"; settings: DeckSettings; machineZone: string }
+	| { type: "settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
 	/** The code being shown, if any, and every front end holding a token. */
 	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[] }
 	/** Who is answering, and what it can do: the first frame of every greeting. */

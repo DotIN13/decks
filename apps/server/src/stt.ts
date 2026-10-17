@@ -24,11 +24,11 @@ function extension(type: string): string {
 	return "webm";
 }
 
-export async function transcribe(audio: Buffer, type: string): Promise<string> {
+export async function transcribe(audio: Buffer, type: string, model: string = MODEL): Promise<string> {
 	const key = process.env.OPENAI_API_KEY;
 	if (!key) throw new Error("No speech recogniser on this server: set OPENAI_API_KEY and restart it.");
 	const form = new FormData();
-	form.append("model", MODEL);
+	form.append("model", model);
 	form.append("file", new Blob([new Uint8Array(audio)], { type: type || "audio/webm" }), `speech.${extension(type)}`);
 	const response = await fetch(URL_(), { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
 	if (!response.ok) {

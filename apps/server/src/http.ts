@@ -657,7 +657,8 @@ export function createHttpApp(app: App): Express {
 				return;
 			}
 			try {
-				res.json({ text: await transcribe(audio, String(req.headers["content-type"] ?? "audio/webm")) });
+				// The model chosen in Settings, or the default (`stt.ts`).
+				res.json({ text: await transcribe(audio, String(req.headers["content-type"] ?? "audio/webm"), app.settings.get().sttModel) });
 			} catch (error) {
 				res.status(502).json({ error: (error as Error).message });
 			}

@@ -1,4 +1,5 @@
-import type { ClaudeAccount, WebStatus } from "@decks/protocol";
+import { STT_MODELS, type ClaudeAccount, type WebStatus } from "@decks/protocol";
+import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../chat/composer/voice.ts";
 import FiveHour from "./FiveHour.tsx";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
@@ -198,6 +199,7 @@ export function Settings(props: {
 					</section>
 
 					<TimeSettings />
+					<VoiceSettings />
 					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} engine={props.engine} onEngine={props.onEngine} />
 					<OtherDecks />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
@@ -518,6 +520,59 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
  * hosted box is UTC, and the group says so beside this browser's own zone with one button to
  * take it: a zone chosen silently would move the person's schedules without telling them.
  */
+/**
+ * The composer's mic (`chat/composer/voice.ts`): which recogniser this browser uses, the language the
+ * browser's own listens for, and the model the server's uses, which is the deck's and every browser's.
+ */
+function VoiceSettings() {
+	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
+	const recogniserNote = () => RECOGNISERS.find((one) => one.id === recogniser())?.note ?? "";
+	return (
+		<section class="set-group" data-group="voice">
+			<header>
+				<span class="set-title">Voice</span>
+				<span class="set-note">The mic in the composer, or Ctrl+M. What you say goes in the box to edit; nothing is sent until you send it.</span>
+			</header>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">Recogniser</span>
+					<span class="row-note">{recogniserNote()} Kept in this browser.</span>
+				</span>
+				<span class="segmented set-recogniser" role="radiogroup" aria-label="Recogniser">
+					<For each={RECOGNISERS}>
+						{(option) => (
+							<button type="button" role="radio" aria-checked={recogniser() === option.id} data-on={recogniser() === option.id} title={option.note} onClick={() => setRecogniser(option.id)}>
+								{option.label}
+							</button>
+						)}
+					</For>
+				</span>
+			</div>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">The server's model</span>
+					<span class="row-note">
+						{STT_MODELS.find((one) => one.id === model())?.note}{" "}
+						{state.sttKey ? "This server has a key." : "This server has no key yet: set OPENAI_API_KEY in its environment and restart it."} The same for every browser on this deck.
+					</span>
+				</span>
+				<select class="field set-select" aria-label="The server's speech model" value={model()} onChange={(event) => send({ type: "settings.set", sttModel: event.currentTarget.value === STT_MODELS[0]!.id ? null : event.currentTarget.value })}>
+					<For each={STT_MODELS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
+				</select>
+			</div>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">The browser's language</span>
+					<span class="row-note">What this browser's recogniser listens for. The server's hears any language, and several in one sentence.</span>
+				</span>
+				<select class="field set-select" aria-label="The browser's speech language" value={voiceLang()} onChange={(event) => setVoiceLang(event.currentTarget.value)}>
+					<For each={VOICE_LANGS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
+				</select>
+			</div>
+		</section>
+	);
+}
+
 function TimeSettings() {
 	const chosen = () => state.settings.timezone;
 	const mine = browserZone();
