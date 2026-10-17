@@ -123,7 +123,8 @@
    so a bold "Documents" is not pressed against its own highlight. */
 .set-renderer > button,
 .set-pictures > button,
-.set-engine > button {
+.set-engine > button,
+.set-recogniser > button {
 	padding: 0 12px;
 	white-space: nowrap;
 }

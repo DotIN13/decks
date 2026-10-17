@@ -30,7 +30,8 @@ const stored = (key: string) => {
 		return "";
 	}
 };
-const [recogniser, setRecogniserSignal] = createSignal<Recogniser>((["auto", "server", "browser"] as const).find((one) => one === stored("decks.voice.recogniser")) ?? "auto");
+// The browser's own by default: it needs no key on the server and costs nothing.
+const [recogniser, setRecogniserSignal] = createSignal<Recogniser>((["auto", "server", "browser"] as const).find((one) => one === stored("decks.voice.recogniser")) ?? "browser");
 const [voiceLang, setVoiceLangSignal] = createSignal(stored("decks.voice.lang"));
 export { recogniser, voiceLang };
 export function setRecogniser(choice: Recogniser): void {
