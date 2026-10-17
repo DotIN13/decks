@@ -8,7 +8,6 @@ const dark = params.get("dark") === "1";
 const stageUrl = `/deck/stages/${name}/stage.pen`;
 
 const canvas = document.getElementById("stage");
-const under = document.getElementById("under");
 const world = document.getElementById("world");
 const hud = document.getElementById("hud");
 
@@ -80,7 +79,7 @@ function frame(now) {
 	const { dpr, width, height } = size();
 	const w = Math.round(width * dpr);
 	const h = Math.round(height * dpr);
-	for (const c of [canvas, under]) {
+	for (const c of [canvas]) {
 		if (c.width !== w || c.height !== h) {
 			c.width = w;
 			c.height = h;
@@ -273,9 +272,7 @@ async function start() {
 	const { dpr, width, height } = size();
 	canvas.width = Math.round(width * dpr);
 	canvas.height = Math.round(height * dpr);
-	under.width = canvas.width;
-	under.height = canvas.height;
-	engine.setGpu(await openStage(canvas, under, canvas.width, canvas.height));
+	engine.setGpu(await openStage(canvas, canvas.width, canvas.height));
 	worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 	worker.onmessage = ({ data }) => {
 		if (data.type === "tiles") {

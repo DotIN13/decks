@@ -4701,8 +4701,6 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
-			{/* The engine's canvas under the world: the boards' pictures, beneath their pages (`stage/engine.ts`). */}
-			<canvas class="stage-engine" aria-hidden="true" ref={(canvas) => penLayer.attachCanvas("under", canvas)} />
 			<div class="world" data-sizing={sizingPaths().size > 0 ? "true" : undefined} data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
 				{/*
 				 * A place for every board on the canvas, in file order, filled while it is within reach.
@@ -4747,13 +4745,13 @@ export function Stage(props: {
 						);
 					}}
 				</For>
-				{/* And its canvas over the pages: the drawing, as tiles, and what a gesture is moving. */}
+				{/* The engine's canvas over the pages (`stage/engine.ts`): the pictures of boards with no live page, the drawing as tiles with a hole for each board, and what a gesture is moving. */}
 				<canvas
 					class="stage-engine stage-engine-over"
 					aria-hidden="true"
 					ref={(canvas) => {
 						engineOver = canvas;
-						penLayer.attachCanvas("over", canvas);
+						penLayer.attachCanvas(canvas);
 					}}
 				/>
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />

@@ -53,7 +53,6 @@ export class StageEngine {
 	private doc: PenDocument | undefined;
 	private base = "";
 	private over: HTMLCanvasElement | undefined;
-	private under: HTMLCanvasElement | undefined;
 	private hits: SVGSVGElement | undefined;
 	private hitWindow: Rect | undefined;
 	private bandZoom = 0;
@@ -97,16 +96,14 @@ export class StageEngine {
 	onCarryPending: ((pending: boolean) => void) | undefined;
 
 	/**
-	 * The two canvases, once the stage has made them: `under` beneath the board pages, `over` among
-	 * them after the pages. The engine starts with the second one given.
+	 * The canvas, once the stage has made it: among the board pages, after them. The boards'
+	 * pictures, the drawing and what a gesture moves are all drawn on it.
 	 */
-	attachCanvas(which: "over" | "under", canvas: HTMLCanvasElement): void {
-		this[which] = canvas;
-		if (this.over && this.under && !this.started) {
+	attachCanvas(canvas: HTMLCanvasElement): void {
+		this.over = canvas;
+		if (!this.started) {
 			this.started = true;
-			const over = this.over;
-			const under = this.under;
-			void this.start(over, under).catch((error: unknown) => {
+			void this.start(canvas).catch((error: unknown) => {
 				const why = String((error as Error)?.message ?? error);
 				console.error(`stage engine: ${why}`);
 				this.failed?.(why);
@@ -116,10 +113,10 @@ export class StageEngine {
 	private started = false;
 	private lastOps = 0;
 
-	private async start(over: HTMLCanvasElement, under: HTMLCanvasElement): Promise<void> {
+	private async start(over: HTMLCanvasElement): Promise<void> {
 		await init();
 		this.fitCanvases();
-		const gpu = await openStage(over, under, over.width, over.height);
+		const gpu = await openStage(over, over.width, over.height);
 		if (this.disposed) return;
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
@@ -269,7 +266,7 @@ export class StageEngine {
 		const h = Math.max(1, Math.round(this.view.height * dpr));
 		if (w === this.size.w && h === this.size.h) return;
 		this.size = { w, h };
-		for (const canvas of [this.over, this.under]) {
+		for (const canvas of [this.over]) {
 			if (!canvas) continue;
 			canvas.width = w;
 			canvas.height = h;

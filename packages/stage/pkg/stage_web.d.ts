@@ -242,7 +242,7 @@ export function openOffscreen(canvas: OffscreenCanvas, width: number, height: nu
  * The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
  * surface) and `under` them (board pictures).
  */
-export function openStage(over: HTMLCanvasElement, under: HTMLCanvasElement, width: number, height: number): Promise<GpuHandle>;
+export function openStage(canvas: HTMLCanvasElement, width: number, height: number): Promise<GpuHandle>;
 
 export function start(): void;
 
@@ -256,7 +256,7 @@ export interface InitOutput {
     readonly __wbg_workerengine_free: (a: number, b: number) => void;
     readonly openCanvas: (a: any, b: number, c: number) => any;
     readonly openOffscreen: (a: any, b: number, c: number) => any;
-    readonly openStage: (a: any, b: any, c: number, d: number) => any;
+    readonly openStage: (a: any, b: number, c: number) => any;
     readonly pageengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly pageengine_apply: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly pageengine_applyEdits: (a: number, b: number, c: number) => [number, number];

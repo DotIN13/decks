@@ -5,8 +5,8 @@ import { StageEngine } from "./stage/engine.ts";
  * One stage, drawn for a picture: the page the server's Chromium loads to take `stage.screenshot`
  * and the drawing's Export (`server/stage/shots.ts`).
  *
- * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its two
- * canvases, with the boards as live frames between them, framed on the box in the address. No socket, no chrome,
+ * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its
+ * canvas, over the boards as live frames, framed on the box in the address. No socket, no chrome,
  * no camera to move. When the boards say they are ready and the drawing has stopped redrawing for
  * fonts, icons and images, `window.__shotReady` is set and the picture is taken.
  */
@@ -36,7 +36,7 @@ async function main(): Promise<void> {
 	const world = document.getElementById("world")!;
 	world.style.transform = `translate(${view.width / 2}px, ${view.height / 2}px) scale(${zoom}) translate(${-camera.x}px, ${-camera.y}px)`;
 
-	// The boards in the box, as the frames the canvas would show, between the engine's two canvases.
+	// The boards in the box, as the frames the canvas would show, under the engine's canvas.
 	const inView = boards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
 	const ready = inView.map(
 		(board) =>
@@ -69,8 +69,7 @@ async function main(): Promise<void> {
 	engine.failed = (why) => (failed = why);
 	engine.setView(view);
 	engine.setScheme(scheme);
-	engine.attachCanvas("under", document.querySelector("canvas.under") as HTMLCanvasElement);
-	engine.attachCanvas("over", document.querySelector("canvas.over") as HTMLCanvasElement);
+	engine.attachCanvas(document.querySelector("canvas.over") as HTMLCanvasElement);
 	// Every board is a live frame here, so the engine leaves a hole over each and fetches no pictures.
 	engine.setBoards(boards.map((board) => ({ ...board, live: true })));
 	engine.setDoc(doc, base);

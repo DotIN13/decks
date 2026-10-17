@@ -929,14 +929,13 @@ export function openOffscreen(canvas, width, height) {
 /**
  * The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
  * surface) and `under` them (board pictures).
- * @param {HTMLCanvasElement} over
- * @param {HTMLCanvasElement} under
+ * @param {HTMLCanvasElement} canvas
  * @param {number} width
  * @param {number} height
  * @returns {Promise<GpuHandle>}
  */
-export function openStage(over, under, width, height) {
-    const ret = wasm.openStage(over, under, width, height);
+export function openStage(canvas, width, height) {
+    const ret = wasm.openStage(canvas, width, height);
     return ret;
 }
 

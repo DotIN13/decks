@@ -9,13 +9,11 @@
 		/* The boards' pages, moved by the same camera in the same frame as the canvas. */
 		#world { position: fixed; left: 0; top: 0; transform-origin: 0 0; pointer-events: none }
 		#world iframe { position: absolute; border: 0; background: #fff; box-shadow: 0 1px 3px #0002; pointer-events: none }
-		#under { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none }
 		#world iframe.asleep { display: none }
 		#hud { position: fixed; right: 10px; bottom: 10px; background: #000c; color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px ui-monospace, monospace; white-space: pre; pointer-events: none }
 	</style>
 </head>
 <body>
-	<canvas id="under"></canvas>
 	<div id="world"></div>
 	<canvas id="stage"></canvas>
 	<div id="hud">starting…</div>

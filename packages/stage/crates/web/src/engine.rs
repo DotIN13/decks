@@ -262,15 +262,17 @@ impl Page {
 		t
 	}
 
-	/// The two layers the screen shows for a camera, in one frame with the board pages:
+	/// What the screen shows over the board pages for a camera, in one frame with them:
 	///
-	/// - under the pages, each board that has no live page: its picture, or its paper until the
-	///   picture comes;
-	/// - over them, the worker's tiles, coarse ones first so the sharpest of each place lies on top,
-	///   then the lifted items and the stroke under the pen, drawn fresh.
+	/// - each board that has no live page: its picture, or its paper until the picture comes. Over
+	///   the pages, so a page still loading or asleep under it never shows through;
+	/// - the worker's tiles, which leave a hole for every board, so the pictures show through them
+	///   and what is drawn over a board stays over it;
+	/// - the lifted items and the stroke under the pen, drawn fresh.
 	///
-	/// Tiles and pictures lie on whole device pixels.
-	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> (DrawList, DrawList) {
+	/// A board going live loses its picture in the frame that shows its page; no tile is painted
+	/// again for it. Tiles and pictures lie on whole device pixels.
+	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> DrawList {
 		self.frame += 1;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		let s = camera.zoom * dpr;
@@ -281,12 +283,14 @@ impl Page {
 			let y1 = ((r.bottom() - camera.y) * s).round();
 			(x0 as f32, y0 as f32, (x1 - x0) as f32, (y1 - y0) as f32)
 		};
-		// Under: the boards with no live page (and those a drag carries): picture, or paper until it comes.
-		let mut under = DrawList::new(Color::TRANSPARENT);
+		// The boards with no live page (and those a drag carries): picture, or paper until it comes.
+		let mut over = DrawList::new(Color::TRANSPARENT);
 		let paper = if self.scene.dark { [0.118, 0.118, 0.125, 1.0] } else { [1.0, 1.0, 1.0, 1.0] };
 		let mut pictured = Vec::new();
 		let mut carrying = Vec::new();
-		for board in &self.boards {
+		// A drag's ghost is the lifted items alone: no boards.
+		let boards: &[BoardPlace] = if self.only_lifted { &[] } else { &self.boards };
+		for board in boards {
 			let carried = self.carry.0.contains(&board.path);
 			let picture = self.pictures.get(&format!("board:{}", board.path));
 			if board.live && !(carried && picture.is_some()) {
@@ -299,12 +303,12 @@ impl Page {
 			}
 			let (x, y, w, h) = snap(&place);
 			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii: [12.0 * s as f32; 4], ellipse: false };
-			under.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
+			over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
 			if let Some((texture, pw, ph)) = picture {
 				// The whole board was pictured: one taller than the box is cut at its foot.
 				let tall = ph as f32 / pw.max(1) as f32 * w;
 				let shown = h.min(tall);
-				under.push(Op::Shape { shape: shape(w, shown), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, shown / tall] }, stroke: None });
+				over.push(Op::Shape { shape: shape(w, shown), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, shown / tall] }, stroke: None });
 				if board.live {
 					carrying.push(board.path.clone());
 				} else {
@@ -312,17 +316,18 @@ impl Page {
 				}
 			}
 			if let Some(colour) = board.news.filter(|_| board.glow) {
-				under.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
+				over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
 			}
 		}
-		self.pictured = pictured;
-		self.carrying = carrying;
+		if !self.only_lifted {
+			self.pictured = pictured;
+			self.carrying = carrying;
+		}
 		// Over: the tiles, one per place. Each place shows the sharpest tile held for it; where the
 		// tile at the scale asked for has not come yet, the part of a coarser one that covers it, and
 		// failing that the sharper tiles of one scale that lie in it, drawn smaller (a zoom out holds
 		// only sharper ones). Never two scales layered in a place: tiles are clear where nothing is
 		// drawn, so a stale one under a fresh one would show through.
-		let mut over = DrawList::new(Color::TRANSPARENT);
 		let want = scale_for(camera.zoom * dpr, moving);
 		let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).collect::<HashSet<_>>().into_iter().collect();
 		// Nearest the scale wanted first, sharper before blurrier at the same distance.
@@ -372,7 +377,7 @@ impl Page {
 			let target = Mat([s, 0.0, 0.0, s, -camera.x * s, -camera.y * s]);
 			paint_ink(&self.ink, &target, &mut over.ops);
 		}
-		(under, over)
+		over
 	}
 
 	/// Lift items for a drag: the worker leaves them out of its tiles from now on.
@@ -763,10 +768,9 @@ mod tests {
 		assert_eq!(page.pick(1150.0, 50.0, 0.0)["id"], "a");
 		// A missed batch is noticed.
 		assert!(worker.apply(&changes, generation + 5).is_err());
-		let (under, over) = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		// No boards placed yet: only tiles.
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
-		// No boards placed yet: nothing under the pages.
-		assert!(under.ops.is_empty());
 		// A drag: the worker repaints without the square (its tile and the overview's), the page draws it.
 		page.lift(&["a".into()]);
 		worker.lift(&["a".into()]);
@@ -774,7 +778,7 @@ mod tests {
 		// The drag's moves are the page's alone: the worker paints nothing.
 		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 0, "moving a lifted item paints no tiles");
-		let (_, over) = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().any(|op| matches!(op, Op::Shape { .. })), "the page draws it");
 		// Let go: saved, and the saved drawing is what both draw.
 		let saved = crate::wire::parse(r#"[{"op":"set","id":"a","key":"x","value":1150}]"#).unwrap();
@@ -789,6 +793,26 @@ mod tests {
 	}
 
 	#[test]
+	fn a_sleeping_boards_picture_lies_over_its_page_and_under_the_tiles() {
+		let mut page = Page::new(STAGE, false, "s").unwrap();
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
+		page.pictures.held.insert("board:boards/x.html".into(), (900, 400, 300));
+		let board = |live| BoardPlace { path: "boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
+		page.boards = vec![board(false)];
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
+		let tile = over.ops.iter().position(|op| matches!(op, Op::Picture { .. }));
+		assert!(matches!((picture, tile), (Some(p), Some(t)) if p < t), "the picture first, then the tiles: {picture:?} {tile:?}");
+		assert_eq!(page.pictured, vec!["boards/x.html".to_owned()]);
+		// Live: its page shows through the tiles' hole, with nothing of the board drawn.
+		page.boards = vec![board(true)];
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
+		assert!(page.pictured.is_empty());
+	}
+
+	#[test]
 	fn a_zoom_out_shows_the_sharper_tiles_until_its_own_come() {
 		let mut page = Page::new(STAGE, false, "s").unwrap();
 		let mut worker = Worker::new(STAGE, false).unwrap();
@@ -800,7 +824,7 @@ mod tests {
 		}
 		// Zoomed out to a fifth: no tile at that scale or coarser is held, only the ones at 1.
 		let far = Camera { x: -2000.0, y: -2000.0, zoom: 0.2 };
-		let (_, over) = page.frame(far, 1.0, 1200.0, 800.0, true);
+		let over = page.frame(far, 1.0, 1200.0, 800.0, true);
 		let pictures = over.ops.iter().filter(|op| matches!(op, Op::Picture { .. })).count();
 		assert!(pictures >= 6, "the sharper tiles stand in: {pictures}");
 	}
