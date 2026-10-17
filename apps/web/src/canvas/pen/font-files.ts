@@ -111,6 +111,11 @@ function fallbackFor(cp: number): Fallback | undefined {
  * Latin, then every fallback file. Only the files that have been fetched are anything to the font engines; the rest of the
  * names are skipped.
  */
+/** Whether a registered family is one of the per-script fallbacks, tried after the family and Inter. */
+export function isFallbackFamily(name: string): boolean {
+	return fallbackList().some((f) => f.name === name);
+}
+
 export function fontChain(family: string): string[] {
 	return [...new Set([family, `${family}${EXT}`, FALLBACK_FAMILY, `${FALLBACK_FAMILY}${EXT}`, ...fallbackList().map((f) => f.name)])];
 }

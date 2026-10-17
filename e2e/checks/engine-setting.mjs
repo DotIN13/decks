@@ -13,7 +13,7 @@ const openSettings = async () => {
 };
 await openSettings();
 const row = await page.evaluate(() => { const g = document.querySelector('.set-engine'); return g ? [...g.querySelectorAll("button")].map((b) => `${b.textContent}:${b.getAttribute("aria-checked")}`) : null; });
-say("Settings has an Engine row of three choices", row?.length === 3, JSON.stringify(row));
+say("Settings has an Engine row of four choices, Rust among them", row?.length === 4 && row.some((one) => one.startsWith("Rust:")), JSON.stringify(row));
 const before = await state();
 await page.locator('.set-engine button:has-text("On")').click();
 await settle(page, 3000);

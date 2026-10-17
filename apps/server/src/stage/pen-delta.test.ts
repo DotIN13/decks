@@ -17,7 +17,7 @@ test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", (
 		let held = first.doc;
 		let rev = first.rev;
 		const take = () => {
-			const [delta] = pens.changes(["agent"], name) as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>;
+			const [delta] = pens.changes(["agent"], name) as unknown as Array<{ type: string; from: number; rev: number; edits: never[]; doc?: PenDocument }>;
 			assert.equal(delta!.type, "stage.pen.delta");
 			assert.equal(delta!.from, rev);
 			held = applyEdits(held, delta!.edits);

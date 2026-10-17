@@ -13,7 +13,7 @@
 import init, { PageEngine, openStage } from "@decks/stage";
 import { diff, expand, isCard, isMarkdownText, isShape, pathBounds, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, fontChain, type FontNeed } from "../canvas/pen/font-files.ts";
+import { fontFiles, isFallbackFamily, type FontNeed } from "../canvas/pen/font-files.ts";
 import { iconUrl, parseIcon } from "../canvas/pen/icons.ts";
 import { isFile, isLiveFile } from "../canvas/pen/card-frame.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
@@ -123,7 +123,14 @@ export class StageEngine {
 		if (this.disposed) return;
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
-		(globalThis as { __decksEngine?: unknown }).__decksEngine = { stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust" }) };
+		const self = this;
+		(globalThis as { __decksEngine?: unknown }).__decksEngine = {
+			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust" }),
+			/** The boards a drag carries as their picture, and by how far. */
+			get carried() {
+				return { paths: new Set(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedBy };
+			},
+		};
 		this.page = new PageEngine(doc, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
@@ -363,7 +370,9 @@ export class StageEngine {
 		this.draw();
 	}
 
+	private carriedBy = { dx: 0, dy: 0 };
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
+		this.carriedBy = { dx: offset.dx, dy: offset.dy };
 		this.page?.carry(JSON.stringify(paths), offset.dx, offset.dy);
 		this.draw();
 	}
@@ -465,7 +474,6 @@ export class StageEngine {
 		const files = fontFiles(needs).filter((file) => !this.fontsAsked.has(file.key));
 		if (!files.length) return;
 		for (const file of files) this.fontsAsked.add(file.key);
-		const primary = new Set(needs.flatMap((need) => fontChain(need.family).slice(0, 4)));
 		void Promise.all(
 			files.map(async (file) => {
 				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
@@ -483,7 +491,7 @@ export class StageEngine {
 			// In the order the chain lists them, so fallbacks are tried in the app's order.
 			for (const one of loaded) {
 				if (!one) continue;
-				const fallback = !primary.has(one.file.family);
+				const fallback = isFallbackFamily(one.file.family);
 				this.page.addFont(one.file.family, one.bytes, fallback);
 				this.post({ type: "font", name: one.file.family, bytes: one.bytes, fallback });
 			}

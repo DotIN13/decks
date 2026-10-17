@@ -17,6 +17,7 @@
 		"@decks/board-kit": "*",
 		"@decks/docs": "*",
 		"@decks/engine": "*",
+		"@decks/stage": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
 		"@decks/runtime": "*",

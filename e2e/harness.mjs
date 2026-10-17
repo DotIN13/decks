@@ -261,7 +261,8 @@ export async function ready(page, { timeout = 30000 } = {}) {
 	 */
 	await page.waitForSelector(".stage", { timeout });
 	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true")) {
-		await page.waitForFunction(() => document.querySelector(".stage-sheet")?.hidden === false, null, { timeout });
+		// The Rust engine has no sheet: ready is its first frame drawn.
+		await page.waitForFunction(() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksEngine?.stats?.().engine === "rust" && (globalThis.__decksSheet?.shown ?? 0) > 0), null, { timeout });
 		return;
 	}
 	await page.waitForSelector(".board-node iframe", { timeout });

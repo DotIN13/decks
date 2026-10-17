@@ -166,6 +166,24 @@ export class PageEngine {
     within(x: number, y: number, w: number, h: number): string;
 }
 
+/**
+ * Words measured as the page lays them out, for the server: the same text crate, fonts and
+ * markdown reader, so a box an agent reads back from an edit is the box the page draws.
+ */
+export class TextMeasure {
+    free(): void;
+    [Symbol.dispose](): void;
+    addFont(name: string, bytes: Uint8Array, fallback: boolean): void;
+    /**
+     * `[w, h]` of words in a style (`{ fontFamily, fontSize, fontWeight, fontStyle, letterSpacing,
+     * lineHeight }`), wrapped at `max_width` when it is not negative. A card's markdown (`markdown`)
+     * is laid out at that width, aligned by `align`, and its height is the card's.
+     */
+    measure(text: string, style: string, max_width: number, markdown: boolean, align: string): Float64Array;
+    constructor();
+    setMarkdownReader(read: Function): void;
+}
+
 export class WorkerEngine {
     free(): void;
     [Symbol.dispose](): void;
@@ -228,6 +246,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_gpuhandle_free: (a: number, b: number) => void;
     readonly __wbg_pageengine_free: (a: number, b: number) => void;
+    readonly __wbg_textmeasure_free: (a: number, b: number) => void;
     readonly __wbg_workerengine_free: (a: number, b: number) => void;
     readonly openCanvas: (a: any, b: number, c: number) => any;
     readonly openOffscreen: (a: any, b: number, c: number) => any;
@@ -277,6 +296,10 @@ export interface InitOutput {
     readonly pageengine_wantedPictures: (a: number) => [number, number];
     readonly pageengine_within: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly start: () => void;
+    readonly textmeasure_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly textmeasure_measure: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
+    readonly textmeasure_new: () => number;
+    readonly textmeasure_setMarkdownReader: (a: number, b: any) => void;
     readonly workerengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly workerengine_apply: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_applyEdits: (a: number, b: number, c: number) => [number, number];
@@ -298,8 +321,8 @@ export interface InitOutput {
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__70: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__71: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__74: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__75: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

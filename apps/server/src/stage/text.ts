@@ -2,15 +2,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { estimateText, isMarkdown, isMarkdownText, type MeasureText } from "@decks/pen";
-import { loadText, type TextEngine } from "@decks/engine/text";
-import { encodeCard } from "../../../web/src/canvas/pen/card-wire.ts";
-import { fontChain, fontFiles, MONO_FAMILY, textNeeds, type FontFile } from "../../../web/src/canvas/pen/font-files.ts";
-import { formulaText, handFormulas } from "../../../web/src/canvas/pen/math.ts";
+import { fileURLToPath } from "node:url";
+import { initSync, TextMeasure } from "@decks/stage";
+import { fontFiles, isFallbackFamily, textNeeds, type FontFile } from "../../../web/src/canvas/pen/font-files.ts";
+import { formulaText } from "../../../web/src/canvas/pen/math.ts";
+import { cardReader } from "../../../web/src/stage/reader.ts";
 
 /**
- * Words measured on the server as the page measures them: the same C++ text as the page's engine
- * (`@decks/engine/text`), the same font files (`font-files.ts` lists them), and a card's markdown
- * encoded by the same code. So a box an agent reads back from an edit is the box the page draws,
+ * Words measured on the server as the page measures them: the same Rust text crate as the page's
+ * engine (`@decks/stage`, `TextMeasure`), the same font files (`font-files.ts` lists them), and a
+ * card's markdown read by the same reader. So a box an agent reads back from an edit is the box the page draws,
  * not an estimate a few pixels off.
  *
  * Font files are fetched from the CDN once and kept on disk, so a file this server has seen is there
@@ -22,26 +23,31 @@ import { formulaText, handFormulas } from "../../../web/src/canvas/pen/math.ts";
 /** Where fetched font files are kept; `DECKS_FONT_CACHE` moves it. */
 const CACHE = process.env.DECKS_FONT_CACHE ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "decks", "fonts");
 
-/** A card's pictures are not known here: the page also measures a card without a picture until it arrives. */
-const noPicture = () => undefined;
+/** The engine's module, loaded from its file once: the page's own build, run here without a graphics card. */
+function loadText(): Promise<TextMeasure> {
+	return Promise.resolve().then(() => {
+		initSync({ module: readFileSync(fileURLToPath(new URL("stage_web_bg.wasm", import.meta.resolve("@decks/stage")))) });
+		const engine = new TextMeasure();
+		engine.setMarkdownReader(cardReader("light"));
+		return engine;
+	});
+}
 
 class ServerText {
-	private engine: TextEngine | undefined;
+	private engine: TextMeasure | undefined;
 	private starting: Promise<void> | undefined;
 	/** Each file by its key: true once handed to the engine, false when it could not be had, a promise while on its way. */
 	private readonly files = new Map<string, boolean | Promise<void>>();
 	private readonly listeners = new Set<() => void>();
-	private plain: MeasureText | undefined;
 
 	/** Load the engine; until it has, every measure is the estimate. */
 	start(): Promise<void> {
 		this.starting ??= loadText()
 			.then((engine) => {
 				this.engine = engine;
-				this.plain = engine.measure(fontChain);
 				this.changed();
 			})
-			.catch((error: unknown) => console.warn(`[text] the C++ text engine did not load, so words are estimated: ${error instanceof Error ? error.message : String(error)}`));
+			.catch((error: unknown) => console.warn(`[text] the Rust text engine did not load, so words are estimated: ${error instanceof Error ? error.message : String(error)}`));
 		return this.starting;
 	}
 
@@ -54,8 +60,7 @@ class ServerText {
 	/**
 	 * The measure `@decks/pen`'s layout takes: the engine's for words whose font files are all here, and
 	 * the estimate for words still waiting on one, which is sent for. Plain words are measured as
-	 * `PenFonts.measure` measures them; a card's markdown is encoded as the page encodes it and laid out
-	 * by `cpp/card.cpp`.
+	 * the page's engine measures them, and a card's markdown is laid out as its cards are.
 	 */
 	readonly measure: MeasureText = (text, style, maxWidth, node) => {
 		if (!this.engine) {
@@ -74,18 +79,8 @@ class ServerText {
 		let ready = true;
 		for (const file of fontFiles(textNeeds(text, style, markdown))) if (!this.have(file)) ready = false;
 		if (!ready) return estimateText(text, style, maxWidth, node);
-		let size: { w: number; h: number };
-		if (markdown) {
-			const w = maxWidth ?? 240;
-			const wire = encodeCard(text, style, { chain: fontChain, mono: MONO_FAMILY, scheme: "light", image: noPicture }, align);
-			// A card's formulas, as the page's scene is handed them (`math.ts`).
-			handFormulas(new TextDecoder().decode(wire.pool), this.engine);
-			size = { w, h: this.engine.card(wire.numbers, wire.pool, Math.max(1, w)) };
-		} else {
-			const shown = formulaText(text);
-			handFormulas(shown, this.engine);
-			size = this.plain!(shown, style, maxWidth);
-		}
+		const [w = 0, h = 0] = this.engine.measure(markdown ? text : formulaText(text), JSON.stringify(style), markdown ? (maxWidth ?? 240) : (maxWidth ?? -1), markdown, align);
+		const size = { w, h };
 		if (this.sizes.size >= 8192) this.sizes.delete(this.sizes.keys().next().value!);
 		// Measured with the files there were: a file that lands later starts a new generation, and so new sizes.
 		this.sizes.set(JSON.stringify([this.generation, markdown, align, maxWidth === undefined ? -1 : Math.round(maxWidth * 10), style, text]), size);
@@ -128,7 +123,7 @@ class ServerText {
 			this.files.set(file.key, false);
 			return;
 		}
-		this.engine!.font(bytes, file.family);
+		this.engine!.addFont(file.family, bytes, isFallbackFamily(file.family));
 		this.files.set(file.key, true);
 		this.generation++;
 	}
