@@ -61,7 +61,8 @@ import type { Box, Guide } from "./pen/snap.ts";
 import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
-import { EngineStage, engineWanted } from "./engine-stage.ts";
+import { EngineStage, engineWanted, rustWanted } from "./engine-stage.ts";
+import { StageEngine } from "../stage/engine.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -632,7 +633,11 @@ export function Stage(props: {
 	 * (`canvas/pen/layer.ts`, `pen/scene.ts`). The camera reaches it through `writeTransform`; the
 	 * document, the window's size and the colour scheme through these.
 	 */
-	const penLayer = new PenLayer();
+	const rust = rustWanted();
+	/** With the Rust engine chosen, it stands where the sheet stood, answering the same calls. */
+	const rustStage = rust ? new StageEngine() : undefined;
+	const penLayer: PenLayer = rustStage ? (rustStage as unknown as PenLayer) : new PenLayer();
+	if (rustStage) rustStage.failed = (why) => console.error(`The Rust stage engine did not start: ${why}`);
 	onCleanup(() => penLayer.dispose());
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
@@ -4712,7 +4717,7 @@ export function Stage(props: {
 			tabindex={-1}
 			data-mode={props.mode}
 			data-renderer={props.renderer}
-			data-engine={useEngine ? "true" : undefined}
+			data-engine={useEngine || rust ? "true" : undefined}
 			data-previewing={Boolean(props.preview)}
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
@@ -4751,11 +4756,12 @@ export function Stage(props: {
 			 * and there is no second one for them to find instead.
 			 */}
 			{/* The engine's canvas, under the world: the boards' pictures, beneath their pages (`engine-stage.ts`). */}
-			<Show when={useEngine}>
+			<Show when={useEngine || rust}>
 				<canvas
 					class="stage-engine"
 					aria-hidden="true"
 					ref={(canvas) => {
+						if (rustStage) return rustStage.attachCanvas("under", canvas);
 						engineUnder = canvas;
 						queueMicrotask(startEngine);
 					}}
@@ -4806,12 +4812,13 @@ export function Stage(props: {
 					}}
 				</For>
 				<canvas class="stage-sheet" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
-				<Show when={useEngine}>
+				<Show when={useEngine || rust}>
 					<canvas
 						class="stage-engine stage-engine-over"
 						aria-hidden="true"
 						ref={(canvas) => {
 							engineOver = canvas;
+							if (rustStage) return rustStage.attachCanvas("over", canvas);
 							queueMicrotask(startEngine);
 						}}
 					/>

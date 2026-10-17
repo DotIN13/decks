@@ -16,6 +16,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { chromium, devices } from "playwright";
+import { applyEdits } from "../packages/pen/src/diff.ts";
 
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
@@ -111,7 +112,9 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * change the browser every check runs in. `renderers.mjs` was the only check that needed
 	 * it and has been cut, so neither canvas renderer is exercised now.
 	 */
-	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement"] });
+	// WebGPU, for the Rust stage engine (`DECKS_E2E_ENGINE=rust`): headless Chromium has it only when asked.
+	const gpu = process.env.DECKS_E2E_ENGINE === "rust" ? ["--enable-unsafe-webgpu", "--use-angle=metal", "--enable-features=Vulkan"] : [];
+	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
 	// `dpr` is a retina screen without a phone attached to it: a canvas renderer can be right
@@ -404,7 +407,24 @@ export async function socket() {
 		ws.onopen = resolve;
 		ws.onerror = reject;
 	});
-	ws.onmessage = (event) => received.push(JSON.parse(String(event.data)));
+	/*
+	 * A stage drawing comes whole once and then as edits (`stage.pen.delta`). Each delta is also
+	 * recorded as the whole `stage.pen` frame it makes, so a check reads every revision the same way.
+	 */
+	const pens = new Map();
+	ws.onmessage = (event) => {
+		const message = JSON.parse(String(event.data));
+		received.push(message);
+		const key = `${message.agentId}|${message.stage}`;
+		if (message.type === "stage.pen") pens.set(key, message);
+		else if (message.type === "stage.pen.delta") {
+			const held = pens.get(key);
+			if (held?.rev !== message.from) return ws.send(JSON.stringify({ type: "stage.pen.get", agentId: message.agentId }));
+			const whole = { type: "stage.pen", agentId: message.agentId, stage: message.stage, rev: message.rev, doc: applyEdits(held.doc, message.edits), base: message.base };
+			pens.set(key, whole);
+			received.push(whole);
+		}
+	};
 	const link = {
 		received,
 		send: (message) => ws.send(JSON.stringify(message)),

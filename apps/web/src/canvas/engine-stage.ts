@@ -27,16 +27,23 @@ const MAX_TILES = 96;
  * `?engine=webgl2` insists on WebGL 2, `?engine=off` goes back to the sheet, and the choice is kept.
  */
 export function engineWanted(): boolean {
-	return engineChoice() !== "off";
+	const choice = engineChoice();
+	return choice === "on" || choice === "webgl2";
 }
 
-export type EngineChoice = "off" | "on" | "webgl2";
+/** Whether the stage is drawn by the Rust engine (`stage/engine.ts`), which replaces both the sheet and this. */
+export function rustWanted(): boolean {
+	return engineChoice() === "rust";
+}
+
+export type EngineChoice = "off" | "on" | "webgl2" | "rust";
 
 /** The choices Settings offers (`settings/Settings.tsx`), with what each does. */
 export const ENGINES: ReadonlyArray<{ id: EngineChoice; label: string; note: string }> = [
 	{ id: "off", label: "Off", note: "The drawing and the boards' pictures are painted by CanvasKit, on a worker's sheet." },
 	{ id: "on", label: "On", note: "The C++ engine draws the stage, on WebGPU where the browser has it and WebGL 2 where it does not." },
 	{ id: "webgl2", label: "WebGL 2", note: "The C++ engine, kept on WebGL 2 even where WebGPU is there." },
+	{ id: "rust", label: "Rust", note: "The Rust engine draws the whole stage on WebGPU: tiles from a worker, laid in the same frame as the board pages." },
 ];
 
 /** Keep a choice for this browser; the canvas is built again to take it (`App.tsx`). */
@@ -51,9 +58,9 @@ export function saveEngineChoice(choice: EngineChoice): void {
 export function engineChoice(): EngineChoice {
 	try {
 		const asked = new URLSearchParams(location.search).get("engine");
-		if (asked === "on" || asked === "off" || asked === "webgl2") localStorage.setItem("decks:stage-engine", asked);
+		if (asked === "on" || asked === "off" || asked === "webgl2" || asked === "rust") localStorage.setItem("decks:stage-engine", asked);
 		const kept = localStorage.getItem("decks:stage-engine");
-		return kept === "on" || kept === "webgl2" ? kept : "off";
+		return kept === "on" || kept === "webgl2" || kept === "rust" ? kept : "off";
 	} catch {
 		return "off";
 	}

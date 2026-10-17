@@ -218,6 +218,21 @@ export class PageEngine {
         wasm.pageengine_forgetTiles(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * Draw only the lifted items over the pages, for a ghost to be copied from the canvas in the
+     * same task; the next `frame` draws everything again.
+     * @param {number} x
+     * @param {number} y
+     * @param {number} zoom
+     * @param {number} dpr
+     * @param {number} width
+     * @param {number} height
+     * @returns {number}
+     */
+    frameLifted(x, y, zoom, dpr, width, height) {
+        const ret = wasm.pageengine_frameLifted(this.__wbg_ptr, x, y, zoom, dpr, width, height);
+        return ret >>> 0;
+    }
+    /**
      * Draw the screen for a camera, under and over the boards' pages. Call it in the same
      * animation frame that moves the pages. Returns how many draw operations it made.
      * @param {number} x
@@ -441,6 +456,13 @@ export class PageEngine {
         wasm.pageengine_setBoards(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * The colour scheme, dark or not.
+     * @param {boolean} dark
+     */
+    setDark(dark) {
+        wasm.pageengine_setDark(this.__wbg_ptr, dark);
+    }
+    /**
      * The whole drawing (`stage.pen` `doc`, as JSON text).
      * @param {string} text
      */
@@ -496,6 +518,13 @@ export class PageEngine {
         const ptr0 = passStringToWasm0(view, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         wasm.pageengine_setView(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * Show the lifted items or not, while a ghost of them stands in.
+     * @param {boolean} on
+     */
+    showLifted(on) {
+        wasm.pageengine_showLifted(this.__wbg_ptr, on);
     }
     /**
      * The document as `.pen` text.
@@ -1790,12 +1819,12 @@ function __wbg_get_imports() {
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 82, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__67);
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__70);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 82, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__68);
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__71);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0) {
@@ -1847,15 +1876,15 @@ function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__67(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__67(arg0, arg1, arg2);
+function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__70(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__70(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__68(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__68(arg0, arg1, arg2);
+function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__71(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__71(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }

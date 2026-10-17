@@ -167,6 +167,12 @@ impl PageEngine {
 		self.page.apply_edits(&parse_edits(edits).map_err(err)?).map_err(err)
 	}
 
+	/// The colour scheme, dark or not.
+	#[wasm_bindgen(js_name = setDark)]
+	pub fn set_dark(&mut self, dark: bool) {
+		self.page.set_dark(dark);
+	}
+
 	/// The whole drawing (`stage.pen` `doc`, as JSON text).
 	#[wasm_bindgen(js_name = setDocument)]
 	pub fn set_document(&mut self, text: &str) -> Result<(), JsError> {
@@ -417,6 +423,23 @@ impl PageEngine {
 		let n = (under.ops.len() + over.ops.len()) as u32;
 		gpu.draw(Target::Surface(1), &under);
 		gpu.draw(Target::Screen, &over);
+		n
+	}
+
+	/// Show the lifted items or not, while a ghost of them stands in.
+	#[wasm_bindgen(js_name = showLifted)]
+	pub fn show_lifted(&mut self, on: bool) {
+		self.page.hide_lifted = !on;
+	}
+
+	/// Draw only the lifted items over the pages, for a ghost to be copied from the canvas in the
+	/// same task; the next `frame` draws everything again.
+	#[allow(clippy::too_many_arguments)]
+	#[wasm_bindgen(js_name = frameLifted)]
+	pub fn frame_lifted(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64) -> u32 {
+		self.page.only_lifted = true;
+		let n = self.frame(x, y, zoom, dpr, width, height, false);
+		self.page.only_lifted = false;
 		n
 	}
 

@@ -44,6 +44,10 @@ impl Pictures {
 /// The page's engine: owns the document, answers the pointer, and lays the worker's tiles on the
 /// screen in the same frame as the board pages.
 pub struct Page {
+	/// Draw the lifted items and nothing else over the pages, for one frame: a drag's ghost.
+	pub only_lifted: bool,
+	/// Leave the lifted items out: a ghost of them is shown in their place.
+	pub hide_lifted: bool,
 	pub icons: HashMap<String, IconShape>,
 	pub text: Text,
 	pub atlas: RefCell<Atlas>,
@@ -78,9 +82,10 @@ pub struct Page {
 impl Page {
 	pub fn new(text: &str, dark: bool, session: &str) -> Result<Page, String> {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
-		let words = Text::new();
+		let mut words = Text::new();
+		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -124,6 +129,15 @@ impl Page {
 		self.doc = next;
 		self.scene = Scene::new(&self.doc, self.scene.dark, &self.text);
 		Ok(())
+	}
+
+	/// The colour scheme: cards and papers are drawn in it, so the stage is laid out again.
+	pub fn set_dark(&mut self, dark: bool) {
+		if dark == self.scene.dark && dark == self.text.dark {
+			return;
+		}
+		self.text.dark = dark;
+		self.scene = Scene::new(&self.doc, dark, &self.text);
 	}
 
 	/// A font file arrived: words are measured again, so everything is laid out again.
@@ -315,7 +329,9 @@ impl Page {
 			let d = |s: u32| ((f32::from_bits(s) as f64).ln() - (want as f64).ln()).abs();
 			d(*a).total_cmp(&d(*b)).then(f32::from_bits(*b).total_cmp(&f32::from_bits(*a)))
 		});
-		for key in Grid::covering(&view, want, 0) {
+		// A ghost of what a drag carries is the lifted items alone, with no tiles under them.
+		let places = if self.only_lifted { Vec::new() } else { Grid::covering(&view, want, 0) };
+		for key in places {
 			let place = key.area();
 			let found = scales.iter().find_map(|&sc| {
 				let side = TILE as f64 / f32::from_bits(sc) as f64;
@@ -335,7 +351,7 @@ impl Page {
 			}
 		}
 		// The lifted items, drawn fresh, and the stroke under the pen.
-		if !self.lifted.is_empty() {
+		if !self.lifted.is_empty() && !self.hide_lifted {
 			let skip = HashSet::new();
 			let pictures = &self.pictures;
 			let image = |url: &str| pictures.get(url);
@@ -473,7 +489,8 @@ pub struct Worker {
 impl Worker {
 	pub fn new(text: &str, dark: bool) -> Result<Worker, String> {
 		let doc = Document::parse(text).map_err(|e| e.0)?;
-		let words = Text::new();
+		let mut words = Text::new();
+		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
 		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
 	}
@@ -482,6 +499,7 @@ impl Worker {
 	pub fn reload(&mut self, text: &str, dark: bool) -> Result<(), String> {
 		self.doc = Document::parse(text).map_err(|e| e.0)?;
 		self.dark = dark;
+		self.text.dark = dark;
 		self.scene = Scene::new(&self.doc, dark, &self.text);
 		self.grid.invalidate_all();
 		Ok(())

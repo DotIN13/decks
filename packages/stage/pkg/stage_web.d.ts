@@ -63,6 +63,11 @@ export class PageEngine {
      */
     forgetTiles(keys: string): void;
     /**
+     * Draw only the lifted items over the pages, for a ghost to be copied from the canvas in the
+     * same task; the next `frame` draws everything again.
+     */
+    frameLifted(x: number, y: number, zoom: number, dpr: number, width: number, height: number): number;
+    /**
      * Draw the screen for a camera, under and over the boards' pages. Call it in the same
      * animation frame that moves the pages. Returns how many draw operations it made.
      */
@@ -117,6 +122,10 @@ export class PageEngine {
      */
     setBoards(boards: string): void;
     /**
+     * The colour scheme, dark or not.
+     */
+    setDark(dark: boolean): void;
+    /**
      * The whole drawing (`stage.pen` `doc`, as JSON text).
      */
     setDocument(text: string): void;
@@ -137,6 +146,10 @@ export class PageEngine {
      * What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
      */
     setView(view: string): void;
+    /**
+     * Show the lifted items or not, while a ghost of them stands in.
+     */
+    showLifted(on: boolean): void;
     /**
      * The document as `.pen` text.
      */
@@ -233,6 +246,7 @@ export interface InitOutput {
     readonly pageengine_forgetPicture: (a: number, b: number, c: number) => void;
     readonly pageengine_forgetTiles: (a: number, b: number, c: number) => void;
     readonly pageengine_frame: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+    readonly pageengine_frameLifted: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
     readonly pageengine_generation: (a: number) => number;
     readonly pageengine_landed: (a: number, b: number, c: number) => void;
     readonly pageengine_layout: (a: number) => [number, number];
@@ -249,12 +263,14 @@ export interface InitOutput {
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
     readonly pageengine_setBoards: (a: number, b: number, c: number) => void;
+    readonly pageengine_setDark: (a: number, b: number) => void;
     readonly pageengine_setDocument: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setGpu: (a: number, b: number) => void;
     readonly pageengine_setInk: (a: number, b: number, c: number) => void;
     readonly pageengine_setMarkdownReader: (a: number, b: any) => void;
     readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number];
     readonly pageengine_setView: (a: number, b: number, c: number) => void;
+    readonly pageengine_showLifted: (a: number, b: number) => void;
     readonly pageengine_text: (a: number) => [number, number];
     readonly pageengine_tileCount: (a: number) => number;
     readonly pageengine_undo: (a: number) => [number, number];
@@ -282,8 +298,8 @@ export interface InitOutput {
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__67: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__68: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__70: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__71: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

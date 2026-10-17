@@ -39,10 +39,21 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 	}
 	try {
 		const doc = applyEdits(known.doc, message.edits);
+		lastEdits.set(message.agentId, { stage: message.stage, from: message.from, rev: message.rev, edits: message.edits });
 		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}
+}
+
+/**
+ * The edits that made each drawing's latest revision, for the stage's engine to apply in place of the
+ * whole drawing (`stage/engine.ts`). Only ever the last: an engine further behind takes the drawing whole.
+ */
+const lastEdits = new Map<string, { stage: string; from: number; rev: number; edits: Extract<ServerMessage, { type: "stage.pen.delta" }>["edits"] }>();
+export function editsTo(agentId: string, stage: string, rev: number) {
+	const last = lastEdits.get(agentId);
+	return last && last.stage === stage && last.rev === rev ? last : undefined;
 }
 
 export function forgetPen(agentId: string): void {
