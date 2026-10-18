@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMiddle, arrowPoints, arrowRoute, arrowShape, arrowStyle, baseTheme, isShape, mediaOf, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -64,6 +64,7 @@ import { blockAt, marqueePick, marqueeRect, pickAt as pickAtIn, pictureAt, type 
 import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
 import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
 import { boardResizeEnd, boardResizeStep, givenFor, HANDLES, hugAgainOp, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle } from "./editor/core/resize.ts";
+import { arrowHandles, arrowOp, bendAt, bendStart, droppedEnd, joinAt as joinAtIn, newArrowEnds, resetBendOp, resetEndOp, routeDraft as routeDraftIn, slideJoin, withEnd, type Join, type RouteDraft } from "./editor/core/arrows.ts";
 import { tsScene } from "./editor/scene-ts.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
@@ -2450,117 +2451,22 @@ export function Stage(props: {
 		return { ...MADE[tool].node, id } as PenNode;
 	};
 
-	/** The board under a stage point, when there is one: an arrow may start or end on it. */
-	const boardAt = (point: { x: number; y: number }) =>
-		props.boards.findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
-
-	/**
-	 * What an arrow's end joins at a point: the item on top there, or else the board, with its box
-	 * to light up. Never an arrow — joining one line to another is not something the drawing does —
-	 * and never the arrow whose end it is.
-	 */
-	const joinAt = (point: { x: number; y: number }, not?: string): { name: string; box: Box; side?: ArrowSide } | undefined => {
-		const hit = pickAt(point, { skip: (node) => isArrow(node) || node.id === not });
-		const found = hit
-			? { name: hit.id, box: hit.box }
-			: (() => {
-					const path = boardAt(point);
-					const board = path ? props.boards.find((candidate) => candidate.path === path) : undefined;
-					return board ? { name: board.path, box: { x: board.x, y: board.y, w: board.w, h: board.h } } : undefined;
-				})();
-		if (!found) return undefined;
-		const side = sideNear(found.box, point);
-		return side ? { ...found, side } : found;
-	};
-	/**
-	 * The side of a box whose middle a point is close to, if any: an arrow end let go there keeps to
-	 * that side (`@decks/pen`, `sidedRoute`). Close is a few screen pixels, or a fifth of a small box.
-	 */
-	const SIDE_PX = 14;
-	const sideNear = (box: Box, point: { x: number; y: number }): ArrowSide | undefined => {
-		const reach = Math.min(SIDE_PX / localCamera.zoom, Math.max(6 / localCamera.zoom, Math.min(box.w, box.h) / 4));
-		let best: { side: ArrowSide; d: number } | undefined;
-		for (const side of ARROW_SIDES) {
-			const [x, y] = sidePoint(box, side);
-			const d = Math.hypot(point.x - x, point.y - y);
-			if (d <= reach && (!best || d < best.d)) best = { side, d };
-		}
-		return best?.side;
-	};
-	/** How a join is written as an arrow's end: an item, or an item and the side it keeps to. */
-	const endOf = (join: { name: string; side?: ArrowSide }) => (join.side ? { item: join.name, side: join.side } : join.name);
-	const pointEnd = (point: { x: number; y: number }): [number, number] => [Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10];
+	/** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
+	const joinAt = (point: { x: number; y: number }, not?: string): Join | undefined => joinAtIn(scene, point, { zoom: localCamera.zoom, not });
 
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
 	const arrowEnds = createMemo(() => {
 		penDrawn();
 		const ids = penSelection();
 		if (ids.length !== 1 || boardPicks().length) return undefined;
-		const node = penLayer.placed.get(ids[0]!)?.node;
-		if (!node || !isArrow(node)) return undefined;
-		const boards = (name: string) => props.boards.find((board) => board.path === name);
-		const points = arrowPoints(node.metadata, penLayer.placed, boards);
-		if (!points) return undefined;
-		const drag = shownDrag();
-		const [fx, fy] = points[0]!;
-		const [tx, ty] = points[points.length - 1]!;
-		const route = arrowStyle(node.metadata).route;
-		const [mx, my] = arrowMiddle(points, route);
-		// What each end joins, and on which side, for a join that slides along it (`dragArrowEnd`).
-		const joined = (end: unknown, x: number, y: number) => {
-			const item = arrowEndItem(end);
-			const box = item ? (penLayer.placed.get(item)?.box ?? boards(item)) : undefined;
-			if (!item || !box) return undefined;
-			const side = arrowEndSide(end) ?? onSide(box, x, y);
-			return { item, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side, at: arrowEndAt(end) };
-		};
-		// The middle handle, where an elbow has a middle segment to slide or a line or curve a middle to pull.
-		const bendable = route !== "elbow" || points.length === 4;
-		return {
-			id: node.id,
-			route,
-			from: { x: fx + drag.dx, y: fy + drag.dy },
-			to: { x: tx + drag.dx, y: ty + drag.dy },
-			fromJoin: joined((node.metadata as { from?: unknown }).from, fx, fy),
-			toJoin: joined((node.metadata as { to?: unknown }).to, tx, ty),
-			...(bendable ? { middle: { x: mx + drag.dx, y: my + drag.dy } } : {}),
-			bent: arrowBend(node.metadata) !== undefined,
-		};
+		return arrowHandles(scene, ids[0]!, shownDrag());
 	});
-	/** The side of a box a point on its edge lies on: the nearest. */
-	const onSide = (box: Box, x: number, y: number): ArrowSide => {
-		const d: Array<[ArrowSide, number]> = [["top", Math.abs(y - box.y)], ["bottom", Math.abs(y - (box.y + box.h))], ["left", Math.abs(x - box.x)], ["right", Math.abs(x - (box.x + box.w))]];
-		return d.sort((a, b) => a[1] - b[1])[0]![0];
-	};
 	/** A new route for an arrow, drawn dashed while one of its handles is dragged (`dragArrowEnd`, `dragArrowBend`). */
 	const [routeDraft, setRouteDraft] = createSignal<string | undefined>();
-	const draftOf = (metadata: Record<string, unknown>, node: PenNode) => {
-		const boards = (name: string) => props.boards.find((board) => board.path === name);
-		const points = arrowPoints(metadata, penLayer.placed, boards);
-		if (!points) return undefined;
-		const shape = arrowShape(points, typeof node.strokeWidth === "number" ? node.strokeWidth : 2, arrowStyle(metadata));
-		return { d: shape.geometry, x: shape.x, y: shape.y };
-	};
 	const [routeDraftAt, setRouteDraftAt] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
-	/** Within this many screen pixels of the side it joins, an end's drag slides the join; further, it re-attaches. */
-	const SLIDE_PX = 18;
-	/** A slid join clicks to a corner or the middle within this many screen pixels, unless Alt is held. */
-	const JOIN_SNAP_PX = 8;
-	const slideAt = (box: Box, side: ArrowSide, point: { x: number; y: number }, free: boolean) => {
-		const along = side === "top" || side === "bottom";
-		const length = along ? box.w : box.h;
-		let at = length > 0 ? ((along ? point.x - box.x : point.y - box.y) / length) : 0.5;
-		at = Math.max(0, Math.min(1, at));
-		if (!free) for (const stop of [0, 0.5, 1]) if (Math.abs(at - stop) * length * localCamera.zoom <= JOIN_SNAP_PX) at = stop;
-		return Math.round(at * 1000) / 1000;
-	};
-	const nearSide = (box: Box, side: ArrowSide, point: { x: number; y: number }) => {
-		const reach = SLIDE_PX / localCamera.zoom;
-		const along = side === "top" || side === "bottom";
-		const line = side === "top" ? box.y : side === "bottom" ? box.y + box.h : side === "left" ? box.x : box.x + box.w;
-		const off = Math.abs((along ? point.y : point.x) - line);
-		const within = along ? point.x >= box.x - reach && point.x <= box.x + box.w + reach : point.y >= box.y - reach && point.y <= box.y + box.h + reach;
-		return off <= reach && within;
+	const showRouteDraft = (draft: RouteDraft | undefined) => {
+		setRouteDraft(draft?.d);
+		if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
 	};
 
 	/**
@@ -2583,15 +2489,14 @@ export function Stage(props: {
 			event,
 			(e) => {
 				const now = worldAt(e);
-				slid = own && nearSide(own.box, own.side, now) ? { item: own.item, side: own.side, at: slideAt(own.box, own.side, now, e.altKey) } : undefined;
+				slid = slideJoin(own, now, { zoom: localCamera.zoom, free: e.altKey });
 				if (slid) {
-					const draft = draftOf({ ...node.metadata!, [which]: slid }, node);
+					const draft = routeDraftIn(scene, withEnd(node.metadata!, which, slid), node);
 					batch(() => {
 						setEndDraft(undefined);
 						setJoinHint([own!.box]);
 						setSideHint([]);
-						setRouteDraft(draft?.d);
-						if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+						showRouteDraft(draft);
 					});
 					return;
 				}
@@ -2614,16 +2519,8 @@ export function Stage(props: {
 					if (secondTap(`end:${ends.id}:${which}`)) resetArrowEnd(which);
 					return;
 				}
-				if (slid) {
-					penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: slid } } }]);
-					return;
-				}
-				const now = worldAt(e);
-				const other = arrowEndItem(node.metadata![which === "from" ? "to" : "from"]);
-				const join = joinAt(now, ends.id);
-				// An arrow from a thing to itself is a point on it instead.
-				const end = join && join.name !== other ? endOf(join) : pointEnd(now);
-				penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: end } } }]);
+				const end = slid ?? droppedEnd(scene, ends.id, node.metadata!, which, worldAt(e), localCamera.zoom);
+				penEdit([arrowOp(ends.id, withEnd(node.metadata!, which, end))]);
 			},
 		);
 	};
@@ -2643,17 +2540,14 @@ export function Stage(props: {
 	/** A double-click on a joined end: the join goes back to the middle of its side, the automatic place. */
 	const resetArrowEnd = (which: "from" | "to") => {
 		const ends = arrowEnds();
-		const node = ends ? penNode(ends.id) : undefined;
-		const end = node?.metadata?.[which];
-		if (!ends || !node?.metadata || !end || typeof end !== "object" || Array.isArray(end) || !("at" in end)) return;
-		const { at: _at, ...kept } = end as Record<string, unknown>;
-		penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: kept } } }]);
+		const op = ends ? resetEndOp(ends.id, penNode(ends.id)?.metadata, which) : undefined;
+		if (op) penEdit([op]);
 	};
 
 	/**
-	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run (`bend`, 0 to
-	 * 1 from start to end), a curve's middle is pulled (`bend: [dx, dy]`), and a straight line pulled there
-	 * becomes a curve. A double-click puts it back on the automatic route.
+	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run, a
+	 * curve's middle is pulled, and a straight line pulled there becomes a curve (`bendAt`). A
+	 * double-click puts it back on the automatic route.
 	 */
 	const dragArrowBend = (event: PointerEvent) => {
 		const ends = arrowEnds();
@@ -2662,33 +2556,16 @@ export function Stage(props: {
 		event.stopPropagation();
 		const node = penNode(ends.id);
 		if (!node?.metadata) return;
-		const boards = (name: string) => props.boards.find((board) => board.path === name);
-		const { bend: _was, ...unbent } = node.metadata as Record<string, unknown>;
 		const route = ends.route;
-		const auto = arrowPoints(unbent, penLayer.placed, boards);
-		if (!auto) return;
+		const start = bendStart(scene, node.metadata as Record<string, unknown>);
+		if (!start) return;
 		let next: Record<string, unknown> | undefined;
-		const bendAt = (now: { x: number; y: number }): Record<string, unknown> => {
-			if (route === "elbow") {
-				const [p, q] = [auto[0]!, auto[auto.length - 1]!];
-				// The middle segment runs down when its two points share an x, so it slides across.
-				const across = auto.length === 4 && auto[1]![0] === auto[2]![0];
-				const span = across ? q[0] - p[0] : q[1] - p[1];
-				const turn = span === 0 ? 0.5 : ((across ? now.x - p[0] : now.y - p[1]) / span);
-				return { ...unbent, bend: Math.round(Math.max(0, Math.min(1, turn)) * 1000) / 1000 };
-			}
-			const [mx, my] = arrowMiddle(route === "curved" ? auto : [auto[0]!, auto[auto.length - 1]!], route === "curved" ? "curved" : "straight");
-			return { ...unbent, route: "curved", bend: [Math.round(now.x - mx), Math.round(now.y - my)] };
-		};
 		follow(
 			event,
 			(e) => {
-				next = bendAt(worldAt(e));
-				const draft = draftOf(next, node);
-				batch(() => {
-					setRouteDraft(draft?.d);
-					if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
-				});
+				next = bendAt(start, route, worldAt(e));
+				const draft = routeDraftIn(scene, next, node);
+				batch(() => showRouteDraft(draft));
 			},
 			(moved) => {
 				setRouteDraft(undefined);
@@ -2697,16 +2574,14 @@ export function Stage(props: {
 					return;
 				}
 				if (!next) return;
-				penEdit([{ op: "update", id: ends.id, set: { metadata: next } }]);
+				penEdit([arrowOp(ends.id, next)]);
 			},
 		);
 	};
 	const resetArrowBend = () => {
 		const ends = arrowEnds();
-		const node = ends ? penNode(ends.id) : undefined;
-		if (!ends || !node?.metadata || !("bend" in node.metadata)) return;
-		const { bend: _bend, ...kept } = node.metadata as Record<string, unknown>;
-		penEdit([{ op: "update", id: ends.id, set: { metadata: kept } }]);
+		const op = ends ? resetBendOp(ends.id, penNode(ends.id)?.metadata) : undefined;
+		if (op) penEdit([op]);
 	};
 
 	/**
@@ -2761,11 +2636,9 @@ export function Stage(props: {
 					 * Each end joins what it was let go on, and follows it from then on; an end on bare
 					 * canvas is a point there. A click with no drag makes an arrow only between two things.
 					 */
-					const fromJoin = startJoin;
-					const toJoin = joinAt(end);
-					const from = fromJoin ? endOf(fromJoin) : pointEnd(at);
-					const to = toJoin && toJoin.name !== fromJoin?.name ? endOf(toJoin) : pointEnd(end);
-					if (!moved && (!fromJoin || !toJoin || fromJoin.name === toJoin.name)) return void setPenDraft(undefined);
+					const made = newArrowEnds(startJoin, joinAt(end), at, end, moved);
+					if (!made) return void setPenDraft(undefined);
+					const { from, to } = made;
 					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to, route: "curved" } } }]);
 					keepDraftFor(id);
 					selectMade([id]);
