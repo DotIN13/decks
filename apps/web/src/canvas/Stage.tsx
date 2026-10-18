@@ -4899,6 +4899,8 @@ export function Stage(props: {
 			/* The camera rests at or above this device's live zoom: boards have pages and take the pointer. */
 			data-live={liveZoom() ? "true" : undefined}
 			data-moving={moving() || panning() || gliding() ? "true" : undefined}
+			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`). Off in the frame a zoom starts, so the layer is never stretched. */
+			data-sliding={(moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
 			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
 			data-carrying={boardDrag() || boardResize() || ownDrag() ? "true" : undefined}
 			ref={element}

@@ -581,6 +581,16 @@
 	will-change: transform;
 }
 	/*
+ * While the camera moves at one zoom, the world is one layer the compositor slides: without it,
+ * every live page in it was painted and layered again on every pan step (726 ms of 2.7 s of
+ * panning, 11 live pages at 22%). Never across a change of scale — `data-sliding` goes off in the
+ * frame the zoom changes — so the layer is never a stretched picture; see the note below for the
+ * gesture-wide version this is not.
+ */
+.stage[data-sliding="true"] .world {
+	will-change: transform;
+}
+	/*
  * ### What is left of the boards being soft at high zoom
  *
  * This box used to say it was *not* the layers, on the strength of a measurement taken in a
@@ -589,7 +599,8 @@
  * of that is still true and half of it is a GPU behaviour that a software rasterizer does not
  * have.
  *
- * **The world carries no `will-change` now, and that is the fix.** On a 2× display at 400%,
+ * **The world carries no `will-change` at rest or while the scale moves, and that is the fix.**
+ * (It does while the camera pans at one zoom, `data-sliding` above, where the matrix is exact.) On a 2× display at 400%,
  * taking it off sharpens the board at once — because the declaration is a promise to hold the
  * raster and apply the camera to it as a matrix, and a zoom is then the same picture stretched.
  * It used to be permanent, so every zoom was paid for that way.

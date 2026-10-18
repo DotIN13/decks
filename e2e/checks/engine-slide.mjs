@@ -50,5 +50,26 @@ const moved = await draws();
 await settle(page, 600);
 say("at rest it is drawn once more, centred", (await draws()) > moved && (await covers()));
 
+// The world is one layer while it slides at one zoom, and never across a change of scale or at rest.
+const layer = () => page.evaluate(() => getComputedStyle(document.querySelector(".world")).willChange);
+const states = [];
+for (let i = 0; i < 6; i++) {
+	await page.mouse.wheel(8, 4);
+	await page.waitForTimeout(16);
+	states.push(await layer());
+}
+say("while it pans, the world is held as one layer", states.slice(1).every((one) => one === "transform"), states.join(" "));
+const zooming = [];
+for (let i = 0; i < 4; i++) {
+	await page.keyboard.down("Control");
+	await page.mouse.wheel(0, -20);
+	await page.keyboard.up("Control");
+	await page.waitForTimeout(16);
+	zooming.push(await layer());
+}
+say("…and not while the zoom changes", zooming.every((one) => one === "auto"), zooming.join(" "));
+await settle(page, 700);
+say("…nor at rest", (await layer()) === "auto");
+
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();

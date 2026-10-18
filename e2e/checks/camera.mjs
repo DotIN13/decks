@@ -278,30 +278,32 @@ const whilePanning = await page.evaluate(() => document.querySelector(".stage").
 say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
 
 /*
- * And the world carries no `will-change` at all — which is the fix for a board being soft at high
- * zoom, and this assertion is here so nobody puts it back for the sake of the pan.
+ * And the world carries no `will-change` at rest or while the scale moves — which is the fix for a
+ * board being soft at high zoom, and these assertions are here so nobody makes it permanent again.
  *
- * The declaration is a promise: hold the raster, apply the camera as a matrix. It makes a pan a
- * matrix rather than a repaint of sixteen documents — and it makes every zoom the same picture
- * stretched, which is what a board looked like at 400% on a 2× display until it was taken off.
- * A gesture-scoped version was tried and reverted: the layer being built and torn down flashed
- * under the pointer, worst over a board, and a camera moved without a gesture (an agent's
- * `stage.show`, a restored view) could leave the promise held over a scale it no longer matched.
- * The cost is a pan painting itself, which `index.css` measures and explains.
+ * The declaration is a promise: hold the raster, apply the camera as a matrix. Across a zoom that
+ * is the same picture stretched, which is what a board looked like at 400% on a 2× display until
+ * it was taken off. A pan at one zoom is the one move where the matrix is exact, so the world
+ * holds the promise then (`data-sliding`, `canvas.css`) and drops it in the frame a zoom starts.
+ * A gesture-wide version was tried and reverted for flashing and for leaking past a change of
+ * scale; this one was recorded frame by frame for flashes, at 22% and 60%, and found none.
  */
 const promise = () =>
 	page.evaluate(() => ({
 		world: getComputedStyle(document.querySelector(".world")).willChange,
 		iframes: getComputedStyle(document.querySelector(".board-node iframe")).willChange,
 	}));
+await settle(page, 400);
 const resting = await promise();
-say("the world makes no promise, so a zoom is drawn at the size it is read at", resting.world === "auto", JSON.stringify(resting));
+say("at rest the world makes no promise, so a zoom is drawn at the size it is read at", resting.world === "auto", JSON.stringify(resting));
 
 await page.mouse.move(700, 400);
 await page.mouse.wheel(0, 120);
-await settle(page, 150);
+await settle(page, 60);
 const whileMoving = await promise();
-say("…and a pan does not make one", whileMoving.world === "auto", JSON.stringify(whileMoving));
+say("…a pan at one zoom holds one, to slide the world", whileMoving.world === "transform", JSON.stringify(whileMoving));
+await settle(page, 400);
+say("…and lets it go when the pan stops", (await promise()).world === "auto");
 await page.keyboard.press("Control+Equal");
 await settle(page, 150);
 const onZoom = await promise();
