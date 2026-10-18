@@ -9,3 +9,15 @@ export type Pt = { x: number; y: number };
 export type Rect = Frame;
 /** A board as the stage places it. */
 export type BoardBox = { path: string; x: number; y: number; w: number; h: number };
+/**
+ * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
+ * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).
+ */
+export type PenTool = "select" | "note" | "card" | "text" | "rectangle" | "ellipse" | "frame" | "arrow" | "shape" | "icon";
+/** A tool that makes an item at a point, by a click or a drag: all but `select` and `arrow`. */
+export type MakingTool = Exclude<PenTool, "select" | "arrow">;
+/**
+ * The key that arms each tool. `v` is select, handled with the camera's keys. `s` still makes a
+ * note, because it made a sticky when the tools inserted into boards.
+ */
+export const PEN_TOOL_KEYS: Record<string, PenTool> = { n: "note", s: "note", c: "card", t: "text", r: "rectangle", o: "ellipse", f: "frame", a: "arrow" };

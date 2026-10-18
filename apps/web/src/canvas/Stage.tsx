@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowEndItem, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -65,6 +65,8 @@ import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderI
 import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
 import { boardResizeEnd, boardResizeStep, givenFor, HANDLES, hugAgainOp, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle } from "./editor/core/resize.ts";
 import { arrowHandles, arrowOp, bendAt, bendStart, droppedEnd, joinAt as joinAtIn, newArrowEnds, resetBendOp, resetEndOp, routeDraft as routeDraftIn, slideJoin, withEnd, type Join, type RouteDraft } from "./editor/core/arrows.ts";
+import { arrowInsertOp, boardMoves, copyOps, deleteOps, drawnOp, duplicateOps, idMaker, makeAtOp, moveOps, type MakeOptions } from "./editor/core/ops.ts";
+import { penKey as penKeyOf, type KeyAct } from "./editor/core/keys.ts";
 import { tsScene } from "./editor/scene-ts.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
@@ -1517,15 +1519,8 @@ export function Stage(props: {
 	};
 	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(localCamera, view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
-	/** Ids for several new items at once, none the same as another or as any on the stage. */
-	const freshIds = () => {
-		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
-		return () => {
-			const id = newId(taken);
-			taken.add(id);
-			return id;
-		};
-	};
+	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
+	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
 
 	/**
 	 * The board whose picture is under a point and that has no node of its own to take the press
@@ -1572,65 +1567,55 @@ export function Stage(props: {
 		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
 	};
 	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
-	const penDeleteSelected = () => {
-		const selected = penSelection();
+	const penDeleteSelected = (selected = penSelection(), ops = deleteOps(selected)) => {
 		if (!selected.length) return;
 		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
 		penLayer.hide(new Set(selected));
 		const mark = penLayer.mark();
-		penEdit(selected.map((id) => ({ op: "delete", id })));
+		penEdit(ops);
 		const clear = () => setPenSelection((now) => (now === selected ? [] : now));
 		afterFrame.push({ mark, run: clear });
 		// A sheet that shows no frame (nothing painting) does not keep the outline.
 		setTimeout(clear, 250);
 	};
 
-	/** The keys of the drawing, in edit mode; true when the key was one of them. */
+	/** The keys of the drawing, in edit mode (`editor/core/keys.ts` decides, this does it); true when the key was one of them. */
 	const penKey = (event: KeyboardEvent): boolean => {
 		const selected = penSelection();
-		const command = event.metaKey || event.ctrlKey;
-		const key = event.key;
-		if (command && !event.altKey && key.toLowerCase() === "z" && props.onPenStep) {
-			props.onPenStep(event.shiftKey ? "redo" : "undo");
-			return true;
+		// The document's ids are gathered only for a key that makes something (⌘D).
+		let ids: (() => string) | undefined;
+		const act: KeyAct = penKeyOf(
+			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
+			{ selection: selected, boards: boardPicks(), tool: penTool(), boardSelected: !!props.selected, canStep: !!props.onPenStep, scene, nextId: () => (ids ??= freshIds())() },
+		);
+		if (!act.handled) return false;
+		switch (act.do) {
+			case "step":
+				props.onPenStep?.(act.step);
+				break;
+			case "delete":
+				penDeleteSelected(selected, act.ops);
+				break;
+			case "escape":
+				if ("tool" in act) setPenTool(act.tool);
+				else {
+					setPenSelection(act.select);
+					setBoardPicks(act.boards);
+				}
+				break;
+			case "duplicate":
+				penEdit(act.ops);
+				if (act.select.length) selectMade(act.select);
+				break;
+			case "nudge":
+				penEdit(act.ops);
+				for (const move of act.boards) props.onMove(move.path, move.x, move.y);
+				break;
+			case "arm":
+				armPenTool(act.tool);
+				break;
 		}
-		if (selected.length && (key === "Delete" || key === "Backspace")) {
-			penDeleteSelected();
-			return true;
-		}
-		if (key === "Escape" && (selected.length || boardPicks().length || penTool() !== "select")) {
-			if (penTool() !== "select") setPenTool("select");
-			else {
-				setPenSelection([]);
-				setBoardPicks([]);
-			}
-			return true;
-		}
-		if (selected.length && command && !event.altKey && key.toLowerCase() === "d") {
-			penDuplicate();
-			return true;
-		}
-		const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
-		if ((selected.length || boardPicks().length) && nudge && !command && !event.altKey) {
-			const step = event.shiftKey ? 10 : 1;
-			penMoveBy(selected, nudge[0]! * step, nudge[1]! * step);
-			moveBoards(boardPicks(), nudge[0]! * step, nudge[1]! * step);
-			return true;
-		}
-		/*
-		 * The letters that arm a tool: from the app's own document only — never forwarded from a
-		 * board's (`shortcut`) — and only while no board is selected. Words typed over a board with
-		 * nothing editable under them fall through to the stage, and an armed tool takes the boards'
-		 * pointer away: "Zoo" typed there armed the ellipse, and the next click drew one instead of
-		 * selecting what was under it. With a board selected the keys are the board's; a press on
-		 * bare canvas lets it go, and then they are the drawing's.
-		 */
-		const tool = !command && !event.altKey && !props.selected ? PEN_TOOL_KEYS[key] : undefined;
-		if (tool) {
-			armPenTool(tool);
-			return true;
-		}
-		return false;
+		return true;
 	};
 
 	/** The path of an arrow being drawn, curved as the arrow it makes will be. */
@@ -1648,98 +1633,22 @@ export function Stage(props: {
 
 	/** An item as the file has it, not as a preview has drawn it. */
 	const penNode = (id: string) => (props.pen ? indexOf(props.pen.doc).get(id)?.node : undefined);
-	const own = (value: unknown) => (typeof value === "number" ? value : 0);
 
-	/**
-	 * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
-	 * because a group's box starts where its children do, not at its own `x` and `y`.
-	 */
-	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => {
-		/*
-		 * Where the next item goes in a frame that stacks its children. The op takes the item out of
-		 * the tree before putting it back, so an item that was already above its new place lands one
-		 * too far down; `was < put` is that correction. A second item of a selection goes after the
-		 * first, which is why this counts up.
-		 */
-		let put = slot;
-		penEdit(
-			idsToMove.flatMap((id): unknown[] => {
-				const node = penNode(id);
-				if (!node) return [];
-				/*
-				 * Into a frame, or out of one onto the stage: a `move` with the parent and the box the
-				 * item ends up at **in stage coordinates**, which the server turns into the frame's own
-				 * x and y. Writing x and y here instead is what made a frame a trap, since a child's are
-				 * measured from its frame's corner.
-				 *
-				 * `into === undefined` is "the parent is not in question" — the drag was held with ⌘, or
-				 * nothing is carried — and then this is the plain move it always was.
-				 */
-				const parent = penLayer.placed.get(id)?.parent ?? null;
-				// A slot means the frame arranges its children, so a drag inside one reorders it: an op even where the parent is unchanged.
-				if (into !== undefined && (into !== parent || put !== undefined)) {
-					const box = penLayer.placed.get(id)?.box;
-					let index: number | undefined;
-					if (put !== undefined) {
-						const was = into && into === parent ? (penNode(into)?.children ?? []).findIndex((child) => child.id === id) : -1;
-						index = Math.max(0, put - (was >= 0 && was < put ? 1 : 0));
-						put += 1;
-					}
-					if (box) {
-						const move = { op: "move", id, parent: into, ...(index === undefined ? {} : { index }), box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy), x2: Math.round(box.x + dx + box.w), y2: Math.round(box.y + dy + box.h) } };
-						// Markdown words in a card are as wide as it; out of one, they keep the width they had.
-						if (into && isMarkdownText(node) && isCard(penNode(into))) return [move, { op: "update", id, set: { width: "fill_container", textGrowth: "fixed-width" } }];
-						return [move];
-					}
-					if (index !== undefined) return [{ op: "move", id, parent: into, index }];
-				}
-				return [{ op: "update", id, set: movedBy(node, dx, dy) }];
-			}),
-		);
-	};
-	/**
-	 * What moving an item by `dx dy` sets. An arrow's point ends are on the stage rather than in its
-	 * box, so they move with it; its joined ends stay joined (`moveArrowEnds`).
-	 */
-	const movedBy = (node: PenNode, dx: number, dy: number) => ({
-		x: Math.round(own(node.x) + dx),
-		y: Math.round(own(node.y) + dy),
-		...(isArrow(node) && node.metadata ? { metadata: moveArrowEnds(node.metadata, dx, dy) } : {}),
-	});
+	/** Move items by `dx dy`, into a frame or out of one when `into` says (`editor/core/ops.ts`). */
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => penEdit(moveOps(scene, idsToMove, dx, dy, into, slot));
 	/** Move boards by `dx dy`, each to its own new corner. */
 	const moveBoards = (paths: readonly string[], dx: number, dy: number) => {
-		for (const path of paths) {
-			const board = props.boards.find((candidate) => candidate.path === path);
-			if (board) props.onMove(path, Math.round(board.x + dx), Math.round(board.y + dy));
-		}
+		for (const move of boardMoves(scene.boards(), paths, dx, dy)) props.onMove(move.path, move.x, move.y);
 	};
 
 	const penDuplicate = () => {
-		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
-		const made: string[] = [];
-		const ops = penSelection().flatMap((id) => {
-			const node = penNode(id);
-			if (!node) return [];
-			const as = newId(taken);
-			taken.add(as);
-			made.push(as);
-			return [{ op: "copy", id, as }, { op: "update", id: as, set: movedBy(node, 24, 24) }];
-		});
+		const { ops, made } = duplicateOps(scene, penSelection(), freshIds());
 		penEdit(ops);
 		if (made.length) selectMade(made);
 	};
 	/** Copies of items, `dx dy` from where they are: an Alt-drag lets go of copies and leaves the originals. */
 	const penCopyBy = (idsToCopy: readonly string[], dx: number, dy: number) => {
-		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
-		const made: string[] = [];
-		const ops = idsToCopy.flatMap((id) => {
-			const node = penNode(id);
-			if (!node) return [];
-			const as = newId(taken);
-			taken.add(as);
-			made.push(as);
-			return [{ op: "copy", id, as }, { op: "update", id: as, set: movedBy(node, dx, dy) }];
-		});
+		const { ops, made } = copyOps(scene, idsToCopy, dx, dy, freshIds());
 		penEdit(ops);
 		if (made.length) selectMade(made);
 	};
@@ -2397,59 +2306,8 @@ export function Stage(props: {
 		if (at && (slides || board.h >= held.h)) setBoardResize(undefined);
 	});
 
-	/*
-	 * What a frame starts with. The padding is what makes a frame readable as a container rather
-	 * than an outline round its contents, and the radius is that padding plus a card's own corner:
-	 * nested corners look right when the gap between the two curves is the same all the way round,
-	 * so a card dropped into a frame sits concentric with it instead of inside a tighter arc.
-	 */
-	const FRAME_PAD = 18;
-	const FRAME_RADIUS = NOTE_RADIUS + FRAME_PAD;
-
-	/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
-	const MADE: Record<Exclude<PenTool, "select" | "arrow" | "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
-		rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
-		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
-		/*
-		 * A frame made by hand is a column, because that is what a frame is for: things in an order,
-		 * arranged for you. It hugs what it holds, and the height it is drawn at is its floor
-		 * (`fit_content(h)`, written by the insert in `@decks/pen`'s `ops.ts`): an empty one is still
-		 * something to drop into, and it grows as things go in.
-		 */
-		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 120 },
-		// A text's words are markdown, as a card's blocks are, typed into with the card's toolbar.
-		text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
-		/*
-		 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
-		 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
-		 */
-		card: { node: { type: "frame", name: "Card" }, w: 320, h: 48 },
-		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
-	};
-
-	/** Shapes that are as tall as they are wide when made with a click: a circle, a star, a ring. */
-	const SQUARE_SHAPES = new Set(["Ellipse", "Ring", "Star", "Octagon", "Pentagon", "Hexagon", "Plus", "Heart", "Triangle"]);
-	/** The size a click makes, for every tool: a shape's by its kind, an icon's 48 square. */
-	const madeSize = (tool: Exclude<PenTool, "select" | "arrow">): { w: number; h: number } => {
-		if (tool === "shape") return SQUARE_SHAPES.has(penShape()) ? { w: 120, h: 120 } : penShape() === "Decision" ? { w: 160, h: 120 } : { w: 160, h: 100 };
-		if (tool === "icon") return { w: 48, h: 48 };
-		return MADE[tool];
-	};
-	/** The item a tool makes, with its id: a shape from the library (`@decks/pen`, `makeShape`), the icon picked, or the tool's own. */
-	const madeNode = (tool: Exclude<PenTool, "select" | "arrow">, id: string, size: { w: number; h: number }): PenNode => {
-		if (tool === "shape") {
-			const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
-			taken.add(id);
-			return makeShape(shapeKind(penShape()) ?? SHAPES[0]!, { frame: id, outline: newId(taken) }, size);
-		}
-		if (tool === "icon") {
-			const icon = penIcon();
-			return { type: "icon", id, name: icon.name, library: icon.library, icon: icon.name, fill: "#1f2328", weight: 400 } as PenNode;
-		}
-		// A card is a column frame of blocks (`pen/card-frame.ts`), starting with one empty one.
-		if (tool === "card") return newCard(id, freshIds()());
-		return { ...MADE[tool].node, id } as PenNode;
-	};
+	/** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
+	const makeOptions = (id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: freshIds(id), card: newCard });
 
 	/** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
 	const joinAt = (point: { x: number; y: number }, not?: string): Join | undefined => joinAtIn(scene, point, { zoom: localCamera.zoom, not });
@@ -2639,7 +2497,7 @@ export function Stage(props: {
 					const made = newArrowEnds(startJoin, joinAt(end), at, end, moved);
 					if (!made) return void setPenDraft(undefined);
 					const { from, to } = made;
-					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to, route: "curved" } } }]);
+					penEdit([arrowInsertOp(id, from, to)]);
 					keepDraftFor(id);
 					selectMade([id]);
 					return;
@@ -2648,22 +2506,15 @@ export function Stage(props: {
 					setPenDraft(undefined);
 					return penMakeAt(tool, at);
 				}
-				const made = madeSize(tool);
-				const x1 = Math.round(moved ? Math.min(at.x, end.x) : at.x);
-				const y1 = Math.round(moved ? Math.min(at.y, end.y) : at.y);
-				const w = moved ? Math.max(8, Math.round(Math.abs(end.x - at.x))) : made.w;
-				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
 				const parent = frameAt(at);
-				// A text grows with its words unless a width was drawn for it; its height is always its words'.
-				// A card or a frame is as tall as its words, and the height drawn is the least it is.
-				const box = tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : { x1, y1, x2: x1 + w, y2: y1 + h };
-				const node = madeNode(tool, id, { w, h });
-				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
+				// The box dragged out, at least 8 each way (`editor/core/ops.ts` `drawnOp`).
+				const { op, node, box } = drawnOp(tool, id, at, end, { ...makeOptions(id), ...(parent ? { parent } : {}) });
+				penEdit([op]);
 				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
 				if (tool === "text" || tool === "note" || tool === "card") setPenDraft(undefined);
 				else keepDraftFor(id);
 				selectMade([id]);
-				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box: { x: x1, y: y1, w, h: tool === "card" ? 80 : h } }, true);
+				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box }, true);
 			},
 		);
 	};
@@ -2675,16 +2526,12 @@ export function Stage(props: {
 	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: { x: number; y: number }, centred = false) => {
 		penMadeAt = performance.now();
 		const id = freshId();
-		const made = madeSize(tool);
-		// From the insert panel, the item is put with its middle where it is put; from a click, its corner.
-		const x1 = Math.round(centred ? at.x - made.w / 2 : at.x);
-		const y1 = Math.round(centred ? at.y - made.h / 2 : at.y);
+		// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`editor/core/ops.ts`).
 		const parent = frameAt(at);
-		const box = tool === "note" ? { x1, y1 } : tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
-		const node = madeNode(tool, id, made);
-		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
+		const { op, node, box } = makeAtOp(tool, id, at, { ...makeOptions(id), centred, ...(parent ? { parent } : {}) });
+		penEdit([op]);
 		selectMade([id]);
-		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box: { x: x1, y: y1, w: made.w, h: tool === "card" ? 80 : made.h } }, true);
+		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box }, true);
 	};
 
 	/**
