@@ -235,6 +235,17 @@ export function boardChanged(path: string, rev: number): "ours" | "adopted" | "t
 }
 
 /**
+ * A board whose new revision changed only the size in its own tag (`board.changed`'s `sized`): a fit,
+ * or a person's resize. The page on screen is kept, pinned to the revision it loaded, and is given
+ * the new size where it is drawn (`BoardFrame`'s `__decksSize`). Reloading it to learn one number was
+ * a white flash at the end of every resize, on every canvas showing the board.
+ */
+export function boardSized(path: string, rev: number, shown: number | undefined): void {
+	if (!frameRevs[path] && shown !== undefined) setFrameRevs(path, shown);
+	selfRevs.set(path, rev);
+}
+
+/**
  * The greeting is a refresh: nothing is in flight any more.
  *
  * Said out loud because the queue depends on it — an edit made while a patch is

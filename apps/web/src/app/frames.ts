@@ -16,7 +16,7 @@ import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
-import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
+import { boardChanged, boardSized, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
 import { notice, offer } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
@@ -198,7 +198,8 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * (already on screen), the echo that overtook our acknowledgement, or
 					 * somebody else's — the agent, another tab, an editor (`state/patches.ts`).
 					 */
-					boardChanged(board.path, board.rev);
+					if (message.sized) boardSized(board.path, board.rev, state.boards.find((one) => one.path === board.path)?.rev);
+					else boardChanged(board.path, board.rev);
 					// Merged into the existing row so its frame survives; only a board that
 					// is genuinely new grows the array.
 					//

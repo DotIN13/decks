@@ -19,7 +19,7 @@ import {
 	type BoardFormat,
 } from "./templates.ts";
 import type { Deck } from "../deck/loader.ts";
-import { withBoardSize } from "../deck/meta.ts";
+import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
 
 /**
  * What the shell has to do for the board service, and nothing else.
@@ -274,11 +274,14 @@ export class BoardService {
 
 	writeBoard(path: string, html: string): Board {
 		const file = this.deck.fileOf(path);
+		const before = existsSync(file) ? readFileSync(file, "utf8") : undefined;
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
 		if (!board) throw new Error(`No such board: ${path}`);
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+		// Only the size in its tag: the pages showing it keep their document (`frames.ts`).
+		const sized = before !== undefined && onlySizeChanged(path, before, html);
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board), ...(sized ? { sized: true as const } : {}) });
 		return board;
 	}
 

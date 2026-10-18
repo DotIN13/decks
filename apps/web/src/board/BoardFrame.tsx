@@ -757,8 +757,9 @@ export function BoardFrame(props: {
 
 	/*
 	 * A size from the stage's handles, given to the page as it is dragged, once a frame at most.
-	 * The words reflow under the handle, and the size is kept in the stage file rather than the
-	 * board's, so no new revision comes back to reload the page. A deck sizes its slides itself.
+	 * The words reflow under the handle. The size goes to the board's file too, but a revision that
+	 * changes only that (`board.changed`'s `sized`) keeps the page, so nothing reloads. A deck sizes
+	 * its slides itself.
 	 */
 	let sizeFrame = 0;
 	createEffect(() => {
@@ -774,6 +775,26 @@ export function BoardFrame(props: {
 			}
 		});
 	});
+
+	/*
+	 * And a size that arrives rather than being dragged: a fit, or the end of a resize on another
+	 * canvas. The page is kept (`boardSized`), so it is given the size it is now drawn at, as a reload
+	 * would have given it the file's.
+	 */
+	createEffect(
+		on(
+			() => [props.board.w, props.board.h] as const,
+			([w, h]) => {
+				if (sizing() || props.board.format === "slides") return;
+				try {
+					(frameEl?.contentWindow as { __decksSize?: (size: { w: number; h: number }) => void } | null | undefined)?.__decksSize?.({ w, h });
+				} catch {
+					/* a page from elsewhere, which keeps its own size */
+				}
+			},
+			{ defer: true },
+		),
+	);
 
 	/**
 	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and

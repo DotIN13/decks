@@ -344,7 +344,7 @@ export type ServerMessage =
 	 * started reports a different catalogue.
 	 */
 	| { type: "runtimes"; list: RuntimeInfo[] }
-	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean }
+	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; /** Only the size in the board's own tag changed: a page showing it keeps its document. */ sized?: true }
 	/**
 	 * A board's measured height changed, and nothing else: its document is the same revision. Sent in
 	 * place of the whole deck state, which on a deck of 400 boards was 400 KB and a second of the

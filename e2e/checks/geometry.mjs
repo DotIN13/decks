@@ -156,6 +156,15 @@ say(
 );
 say("…a real target, drawn in screen pixels", both !== null && both.w >= 8 && both.cursor === "nwse-resize", JSON.stringify(both));
 
+// A mark on the page in the frame: a reload would take it away.
+const markPage = (wanted) =>
+	page.evaluate((wanted) => {
+		const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
+		if (frame?.contentWindow) frame.contentWindow.__kept = true;
+		return !!frame?.contentWindow;
+	}, wanted);
+const pageKept = (wanted) => page.evaluate((wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`)?.contentWindow?.__kept === true, wanted);
+await markPage(componentPath);
 const dragged = await dragHandle(componentPath, 140, 90);
 say(
 	"the box follows the drag, before anything is written",
@@ -176,6 +185,7 @@ say(
 	Math.abs(drawn.w - dragged.w) <= 2 && Math.abs(drawn.h - dragged.h) <= 2,
 	`drawn ${drawn.w}x${drawn.h}, dragged ${dragged.w}x${dragged.h}`,
 );
+say("…without reloading the page in it", await pageKept(componentPath));
 const writtenMeta = metaOf(nowComponent);
 say("…and writes that size to the board's own file", Math.abs(writtenMeta?.w - drawn.w) <= 1 && Math.abs(writtenMeta?.h - drawn.h) <= 1, JSON.stringify(writtenMeta));
 // The person's own resize is theirs: the board's new file time must not read as an agent's change.
