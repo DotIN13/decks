@@ -52,8 +52,9 @@ export function failed() {
 }
 
 /** The deck the server actually has open, straight from the API. */
-export async function deckState() {
-	const response = await fetch(`${API}/api/deck`);
+export async function deckState(api) {
+	api = typeof api === "string" ? api : API;
+	const response = await fetch(`${api}/api/deck`);
 	if (!response.ok) throw new Error(`GET /api/deck -> ${response.status}`);
 	return (await response.json()).deck;
 }
@@ -234,7 +235,13 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 	const boards = () => page.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
 	await page.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
-		await page.waitForTimeout(i === 0 ? 400 : 350);
+		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
+		await page
+			.waitForFunction(() => {
+				const stage = document.querySelector(".stage")?.dataset;
+				return stage?.live === "true" && stage.gliding !== "true" && stage.moving !== "true";
+			}, null, { timeout: i === 0 ? 400 : 350, polling: 50 })
+			.catch(() => {});
 		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
 			// Live is decided when the camera rests; the pages start a moment later. Wait for one.
 			await page
@@ -289,6 +296,30 @@ export async function ready(page, { timeout = 30000 } = {}) {
  */
 export async function still(page, { timeout = 5000 } = {}) {
 	await page.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout });
+}
+
+/**
+ * Wait for the camera to come to rest after something that *may* move it — a Fit, a `1`, a click
+ * on a stage card — instead of a fixed pause long enough for the longest glide.
+ *
+ * Two steps, because the move may not have begun when this is called: up to `start` ms for it to
+ * begin (and if it never does, nothing moved), then for it to end. Then, as a glide that ends live
+ * mounts pages, for the boards on screen to be ready, and one frame for whatever reads layout.
+ */
+export async function rest(page, { start = 300, timeout = 6000 } = {}) {
+	const moving = (want) => {
+		const stage = document.querySelector(".stage")?.dataset;
+		return (stage?.gliding === "true" || stage?.moving === "true") === want;
+	};
+	// (Playwright reads a timeout of 0 as "forever", so `start: 0` skips the first step instead.)
+	if (start > 0) await page.waitForFunction(moving, true, { timeout: start, polling: "raf" }).catch(() => {});
+	await page.waitForFunction(moving, false, { timeout, polling: "raf" });
+	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
+		await page
+			.waitForFunction(() => [...document.querySelectorAll(".board-node iframe")].every((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 5000 })
+			.catch(() => {});
+	}
+	await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
 /**
@@ -399,8 +430,9 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 }
 
 /** Talk to the server the way the client does. */
-export async function socket() {
-	const ws = new WebSocket(`${API.replace("http", "ws")}/ws`);
+export async function socket(api) {
+	api = typeof api === "string" ? api : API;
+	const ws = new WebSocket(`${api.replace("http", "ws")}/ws`);
 	const received = [];
 	await new Promise((resolve, reject) => {
 		ws.onopen = resolve;
@@ -445,9 +477,13 @@ export async function socket() {
  * Most of these checks predate the context/in-play tiers and expect to see every board.
  * Without this they inherit whatever the previous check narrowed the stage to, and fail
  * for reasons that have nothing to do with what they test.
+ *
+ * A URL is for the runner, which has one server per worker and so no single `API` to read;
+ * checks call it with their page, or nothing, and get this process's `API`.
  */
-export async function resetStage() {
-	const deck = await deckState();
+export async function resetStage(at) {
+	const api = typeof at === "string" ? at : API;
+	const deck = await deckState(api);
 	const wanted = deck.boards.map((board) => board.path);
 	/*
 	 * And where the fixture puts them, not wherever the last check left them.
@@ -458,7 +494,7 @@ export async function resetStage() {
 	 * from — so putting each board back is one `board.move` per board, the same message a drag sends.
 	 */
 	const places = deck.boards.filter((board) => Number.isFinite(board.x) && Number.isFinite(board.y));
-	const link = await socket();
+	const link = await socket(api);
 	/*
 	 * Confirmed, for the *focused* agent, and retried until it is.
 	 *
@@ -483,8 +519,13 @@ export async function resetStage() {
 			for (const board of places) link.send({ type: "board.move", path: board.path, x: board.x, y: board.y });
 			for (const path of wanted) link.send({ type: "board.play", path });
 		}
-		await new Promise((resolve) => setTimeout(resolve, 400));
-		landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
+		// Watched rather than slept on: the answer is usually back in a few milliseconds, and is resent after 1.5s.
+		const resend = Date.now() + (agent ? 1500 : 100);
+		while (Date.now() < resend) {
+			await new Promise((resolve) => setTimeout(resolve, 25));
+			landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
+			if (agent && wanted.every((path) => landed.includes(path))) break;
+		}
 		if (agent && wanted.every((path) => landed.includes(path))) break;
 	}
 	link.close();
@@ -753,7 +794,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 		const fitButton = page.locator('button[aria-label="Fit the boards on the canvas"]').first();
 		if (await fitButton.isVisible().catch(() => false)) {
 			await fitButton.click();
-			await page.waitForTimeout(900);
+			await rest(page);
 			at = await spot();
 		}
 	}
@@ -792,7 +833,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 export async function flyToBoard(page, path) {
 	await selectBoard(page, path);
 	await pressBoardAction(page, "Fit");
-	await page.waitForTimeout(900);
+	await rest(page);
 }
 
 /** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
@@ -804,6 +845,22 @@ export async function pressBoardAction(page, label) {
 	const labels = [label].flat();
 	const any = (prefix) => labels.map((one) => `${prefix}[data-act="${one}"]`).join(", ");
 	const bar = () => page.locator(`.bar-layer .chrome[data-selected]:not([data-tight]) :is(${any("")})`).first();
+	/*
+	 * A bar under the composer or a panel cannot be pressed — a board that lands low on a fresh
+	 * deck has it there — and a click on it waits thirty seconds for nothing. `1` frames the
+	 * selected board, which is what Fit does, and brings the bar into the open for anything else.
+	 */
+	const covered = () =>
+		bar().evaluate((button) => {
+			const r = button.getBoundingClientRect();
+			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+			return !hit || !(hit === button || button.contains(hit));
+		});
+	if ((await bar().count()) && (await covered())) {
+		await page.keyboard.press("1");
+		if (labels.includes("Fit")) return true;
+		await rest(page);
+	}
 	if (await bar().count()) return bar().click().then(() => true);
 	if ((await page.locator(`.bar-layer .chrome[data-selected][data-tight]`).count()) > 0) {
 		const key = labels.includes("Present") || labels.includes("Fullscreen") ? "f" : labels.includes("Focus") ? "d" : undefined;

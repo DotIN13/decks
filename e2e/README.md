@@ -8,9 +8,10 @@ npx playwright install chromium
 ```
 
 ```sh
-npm run test:e2e                        # the twenty-nine that need no model
+npm run test:e2e                        # every check that needs no model, four at a time
 DECKS_E2E_AGENT=1 npm run test:e2e      # and the five that prompt an agent — slower, spends tokens
-npm run test:e2e -- panel tiers         # just these
+npm run test:e2e -- panel tiers         # just these (a prefix of the file name)
+DECKS_E2E_JOBS=1 npm run test:e2e       # one at a time — still a fresh deck each
 DECKS_BACKEND=claude npm run test:e2e   # the same checks, on the Claude runtime
 ```
 
@@ -21,15 +22,37 @@ either a real gap in that backend or a check that was secretly specific to the o
 worth knowing. A Claude run answers the runtime's permission questions automatically, since
 the fixture is a throwaway copy.
 
-The runner also refuses to run if something *else* is already serving port 4329. That is not
-hypothetical: a dev server left up meant a whole parity run silently went against a scratch
-deck and reported a result that meant nothing.
+## The runner
 
-The runner (`run.mjs`) copies `example/` to a throwaway directory under the system temp,
-starts the dev server on it, runs each file in `checks/`, and deletes it. Nothing here ever
-touches a deck you are working in: `harness.preflight()` refuses to run unless the deck
-path contains `decks-e2e`, which exists because a stale server on the API port once meant a
-run went against a real deck and dragged boards around before anyone noticed.
+`run.mjs` gives **every check a deck and a server of its own**, and runs several at once:
+
+- A pool of `DECKS_E2E_JOBS` workers (default 4). Worker *i* owns the port pair
+  `DECKS_E2E_API_PORT + 2·i` / `DECKS_E2E_WEB_PORT + 2·i` (base 4329/4328), and runs one Vite
+  (`npm run dev:web`) on its web port for the whole run.
+- For each check, the worker copies `example/` to a fresh `decks-e2e-*` directory under the
+  system temp, starts the server on it (`node --import tsx src/index.ts` in `apps/server`, the
+  `start` script: no `--watch`, so saving a file mid-run cannot restart it), puts the whole deck
+  in play (`resetStage`), runs the check — which opens its own browser — then stops that
+  server (TERM, then KILL, its own process group only) and deletes the copy.
+- So nothing a check does reaches another, and order does not matter. A check that fails in
+  the full run fails alone too; run it alone before believing otherwise.
+- Output is one line per check in the order of `CHECKS`, whatever order they finished in, with
+  that check's own time (setup excluded; the average setup is printed under the totals). The
+  schedule is longest-first, by the last run's times, cached in
+  `node_modules/.cache/decks-e2e/timings.json`.
+
+Use non-default ports while a live Decks is on 4329, e.g.
+`DECKS_E2E_API_PORT=4529 DECKS_E2E_WEB_PORT=4528` (with four jobs: 4528–4535). The runner
+refuses to start if *anything* is listening on any port it would use — another suite, a live
+deck, a stale run — and then checks each server it started has the fixture open. That is not
+hypothetical: a dev server left up once meant a whole parity run silently went against a
+scratch deck. And `harness.preflight()` refuses to run unless the deck path contains
+`decks-e2e`, because a stale server on the API port once meant a run dragged boards around in
+a real deck. Stop a run with ⌃C or by its pid; never `pkill` by pattern, since other worktrees
+run their own suites on other ports.
+
+If the machine is loaded (another suite, a render), fewer jobs is the fix for timeouts that
+are not failures.
 
 ## What is covered, and what is not
 
@@ -72,9 +95,9 @@ machine — simultaneously slow and flaky. `harness.open()` waits for every boar
 
 Removing the sleeps once took the suite from 189s to 33s, and the stricter waits found a bug
 they had been hiding: a revision preview was loading without its stylesheet, so the time
-machine showed the right *text* in an unstyled document. `resetStage` in `harness.mjs` is
-the one place that still breaks this rule — it sleeps 400ms twice per check, measured at
-810ms every time, which is about 8s of a run.
+machine showed the right *text* in an unstyled document. After something that may move the
+camera (a Fit, a `1`, a stage card), wait with `rest(page)` — for the move to begin and end
+and the pages it brought to mount — rather than a pause as long as the longest glide.
 
 ## Writing one
 
@@ -99,14 +122,14 @@ await browser.close();
 - `ask(page, text)` / `idle(page)` — one agent turn. Never swallow the timeout: a prompt
   typed into a still-running turn truncates it, and the truncated reply reads as a bug.
 - A check that creates boards must play them (`board.play`) and delete them in a `finally`.
-  A board nobody holds is not on the canvas, and a leftover fixture changes what the next
-  check sees.
+  A board nobody holds is not on the canvas, and a leftover fixture changes what the rest
+  of the same check sees.
 
 ## Things that have bitten
 
-- **State leaks between checks.** They share one server and one focused agent, so the
-  runner puts the whole deck back in play before each file. Clicking a rail item plays that
-  board *and only that board*.
+- **State leaks between checks.** They used to share one server and one deck, and five
+  checks failed only in full order. Each check now has its own; within a check, clicking a
+  rail item still plays that board *and only that board*.
 - **Assertions that cannot fail.** `say("...", x !== undefined)` and `ok || true` both
   shipped here. If a check has never failed, break the code and watch it fail.
 - **`src` changes before the document does.** Waiting for an iframe's URL and then reading

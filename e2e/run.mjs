@@ -1,20 +1,24 @@
 /**
- * Run the browser checks against a throwaway deck.
+ * Run the browser checks, each against a throwaway deck of its own.
  *
  * The fixture is a copy of `example/`, so the checks run on the same boards a reader can
- * open with `npm run dev:example` — and never on a deck somebody is working in. The copy
- * lives under the system temp directory with `decks-e2e` in its name, which is what
+ * open with `npm run dev:example` — and never on a deck somebody is working in. Every check
+ * gets a fresh copy and a fresh server on it, so no check sees what another one did, and a
+ * pool of workers (`DECKS_E2E_JOBS`, 4 by default) runs several at once. The copies live
+ * under the system temp directory with `decks-e2e` in their names, which is what
  * `harness.preflight()` insists on before any check is allowed to write to a board.
  *
  *   npm run test:e2e                  # everything that does not need a model
  *   DECKS_E2E_AGENT=1 npm run test:e2e   # including the checks that prompt an agent
  *   DECKS_E2E_MODEL="muse-spark" DECKS_E2E_AGENT=1 npm run test:e2e   # …on a named model
  *   npm run test:e2e -- keys gestures    # just these
+ *   DECKS_E2E_JOBS=1 npm run test:e2e    # one at a time (still a deck each)
  */
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -207,261 +211,158 @@ const selected = CHECKS.filter((check) => {
 });
 const skipped = CHECKS.filter((check) => !selected.includes(check));
 
+
 /*
- * The ports, from the environment.
+ * The ports, from the environment: the **base** pair, from which every worker's own pair is
+ * derived (`API + 2·i`, `WEB + 2·i`), so worker 0 is on exactly the ports a run always used.
  *
  * They were fixed at 4329/4328, which was fine while there was one deck on a machine and
  * is not now: a suite cannot run while a live deck holds the port, and `strictPort` makes
- * that a failure rather than a quiet move. `harness.mjs` has always read
- * `DECKS_E2E_API`/`DECKS_E2E_WEB`; this passes the same numbers to the server it spawns,
- * so the two halves finally agree.
+ * that a failure rather than a quiet move. `harness.mjs` reads `DECKS_E2E_API`/`DECKS_E2E_WEB`;
+ * each check is handed its own worker's pair in those two, so the two halves always agree.
  */
-const API_PORT = Number(process.env.DECKS_E2E_API_PORT ?? 4329);
-const WEB_PORT = Number(process.env.DECKS_E2E_WEB_PORT ?? 4328);
-const API_URL = `http://127.0.0.1:${API_PORT}`;
-const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
+const API_BASE = Number(process.env.DECKS_E2E_API_PORT ?? 4329);
+const WEB_BASE = Number(process.env.DECKS_E2E_WEB_PORT ?? 4328);
+/*
+ * How many checks run at once. Each worker is a Vite of its own and, per check, a server of its
+ * own on a deck of its own and the check's own browser — so nothing a check does is seen by
+ * another, and the order they run in stops mattering. Four is what this machine (10 cores) runs
+ * without checks timing out; `DECKS_E2E_JOBS=1` is the old one-after-another, still isolated.
+ */
+const JOBS = Math.max(1, Math.min(Number(process.env.DECKS_E2E_JOBS ?? 4) || 1, selected.length || 1));
+const urls = (i) => ({ api: `http://127.0.0.1:${API_BASE + 2 * i}`, web: `http://127.0.0.1:${WEB_BASE + 2 * i}`, apiPort: API_BASE + 2 * i, webPort: WEB_BASE + 2 * i });
 
 /*
- * Into *this* process's environment as well, and that is not belt-and-braces.
- *
- * `harness.mjs` reads `DECKS_E2E_API` at import time, and this file imports it for
- * `resetStage` — which it then calls before every check. Passing the URLs only to the
- * server it spawns and the checks it forks left the runner's own copy of the harness
- * pointed at the default port, so `resetStage` played the fixture's boards onto whatever
- * deck happened to be on 4329. On a machine with a live Decks open, that is somebody's
- * real canvas: every board in their deck, put in play by a test run, and no check ever saw
- * a board because the plays landed somewhere else entirely.
- *
- * Set before the import below is used, so there is one source of these two numbers.
+ * Set in this process too, for worker 0, so anything that reads the harness's defaults here reads
+ * a port this run owns rather than 4329 — which on a machine with a live Decks open is somebody's
+ * real canvas. (The runner used to call `resetStage()` with no argument and played the fixture's
+ * boards onto that deck; it passes its worker's URL explicitly now, and this stays as the floor.)
  */
-process.env.DECKS_E2E_API = API_URL;
-process.env.DECKS_E2E_WEB = WEB_URL;
-
-/*
- * Imported here rather than at the top, because `harness.mjs` reads those two variables
- * once, at *its* import time. A static import runs before the two lines above, so the
- * runner's own copy of the harness would still hold the defaults — which is the bug those
- * lines were written to fix, arriving one statement too late to fix it.
- */
+process.env.DECKS_E2E_API = urls(0).api;
+process.env.DECKS_E2E_WEB = urls(0).web;
 const { resetStage } = await import("./harness.mjs");
 
-const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
-cpSync(join(root, "example"), data, { recursive: true });
-// `example/decks/lib` is generated and gitignored, so a fresh clone has to be given one
-// or every board in the fixture loads without its stylesheet. The server would now write
-// it on open (`App.refreshLib`), but the fixture is built before the server starts and a
-// check that fails because of a race in its own setup is the worst kind to debug.
-cpSync(join(root, "runtime", "lib"), join(data, "decks", "lib"), { recursive: true });
-// Revisions and agent transcripts from whoever ran the example deck last are not fixture.
-rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });
-rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
-/*
- * And the signed-in accounts, for the same reason as the two above.
- *
- * `example/claude-accounts` is gitignored — this repo has a commit named "Never commit the
- * signed-in Claude accounts" — but it exists on any machine where somebody has logged in
- * from the example deck, and the copy above takes `example/` wholesale. So the fixture
- * arrived with a real account and an `active` symlink already in it, and `accounts.mjs`
- * failed three assertions about what a *fresh install* looks like. That check has since been
- * cut, but the removal stays and does not depend on it: a fixture carrying somebody's real
- * credentials is wrong whether or not anything asserts against it.
- */
-rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
+/** Every process group this run started, so every way out can take them with it. */
+const groups = new Set();
+/** Every deck copy, for the same reason. */
+const decks = new Set();
+let stopping = false;
 
-/*
- * `e2e:serve`, not `dev`: the same two processes with the server's `--watch` taken off.
- *
- * A suite's server must not reload under the suite. `npm run dev` runs the server with
- * `node --watch`, so saving a source file part-way through a run restarts it — every open
- * socket drops, and whichever check happened to be starting waits thirty seconds for a
- * board to mount and fails with nothing run. It reads as that check being broken: on
- * 21 September 2026 it was `mirror.mjs`, which passes on its own in thirteen seconds, and
- * before that `working-marks.mjs` and `panel-steady.mjs` the same way. Vite still watches
- * the browser half, which reloads a module rather than dropping the connection.
- */
-const server = spawn("npm", ["run", "e2e:serve"], {
-	cwd: root,
+const stopAll = () => {
+	stopping = true;
 	/*
-	 * Its own process group, which is what makes `stop()` able to reach the whole tree.
-	 *
-	 * `npm run dev` is a wrapper around `concurrently` around two more processes. Killing
-	 * the pid we hold kills the wrapper and orphans the rest, and the orphans keep the
-	 * ports — so the next run finds a stranger's deck on 4329 and refuses. With this, one
-	 * negative pid addresses all of them.
+	 * SIGKILL, to the group. `npm run dev:web` is npm around Vite around esbuild, and each server is
+	 * spawned `detached`, which is what gives its whole tree one negative pid. Only the groups this
+	 * run started — never a pattern: other worktrees run their own suites on other ports.
 	 */
-	detached: true,
-	env: {
-		...process.env,
-		DECKS_DATA_DIR: data,
-		DECKS_E2E_MARKER: "decks-e2e",
-		DECKS_PORT: String(API_PORT),
-		DECKS_WEB_PORT: String(WEB_PORT),
-		// The checks talk to these, and a mismatch between what is spawned and what is
-		// polled is a 90-second wait ending in "did not come up".
-		DECKS_E2E_API: API_URL,
-		DECKS_E2E_WEB: WEB_URL,
-	},
-	stdio: ["ignore", "pipe", "pipe"],
-});
-const log = [];
-for (const stream of [server.stdout, server.stderr]) {
-	stream.setEncoding("utf8");
-	stream.on("data", (chunk) => log.push(chunk));
-}
-
-let exitCode = 0;
-let stopped = false;
-const stop = () => {
-	if (stopped) return;
-	stopped = true;
-	/*
-	 * SIGKILL, and not SIGTERM first.
-	 *
-	 * `npm run dev` is a wrapper around `concurrently` around two more processes, and
-	 * `concurrently` does not pass a TERM down to children it started through npm scripts —
-	 * so a polite stop left the server and Vite holding their ports, and the *next* run
-	 * found "something else is already serving" and refused. Correctly, and confusingly,
-	 * because the something else was the previous run.
-	 *
-	 * There is nothing here worth shutting down gracefully: a dev server over a throwaway
-	 * fixture, and the fixture is deleted on the next line. `detached` above is what gives
-	 * the whole tree one negative pid to send this to.
-	 */
-	try {
-		process.kill(-server.pid, "SIGKILL");
-	} catch {
+	for (const pid of groups) {
 		try {
-			server.kill("SIGKILL");
+			process.kill(-pid, "SIGKILL");
 		} catch {
 			/* already gone */
 		}
 	}
-	rmSync(data, { recursive: true, force: true });
+	groups.clear();
+	for (const deck of decks) rmSync(deck, { recursive: true, force: true });
+	decks.clear();
 };
-
-/*
- * Every way this process can end, the tree goes with it.
- *
- * `finally` covers a thrown check and `SIGINT` covers a ⌃C, but neither covers being killed
- * from outside — which is how an interrupted run left a server behind and then broke the
- * next two runs before anyone worked out why.
- */
-process.on("exit", stop);
+process.on("exit", stopAll);
 process.on("SIGINT", () => {
-	stop();
+	stopAll();
 	process.exit(130);
 });
 process.on("SIGTERM", () => {
-	stop();
+	stopAll();
 	process.exit(143);
 });
 
-try {
-	await waitForServer();
-	/*
-	 * Confirm it is *our* server.
-	 *
-	 * `npm run dev` fails to bind a port that is already taken, and the checks then talk
-	 * happily to whatever else is listening — which is how a run once went against a
-	 * scratch deck and reported a parity result that meant nothing. The ports are fixed, so
-	 * this is not a rare accident; it is what happens whenever a dev server is left up.
-	 */
-	const serving = await deckPath();
-	if (!serving || !serving.startsWith(data)) {
-		throw new Error(
-			`something else is already serving ${API_URL} — it has ${serving ?? "an unknown deck"} open, not the fixture at ${data}. Stop it and run again.`,
-		);
-	}
-	console.log(`fixture: ${data}`);
-	console.log(`running ${selected.length} check(s)${skipped.length ? `, skipping ${skipped.length}` : ""}`);
-	// Said out loud, because it is the difference between a free run and a metered one.
-	if (withAgent) console.log(`model: ${process.env.DECKS_E2E_MODEL || "whatever the runtime defaults to"}`);
-	console.log("");
-
-	let pass = 0;
-	let fail = 0;
-	const failedFiles = [];
-	const started = Date.now();
-
-	for (const check of selected) {
-		const at = Date.now();
-		// Every check gets the whole deck on the canvas. They share one server and one
-		// focused agent, so without this a check that narrows the canvas — clicking a rail
-		// item plays that board and only that board — silently changes what the next one
-		// sees, and it fails for a reason that has nothing to do with what it tests.
-		await resetStage();
-		const result = await runCheck(join(here, "checks", check.file));
-		const counts = tally(result.output);
-		pass += counts.pass;
-		fail += counts.fail;
-		const seconds = ((Date.now() - at) / 1000).toFixed(1);
-		const status = counts.fail === 0 && result.code === 0 ? "ok" : "FAILED";
-		console.log(`${status === "ok" ? "  ok  " : "  FAIL"} ${check.file.padEnd(20)} ${String(counts.pass).padStart(2)} passed  ${seconds}s`);
-		/*
-		 * Every line, on request — because "10 passed" is not the same as "10 things were
-		 * true", and the difference matters most in the five files that need a model: an
-		 * assertion whose subject never appeared can pass by reading `undefined`, and the
-		 * only way to see that is to read what it printed beside itself.
-		 */
-		if (process.env.DECKS_E2E_VERBOSE === "1") {
-			for (const line of result.output.split("\n")) {
-				if (/^(PASS|FAIL)/.test(line)) console.log(`        ${line}`);
-			}
-		}
-		if (status !== "ok") {
-			failedFiles.push(check.file);
-			for (const line of result.output.split("\n")) {
-				if (/^FAIL/.test(line)) console.log(`        ${line}`);
-			}
-			// Printed whenever the process failed, not only when nothing ran: a script that
-			// throws after three passing checks looked like a silent failure.
-			if (result.code !== 0) {
-				console.log(`        exited ${result.code} — tail of its output:`);
-				for (const line of result.output.trim().split("\n").slice(-8)) console.log(`        ${line}`);
-			}
-		}
-	}
-
-	/*
-	 * Failed *files* as well as failed assertions, and that is not decoration.
-	 *
-	 * A check that dies on its first import prints no assertion at all, so it contributes
-	 * nothing to either count — the summary said "256 passed, 0 failed" with one whole file
-	 * red, and a run read as green until somebody looked at the lines above. The exit code
-	 * was always right; the sentence at the end was the part that lied.
-	 */
-	console.log(
-		`\n${pass} passed, ${fail} failed assertions, ${failedFiles.length} failed check(s), ${((Date.now() - started) / 1000).toFixed(0)}s`,
-	);
-	for (const check of skipped) {
-		const why = wanted.length > 0 ? "not selected" : "needs a model; set DECKS_E2E_AGENT=1";
-		console.log(`  skipped ${check.file} (${why})`);
-	}
-	if (fail > 0 || failedFiles.length > 0) exitCode = 1;
-} catch (error) {
-	console.error(`e2e: ${error.message}`);
-	console.error(log.join("").split("\n").slice(-15).join("\n"));
-	exitCode = 1;
-} finally {
-	stop();
-}
-process.exit(exitCode);
-
-async function waitForServer() {
-	const deadline = Date.now() + 90000;
-	while (Date.now() < deadline) {
-		if (server.exitCode !== null) throw new Error(`dev server exited with ${server.exitCode}`);
-		const api = await ping(`${API_URL}/api/deck`);
-		const web = await ping(`${WEB_URL}/`);
-		if (api && web) return;
-		await new Promise((resolve) => setTimeout(resolve, 400));
-	}
-	throw new Error("dev server did not come up within 90s");
+/** A fresh copy of `example/`, as a check may find it: its own, so whatever it writes is gone after it. */
+function freshDeck() {
+	const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
+	decks.add(data);
+	cpSync(join(root, "example"), data, { recursive: true });
+	// `example/decks/lib` is generated and gitignored, so a fresh clone has to be given one or every
+	// board in the fixture loads without its stylesheet.
+	cpSync(join(root, "runtime", "lib"), join(data, "decks", "lib"), { recursive: true });
+	// Revisions and agent transcripts from whoever ran the example deck last are not fixture.
+	rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });
+	rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
+	// Nor are the signed-in accounts: `example/claude-accounts` is gitignored but exists on any machine
+	// where somebody has logged in from the example deck, and a fixture must not carry real credentials.
+	rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
+	return data;
 }
 
-async function deckPath() {
+/** Anything at all listening on a port — not only something that answers HTTP. */
+function listening(port) {
+	return new Promise((done) => {
+		const probe = connect({ host: "127.0.0.1", port });
+		probe.once("connect", () => {
+			probe.destroy();
+			done(true);
+		});
+		probe.once("error", () => done(false));
+		probe.setTimeout(1000, () => {
+			probe.destroy();
+			done(false);
+		});
+	});
+}
+
+function launch(command, args, { cwd, env, log }) {
+	const child = spawn(command, args, { cwd, detached: true, env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+	groups.add(child.pid);
+	for (const stream of [child.stdout, child.stderr]) {
+		stream.setEncoding("utf8");
+		stream.on("data", (chunk) => {
+			log.push(chunk);
+			if (log.length > 400) log.splice(0, log.length - 200);
+		});
+	}
+	child.closed = new Promise((done) => child.once("close", done));
+	return child;
+}
+
+/** Stop a tree politely, so the server closes the Chromium it may have opened, then for certain. */
+async function halt(child, grace = 2500) {
+	if (!groups.has(child.pid)) return;
 	try {
-		const response = await fetch(`${API_URL}/api/deck`);
+		process.kill(-child.pid, "SIGTERM");
+	} catch {
+		/* already gone */
+	}
+	const timer = new Promise((done) => setTimeout(done, grace));
+	await Promise.race([child.closed, timer]);
+	try {
+		process.kill(-child.pid, "SIGKILL");
+	} catch {
+		/* gone, which is what we wanted */
+	}
+	await Promise.race([child.closed, new Promise((done) => setTimeout(done, 1000))]);
+	groups.delete(child.pid);
+}
+
+async function until(what, test, { timeout, child, every = 100 }) {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		if (child && child.exitCode !== null) throw new Error(`${what} exited with ${child.exitCode}`);
+		if (await test()) return;
+		await new Promise((resolve) => setTimeout(resolve, every));
+	}
+	throw new Error(`${what} did not come up within ${Math.round(timeout / 1000)}s`);
+}
+
+async function ping(url) {
+	try {
+		return (await fetch(url)).ok;
+	} catch {
+		return false;
+	}
+}
+
+async function deckPath(api) {
+	try {
+		const response = await fetch(`${api}/api/deck`);
 		if (!response.ok) return undefined;
 		return (await response.json())?.deck?.path;
 	} catch {
@@ -469,30 +370,59 @@ async function deckPath() {
 	}
 }
 
-async function ping(url) {
-	try {
-		const response = await fetch(url);
-		return response.ok;
-	} catch {
-		return false;
-	}
+/*
+ * One worker's Vite, for the whole run. `npm run dev:web` with the worker's ports: it proxies
+ * `/api` and `/ws` to `DECKS_PORT`, which is where each of the worker's servers comes up in turn.
+ * Kept across checks because what it costs is the first page's transforms, and a Vite that
+ * survives does those once.
+ */
+async function startWeb(i) {
+	const { web, apiPort, webPort } = urls(i);
+	const log = [];
+	const child = launch("npm", ["run", "dev:web"], { cwd: root, log, env: { DECKS_PORT: String(apiPort), DECKS_WEB_PORT: String(webPort) } });
+	await until(`vite on ${web}`, () => ping(`${web}/`), { timeout: 90000, child, every: 200 });
+	return { child, log };
 }
 
-function runCheck(file) {
+/*
+ * One check's server: `node --import tsx src/index.ts`, the server package's `start` script,
+ * spawned directly rather than through two layers of npm, on a deck nobody else has seen.
+ *
+ * `start`, not `dev`: a suite's server must not reload under the suite. `dev` runs it with
+ * `node --watch`, so saving a source file part-way through a run restarted it and whichever
+ * check was starting waited thirty seconds for a board and failed with nothing run.
+ */
+async function startServer(i, data) {
+	const { api, web, apiPort, webPort } = urls(i);
+	const log = [];
+	const child = launch(process.execPath, ["--import", "tsx", "src/index.ts"], {
+		cwd: join(root, "apps", "server"),
+		log,
+		/*
+		 * With the `.bin` folders on PATH, as `npm run` would have put them, so whatever the server
+		 * spawns by name is found the same way it is under `npm run e2e:serve`.
+		 */
+		env: { PATH: [join(root, "apps", "server", "node_modules", ".bin"), join(root, "node_modules", ".bin"), process.env.PATH].join(delimiter), DECKS_DATA_DIR: data, DECKS_E2E_MARKER: "decks-e2e", DECKS_PORT: String(apiPort), DECKS_WEB_PORT: String(webPort), DECKS_E2E_API: api, DECKS_E2E_WEB: web },
+	});
+	await until(`server on ${api}`, async () => (await deckPath(api)) !== undefined, { timeout: 60000, child, every: 100 });
+	/*
+	 * Confirm it is *our* server: a server that failed to bind leaves the checks talking happily
+	 * to whatever else is listening — which is how a run once went against a scratch deck.
+	 */
+	const serving = await deckPath(api);
+	if (!serving || !serving.startsWith(data)) throw new Error(`something else is serving ${api} — it has ${serving ?? "an unknown deck"} open, not ${data}`);
+	return { child, log };
+}
+
+function runCheck(file, { api, web }) {
 	return new Promise((done) => {
 		const child = spawn(process.execPath, [file], {
 			cwd: root,
-			/*
-			 * The URLs go to the checks too, not only to the server.
-			 *
-			 * `harness.mjs` reads them, and every check goes through `open()` — so without
-			 * them here a run on non-default ports spawns the fixture correctly and then has
-			 * twenty-five checks navigate to whatever is on 4328, which is either nothing or,
-			 * worse, somebody's live deck.
-			 */
-			env: { ...process.env, DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: API_URL, DECKS_E2E_WEB: WEB_URL },
+			// The worker's URLs, which every `open()` and `deckState()` in the harness reads.
+			env: { ...process.env, DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: api, DECKS_E2E_WEB: web },
 			stdio: ["ignore", "pipe", "pipe"],
 		});
+		groups.add(child.pid);
 		let output = "";
 		for (const stream of [child.stdout, child.stderr]) {
 			stream.setEncoding("utf8");
@@ -500,7 +430,10 @@ function runCheck(file) {
 				output += chunk;
 			});
 		}
-		child.on("close", (code) => done({ code, output }));
+		child.on("close", (code) => {
+			groups.delete(child.pid);
+			done({ code, output });
+		});
 	});
 }
 
@@ -511,3 +444,139 @@ function tally(output) {
 		fail: lines.filter((line) => line.startsWith("FAIL")).length,
 	};
 }
+
+/*
+ * Longest first, by the last run's times on this machine, so the pool does not end on one worker
+ * running `panel.mjs` while three sit idle. Only the schedule; the report is in `CHECKS` order.
+ */
+const TIMINGS = join(root, "node_modules", ".cache", "decks-e2e", "timings.json");
+function readTimings() {
+	try {
+		return JSON.parse(readFileSync(TIMINGS, "utf8"));
+	} catch {
+		return {};
+	}
+}
+function writeTimings(timings) {
+	try {
+		mkdirSync(dirname(TIMINGS), { recursive: true });
+		writeFileSync(TIMINGS, JSON.stringify(timings, null, "\t"));
+	} catch {
+		/* a cache, nothing more */
+	}
+}
+
+let exitCode = 0;
+const webs = [];
+try {
+	/*
+	 * Refuse before starting anything if any port this run would use is taken. A taken port is
+	 * another suite, a live deck or a stale run, and none of them are ours to talk to or to stop.
+	 */
+	for (let i = 0; i < JOBS; i++) {
+		const { apiPort, webPort } = urls(i);
+		for (const port of [apiPort, webPort]) {
+			if (await listening(port)) throw new Error(`something else is already serving 127.0.0.1:${port}. Stop it, or move this run with DECKS_E2E_API_PORT/DECKS_E2E_WEB_PORT (workers use base + 2·i) or fewer DECKS_E2E_JOBS.`);
+		}
+	}
+	console.log(`running ${selected.length} check(s)${skipped.length ? `, skipping ${skipped.length}` : ""} on ${JOBS} worker(s), each check on its own fixture deck (ports ${API_BASE}/${WEB_BASE} + 2·i)`);
+	// Said out loud, because it is the difference between a free run and a metered one.
+	if (withAgent) console.log(`model: ${process.env.DECKS_E2E_MODEL || "whatever the runtime defaults to"}`);
+	console.log("");
+
+	const started = Date.now();
+	/*
+	 * Vite 0 first and on its own: it is the one that may re-optimize dependencies into
+	 * `node_modules/.vite`, and the others should find that done rather than write it at once.
+	 */
+	webs[0] = await startWeb(0);
+	await ping(`${urls(0).web}/src/index.tsx`);
+	await Promise.all(Array.from({ length: JOBS - 1 }, async (_, k) => (webs[k + 1] = await startWeb(k + 1))));
+
+	const timings = readTimings();
+	const queue = [...selected].sort((a, b) => (timings[b.file] ?? 30) - (timings[a.file] ?? 30));
+	const results = new Array(selected.length);
+	let printed = 0;
+	let pass = 0;
+	let fail = 0;
+	const failedFiles = [];
+	let setup = 0;
+
+	const report = () => {
+		while (printed < selected.length && results[printed]) {
+			const check = selected[printed];
+			const { result, seconds } = results[printed];
+			const counts = tally(result.output);
+			pass += counts.pass;
+			fail += counts.fail;
+			const ok = counts.fail === 0 && result.code === 0;
+			console.log(`${ok ? "  ok  " : "  FAIL"} ${check.file.padEnd(20)} ${String(counts.pass).padStart(2)} passed  ${seconds}s`);
+			/*
+			 * Every line, on request — because "10 passed" is not the same as "10 things were true":
+			 * an assertion whose subject never appeared can pass by reading `undefined`.
+			 */
+			if (process.env.DECKS_E2E_VERBOSE === "1") {
+				for (const line of result.output.split("\n")) if (/^(PASS|FAIL)/.test(line)) console.log(`        ${line}`);
+			}
+			if (!ok) {
+				failedFiles.push(check.file);
+				for (const line of result.output.split("\n")) if (/^FAIL/.test(line)) console.log(`        ${line}`);
+				// Whenever the process failed, not only when nothing ran: a script that throws after
+				// three passing checks looked like a silent failure.
+				if (result.code !== 0) {
+					console.log(`        exited ${result.code} — tail of its output:`);
+					for (const line of result.output.trim().split("\n").slice(-(Number(process.env.DECKS_E2E_TAIL) || 8))) console.log(`        ${line}`);
+				}
+			}
+			printed += 1;
+		}
+	};
+
+	const worker = async (i) => {
+		while (queue.length > 0 && !stopping) {
+			const check = queue.shift();
+			const index = selected.indexOf(check);
+			const data = freshDeck();
+			let server;
+			let result;
+			let at = Date.now();
+			try {
+				server = await startServer(i, data);
+				setup += Date.now() - at;
+				at = Date.now();
+				// The whole deck on the canvas, where the fixture puts it: most checks expect to see every board.
+				await resetStage(urls(i).api);
+				result = await runCheck(join(here, "checks", check.file), urls(i));
+			} catch (error) {
+				const tail = server?.log.join("").trim().split("\n").slice(-10).join("\n") ?? "";
+				result = { code: 1, output: `FAIL  runner — ${error.message}\n${tail}` };
+			}
+			const seconds = ((Date.now() - at) / 1000).toFixed(1);
+			timings[check.file] = Number(seconds);
+			if (server) await halt(server.child);
+			rmSync(data, { recursive: true, force: true });
+			decks.delete(data);
+			results[index] = { result, seconds };
+			report();
+		}
+	};
+	await Promise.all(Array.from({ length: JOBS }, (_, i) => worker(i)));
+	writeTimings(timings);
+
+	/*
+	 * Failed *files* as well as failed assertions: a check that dies on its first import prints no
+	 * assertion at all, and the summary once said "256 passed, 0 failed" with one whole file red.
+	 */
+	console.log(`\n${pass} passed, ${fail} failed assertions, ${failedFiles.length} failed check(s), ${((Date.now() - started) / 1000).toFixed(0)}s on ${JOBS} worker(s)`);
+	console.log(`  (a fresh deck and server per check: ${(setup / 1000 / Math.max(1, selected.length)).toFixed(1)}s each, before its time above)`);
+	if (wanted.length > 0 && skipped.length > 0) console.log(`  skipped ${skipped.length} not selected`);
+	else for (const check of skipped) console.log(`  skipped ${check.file} (needs a model; set DECKS_E2E_AGENT=1)`);
+	if (fail > 0 || failedFiles.length > 0) exitCode = 1;
+} catch (error) {
+	console.error(`e2e: ${error.message}`);
+	for (const web of webs) if (web) console.error(web.log.join("").split("\n").slice(-10).join("\n"));
+	exitCode = 1;
+} finally {
+	stopAll();
+}
+process.exit(exitCode);
