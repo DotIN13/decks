@@ -174,6 +174,7 @@ const CHECKS = [
 	{ file: "bent-arrows.mjs", needsAgent: false },
 	{ file: "item-pill.mjs", needsAgent: false },
 	{ file: "engine-slide.mjs", needsAgent: false },
+	{ file: "zoom-out-pictures.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/*

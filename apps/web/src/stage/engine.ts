@@ -75,7 +75,8 @@ export class StageEngine {
 	private viewState = { hidden: [] as string[], mute: [] as string[], holes: [] as string[], scrolls: {} as Record<string, number> };
 	private viewKey = "";
 	private fontsAsked = new Set<string>();
-	private picturesAsked = new Map<string, { url: string; tries: number }>();
+	/** Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own address for it, and stand-in retries. */
+	private picturesAsked = new Map<string, { url: string; source: string; tries: number }>();
 	private iconsAsked = new Set<string>();
 	private fetching = 0;
 	private lifted = new Set<string>();
@@ -426,13 +427,15 @@ export class StageEngine {
 			this.boardIndex = new BoxIndex(boards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
 			this.writeHits();
 		}
-		// A board whose picture changed is asked for again.
+		/*
+		 * A board whose picture changed is asked for again, against the board's own address: the one
+		 * fetched carries a size (`&w=480`), and comparing that one forgot every server picture on each
+		 * change of the boards, such as the zoom crossing the live zoom, so each board went white until
+		 * it was fetched again. The old picture stays drawn until the new one replaces it.
+		 */
 		for (const board of boards) {
 			const asked = this.picturesAsked.get(`board:${board.path}`);
-			if (asked && board.picture && asked.url !== board.picture) {
-				this.picturesAsked.delete(`board:${board.path}`);
-				this.page.forgetPicture(`board:${board.path}`);
-			}
+			if (asked && board.picture && asked.source !== board.picture) this.picturesAsked.delete(`board:${board.path}`);
 		}
 		this.wantBoardPictures();
 		this.draw();
@@ -503,7 +506,7 @@ export class StageEngine {
 			const need = board.w * this.camera.zoom * dpr;
 			const size = /^(https?:|\/)/.test(board.picture) ? (SMALL.find((one) => one >= need) ?? 0) : 0;
 			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}` : board.picture;
-			this.fetchPicture(key, url, true);
+			this.fetchPicture(key, url, true, board.picture);
 		}
 	}
 
@@ -520,8 +523,8 @@ export class StageEngine {
 		}
 	}
 
-	private fetchPicture(key: string, url: string, board: boolean): void {
-		const asked = this.picturesAsked.get(key) ?? { url, tries: 0 };
+	private fetchPicture(key: string, url: string, board: boolean, source = url): void {
+		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0 };
 		this.picturesAsked.set(key, asked);
 		if (this.fetching >= FETCHES) {
 			setTimeout(() => {
@@ -545,7 +548,7 @@ export class StageEngine {
 					this.post({ type: "picture", url: key, bitmap: forWorker }, [forWorker]);
 					this.laidOut();
 				}
-				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board), STAND_IN_RETRY_MS);
+				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source), STAND_IN_RETRY_MS);
 				this.draw();
 			})
 			.catch(() => {
