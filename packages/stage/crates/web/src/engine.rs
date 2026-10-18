@@ -713,11 +713,47 @@ impl Worker {
 		self.discard_stale();
 	}
 
+	/// Where an item paints, to mark the tiles it is on. A stroked path with no fill and nothing in
+	/// it (an arrow, a line) is each of its segments grown by its stroke, so a long elbow arrow marks
+	/// the tiles its three lines cross rather than every tile in its box; anything else, its extent.
+	fn ink_areas(&self, id: &str) -> Vec<Rect> {
+		let extent = || self.scene.extent_of(id).into_iter().collect::<Vec<_>>();
+		let Some((r, i)) = self.scene.find(id) else { return extent() };
+		let root = &self.scene.roots[r];
+		let item = &root.tree.items[i as usize];
+		let filled = item.get("fill").is_some_and(|f| !f.is_null());
+		if item.kind() != "path" || filled || !item.children.is_empty() {
+			return extent();
+		}
+		let rect = root.placed[i as usize].rect;
+		let Some(path) = stage_paint::mesh::geometry_path(item, rect.w, rect.h) else { return extent() };
+		let Some(segments) = stage_paint::mesh::segment_bounds(&path, 256) else { return extent() };
+		let m = &root.world[i as usize];
+		let (ox, oy) = m.apply(0.0, 0.0);
+		let reach = |(x, y): (f64, f64)| (x - ox).hypot(y - oy);
+		let k = reach(m.apply(1.0, 0.0)).max(reach(m.apply(0.0, 1.0)));
+		// Half the stroke reaches either side of the line; a mitred corner up to twice its width.
+		let pad = item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0) * 2.0 * k + 1.0;
+		let out: Vec<Rect> = segments
+			.into_iter()
+			.map(|[x0, y0, x1, y1]| {
+				let corners = [m.apply(x0, y0), m.apply(x1, y0), m.apply(x0, y1), m.apply(x1, y1)];
+				let (mut a, mut b) = ((f64::INFINITY, f64::INFINITY), (f64::NEG_INFINITY, f64::NEG_INFINITY));
+				for (x, y) in corners {
+					a = (a.0.min(x), a.1.min(y));
+					b = (b.0.max(x), b.1.max(y));
+				}
+				Rect { x: a.0 - pad, y: a.1 - pad, w: b.0 - a.0 + pad * 2.0, h: b.1 - a.1 + pad * 2.0 }
+			})
+			.collect();
+		if out.is_empty() { extent() } else { out }
+	}
+
 	/// The page lifted these items: paint their tiles without them.
 	pub fn lift(&mut self, ids: &[String]) {
 		self.version += 1;
 		for id in ids {
-			if let Some(area) = self.scene.extent_of(id) {
+			for area in self.ink_areas(id) {
 				self.grid.invalidate(&area);
 			}
 			self.lifted.insert(id.clone());
@@ -731,9 +767,9 @@ impl Worker {
 		let mut area: Option<Rect> = None;
 		for id in ids {
 			self.lifted.remove(id);
-			if let Some(extent) = self.scene.extent_of(id) {
-				self.grid.invalidate(&extent);
-				area = Some(area.map_or(extent, |a| a.union(&extent)));
+			for ink in self.ink_areas(id) {
+				self.grid.invalidate(&ink);
+				area = Some(area.map_or(ink, |a| a.union(&ink)));
 			}
 		}
 		self.discard_stale();
@@ -778,10 +814,15 @@ impl Worker {
 		let scale = scale_for(camera.zoom * dpr, moving);
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
-		let wanted = Grid::covering(&view, scale, if moving { 0 } else { 1 });
+		/*
+		 * While the page holds items lifted (a drag), only what is on screen is painted: the margin and
+		 * the overview are not seen until a pan or a zoom out, and wait, still marked, for the drop.
+		 */
+		let holding = !self.lifted.is_empty();
+		let wanted = Grid::covering(&view, scale, if moving || holding { 0 } else { 1 });
 		let mut keys = self.grid.to_paint(&wanted, limit);
 		// Once the view has all it needs, the overview: the whole stage at one small scale.
-		if keys.len() < limit {
+		if keys.len() < limit && !holding {
 			if let Some(extent) = self.scene.extent() {
 				let overview = Grid::covering(&extent, overview_scale(&extent), 0);
 				keys.extend(self.grid.to_paint(&overview, limit - keys.len()));
@@ -852,6 +893,51 @@ mod tests {
 	}
 
 	#[test]
+	fn a_lifted_arrow_repaints_only_the_tiles_its_line_crosses_on_screen() {
+		// The arrow measured on the tile-repaint board: 7,804 by 6,045 px of box, three thin lines.
+		let stage = r##"{"version":"2.6","children":[
+			{"type":"rectangle","id":"b","x":9400,"y":9000,"width":120,"height":70,"fill":"#f5a34c"},
+			{"type":"path","id":"long","x":1598,"y":2992,"width":7804,"height":6045,"viewBox":[0,0,7804,6045],"stroke":"#4a5568","strokeWidth":2,
+				"geometry":"M7802 6043 L3902 6043 L3902 8 L2 8 M12 2 L2 8 L12 14","metadata":{"type":"decks.arrow","from":"b","to":[1600,3000],"route":"elbow"}}
+		]}"##;
+		let mut page = Page::new(stage, false, "s").unwrap();
+		let mut worker = Worker::new(stage, false).unwrap();
+		let cam = Camera { x: 8200.0, y: 8350.0, zoom: 1.0 };
+		let mut gpu = Recording::default();
+		let mut paint_all = |worker: &mut Worker| {
+			let mut keys = Vec::new();
+			loop {
+				let batch = worker.next(cam, 1.0, 1400.0, 900.0, false, 64);
+				if batch.is_empty() {
+					return keys;
+				}
+				for (key, list) in batch {
+					let t = page.tile_texture(key);
+					gpu.texture(t, TextureKind::Color, TILE, TILE, None);
+					gpu.draw(Target::Texture(t), &list);
+					worker.sent(key);
+					keys.push(key);
+				}
+			}
+		};
+		paint_all(&mut worker);
+		worker.lift(&["long".into()]);
+		let lifted = paint_all(&mut worker);
+		// The bottom line runs along tile row 17 (y 8704 to 9216): three of its tiles are on screen.
+		assert_eq!(lifted.iter().map(|k| (k.x, k.y)).collect::<Vec<_>>().len(), 3, "{lifted:?}");
+		assert!(lifted.iter().all(|k| k.y == 17 && (16..=18).contains(&k.x)), "{lifted:?}");
+		// Put down: those three with it again, the one margin tile it crosses, and the overview's tiles
+		// (2,048 px here) along its three lines: 8, where its box covers 20. Then nothing more.
+		worker.drop_items(&["long".into()]);
+		let dropped = paint_all(&mut worker);
+		let screen: Vec<(i32, i32)> = dropped.iter().filter(|k| k.scale() == 1.0).map(|k| (k.x, k.y)).collect();
+		let overview: std::collections::BTreeSet<(i32, i32)> = dropped.iter().filter(|k| k.scale() != 1.0).map(|k| (k.x, k.y)).collect();
+		assert!(screen.len() == 4 && screen.iter().all(|&(x, y)| y == 17 && (15..=18).contains(&x)), "{screen:?}");
+		assert_eq!(overview, [(0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (2, 4), (3, 4), (4, 4)].into_iter().collect(), "{dropped:?}");
+		assert!(paint_all(&mut worker).is_empty());
+	}
+
+	#[test]
 	fn page_and_worker_stay_in_step() {
 		let mut page = Page::new(STAGE, false, "s").unwrap();
 		let mut worker = Worker::new(STAGE, false).unwrap();
@@ -882,10 +968,11 @@ mod tests {
 		// No boards placed yet: only tiles.
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
-		// A drag: the worker repaints without the square (its tile and the overview's), the page draws it.
+		// A drag: the worker repaints its tile on screen without the square, and the page draws it. The
+		// overview's tile waits for the drop: nothing shows it during a drag.
 		page.lift(&["a".into()]);
 		worker.lift(&["a".into()]);
-		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 2);
+		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 1);
 		// The drag's moves are the page's alone: the worker paints nothing.
 		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 0, "moving a lifted item paints no tiles");

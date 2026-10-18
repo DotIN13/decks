@@ -27,6 +27,20 @@ pub fn geometry_path(item: &Item, w: f64, h: f64) -> Option<BezPath> {
 	Some(path)
 }
 
+/// Each segment's bounds in the path's own units, `[x0, y0, x1, y1]`: where a stroke along it can
+/// paint, before the stroke's own width. `None` past `most` segments, when one box is as good.
+pub fn segment_bounds(path: &BezPath, most: usize) -> Option<Vec<[f64; 4]>> {
+	let mut out = Vec::new();
+	for seg in path.segments() {
+		if out.len() == most {
+			return None;
+		}
+		let b = kurbo::ParamCurveExtrema::bounding_box(&seg);
+		out.push([b.x0, b.y0, b.x1, b.y1]);
+	}
+	Some(out)
+}
+
 pub fn rounded_rect_path(w: f64, h: f64, r: f64) -> BezPath {
 	RoundedRect::new(0.0, 0.0, w, h, r.min(w.min(h) / 2.0).max(0.0)).to_path(0.01)
 }

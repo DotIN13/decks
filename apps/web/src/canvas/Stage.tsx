@@ -899,6 +899,7 @@ export function Stage(props: {
 	 * changed nothing), the drag's offset and the resized outline still go, back onto the drawing.
 	 */
 	const settleGesture = () => {
+		penLayer.settle();
 		const at = drawnGeneration;
 		setTimeout(() => {
 			if (drawnGeneration !== at) return;
@@ -4122,6 +4123,7 @@ export function Stage(props: {
 				if (carrying)
 					batch(() => {
 						penMoveBy(selected, offset.dx, offset.dy, into, slot);
+						if (selected.length) settleGesture();
 						moveBoards(boardPicks(), offset.dx, offset.dy);
 						setBoardDrag(undefined);
 					});

@@ -225,7 +225,23 @@ export class StageEngine {
 		this.draw();
 		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
 		if (this.boardsOnly && !this.carriedCount) this.landBoards();
+		// A gesture let go: the drawing that answers it is here, so what it lifted goes back into the tiles.
+		if (this.settling) {
+			this.settling = false;
+			if (this.lifted.size && !this.boardsOnly) this.post({ type: "drop", ids: [...this.lifted] });
+		}
 	}
+
+	/**
+	 * A gesture was let go and its edit sent (`Stage.tsx`, `settleGesture`). When the drawing that
+	 * answers it arrives, what it lifted is put down: painted back into the worker's tiles, and drawn
+	 * here until they come (`landed`). Without this an item stayed lifted after its drop, drawn by
+	 * the page every frame and holding the worker to the screen's tiles. A new gesture first cancels it.
+	 */
+	settle(): void {
+		this.settling = true;
+	}
+	private settling = false;
 
 
 	private whole(doc: PenDocument | undefined): void {
@@ -566,6 +582,7 @@ export class StageEngine {
 			// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
 			this.shown = JSON.stringify(this.withOutlines(moving));
 			this.boardsOnly = false;
+			this.settling = false;
 			this.lift(this.page.setPreview(this.shown));
 		} else {
 			this.shown = undefined;
