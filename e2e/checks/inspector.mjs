@@ -23,7 +23,7 @@
 // about boards rather than about the protocol, and it lives in its own package.
 import { BOX_CLASSES } from "@decks/board-kit";
 import { rmSync } from "node:fs";
-import { boardPath, differ, open, rangeOfAttr, read, say, socket, still, write, boardEdge } from "../harness.mjs";
+import { boardPath, differ, open, rangeOfAttr, read, say, socket, still, write, boardEdge, deckState } from "../harness.mjs";
 
 /**
  * Wait until the file *says* something, rather than until it differs.
@@ -113,6 +113,13 @@ write(fixture, original);
 
 // A board nobody has in play is not on the canvas, so the fixture is played as well as
 // written — and only it, so the camera lands close enough for the frame to be live.
+//
+// Played once the server has the file. It learns of a new file from its watcher, and a play
+// for a path it does not know yet is dropped: sent straight after the write, the play lost
+// that race every time, the fixture never reached the canvas and the wait below timed out.
+for (let i = 0; i < 100 && !(await deckState()).boards.some((board) => board.path === path); i++) {
+	await new Promise((resolve) => setTimeout(resolve, 100));
+}
 const link = await socket();
 link.send({ type: "board.play", path });
 await new Promise((resolve) => setTimeout(resolve, 500));
