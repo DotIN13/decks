@@ -205,6 +205,7 @@ export class StageEngine {
 		 * until the stage puts the gesture down.
 		 */
 		this.page.setPreview("null");
+		this.shown = undefined;
 		if (!doc) this.whole(undefined);
 		else if (!before) this.whole(doc);
 		else {
@@ -222,7 +223,10 @@ export class StageEngine {
 		this.laidOut();
 		this.needFonts();
 		this.draw();
+		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
+		if (this.boardsOnly && !this.carriedCount) this.landBoards();
 	}
+
 
 	private whole(doc: PenDocument | undefined): void {
 		const text = doc ? JSON.stringify(doc) : EMPTY;
@@ -370,10 +374,52 @@ export class StageEngine {
 	}
 
 	private carriedBy = { dx: 0, dy: 0 };
+	/**
+	 * The boards a drag carries, and how far. An arrow with an end on one bends with it: the gesture's
+	 * preview is sent again with the boards where they are now, or, when only boards are dragged, a
+	 * preview of nothing but them. Such a drag's arrows stay as last routed when it is let go, until
+	 * the server's drawing comes back routed to where the boards landed (`setDoc`), or two seconds pass.
+	 */
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
 		this.carriedBy = { dx: offset.dx, dy: offset.dy };
-		this.page?.carry(JSON.stringify(paths), offset.dx, offset.dy);
+		this.carriedCount = paths.length;
+		if (!this.page) return;
+		this.page.carry(JSON.stringify(paths), offset.dx, offset.dy);
+		if (paths.length) {
+			if (this.shown === undefined) {
+				this.boardsOnly = true;
+				clearTimeout(this.boardsLanding);
+			}
+			this.lift(this.page.setPreview(this.shown ?? "[]"));
+			this.laidOut();
+		} else if (this.boardsOnly && this.shown === undefined) {
+			clearTimeout(this.boardsLanding);
+			this.boardsLanding = setTimeout(() => this.landBoards(), 2000);
+		}
 		this.draw();
+	}
+	/** The preview a gesture on drawn items is showing, as sent to the engine; undefined when none. */
+	private shown: string | undefined;
+	private carriedCount = 0;
+	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
+	private boardsOnly = false;
+	private boardsLanding: ReturnType<typeof setTimeout> | undefined;
+	private landBoards(): void {
+		clearTimeout(this.boardsLanding);
+		if (!this.boardsOnly) return;
+		this.boardsOnly = false;
+		if (this.shown !== undefined || !this.page) return;
+		this.page.setPreview("null");
+		if (this.lifted.size) this.post({ type: "drop", ids: [...this.lifted] });
+		this.laidOut();
+		this.draw();
+	}
+	/** Arrows `setPreview` newly lifted (its answer): the worker leaves them out of its tiles too. */
+	private lift(answer: string): void {
+		const bent = JSON.parse(answer) as string[];
+		if (!bent.length) return;
+		for (const id of bent) this.lifted.add(id);
+		this.post({ type: "lift", ids: bent });
 	}
 
 	/** Fetch the pictures of the boards in view (and of live ones kept ready), at the size they are shown. */
@@ -518,12 +564,12 @@ export class StageEngine {
 			const first = moving.values().next().value;
 			this.offset = { dx: first?.dx ?? 0, dy: first?.dy ?? 0 };
 			// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
-			const bent = JSON.parse(this.page.setPreview(JSON.stringify(this.withOutlines(moving)))) as string[];
-			if (bent.length) {
-				for (const id of bent) this.lifted.add(id);
-				this.post({ type: "lift", ids: bent });
-			}
+			this.shown = JSON.stringify(this.withOutlines(moving));
+			this.boardsOnly = false;
+			this.lift(this.page.setPreview(this.shown));
 		} else {
+			this.shown = undefined;
+			this.boardsOnly = false;
 			this.page.setPreview("null");
 			this.offset = { dx: 0, dy: 0 };
 			if (this.lifted.size) this.post({ type: "drop", ids: [...this.lifted] });

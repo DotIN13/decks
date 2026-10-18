@@ -4,7 +4,8 @@
  * Two boxes joined by an arrow; one is dragged (the engine's own preview, as a drag sends it). The
  * arrow is routed again in the page's engine from where the box is at each step (`arrows.rs`, pen's
  * router ported) and lifted with the box, so the worker paints its tiles once without them and then
- * not again however long the drag. Letting go leaves the arrow to the saved drawing.
+ * not again however long the drag. Letting go leaves the arrow to the saved drawing. A board dragged
+ * alone bends the arrows ending on it the same way.
  */
 import { open, resetStage, say, settle, socket } from "../harness.mjs";
 
@@ -81,6 +82,36 @@ await page.evaluate(() => globalThis.__decksRust.preview(undefined));
 await settle(page, 400);
 const back = await placed("bend-ab");
 say("letting go puts the saved arrow back", back && Math.abs(back.h - routed.h) < 0.5, JSON.stringify(back));
+
+// --- a board dragged alone: an arrow ending on it bends with it -------------------------------------
+const board = await page.evaluate(() => window.__decksBoards()[0]);
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "path", id: "bend-board", geometry: "M0 0 L1 1", metadata: { type: "decks.arrow", from: "bend-b", to: board.path, route: "elbow" } } }] });
+const saved = await until(() => placed("bend-board"));
+say("an arrow from a box to a board is routed by the server", !!saved, JSON.stringify(saved));
+const carry = (path, dy) => page.evaluate(([path, dy]) => new Promise((done) => {
+	globalThis.__decksRust.carry(path ? [path] : [], { dx: 0, dy });
+	requestAnimationFrame(() => done());
+}), [board.path, dy].map((v, i) => (i === 0 ? (dy === null ? "" : v) : (v ?? 0))));
+// The first step lifts the arrow, which paints the tiles under it once without it.
+await carry(board.path, 20);
+await settle(page, 600);
+await page.evaluate(() => (globalThis.__tilesPainted = 0));
+const carried = [];
+for (let dy = 40; dy <= 400; dy += 40) {
+	await carry(board.path, dy);
+	carried.push(await placed("bend-board"));
+}
+const liftedNow = await page.evaluate(() => globalThis.__decksRust.lifted.has("bend-board"));
+say("dragging the board alone lifts the arrow and routes it at every step", liftedNow && carried.every((box, i) => i === 0 || JSON.stringify(box) !== JSON.stringify(carried[i - 1])), JSON.stringify([saved, carried.at(-1)]));
+await settle(page, 600);
+const boardPainted = await page.evaluate(() => globalThis.__tilesPainted);
+say("…and the steps after the lift paint no tile", boardPainted === 0, `${boardPainted} tiles`);
+await carry(null, null);
+const kept = await placed("bend-board");
+say("let go, the arrow stays where it was routed until the drawing comes back", JSON.stringify(kept) === JSON.stringify(carried.at(-1)), JSON.stringify(kept));
+await settle(page, 2400);
+const after = await placed("bend-board");
+say("with no drawing back in two seconds, it returns to the saved arrow", JSON.stringify(after) === JSON.stringify(saved), JSON.stringify(after));
 
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 await engine.dispose();
