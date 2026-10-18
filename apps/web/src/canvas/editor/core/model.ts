@@ -76,8 +76,11 @@ export type EditorState = {
 	radius?: { id: string; radius: number; done?: true; until?: number } | undefined;
 	marquee?: Corners | undefined;
 	guides: readonly Guide[];
-	/** The frame a drag would drop into (`null` the stage) and the slot among its children. */
-	drop: { into?: string | null | undefined; slot?: { index: number; line: Rect } | undefined };
+	/**
+	 * The frame a drag would drop into (`null` the stage) and the slot among its children; and the
+	 * other places it could drop near the pointer, drawn dashed (`drop.ts`, `nearDrops`).
+	 */
+	drop: { into?: string | null | undefined; slot?: { index: number; line: Rect } | undefined; near?: { slots: readonly Rect[]; frames: readonly Rect[] } | undefined };
 	/** What an arrow's end would join, lit up, and the sides it can keep to there. */
 	joins: readonly Rect[];
 	sides: readonly SideHintBox[];

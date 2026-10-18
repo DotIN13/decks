@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.ts";
-import { dropSlot, frameAt, frameUnder } from "./drop.ts";
+import { boxDistance, dropSlot, frameAt, frameUnder, nearDrops } from "./drop.ts";
 
 const column = () => fakeScene([
 	{ id: "col", type: "frame", layout: "vertical", padding: 12, box: { x: 0, y: 0, w: 200, h: 300 } },
@@ -38,4 +38,29 @@ test("a carried child is skipped when asking which side, but still counted in th
 	const scene = column();
 	// Carrying b: just under a's middle is before c, which is index 2 counting b.
 	assert.equal(dropSlot(scene, "col", { x: 50, y: 70 }, ["b"])!.index, 2);
+});
+
+test("near the pointer, every slot whose line passes within reach shows, but not the one the drop takes", () => {
+	const scene = column();
+	// Carrying c, its place folds away: three slots are left (before a, between a and b, after b), and the drop takes the middle one.
+	const near = nearDrops(scene, { x: 100, y: 57 }, ["c"], 60, { into: "col", line: { x: 12, y: 57, w: 176, h: 0 } });
+	assert.deepEqual(near.slots, [
+		{ x: 12, y: 7, w: 176, h: 0 },
+		{ x: 12, y: 107, w: 176, h: 0 },
+	]);
+	// The frame with no layout is 300 away: out of reach; within 320 it shows, dashed, whole.
+	assert.deepEqual(near.frames, []);
+	assert.deepEqual(nearDrops(scene, { x: 100, y: 57 }, ["c"], 320).frames, [{ x: 400, y: 0, w: 200, h: 200 }]);
+});
+
+test("a carried frame offers no slots of its own, and the frame a drop goes into is not drawn dashed", () => {
+	const scene = column();
+	assert.deepEqual(nearDrops(scene, { x: 100, y: 57 }, ["col"], 1000).slots, []);
+	assert.deepEqual(nearDrops(scene, { x: 450, y: 50 }, ["a"], 10, { into: "free" }).frames, []);
+	assert.deepEqual(nearDrops(scene, { x: 450, y: 50 }, ["a"], 10).frames, [{ x: 400, y: 0, w: 200, h: 200 }]);
+});
+
+test("a point's distance from a box is 0 inside it and straight-line outside", () => {
+	assert.equal(boxDistance({ x: 5, y: 5 }, { x: 0, y: 0, w: 10, h: 10 }), 0);
+	assert.equal(boxDistance({ x: 13, y: 14 }, { x: 0, y: 0, w: 10, h: 10 }), 5);
 });

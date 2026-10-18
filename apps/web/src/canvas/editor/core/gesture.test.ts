@@ -151,6 +151,14 @@ test("over a frame that stacks its children, a drag aims at the slot between the
 	const over = steps[1]!.state.drop;
 	assert.equal(over.into, "col");
 	assert.deepEqual(over.slot, { index: 1, line: { x: 8, y: 364, w: 284, h: 0 } });
+	// The column's other two slots are within 200 screen pixels of the pointer at 100%: dashed beside the solid one.
+	assert.deepEqual(over.near?.slots, [
+		{ x: 8, y: 313, w: 284, h: 0 },
+		{ x: 8, y: 415, w: 284, h: 0 },
+	]);
+	// Zoomed in to 500%, 200 screen pixels is 40 on the stage, and the slots 49 and 53 away drop out.
+	const close = run(initialState("edit"), [{ type: "press-canvas", ...at(50, 40) }, { type: "move", ...at(150, 362) }], ctx({ zoom: 5 }));
+	assert.equal(close.steps[1]!.state.drop.near, undefined);
 	assert.deepEqual(steps[2]!.ops, [{ op: "move", id: "a", parent: "col", index: 1, box: { x1: 110, y1: 342, x2: 210, y2: 392 } }]);
 	assert.deepEqual(steps[2]!.state.drop, {});
 });

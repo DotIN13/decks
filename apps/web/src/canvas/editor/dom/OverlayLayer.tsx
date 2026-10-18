@@ -167,6 +167,20 @@ export function OverlayLayer(
 					/>
 				)}
 			</Show>
+			{/*
+			 * The other places it could land near the pointer, dashed: each slot of a frame that
+			 * arranges its children, and each frame that does not (`core/drop.ts`, `nearDrops`).
+			 */}
+			<For each={o().slotFrames}>
+				{(box) => <div class="pen-slot-frame" style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "outline-width": `${1.5 / props.zoom}px` }} />}
+			</For>
+			<Show when={o().slots.length > 0}>
+				<svg class="pen-slots" width="1" height="1" overflow="visible" aria-hidden="true">
+					<For each={o().slots}>
+						{(line) => <line x1={line.x} y1={line.y} x2={line.x + line.w} y2={line.y + line.h} stroke-width={1.5 / props.zoom} stroke-dasharray={`${4 / props.zoom} ${3 / props.zoom}`} />}
+					</For>
+				</svg>
+			</Show>
 			{/* And where in it: the boundary between two of its children that the drop would take. */}
 			<Show when={o().insert}>
 				{(line) => {

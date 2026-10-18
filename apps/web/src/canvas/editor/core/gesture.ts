@@ -16,7 +16,7 @@
 import { isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } from "@decks/pen";
 import { snapMove, type Guide } from "../../pen/snap.ts";
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
-import { dropSlot, frameUnder } from "./drop.ts";
+import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
 import type { BoardBox, EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
 import { boardMoves, copyOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
@@ -311,7 +311,13 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 		}
 		effects.push({ do: "ghost-show", over, client: p.client, gap: 12 }, { do: "composer", client: p.client, ids, boards }, { do: "panned" });
 	}
-	const drop = { into: onto, slot: onto ? dropSlot(scene, onto, now, ids) : undefined };
+	const slot = onto ? dropSlot(scene, onto, now, ids) : undefined;
+	/*
+	 * The other places it could go, near the pointer: dashed, round the one it would take. Not for
+	 * boards alone, which drop nowhere, nor with ⌘ or Ctrl, which keeps what is carried where it is.
+	 */
+	const near = ids.length && (g.touch || !isFree(p.mods)) ? nearDrops(scene, now, ids, NEAR_PX / ctx.zoom, { into: onto, line: slot?.line }) : undefined;
+	const drop = { into: onto, slot, ...(near && (near.slots.length || near.frames.length) ? { near } : {}) };
 	// A finger carries the boards picked up as they are now; a mouse the ones it picked up.
 	const carried = g.touch ? state.selection.boards : boards;
 	let next: EditorState = { ...state, gesture: { ...g, kind: "move", offset }, drop };

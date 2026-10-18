@@ -2709,6 +2709,8 @@ export function Stage(props: {
 		gripHidden: gripHidden(editor.drag(), !!editor.resize()),
 		drop: dropBox(),
 		insert: editor.dropSlot()?.line,
+		slots: editor.dropNear()?.slots ?? [],
+		slotFrames: editor.dropNear()?.frames ?? [],
 		joins: editor.joins(),
 		sides: editor.sides(),
 		guides: editor.guides(),

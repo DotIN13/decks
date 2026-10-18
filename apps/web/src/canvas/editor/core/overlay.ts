@@ -87,6 +87,12 @@ export type Overlay = {
 	drop?: DropBox;
 	/** Where in the frame the drop lands: a line along the boundary it would take. */
 	insert?: Rect;
+	/**
+	 * The other places a drag could land near the pointer (`drop.ts`, `nearDrops`): slot lines in
+	 * frames that arrange their children, and frames that do not, both dashed.
+	 */
+	slots: readonly Rect[];
+	slotFrames: readonly Rect[];
 	joins: readonly Box[];
 	sides: readonly SideHint[];
 	guides: readonly Guide[];
@@ -398,6 +404,7 @@ export type OverlayInput = OutlineInput &
 		lineOf: (id: string, node: PenNode) => { top: number; height: number };
 		dropInto?: string | null | undefined;
 		dropAt?: { line: Rect } | undefined;
+		dropNear?: { slots: readonly Rect[]; frames: readonly Rect[] } | undefined;
 		radiusDrag?: { id: string; radius: number } | undefined;
 		joins: readonly Box[];
 		sides: readonly SideHint[];
@@ -433,6 +440,8 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 		gripHidden: gripHidden(input.pointerDrag, input.resizing),
 		drop: dropBox(input.dropInto, scene),
 		insert: input.dropAt?.line,
+		slots: input.dropNear?.slots ?? [],
+		slotFrames: input.dropNear?.frames ?? [],
 		joins: input.joins,
 		sides: input.sides,
 		guides: input.guides,

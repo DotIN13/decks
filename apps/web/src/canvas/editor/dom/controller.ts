@@ -193,6 +193,7 @@ export function createEditor(host: EditorHost) {
 		guides: part((now) => now.guides),
 		dropInto: part((now) => now.drop.into),
 		dropSlot: part((now) => now.drop.slot),
+		dropNear: part((now) => now.drop.near),
 		joins: part((now) => now.joins),
 		sides: part((now) => now.sides),
 		draft: part((now) => now.draft),
