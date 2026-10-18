@@ -1031,6 +1031,7 @@ dependencies = [
  "serde_json",
  "stage-doc",
  "stage-paint",
+ "stage-render",
  "stage-scene",
  "stage-text",
  "wgpu",
@@ -1047,6 +1048,15 @@ dependencies = [
  "stage-doc",
  "stage-scene",
  "stage-text",
+]
+
+[[package]]
+name = "stage-render"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "naga",
+ "stage-paint",
 ]
 
 [[package]]

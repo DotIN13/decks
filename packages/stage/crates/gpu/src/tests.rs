@@ -1,8 +1,9 @@
 //! Drawn on this machine's graphics card and read back. Set `STAGE_SHOTS` to a folder to keep the
-//! pictures; set `STAGE_FIXTURES` to a folder of `.pen` files to draw real stages too.
+//! pictures; set `STAGE_FIXTURES` to a folder of `.pen` files to draw real stages too. Every
+//! picture is drawn a second time on a device held to WebGL 2's limits and must come out the same.
 
 use super::*;
-use stage_paint::list::Affine;
+use stage_paint::list::{Affine, Align, Clip, Color, Paint, Shape};
 use stage_paint::painter::{Context, paint_area};
 use stage_paint::tiles::{Grid, TILE};
 
@@ -37,9 +38,12 @@ fn solid(c: [f32; 4]) -> Paint {
 	Paint::Solid(Color::straight(c, 1.0))
 }
 
-#[test]
-fn shapes_have_exact_soft_edges() {
-	let Some(mut g) = gpu() else { return };
+/// A device with only what every WebGL 2 context promises: no storage buffers, 2048-texel textures.
+fn webgl2_gpu() -> Option<Gpu> {
+	pollster::block_on(headless_with(wgpu::Limits::downlevel_webgl2_defaults()))
+}
+
+fn draw_shapes(g: &mut Gpu) -> Vec<u8> {
 	g.texture(1, TextureKind::Color, 200, 100, None);
 	let mut list = DrawList::new(Color::TRANSPARENT);
 	let rect = Shape { w: 100.0, h: 60.0, radii: [20.0; 4], ellipse: false };
@@ -47,7 +51,13 @@ fn shapes_have_exact_soft_edges() {
 	let circle = Shape { w: 60.0, h: 60.0, radii: [0.0; 4], ellipse: true };
 	list.push(Op::Shape { shape: circle, transform: Affine::translate(130.0, 20.0), paint: solid([0.0, 0.0, 1.0, 1.0]), stroke: Some((4.0, Align::Inside)) });
 	g.draw(Target::Texture(1), &list);
-	let p = g.read(1).unwrap();
+	g.read(1).unwrap()
+}
+
+#[test]
+fn shapes_have_exact_soft_edges() {
+	let Some(mut g) = gpu() else { return };
+	let p = draw_shapes(&mut g);
 	save("shapes", &p, 200, 100);
 	assert_eq!(px(&p, 200, 60, 50), [255, 0, 0, 255], "inside the rectangle");
 	assert_eq!(px(&p, 200, 12, 22)[3], 0, "outside its rounded corner");
@@ -58,9 +68,7 @@ fn shapes_have_exact_soft_edges() {
 	assert_eq!(px(&p, 200, 131, 50), [0, 0, 255, 255], "on the ring");
 }
 
-#[test]
-fn layers_clips_gradients_shadows_and_meshes() {
-	let Some(mut g) = gpu() else { return };
+fn draw_effects(g: &mut Gpu) -> Vec<u8> {
 	g.texture(1, TextureKind::Color, 200, 200, None);
 	let mut list = DrawList::new(Color([1.0, 1.0, 1.0, 1.0]));
 	let sq = |w: f32| Shape { w, h: w, radii: [0.0; 4], ellipse: false };
@@ -81,7 +89,13 @@ fn layers_clips_gradients_shadows_and_meshes() {
 	list.push(Op::Shape { shape: sq(50.0), transform: Affine::translate(115.0, 115.0), paint: solid([1.0, 1.0, 1.0, 1.0]), stroke: None });
 	list.push(Op::Mesh { vertices: vec![[0.0, 0.0], [20.0, 0.0], [0.0, 20.0]], indices: vec![0, 1, 2], transform: Affine::translate(170.0, 170.0), paint: solid([1.0, 0.5, 0.0, 1.0]) });
 	g.draw(Target::Texture(1), &list);
-	let p = g.read(1).unwrap();
+	g.read(1).unwrap()
+}
+
+#[test]
+fn layers_clips_gradients_shadows_and_meshes() {
+	let Some(mut g) = gpu() else { return };
+	let p = draw_effects(&mut g);
 	save("effects", &p, 200, 200);
 	let one = px(&p, 200, 20, 30)[0];
 	let both = px(&p, 200, 40, 30)[0];
@@ -97,21 +111,21 @@ fn layers_clips_gradients_shadows_and_meshes() {
 	assert_eq!(px(&p, 200, 172, 172), [255, 128, 0, 255], "the triangle");
 }
 
-/// Real stages, drawn as tiles the way the worker will, and stitched into one picture.
-#[test]
-fn real_stages_draw() {
-	let Some(mut g) = gpu() else { return };
-	let Ok(root) = std::env::var("STAGE_FIXTURES") else { return };
-	let names = ["herobrine", "rotary", "md-edit-test"];
-	for name in names {
+const STAGES: [&str; 3] = ["herobrine", "rotary", "md-edit-test"];
+
+/// A real stage from `STAGE_FIXTURES`, drawn as tiles the way the worker will and stitched into one
+/// picture: its pixels, width and height.
+fn draw_stage(g: &mut Gpu, name: &str) -> Option<(Vec<u8>, u32, u32)> {
+	let root = std::env::var("STAGE_FIXTURES").ok()?;
+	{
 		let path = format!("{root}/{name}/stage.pen");
-		let Ok(text) = std::fs::read_to_string(&path) else { continue };
+		let text = std::fs::read_to_string(&path).ok()?;
 		let doc = stage_doc::Document::parse(&text).unwrap();
 		let words = fonts();
 		let scene = stage_scene::Scene::new(&doc, false, &words);
 		let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
 		// The drawing only: boards are drawn by the page, not into tiles.
-		let Some(extent) = scene.roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b)) else { continue };
+		let extent = scene.roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b))?;
 		// The whole stage in at most 2048 pixels across.
 		let scale = (2048.0 / extent.w.max(extent.h)).min(1.0);
 		let (w, h) = ((extent.w * scale).ceil() as u32, (extent.h * scale).ceil() as u32);
@@ -127,7 +141,7 @@ fn real_stages_draw() {
 			let list = paint_area(&ctx, key.area(), key.scale(), Color([0.98, 0.98, 0.98, 1.0]));
 			let texture = grid.painted(*key, 1);
 			g.texture(texture, TextureKind::Color, TILE, TILE, None);
-			stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+			stage_paint::flush_glyphs(&mut atlas.borrow_mut(), g);
 			g.draw(Target::Texture(texture), &list);
 			let tile = g.read(texture).unwrap();
 			// Copy the tile into the stitched picture.
@@ -147,7 +161,18 @@ fn real_stages_draw() {
 			}
 		}
 		eprintln!("{name}: {} tiles in {:.0} ms (with read-back)", todo.len(), started.elapsed().as_secs_f64() * 1000.0);
-		save(&format!("stage-{name}"), &out, w, h);
+		Some((out, w, h))
+	}
+}
+
+/// Real stages, drawn as tiles the way the worker will, and stitched into one picture.
+#[test]
+fn real_stages_draw() {
+	let Some(mut g) = gpu() else { return };
+	for name in STAGES {
+		if let Some((out, w, h)) = draw_stage(&mut g, name) {
+			save(&format!("stage-{name}"), &out, w, h);
+		}
 	}
 }
 
@@ -165,13 +190,10 @@ fn fonts() -> stage_text::Text {
 	t
 }
 
-/// Words, upright at three sizes and turned, drawn and read back.
-#[test]
-fn words_are_crisp() {
-	let Some(mut g) = gpu() else { return };
+fn draw_words(g: &mut Gpu) -> Option<Vec<u8>> {
 	let words = fonts();
 	if !words.has_fonts() {
-		return;
+		return None;
 	}
 	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
 		{"type":"text","id":"a","x":10,"y":10,"content":"Crisp words at 14 px, 你好","fontSize":14},
@@ -189,22 +211,27 @@ fn words_are_crisp() {
 	let list = paint_area(&ctx, area, 2.0, Color([1.0, 1.0, 1.0, 1.0]));
 	assert!(list.ops.iter().filter(|o| matches!(o, Op::Glyphs { .. })).count() >= 5);
 	g.texture(1, TextureKind::Color, 800, 512, None);
-	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), g);
 	g.draw(Target::Texture(1), &list);
-	let p = g.read(1).unwrap();
+	g.read(1)
+}
+
+/// Words, upright at three sizes and turned, drawn and read back.
+#[test]
+fn words_are_crisp() {
+	let Some(mut g) = gpu() else { return };
+	let Some(p) = draw_words(&mut g) else { return };
 	save("words", &p, 800, 512);
 	// Somewhere in the first line there is solid ink, not only grey smears.
 	let darkest = (20..40).flat_map(|y| (20..300).map(move |x| (x, y))).map(|(x, y)| px(&p, 800, x, y)[0]).min().unwrap();
 	assert!(darkest < 60, "darkest {darkest}");
 }
 
-/// A markdown card with every kind of block, drawn as a note.
-#[test]
-fn cards_are_drawn() {
-	let Some(mut g) = gpu() else { return };
+/// A markdown card with every kind of block, drawn as a note: its pixels, width and height.
+fn draw_card(g: &mut Gpu) -> Option<(Vec<u8>, u32, u32)> {
 	let mut words = fonts();
 	if !words.has_fonts() {
-		return;
+		return None;
 	}
 	if let Ok(bytes) = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts/jetbrains-mono_latest_latin-400-normal.ttf")) {
 		words.add_font("JetBrains Mono", bytes, false);
@@ -224,7 +251,40 @@ fn cards_are_drawn() {
 	let list = paint_area(&ctx, area, 2.0, Color([0.96, 0.96, 0.96, 1.0]));
 	let (w, hh) = (800, ((h + 20.0) * 2.0) as u32);
 	g.texture(1, TextureKind::Color, w, hh, None);
-	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+	stage_paint::flush_glyphs(&mut atlas.borrow_mut(), g);
 	g.draw(Target::Texture(1), &list);
-	save("card", &g.read(1).unwrap(), w, hh);
+	Some((g.read(1)?, w, hh))
+}
+
+/// A markdown card with every kind of block, drawn as a note.
+#[test]
+fn cards_are_drawn() {
+	let Some(mut g) = gpu() else { return };
+	let Some((p, w, h)) = draw_card(&mut g) else { return };
+	save("card", &p, w, h);
+}
+
+/// Under WebGL 2's limits (no storage buffers at all) the pipelines build and every picture comes out
+/// byte for byte as on the full device.
+#[test]
+fn webgl2_limits_draw_the_same() {
+	let (Some(mut full), Some(mut small)) = (gpu(), webgl2_gpu()) else { return };
+	assert_eq!(small.device.limits().max_storage_buffers_per_shader_stage, 0);
+	let same = |name: &str, a: Option<Vec<u8>>, b: Option<Vec<u8>>| {
+		assert_eq!(a.is_some(), b.is_some(), "{name}");
+		if let (Some(a), Some(b)) = (a, b) {
+			assert_eq!(a.len(), b.len(), "{name}");
+			let differ = a.iter().zip(&b).filter(|(x, y)| x != y).count();
+			assert_eq!(differ, 0, "{name}: {differ} bytes differ");
+		}
+	};
+	same("shapes", Some(draw_shapes(&mut full)), Some(draw_shapes(&mut small)));
+	same("effects", Some(draw_effects(&mut full)), Some(draw_effects(&mut small)));
+	same("words", draw_words(&mut full), draw_words(&mut small));
+	same("card", draw_card(&mut full).map(|c| c.0), draw_card(&mut small).map(|c| c.0));
+	for name in STAGES {
+		same(name, draw_stage(&mut full, name).map(|s| s.0), draw_stage(&mut small, name).map(|s| s.0));
+	}
+	// Nothing was lost on the way: the small device reported no errors.
+	assert!(!small.lost());
 }

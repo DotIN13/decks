@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 stage-paint = { path = "../paint" }
+stage-render = { path = "../render" }
 wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "metal", "std"] }
 bytemuck = { version = "1", features = ["derive"] }
 

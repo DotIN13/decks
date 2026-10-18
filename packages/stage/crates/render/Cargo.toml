@@ -1,0 +1,14 @@
+[package]
+name = "stage-render"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+# What every backend shares and that knows no graphics API: batching a draw list, the paint and clip
+# table, what a device allows, and the one shader. No wgpu, no web-sys, no Metal.
+[dependencies]
+stage-paint = { path = "../paint" }
+bytemuck = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+naga = { version = "30", features = ["wgsl-in", "glsl-out", "msl-out"] }

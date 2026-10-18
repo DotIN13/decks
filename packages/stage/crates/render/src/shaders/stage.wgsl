@@ -2,11 +2,14 @@
 //
 // Shapes are instanced quads whose fragment works out how much of each pixel a rounded rectangle
 // or an ellipse covers, so edges are exact at any zoom and turn. Meshes (paths) are triangles the
-// painter cut, smoothed by multisampling. Both read their paint and clip from per-frame tables.
+// painter cut, smoothed by multisampling. Both read their paint and clip from a per-frame table: a
+// float texture of 64-byte records, four texels each, paints from 0 and clips from `clip_base`
+// (render/src/table.rs packs it). It is a texture and not storage buffers so WebGL 2 can run it.
 
 struct Frame {
 	size: vec2<f32>,
-	_pad: vec2<f32>,
+	clip_base: u32,
+	_pad: u32,
 };
 
 // A paint: [kind, ramp row, opacity, 0], colour, gradient geometry, picture uv.
@@ -27,11 +30,32 @@ struct ClipRec {
 };
 
 @group(0) @binding(0) var<uniform> frame: Frame;
-@group(0) @binding(1) var<storage, read> paints: array<PaintRec>;
-@group(0) @binding(2) var<storage, read> clips: array<ClipRec>;
-@group(0) @binding(3) var ramp: texture_2d<f32>;
-@group(0) @binding(4) var smooth_sampler: sampler;
+@group(0) @binding(1) var table: texture_2d<f32>;
+@group(0) @binding(2) var ramp: texture_2d<f32>;
+@group(0) @binding(3) var smooth_sampler: sampler;
 @group(1) @binding(0) var picture: texture_2d<f32>;
+
+// The `part`th texel of record `index`; the table is as wide as its texture.
+fn record(index: u32, part: u32) -> vec4<f32> {
+	let width = textureDimensions(table).x;
+	let texel = index * 4u + part;
+	return textureLoad(table, vec2<u32>(texel % width, texel / width), 0);
+}
+
+fn paint_rec(index: i32) -> PaintRec {
+	let i = u32(index);
+	return PaintRec(record(i, 0u), record(i, 1u), record(i, 2u), record(i, 3u));
+}
+
+fn clip_rec(index: i32) -> ClipRec {
+	let i = frame.clip_base + u32(index);
+	return ClipRec(record(i, 0u), record(i, 1u), record(i, 2u), record(i, 3u));
+}
+
+// A paint's colour only: shadows and glyphs need no more of it.
+fn paint_color(index: i32) -> vec4<f32> {
+	return record(u32(index), 1u);
+}
 
 struct Instance {
 	@location(0) xf0: vec4<f32>,   // a, b, c, d
@@ -154,7 +178,7 @@ fn shadow(p: vec2<f32>, size: vec2<f32>, sigma: f32, corner: f32) -> f32 {
 }
 
 fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
-	let rec = paints[index];
+	let rec = paint_rec(index);
 	let kind = rec.head.x;
 	if (kind == 0.0) {
 		return rec.color;
@@ -182,7 +206,7 @@ fn clip_at(index: i32, target_pos: vec2<f32>) -> f32 {
 	if (index < 0) {
 		return 1.0;
 	}
-	let c = clips[index];
+	let c = clip_rec(index);
 	let p = vec2<f32>(c.inv0.x * target_pos.x + c.inv0.z * target_pos.y + c.inv1.x, c.inv0.y * target_pos.x + c.inv0.w * target_pos.y + c.inv1.y);
 	let back_scale = max(length(c.inv0.xy), 1e-6);
 	let d = sd_shape(p, c.inv1.zw, c.radii, c.flags.x);
@@ -218,13 +242,13 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 		discard;
 	}
 	if (mode == 2.0) {
-		return paints[i32(in.extra.z)].color * coverage;
+		return paint_color(i32(in.extra.z)) * coverage;
 	}
 	if (mode == 4.0 || mode == 5.0) {
 		// A glyph: its part of the glyph texture, carried in `radii` as a uv rectangle.
 		let uv = mix(in.radii.xy, in.radii.zw, in.local / max(in.size, vec2<f32>(1e-6)));
 		let texel = textureSampleLevel(picture, smooth_sampler, uv, 0.0);
-		let color = paints[i32(in.extra.z)].color;
+		let color = paint_color(i32(in.extra.z));
 		if (mode == 4.0) {
 			return color * texel.r * coverage;
 		}
