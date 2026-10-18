@@ -16,9 +16,9 @@ import { batch, onCleanup, untrack } from "solid-js";
 import { setPenSheet } from "../../../state/pen-tools.ts";
 import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
-import type { Offset, PenTool, Pt, Rect } from "../core/model.ts";
+import type { BoardBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
 import type { BoardHandles, Outline, RadiusHandle } from "../core/overlay.ts";
-import { blockAt, pickAt, type Picked, type PickOptions } from "../core/pick.ts";
+import { blockAt, pickAt, pictureAt, type Picked, type PickOptions } from "../core/pick.ts";
 import type { Handle } from "../core/resize.ts";
 import type { SceneQuery } from "../core/scene.ts";
 import { pointerInput, type Editor } from "./controller.ts";
@@ -75,8 +75,11 @@ export type PointerHost = {
 	mode: () => "browse" | "edit";
 	tool: () => PenTool;
 	spaceHeld: () => boolean;
-	/** The board whose picture, with no node, is under a screen point (`Stage`'s `pictureUnder`). */
-	picture: (event: Client) => string | undefined;
+	/** The boards near a stage point, in file order (the stage's spatial index): candidates for the picture under it. */
+	boardsNear: (at: Pt) => readonly BoardBox[];
+	/** The boards that have a node of their own to take a press, and the board in focus. */
+	rendered: () => ReadonlySet<string>;
+	focus: () => string | undefined;
 	/** The item open for typing, whose blocks have no grip. */
 	typing: () => string | undefined;
 	linkAt: (at: Pt) => string | undefined;
@@ -137,6 +140,15 @@ export function createPointer(editor: Editor, host: PointerHost) {
 
 	const worldAt = host.worldAt;
 	const pickAtHere = (at: Pt, options?: PickOptions) => pickAt(host.scene, at, options);
+	/**
+	 * The board whose picture is under a point and that has no node of its own to take the press
+	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
+	 */
+	const pictureUnder = (event: Client): string | undefined => {
+		const at = worldAt(event);
+		// The spatial index finds the few boards near the point; core decides among them, in paint order.
+		return pictureAt(host.boardsNear(at), at, host.rendered(), host.focus());
+	};
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
 	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
@@ -385,7 +397,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			if (host.mode() !== "edit") return;
 			const hit = hoverAt ? pickAtHere(hoverAt) : undefined;
 			// A board with no node says nothing when the pointer is over it, so the stage asks.
-			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: !hit && hoverAt && hoverPoint ? host.picture(hoverPoint) : undefined });
+			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: !hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined });
 		});
 	};
 	onCleanup(() => {
@@ -575,7 +587,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
 		 * to pick a word in it opened the menu.
 		 */
-		if (event.target !== host.element() || host.picture(event)) return;
+		if (event.target !== host.element() || pictureUnder(event)) return;
 		if (performance.now() - pannedAt < PANNED_MS) return;
 		// A finger's two taps already opened it (`onPointerDown`); a touch screen's own dblclick is the same gesture.
 		if (host.menuOpen()) return;
@@ -607,7 +619,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			space: host.spaceHeld(),
 			fingers: host.fingers(),
 			onItem: () => !!pickAtHere(worldAt(event)),
-			picture: () => host.picture(event),
+			picture: () => pictureUnder(event),
 		});
 		switch (act.do) {
 			case "make":
@@ -668,6 +680,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		onArrowBend: dragArrowBend,
 		selectBoard,
 		boardView,
+		pictureUnder,
 	};
 }
 

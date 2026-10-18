@@ -5,6 +5,7 @@
 import type { Frame } from "@decks/pen";
 import type { Guide } from "../../pen/snap.ts";
 import type { Gesture } from "./gesture.ts";
+import type { TextSession } from "./text.ts";
 
 export type Pt = { x: number; y: number };
 /** A box on the stage, in stage pixels. */
@@ -93,4 +94,6 @@ export type EditorState = {
 	settling: readonly { generation: number; until: number }[];
 	/** The last press on a handle that did not move, for a handle's double-click. */
 	handleTap?: { key: string; at: number } | undefined;
+	/** The words open for typing, in the editor laid over their item (`dom/TextEditing.tsx`). */
+	text?: TextSession | undefined;
 };

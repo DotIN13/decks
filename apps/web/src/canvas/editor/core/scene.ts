@@ -5,7 +5,7 @@
  * Later the Rust engine can answer parts of it itself (picking, snapping, drop slots), and the
  * same core tests run against both.
  */
-import type { PenNode, Placed } from "@decks/pen";
+import type { PenDocument, PenNode, Placed } from "@decks/pen";
 import type { BoardBox, Pt, Rect } from "./model.ts";
 
 export interface SceneQuery {
@@ -57,4 +57,11 @@ export interface EngineSeam {
 	shows(mark: number): boolean;
 	/** The link of a card under a stage point. */
 	linkAt(point: Pt): string | undefined;
+	/** Leave out the words of these items, which the editor laid over them is showing; `undefined` draws them all again. */
+	muteText(ids: ReadonlySet<string> | undefined): void;
+	/**
+	 * Draw this document in place of the one the page has, until the next one is given: the words
+	 * being typed, laid out as typed (`dom/TextEditing.tsx`). Given the page's own, it goes back.
+	 */
+	showDoc(doc: PenDocument | undefined, base: string): void;
 }

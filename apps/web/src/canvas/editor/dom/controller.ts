@@ -17,6 +17,7 @@ import { feedSelection, keptSelection } from "../../../state/pen-tools.ts";
 import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
 import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
+import type { TextSession } from "../core/text.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 
@@ -63,6 +64,8 @@ export function createEditor(host: EditorHost) {
 
 	/** Resize steps waiting for the frame the sheet paints them in (`EngineSeam.mark`, `shows`). */
 	const frames: Array<{ mark: number; resize: ResizeBox }> = [];
+	/** What waits for the next frame the sheet shows: a deleted item's outline goes with the item. */
+	const afterFrame: Array<{ mark: number; run: () => void }> = [];
 	const timers = new Set<ReturnType<typeof setTimeout>>();
 	onCleanup(() => {
 		for (const timer of timers) clearTimeout(timer);
@@ -193,6 +196,9 @@ export function createEditor(host: EditorHost) {
 		draft: part((now) => now.draft),
 		endDraft: part((now) => now.endDraft),
 		route: part((now) => now.route),
+		/** The words open for typing (`dom/TextEditing.tsx`), and the item they are. */
+		text: part((now) => now.text),
+		typing: part((now) => now.text?.id),
 
 		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
 		carrying: createMemo(() => !!boardDrag() || !!boardResize() || !!ownDrag()),
@@ -232,6 +238,7 @@ export function createEditor(host: EditorHost) {
 		hover: (next: Partial<EditorState["hover"]>) =>
 			update((now) => ((Object.keys(next) as Array<keyof EditorState["hover"]>).every((key) => now.hover[key] === next[key]) ? now : { ...now, hover: { ...now.hover, ...next } })),
 		setOwnDrag: (at: EditorState["ownDrag"]) => update((now) => (now.ownDrag === at ? now : { ...now, ownDrag: at })),
+		setText: (text: TextSession | undefined) => update((now) => (now.text === text ? now : { ...now, text })),
 		setDraft: (draft: DraftBox | undefined) => update((now) => (now.draft === draft ? now : { ...now, draft })),
 		setHints: (hints: { joins?: readonly Rect[]; sides?: readonly SideHintBox[] }) => update((now) => ({ ...now, ...(hints.joins ? { joins: hints.joins } : {}), ...(hints.sides ? { sides: hints.sides } : {}) })),
 
@@ -251,7 +258,15 @@ export function createEditor(host: EditorHost) {
 			let painted: ResizeBox | undefined;
 			while (frames.length && host.engine.shows(frames[0]!.mark)) painted = frames.shift()!.resize;
 			if (painted && read().resize) dispatch({ type: "frame", resize: painted });
+			for (let k = afterFrame.length - 1; k >= 0; k--) {
+				const wait = afterFrame[k]!;
+				if (!host.engine.shows(wait.mark)) continue;
+				afterFrame.splice(k, 1);
+				wait.run();
+			}
 		},
+		/** Run this once the sheet shows a frame painted after `mark` (`EngineSeam.mark`). */
+		afterFrame: (mark: number, run: () => void) => afterFrame.push({ mark, run }),
 		carryPending: (pending: boolean) => dispatch({ type: "carry-pending", pending }),
 		openLink: effects.openLink,
 	};

@@ -8,14 +8,8 @@ import MessageSquare from "lucide-solid/icons/message-square";
 import Scan from "lucide-solid/icons/scan";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import Pencil from "lucide-solid/icons/pencil";
-import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
-import { can } from "../connections/backend.ts";
-import FilePlus from "lucide-solid/icons/file-plus";
-import Paperclip from "lucide-solid/icons/paperclip";
-import FileText from "lucide-solid/icons/file-text";
-import Presentation from "lucide-solid/icons/presentation";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
@@ -39,20 +33,16 @@ import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import type { PenHit, SceneBoard } from "../stage/types.ts";
+import type { SceneBoard } from "../stage/types.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
+import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenSheet, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { baseTheme, isShape, mediaOf, makeLabel, shapeLabel, sidePoint, type ArrowSide, color, fillsOf, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
-import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
-import { isPhone } from "../camera/camera.ts";
-import { CardEditor } from "./pen/CardEditor.tsx";
-import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels, isFile, isLiveFile, newCard } from "./pen/card-frame.ts";
-import { Insert } from "./pen/Insert.tsx";
+import { mediaOf, isCard, ids as penIds, indexOf, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
+import { firstLine } from "./pen/look.ts";
+import { isLiveFile } from "./pen/card-frame.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
-import type { Box } from "./pen/snap.ts";
 import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
@@ -62,56 +52,29 @@ import {
 	ANCHOR_PX,
 	arrowAnchors,
 	arrowEnds as arrowEndsOf,
-	arrowInsertOp,
 	boardHandles as boardHandlesOf,
 	createStageEditor,
 	deleteOps,
-	drawnOp,
 	dropBox as dropBoxOf,
 	dropSlot as dropSlotIn,
 	duplicateOps,
-	frameAt as frameAtIn,
 	frameUnder as frameUnderIn,
 	gripBox as gripBoxOf,
 	gripHidden,
 	hoverBox as hoverBoxOf,
 	idMaker,
+	InsertMenu,
 	itemHandles,
-	joinAt as joinAtIn,
-	makeAtOp,
 	moveOps,
-	newArrowEnds,
 	OverlayLayer,
-	pictureAt,
 	radiusHandle as radiusHandleOf,
 	selectionOutlines,
+	TextEditor,
 	tsScene,
 	tsSeam,
-	type Join,
-	type MakeOptions,
 	type Overlay,
 } from "./editor/index.ts";
 
-/** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
-interface TextLook {
-	font: string;
-	size: number;
-	weight: number;
-	italic: boolean;
-	spacing: number;
-	/** A multiple of the size; unset is the font's own. */
-	line?: number;
-	align: string;
-	/** Between the item's edge and its words: a note's padding, none for a text. */
-	pad: number;
-	ink: string;
-	/** A note's colour, drawn under the editor when its words outgrow the note. */
-	paper?: string;
-	/** A text that grows as wide as its words, or a box of fixed width that grows down. */
-	grows: "wide" | "tall";
-	/** A card: its words are markdown, typed as markdown and drawn as it reads. */
-	markdown?: boolean;
-}
 
 /**
  * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
@@ -740,6 +703,8 @@ export function Stage(props: {
 	 * gesture in hand and what is drawn for it, stepped by `editor/core/gesture.ts`. The handlers
 	 * here follow the pointer and tell it each step.
 	 */
+	/** Counted up each time the engine lays the drawing out (`penLayer.drawn`): what reads where items are reads it. */
+	const [penDrawn, setPenDrawn] = createSignal(0);
 	const editor = createStageEditor({
 		scene,
 		engine: tsSeam(penLayer),
@@ -782,8 +747,13 @@ export function Stage(props: {
 			mode: () => props.mode,
 			tool: penTool,
 			spaceHeld: () => spaceHeld(),
-			picture: (event) => pictureUnder(event),
-			typing: () => penText()?.id,
+			boardsNear: (at) =>
+				boardIndex()
+					.search({ x: at.x, y: at.y, w: 0, h: 0 })
+					.sort((a, b) => a - b)
+					.map((index) => props.boards[index]!),
+			rendered: () => renderedPaths(),
+			focus: () => props.focus,
 			linkAt: (at) => penLayer.linkAt(at),
 			onSelect: (path) => props.onSelect(path),
 			canCreate: () => !!props.onCreateBoard,
@@ -791,20 +761,8 @@ export function Stage(props: {
 			claim: (pointer) => claimed.add(pointer),
 			beginTouch: (event) => beginTouch(event),
 			pan: (event, how) => panFrom(event, how),
-			make: (event, tool, at) => penCreate(event, tool, at),
-			madeAt: () => penMadeAt,
-			menuOpen: () => !!canvasMenu(),
-			openMenu: (event) => openCanvasMenu(event),
 			toggleMedia: (id, media) => toggleMedia(id, media),
-			open: {
-				liveFile: (id) => openLiveFile(id),
-				file: (id) => openFileOf(id),
-				cardAt: (hit, at, client) => openCardAt(hit, at, client),
-				shapeWords: (shape) => openShapeWords(shape),
-				text: (hit) => openPenText(hit),
-				shapeOf: (id) => shapeOf(id),
-				cardOf: (id) => cardOf(id),
-			},
+			open: { liveFile: (id) => openLiveFile(id) },
 			handles: { item: () => penHandles(), board: () => boardHandles(), radius: () => radiusHandle(), arrow: () => arrowEnds() },
 		},
 		// The drawing's keys (`editor/dom/keys.ts`).
@@ -820,15 +778,28 @@ export function Stage(props: {
 			arm: (tool) => armPenTool(tool),
 			onMove: (path, x, y) => props.onMove(path, x, y),
 		},
+		// The words typed over an item (`editor/dom/TextEditing.tsx`).
+		text: {
+			pen: () => props.pen,
+			scheme: () => scheme(),
+			world: () => worldEl,
+			redrawn: () => penDrawn(),
+			editable: () => !!props.onPenEdit,
+			freshId: () => freshId(),
+		},
+		// What a tool and the canvas menu add (`editor/dom/InsertMenu.tsx`).
+		insert: {
+			worldAt: (event) => worldAt(event),
+			camera: () => props.camera,
+			freshId: () => freshId(),
+			idsBut: (id) => freshIds(id),
+			createBoard: (at, format) => props.onCreateBoard?.(at, format),
+			openDocument: (at) => props.onOpenDocument?.(at),
+		},
 	});
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
 	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());
 	let holesAsked: { ids: ReadonlySet<string>; mark: number } | undefined;
-	/*
-	 * What is being typed into. A card (`card`) is a frame of items typed into as one piece of markdown
-	 * (`pen/card-frame.ts`); a note card from before (`legacy`) becomes such a frame when it is saved.
-	 */
-	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean; kind?: string; card?: true; legacy?: true; held?: Record<string, string>; insertAt?: number; caretAt?: { x: number; y: number } } | undefined>();
 	/**
 	 * The one film or sound playing, if any.
 	 *
@@ -858,7 +829,6 @@ export function Stage(props: {
 		playingSince = performance.now();
 		setPlaying({ id, kind: media.kind, file: media.file });
 	};
-	const [penDrawn, setPenDrawn] = createSignal(0);
 	/*
 	 * Boards picked up with the drawing (`editor.boardPicks`): by a marquee, or Shift and a press on a
 	 * title bar. They move with the selected items as one selection. The app's own selected board is
@@ -937,8 +907,6 @@ export function Stage(props: {
 		resolvedColours.set(key, value);
 		return value;
 	};
-	/** When a tool last made an item, so the second press of a double-click does not make a board. */
-	let penMadeAt = 0;
 	/** The boards the sheet has on screen as pictures (`layer.ts`, `pictured`). */
 	const [onSheet, setOnSheet] = createSignal<ReadonlySet<string>>(new Set());
 	const picturedNow = (paths: ReadonlySet<string>) => {
@@ -948,7 +916,7 @@ export function Stage(props: {
 	};
 	penLayer.pictured = picturedNow;
 	penLayer.drawn = () => {
-		if (unmute && wordsOf(penLayer.placed.get(unmute.id)?.node) === unmute.value) unmuteNow();
+		editor.textEditing.drawn();
 		/*
 		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
 		 * goes (`editor/core/gesture.ts`, `drawn`). Not when the answer *arrives* — the layout is only
@@ -969,7 +937,7 @@ export function Stage(props: {
 		if (props.drawing) {
 			editor.select([]);
 			editor.pickBoards([]);
-			setPenText(undefined);
+			editor.setText(undefined);
 			setPenTool("select");
 		}
 	});
@@ -986,7 +954,7 @@ export function Stage(props: {
 		return selectionOutlines(
 			{
 				selection: editor.items(),
-				typing: penText()?.id,
+				typing: editor.typing(),
 				drag: shownDrag(),
 				resize: editor.shownResize(),
 				boards: scene.boards(),
@@ -1026,136 +994,8 @@ export function Stage(props: {
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards() }));
 
-	/**
-	 * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
-	 * over them: the same font, size, weight, spacing, line height, padding and colour, so the words do
-	 * not move when the editor opens or closes. The canvas keeps drawing the item — its paper, its
-	 * shadow, its card — and leaves out only the words while they are the editor's (`muteText`).
-	 */
-	const textLookOf = (node: PenNode, placed: Placed | undefined): TextLook => {
-		const doc = props.pen?.doc ?? { version: "", children: [] };
-		const theme = placed?.theme ?? baseTheme(doc, scheme());
-		const style = textStyleOf(doc, node, theme);
-		const css = (rgba: ReturnType<typeof color>) => (rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : undefined);
-		const firstColour = fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
-		const card = node.type !== "text";
-		const NOTE_PAPER: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
-		const palette = CARD_PALETTE[scheme()];
-		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (isMarkdown(node) ? palette.paper : (NOTE_PAPER[node.type] ?? NOTE_PAPER.note!))) : undefined;
-		// A card's words are the app's own colour, light or dark; a sticky note's are dark on its colour.
-		const ink = isMarkdown(node) ? palette.fg : card ? "#1f2328" : (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (scheme() === "dark" ? "#e6e6e6" : "#1f2328"));
-		return {
-			font: pageFont(style.fontFamily, style.fontWeight, style.fontStyle === "italic"),
-			size: style.fontSize,
-			weight: style.fontWeight,
-			italic: style.fontStyle === "italic",
-			spacing: style.letterSpacing,
-			// Skia's line height, left unset, is the font's own: CSS's "normal".
-			line: style.lineHeight,
-			align: node.textAlign ?? "left",
-			pad: card ? NOTE_PAD : 0,
-			ink,
-			...(paper ? { paper } : {}),
-			grows: node.type === "text" ? ((node.textGrowth ?? "auto") === "auto" ? "wide" : "tall") : "tall",
-			...(isMarkdown(node) || isMarkdownText(node) ? { markdown: true } : {}),
-		};
-	};
-	/** The shape an item is, or is part of (its outline or its words): the frame, by id. */
-	const shapeOf = (id: string): string | undefined => {
-		const doc = props.pen?.doc;
-		if (!doc) return undefined;
-		const found = indexOf(doc).get(id);
-		if (!found) return undefined;
-		if (isShape(found.node)) return found.node.id;
-		return isShape(found.parent) ? found.parent!.id : undefined;
-	};
-	/**
-	 * Type a shape's words: its own, or a new text made inside it, centred and as wide as the shape,
-	 * which goes again if nothing is typed (`commitPenText`, `fresh`).
-	 */
-	const openShapeWords = (id: string) => {
-		const doc = props.pen?.doc;
-		const frame = doc ? indexOf(doc).get(id)?.node : undefined;
-		const box = penLayer.placed.get(id)?.box;
-		if (!frame || !box) return;
-		editor.select([id]);
-		const label = shapeLabel(frame);
-		if (label) {
-			const placed = penLayer.placed.get(label.id);
-			openPenText({ id: label.id, node: label, box: placed?.box ?? box });
-			return;
-		}
-		const labelId = freshId();
-		const node = makeLabel(labelId);
-		penEdit([{ op: "insert", parent: id, node }]);
-		openPenText({ id: labelId, node, box: { x: box.x + 10, y: box.y + box.h / 2 - 10, w: Math.max(20, box.w - 20), h: 20 } }, true);
-	};
-	const openPenText = (given: PenHit, fresh?: boolean) => {
-		// The item as the server has it now: what the canvas last drew can be a save behind.
-		const now = props.pen ? indexOf(props.pen.doc).get(given.id)?.node : undefined;
-		const hit = now ? { ...given, node: now } : given;
-		// A card, or one of its blocks: the whole card is typed into, as one piece of markdown.
-		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
-		if (card) return openCard(card, hit.box, fresh);
-		const node = hit.node;
-		const placed = penLayer.placed.get(hit.id);
-		const box = placed?.box ?? hit.box;
-		penLayer.muteText(new Set([hit.id]));
-		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), kind: node.type, ...(fresh ? { fresh } : {}), ...(isMarkdown(node) ? { legacy: true as const } : {}) });
-	};
-	/** A file's chip, or its icon or name: the file opens in a tab of its own. Answers whether it was one. */
-	const openFileOf = (id: string): boolean => {
-		// The chip itself, or anything inside it: a file card's picture, tile, name.
-		const index = props.pen ? indexOf(props.pen.doc) : undefined;
-		let file: PenNode | undefined;
-		for (let at = index?.get(id); at && !file; at = at.parent ? index?.get(at.parent.id) : undefined) if (isFile(at.node)) file = at.node;
-		if (!file || typeof file.metadata?.path !== "string") return false;
-		editor.select([file.id]);
-		window.open(new URL(file.metadata.path, new URL(props.pen?.base || "/", location.origin)).href, "_blank", "noopener");
-		return true;
-	};
-	// While a card is typed into its toolbar is the panel, so the properties stand aside; on a phone, for any words.
-	createEffect(() => setPenTyping(!!penText() && (!!penText()!.card || isPhone())));
 	// A new selection starts with a phone's sheet put away; a second tap on it brings the sheet (`touchOnDrawing`).
 	createEffect(on(editor.items, () => setPenSheet(false)));
-	onCleanup(() => setPenTyping(false));
-	/** The card an item is a block of, if it is one. */
-	const cardOf = (id: string): PenNode | undefined => {
-		const parent = props.pen ? indexOf(props.pen.doc).get(id)?.parent : undefined;
-		return parent && isCard(parent) ? parent : undefined;
-	};
-	/** A card's words, its padding and its paper, for the editor laid over it. */
-	const cardLook = (card: PenNode): TextLook => {
-		const block = (card.children ?? []).find((child) => child.type === "text");
-		const look = textLookOf(block ?? ({ type: "text", id: "", content: "" } as PenNode), undefined);
-		const palette = CARD_PALETTE[scheme()];
-		const doc = props.pen?.doc ?? { version: "", children: [] };
-		const firstColour = fillsOf(card.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
-		const rgba = firstColour ? color(doc, firstColour, baseTheme(doc, scheme())) : undefined;
-		const paper = rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : palette.paper;
-		return { ...look, pad: typeof card.padding === "number" ? card.padding : CARD_PAD, ink: palette.fg, paper, align: "left", grows: "tall", markdown: true };
-	};
-	const openCard = (card: PenNode, at: { x: number; y: number; w: number; h: number }, fresh?: boolean, where?: { insertAt?: number; caretAt?: { x: number; y: number } }) => {
-		const placed = penLayer.placed.get(card.id);
-		const kids = card.children ?? [];
-		editor.select([card.id]);
-		penLayer.muteText(new Set(kids.filter((child) => child.type === "text").map((child) => child.id)));
-		setPenText({ id: card.id, box: { ...(placed?.box ?? at) }, value: cardMarkdown(kids), style: cardLook(card), card: true, held: heldLabels(kids), ...(fresh ? { fresh } : {}), ...where });
-	};
-	/**
-	 * A double-click or a double tap on a card: on its words, the card opens with the caret there; in a
-	 * gap, between blocks or in its padding, a new empty line is made there to type into. Answers
-	 * whether it was a card. The canvas menu is for empty canvas only.
-	 */
-	const openCardAt = (hit: PenHit, at: { x: number; y: number }, client: { x: number; y: number }): boolean => {
-		const card = isCard(hit.node) ? hit.node : cardOf(hit.id);
-		if (!card) return false;
-		const current = (props.pen ? indexOf(props.pen.doc).get(card.id)?.node : undefined) ?? card;
-		const box = penLayer.placed.get(card.id)?.box ?? hit.box;
-		if (hit.node.id === card.id) openCard(current, box, false, { insertAt: dropSlot(card.id, at, [])?.index ?? (current.children ?? []).length });
-		else openCard(current, box, false, { caretAt: client });
-		return true;
-	};
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
 	 * (`state/pen-tools.ts`, `penLive`). The same preview a drag of an item uses, so the sheet draws
@@ -1165,12 +1005,6 @@ export function Stage(props: {
 	createEffect(() => {
 		const live = penLive();
 		penLayer.preview(live?.length ? new Map(live.map((change) => [change.id, { dx: 0, dy: 0, set: change.set }])) : undefined);
-	});
-	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
-	createEffect(() => {
-		if (!props.pen) return;
-		pageFont("Inter", 400, false);
-		pageFont("Inter", 600, false);
 	});
 	/**
 	 * The corner radius and the angle being dragged, for the handles and the outline the canvas draws
@@ -1190,111 +1024,12 @@ export function Stage(props: {
 	 * would otherwise leave the handles turned for an item that is not.
 	 */
 
-		/**
-	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
-	 * a card round its title, a note round its words. A copy of the document with the one item's
-	 * words changed, drawn in place of the real one until the server answers with the real edit.
-	 * Once a frame at most.
-	 */
-	let typedFrame: number | undefined;
-	let typedValue: { id: string; value: string } | undefined;
-	const previewTyped = (id: string, value: string) => {
-		typedValue = { id, value };
-		typedFrame ??= requestAnimationFrame(() => showTyped());
-	};
-	/** The typed words drawn now, not at the next frame: what putting the editor away draws in its place. */
-	const showTyped = () => {
-		{
-			if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-			typedFrame = undefined;
-			const doc = props.pen?.doc;
-			if (!doc || !typedValue) return;
-			const copy = structuredClone(doc);
-			const found = indexOf(copy).get(typedValue.id);
-			if (!found) return;
-			if (isCard(found.node)) {
-				// The card grows as its blocks are typed: stand-in ids, swapped for real ones when it is saved.
-				let n = 0;
-				found.node.children = cardChildren(typedValue.value, found.node.children ?? [], { fresh: () => `typing-${n++}`, inner: cardInner(found.node), size: pictureSize });
-			} else found.node.content = typedValue.value;
-			penLayer.setDoc(copy, props.pen?.base ?? "");
-		}
-	};
-	/** Back to the document as the server has it, for an edit taken back with Escape. */
-	const dropTyped = () => {
-		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-		typedFrame = undefined;
-		typedValue = undefined;
-		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
-	};
-	onCleanup(() => {
-		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
-	});
-	/** Where the item being typed into is now: a made item is placed once the server answers. */
-	const penTextBox = createMemo(() => {
-		penDrawn();
-		const open = penText();
-		return open ? (penLayer.placed.get(open.id)?.box ?? open.box) : undefined;
-	});
-	/*
-	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
-	 * server's answer has been drawn shows the old words for a moment, and then the new.
-	 */
-	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
-	const unmuteNow = () => {
-		if (unmute) clearTimeout(unmute.timer);
-		unmute = undefined;
-		penLayer.muteText(undefined);
-		// The canvas draws the words on its next frame: the editor's still copy goes then, not before.
-		if (editorGhost) ghostUntil = penLayer.mark();
-	};
-	/*
-	 * A still copy of the editor, left where the editor was when the typing was put away, until the
-	 * canvas has a frame with the words in it. Without it the words were gone for two or three frames:
-	 * the editor was taken away at once, and the canvas, which leaves the words out while they are
-	 * the editor's, drew them only once the server's answer had been laid out.
-	 */
-	let editorGhost: HTMLElement | undefined;
-	/** What waits for the next frame the sheet shows: a deleted item's outline goes with the item. */
-	const afterFrame: Array<{ mark: number; run: () => void }> = [];
-	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`layer.ts`, `mark`). */
-	let ghostUntil: number | undefined;
-	const leaveGhost = () => {
-		dropGhost();
-		const live = worldEl?.querySelector<HTMLElement>(":scope > .pen-text");
-		if (!live) return;
-		const copy = live.cloneNode(true) as HTMLElement;
-		if (live instanceof HTMLTextAreaElement) (copy as HTMLTextAreaElement).value = live.value;
-		// Only the words and what holds them: not the card's style bar, the caret, or the focus ring.
-		for (const extra of copy.querySelectorAll(".pce-bar, [data-editorGhost-skip]")) extra.remove();
-		copy.removeAttribute("id");
-		copy.setAttribute("aria-hidden", "true");
-		copy.setAttribute("tabindex", "-1");
-		copy.querySelectorAll("[contenteditable]").forEach((el) => el.setAttribute("contenteditable", "false"));
-		if (copy.hasAttribute("contenteditable")) copy.setAttribute("contenteditable", "false");
-		copy.style.pointerEvents = "none";
-		copy.style.boxShadow = "none";
-		copy.style.caretColor = "transparent";
-		copy.classList.add("pen-editorGhost");
-		live.after(copy);
-		editorGhost = copy;
-		ghostUntil = undefined;
-		// Never left standing: a sheet that paints nothing for a second has had its chance.
-		const left = copy;
-		setTimeout(() => {
-			if (editorGhost === left && ghostUntil !== undefined) dropGhost();
-		}, 1000);
-	};
-	const dropGhost = () => {
-		editorGhost?.remove();
-		editorGhost = undefined;
-		ghostUntil = undefined;
-	};
 	{
 		const before = penLayer.presented;
 		penLayer.presented = () => {
 			before?.();
-			if (ghostUntil !== undefined && penLayer.shows(ghostUntil)) dropGhost();
+			// The typing's still copy goes once the words are on screen (`editor/dom/TextEditing.tsx`).
+			editor.textEditing.presented();
 			if (holesAsked && penLayer.shows(holesAsked.mark)) {
 				setHolesShown(holesAsked.ids);
 				holesAsked = undefined;
@@ -1305,106 +1040,14 @@ export function Stage(props: {
 			 * of the shape at every step. Each step waits in the editor for the frame painted with it.
 			 */
 			editor.presented();
-			if (draftFor && penLayer.placed.has(draftFor)) {
-				draftFor = undefined;
-				editor.setDraft(undefined);
-			}
-			for (let k = afterFrame.length - 1; k >= 0; k--) {
-				const wait = afterFrame[k]!;
-				if (!penLayer.shows(wait.mark)) continue;
-				afterFrame.splice(k, 1);
-				wait.run();
-			}
+			// The dashed outline of what a tool drew goes once the item is drawn (`editor/dom/InsertMenu.tsx`).
+			editor.insert.presented();
 		};
 	}
-	onCleanup(dropGhost);
 	/** A file shown live (`liveFiles`): which item, what it is, and its deck path. */
 	type LiveFile = { id: string; file: string; name: string };
 	/** The most file items alive at once, the nearest the middle of the screen: a frame each is a page's worth of work. */
 	const LIVE_FILES = 12;
-	/** A plain text item with no words is invisible, so a fresh one left empty goes; a note or a card is a shape you can see, and is kept. */
-	const emptyVanishes = (open: { kind?: string; card?: true }) => !open.card && open.kind === "text";
-	const commitPenText = (value: string) => {
-		const open = penText();
-		if (open) leaveGhost();
-		setPenText(undefined);
-		if (!open || !props.onPenEdit) return unmuteNow();
-		// A text made by a tool and left empty was never wanted: with no words it is nothing on the canvas. A note or a card stays, empty, where it was put.
-		if (open.fresh && !value.trim() && emptyVanishes(open)) {
-			unmuteNow();
-			dropTyped();
-			return props.onPenEdit([{ op: "delete", id: open.id }]);
-		}
-		// Against the document the server has: the one drawn already has the typed words in it.
-		const node = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
-		const was = node ? (open.card ? cardMarkdown(node.children ?? []) : node.content) : undefined;
-		if (value === was) {
-			unmuteNow();
-			return dropTyped();
-		}
-		if (unmute) clearTimeout(unmute.timer);
-		/*
-		 * The words as typed are drawn at once, from a copy of the drawing (`showTyped`), and the canvas
-		 * may draw them now: the editor's still copy stands over them until that frame is on screen. It
-		 * used to wait for the server's answer to be drawn, and a card's words, which keep their ids in
-		 * the answer, were left out for a frame after its copy had already shown them.
-		 */
-		typedValue = { id: open.id, value };
-		showTyped();
-		unmuteNow();
-		if (!open.card && !open.legacy) {
-			props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
-			return;
-		}
-		// A card is saved as edits to its blocks, each untouched block left alone. A note card from before
-		// becomes a card frame here, in its place. Pictures are measured first, for their shape.
-		const save = props.onPenEdit;
-		void measurePictures(value).then(() => {
-			const current = props.pen ? indexOf(props.pen.doc).get(open.id)?.node : undefined;
-			const base = current ?? node;
-			if (!base) return unmuteNow();
-			const card = isCard(base) ? base : ({ type: "frame", id: base.id, name: base.name ?? "Card", ...(base.x !== undefined ? { x: base.x } : {}), ...(base.y !== undefined ? { y: base.y } : {}), width: typeof base.width === "number" ? base.width : 320, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, ...(base.fill ? { fill: base.fill } : {}), metadata: { type: CARD }, children: [] } as PenNode);
-			const children = cardChildren(value, card.children ?? [], { fresh: freshIds(), inner: cardInner(card), size: pictureSize });
-			// A card's blocks are edited one by one, and only the ones that changed; a note card becomes a frame.
-			const ops = isCard(base) ? cardEdits(base.id, base.children ?? [], children) : [{ op: "replace" as const, id: open.id, node: { ...card, children } }];
-			if (!ops.length) return unmuteNow();
-			save(ops);
-		});
-	};
-	/** How wide a card's words are: its width less its padding. */
-	const cardInner = (card: PenNode) => {
-		const width = penLayer.placed.get(card.id)?.box.w ?? (typeof card.width === "number" ? card.width : 320);
-		const pad = typeof card.padding === "number" ? card.padding : CARD_PAD;
-		return Math.max(40, width - pad * 2);
-	};
-	/** Pictures' own sizes, as they arrive, so a picture put in a card keeps its shape. */
-	const pictureSizes = new Map<string, { w: number; h: number } | null>();
-	const pictureSize = (url: string) => pictureSizes.get(url) ?? undefined;
-	const measurePictures = async (markdown: string) => {
-		const urls = [...markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)|!\[\[([^\]|]+\.(?:png|jpe?g|gif|webp|svg|avif|bmp))(?:\|[^\]]*)?\]\]/gi)].map((m) => (m[1] ?? m[2])!).filter((url) => !pictureSizes.has(url));
-		await Promise.all(
-			urls.map(
-				(url) =>
-					new Promise<void>((done) => {
-						const image = new Image();
-						const finish = (size: { w: number; h: number } | null) => {
-							pictureSizes.set(url, size);
-							done();
-						};
-						image.onload = () => finish(image.naturalWidth ? { w: image.naturalWidth, h: image.naturalHeight } : null);
-						image.onerror = () => finish(null);
-						setTimeout(() => finish(null), 1500);
-						try {
-							image.src = new URL(url, new URL(props.pen?.base || "/", location.origin)).href;
-						} catch {
-							finish(null);
-						}
-					}),
-			),
-		);
-	};
-	/** The words an item holds, for telling when the canvas has drawn a save: a card's are its blocks'. */
-	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
 	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
@@ -1457,21 +1100,7 @@ export function Stage(props: {
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
 	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
 
-	/**
-	 * The board whose picture is under a point and that has no node of its own to take the press
-	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
-	 */
-	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => {
-		const at = worldAt(event);
-		// The spatial index finds the few boards near the point; core decides among them, in paint order.
-		const near = boardIndex()
-			.search({ x: at.x, y: at.y, w: 0, h: 0 })
-			.sort((a, b) => a - b)
-			.map((index) => props.boards[index]!);
-		return pictureAt(near, at, renderedPaths(), props.focus);
-	};
-	/** For the file drop (`app/files.ts`): whether a board's picture, with no node to find, is under a point on screen. */
-	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? pictureUnder({ clientX: x, clientY: y }) : undefined);
+	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? editor.pictureUnder({ clientX: x, clientY: y }) : undefined);
 	/*
 	 * The card under a screen point and the slot between its blocks there, for files dropped from the
 	 * desktop (`app/files.ts`): they go into the card where they land, as a picture or a file dragged
@@ -1483,7 +1112,7 @@ export function Stage(props: {
 		const id = frameUnder(at, []);
 		const card = id ? penNode(id) : undefined;
 		if (!id || !card || !isCard(card)) return undefined;
-		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: cardInner(card) };
+		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: editor.textEditing.cardInner(card) };
 	};
 
 	/** The words an item shows, its own or its children's, on one line: what a comment on it quotes. */
@@ -1501,7 +1130,7 @@ export function Stage(props: {
 		const mark = penLayer.mark();
 		penEdit(ops);
 		const clear = () => editor.select((now) => (now === selected ? [] : now));
-		afterFrame.push({ mark, run: clear });
+		editor.afterFrame(mark, clear);
 		// A sheet that shows no frame (nothing painting) does not keep the outline.
 		setTimeout(clear, 250);
 	};
@@ -1581,7 +1210,7 @@ export function Stage(props: {
 	 * to call it. Not while one is typed into (its editor has its own toolbar) or drawn with the pen.
 	 */
 	const calloutItems = createMemo(() => {
-		if (props.selected || props.drawing || !props.onPenEdit || penText()) return undefined;
+		if (props.selected || props.drawing || !props.onPenEdit || editor.text()) return undefined;
 		const outlines = penOutlines().filter((one) => one.id && !one.id.startsWith("board:"));
 		if (!outlines.length || outlines.length !== editor.items().length) return undefined;
 		const x = Math.min(...outlines.map((one) => one.x));
@@ -1595,174 +1224,12 @@ export function Stage(props: {
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
-	/** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
-	const makeOptions = (id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: freshIds(id), card: newCard });
-
-	/** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
-	const joinAt = (point: { x: number; y: number }, not?: string): Join | undefined => joinAtIn(scene, point, { zoom: localCamera.zoom, not });
-
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
 	const arrowEnds = createMemo(() => {
 		penDrawn();
 		return arrowEndsOf({ selection: editor.items(), boardPicks: editor.boardPicks(), drag: shownDrag() }, scene);
 	});
 
-	/**
-	 * The innermost frame under a point. An item drawn inside a free-standing frame belongs to it,
-	 * which is the plain call; `stacking` also takes the frames that arrange their children, which
-	 * is what a drop asks for. A library shape is a frame with a layout too, and never either.
-	 */
-	const frameAt = (point: { x: number; y: number }, stacking = false) => frameAtIn(scene, point, stacking);
-
-	/*
-	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
-	 * item is drawn only once the server has answered, and taking the outline away at the release left
-	 * the spot empty for two or three frames.
-	 */
-	let draftFor: string | undefined;
-	const keepDraftFor = (id: string) => {
-		draftFor = id;
-		setTimeout(() => {
-			if (draftFor !== id) return;
-			draftFor = undefined;
-			editor.setDraft(undefined);
-		}, 1500);
-	};
-	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }, from?: { name: string; box: Box; side?: ArrowSide }) => {
-		// A new drawing: the outline still standing in for the last item is not this one's to take away.
-		draftFor = undefined;
-		editor.setDraft({ tool, x1: at.x, y1: at.y, x2: at.x, y2: at.y });
-		// An arrow lights up what each of its ends would join, from the first press to the release.
-		const startJoin = tool === "arrow" ? (from ?? joinAt(at)) : undefined;
-		if (startJoin) editor.setHints({ joins: [startJoin.box] });
-		editor.follow(
-			event,
-			(e) => {
-				const now = worldAt(e);
-				editor.setDraft({ tool, x1: at.x, y1: at.y, x2: now.x, y2: now.y });
-				if (tool === "arrow") {
-					const endJoin = joinAt(now);
-					const other = endJoin && endJoin.name !== startJoin?.name ? endJoin : undefined;
-					editor.setHints({ joins: [...(startJoin ? [startJoin.box] : []), ...(other ? [other.box] : [])], sides: other ? [{ box: other.box, ...(other.side ? { side: other.side } : {}) }] : [] });
-				}
-			},
-			(moved, e) => {
-				editor.setHints({ joins: [], sides: [] });
-				setPenTool("select");
-				penMadeAt = performance.now();
-				const end = worldAt(e);
-				const id = freshId();
-				if (tool === "arrow") {
-					/*
-					 * Each end joins what it was let go on, and follows it from then on; an end on bare
-					 * canvas is a point there. A click with no drag makes an arrow only between two things.
-					 */
-					const made = newArrowEnds(startJoin, joinAt(end), at, end, moved);
-					if (!made) return void editor.setDraft(undefined);
-					const { from, to } = made;
-					penEdit([arrowInsertOp(id, from, to)]);
-					keepDraftFor(id);
-					selectMade([id]);
-					return;
-				}
-				if (!moved) {
-					editor.setDraft(undefined);
-					return penMakeAt(tool, at);
-				}
-				const parent = frameAt(at);
-				// The box dragged out, at least 8 each way (`editor/core/ops.ts` `drawnOp`).
-				const { op, node, box } = drawnOp(tool, id, at, end, { ...makeOptions(id), ...(parent ? { parent } : {}) });
-				penEdit([op]);
-				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
-				if (tool === "text" || tool === "note" || tool === "card") editor.setDraft(undefined);
-				else keepDraftFor(id);
-				selectMade([id]);
-				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box }, true);
-			},
-		);
-	};
-
-	/**
-	 * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
-	 * from the canvas menu. Words open for typing at once.
-	 */
-	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: { x: number; y: number }, centred = false) => {
-		penMadeAt = performance.now();
-		const id = freshId();
-		// From the insert panel, the item is put with its middle where it is put; from a click, its corner (`editor/core/ops.ts`).
-		const parent = frameAt(at);
-		const { op, node, box } = makeAtOp(tool, id, at, { ...makeOptions(id), centred, ...(parent ? { parent } : {}) });
-		penEdit([op]);
-		selectMade([id]);
-		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node, box }, true);
-	};
-
-	/**
-	 * The canvas menu: everything that can be added, at the place a double-click or a double-tap on
-	 * bare canvas landed, on every device. A board or a slide deck first, then the drawing's tools.
-	 * One gesture means one thing everywhere: it used to make a board straight away with a mouse and
-	 * open the tools with a finger. A pick makes the thing there; the arrow, which needs a drag, is
-	 * put in hand.
-	 */
-	const [canvasMenu, setCanvasMenu] = createSignal<{ client: { x: number; y: number }; world: { x: number; y: number }; stage: { x: number; y: number } } | undefined>();
-	const openCanvasMenu = (event: { clientX: number; clientY: number }) => {
-		// A canvas that can only be read (one opened from a file) has nothing to add.
-		if (!can("write")) return;
-		setCanvasMenu({ client: { x: event.clientX, y: event.clientY }, world: worldAt(event), stage: stagePoint(event as PointerEvent) });
-	};
-	const boardFromMenu = (format: "board" | "slides") => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (menu) props.onCreateBoard?.(menu.stage, format);
-	};
-	const documentFromMenu = () => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (menu) props.onOpenDocument?.(menu.stage);
-	};
-
-	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (!menu) return;
-		if (tool === "arrow") setPenTool("arrow");
-		// A shape or an icon is chosen first, in the insert panel, and put where the menu was opened.
-		else if (tool === "shape" || tool === "icon") setInsertPanel({ tab: tool === "shape" ? "shapes" : "icons", at: menu.world, client: menu.client });
-		else penMakeAt(tool, menu.world);
-	};
-	/** A pick in the insert panel: put where the canvas menu was opened, or else armed for the next press. */
-	const insertPicked = (tool: "shape" | "icon") => {
-		const open = insertPanel();
-		setInsertPanel(undefined);
-		// Another icon for one already drawn: the same place, size and colour, a new name.
-		if (open?.replace && tool === "icon") {
-			const icon = penIcon();
-			penEdit([{ op: "update", id: open.replace, set: { library: icon.library, icon: icon.name, name: icon.name } }]);
-			return;
-		}
-		if (open?.at) penMakeAt(tool, open.at, true);
-		else setPenTool(tool);
-	};
-	createEffect(() => {
-		if (!canvasMenu()) return;
-		const away = (event: PointerEvent) => {
-			if (!(event.target as Element | null)?.closest?.(".canvas-menu")) setCanvasMenu(undefined);
-		};
-		const key = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setCanvasMenu(undefined);
-		};
-		window.addEventListener("pointerdown", away, true);
-		window.addEventListener("keydown", key);
-		onCleanup(() => {
-			window.removeEventListener("pointerdown", away, true);
-			window.removeEventListener("keydown", key);
-		});
-	});
-	// The camera moving takes it away: it belongs to a place on the canvas, which has just moved.
-	createEffect(() => {
-		void props.camera;
-		untrack(() => canvasMenu() && setCanvasMenu(undefined));
-	});
 
 	/*
 	 * The boards' title bars, on a desktop, in a layer over the canvas that does not zoom
@@ -2604,7 +2071,7 @@ export function Stage(props: {
 		penDrawn();
 		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.boardDrag() || panning() }, scene, (id, node) => {
 			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
-			const look = textLookOf(node, penLayer.placed.get(id));
+			const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
 			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
 		});
 	});
@@ -2613,7 +2080,7 @@ export function Stage(props: {
 	const hoverBox = createMemo(() => {
 		penDrawn();
 		return hoverBoxOf(
-			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: penText()?.id, board: editor.hoverBoard() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.boardDrag() || panning(), boards: scene.boards() },
+			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverBoard() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.boardDrag() || panning(), boards: scene.boards() },
 			scene,
 		);
 	});
@@ -2735,7 +2202,7 @@ export function Stage(props: {
 		/*
 		 * Below the live zoom a board is its picture on the sheet and nothing else, so it has no node:
 		 * 400 of them cost a pan step 10 ms of the page's time, and each camera step reached every one.
-		 * The stage finds the board under a press itself (`pictureUnder`). Not under the Canvas renderer,
+		 * The stage finds the board under a press itself (`editor/dom/pointer.ts`, `pictureUnder`). Not under the Canvas renderer,
 		 * where a board's node draws its own picture.
 		 *
 		 * Live as of the last rest *and* now: the zoom of the last rest holds through a gesture, and a
@@ -3353,13 +2820,7 @@ export function Stage(props: {
 					zoom={props.camera.zoom}
 					sizing={(path) => sizingPaths().has(path)}
 					onGrip={editor.onGrip}
-					onAnchor={(event, box, side) => {
-						if (event.button !== 0) return;
-						event.preventDefault();
-						event.stopPropagation();
-						const start = sidePoint(box, side);
-						penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box.id, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side });
-					}}
+					onAnchor={editor.insert.fromAnchor}
 					onArrowEnd={editor.onArrowEnd}
 					onArrowBend={editor.onArrowBend}
 					onHandle={editor.onHandle}
@@ -3404,156 +2865,9 @@ export function Stage(props: {
 						}}
 					</Show>
 				</OverlayLayer>
-				<Show when={penText()} keyed>
-					{(open) => {
-						const look = open.style;
-						const box = () => penTextBox() ?? open.box;
-						const cancel = () => {
-							const open = penText();
-							setPenText(undefined);
-							unmuteNow();
-							dropTyped();
-							if (open?.fresh && emptyVanishes(open)) props.onPenEdit?.([{ op: "delete", id: open.id }]);
-						};
-						// A card is typed into as it reads (`pen/CardEditor.tsx`); a text or a note as its words.
-						if (look.markdown)
-							return (
-								<CardEditor
-									class="pen-text"
-									value={open.value}
-									{...(open.insertAt !== undefined ? { insertAt: open.insertAt } : {})}
-									{...(open.caretAt ? { caretAt: open.caretAt } : {})}
-									{...(open.held ? { held: open.held } : {})}
-									base={props.pen?.base ?? ""}
-									zoom={props.camera.zoom}
-									style={{
-										left: `${box().x}px`,
-										top: `${box().y}px`,
-										width: `${box().w}px`,
-										"min-height": `${box().h}px`,
-										padding: `${look.pad}px`,
-										"font-family": look.font,
-										"font-size": `${look.size}px`,
-										"--card-size": `${look.size}px`,
-										"font-weight": String(look.weight),
-										"letter-spacing": `${look.spacing}px`,
-										"line-height": look.line === undefined ? "1.5" : String(look.line),
-										color: look.ink,
-										background: look.paper ?? "transparent",
-										// Rounded only where the item is: a note or a card has corners, words on the canvas do not.
-										"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-										"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
-									}}
-									onInput={(value) => previewTyped(open.id, value)}
-									onCommit={commitPenText}
-									onCancel={cancel}
-								/>
-							);
-						return (
-							<textarea
-								class="pen-text"
-								data-grows={look.grows}
-								spellcheck={false}
-								style={{
-									left: `${box().x}px`,
-									top: `${box().y}px`,
-									...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
-									"min-height": `${box().h}px`,
-									padding: `${look.pad}px`,
-									"font-family": look.font,
-									"font-size": `${look.size}px`,
-									"font-weight": String(look.weight),
-									"font-style": look.italic ? "italic" : "normal",
-									"letter-spacing": `${look.spacing}px`,
-									"line-height": look.line === undefined ? "normal" : String(look.line),
-									"text-align": look.align as "left",
-									color: look.ink,
-									background: look.paper ?? "transparent",
-									"border-radius": open.card || look.paper ? `${NOTE_RADIUS}px` : "0",
-									"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
-								}}
-								value={open.value}
-								ref={(area) => requestAnimationFrame(() => {
-									area.focus();
-									area.select();
-								})}
-								onInput={(event) => previewTyped(open.id, event.currentTarget.value)}
-								onBlur={(event) => commitPenText(event.currentTarget.value)}
-								onKeyDown={(event) => {
-									if (event.key === "Escape") {
-										event.preventDefault();
-										cancel();
-									} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-										event.preventDefault();
-										event.currentTarget.blur();
-									}
-								}}
-							/>
-						);
-					}}
-				</Show>
+				<TextEditor text={editor.textEditing} zoom={props.camera.zoom} />
 			</div>
-			<Show when={canvasMenu()} keyed>
-				{(menu) => (
-					<div
-						class="popover canvas-menu"
-						role="menu"
-						aria-label="Add to the canvas"
-						style={{
-							// Its left edge at the point, as a dropdown's is at its button's, and kept on the screen.
-							left: `${Math.max(8, Math.min(menu.client.x, window.innerWidth - 228))}px`,
-							top: `${menu.client.y}px`,
-							width: "220px",
-							// Above the point in the lower half of the screen, under it in the upper half.
-							transform: menu.client.y > window.innerHeight / 2 ? "translateY(calc(-100% - 12px))" : "translateY(12px)",
-						}}
-					>
-						<Show when={props.onCreateBoard}>
-							<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => boardFromMenu("board")}>
-								<span class="row-icon">
-									<Icon of={FilePlus} size={15} />
-								</span>
-								<span class="row-label">Board</span>
-								<span class="row-note">.html</span>
-							</button>
-							<button type="button" role="menuitem" data-row data-flat="true" data-new-board="slides" onClick={() => boardFromMenu("slides")}>
-								<span class="row-icon">
-									<Icon of={Presentation} size={15} />
-								</span>
-								<span class="row-label">Slides</span>
-								<span class="row-note">.slides.html</span>
-							</button>
-							<Show when={props.onOpenDocument}>
-								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="document" onClick={documentFromMenu}>
-									<span class="row-icon">
-										<Icon of={Paperclip} size={15} />
-									</span>
-									{/* Bold like Board and Slides beside it, which are bold because they carry a note. */}
-								<span class="row-label row-name">Open File…</span>
-								</button>
-							</Show>
-							<Show when={props.onPenEdit}>
-								<div class="rule" aria-hidden="true" />
-							</Show>
-						</Show>
-						<Show when={props.onPenEdit}>
-						<For each={TOOLS}>
-							{(entry) => (
-								<button type="button" role="menuitem" data-row data-flat="true" data-tool={entry.tool} onClick={() => pickFromMenu(entry.tool as Exclude<PenTool, "select">)}>
-									<span class="row-icon">
-										<Icon of={entry.icon} size={15} />
-									</span>
-									<span class="row-label">{entry.label.split(":")[0]}</span>
-								</button>
-							)}
-						</For>
-						</Show>
-					</div>
-				)}
-			</Show>
-			<Show when={insertPanel()}>
-				{(open) => <Insert open={open()} onPick={insertPicked} onClose={() => setInsertPanel(undefined)} />}
-			</Show>
+			<InsertMenu menu={editor.insert} board={!!props.onCreateBoard} document={!!props.onOpenDocument} editable={!!props.onPenEdit} />
 			{/*
 				Boards have no title bars: the selected board's name and actions are a pill over it
 				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
