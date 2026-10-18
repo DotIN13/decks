@@ -12,11 +12,12 @@ stage-doc = { path = "../doc" }
 stage-scene = { path = "../scene" }
 stage-paint = { path = "../paint" }
 stage-gpu = { path = "../gpu" }
+stage-render = { path = "../render" }
 stage-text = { path = "../text" }
 serde_json.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "std"] }
+wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "webgl", "std"] }
 wasm-bindgen = "0.2.129"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"

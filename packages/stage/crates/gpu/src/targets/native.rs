@@ -10,8 +10,13 @@ pub async fn headless() -> Option<Gpu> {
 /// The same, with the device held to these limits: `wgpu::Limits::downlevel_webgl2_defaults()`
 /// draws on Metal as WebGL 2 would let it (no storage buffers, 2048-texel textures).
 pub async fn headless_with(limits: wgpu::Limits) -> Option<Gpu> {
+	headless_sampled(limits, crate::SAMPLES).await
+}
+
+/// The same, drawing with `samples` samples a pixel: 1 is how a device short of memory draws.
+pub async fn headless_sampled(limits: wgpu::Limits, samples: u32) -> Option<Gpu> {
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::METAL, ..wgpu::InstanceDescriptor::new_without_display_handle() });
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.ok()?;
 	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits: limits, ..Default::default() }).await.ok()?;
-	Some(Gpu::new(device, queue))
+	Some(Gpu::on(device, queue, crate::Api::Native, samples))
 }

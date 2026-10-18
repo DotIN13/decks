@@ -1,9 +1,11 @@
 //! The calls JavaScript makes: `PageEngine` on the page, `WorkerEngine` in the render worker, and
-//! opening WebGPU on a canvas for either. Changes cross as JSON text; tiles as `ImageBitmap`s.
+//! opening WebGPU or WebGL 2 on a canvas for either (`select.rs` picks which). Changes cross as JSON text; tiles as `ImageBitmap`s.
 
 use crate::engine::{Camera, Page, TILE_SIZE, Worker};
+use crate::select::{self, Api};
 use crate::wire;
 use stage_gpu::Gpu;
+use stage_gpu::targets::webgl::Canvas;
 use stage_paint::tiles::Key;
 use stage_paint::{Backend, Target, TextureKind};
 use wasm_bindgen::prelude::*;
@@ -17,35 +19,80 @@ fn err(e: impl std::fmt::Display) -> JsError {
 	JsError::new(&e.to_string())
 }
 
-/// WebGPU, opened on a canvas: the page's own, or the worker's offscreen one.
+/// WebGPU or WebGL 2, opened on a canvas: the page's own, or the worker's offscreen one.
 #[wasm_bindgen]
 pub struct GpuHandle {
 	gpu: Gpu,
 }
 
-async fn open(target: wgpu::SurfaceTarget<'static>, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	Ok(GpuHandle { gpu: stage_gpu::targets::webgpu::open(target, width, height).await.map_err(err)? })
+#[wasm_bindgen]
+impl GpuHandle {
+	/// The graphics API it draws with: `"webgpu"` or `"webgl2"`. The worker opens with the page's.
+	pub fn backend(&self) -> String {
+		self.gpu.api().name().into()
+	}
+
+	/// The widest and tallest texture the device allows, in pixels. Pictures are kept no bigger
+	/// than this or 4096, whichever is less (`maxPictureSize`).
+	#[wasm_bindgen(js_name = maxTextureSize)]
+	pub fn max_texture_size(&self) -> u32 {
+		self.gpu.limits().max_texture
+	}
+
+	/// The widest and tallest a picture is kept: resize bigger ones before `putPicture`.
+	#[wasm_bindgen(js_name = maxPictureSize)]
+	pub fn max_picture_size(&self) -> u32 {
+		self.gpu.limits().max_picture()
+	}
+
+	/// Samples a pixel it draws with: 4, or 1 on a device short of them or of memory.
+	pub fn samples(&self) -> u32 {
+		self.gpu.limits().samples
+	}
 }
 
-/// The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
-/// surface) and `under` them (board pictures).
+/// Open the stage on a canvas. `backend` (`"webgpu"`, `"webgl2"`, or nothing for WebGPU first) is
+/// tried first, then the other; `low_memory` says whether the device is short of memory (drawn
+/// with one sample a pixel), guessed from `navigator.deviceMemory` when not given.
+async fn open(canvas: Canvas, width: u32, height: u32, backend: Option<String>, low_memory: Option<bool>) -> Result<GpuHandle, JsError> {
+	let prefer = backend.as_deref().map(Api::parse).transpose().map_err(err)?;
+	Ok(GpuHandle { gpu: select::open(canvas, width, height, prefer, low_memory).await.map_err(err)? })
+}
+
+/// The page's canvas, over the boards' pages: the drawing, and the boards' pictures.
 #[wasm_bindgen(js_name = openStage)]
-pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	open(wgpu::SurfaceTarget::Canvas(canvas), width, height).await
+pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32, backend: Option<String>, low_memory: Option<bool>) -> Result<GpuHandle, JsError> {
+	open(Canvas::Element(canvas), width, height, backend, low_memory).await
 }
 
-/// Copy a picture into texture `id`, made the picture's size, and let the picture go.
+/// Copy a picture into texture `id`, made the picture's size (or `size`), and let the picture go.
+/// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
+/// them first, so it should not come) keeps what fits, and says so.
 fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>) {
+	let cap = gpu.limits().max_picture();
 	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
+	let (w, h) = (w.min(cap), h.min(cap));
+	if bitmap.width() > w || bitmap.height() > h {
+		web_sys::console::warn_1(&format!("stage: a {}×{} picture is over the {cap}-pixel limit: only {w}×{h} of it is kept", bitmap.width(), bitmap.height()).into());
+	}
 	if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h) {
 		gpu.texture(id, TextureKind::Color, w, h, None);
 	}
 	let texture = gpu.texture_handle(id).expect("just made").clone();
+	// Pictures come premultiplied (`premultiplyAlpha: "premultiply"`, or a premultiplied canvas's
+	// `transferToImageBitmap`). WebGPU is told to keep them so; WebGL 2 copies an ImageBitmap as it
+	// is stored and refuses to be asked to premultiply one.
+	let premultiplied_alpha = gpu.api() != stage_gpu::Api::WebGl2;
 	gpu.queue.copy_external_image_to_texture(
 		&wgpu::CopyExternalImageSourceInfo { source: wgpu::ExternalImageSource::ImageBitmap(bitmap.clone()), origin: wgpu::Origin2d::ZERO, flip_y: false },
-		wgpu::CopyExternalImageDestInfo { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha: true },
+		wgpu::CopyExternalImageDestInfo { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha },
 		wgpu::Extent3d { width: bitmap.width().min(w), height: bitmap.height().min(h), depth_or_array_layers: 1 },
 	);
+	// WebGPU has copied the picture by now; WebGL 2 copies it with the queue's next submission, so
+	// submit now, before the picture is let go.
+	if !premultiplied_alpha {
+		gpu.queue.submit([]);
+	}
 	bitmap.close();
 }
 
@@ -117,14 +164,16 @@ fn ids(json: &str) -> Vec<String> {
 	serde_json::from_str(json).unwrap_or_default()
 }
 
+/// Any page canvas, as `openStage`.
 #[wasm_bindgen(js_name = openCanvas)]
-pub async fn open_canvas(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	open(wgpu::SurfaceTarget::Canvas(canvas), width, height).await
+pub async fn open_canvas(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32, backend: Option<String>, low_memory: Option<bool>) -> Result<GpuHandle, JsError> {
+	open(Canvas::Element(canvas), width, height, backend, low_memory).await
 }
 
+/// The worker's tile canvas. Pass the page's `backend()` so both draw with the same API.
 #[wasm_bindgen(js_name = openOffscreen)]
-pub async fn open_offscreen(canvas: web_sys::OffscreenCanvas, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	open(wgpu::SurfaceTarget::OffscreenCanvas(canvas), width, height).await
+pub async fn open_offscreen(canvas: web_sys::OffscreenCanvas, width: u32, height: u32, backend: Option<String>, low_memory: Option<bool>) -> Result<GpuHandle, JsError> {
+	open(Canvas::Offscreen(canvas), width, height, backend, low_memory).await
 }
 
 fn key(scale: u32, x: i32, y: i32) -> Key {
@@ -263,11 +312,12 @@ impl PageEngine {
 		copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)));
 	}
 
-	/// A picture by its address (an image fill's `url`, or `board:<id>`).
+	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
+	/// own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
 	#[wasm_bindgen(js_name = putPicture)]
-	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap) {
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>) {
 		let Some(gpu) = &mut self.gpu else { return };
-		let (w, h) = (bitmap.width(), bitmap.height());
+		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
 		copy_in(gpu, id, &bitmap, None);
 		self.page.picture(url, id, w, h);
@@ -495,7 +545,7 @@ impl WorkerEngine {
 		Ok(WorkerEngine { worker: Worker::new(text, dark).map_err(err)?, gpu: None, canvas: None })
 	}
 
-	/// The tile canvas, `TILE` pixels square, and WebGPU opened on it.
+	/// The tile canvas, `TILE` pixels square, and the GPU opened on it.
 	#[wasm_bindgen(js_name = setGpu)]
 	pub fn set_gpu(&mut self, handle: GpuHandle, canvas: web_sys::OffscreenCanvas) {
 		self.gpu = Some(handle.gpu);
@@ -579,10 +629,11 @@ impl WorkerEngine {
 		serde_json::to_string(&self.worker.landed()).unwrap_or_else(|_| "[]".into())
 	}
 
+	/// As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
 	#[wasm_bindgen(js_name = putPicture)]
-	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap) {
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>) {
 		let Some(gpu) = &mut self.gpu else { return };
-		let (w, h) = (bitmap.width(), bitmap.height());
+		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
 		copy_in(gpu, id, &bitmap, None);
 		self.worker.picture(url, id, w, h);

@@ -29,8 +29,46 @@ impl Limits {
 	}
 }
 
+/// Samples a pixel the stage draws with (D3): four, unless the device can do fewer than four (WebGL
+/// 2's `MAX_SAMPLES`, when the browser tells it: `None` or 0 is a browser that does not say, and
+/// WebGL 2 promises four), or is short of memory, where four samples cost four times the memory of
+/// every pass's target.
+pub fn samples(max_samples: Option<u32>, short_of_memory: bool) -> u32 {
+	let can = match max_samples {
+		Some(n) if n > 0 => n,
+		_ => 4,
+	};
+	if short_of_memory || can < 4 { 1 } else { 4 }
+}
+
+/// Whether a device with this much memory (`navigator.deviceMemory`, in GiB, which browsers round
+/// down to 0.25, 0.5, 1, 2, 4 or 8, and Safari does not give) is short of it for four samples.
+pub fn short_of_memory(device_memory_gib: Option<f64>) -> bool {
+	device_memory_gib.is_some_and(|gib| gib <= 2.0)
+}
+
 impl Default for Limits {
 	fn default() -> Limits {
 		Limits::WEBGPU
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn four_samples_unless_short() {
+		assert_eq!(samples(Some(4), false), 4);
+		assert_eq!(samples(Some(16), false), 4);
+		assert_eq!(samples(None, false), 4);
+		assert_eq!(samples(Some(0), false), 4, "a browser that answers 0 does not say");
+		assert_eq!(samples(Some(2), false), 1);
+		assert_eq!(samples(Some(1), false), 1);
+		assert_eq!(samples(Some(8), true), 1);
+		assert!(short_of_memory(Some(2.0)));
+		assert!(short_of_memory(Some(0.5)));
+		assert!(!short_of_memory(Some(4.0)));
+		assert!(!short_of_memory(None), "Safari does not say: not short");
 	}
 }

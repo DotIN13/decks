@@ -1,5 +1,5 @@
-//! The one interface every graphics backend implements. WebGPU is the first; WebGL 2 and Metal plug
-//! in here later without the painter, the tiles or the document knowing.
+//! The one interface every graphics backend implements: wgpu on WebGPU or WebGL 2 today, Metal
+//! later, without the painter, the tiles or the document knowing.
 
 use crate::list::{Color, DrawList};
 
@@ -23,7 +23,29 @@ pub enum TextureKind {
 	Mask,
 }
 
+/// What the device a backend draws on allows, as far as the engine above it needs to know.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeviceLimits {
+	/// The widest and tallest texture, in texels.
+	pub max_texture: u32,
+	/// Samples a pixel the backend draws with (4, or 1 on a device short of them or of memory).
+	pub samples: u32,
+}
+
+/// No picture is kept bigger than this across, whatever the device allows: a 4096-texel picture is
+/// 64 MiB, and a board's picture is never shown wider than a screen.
+pub const PICTURE_MAX: u32 = 4096;
+
+impl DeviceLimits {
+	/// The widest and tallest a picture (an image fill, a board's picture) is kept.
+	pub fn max_picture(&self) -> u32 {
+		self.max_texture.min(PICTURE_MAX)
+	}
+}
+
 pub trait Backend {
+	/// What the device allows: its biggest texture, and the samples a pixel drawn with.
+	fn limits(&self) -> DeviceLimits;
 	/// Make or remake a texture, optionally with pixels (RGBA8 premultiplied, or one byte a texel
 	/// for a mask), rows tightly packed.
 	fn texture(&mut self, id: u32, kind: TextureKind, width: u32, height: u32, pixels: Option<&[u8]>);
@@ -47,6 +69,10 @@ pub struct Recording {
 }
 
 impl Backend for Recording {
+	/// What WebGPU promises by default.
+	fn limits(&self) -> DeviceLimits {
+		DeviceLimits { max_texture: 8192, samples: 4 }
+	}
 	fn texture(&mut self, id: u32, kind: TextureKind, width: u32, height: u32, _: Option<&[u8]>) {
 		self.textures.insert(id, (kind, width, height));
 	}

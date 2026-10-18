@@ -1,5 +1,6 @@
 //! One draw: a [`Built`] batch run as render passes into a view, with the pipelines and the kept
-//! resources. Each pass draws into a multisampled texture and resolves into its layer or the target.
+//! resources. Each pass draws into a multisampled texture and resolves into its layer or the target;
+//! with one sample a pixel it draws straight into the layer or the target.
 
 use crate::exec::pipelines::Pipelines;
 use crate::exec::resources::{Resources, Tex};
@@ -29,14 +30,14 @@ pub fn run(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &mut Pipelines
 			Some(id) => (res.lent[&id].view.clone(), wgpu::TextureFormat::Rgba8Unorm),
 		};
 		pipelines.prepare(device, format);
-		let msaa = res.msaa(device, pipelines.samples, width, height, format, pass.depth);
+		let msaa = (pipelines.samples > 1).then(|| res.msaa(device, pipelines.samples, width, height, format, pass.depth));
 		views.push((resolve, msaa, format));
 	}
 	encode(device, queue, pipelines, res, textures, built, &views);
 	res.return_layers();
 }
 
-fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res: &Resources, textures: &HashMap<u32, Tex>, built: &Built, views: &[(wgpu::TextureView, wgpu::TextureView, wgpu::TextureFormat)]) {
+fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res: &Resources, textures: &HashMap<u32, Tex>, built: &Built, views: &[(wgpu::TextureView, Option<wgpu::TextureView>, wgpu::TextureFormat)]) {
 	let frame = res.frame();
 	let picture = |t: &Option<u32>| t.and_then(|id| textures.get(&id).or_else(|| res.lent.get(&id))).map_or(&res.white, |tex| &tex.picture);
 	let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("stage draw") });
@@ -48,7 +49,10 @@ fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res
 		let set = pipelines.get(*format);
 		let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			label: Some("stage pass"),
-			color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: msaa, depth_slice: None, resolve_target: Some(resolve), ops: wgpu::Operations { load, store: wgpu::StoreOp::Store } })],
+			color_attachments: &[Some(match msaa {
+				Some(msaa) => wgpu::RenderPassColorAttachment { view: msaa, depth_slice: None, resolve_target: Some(resolve), ops: wgpu::Operations { load, store: wgpu::StoreOp::Store } },
+				None => wgpu::RenderPassColorAttachment { view: resolve, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load, store: wgpu::StoreOp::Store } },
+			})],
 			depth_stencil_attachment: None,
 			timestamp_writes: None,
 			occlusion_query_set: None,

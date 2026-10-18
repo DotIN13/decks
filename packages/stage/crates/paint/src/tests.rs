@@ -161,3 +161,12 @@ fn collect(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
 		}
 	}
 }
+
+/// The recording backend allows what WebGPU promises; pictures are kept at most 4096 across.
+#[test]
+fn recording_allows_webgpus_defaults() {
+	let r = Recording::default();
+	assert_eq!(r.limits(), crate::DeviceLimits { max_texture: 8192, samples: 4 });
+	assert_eq!(r.limits().max_picture(), 4096);
+	assert_eq!(crate::DeviceLimits { max_texture: 2048, samples: 4 }.max_picture(), 2048);
+}

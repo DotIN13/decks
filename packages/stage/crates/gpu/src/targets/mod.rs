@@ -2,6 +2,7 @@
 //! device its own way and hands it to [`Gpu::new`]; drawing is the same on all of them.
 //!
 //! - [`webgpu`]: a browser canvas or `OffscreenCanvas`, through WebGPU.
+//! - [`webgl`]: the same, through WebGL 2, where there is no WebGPU.
 //! - [`native`]: this machine's graphics card (Metal), with no window: for tests.
 //!
 //! Screen surfaces, which a browser target configures, are set up here for all of them.
@@ -9,24 +10,36 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 #[cfg(target_arch = "wasm32")]
+pub mod webgl;
+#[cfg(target_arch = "wasm32")]
 pub mod webgpu;
 
-use crate::Gpu;
+use crate::{Api, Gpu};
 
 impl Gpu {
 	/// Draw to the screen through this surface from now on, as the first screen surface.
 	pub fn set_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) {
 		self.surfaces.clear();
-		self.add_surface(surface, adapter, width, height);
+		self.configure(surface, adapter, width, height);
 	}
 
-	/// One more screen surface on the same device; returns its number for `Target::Surface`.
-	pub fn add_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) -> u32 {
+	/// One more screen surface on the same device; returns its number for `Target::Surface`. A
+	/// WebGL 2 device is its canvas's context and draws on no other canvas, so it refuses.
+	pub fn add_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) -> Result<u32, String> {
+		if self.api == Api::WebGl2 && !self.surfaces.is_empty() {
+			return Err("a WebGL 2 device draws on its own canvas only: open another for this one".into());
+		}
+		Ok(self.configure(surface, adapter, width, height))
+	}
+
+	fn configure(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) -> u32 {
 		let caps = surface.get_capabilities(adapter);
 		let format = caps.formats.iter().copied().find(|f| matches!(f, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm)).unwrap_or(caps.formats[0]);
 		// The stage canvas lies over the boards' pages, so what it leaves clear must show through.
 		// wgpu's browser backend lists only "opaque" among its modes but configures "premultiplied".
-		let alpha = if cfg!(target_arch = "wasm32") || caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) { wgpu::CompositeAlphaMode::PreMultiplied } else { caps.alpha_modes[0] };
+		// Its WebGL 2 backend lists only "opaque" too, refuses any other, and makes the context with
+		// WebGL's defaults (alpha, premultiplied) whatever is asked: "opaque" there is transparent.
+		let alpha = if (cfg!(target_arch = "wasm32") && self.api == Api::WebGpu) || caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) { wgpu::CompositeAlphaMode::PreMultiplied } else { caps.alpha_modes[0] };
 		let config = wgpu::SurfaceConfiguration {
 			usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 			format,

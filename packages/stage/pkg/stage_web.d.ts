@@ -2,12 +2,29 @@
 /* eslint-disable */
 
 /**
- * WebGPU, opened on a canvas: the page's own, or the worker's offscreen one.
+ * WebGPU or WebGL 2, opened on a canvas: the page's own, or the worker's offscreen one.
  */
 export class GpuHandle {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
+    /**
+     * The graphics API it draws with: `"webgpu"` or `"webgl2"`. The worker opens with the page's.
+     */
+    backend(): string;
+    /**
+     * The widest and tallest a picture is kept: resize bigger ones before `putPicture`.
+     */
+    maxPictureSize(): number;
+    /**
+     * The widest and tallest texture the device allows, in pixels. Pictures are kept no bigger
+     * than this or 4096, whichever is less (`maxPictureSize`).
+     */
+    maxTextureSize(): number;
+    /**
+     * Samples a pixel it draws with: 4, or 1 on a device short of them or of memory.
+     */
+    samples(): number;
 }
 
 export class PageEngine {
@@ -105,9 +122,10 @@ export class PageEngine {
      */
     putIcon(key: string, json: string): void;
     /**
-     * A picture by its address (an image fill's `url`, or `board:<id>`).
+     * A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
+     * own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
      */
-    putPicture(url: string, bitmap: ImageBitmap): void;
+    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null): void;
     /**
      * A tile's picture from the worker, copied into the page's own texture for it.
      */
@@ -222,10 +240,13 @@ export class WorkerEngine {
      */
     paint(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, limit: number): Array<any>;
     putIcon(key: string, json: string): void;
-    putPicture(url: string, bitmap: ImageBitmap): void;
+    /**
+     * As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
+     */
+    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null): void;
     reload(text: string, dark: boolean): void;
     /**
-     * The tile canvas, `TILE` pixels square, and WebGPU opened on it.
+     * The tile canvas, `TILE` pixels square, and the GPU opened on it.
      */
     setGpu(handle: GpuHandle, canvas: OffscreenCanvas): void;
     setMarkdownReader(read: Function): void;
@@ -235,15 +256,20 @@ export class WorkerEngine {
     wantedPictures(): string;
 }
 
-export function openCanvas(canvas: HTMLCanvasElement, width: number, height: number): Promise<GpuHandle>;
-
-export function openOffscreen(canvas: OffscreenCanvas, width: number, height: number): Promise<GpuHandle>;
+/**
+ * Any page canvas, as `openStage`.
+ */
+export function openCanvas(canvas: HTMLCanvasElement, width: number, height: number, backend?: string | null, low_memory?: boolean | null): Promise<GpuHandle>;
 
 /**
- * The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
- * surface) and `under` them (board pictures).
+ * The worker's tile canvas. Pass the page's `backend()` so both draw with the same API.
  */
-export function openStage(canvas: HTMLCanvasElement, width: number, height: number): Promise<GpuHandle>;
+export function openOffscreen(canvas: OffscreenCanvas, width: number, height: number, backend?: string | null, low_memory?: boolean | null): Promise<GpuHandle>;
+
+/**
+ * The page's canvas, over the boards' pages: the drawing, and the boards' pictures.
+ */
+export function openStage(canvas: HTMLCanvasElement, width: number, height: number, backend?: string | null, low_memory?: boolean | null): Promise<GpuHandle>;
 
 /**
  * One joined arrow routed by the engine's router (`stage_scene::arrows`), for the server's reroute:
@@ -263,9 +289,13 @@ export interface InitOutput {
     readonly __wbg_pageengine_free: (a: number, b: number) => void;
     readonly __wbg_textmeasure_free: (a: number, b: number) => void;
     readonly __wbg_workerengine_free: (a: number, b: number) => void;
-    readonly openCanvas: (a: any, b: number, c: number) => any;
-    readonly openOffscreen: (a: any, b: number, c: number) => any;
-    readonly openStage: (a: any, b: number, c: number) => any;
+    readonly gpuhandle_backend: (a: number) => [number, number];
+    readonly gpuhandle_maxPictureSize: (a: number) => number;
+    readonly gpuhandle_maxTextureSize: (a: number) => number;
+    readonly gpuhandle_samples: (a: number) => number;
+    readonly openCanvas: (a: any, b: number, c: number, d: number, e: number, f: number) => any;
+    readonly openOffscreen: (a: any, b: number, c: number, d: number, e: number, f: number) => any;
+    readonly openStage: (a: any, b: number, c: number, d: number, e: number, f: number) => any;
     readonly pageengine_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly pageengine_apply: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly pageengine_applyEdits: (a: number, b: number, c: number) => [number, number];
@@ -292,7 +322,7 @@ export interface InitOutput {
     readonly pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pictured: (a: number) => [number, number];
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly pageengine_putPicture: (a: number, b: number, c: number, d: any) => void;
+    readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number) => void;
     readonly pageengine_putTile: (a: number, b: number, c: number, d: number, e: any) => void;
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
@@ -329,7 +359,7 @@ export interface InitOutput {
     readonly workerengine_new: (a: number, b: number, c: number) => [number, number, number];
     readonly workerengine_paint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
     readonly workerengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly workerengine_putPicture: (a: number, b: number, c: number, d: any) => void;
+    readonly workerengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number) => void;
     readonly workerengine_reload: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_setGpu: (a: number, b: number, c: any) => void;
     readonly workerengine_setMarkdownReader: (a: number, b: any) => void;
@@ -337,12 +367,13 @@ export interface InitOutput {
     readonly workerengine_setView: (a: number, b: number, c: number) => void;
     readonly workerengine_tileSize: () => number;
     readonly workerengine_wantedPictures: (a: number) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__78: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__79: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_a918a428dde8d233___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__83: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__84: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___web_sys_46aa44363d28b235___features__gen_Event__Event______true_: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

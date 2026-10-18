@@ -289,6 +289,29 @@ fn webgl2_limits_draw_the_same() {
 	assert!(!small.lost());
 }
 
+/// With one sample a pixel (a device short of memory, or of samples) every picture still draws:
+/// shapes' edges are the shader's own and come out as with four; meshes lose their smoothing only.
+#[test]
+fn one_sample_draws() {
+	let (Some(mut four), Some(mut one)) = (gpu(), pollster::block_on(headless_sampled(wgpu::Limits::downlevel_webgl2_defaults(), 1))) else { return };
+	assert_eq!(one.limits().samples, 1);
+	assert_eq!(four.limits(), DeviceLimits { max_texture: four.device.limits().max_texture_dimension_2d, samples: 4 });
+	let (a, b) = (draw_shapes(&mut four), draw_shapes(&mut one));
+	assert_eq!(px(&b, 200, 60, 50), [255, 0, 0, 255], "inside the rectangle");
+	assert_eq!(px(&b, 200, 12, 22)[3], 0, "outside its rounded corner");
+	let far = a.iter().zip(&b).filter(|(x, y)| x.abs_diff(**y) > 8).count();
+	assert!(far < a.len() / 100, "{far} bytes far from four samples' shapes");
+	let (a, b) = (draw_effects(&mut four), draw_effects(&mut one));
+	let far = a.iter().zip(&b).filter(|(x, y)| x.abs_diff(**y) > 64).count();
+	assert!(far < a.len() / 50, "{far} bytes far from four samples' effects");
+	if let (Some(a), Some(b)) = (draw_card(&mut four), draw_card(&mut one)) {
+		save("card-1x", &b.0, b.1, b.2);
+		let far = a.0.iter().zip(&b.0).filter(|(x, y)| x.abs_diff(**y) > 64).count();
+		assert!(far < a.0.len() / 50, "{far} bytes far from four samples' card");
+	}
+	assert!(!one.lost());
+}
+
 /// Buffers, the table and layer textures are kept between draws: a picture drawn after bigger and
 /// smaller ones, into the same textures, comes out as on a device that drew nothing before.
 #[test]

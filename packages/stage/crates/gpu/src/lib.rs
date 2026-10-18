@@ -1,14 +1,16 @@
-//! The first backend: wgpu, on WebGPU in the browser (and on Metal when the tests run on a Mac).
+//! The first backend: wgpu, on WebGPU or WebGL 2 in the browser (and on Metal when the tests run on
+//! a Mac).
 //!
 //! It implements [`Backend`]: it turns a draw list into render passes and knows nothing of the
 //! document. Shapes are instanced quads whose edges the shader works out exactly; meshes are the
-//! painter's triangles, smoothed by four samples a pixel. Layers are drawn into a texture of their
+//! painter's triangles, smoothed by four samples a pixel (one on a device short of them). Layers are drawn into a texture of their
 //! own and laid down at their opacity. Paints and clips go up as one small table texture.
 //! Batching, the table and the shader are stage-render's; this crate runs them on wgpu.
 //!
 //! - [`exec`]: the pipelines, what is kept on the device between frames, and running one draw: the
 //!   same on every wgpu target.
-//! - [`targets`]: opening a device on each target (WebGPU in a browser, Metal for the tests).
+//! - [`targets`]: opening a device on each target (WebGPU or WebGL 2 in a browser, Metal for the
+//!   tests).
 //! - this file: [`Gpu`], the stage's textures and screen surfaces, as a [`Backend`].
 
 pub mod exec;
@@ -18,7 +20,7 @@ use exec::draw::{self, Out};
 use exec::pipelines::Pipelines;
 use exec::resources::{Resources, Tex};
 use stage_paint::list::{DrawList, Op};
-use stage_paint::{Backend, Target, TextureKind};
+use stage_paint::{Backend, DeviceLimits, Target, TextureKind};
 use stage_render::batch::{Built, LAYER_IDS};
 use stage_render::Limits;
 use std::collections::HashMap;
@@ -26,10 +28,30 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use targets::native::{headless, headless_with};
+pub use targets::native::{headless, headless_sampled, headless_with};
 
-/// Samples a pixel in every pass.
-const SAMPLES: u32 = 4;
+/// Samples a pixel in every pass, where the device allows them.
+pub const SAMPLES: u32 = 4;
+
+/// The graphics API a [`Gpu`]'s device is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Api {
+	WebGpu,
+	WebGl2,
+	/// This machine's own (Metal), for tests.
+	Native,
+}
+
+impl Api {
+	/// The name the page reads: `"webgpu"`, `"webgl2"` or `"native"`.
+	pub fn name(self) -> &'static str {
+		match self {
+			Api::WebGpu => "webgpu",
+			Api::WebGl2 => "webgl2",
+			Api::Native => "native",
+		}
+	}
+}
 
 pub struct Gpu {
 	pub device: wgpu::Device,
@@ -41,18 +63,35 @@ pub struct Gpu {
 	lost: Arc<AtomicBool>,
 	next_layer: u32,
 	limits: Limits,
+	api: Api,
 }
 
 impl Gpu {
-	/// A backend on a device a target opened: the page's, the worker's, or the tests'.
+	/// A backend on a device this machine opened, drawing with four samples a pixel: the tests'.
 	pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Gpu {
+		Gpu::on(device, queue, Api::Native, SAMPLES)
+	}
+
+	/// A backend on a device a target opened (the page's, the worker's, the tests'), on `api`,
+	/// drawing with `samples` samples a pixel (4 or 1).
+	pub fn on(device: wgpu::Device, queue: wgpu::Queue, api: Api, samples: u32) -> Gpu {
 		let lost = Arc::new(AtomicBool::new(false));
 		let flag = lost.clone();
 		device.set_device_lost_callback(move |_, _| flag.store(true, Ordering::SeqCst));
-		let limits = Limits { max_texture: device.limits().max_texture_dimension_2d, max_samples: SAMPLES, table_width: stage_render::limits::TABLE_WIDTH };
+		let limits = Limits { max_texture: device.limits().max_texture_dimension_2d, max_samples: samples, table_width: stage_render::limits::TABLE_WIDTH };
 		let pipelines = Pipelines::new(&device, limits.max_samples);
 		let resources = Resources::new(&device, &queue, &pipelines);
-		Gpu { device, queue, surfaces: Vec::new(), textures: HashMap::new(), pipelines, resources, lost, next_layer: LAYER_IDS, limits }
+		Gpu { device, queue, surfaces: Vec::new(), textures: HashMap::new(), pipelines, resources, lost, next_layer: LAYER_IDS, limits, api }
+	}
+
+	/// The graphics API this backend's device is on.
+	pub fn api(&self) -> Api {
+		self.api
+	}
+
+	/// Mark the device gone from outside wgpu (a WebGL context lost): `lost()` says so from now on.
+	pub fn lost_flag(&self) -> Arc<AtomicBool> {
+		self.lost.clone()
 	}
 
 	fn make_texture(&self, kind: TextureKind, width: u32, height: u32) -> Tex {
@@ -97,6 +136,10 @@ impl Gpu {
 }
 
 impl Backend for Gpu {
+	fn limits(&self) -> DeviceLimits {
+		DeviceLimits { max_texture: self.limits.max_texture, samples: self.limits.max_samples }
+	}
+
 	fn texture(&mut self, id: u32, kind: TextureKind, width: u32, height: u32, pixels: Option<&[u8]>) {
 		let tex = self.make_texture(kind, width, height);
 		if let Some(pixels) = pixels {
