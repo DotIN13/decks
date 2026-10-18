@@ -19,6 +19,7 @@ import { snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
 import { boundsOf } from "../canvas/pen/bounds.ts";
 import { BoxIndex, type Rect } from "../canvas/spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
+import { GLIDE_MS, glideAt, glideShifts } from "../canvas/editor/core/glide.ts";
 import type { CardGeometry, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
@@ -233,14 +234,55 @@ export class StageEngine {
 		}
 		this.laidOut();
 		this.needFonts();
-		this.draw();
+		// A drop that moved things glides them in from where they were let go, from this very frame.
+		const gliding = this.settling && this.startGlide();
+		if (!gliding) this.draw();
 		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
 		if (this.boardsOnly && !this.carriedCount) this.landBoards();
 		// A gesture let go: the drawing that answers it is here, so what it lifted goes back into the tiles.
 		if (this.settling) {
 			this.settling = false;
+			this.landing = undefined;
 			if (this.lifted.size && !this.boardsOnly) this.post({ type: "drop", ids: [...this.lifted] });
 		}
+	}
+
+	/**
+	 * Where what a drop can move was let go (`settle`), and the glide in hand: each item's shift from
+	 * where it lands, and when it began.
+	 */
+	private landing: ReadonlyMap<string, Frame> | undefined;
+	private glide: { shifts: ReadonlyMap<string, { dx: number; dy: number }>; start: number; frame: number } | undefined;
+
+	/**
+	 * The drawing that answers a drop is laid out: everything that moved glides from where it was let
+	 * go to where it is now (`editor/core/glide.ts`), drawn lifted with a shrinking offset for
+	 * `GLIDE_MS`, then put down. Shown before this drawing's first frame, so nothing is drawn where it
+	 * lands before it has glided there. False when nothing moved.
+	 */
+	private startGlide(): boolean {
+		const landing = this.landing;
+		this.landing = undefined;
+		if (!landing || !this.page) return false;
+		const shifts = glideShifts(landing, (id) => this.placed.get(id)?.box, (id) => this.placed.get(id)?.parent);
+		if (!shifts.size) return false;
+		this.settling = false;
+		const start = performance.now();
+		this.showPreview(glideAt(shifts, 0));
+		const step = () => {
+			const glide = this.glide;
+			if (!glide || this.disposed) return;
+			const elapsed = performance.now() - glide.start;
+			if (elapsed >= GLIDE_MS) {
+				this.glide = undefined;
+				this.showPreview(undefined);
+				return;
+			}
+			this.showPreview(glideAt(glide.shifts, elapsed));
+			glide.frame = requestAnimationFrame(step);
+		};
+		this.glide = { shifts, start, frame: requestAnimationFrame(step) };
+		return true;
 	}
 
 	/**
@@ -249,8 +291,9 @@ export class StageEngine {
 	 * here until they come (`landed`). Without this an item stayed lifted after its drop, drawn by
 	 * the page every frame and holding the worker to the screen's tiles. A new gesture first cancels it.
 	 */
-	settle(): void {
+	settle(landing?: ReadonlyMap<string, Frame>): void {
 		this.settling = true;
+		this.landing = landing;
 	}
 	private settling = false;
 
@@ -620,6 +663,15 @@ export class StageEngine {
 	 * drawing has been painted into the tiles again.
 	 */
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
+		// A gesture's own preview ends a glide still in hand: what it shows is where things are now.
+		if (this.glide) {
+			cancelAnimationFrame(this.glide.frame);
+			this.glide = undefined;
+		}
+		this.showPreview(moving);
+	}
+
+	private showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		if (!this.page) return;
 		if (moving?.size) {
 			const fresh = [...moving.keys()].filter((id) => !this.lifted.has(id));

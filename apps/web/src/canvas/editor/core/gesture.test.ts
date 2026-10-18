@@ -161,6 +161,13 @@ test("over a frame that stacks its children, a drag aims at the slot between the
 	assert.equal(close.steps[1]!.state.drop.near, undefined);
 	assert.deepEqual(steps[2]!.ops, [{ op: "move", id: "a", parent: "col", index: 1, box: { x1: 110, y1: 342, x2: 210, y2: 392 } }]);
 	assert.deepEqual(steps[2]!.state.drop, {});
+	// The engine is told where it was let go and where the column's children are, to glide them from (`glide.ts`).
+	const settled = steps[2]!.effects.find((one) => one.do === "settle");
+	assert.deepEqual(settled && "landing" in settled ? [...settled.landing!] : undefined, [
+		["c1", { x: 18, y: 318, w: 264, h: 40 }],
+		["c2", { x: 18, y: 370, w: 264, h: 40 }],
+		["a", { x: 110, y: 342, w: 100, h: 50 }],
+	]);
 });
 
 test("let go on the composer, a drag mentions what it carried instead of moving it", () => {

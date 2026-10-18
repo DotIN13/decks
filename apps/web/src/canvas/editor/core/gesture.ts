@@ -17,6 +17,7 @@ import { isCard, mediaOf, shapeRadius, type MediaItem, type Op, type PenNode } f
 import { snapMove, type Guide } from "../../pen/snap.ts";
 import { arrowOp, bendAt, bendStart, droppedEnd, joinAt, resetBendOp, resetEndOp, routeDraft, slideJoin, withEnd, type ArrowHandles, type JoinedEnd, type Which } from "./arrows.ts";
 import { dropSlot, frameUnder, NEAR_PX, nearDrops } from "./drop.ts";
+import { landingBoxes } from "./glide.ts";
 import type { BoardBox, EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
 import { boardMoves, copyOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
@@ -111,8 +112,11 @@ export type Effect =
 	| Tap
 	| { do: "move-boards"; moves: readonly BoardMove[] }
 	| { do: "board-size"; path: string; size: { w: number; h: number } }
-	/** Tell the engine a gesture was let go (`EngineSeam.settle`). */
-	| { do: "settle" }
+	/**
+	 * Tell the engine a gesture was let go (`EngineSeam.settle`); a drop says where what it can move
+	 * was let go (`glide.ts`, `landingBoxes`), for the drawing that answers it to glide them from.
+	 */
+	| { do: "settle"; landing?: ReadonlyMap<string, Rect> }
 	/** Step again with a `tick` at this time. */
 	| { do: "wake"; at: number }
 	/** The camera was dragged or something carried: a double-click soon after is not one. */
@@ -338,7 +342,7 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		const slot = state.drop.slot?.index;
 		next = { ...next, drop: {} };
 		const ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
-		if (ids.length) next = settle(next, p.time, ctx, effects);
+		if (ids.length) next = settle(next, p.time, ctx, effects, landingBoxes(scene, ids, offset, into));
 		effects.push({ do: "move-boards", moves: boardMoves(scene.boards(), state.selection.boards, offset.dx, offset.dy) });
 		return { state: { ...next, boardDrag: undefined }, ops, effects };
 	}
@@ -373,16 +377,17 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drag: ZERO };
 		if (copied.made.length) next = selectMade(next, copied.made);
 	} else ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
-	if (ids.length) next = settle(next, p.time, ctx, effects);
+	// A copy lands where it was let go and moves nothing else: only a move glides.
+	if (ids.length) next = settle(next, p.time, ctx, effects, p.mods.alt ? undefined : landingBoxes(scene, ids, offset, into));
 	effects.push({ do: "move-boards", moves: boardMoves(scene.boards(), boards, offset.dx, offset.dy) });
 	next = { ...next, boardDrag: undefined };
 	return { state: next, ops, effects, ...(preview === null ? { preview } : {}) };
 }
 
 /** A gesture let go with its edit sent: the engine is told, and it waits for the drawing that answers it. */
-function settle(state: EditorState, time: number, ctx: GestureContext, effects: Effect[]): EditorState {
+function settle(state: EditorState, time: number, ctx: GestureContext, effects: Effect[], landing?: ReadonlyMap<string, Rect>): EditorState {
 	const until = time + SETTLE_MS;
-	effects.push({ do: "settle" }, { do: "wake", at: until });
+	effects.push(landing?.size ? { do: "settle", landing } : { do: "settle" }, { do: "wake", at: until });
 	return { ...state, settling: [...state.settling, { generation: ctx.generation, until }] };
 }
 

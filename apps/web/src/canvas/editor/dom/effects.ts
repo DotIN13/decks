@@ -31,7 +31,7 @@ export type EffectHost = {
 	onMove: (path: string, x: number, y: number) => void;
 	onResize?: ((path: string, size: { w: number; h: number }) => void) | undefined;
 	toggleMedia: (id: string, media: MediaItem) => void;
-	settle: () => void;
+	settle: (landing?: ReadonlyMap<string, Rect>) => void;
 	/** Step the editor again at a time (`tick`). */
 	wake: (at: number) => void;
 	panned: () => void;
@@ -183,7 +183,7 @@ export function createEffects(host: EffectHost) {
 			case "board-size":
 				return host.onResize?.(effect.path, effect.size);
 			case "settle":
-				return host.settle();
+				return host.settle(effect.landing);
 			case "wake":
 				return host.wake(effect.at);
 			case "panned":

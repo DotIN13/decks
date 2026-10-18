@@ -77,7 +77,7 @@ export function createEditor(host: EditorHost) {
 	const effects = createEffects({
 		...host.effects,
 		boards: host.boards,
-		settle: () => host.engine.settle(),
+		settle: (landing) => host.engine.settle(landing),
 		wake: (at) => {
 			const timer = setTimeout(() => {
 				timers.delete(timer);

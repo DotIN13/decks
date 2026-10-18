@@ -48,8 +48,12 @@ export type PreviewChange = { dx: number; dy: number; w?: number; h?: number; ra
 export interface EngineSeam {
 	/** Draw these items lifted and changed until the next drawing; `undefined` puts them back. */
 	preview(changes: ReadonlyMap<string, PreviewChange> | undefined): void;
-	/** A gesture was let go and its edit sent: what it lifted goes down when the answer is drawn. */
-	settle(): void;
+	/**
+	 * A gesture was let go and its edit sent: what it lifted goes down when the answer is drawn.
+	 * A drop says where what it can move was let go (`glide.ts`, `landingBoxes`): the drawing that
+	 * answers it glides each of them from there to where it lands.
+	 */
+	settle(landing?: ReadonlyMap<string, Rect>): void;
 	/** The boards a drag carries, and how far: their pictures go with it. */
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void;
 	/** A mark for what has been sent so far, and whether a frame painted after it is on screen. */

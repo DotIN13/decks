@@ -29,7 +29,7 @@ export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll
 export function tsSeam(engine: Pick<StageEngine, "preview" | "settle" | "carry" | "mark" | "shows" | "linkAt" | "muteText" | "setDoc">): EngineSeam {
 	return {
 		preview: (changes) => engine.preview(changes),
-		settle: () => engine.settle(),
+		settle: (landing) => engine.settle(landing),
 		carry: (paths, offset) => engine.carry(paths, offset),
 		mark: () => engine.mark(),
 		shows: (mark) => engine.shows(mark),
