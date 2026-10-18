@@ -1,0 +1,17 @@
+{
+  "name": "@decks/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The verb table: every stage verb Decks answers, each declared once, with its arguments, its result and what it changes. The server's routes and the SDK's three forms are made from it.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
