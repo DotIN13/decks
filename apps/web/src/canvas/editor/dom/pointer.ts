@@ -551,7 +551,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		if (host.editable() && !host.drawing() && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a board.
 			if (performance.now() - host.madeAt() < MADE_MS) return;
-			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
+			// A double-click reaches into what is one thing (a shape, a file, a card): words open for rewriting, anything else is selected on its own.
 			const hit = pickAtHere(worldAt(event), { deep: true });
 			// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
 			// A film or a sound: its first press already started it, so the second is only a press.

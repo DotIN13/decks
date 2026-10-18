@@ -67,6 +67,10 @@ export function createKeys(editor: Editor, host: KeysHost) {
 				host.edit(act.ops);
 				for (const move of act.boards) host.onMove(move.path, move.x, move.y);
 				break;
+			case "select":
+				editor.pickBoards([]);
+				editor.select(act.select);
+				break;
 			case "arm":
 				host.arm(act.tool);
 				break;

@@ -10,6 +10,7 @@
  */
 import type { Op } from "@decks/pen";
 import { PEN_TOOL_KEYS, type PenTool } from "./model.ts";
+import { childrenOf, parentOf } from "./pick.ts";
 import { boardMoves, deleteOps, duplicateOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
 import type { SceneQuery } from "./scene.ts";
 
@@ -44,6 +45,8 @@ export type KeyAct =
 	/** Copies of the selection, selected in its place once they arrive. */
 	| { handled: true; do: "duplicate"; ops: Op[]; select: string[] }
 	| { handled: true; do: "nudge"; ops: Op[]; boards: BoardMove[] }
+	/** Another selection: the parents of what is selected (⇧Enter), or its children (Enter). */
+	| { handled: true; do: "select"; select: string[] }
 	| { handled: true; do: "arm"; tool: PenTool };
 
 const NUDGES: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -61,6 +64,16 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	if (selection.length && command && !alt && key.toLowerCase() === "d") {
 		const { ops, made } = duplicateOps(context.scene, selection, context.nextId);
 		return { handled: true, do: "duplicate", ops, select: made };
+	}
+	/*
+	 * ⇧Enter climbs to what the selection sits in, Enter goes down into what it holds: a group's or
+	 * a frame's children, never the parts of what is one thing (a shape, a file, a card).
+	 */
+	if (key === "Enter" && selection.length && !command && !alt) {
+		const next = press.shift ? selection.map((id) => parentOf(context.scene, id)).filter((id): id is string => !!id) : selection.flatMap((id) => childrenOf(context.scene, id));
+		const unique = [...new Set(next)];
+		if (unique.length) return { handled: true, do: "select", select: unique };
+		return { handled: false };
 	}
 	const nudge = NUDGES[key];
 	if ((selection.length || boards.length) && nudge && !command && !alt) {

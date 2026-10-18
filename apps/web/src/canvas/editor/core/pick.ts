@@ -8,13 +8,20 @@ import type { BoardBox, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /**
- * How far up a press climbs from the item it hit. `"outermost"`: to the outermost group round it,
- * the way a design tool selects a group whole, and likewise to a shape, a file or a live file it
- * is part of, and to the card round a block of markdown.
+ * How far up a press climbs from the item it hit.
+ *
+ * `"exact"`, the default: what is under the pointer, the deepest item there. An item in a group or
+ * a frame is picked itself; the group's own empty space, between what it holds, picks the group,
+ * and a frame's padding the frame (it is hit there). Only what is one thing made of parts is
+ * climbed to: a shape, a file or a live file, and the card round a block of markdown.
+ *
+ * `"outermost"`: as `"exact"`, and on to the outermost group round it, the way some design tools
+ * select a group whole. A group's empty space is nothing. What an arrow's end joins still asks this.
  */
-export type PickPolicy = "outermost";
+export type PickPolicy = "exact" | "outermost";
 
 export type PickOptions = {
+	/** `"exact"` unless said. */
 	policy?: PickPolicy;
 	/** The item itself, with no climb: a double-click reaching inside a group. */
 	deep?: boolean;
@@ -49,19 +56,58 @@ function topAt(scene: SceneQuery, point: Pt, skip?: (node: PenNode) => boolean):
 	return undefined;
 }
 
-/** Whether a press on `hit` climbs to `up`, one of the parents round it. */
-const climbsTo = (up: PenNode, hit: PenNode) => up.type === "group" || isShape(up) || isFile(up) || isLiveFile(up) || (isCard(up) && isMarkdownText(hit));
+/** One thing made of parts: a press on a part picks it whole (a card, only from its markdown). */
+const isWhole = (up: PenNode, hit: PenNode) => isShape(up) || isFile(up) || isLiveFile(up) || (isCard(up) && isMarkdownText(hit));
+/** Whether a press on `hit` climbs to `up`, one of the parents round it, under a policy. */
+const climbsTo = (policy: PickPolicy, up: PenNode, hit: PenNode) => (policy === "outermost" && up.type === "group") || isWhole(up, hit);
+
+/**
+ * The topmost group whose box holds the point and that is drawn over `above` (its order), if any:
+ * a press in its empty space, between what it holds. The engine never finds a group under a point
+ * (a group draws nothing of its own), so the groups are looked through here.
+ */
+function groupGapAt(scene: SceneQuery, point: Pt, above: number, skip?: (node: PenNode) => boolean): Placed | undefined {
+	let top: Placed | undefined;
+	for (const placed of scene.items()) {
+		const { node } = placed;
+		if (node.type !== "group" || node.id.includes("/") || placed.order <= above || (top && placed.order < top.order)) continue;
+		if (skip?.(node)) continue;
+		if (contains(scene.box(node.id) ?? placed.box, point)) top = placed;
+	}
+	return top;
+}
 
 /** The item a press at a stage point picks. Boards are not found here, and an item inside an instance is found as the instance. */
 export function pickAt(scene: SceneQuery, point: Pt, options: PickOptions = {}): Picked | undefined {
+	const policy = options.policy ?? "exact";
 	let best = topAt(scene, point, options.skip);
+	// "exact": a group drawn over what was hit, with the point in its empty space, is what the press is on.
+	if (policy === "exact") best = groupGapAt(scene, point, best?.order ?? -1, options.skip) ?? best;
 	if (!best) return undefined;
 	if (!options.deep) {
-		// "outermost", the only policy: every qualifying parent on the way up, the last one winning.
+		// Every qualifying parent on the way up, the last one winning.
 		const hit = best.node;
-		for (let up = best.parent ? scene.item(best.parent) : undefined; up; up = up.parent ? scene.item(up.parent) : undefined) if (climbsTo(up.node, hit)) best = up;
+		for (let up = best.parent ? scene.item(best.parent) : undefined; up; up = up.parent ? scene.item(up.parent) : undefined) if (climbsTo(policy, up.node, hit)) best = up;
 	}
 	return { id: best.node.id, node: best.node, box: { ...(scene.box(best.node.id) ?? best.box) } };
+}
+
+/** The node an item sits in that the editor can select: not a board, not inside an instance. */
+export function parentOf(scene: SceneQuery, id: string): string | undefined {
+	const up = scene.item(id)?.parent;
+	const node = up ? scene.item(up)?.node : undefined;
+	return node && !isBoard(node) && !node.id.includes("/") ? node.id : undefined;
+}
+
+/**
+ * What an item holds that the editor can select one by one: a group's or a frame's children. Not
+ * the parts of what is one thing (a shape, a file, a live file, a card), and nothing in an instance.
+ */
+export function childrenOf(scene: SceneQuery, id: string): string[] {
+	const node = scene.item(id)?.node ?? scene.node(id);
+	if (!node || id.includes("/") || isBoard(node) || isShape(node) || isFile(node) || isLiveFile(node) || isCard(node)) return [];
+	if (node.type !== "group" && node.type !== "frame") return [];
+	return (scene.node(id)?.children ?? node.children ?? []).map((child) => child.id).filter((child) => !child.includes("/") && !!scene.item(child));
 }
 
 /**

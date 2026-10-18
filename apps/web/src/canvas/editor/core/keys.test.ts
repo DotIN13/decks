@@ -94,3 +94,28 @@ test("a letter arms its tool, unless a board is selected or a modifier is held",
 	assert.deepEqual(penKey(key("v"), context()), none);
 	assert.deepEqual(penKey(key("x"), context()), none);
 });
+
+test("⇧Enter picks what the selection sits in, Enter what it holds; neither with ⌘ or Alt, nor where there is nothing", () => {
+	const nested = fakeScene([
+		{ id: "g", type: "group", box: { x: 0, y: 0, w: 300, h: 100 } },
+		{ id: "f", type: "frame", parent: "g", box: { x: 0, y: 0, w: 140, h: 100 } },
+		{ id: "f1", parent: "f", box: { x: 10, y: 10, w: 50, h: 50 } },
+		{ id: "f2", parent: "f", box: { x: 70, y: 10, w: 50, h: 50 } },
+		{ id: "x", parent: "g", box: { x: 200, y: 0, w: 100, h: 100 } },
+		{ id: "sh", type: "frame", box: { x: 500, y: 0, w: 100, h: 100 }, extra: { metadata: { type: "decks.shape" } } },
+		{ id: "sh-words", type: "text", parent: "sh", box: { x: 520, y: 40, w: 60, h: 20 } },
+	]);
+	const at = (selection: string[]) => context({ selection, scene: nested });
+	assert.deepEqual(penKey(key("Enter", { shift: true }), at(["f1"])), { handled: true, do: "select", select: ["f"] });
+	assert.deepEqual(penKey(key("Enter", { shift: true }), at(["f1", "f2"])), { handled: true, do: "select", select: ["f"] });
+	assert.deepEqual(penKey(key("Enter", { shift: true }), at(["f"])), { handled: true, do: "select", select: ["g"] });
+	assert.deepEqual(penKey(key("Enter", { shift: true }), at(["g"])), none);
+	assert.deepEqual(penKey(key("Enter"), at(["g"])), { handled: true, do: "select", select: ["f", "x"] });
+	assert.deepEqual(penKey(key("Enter"), at(["f"])), { handled: true, do: "select", select: ["f1", "f2"] });
+	assert.deepEqual(penKey(key("Enter"), at(["f1"])), none);
+	// A shape is one thing: Enter does not reach its parts.
+	assert.deepEqual(penKey(key("Enter"), at(["sh"])), none);
+	assert.deepEqual(penKey(key("Enter"), at([])), none);
+	assert.deepEqual(penKey(key("Enter", { meta: true }), at(["g"])), none);
+	assert.deepEqual(penKey(key("Enter", { alt: true, shift: true }), at(["f1"])), none);
+});

@@ -212,7 +212,7 @@ function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: Po
 function pressCanvas(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: GestureContext): Step {
 	const at = p.at;
 	const selected = state.selection.items;
-	// The group under the point, unless a double-click already selected the thing inside it.
+	// What is under the point (`pickAt`, "exact"), unless a double-click already selected a part of what is one thing there.
 	const inner = pickAt(scene, at, { deep: true });
 	const hit: Picked | undefined = inner && selected.includes(inner.id) ? inner : pickAt(scene, at);
 	if (hit) {

@@ -79,7 +79,8 @@ export function onSide(box: Rect, point: Pt): ArrowSide {
  * whose end it is.
  */
 export function joinAt(scene: SceneQuery, point: Pt, options: { zoom: number; not?: string }): Join | undefined {
-	const hit = pickAt(scene, point, { skip: (node) => isArrow(node) || node.id === options.not });
+	// An end joins the outermost group round what it is let go on, as it always has.
+	const hit = pickAt(scene, point, { policy: "outermost", skip: (node) => isArrow(node) || node.id === options.not });
 	const found = hit
 		? { name: hit.id, box: hit.box }
 		: (() => {

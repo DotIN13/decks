@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene, type FakeItem } from "./fake-scene.ts";
-import { blockAt, marqueePick, marqueeRect, pickAt, pictureAt } from "./pick.ts";
+import { blockAt, childrenOf, marqueePick, marqueeRect, parentOf, pickAt, pictureAt } from "./pick.ts";
 
 const mark = (type: string) => ({ metadata: { type } });
 
@@ -27,15 +27,47 @@ const stage = (): FakeItem[] => [
 	{ id: "board", type: "browser", box: { x: 1200, y: 0, w: 50, h: 50 }, extra: mark("decks.board") },
 ];
 
-test("a press climbs to the outermost group; deep finds the item itself", () => {
+test("a press picks exactly what is under it: the item in a frame in a group, the frame's padding, the group's gap", () => {
 	const scene = fakeScene(stage());
-	assert.equal(pickAt(scene, { x: 20, y: 20 })?.id, "g");
-	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "outermost" })?.id, "g");
+	assert.equal(pickAt(scene, { x: 20, y: 20 })?.id, "r");
+	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "exact" })?.id, "r");
 	assert.equal(pickAt(scene, { x: 20, y: 20 }, { deep: true })?.id, "r");
-	// Deep on the frame's own paper is the frame.
-	assert.equal(pickAt(scene, { x: 150, y: 150 }, { deep: true })?.id, "f");
-	// A group is never hit itself, only climbed to: its empty corner is nothing.
-	assert.equal(pickAt(scene, { x: 300, y: 300 }), undefined);
+	// The frame's own paper, round the rectangle, is the frame.
+	assert.equal(pickAt(scene, { x: 150, y: 150 })?.id, "f");
+	// The group's empty space, where nothing it holds is drawn, is the group.
+	assert.equal(pickAt(scene, { x: 300, y: 300 })?.id, "g");
+	assert.equal(pickAt(scene, { x: 300, y: 300 }, { deep: true })?.id, "g");
+	// Outside the group's box: nothing.
+	assert.equal(pickAt(scene, { x: 450, y: 450 }), undefined);
+});
+
+test("\"outermost\" climbs to the outermost group, and a group's gap is nothing", () => {
+	const scene = fakeScene(stage());
+	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "outermost" })?.id, "g");
+	assert.equal(pickAt(scene, { x: 150, y: 150 }, { policy: "outermost" })?.id, "g");
+	assert.equal(pickAt(scene, { x: 20, y: 20 }, { policy: "outermost", deep: true })?.id, "r");
+	assert.equal(pickAt(scene, { x: 300, y: 300 }, { policy: "outermost" }), undefined);
+});
+
+test("a group's gap is the group only where it is drawn over what is under it", () => {
+	const scene = fakeScene([
+		{ id: "under", box: { x: 0, y: 0, w: 300, h: 300 } },
+		{ id: "g", type: "group", box: { x: 50, y: 50, w: 200, h: 100 } },
+		{ id: "a", parent: "g", box: { x: 50, y: 50, w: 60, h: 100 } },
+		{ id: "b", parent: "g", box: { x: 190, y: 50, w: 60, h: 100 } },
+		{ id: "inner", type: "group", parent: "g", box: { x: 120, y: 60, w: 60, h: 80 } },
+		{ id: "c", parent: "inner", box: { x: 120, y: 60, w: 20, h: 80 } },
+		{ id: "over", box: { x: 130, y: 0, w: 10, h: 300 } },
+	]);
+	// Between a and b, outside the inner group: the group, drawn over the rectangle under it.
+	assert.equal(pickAt(scene, { x: 115, y: 100 })?.id, "g");
+	// The inner group's own gap is the inner group, the deepest.
+	assert.equal(pickAt(scene, { x: 170, y: 100 })?.id, "inner");
+	assert.equal(pickAt(scene, { x: 125, y: 100 })?.id, "c");
+	// Something drawn over the group is picked over its gap.
+	assert.equal(pickAt(scene, { x: 135, y: 100 })?.id, "over");
+	// Outside the group, the rectangle under it.
+	assert.equal(pickAt(scene, { x: 20, y: 200 })?.id, "under");
 });
 
 test("a shape, a file and a live file are picked whole", () => {
@@ -120,4 +152,19 @@ test("a marquee picks what is wholly inside it, leaving children of a picked par
 	// A card takes its blocks; an instance's inside and a board's node are left out; boards wholly inside are picked.
 	assert.deepEqual(marqueePick(scene, { x: -10, y: 490, w: 2000, h: 700 }), { items: ["card", "line", "line2"], boards: ["boards/x.html"] });
 	assert.deepEqual(marqueePick(scene, { x: 1090, y: -10, w: 200, h: 100 }).items, []);
+});
+
+test("what an item sits in and what it holds, as the keys climb them", () => {
+	const scene = fakeScene(stage());
+	assert.equal(parentOf(scene, "r"), "f");
+	assert.equal(parentOf(scene, "f"), "g");
+	assert.equal(parentOf(scene, "g"), undefined);
+	assert.deepEqual(childrenOf(scene, "g"), ["f"]);
+	assert.deepEqual(childrenOf(scene, "f"), ["r"]);
+	assert.deepEqual(childrenOf(scene, "r"), []);
+	// What is one thing has parts, not children.
+	assert.deepEqual(childrenOf(scene, "sh"), []);
+	assert.deepEqual(childrenOf(scene, "file"), []);
+	assert.deepEqual(childrenOf(scene, "live"), []);
+	assert.deepEqual(childrenOf(scene, "card"), []);
 });
