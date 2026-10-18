@@ -6,13 +6,12 @@ import { isIsolatedStage } from "./isolated-stages.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
-import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
-import type { Stage } from "../../../../runtime/stage.d.ts";
+import { guidelinesFile } from "@decks/runtime";
+import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { serverText } from "./text.ts";
-import { runEval, safeJson } from "./eval.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { StageService, WebTarget } from "./service.ts";
 import { imageKind, imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
@@ -179,34 +178,12 @@ export interface StageSnapshot {
 	identity: Identity;
 }
 
-export interface StageToolResult {
-	/** What the model reads. */
-	text: string;
-	/** Whether the run failed, which each runtime signals in its own way. */
-	isError: boolean;
-	/**
-	 * Pictures the run produced, for the model to look at alongside the text.
-	 *
-	 * One source today: `stage.web.screenshot()`. Base64, so each runtime can put it in
-	 * its own kind of image block; a runtime with no image blocks drops them and the text
-	 * still names the file.
-	 */
-	images?: Array<{ data: string; mimeType: string }>;
-}
-
 export interface StageTool {
-	readonly name: string;
-	readonly label: string;
-	readonly description: string;
-	readonly promptSnippet: string;
+	/** The guidelines appended to every agent's context (`runtime/guidelines.txt`). */
 	readonly guidelines: string[];
-	readonly parameterDescription: string;
 	/**
-	 * The `stage` object this tool runs code against.
-	 *
-	 * Exposed for the one other caller that needs a full stage with a different actor: a
-	 * board running its own code (`stage/board-actor.ts`), which takes this same object and
-	 * never goes through `run`.
+	 * The `stage` object the verbs act through, bound to this caller: an agent, or a board or app
+	 * acting for a conversation (`stage/board-actor.ts`).
 	 */
 	readonly stage: Stage;
 	/**
@@ -216,13 +193,12 @@ export interface StageTool {
 	 * verbs are only described to an agent that can use them (`agents/context.ts`).
 	 */
 	webShared(): boolean;
-	run(code: string): Promise<StageToolResult>;
 	/**
 	 * Call one verb by its name in the verb table (`move`, `pen.edit`), with its arguments as a list.
 	 *
-	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes a run would have
-	 * added to its text (the viewport after `newBoard`, what `fit` measured, the reminders), and any
-	 * pictures. A verb that throws is an answer too, `ok: false` with its sentence.
+	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes the verb added
+	 * (the viewport after `newBoard`, what `fit` measured, the reminders), and any pictures. A verb
+	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
 	call(name: string, args: readonly unknown[]): Promise<StageCallResult>;
 	snapshot(): StageSnapshot;
@@ -235,30 +211,6 @@ export interface StageCallResult {
 	error?: string;
 	notes: string[];
 	images?: Array<{ data: string; mimeType: string }>;
-}
-
-const STAGE_TOOL_NAME = "stage_eval";
-
-/**
- * The tool's description, read from `runtime/tool-description.txt`.
- *
- * **A file, not a string in this module**, because three processes show this text to a
- * model and only one of them is this one. Pi and Claude get it through `StageTool`; opencode
- * reads the same file from its own tool loader, and antigravity's MCP server from its own
- * script (`runtime/opencode/tools/stage_eval.ts`, `runtime/antigravity/mcp-server.mjs`).
- * All three copies used to be hand-written, and two of them had already been shortened —
- * under a comment that still claimed they were "in the same words".
- *
- * The wording is the part that must not drift: four runtimes disagreeing about what a board
- * is for would be four products. Reading one file is the cheapest way to make that
- * impossible rather than merely discouraged.
- */
-let description: string | undefined;
-function toolDescription(): string {
-	if (description === undefined) {
-		description = readFileSync(toolDescriptionPath(), "utf8").trim();
-	}
-	return description;
 }
 
 /** What an agent is told when `runtime/guidelines.txt` is missing: the one rule the rest hang from. */
@@ -277,39 +229,6 @@ function guidelines(): string[] {
 	return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
 }
 const GUIDELINES = guidelines();
-
-/**
- * Verbs this build removed, and the sentence each one answers with for a release.
- *
- * Four runtimes' transcripts contain these names, and a resumed conversation will call them.
- * Each sentence names the call that does the same job, so the next line a model writes is the
- * right one — a refusal it can act on beats a `TypeError` it cannot.
- */
-const GONE: Record<string, string> = {
-	mirror: "stage.mirror is gone. A mirror board is made from the Agents tab; nothing in the API makes one.",
-	toast: "stage.toast is gone. Say it in your turn: what you write reaches the person.",
-	read: "stage.read is gone. A board is a file — read it with your own file tools.",
-	roots: "stage.roots is gone. stage.resolve(file) answers, and says which roots it may reach when it cannot.",
-	context: "stage.context() is gone. stage.boards() marks what each agent holds, in inContext.",
-	workspaces: "stage.workspaces() is gone. stage.agents({ filter: { workspace } }) lists who is on a project.",
-	inPlay: "stage.inPlay() is now stage.boards(), whose inContext says what each agent holds.",
-	attach: "stage.attach is gone: stage.show(path) puts a board on your stage, and you hold what you show.",
-	detach: "stage.detach is gone: stage.hide(path) takes a board off your stage.",
-	task: "stage.task is gone, with the dashboard. Hand work to an agent with stage.send(name, { task }).",
-	schedule: "stage.schedule is gone, with the dashboard's cron list. Nothing in the deck runs on a timer.",
-	annotate: "stage.annotate is gone: put what you want to point at on the board itself, or draw a note beside it with stage.pen.edit.",
-	canvas: "stage.canvas is gone: each agent has its own stage now, and stage.boards() is what is on it.",
-	canvases: "stage.canvases is gone: each agent has its own stage now. stage.agents() lists who else is working.",
-	useCanvas: "stage.useCanvas is gone: each agent has its own stage now, and there is nothing to move to.",
-	newCanvas: "stage.newCanvas is gone: each agent has its own stage now. Show your boards with stage.show.",
-	link: "stage.link is gone with canvases. Link one board to another with an <a href> inside the board.",
-	group: "stage.group is gone with canvases.",
-	unlink: "stage.unlink is gone with canvases.",
-	ungroup: "stage.ungroup is gone with canvases.",
-	web_jev: "stage.web_jev is gone. stage.web drives the person's shared Chrome one step at a time.",
-	delegate: "stage.delegate is gone: a stage run is abandoned after 20 seconds, so it could never return a subagent's report. Use stage.send({ name, kind }, { task, reply: true }) — the agent is made, the work is queued, and its report reaches you on your next turn.",
-	create: 'stage.create({ name }) is now the first argument of send: stage.send({ name, kind }, { task }).',
-};
 
 export function createStageTool(deps: {
 	stage: StageService;
@@ -331,7 +250,7 @@ export function createStageTool(deps: {
 	 * the result text, so that is where a number it should notice belongs.
 	 */
 	let notes: string[] = [];
-	/** Pictures produced during one run — see `StageToolResult.images`. */
+	/** Pictures produced during one call, which go back beside its value (`StageCallResult.images`). */
 	let images: Array<{ data: string; mimeType: string }> = [];
 
 	/** The canvas's own size, or nothing if no browser has ever reported one. */
@@ -434,7 +353,7 @@ export function createStageTool(deps: {
 		// A board shown again that came back to the place it had: nothing was chosen for it.
 		if (!named && before && before.x === box.x && before.y === box.y) return;
 		if (!named) {
-			notes.push(`No at was given, so ${path} went beside your newest board, at ${corner}. Say where each board goes with at: { x1, y1 }: stage.pen.read() lists what is on your stage and where.`);
+			notes.push(`No at was given, so ${path} went beside your newest board, at ${corner}. Say where each board goes with at: { x1, y1 }: decks pen read lists what is on your stage and where.`);
 			return;
 		}
 		const hits = (other: { x: number; y: number; w: number; h: number }) =>
@@ -486,7 +405,8 @@ export function createStageTool(deps: {
 		 * it is used, and a board sized against a fiction is worse than a board sized against
 		 * your own judgement.
 		 */
-		viewport: async () => viewport(),
+		// `null`, not nothing, when no browser has reported one: the answer travels as JSON.
+		viewport: async () => viewport() ?? null,
 
 		/**
 		 * Start a board: the shell, written for you, so you write only the content.
@@ -495,7 +415,7 @@ export function createStageTool(deps: {
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number; at?: { x1: number; y1: number } }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number; at?: { x1: number; y1: number } | { x: number; y: number } }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
 			const named = cornerOf(options.at);
@@ -589,10 +509,10 @@ export function createStageTool(deps: {
 			const pens = service.pens;
 			const asked = typeof options?.canvas === "string" ? options.canvas.trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "") : undefined;
 			const named = asked && pens ? (pens.names().includes(asked) ? asked : pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase())) : undefined;
-			if (asked && !named) throw new Error(`No canvas is called "${options?.canvas}". stage.stages() lists them, by name and title.`);
+			if (asked && !named) throw new Error(`No canvas is called "${options?.canvas}". decks stages lists them, by name and title.`);
 			const on = named ?? agent.stageName?.();
 			const held = on && pens ? pens.boards(on).find((one) => one.path === path) : undefined;
-			if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your stage's canvas"}, so there is no width to fit it at. Show it there first, or name a canvas that holds it: stage.fit(path, { canvas }).`);
+			if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your stage's canvas"}, so there is no width to fit it at. Show it there first, or name a canvas that holds it: decks fit <path> --canvas <name>.`);
 			const { board, content, reading, views } = await service.fit(path, { ...(options?.margin === undefined ? {} : { margin: options.margin }), w: held.w });
 			if (named) pens!.sizeBoard(named, board.path, { w: board.w, h: board.h });
 			else agent.sized?.(board.path, { w: board.w, h: board.h });
@@ -816,7 +736,7 @@ export function createStageTool(deps: {
 			const known = (name: unknown) => {
 				const apps = service_();
 				const text = String(name ?? "").trim();
-				if (!apps.exists(text)) throw new Error(`There is no app called ${JSON.stringify(text)}. stage.apps.list() names them; stage.apps.create(name, { starter }) makes one.`);
+				if (!apps.exists(text)) throw new Error(`There is no app called ${JSON.stringify(text)}. decks apps list names them; decks apps create <name> --starter … makes one.`);
 				return text;
 			};
 			return {
@@ -845,7 +765,7 @@ export function createStageTool(deps: {
 						files,
 						board,
 						url: `/app/${text}/`,
-						next: STARTER_KIND[starter] === "static" ? "Edit the files, then stage.apps.check(name) and stage.show(board)." : STARTER_KIND[starter] === "build" ? "Edit the files, stage.apps.build(name), then stage.apps.check(name) and stage.show(board)." : "Edit the files, stage.apps.run(name), then stage.apps.check(name) and stage.show(board).",
+						next: STARTER_KIND[starter] === "static" ? `Edit the files, then decks apps check ${text} and decks show ${board}.` : STARTER_KIND[starter] === "build" ? `Edit the files, decks apps build ${text}, then decks apps check ${text} and decks show ${board}.` : `Edit the files, decks apps run ${text}, then decks apps check ${text} and decks show ${board}.`,
 					};
 				},
 				/** The board for an app whose folder was written by hand. */
@@ -881,7 +801,7 @@ export function createStageTool(deps: {
 					const kind = service_().state(text).kind;
 					if (kind !== "static") {
 						const ready = kind === "server" ? await service_().run(text, 6_000) : service_().state(text).status === "running" ? undefined : await service_().build(text, 6_000);
-						if (ready && !ready.ok) return { verdict: ready.pending ? `apps/${text} is still ${ready.status}; check again in a moment.` : `apps/${text} is ${ready.status}: ${ready.errors.at(-1) ?? "see stage.apps.logs(name)"}`, ...ready };
+						if (ready && !ready.ok) return { verdict: ready.pending ? `apps/${text} is still ${ready.status}; check again in a moment.` : `apps/${text} is ${ready.status}: ${ready.errors.at(-1) ?? `see decks apps logs ${text}`}`, ...ready };
 					}
 					return service.appCheck(text);
 				},
@@ -917,12 +837,12 @@ export function createStageTool(deps: {
 			if (target && typeof target === "object") {
 				if (!agent.create) throw new Error("This deck cannot make agents.");
 				const name = String(target.name ?? "").trim();
-				if (!name) throw new Error('A new agent needs a name: stage.send({ name: "Rune" }, { task });');
+				if (!name) throw new Error('A new agent needs a name: decks send \'{"name":"Rune"}\' --task …');
 				const made = await agent.create({ ...target, name });
 				return { ...agent.send(made.agent, work), agent: made.agent, name: made.name };
 			}
 			const to = String(target ?? "").trim();
-			if (!to) throw new Error("Say who: a name or id from stage.agents(), or { name } to make one.");
+			if (!to) throw new Error("Say who: a name or id from decks agents, or { name } to make one.");
 			return agent.send(to, work);
 		},
 		/** What is waiting for an agent: yours, or another's if you name it. */
@@ -983,9 +903,9 @@ export function createStageTool(deps: {
 				images.push({ data: shot.png.toString("base64"), mimeType: "image/png" });
 				return { file: shot.file, width: shot.width, height: shot.height };
 			},
-			fill: async (field: WebTarget, text: string) => needWeb().fill(needTarget(field, "fill needs the field's label, or a { ref } from stage.web.read()"), String(text ?? "")),
-			select: async (field: WebTarget, option: string) => needWeb().select(needTarget(field, "select needs the field's label, or a { ref } from stage.web.read()"), option),
-			click: async (what: WebTarget) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from stage.web.read()")),
+			fill: async (field: WebTarget, text: string) => needWeb().fill(needTarget(field, "fill needs the field's label, or a { ref } from decks web read"), String(text ?? "")),
+			select: async (field: WebTarget, option: string) => needWeb().select(needTarget(field, "select needs the field's label, or a { ref } from decks web read"), option),
+			click: async (what: WebTarget) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from decks web read")),
 			press: async (key: string) => needWeb().press(key),
 			/**
 			 * Press the named button, or Enter, once the user has allowed it on the status
@@ -993,7 +913,7 @@ export function createStageTool(deps: {
 			 * asked for this site.
 			 */
 			submit: async (what?: WebTarget, options?: { ask?: boolean }) =>
-				needWeb().submit(what === undefined ? undefined : needTarget(what, "submit needs the button's name, or a { ref } from stage.web.read()"), options),
+				needWeb().submit(what === undefined ? undefined : needTarget(what, "submit needs the button's name, or a { ref } from decks web read"), options),
 			/** Detach from the shared tab. */
 			stop: async () => needWeb().stop(),
 		},
@@ -1023,7 +943,7 @@ export function createStageTool(deps: {
 		},
 		/** Work on another stage: its boards are yours from now on, and the person sees it when talking to you. */
 		open: async (name: string) => {
-			if (typeof name !== "string" || !name.trim()) throw new Error('open names a stage, as in stage.open("deploy"); stage.stages() lists them.');
+			if (typeof name !== "string" || !name.trim()) throw new Error('open names a stage, as in decks open deploy; decks stages lists them.');
 			if (!agent.openStage) throw new Error("This agent cannot change stages.");
 			// By its folder, or by what it is called: the person reads names, and an agent is told them.
 			const pens = service.pens;
@@ -1041,7 +961,7 @@ export function createStageTool(deps: {
 			const pens = needPens();
 			const name = needStage();
 			if (title !== undefined) {
-				if (typeof title !== "string" || !title.trim()) throw new Error('title takes the canvas\'s new name, as in stage.title("Launch plan"); stage.title() reads it.');
+				if (typeof title !== "string" || !title.trim()) throw new Error('title takes the canvas\'s new name, as in decks title "Launch plan"; decks title reads it.');
 				const folder = service.retitle(name, title);
 				service.stagesChanged?.();
 				return { stage: folder, title: pens.titleOf(folder) };
@@ -1050,7 +970,7 @@ export function createStageTool(deps: {
 		},
 		/** A new, empty stage named from a title, opened at once. */
 		newStage: async (title: string) => {
-			if (typeof title !== "string" || !title.trim()) throw new Error('newStage takes a title, as in stage.newStage("Launch plan").');
+			if (typeof title !== "string" || !title.trim()) throw new Error('newStage takes a title, as in decks new-stage "Launch plan".');
 			if (!agent.newStage) throw new Error("This agent cannot make stages.");
 			return { stage: agent.newStage(title.trim()) };
 		},
@@ -1145,7 +1065,7 @@ export function createStageTool(deps: {
 			create: async (path: string, item?: Record<string, unknown>) => needPens().createFile(path, item as never),
 			/** Save an item as a frame file and, unless `replace` is false, put a ref to it in its place. */
 			save: async (id: string, path: string, options?: { replace?: boolean }) => {
-				if (typeof id !== "string" || !id) throw new Error("stage.pen.save(id, path) needs the item's id, from stage.pen.read().");
+				if (typeof id !== "string" || !id) throw new Error("decks pen save <id> <path> needs the item's id, from decks pen read.");
 				return needPens().saveFrame(needStage(), id, path, options?.replace !== false);
 			},
 		},
@@ -1187,37 +1107,8 @@ export function createStageTool(deps: {
 		identity: agent.identity(),
 	});
 
-	/*
-	 * The names that are gone, and what to say instead.
-	 *
-	 * A verb that stops existing becomes "stage.mirror is not a function", which is a turn
-	 * thrown away and a model with no idea what to do next. So each removed name stays
-	 * callable for one release and refuses with the call that replaces it. They are added
-	 * after the object rather than declared in `Stage`, because the whole point is that they
-	 * are not part of the API any more — nothing in the type, nothing in the prompt.
-	 */
-	Object.assign(stage, Object.fromEntries(Object.entries(GONE).map(([name, sentence]) => [name, async () => { throw new Error(sentence); }])));
-	/*
-	 * `me` was five verbs and is one, and it is the busiest thing that moved — 129 calls to
-	 * `me.setTags` alone on this deck. A call to the old shape has to say so rather than read
-	 * as a missing property, so the function carries the five names and each throws its own
-	 * sentence.
-	 */
-	Object.assign(stage.me, {
-		get: async () => { throw new Error("stage.me.get() is now stage.me()."); },
-		setName: async () => { throw new Error('stage.me.setName(name) is now stage.me({ name }).'); },
-		setAvatar: async () => { throw new Error("stage.me.setAvatar(avatar) is now stage.me({ avatar })."); },
-		setTags: async () => { throw new Error("stage.me.setTags(tags) is now stage.me({ tags })."); },
-		setWorkspace: async () => { throw new Error('stage.me.setWorkspace(name) is now stage.me({ workspace }).'); },
-	});
-
 	return {
-		name: STAGE_TOOL_NAME,
-		label: "Stage",
-		description: toolDescription(),
-		promptSnippet: "Run TypeScript against your stage: show boards, hold them in context, name yourself",
 		guidelines: GUIDELINES,
-		parameterDescription: "TypeScript, run as an async function body with `stage` in scope. Return a value to see it.",
 		stage,
 		snapshot,
 		webShared: () => service.web?.status().paired === true,
@@ -1245,41 +1136,6 @@ export function createStageTool(deps: {
 			if (unnamed) said.push(unnamed);
 			deps.persist?.(snapshot());
 			return { ...answer, notes: said, ...(images.length > 0 ? { images: [...images] } : {}) };
-		},
-
-		async run(code: string): Promise<StageToolResult> {
-			notes = [];
-			images = [];
-			const outcome = await runEval(code, stage);
-			const parts: string[] = [];
-			if (outcome.logs.length > 0) parts.push(outcome.logs.join("\n"));
-			if (outcome.error) parts.push(`Error: ${outcome.error}`);
-			else if (outcome.value !== undefined) parts.push(safeJson(outcome.value));
-			else parts.push("(done)");
-			// After the value, because the value is the answer and this is a fact about the
-			// canvas the call happened on.
-			if (notes.length > 0) parts.push(...notes);
-			// Last, and after the run, so a call that has just set them hears nothing
-			// (`agents/identity-reminder.ts`).
-			const unsaid = identityReminder(agent.identity());
-			if (unsaid) parts.push(unsaid);
-			// And a canvas with no name of its own, or one it has outgrown (`stage/canvas-name.ts`).
-			const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
-			if (unnamed) parts.push(unnamed);
-
-			// Written after every run, failed ones included: a run that threw halfway may
-			// still have attached a board, and the snapshot is what the canvas is restored
-			// from.
-			deps.persist?.(snapshot());
-
-			// A timed-out eval is reported rather than raised — the code may well have done
-			// its work before the timer — which is the one case that is an error to read
-			// and not an error to fail.
-			return {
-				text: parts.join("\n"),
-				isError: Boolean(outcome.error) && !outcome.timedOut,
-				...(images.length > 0 ? { images: [...images] } : {}),
-			};
 		},
 	};
 }

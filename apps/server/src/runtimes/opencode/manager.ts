@@ -27,7 +27,7 @@ import { decksServerEnv } from "../decks-env.ts";
  * are first. Memoising the start promise makes the second acquirer wait on the first
  * spawn and then share it, which is the whole point of the exercise.
  *
- * **The server carries ONE token.** The canvas tool used to authenticate with a token
+ * **The server carries ONE token.** Decks' tools used to authenticate with a token
  * minted per agent and placed in that agent's own process environment. With one process
  * there is no per-agent environment to put anything in; instead the tool sends
  * `context.sessionID`, which Decks created and therefore knows, and this server's single
@@ -42,7 +42,7 @@ export interface OpencodeServerSpec {
 	 * deck's project, which is where the tool's `directory` points as well.
 	 */
 	cwd: string;
-	/** Where the canvas tool calls back: Decks' own `/api/stage/eval`, on this process's port. */
+	/** Decks' own address on this process's port, which the Google Docs tools call back to (`/api/gdocs/call`). */
 	stageUrl: string;
 	/** Decks' own port, for the `decks` command in every session's shell (`runtimes/decks-env.ts`). */
 	decksPort?: number;
@@ -194,11 +194,11 @@ export class OpencodeManager {
 			const env: NodeJS.ProcessEnv = {
 				...process.env,
 				OPENCODE_CONFIG_CONTENT: JSON.stringify(spec.config),
-				// Where the canvas tool comes from: `runtime/opencode/tools/stage_eval.ts`,
-				// loaded on top of whatever the user's own config says.
+				// Where Decks' tools and plugin come from: `runtime/opencode/`, loaded on top of
+				// whatever the user's own config says.
 				OPENCODE_CONFIG_DIR: opencodeConfigDir(),
-				// …and what that tool calls back with. One token for the whole server, and
-				// the session id does the rest of the naming.
+				// …and what the Google Docs tools call back with. One token for the whole server,
+				// and the session id does the rest of the naming.
 				DECKS_STAGE_URL: spec.stageUrl,
 				DECKS_STAGE_TOKEN: this.token,
 				// The `decks` command and where Decks is, for every session's shell; the plugin in

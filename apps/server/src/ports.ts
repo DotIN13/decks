@@ -77,7 +77,7 @@ export class Forwards {
 	/** Open a port, or say why not. Opening one that is open again updates its label. */
 	open(port: unknown, options: { label?: string; by?: string } = {}): Forward {
 		if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) {
-			throw new Error("A port is a whole number from 1 to 65535, as in stage.ports({ open: 8766 }).");
+			throw new Error("A port is a whole number from 1 to 65535, as in decks ports --open 8766.");
 		}
 		if (port === this.own) throw new Error(`Port ${port} is Decks itself, and is not forwarded.`);
 		const label = typeof options.label === "string" && options.label.trim() ? options.label.trim().slice(0, 80) : undefined;
@@ -119,7 +119,7 @@ export function forwardRequest(req: IncomingMessage, res: ServerResponse, forwar
 	if (!target) return false;
 	if (!forwards.isOpen(target.port)) {
 		res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-		res.end(`Port ${target.port} is not forwarded. An agent opens it with stage.ports({ open: ${target.port} }).`);
+		res.end(`Port ${target.port} is not forwarded. An agent opens it with decks ports --open ${target.port}.`);
 		return true;
 	}
 	const upstream = httpRequest({ host: "127.0.0.1", port: target.port, method: req.method, path: target.path, headers: withForwarding(req) }, (answer) => {

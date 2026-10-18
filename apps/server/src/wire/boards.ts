@@ -1,8 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import type { ServerMessage } from "@decks/protocol";
 import { asBoardFormat } from "../boards/templates.ts";
-import { codeFor } from "../boards/eval-code.ts";
-import { conversationFor, runAsCaller } from "../stage/caller-run.ts";
 import type { WireContext, WirePart } from "./context.ts";
 import { putOn, takeOff } from "../stage/canvas-ops.ts";
 
@@ -290,99 +287,4 @@ export const boards = {
 			text: restored === 0 ? "Those boards are already as they were." : `Restored ${restored} board${restored === 1 ? "" : "s"}.`,
 		});
 	},
-
-	/**
-	 * A component on a board was pressed, and the board carries code for it.
-	 *
-	 * Everything that makes this safe is a decision made here rather than in the board:
-	 *
-	 * - **The path is the app's**, stamped from the frame the message came from
-	 *   (`board/board-eval.ts`), so a board cannot ask for another board's trust.
-	 * - **The code is the file's**, read here (`boards/eval-code.ts`) rather than sent by the
-	 *   board, so what ran is always recoverable from the board on disk.
-	 * - **The trust list is the person's** (`boards/eval-trust.ts`), and the first ask is a
-	 *   question with the board's name in it rather than a click.
-	 */
-	"board.eval": (message, reply, wire) => {
-		void runBoardEval(message.path, message.id, message.value, reply, wire, message.stage);
-	},
 } satisfies WirePart;
-
-/**
- * Read one board's code for one component, confirm the board is trusted, and run it.
- *
- * Async and unawaited by the frame handler for one reason: the trust question is a dialog,
- * and a handler that blocked would hold the socket. The answer arrives on its own frame
- * (`extension.ui.answer`), so all this has to do is wait.
- */
-async function runBoardEval(
-	path: string,
-	id: string,
-	value: unknown,
-	reply: (message: ServerMessage) => void,
-	wire: WireContext,
-	stage?: string,
-): Promise<void> {
-	if (!wire.deck.board(path)) {
-		reply({ type: "notice", level: "warn", text: `There is no board at ${path} to run anything.` });
-		return;
-	}
-
-	let html: string;
-	try {
-		html = readFileSync(wire.deck.fileOf(path), "utf8");
-	} catch (error) {
-		reply({ type: "notice", level: "error", text: `Could not read ${path}: ${(error as Error).message}` });
-		return;
-	}
-
-	const code = codeFor(html, id);
-	if (code === undefined) {
-		reply({ type: "notice", level: "warn", text: `Nothing on ${path} answers "${id}".` });
-		return;
-	}
-
-	/*
-	 * The question, once per board.
-	 *
-	 * A conversation is needed to ask it and to hold the notice afterwards, and `focused()`
-	 * is what every other frame that needs a stage uses — it mints one for a deck nobody has
-	 * spoken to, which is the right answer here too: a click on a board is a thing a person
-	 * did, and it should be legible in a chat.
-	 */
-	const focused = conversationFor(wire, { board: path, ...(stage ? { stage } : {}) });
-	if (!wire.evalTrust.allows(path)) {
-		const answer = await focused.bridge.choose({
-			title: "Run this board's code?",
-			message: `${path} wants to run the code behind "${id}". It runs with the stage API inside the Decks server, so it can do anything the server can: read files, write boards, move the canvas, message agents.`,
-			options: [
-				{ label: "Allow" },
-				{ label: "Always allow this board", description: `Remember ${path}, and stop asking` },
-				{ label: "No", description: "Run nothing" },
-			],
-		});
-		if (answer === "Always allow this board") wire.evalTrust.allow(path);
-		else if (answer !== "Allow") {
-			reply({ type: "notice", level: "info", text: `${path} was not allowed to run "${id}".` });
-			return;
-		}
-	}
-
-	/*
-	 * The same stage object an agent gets, with the board as the actor (`stage/caller-run.ts`).
-	 *
-	 * `event` is the one name added to the snippet's scope: which component was pressed, what
-	 * it carried, and the board it sits on.
-	 */
-	const event = {
-		id,
-		board: path,
-		path,
-		...(value !== undefined ? { value } : {}),
-	};
-	const outcome = await runAsCaller(
-		{ agents: wire.agents, cameras: wire.cameras, boards: wire.boards, stage: wire.stage, port: wire.port },
-		{ board: path, name: path, code, scope: { event }, what: `ran "${id}"`, ...(stage ? { stage } : {}) },
-	);
-	if (outcome.error) reply({ type: "notice", level: "error", text: `${path}: ${outcome.error}` });
-}

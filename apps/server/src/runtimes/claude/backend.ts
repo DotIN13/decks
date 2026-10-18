@@ -29,7 +29,7 @@ import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { isTransientAuthFailure, MAX_TRANSIENT_RETRIES, retryDelayMs } from "./transient.ts";
 import { isStaleSession } from "./stale-session.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
-import { gdocsToolNames, qualifiedToolName, stageMcpServer } from "./tools.ts";
+import { DECKS_COMMAND_RULES, decksMcpServer, gdocsToolNames } from "./tools.ts";
 import { gdocsCaller } from "../../google/agent-tools.ts";
 import { decksEnv } from "../decks-env.ts";
 import { eventPercent, toUsageReport } from "./usage.ts";
@@ -44,7 +44,7 @@ import { eventPercent, toUsageReport } from "./usage.ts";
  * child process per started agent, which is what `dispose` closes.
  *
  * What is *not* here: the transcript (`agents/translator.ts`, shared with Pi), and the
- * canvas tool's wording (`stage/tool.ts`, likewise).
+ * guidelines every agent is given (`stage/tool.ts`, likewise).
  */
 
 /** Anthropic is the only provider behind this backend. */
@@ -242,7 +242,7 @@ export class ClaudeBackend implements AgentBackend {
 			systemPrompt: {
 				type: "preset",
 				preset: "claude_code",
-				append: [deckContext(deck, qualifiedToolName(this.context.tool), briefingFor(this.context)), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
+				append: [deckContext(deck, briefingFor(this.context)), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
 					"\n",
 				),
 			},
@@ -264,10 +264,10 @@ export class ClaudeBackend implements AgentBackend {
 			 * `commands/`, `agents/` or `hooks/` beside them to pick up.
 			 */
 			plugins: [{ type: "local", path: runtimeDir() }],
-			mcpServers: { [stageServerName()]: stageMcpServer(this.context.tool, gdocsCaller(this.context.port, this.context.canvasToken)) },
-			// Pre-approved: the canvas tool is how the agent answers, and a confirm in
+			mcpServers: { [stageServerName()]: decksMcpServer(gdocsCaller(this.context.port, this.context.canvasToken)) },
+			// Pre-approved: the `decks` command is how the agent answers, and a confirm in
 			// front of it would be a confirm in front of every reply.
-			allowedTools: [qualifiedToolName(this.context.tool), ...gdocsToolNames()],
+			allowedTools: [...DECKS_COMMAND_RULES, ...gdocsToolNames()],
 			permissionMode: CLI_MODE[this.currentMode],
 			includePartialMessages: true,
 			canUseTool: (toolName, input) => this.ask(toolName, input),

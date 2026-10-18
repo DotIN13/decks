@@ -55,7 +55,7 @@ test("a forwarded port answers through Decks, websockets too, and an unopened on
 	try {
 		const shut = await fetch(`${base}/rnode/localhost/${targetPort}/hello`);
 		assert.equal(shut.status, 404, "nothing is forwarded until an agent opens it");
-		assert.match(await shut.text(), /stage\.ports\(\{ open:/);
+		assert.match(await shut.text(), /decks ports --open/);
 
 		forwards.open(targetPort);
 		assert.equal(await (await fetch(`${base}/rnode/localhost/${targetPort}/hello?a=1`)).text(), `saw GET /hello?a=1 host=127.0.0.1:${decksPort}`);

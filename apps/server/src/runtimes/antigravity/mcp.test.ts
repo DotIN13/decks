@@ -6,18 +6,15 @@ import { test } from "node:test";
 import { mcpServerPath } from "./install.ts";
 
 /**
- * The canvas-tool MCP server, driven the way the CLI drives it.
+ * The Google Docs MCP server, driven the way the CLI drives it.
  *
- * `runtime/antigravity/mcp-server.mjs` is the one file this project runs that is not a
- * test, and what it has to get right is a protocol — the MCP handshake, the one tool's
- * schema, and a tool body that is one HTTP call carrying the agent's token — none of
- * which needs a model. So it is spawned for real (the `node` that runs Decks runs it) and
- * spoken to over stdio, with a throwaway HTTP server standing in for Decks' own
- * `/api/stage/eval`. That covers the whole round trip through the CLI's own mechanism
- * except the CLI itself.
+ * What `runtime/antigravity/mcp-server.mjs` has to get right is a protocol — the MCP handshake,
+ * the tools' schemas, and a tool body that is one HTTP call carrying the agent's token — none of
+ * which needs a model. So it is spawned for real (the `node` that runs Decks runs it) and spoken
+ * to over stdio, with a throwaway HTTP server standing in for Decks' own `/api/gdocs/call`.
  */
 
-/** A stand-in for Decks' own `/api/stage/eval`, which answers and remembers. */
+/** A stand-in for Decks' own `/api/gdocs/call`, which answers and remembers. */
 async function stageServer(answer: { text: string; isError?: boolean }) {
 	const seen: Array<{ token: string | undefined; code: unknown }> = [];
 	const server = createServer((request, response) => {
@@ -25,7 +22,7 @@ async function stageServer(answer: { text: string; isError?: boolean }) {
 		request.on("data", (chunk) => (body += chunk));
 		request.on("end", () => {
 			const header = request.headers.authorization;
-			seen.push({ token: typeof header === "string" ? header.replace("Bearer ", "") : undefined, code: JSON.parse(body || "{}").code });
+			seen.push({ token: typeof header === "string" ? header.replace("Bearer ", "") : undefined, code: JSON.parse(body || "{}").tool });
 			response.writeHead(200, { "content-type": "application/json" });
 			response.end(JSON.stringify(answer));
 		});
@@ -79,7 +76,7 @@ async function mcpClient(url: string): Promise<McpClient> {
 	};
 }
 
-test("the handshake lists the one tool, in Decks' words", { skip: false }, async () => {
+test("the handshake lists the Google Docs tools, and no canvas tool", { skip: false }, async () => {
 	const stage = await stageServer({ text: "4" });
 	const client = await mcpClient(stage.url);
 	try {
@@ -92,9 +89,8 @@ test("the handshake lists the one tool, in Decks' words", { skip: false }, async
 
 		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
 
-		const listed = (await client.call("tools/list", {})) as { tools?: Array<{ name?: string; inputSchema?: Record<string, unknown> }> };
-		assert.deepEqual(listed.tools?.map((t) => t.name), ["stage_eval", "gdocs_read", "gdocs_edit"]);
-		assert.equal((listed.tools![0]!.inputSchema?.required as string[])?.join(","), "code");
+		const listed = (await client.call("tools/list", {})) as { tools?: Array<{ name?: string }> };
+		assert.deepEqual(listed.tools?.map((t) => t.name), ["gdocs_read", "gdocs_edit"], "the canvas is the decks command in the CLI's shell");
 	} finally {
 		client.close();
 		stage.close();
@@ -102,53 +98,34 @@ test("the handshake lists the one tool, in Decks' words", { skip: false }, async
 });
 
 test("a tool call reaches Decks with the agent's token, and the answer comes back", { skip: false }, async () => {
+	const stage = await stageServer({ text: "# The doc" });
+	const client = await mcpClient(stage.url);
+	try {
+		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
+		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
+		const outcome = (await client.call("tools/call", { name: "gdocs_read", arguments: { doc: "abc" } })) as {
+			content?: Array<{ type?: string; text?: string }>;
+			isError?: boolean;
+		};
+		assert.deepEqual(stage.seen, [{ token: "test-token", code: "gdocs_read" }]);
+		assert.equal(outcome.isError, false);
+		assert.equal(outcome.content?.[0]?.text, "# The doc");
+	} finally {
+		client.close();
+		stage.close();
+	}
+});
+
+test("the old canvas tool is an unknown tool, said as a failed call", { skip: false }, async () => {
 	const stage = await stageServer({ text: "4" });
 	const client = await mcpClient(stage.url);
 	try {
 		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
-		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
-		const outcome = (await client.call("tools/call", { name: "stage_eval", arguments: { code: "return 42" } })) as {
-			content?: Array<{ type?: string; text?: string }>;
-			isError?: boolean;
-		};
-		assert.deepEqual(stage.seen, [{ token: "test-token", code: "return 42" }]);
-		assert.equal(outcome.isError, false);
-		assert.equal(outcome.content?.[0]?.text, "4");
-	} finally {
-		client.close();
-		stage.close();
-	}
-});
-
-test("a canvas failure is a failed tool call, not a crash", { skip: false }, async () => {
-	const stage = await stageServer({ text: "that board does not exist", isError: true });
-	const client = await mcpClient(stage.url);
-	try {
-		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
-		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
-		const outcome = (await client.call("tools/call", { name: "stage_eval", arguments: { code: "return missing()" } })) as {
-			content?: Array<{ text?: string }>;
-			isError?: boolean;
-		};
-		// Raised on the server side, so the CLI reads a failed tool call rather than a
-		// result that happens to contain the word "Error".
-		assert.equal(outcome.isError, true);
-		assert.match(outcome.content?.[0]?.text ?? "", /that board does not exist/);
-	} finally {
-		client.close();
-		stage.close();
-	}
-});
-
-test("a server that is not there is a failed tool call too", { skip: false }, async () => {
-	const client = await mcpClient("http://127.0.0.1:1/api/stage/eval");
-	try {
-		await client.call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "agy", version: "1" } });
-		client.send({ jsonrpc: "2.0", method: "notifications/initialized" });
 		const outcome = (await client.call("tools/call", { name: "stage_eval", arguments: { code: "x" } })) as { isError?: boolean; content?: Array<{ text?: string }> };
 		assert.equal(outcome.isError, true);
-		assert.match(outcome.content?.[0]?.text ?? "", /117|answered|fetch/i);
+		assert.match(outcome.content?.[0]?.text ?? "", /Unknown tool: stage_eval/);
 	} finally {
 		client.close();
+		stage.close();
 	}
 });

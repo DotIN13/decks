@@ -26,7 +26,6 @@ import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts"
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachLiveDoc } from "./live-doc.ts";
 import { attachBoardOpen } from "./board-links.ts";
-import { attachBoardEval } from "./board-eval.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
@@ -270,13 +269,6 @@ export function BoardFrame(props: {
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
 	/**
-	 * A component on this board carrying code was pressed (`board/board-eval.ts`).
-	 *
-	 * The board posted the name of the code block; the path is stamped here, from the board
-	 * this frame is showing, and the server reads the code out of that board's file.
-	 */
-	onBoardEval?: (path: string, id: string, value: unknown) => void;
-	/**
 	 * How this board is put on the stage (`lib/renderer.ts`): a document in a box, a
 	 * document drawn into a canvas of its own, or a picture on the stage's one canvas.
 	 */
@@ -304,7 +296,6 @@ export function BoardFrame(props: {
 	let detachLive: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
 	let detachDoc: (() => void) | undefined;
-	let detachEval: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	/** Whether the stage has been told this board's document is showing (`onLive`). */
@@ -812,7 +803,6 @@ export function BoardFrame(props: {
 		detachLive?.();
 		detachLinks?.();
 		detachDoc?.();
-		detachEval?.();
 		detachSelect?.();
 		frames?.detach();
 		frames = frame.contentWindow ? holdFrames(frame.contentWindow) : undefined;
@@ -901,14 +891,6 @@ export function BoardFrame(props: {
 		detachLinks = attachBoardOpen(frame, (path) => {
 			props.onOpenBoard?.(path, props.board.path);
 		});
-		/*
-		 * A component carrying code, pressed. The board sends the block's name and this frame's
-		 * own path goes with it, which is what stops one board asking to run another's code
-		 * (`board/board-eval.ts`).
-		 */
-		detachEval = props.onBoardEval
-			? attachBoardEval(frame, (ask) => props.onBoardEval?.(props.board.path, ask.id, ask.value))
-			: undefined;
 		reportExtent(frame, props.board.rev);
 	};
 
@@ -932,8 +914,7 @@ export function BoardFrame(props: {
 		detachLive?.();
 		detachLinks?.();
 		detachDoc?.();
-		detachEval?.();
-		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = detachEval = undefined;
+		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = undefined;
 		frames?.detach();
 		frames = undefined;
 		clearTimeout(measuring);

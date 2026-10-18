@@ -22,11 +22,11 @@ import { decksEnv } from "../decks-env.ts";
  *
  * Two of the CLI's behaviours are worth stating before the code.
  *
- * **The canvas tool arrives over MCP, not as a registered function.** The CLI's own tool
- * list is fixed at its built-ins plus `call_mcp_tool`; the SDK's plain-python-callable
- * route is what died with the SDK. Decks points the CLI's `HOME` at a sandbox it owns
- * (`install.ts`), whose `mcp_config.json` names the canvas-tool server, and the MCP child
- * inherits this agent's token from the process environment.
+ * **The canvas is the `decks` command; Decks' other tools arrive over MCP.** The CLI's shell
+ * has `decks` on its PATH (`runtimes/decks-env.ts`). Its own tool list is fixed at its built-ins
+ * plus `call_mcp_tool`, so the Google Docs tools come from an MCP server: Decks points the CLI's
+ * `HOME` at a sandbox it owns (`install.ts`), whose `mcp_config.json` names that server, and the
+ * MCP child inherits this agent's token from the process environment.
  *
  * **Headless mode cannot ask, so Decks answers yes.** The CLI's permission engine would
  * soft-deny every tool it could not prompt for — including the MCP call and, with it, the
@@ -228,14 +228,14 @@ export class AntigravityBackend implements AgentBackend {
 	 * What the model should know about the deck before its first word.
 	 *
 	 * The same briefing the other backends hand their runtimes — a deck is a directory of
-	 * absolutely- positioned HTML boards, and the canvas tool is the way to reach the
+	 * absolutely- positioned HTML boards, and the `decks` command is the way to reach the
 	 * user's view. It belongs in the prompt because that is the one channel print mode
 	 * reads; it belongs in the *first* prompt because that is the one the model cannot
 	 * miss, and a conversation that resumes already has it in its history.
 	 */
 	private briefing(): string {
 		const { deck, tool } = this.context;
-		return [deckContext(deck, tool.name, briefingFor(this.context)), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return [deckContext(deck, briefingFor(this.context)), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 	}
 
 	async abort(): Promise<void> {

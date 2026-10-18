@@ -210,6 +210,8 @@ export interface ConnectOptions {
 	agent?: string;
 	/** The app the calls are from. Default: `DECKS_APP`, or the page's app. */
 	app?: string;
+	/** A board whose button is calling. Default: the board whose page this is. */
+	board?: string;
 	/** An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`. */
 	session?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */

@@ -90,7 +90,7 @@ export function shotBox(pens: StagePens, stage: string, of: ShotOf): Box {
 	const boxes: Box[] = [];
 	for (const name of names) {
 		const box = boxOfName(String(name));
-		if (!box) throw new Error(`"${name}" is not an item or a board on stage ${stage}: stage.pen.read() lists the items, stage.boards() the boards.`);
+		if (!box) throw new Error(`"${name}" is not an item or a board on stage ${stage}: decks pen read lists the items, decks boards the boards.`);
 		boxes.push(box);
 	}
 	if (boxes.length === 0) throw new Error(`Stage ${stage} has nothing on it to picture.`);

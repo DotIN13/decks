@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { test } from "node:test";
-import { antigravityServer, installDir, opencodeConfigDir, runtimeDir, runtimeLib, SHIPPED, skillsDir, stageDts, toolDescription } from "./paths.ts";
+import { antigravityServer, decksCommands, installDir, opencodeConfigDir, runtimeDir, runtimeLib, SHIPPED, skillsDir } from "./paths.ts";
 
 /**
  * What this build ships, and where it says it is.
@@ -25,8 +25,7 @@ test("the named spots are the ones the app asks for", () => {
 	assert.ok(isAbsolute(runtimeDir()));
 	assert.equal(runtimeLib(), join(runtimeDir(), "lib"));
 	assert.equal(skillsDir(), join(runtimeDir(), "skills"));
-	assert.equal(stageDts(), join(runtimeDir(), "stage.d.ts"));
-	assert.equal(toolDescription(), join(runtimeDir(), "tool-description.txt"));
+	assert.equal(decksCommands(), join(runtimeDir(), "decks-commands.md"));
 	assert.equal(opencodeConfigDir(), join(runtimeDir(), "opencode"));
 	assert.equal(antigravityServer(), join(runtimeDir(), "antigravity", "mcp-server.mjs"));
 });
@@ -41,17 +40,16 @@ test("the install directory is the one node_modules sits in", () => {
 });
 
 test("the two out-of-process shims are where their runtimes are told to look", () => {
-	// opencode is handed this directory as `OPENCODE_CONFIG_DIR`, and the file name is the
-	// tool name — `tools/stage_eval.ts` is the tool `stage_eval`.
-	assert.ok(existsSync(join(opencodeConfigDir(), "tools", "stage_eval.ts")));
+	// opencode is handed this directory as `OPENCODE_CONFIG_DIR`: a tool's file name is its name,
+	// and the plugin is what names a shell command's session for the decks command.
+	assert.ok(existsSync(join(opencodeConfigDir(), "tools", "gdocs_read.ts")));
+	assert.ok(existsSync(join(opencodeConfigDir(), "plugin", "decks-session.ts")));
 	// antigravity is given this path as an MCP server command in its own config.
 	assert.ok(existsSync(antigravityServer()));
 });
 
-test("the description every runtime shows is one file", () => {
-	// Read by the server's tool, by opencode's loader and by antigravity's MCP server. The
-	// server asserts the same thing from its side (`stage/tool.test.ts`); this is the one
-	// that fails if the file itself is missing from a checkout.
-	const text = existsSync(toolDescription()) ? readFileSync(toolDescription(), "utf8") : "";
-	assert.ok(text.length > 500, "the tool description is missing or empty");
+test("the command reference every agent is given is there", () => {
+	// Generated from the verb table (`scripts/gen-sdk.mjs`) and read into each agent's context.
+	const text = existsSync(decksCommands()) ? readFileSync(decksCommands(), "utf8") : "";
+	assert.match(text, /`decks new-board`/, "the command reference is missing or empty");
 });

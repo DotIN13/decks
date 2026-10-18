@@ -24,13 +24,11 @@ import { opencodeManager, type OpencodeServerHandle } from "./manager.ts";
  *
  * Three decisions are worth stating before the code.
  *
- * **The canvas tool is a file, not a closure.** opencode loads `tools/<name>.ts` from the
- * directory `OPENCODE_CONFIG_DIR` names, and Decks points that at `runtime/opencode/`,
- * which it ships. The tool body runs inside opencode's own Bun runtime and calls back over
- * HTTP — with the shared server's token and the session id opencode itself handed it, so
- * the bridge can say which agent is calling (`stage/bridge.ts`) — and it is a real tool
- * call in the transcript, drawn the way pi's and Claude's are, rather than a shell
- * command.
+ * **The canvas is the `decks` command, and a session names its agent.** opencode loads its
+ * tools and plugins from the directory `OPENCODE_CONFIG_DIR` names, and Decks points that at
+ * `runtime/opencode/`, which it ships: the Google Docs tools, and a plugin that puts the session
+ * in each shell command's environment (`DECKS_SESSION`), so a `decks` command reaches the agent
+ * the bridge registered that session to (`stage/bridge.ts`).
  *
  * **Nothing per agent lives in the server's config.** When each agent had its own
  * process, `OPENCODE_CONFIG_CONTENT` could carry that agent's model, mode and briefing on
@@ -163,9 +161,9 @@ export class OpencodeBackend implements AgentBackend {
 
 		this.sessionId = await this.openSession();
 
-		// The canvas tool's calls name this session; the bridge resolves that to this
+		// A `decks` command and the Google Docs tools name this session; the bridge resolves that to this
 		// agent. Registered before the conversation can run a single turn.
-		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, this.context.tool);
+		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id);
 		if (this.context.isolation) await this.setIsolation(this.context.isolation);
 
 		this.stream = new OpencodeStream(translator, this.sessionId, {
@@ -224,7 +222,7 @@ export class OpencodeBackend implements AgentBackend {
 		const path = resolve(deck.path, ".decks-agent.md");
 		// Shared by every opencode agent in the deck, so never an isolated one's: that rides on the
 		// prompt instead (`send`).
-		const text = [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		const text = [deckContext(deck, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 		try {
 			/*
 			 * Only when it has changed, which is not an optimisation.

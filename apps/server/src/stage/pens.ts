@@ -427,7 +427,7 @@ export class StagePens {
 		const target = this.penFile(path);
 		if (!target.ref) throw new PenError(`A frame is saved in frames/ or boards/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
 		const found = indexOf(entry.doc).get(id);
-		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: stage.pen.read() lists the items.`);
+		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: decks pen read lists the items.`);
 		const node = clone(found.node);
 		const { x, y } = node;
 		delete node.x;

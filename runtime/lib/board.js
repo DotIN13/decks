@@ -261,15 +261,17 @@
 	/**
 	 * A component that carries code, pressed.
 	 *
-	 * A board's code does not run here. Its script blocks are typed `text/decks-eval`, so a
-	 * browser reads them as text and never executes them, and this posts the *name* of the
-	 * code rather than the code: the app stamps the board path from the frame the message came
-	 * from, and the server reads the code out of the file, decides whether this board is
-	 * trusted, and runs it with the stage API (`apps/server/src/boards/eval-code.ts`).
+	 * Its code is a script block typed `text/decks-eval`, which a browser reads as text and never
+	 * runs on its own. A press runs the block whose `data-for` names the component, here in the
+	 * board's own page, as the body of an async function with two names in scope: `stage`, the
+	 * Decks SDK (`packages/sdk`, served at `api/sdk/decks.mjs`), whose every call is one verb the
+	 * server checks and answers as this board; and `event`, which component was pressed, what it
+	 * carried and the board it sits on. The server runs none of it: it is asked once whether this
+	 * board may use the stage at all, and notes each verb the code calls in the conversation.
 	 *
 	 * A board therefore explains itself. What a click can do is in the file, in one place, in
 	 * a script block somebody can read and grep, and a board that wants an agent to hear
-	 * something says so in that code — there is no second message kind for reporting.
+	 * something says so in that code (`stage.send`) — there is no second message kind for it.
 	 *
 	 * The value is the component's own where it has one (an input, a select, a textarea) and
 	 * `data-value` otherwise, because a button carries no value and most of what a person
@@ -279,6 +281,38 @@
 	 * Deliberately silent in **edit mode**, like a link: a press there belongs to the caret or
 	 * the drag, and a board must not run code because somebody was moving a box.
 	 */
+	const BOARD_ROUTE = "/api/board/";
+	let stageClient;
+
+	/** The SDK, as this board: found from the board's own address, `<prefix>/api/board/<path>`. */
+	function boardStage() {
+		if (stageClient) return stageClient;
+		const at = location.pathname.indexOf(BOARD_ROUTE);
+		if (at < 0) return Promise.reject(new Error("This page is not a board Decks serves, so its buttons have no stage."));
+		const prefix = location.pathname.slice(0, at);
+		stageClient = import(`${location.origin}${prefix}/api/sdk/decks.mjs`).then((sdk) => sdk.connect());
+		return stageClient;
+	}
+
+	const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+
+	async function runEval(id, value) {
+		const block = [...document.querySelectorAll('script[type="text/decks-eval"]')].find((one) => (one.getAttribute("data-for") ?? "").trim() === id);
+		if (!block) {
+			console.warn(`[decks] Nothing on this board answers "${id}".`);
+			return;
+		}
+		const at = location.pathname.indexOf(BOARD_ROUTE);
+		const path = at < 0 ? location.pathname : decodeURIComponent(location.pathname.slice(at + BOARD_ROUTE.length));
+		const event = { id, board: path, path, ...(value !== undefined ? { value } : {}) };
+		try {
+			const stage = await boardStage();
+			await new AsyncFunction("stage", "event", block.textContent ?? "")(stage, event);
+		} catch (error) {
+			console.error(`[decks] "${id}" on ${path} failed:`, error);
+		}
+	}
+
 	function onEvalClick(event) {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		if (document.documentElement.hasAttribute("data-decks-edit")) return;
@@ -296,8 +330,7 @@
 		const carried = target.getAttribute("data-value");
 		const own = typeof target.value === "string" ? target.value : undefined;
 		const value = carried !== null ? carried : own;
-		if (window.parent === window) return;
-		window.parent.postMessage({ decks: "board.eval", id, ...(value !== undefined ? { value } : {}) }, "*");
+		void runEval(id, value);
 	}
 
 	document.addEventListener("click", onEvalClick, true);

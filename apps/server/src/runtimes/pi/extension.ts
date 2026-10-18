@@ -1,30 +1,26 @@
 import { createBashTool, type ExtensionAPI, type InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { StageAgentHooks, StageTool } from "../../stage/tool.ts";
+import type { StageAgentHooks } from "../../stage/tool.ts";
 import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
 
 /**
- * `decks-stage`: Pi's adapter for the canvas tool.
+ * `decks-stage`: what Pi needs from Decks besides the deck context.
+ *
+ * The canvas is reached with the `decks` command in the agent's shell, so this registers Pi's
+ * bash again with the agent's variables in it, the Google Docs tools, and the revision hook below.
  *
  * Inline rather than a file on disk, for the reason Picone builds its permission layer
- * inline: Pi hands a factory only `ExtensionAPI`, so an extension found on disk could only
- * reach the canvas by reading a config file and guessing. Built here, it closes over the
- * tool the shell already made.
- *
- * The tool itself — its description, its guidelines, the `stage` object — is in
- * `stage/tool.ts`, shared with the Claude backend. What is left here is the two things
- * only Pi can do: register a tool with a TypeBox schema, and write a `board-rev` entry
- * into the session tree.
+ * inline: Pi hands a factory only `ExtensionAPI`, so an extension found on disk could not
+ * close over this agent's hooks and variables.
  */
 
 export function decksStage(deps: {
-	tool: StageTool;
 	agent: StageAgentHooks;
 	gdocs?: GdocsCall;
 	/** The agent's shell: where it runs, and the variables that put `decks` in it (`runtimes/decks-env.ts`). */
 	shell?: { cwd: string; env: Record<string, string> };
 }): InlineExtension {
-	const { tool, agent, gdocs, shell } = deps;
+	const { agent, gdocs, shell } = deps;
 
 	return {
 		name: "decks-stage",
@@ -42,7 +38,7 @@ export function decksStage(deps: {
 				});
 				pi.registerTool({ ...bash, execute: (id, params, signal, onUpdate) => bash.execute(id, params, signal, onUpdate) });
 			}
-			// Google Docs, read and edited as markdown (`google/docs.ts`); a failure is thrown, as the canvas tool's is.
+			// Google Docs, read and edited as markdown (`google/docs.ts`); a failure is thrown, so Pi marks it as one.
 			for (const t of gdocs ? GDOCS_TOOLS : []) {
 				pi.registerTool({
 					name: t.name,
@@ -56,34 +52,6 @@ export function decksStage(deps: {
 					},
 				});
 			}
-			pi.registerTool({
-				name: tool.name,
-				label: tool.label,
-				description: tool.description,
-				promptSnippet: tool.promptSnippet,
-				promptGuidelines: tool.guidelines,
-				parameters: Type.Object({
-					code: Type.String({ description: tool.parameterDescription }),
-				}),
-				async execute(_toolCallId, params) {
-					const outcome = await tool.run(params.code);
-					// A failed eval is a failed tool call: thrown, so Pi marks it as an error
-					// and the model sees it as one rather than as a result that happens to
-					// contain the word "Error".
-					if (outcome.isError) throw new Error(outcome.text);
-					// `details` is where Pi keeps a tool's structured result. The canvas
-					// state is no longer *restored* from it — that is `AgentStateStore`, which
-					// both runtimes use — but it costs nothing and is what Pi renders from.
-					return {
-						content: [
-							{ type: "text", text: outcome.text },
-							// The same image blocks Pi's own read tool returns for a picture.
-							...(outcome.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
-						],
-						details: tool.snapshot(),
-					};
-				},
-			});
 
 			/**
 			 * Write down which version of a board this turn produced (§6.7).

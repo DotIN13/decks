@@ -16,7 +16,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  *
  * Who is calling is said, not proven, for now: `X-Decks-Agent` names an agent by id or name (the
  * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
- * opencode session, whose agent the bridge knows, and `X-Decks-App`
+ * opencode session, whose agent the bridge knows, `X-Decks-Board` a board's button (with
+ * `X-Decks-Stage`, the canvas it was pressed on), and `X-Decks-App`
  * names an app, which acts for the conversation on screen once the person has let it. Requests
  * from another site still need the pairing token (`http.ts`), as every `/api` route does.
  */
@@ -77,6 +78,9 @@ async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: u
 	};
 	const appName = header("x-decks-app") ?? (typeof body.app === "string" ? body.app : undefined);
 	if (appName) return appCaller(app, appName, allowedOnce);
+	// A board's own button, whose code runs in the board's page (`runtime/lib/board.js`).
+	const board = header("x-decks-board");
+	if (board) return boardCaller(app, decodeURIComponent(board), header("x-decks-stage"), allowedOnce);
 
 	// An opencode session names its agent through the bridge that registered it (`runtime/opencode/plugin`).
 	const session = header("x-decks-session");
@@ -99,6 +103,38 @@ function agentNamed(app: App, named: string): DeckAgent | undefined {
 	const lower = named.toLowerCase();
 	const matches = app.agents.all().filter((one) => one.name.toLowerCase() === lower);
 	return matches.length === 1 ? matches[0] : undefined;
+}
+
+/**
+ * A board's button: its code runs in the board's own page, and each verb it calls comes here. Once
+ * the person has let that board (asked once, by its path), it acts for the conversation on the
+ * board's canvas under the board's name, as its code always did; it may not make agents.
+ */
+async function boardCaller(app: App, path: string, stage: string | undefined, allowedOnce: Set<string>): Promise<Caller> {
+	if (!app.deck.board(path)) return { status: 404, error: `There is no board at ${path}.` };
+	const on = { board: path, ...(stage ? { stage } : {}) };
+	if (!app.evalTrust.allows(path) && !allowedOnce.has(path)) {
+		const answer = await conversationFor(app, on).bridge.choose({
+			title: "Let this board use the stage?",
+			message: `${path} has a button whose code calls stage verbs: it can write boards, move the canvas and message agents.`,
+			options: [
+				{ label: "Allow until Decks restarts" },
+				{ label: "Always allow this board", description: `Remember ${path}, and stop asking` },
+				{ label: "No", description: "Refuse its calls" },
+			],
+		});
+		if (answer === "Always allow this board") app.evalTrust.allow(path);
+		else if (answer === "Allow until Decks restarts") allowedOnce.add(path);
+		else return { status: 403, error: `The person did not let ${path} use the stage.` };
+	}
+	const { tool, focused } = callerTool({ agents: app.agents, cameras: app.cameras, boards: app.boards, stage: app.stage, port: app.port }, { ...on, name: path });
+	return {
+		tool,
+		announce: (verb, answer) => {
+			if (answer.ok) focused.translator.notice("info", `${path} called ${verb}`);
+			else focused.translator.notice("error", `${path} called ${verb} and failed: ${answer.error}`);
+		},
+	};
 }
 
 /**

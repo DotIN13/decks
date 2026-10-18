@@ -1,6 +1,6 @@
 ---
 name: pen-stage
-description: Your stage is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, stage.pen.edit and boxes, moving between stages, and patterns for arranging boards. Read before your first stage.pen edit.
+description: Your stage is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, pen edits and boxes, moving between stages, and patterns for arranging boards. Read before your first decks pen edit.
 ---
 
 # Drawing on the stage
@@ -9,10 +9,10 @@ Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format*
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
 - **Boards**: the HTML pages you write. Each one on the stage is a pen `browser` item pointing at
-  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`. `stage.show`, `stage.hide`
-  and `stage.move` add, remove and move them; you can also move them with `stage.pen.edit`, or put
+  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`. `decks.show`, `decks.hide`
+  and `decks.move` add, remove and move them; you can also move them with `decks.pen.edit`, or put
   them inside a frame that lays them out. Never make a board by inserting a `browser` item: write it
-  with `stage.newBoard` and show it.
+  with `decks.newBoard` and show it.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
   boards — a note beside one, an arrow from one to the next, an outline round a group. Put an
   answer on a board; put the arrangement around it here.
@@ -26,12 +26,16 @@ board rather than on it, unless covering part of it is the point.
 The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
 the file may have changed since you last looked.
 
+The examples below are a node script, where `const { decks } = await import(process.env.DECKS_SDK)`
+gives every verb as a function; a big edit reads best that way. The same calls are commands in bash:
+`decks pen read`, `decks pen edit '[…]'` (or `… | decks pen edit -` from a file), `decks show <id>`.
+
 ## Stages
 
 ```ts
-await stage.stages();                  // every stage: { name, open: [agents], boards, mine? }
-await stage.open("deploy");            // work on another stage: its boards become yours
-await stage.newStage("Launch plan");   // an empty stage, opened; answers its folder name
+await decks.stages();                  // every stage: { name, open: [agents], boards, mine? }
+await decks.open("deploy");            // work on another stage: its boards become yours
+await decks.newStage("Launch plan");   // an empty stage, opened; answers its folder name
 ```
 
 The person sees the stage the agent they are talking to has open. Two agents on one stage share
@@ -40,9 +44,9 @@ its boards and its drawing. Make a new stage for a new piece of work; open an ol
 ## The three calls
 
 ```ts
-const drawing = await stage.pen.read();   // every item as saved, plus its box on the stage
-await stage.pen.edit([ /* edits */ ]);    // applied together, or not at all
-const file = await stage.pen.file();      // "canvases/<name>/canvas.pen", to edit by hand instead
+const drawing = await decks.pen.read();   // every item as saved, plus its box on the stage
+await decks.pen.edit([ /* edits */ ]);    // applied together, or not at all
+const file = await decks.pen.file();      // "canvases/<name>/canvas.pen", to edit by hand instead
 ```
 
 - `read()` returns `{ stage, file, version, variables?, themes?, children }`. Each item is exactly
@@ -59,14 +63,14 @@ const file = await stage.pen.file();      // "canvases/<name>/canvas.pen", to ed
 Every position you read is a box with both corners, and every position you write can be one:
 
 ```ts
-await stage.pen.edit([
+await decks.pen.edit([
   { op: "insert", node: { type: "note", id: "check", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } },
 ]);
 ```
 
 The server turns the box into pen's own numbers — `x` and `y` from the parent's corner, `width`,
 `height` — against wherever the parent really is. Give `x1, y1` alone to move without resizing.
-`stage.boards()` gives each board a `box` too, so a note beside a board is
+`decks.boards()` gives each board a `box` too, so a note beside a board is
 `{ x1: board.box.x2 + 40, y1: board.box.y1, … }`. Inside a frame that lays out its children (a row
 or a column), the frame decides where they go, so only the size is taken from a box.
 
@@ -107,7 +111,7 @@ no field for: `{ type: "…", … }`).
 | `group` | a container, no layout: its box is its children's | `children` |
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
-| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — put up with `stage.show`, not inserted |
+| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — put up with `decks.show`, not inserted |
 | `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
 
 Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;
@@ -202,13 +206,13 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
 **Saved frames.** A frame worth using again goes in the deck's `frames/` folder, as a board goes in
 `boards/`, in folders if you like. Two ways in:
 
-- `stage.pen.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
+- `decks.pen.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
   `frames/ui/agent-card.pen` with that frame as its one reusable item;
-- `stage.pen.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
+- `decks.pen.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
   puts a ref to it where the item was.
 
 Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
-with nothing to declare. `stage.pen.read("frames/ui/agent-card")` reads it and `stage.pen.edit([...],
+with nothing to declare. `decks.pen.read("frames/ui/agent-card")` reads it and `decks.pen.edit([...],
 { path: "frames/ui/agent-card" })` edits it with the same edits a stage takes; every stage using it
 shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
 reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
@@ -259,7 +263,7 @@ nothing else — the server draws the line and its head between the facing edges
 whenever either end moves**, a board included:
 
 ```ts
-await stage.pen.edit([
+await decks.pen.edit([
   { op: "insert", node: { type: "path", id: "then", metadata: { type: "decks.arrow", from: "boards/draft.html", to: "boards/final.html" } } },
 ]);
 ```
@@ -287,30 +291,30 @@ drawn on the middle of the line.
 
 ## Look at it
 
-`stage.screenshot()` takes a picture of your stage as the person sees it, boards and drawing
+`decks.screenshot()` takes a picture of your stage as the person sees it, boards and drawing
 together, and hands it to you in the call's result. Check with it after a big change: text that
 overflows a note, an arrow that crosses a board, a frame that clips what is in it are plain in a
 picture and invisible in `read()`.
 
-**Point the person's camera at one item** with `stage.show`, the same verb that puts a board up:
+**Point the person's camera at one item** with `decks.show`, the same verb that puts a board up:
 an item's id is taken where a board's path is, and the canvas flies to it. Nothing is held and
 nothing moves — the item is on the stage already — and naming an item and a board together frames
 both.
 
 ```ts
-await stage.show("summary");                          // look at this note
-await stage.show(["boards/plan.html", "summary"]);    // the board and the note beside it
+await decks.show("summary");                          // look at this note
+await decks.show(["boards/plan.html", "summary"]);    // the board and the note beside it
 ```
 
 The person can drag an item **into the composer** to talk about it, and it arrives in their
 message as `@item:<id>` — the id to look up in `read()`.
 
 ```ts
-await stage.screenshot();                               // the whole stage
-await stage.screenshot({ of: "summary" });             // one item, with a margin
-await stage.screenshot({ of: ["boards/plan.html", "then"] });
-await stage.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
-await stage.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
+await decks.screenshot();                               // the whole stage
+await decks.screenshot({ of: "summary" });             // one item, with a margin
+await decks.screenshot({ of: ["boards/plan.html", "then"] });
+await decks.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
+await decks.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
 ```
 
 ## Ink
@@ -328,7 +332,7 @@ near. Leave it as they drew it: move or delete a stroke only when asked.
 
 ## Patterns
 
-- **A note beside a board:** read the board's `box` from `stage.boards()`, insert a `note` with
+- **A note beside a board:** read the board's `box` from `decks.boards()`, insert a `note` with
   `box: { x1: box.x2 + 40, y1: box.y1, x2: box.x2 + 300 }`.
 - **A titled area behind boards:** a `frame` with `layout: "none"`, a soft `fill`
   (`"#3b82f614"`), `cornerRadius: 16`, boxed 40 px outside the boards it gathers, and a `text`

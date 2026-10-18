@@ -4,10 +4,11 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /**
- * Decks' tools for OpenCode 2: the canvas tool and the two Google Docs tools, as one plugin.
+ * Decks' tools for OpenCode 2: the two Google Docs tools, and the session for the `decks` command,
+ * as one plugin.
  *
- * The opencode 1 version is three files in `runtime/opencode/tools/`, one per tool, because v1
- * named a tool after its file. OpenCode 2 has no tool files: a plugin registers tools in its
+ * The opencode 1 version is two files in `runtime/opencode/tools/`, one per tool, because v1
+ * named a tool after its file, and a plugin in `runtime/opencode/plugin/`. OpenCode 2 has no tool files: a plugin registers tools in its
  * `setup`, so they live together here. Everything else is the same bargain. This runs inside
  * OpenCode's own process, not inside Decks, so each tool is one HTTP call back to the Decks
  * server that spawned it, with the server's single token and the session id that names the
@@ -22,7 +23,6 @@ import { fileURLToPath } from "node:url"
 const here = dirname(fileURLToPath(import.meta.url))
 const runtime = resolve(here, "..", "..")
 
-const stageWords = readFileSync(resolve(runtime, "tool-description.txt"), "utf8").trim()
 const gdocs = JSON.parse(readFileSync(resolve(runtime, "gdocs-tools.json"), "utf8")) as Array<{
   name: string
   description: string
@@ -72,21 +72,6 @@ export default Plugin.define({
       if (typeof session === "string" && session) command.env.DECKS_SESSION = session
     })
     await ctx.tool.transform((editor) => {
-      editor.add({
-        name: "stage_eval",
-        description: stageWords,
-        options: { codemode: false },
-        input: {
-          type: "object",
-          properties: {
-            code: { type: "string", description: "TypeScript, run as an async function body with `stage` in scope. Return a value to see it." },
-          },
-          required: ["code"],
-        },
-        execute: async (input: { code: string }, context: { sessionID: string }) => ({
-          content: await callDecks("/stage/eval", { code: input.code, sessionID: context.sessionID }, "canvas"),
-        }),
-      })
       for (const spec of gdocs) {
         editor.add({
           name: spec.name,

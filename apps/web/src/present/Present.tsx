@@ -4,7 +4,6 @@ import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 import { attachBoardOpen } from "../board/board-links.ts";
-import { attachBoardEval } from "../board/board-eval.ts";
 import { lendFrame } from "../canvas/borrow.ts";
 import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS, springEasing } from "../app/spring.ts";
 import { reducedMotion } from "../state/camera.ts";
@@ -70,8 +69,6 @@ export function Present(props: {
 	 * it is a board nobody sees.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
-	/** A component on the presented board carrying code was pressed (`board/board-eval.ts`). */
-	onBoardEval?: (path: string, id: string, value: unknown) => void;
 }) {
 	let frameEl: HTMLIFrameElement | undefined;
 	let layerEl: HTMLDivElement | undefined;
@@ -241,7 +238,6 @@ export function Present(props: {
 	 */
 	let frameListeners: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
-	let detachEval: (() => void) | undefined;
 	const listenInFrame = () => {
 		const doc = frameEl?.contentDocument;
 		if (!doc) return;
@@ -269,7 +265,6 @@ export function Present(props: {
 			window.removeEventListener("pointerdown", wake);
 			frameListeners?.();
 			detachLinks?.();
-			detachEval?.();
 			clearTimeout(wakeTimer);
 		});
 	});
@@ -403,13 +398,6 @@ export function Present(props: {
 						detachLinks = attachBoardOpen(element, (path) => {
 							if (props.onOpenBoard?.(path, props.board.path)) props.onExit();
 						});
-						/*
-						 * Code on the presented board, pressed. The overlay's own frame carries this for the
-						 * same reason the link above does, and the path is stamped from the board being
-						 * presented rather than from anything the board said.
-						 */
-						detachEval?.();
-						detachEval = attachBoardEval(element, (ask) => props.onBoardEval?.(props.board.path, ask.id, ask.value));
 						if (slides()) ready();
 					});
 				}}

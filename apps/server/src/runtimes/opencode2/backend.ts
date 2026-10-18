@@ -141,8 +141,8 @@ export class Opencode2Backend implements AgentBackend {
 		await this.refreshModels();
 		this.sessionId = await this.openSession();
 
-		// The canvas tool's calls name this session; the bridge resolves that to this agent.
-		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, this.context.tool, "opencode2");
+		// A `decks` command and the Google Docs tools name this session; the bridge resolves that to this agent.
+		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, "opencode2");
 		await this.putInstruction(BRIEFING, this.briefing());
 		if (this.context.isolation) await this.setIsolation(this.context.isolation);
 
@@ -195,7 +195,7 @@ export class Opencode2Backend implements AgentBackend {
 	/** The deck's description and the guidelines, as every runtime gets them. */
 	private briefing(): string {
 		const { deck, tool } = this.context;
-		return [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return [deckContext(deck, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 	}
 
 	private async putInstruction(key: string, value: string): Promise<void> {

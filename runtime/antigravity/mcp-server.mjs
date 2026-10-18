@@ -3,37 +3,23 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 /**
- * The Decks canvas tool, for antigravity — over MCP.
+ * Decks' Google Docs tools, for antigravity — over MCP.
  *
- * Antigravity's own tool surface is fixed: the CLI ships its built-ins plus
- * `call_mcp_tool`, so the only way a board-writing tool gets into the agent's
- * toolset is MCP. This server is what the CLI spawns (`mcp_config.json` in the
- * HOME Decks hands it) and it exposes the canvas tool and the Google Docs tools: the same `stage_eval`
- * every other runtime gets, in the same words.
+ * Antigravity's own tool surface is fixed: the CLI ships its built-ins plus `call_mcp_tool`, so
+ * the only way Decks' own tools get into the agent's toolset is MCP. This server is what the CLI
+ * spawns (`mcp_config.json` in the HOME Decks hands it), and it exposes the Google Docs tools. The
+ * canvas is not one of them: the agent reaches it with the `decks` command in its shell, which
+ * Decks puts on the CLI's PATH (`apps/server/src/runtimes/decks-env.ts`).
  *
- * The body is one HTTP call back to the Decks server that spawned the CLI. The
- * *CLI process* carries `DECKS_STAGE_URL` and `DECKS_STAGE_TOKEN` in its
- * environment and the MCP child inherits them — the token is this agent's
- * identity, minted per agent, and Decks knows which conversation it belongs to,
- * so nothing here has to say who is calling. `DECKS_AGENT` is ride-along
- * identity for a runtime that wants to say so.
+ * The body is one HTTP call back to the Decks server that spawned the CLI. The *CLI process*
+ * carries `DECKS_STAGE_URL` and `DECKS_STAGE_TOKEN` in its environment and the MCP child inherits
+ * them — the token is this agent's identity, minted per agent.
  *
- * No dependencies and no package.json: the MCP protocol is JSON-RPC 2.0 over
- * stdio, which is small enough to hold in one file, and the fewer things agy
- * has to resolve to spawn this, the fewer ways a deck can be missing it.
+ * No dependencies and no package.json: the MCP protocol is JSON-RPC 2.0 over stdio, which is
+ * small enough to hold in one file.
  */
 
-/*
- * The tool's own words, read from `runtime/tool-description.txt`.
- *
- * One file, four runtimes: Pi and Claude are handed it by the server, opencode's loader
- * reads it, and this reads it. It used to be typed out here too, shortened, under a comment
- * that said "in the same words" — and the model on antigravity was told a different thing
- * about what a board is for than the model on Pi. The MCP protocol wants the text at
- * registration time, which is why it is read here rather than passed in.
- */
 const HERE = dirname(fileURLToPath(import.meta.url));
-const TOOL_DESCRIPTION = readFileSync(resolve(HERE, "../tool-description.txt"), "utf8").trim();
 
 const STAGE_URL = process.env.DECKS_STAGE_URL ?? "";
 const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
@@ -41,23 +27,8 @@ const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
 /** The Google Docs tools, worded in `runtime/gdocs-tools.json` as every runtime has them. */
 const GDOCS = JSON.parse(readFileSync(resolve(HERE, "../gdocs-tools.json"), "utf8"));
 
-/** The canvas tool, named and worded as `stage/tool.ts` has it, and the Google Docs tools. */
+/** The Google Docs tools. The canvas is the `decks` command in the CLI's shell. */
 const TOOLS = [
-	{
-		name: "stage_eval",
-		description: TOOL_DESCRIPTION,
-		inputSchema: {
-			type: "object",
-			properties: {
-				code: {
-					type: "string",
-					description:
-						"TypeScript, run as an async function body with `stage` in scope. Return a value to see it.",
-				},
-			},
-			required: ["code"],
-		},
-	},
 	...GDOCS.map((t) => ({
 		name: t.name,
 		description: t.description,
@@ -71,24 +42,7 @@ const TOOLS = [
 
 async function callTool(name, args) {
 	if (GDOCS.some((t) => t.name === name)) return callGdocs(name, args);
-	if (name !== "stage_eval") throw new Error(`Unknown tool: ${name}`);
-	const code = String((args && args.code) ?? "");
-	if (!STAGE_URL || !STAGE_TOKEN) {
-		throw new Error("This antigravity session was not started by Decks, so there is no canvas to reach.");
-	}
-	const response = await fetch(STAGE_URL, {
-		method: "POST",
-		headers: { "content-type": "application/json", authorization: `Bearer ${STAGE_TOKEN}` },
-		body: JSON.stringify({ code }),
-	});
-	if (!response.ok) throw new Error(`The Decks canvas answered ${response.status}.`);
-	const outcome = await response.json();
-	const text = String(outcome && typeof outcome.text === "string" ? outcome.text : JSON.stringify(outcome));
-	// Thrown rather than returned, which is what the Pi adapter does and for the same
-	// reason: a failed eval must read as a failed tool call and not as a result that
-	// happens to contain the word "Error".
-	if (outcome && outcome.isError) throw new Error(text);
-	return text;
+	throw new Error(`Unknown tool: ${name}`);
 }
 
 // --- stdio JSON-RPC ----------------------------------------------------------

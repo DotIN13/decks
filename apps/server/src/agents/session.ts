@@ -794,7 +794,7 @@ export class DeckAgent {
 	openStage(name: string): void {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
-		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". stage.stages() lists them; stage.newStage(title) makes one.`);
+		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks stages lists them; decks new-stage <title> makes one.`);
 		// Isolated, the only stages there are are isolated ones (`stage/isolated-stages.ts`).
 		if (this.isolatedOn && !isIsolatedStage(pens, name)) throw new Error(`Isolated mode: "${name}" is not an isolated stage, and an isolated agent can open only those.`);
 		if (this.isolatedOn && !this.isolatedStages.includes(name)) this.isolatedStages.push(name);
@@ -1159,7 +1159,7 @@ export class DeckAgent {
 			// Minted here rather than in the backend, because the token is the *agent's* and
 			// outlives any one runtime process: a rewind reopens the session and the tool on
 			// the other side must not be left holding a token nobody answers.
-			...(this.stageBridge ? { canvasToken: this.stageBridge.issue(this.id, tool) } : {}),
+			...(this.stageBridge ? { canvasToken: this.stageBridge.issue(this.id) } : {}),
 			// …and the bridge itself, for the one runtime that shares a process and so names
 			// its calls by session id rather than by a token of its own (opencode).
 			...(this.stageBridge ? { stageBridge: this.stageBridge } : {}),

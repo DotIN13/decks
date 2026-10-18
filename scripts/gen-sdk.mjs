@@ -2,6 +2,7 @@
 //   packages/sdk/src/index.js   the list of verbs, between its <generated:verbs> markers
 //   packages/sdk/src/index.d.ts the types: every named shape, and every verb as a method
 //   packages/sdk/src/verbs.json what the decks command and the MCP server read: summaries, signatures, JSON Schemas
+//   runtime/decks-commands.md   the command reference every agent is given in its context
 // Run: node --import tsx scripts/gen-sdk.mjs        Check only: node --import tsx scripts/gen-sdk.mjs --check
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -66,6 +67,8 @@ export interface ConnectOptions {
 	agent?: string;
 	/** The app the calls are from. Default: \`DECKS_APP\`, or the page's app. */
 	app?: string;
+	/** A board whose button is calling. Default: the board whose page this is. */
+	board?: string;
 	/** An opencode session, which Decks maps to its agent. Default: \`DECKS_SESSION\`. */
 	session?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */
@@ -128,6 +131,45 @@ export function verbsJson() {
 	)}\n`;
 }
 
+const GROUP_TITLES = {
+	boards: "Boards: make, size and refresh a board file",
+	stage: "Boards on your stage",
+	view: "Your view",
+	stages: "Stages",
+	pen: "The drawing on your stage",
+	agents: "Agents",
+	apps: "Apps",
+	web: "The person's Chrome",
+	misc: "Addresses and time",
+};
+
+/**
+ * The reference an agent reads: each verb as its command and its TypeScript signature, by group,
+ * with the shared types first. The person's Chrome is between markers, so a deck where nobody is
+ * sharing a tab can leave it out (`agents/context.ts`).
+ */
+export function commandsMarkdown() {
+	const named = new Map();
+	for (const verb of VERBS) {
+		for (const param of verb.params) namesIn(param.schema, named);
+		if (verb.result) namesIn(verb.result, named);
+	}
+	const lines = ["<!-- Generated from packages/api by scripts/gen-sdk.mjs. Edit the table there, then run the script. -->", ""];
+	lines.push("```ts");
+	for (const [name, schema] of named) lines.push(`type ${name} = ${tsOf(schema, true)};`);
+	lines.push("```", "");
+	const groups = new Map();
+	for (const verb of VERBS) groups.set(verb.group, [...(groups.get(verb.group) ?? []), verb]);
+	for (const [group, verbs] of groups) {
+		if (group === "web") lines.push("<!-- web -->");
+		lines.push(`**${GROUP_TITLES[group] ?? group}**`, "");
+		for (const verb of verbs) lines.push(`- \`decks ${commandOf(verb).join(" ")}\` · \`${signature(verb)}: ${verb.result ? tsOf(verb.result) : "void"}\`. ${verb.summary}`);
+		lines.push("");
+		if (group === "web") lines.push("<!-- /web -->", "");
+	}
+	return `${lines.join("\n").trimEnd()}\n`;
+}
+
 function withList(js) {
 	return js.replace(/(\/\/ <generated:verbs>[^\n]*\n)[\s\S]*?(\n\/\/ <\/generated:verbs>)/, (_all, open, close) => `${open}${verbList()}${close}`);
 }
@@ -136,6 +178,7 @@ const files = [
 	[`${sdk}index.js`, withList(readFileSync(`${sdk}index.js`, "utf8"))],
 	[`${sdk}index.d.ts`, declarations()],
 	[`${sdk}verbs.json`, verbsJson()],
+	[`${root}runtime/decks-commands.md`, commandsMarkdown()],
 ];
 
 if (process.argv.includes("--check")) {

@@ -1,6 +1,6 @@
 import { processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { agentsTemplate, stageDts } from "@decks/runtime";
+import { agentsTemplate, decksCommands } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -17,7 +17,7 @@ import type { Deck } from "../deck/loader.ts";
  * deck already knowing there are three boards called plan, risks and sources asks
  * a better first question.
  *
- * **This file does not know where anything is.** `runtimeDir`, `stageDts` and the rest were
+ * **This file does not know where anything is.** `runtimeDir`, `decksCommands` and the rest were
  * four levels of `../../..` computed here; they are `@decks/runtime`'s now, and there is a
  * test over there that the directories exist.
  */
@@ -27,12 +27,12 @@ import type { Deck } from "../deck/loader.ts";
  *
  * A system prompt is written once per session, so it says *which* clock the person is on
  * and how to read it, and leaves the time itself to the places written when work runs
- * (a handed-over brief carries "now") and to `stage.now()`. The zone is the process
+ * (a handed-over brief carries "now") and to `decks now`. The zone is the process
  * clock's, which is the deck's Time setting once one is chosen (`settings.ts`).
  */
 export function timeLine(): string {
 	const zone = processZone();
-	return `**The person's timezone is ${zone}.** Times and dates they mention ("this afternoon", "by Friday", "every weekday at nine") are in it. \`date\` in your shell prints it, and \`await stage.now()\` returns the time there. Timestamps from the stage API are epoch milliseconds.`;
+	return `**The person's timezone is ${zone}.** Times and dates they mention ("this afternoon", "by Friday", "every weekday at nine") are in it. \`date\` in your shell prints it, and \`decks now\` returns the time there. Timestamps from Decks are epoch milliseconds.`;
 }
 
 /**
@@ -45,16 +45,15 @@ export function timeLine(): string {
  * pair, which is the only thing an agent can usefully do about it.
  */
 export function apiFor(api: string, options: { web: boolean }): string {
-	if (options.web) return api;
-	const start = api.indexOf("\n\tweb: {");
-	if (start < 0) return api;
-	const end = api.indexOf("\n\t};", start);
-	if (end < 0) return api;
-	return (
-		api.slice(0, start) +
-		"\n\t/** The person's own Chrome, when they are sharing a tab. Nothing is shared now; `stage.web.status()` says so and how to pair. */\n\tweb: { status(): Promise<{ paired: boolean; connected: boolean }>; pairing(): Promise<{ code: string; path: string; note: string }> };" +
-		api.slice(end + "\n\t};".length)
-	);
+	const start = api.indexOf("<!-- web -->");
+	const end = api.indexOf("<!-- /web -->");
+	if (start < 0 || end < 0) return api;
+	const kept = options.web
+		? api.slice(0, start) + api.slice(start + "<!-- web -->".length, end) + api.slice(end + "<!-- /web -->".length)
+		: api.slice(0, start) +
+			"**The person's Chrome**: nothing is shared now. `decks web status` says so, and `decks web pairing` says how to pair.\n" +
+			api.slice(end + "<!-- /web -->".length);
+	return kept.replace(/\n{3,}/g, "\n\n");
 }
 
 /**
@@ -80,12 +79,12 @@ export function isolationNote(isolated: { dir: string; data: string }, boards: r
 	].join(" ");
 }
 
-export function deckContext(deck: Deck, toolName: string, options: { web?: boolean; isolated?: IsolatedBriefing } = {}): string {
+export function deckContext(deck: Deck, options: { web?: boolean; isolated?: IsolatedBriefing } = {}): string {
 	const template = agentsTemplate();
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
 		// agent still has the skills and the deck.
-		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/. The canvas tool is \`${toolName}\`.`;
+		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/. The decks command in your shell reaches the canvas: decks --help.`;
 	}
 
 	const isolated = options.isolated;
@@ -107,24 +106,16 @@ export function deckContext(deck: Deck, toolName: string, options: { web?: boole
 					...roots.map((root) => `- \`${root.path}\`${root.exists ? "" : " — **missing**"}`),
 				].join("\n");
 
-	const stageApi = stageDts();
-	const api = existsSync(stageApi) ? readFileSync(stageApi, "utf8") : "";
+	const reference = decksCommands();
+	const api = existsSync(reference) ? readFileSync(reference, "utf8").replace(/^<!--[^\n]*-->\n+/, "") : "";
 
 	return readFileSync(template, "utf8")
-		.replaceAll("{{STAGE_API}}", api ? ["```ts", apiFor(api, { web: options.web === true }).trim(), "```"].join("\n") : "_The stage API is not available in this install._")
+		.replaceAll("{{DECKS_COMMANDS}}", api ? apiFor(api, { web: options.web === true }).trim() : "_The command reference is not in this install: `decks --help` lists the commands._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", isolated ? isolated.dir : deck.path)
 		.replaceAll("{{BOARDS}}", isolated ? `${boardList}\n\n${isolationNote(isolated, isolated.boards)}` : boardList)
 		.replaceAll("{{ROOTS}}", rootList)
-		.replaceAll("{{TIME}}", timeLine())
-		/*
-		 * Last, and deliberately: the tool has a different name on each runtime — Pi
-		 * registers `stage_eval`, while through the SDK's MCP server the model sees
-		 * `mcp__decks__stage_eval` — and `{{STAGE_API}}` above inlines `stage.d.ts`, which
-		 * names it too. Substituting after that insertion covers both places, so neither
-		 * runtime reads instructions naming a tool it does not have.
-		 */
-		.replaceAll("{{STAGE_TOOL}}", toolName);
+		.replaceAll("{{TIME}}", timeLine());
 }
 
 /** The briefing options a backend passes, from its context: isolation included when it is on. */

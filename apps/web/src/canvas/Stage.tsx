@@ -250,8 +250,6 @@ export function Stage(props: {
 	 * deck does not hold, which the app has already said in a notice.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
-	/** A component on a board carrying code was pressed (`board/board-eval.ts`). */
-	onBoardEval?: (path: string, id: string, value: unknown) => void;
 	/**
 	 * Dropped on the composer: talk about it rather than move it.
 	 *
@@ -2617,7 +2615,6 @@ export function Stage(props: {
 							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
-							{...(props.onBoardEval ? { onBoardEval: props.onBoardEval } : {})}
 							view={editor.boardView(board.path)}
 							{...(props.onExtent && !sized ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}

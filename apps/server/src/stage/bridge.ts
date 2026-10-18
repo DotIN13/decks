@@ -1,42 +1,26 @@
 import { randomBytes } from "node:crypto";
-import type { StageTool } from "./tool.ts";
 
 /**
- * The canvas tool, for a runtime that is not in this process (DESIGN §6.3).
+ * Who a call from another process speaks for (DESIGN §6.3).
  *
- * Pi takes a tool definition and Claude takes an in-process MCP server, so for both of
- * them the tool *is* a function call in this Node process. opencode and antigravity are
- * somebody else's program: opencode registers a TypeScript tool that runs inside its own
- * Bun runtime, antigravity registers a Python function inside its SDK's process. Neither
- * can reach a closure here.
+ * opencode and antigravity are somebody else's program, so what they send back to Decks names
+ * its agent by something Decks handed them: their Google Docs tools send a token, and opencode's
+ * shell sends the session (`DECKS_SESSION`) so a `decks` command reaches its own agent
+ * (`verbs/router.ts`).
  *
- * So the tool body they register is four lines of HTTP, and this is the other end of it:
- * one route, one identity per caller, and the same `StageTool` the in-process runtimes
- * get. The wording, the guidelines and the `stage` object stay in `stage/tool.ts`, which
- * is the whole point — a fifth runtime should not be a fifth description of what a board
- * is for.
- *
- * Two callers, two identity schemes, and the route answers both.
- *
- * **Antigravity keeps a token per agent.** One agent, one Python sidecar, so the token is
- * still minted when the agent starts, handed into that agent's environment, and forgotten
- * when the agent is disposed. This is the original design and it still holds wherever a
- * runtime owns a process per agent.
+ * **Antigravity keeps a token per agent.** One agent, one process, so the token is minted when
+ * the agent starts, handed into that agent's environment, and forgotten when it is disposed.
  *
  * **opencode has one shared process, so it gets a server token and a session id.** With
- * everything in one Bun process there is no per-agent environment to put a token in; the
- * tool instead sends back the `context.sessionID` opencode handed it, and Decks — which
- * created that session — knows which agent it belongs to. A single server token in the
- * process environment proves the caller is the process Decks spawned, and the session
- * registration below names whose agent it acts for. Nothing else authenticates: the
- * endpoint is on the same loopback server the browser talks to, and either identity is by
- * construction the process Decks spawned.
+ * everything in one process there is no per-agent environment to put a token in; Decks, which
+ * created each session, knows which agent it belongs to, and a single server token in the
+ * process environment proves the caller is the process Decks spawned.
  */
 export class StageBridge {
-	private readonly byToken = new Map<string, { agentId: string; tool: StageTool }>();
+	private readonly byToken = new Map<string, { agentId: string }>();
 	private readonly byAgent = new Map<string, string>();
 	/** One opencode session, resolved from the id its tool sends back. */
-	private readonly bySession = new Map<string, { agentId: string; tool: StageTool; server: string }>();
+	private readonly bySession = new Map<string, { agentId: string; server: string }>();
 	/**
 	 * The token each shared server holds, by server: `opencode` (`opencode/manager.ts`) and
 	 * `opencode2` (`opencode2/manager.ts`), which can both be running.
@@ -57,15 +41,15 @@ export class StageBridge {
 	 * per-agent scheme, which antigravity still uses; opencode's identity has moved to
 	 * the session registration below.
 	 */
-	issue(agentId: string, tool: StageTool): string {
+	issue(agentId: string): string {
 		const existing = this.byAgent.get(agentId);
 		if (existing) {
-			this.byToken.set(existing, { agentId, tool });
+			this.byToken.set(existing, { agentId });
 			return existing;
 		}
 		const token = randomBytes(24).toString("base64url");
 		this.byAgent.set(agentId, token);
-		this.byToken.set(token, { agentId, tool });
+		this.byToken.set(token, { agentId });
 		return token;
 	}
 
@@ -89,8 +73,8 @@ export class StageBridge {
 	 * wants to know who a call speaks for can ask, and the answer is the agent's, not a
 	 * guess about it.
 	 */
-	registerSession(sessionId: string, agentId: string, tool: StageTool, server = "opencode"): void {
-		this.bySession.set(sessionId, { agentId, tool, server });
+	registerSession(sessionId: string, agentId: string, server = "opencode"): void {
+		this.bySession.set(sessionId, { agentId, server });
 	}
 
 	/** Whether a token is the one the server holding this session was given. */
@@ -103,31 +87,6 @@ export class StageBridge {
 	unregisterSession(sessionId: string | undefined): void {
 		if (!sessionId) return;
 		this.bySession.delete(sessionId);
-	}
-
-	/**
-	 * Run code as the agent that identity belongs to.
-	 *
-	 * An unknown identity is not an error the model should see a stack trace for — it is a
-	 * tool call from a process that has outlived its agent, or from a session that was
-	 * replaced, which happens when a runtime is slow to exit. It answers as a failed tool
-	 * call and says why.
-	 */
-	async run(token: string | undefined, code: string, sessionID?: string): Promise<{ text: string; isError: boolean }> {
-		if (typeof code !== "string" || code.trim() === "") return { text: "No code to run.", isError: true };
-		if (sessionID !== undefined) {
-			// opencode's path: the session id names the agent, the server token proves the
-			// caller is the process Decks spawned. A session id with anything but that token
-			// is refused the same way a bad per-agent token is — the identity did not hold.
-			if (typeof sessionID !== "string" || sessionID === "") return { text: "The canvas call did not say which opencode session it came from.", isError: true };
-			const held = this.bySession.get(sessionID);
-			if (!held) return { text: "This opencode session is not registered to a live Decks agent any more.", isError: true };
-			if (!this.sessionHolds(held, token)) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
-			return held.tool.run(code);
-		}
-		const held = token ? this.byToken.get(token) : undefined;
-		if (!held) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
-		return held.tool.run(code);
 	}
 
 	/** Which agent a call speaks for: a per-agent token, or opencode's session with the server's token. */

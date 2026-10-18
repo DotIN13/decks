@@ -112,7 +112,7 @@ export class AntigravityStream {
 			this.replying = false;
 			const parameters = (step.tool_info?.parameters ?? {}) as Record<string, unknown>;
 			// The CLI's one lever is `call_mcp_tool`, so the chip names the tool *inside*
-			// it — `call_mcp_tool · stage_eval` — or the model would read every canvas call
+			// it — `call_mcp_tool · gdocs_read` — or the person would read every MCP call
 			// as the same mystery lever.
 			const inside = step.tool_name === "call_mcp_tool" && typeof parameters.ToolName === "string" ? `call_mcp_tool · ${parameters.ToolName}` : name;
 			this.t.toolStart(String(index), name, inside, parameters);

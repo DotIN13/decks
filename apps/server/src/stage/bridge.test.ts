@@ -1,142 +1,82 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { StageBridge } from "./bridge.ts";
-import type { StageTool } from "./tool.ts";
 
 /**
- * The canvas tool's other end, for the runtimes that are not in this process.
+ * Who a call from another process speaks for.
  *
- * The whole security model is one sentence — the token is the identity — so the tests are
- * about exactly that: a token reaches its own agent's tool and nothing else, and a token
+ * The model is one sentence for each runtime — a token is an agent's identity, and opencode's
+ * shared server proves itself with its token and names the agent with the session — so the tests
+ * are about exactly that: an identity reaches its own agent and nothing else, and an identity
  * whose agent has gone reaches nothing at all.
  */
-function fakeTool(answer: string): StageTool {
-	return {
-		name: "stage_eval",
-		label: "Stage",
-		description: "",
-		promptSnippet: "",
-		guidelines: [],
-		parameterDescription: "",
-		run: async (code: string) => ({ text: `${answer}:${code}`, isError: false }),
-	} as unknown as StageTool;
-}
 
-test("a token runs against the agent it was minted for", async () => {
+test("a token names the agent it was minted for", () => {
 	const bridge = new StageBridge();
-	const ada = bridge.issue("ada", fakeTool("ada"));
-	const bo = bridge.issue("bo", fakeTool("bo"));
+	const ada = bridge.issue("ada");
+	const bo = bridge.issue("bo");
 	assert.notEqual(ada, bo);
-	assert.deepEqual(await bridge.run(ada, "x"), { text: "ada:x", isError: false });
-	assert.deepEqual(await bridge.run(bo, "x"), { text: "bo:x", isError: false });
+	assert.equal(bridge.agentOf(ada), "ada");
+	assert.equal(bridge.agentOf(bo), "bo");
+	assert.equal(bridge.agentOf("nonsense"), undefined);
+	assert.equal(bridge.agentOf(undefined), undefined);
 });
 
 test("the same agent asking twice gets the same token", () => {
-	// A rewind reopens the runtime, and the tool on the other side is still holding the
+	// A rewind reopens the runtime, and the process on the other side is still holding the
 	// token it was given: minting a new one would leave it talking to nobody.
 	const bridge = new StageBridge();
-	const first = bridge.issue("ada", fakeTool("ada"));
-	const second = bridge.issue("ada", fakeTool("ada"));
-	assert.equal(first, second);
+	assert.equal(bridge.issue("ada"), bridge.issue("ada"));
 });
 
-test("a revoked token is refused, and says why rather than throwing", async () => {
+test("a revoked token names nobody", () => {
 	const bridge = new StageBridge();
-	const token = bridge.issue("ada", fakeTool("ada"));
+	const token = bridge.issue("ada");
 	bridge.revoke("ada");
-	const outcome = await bridge.run(token, "x");
-	assert.equal(outcome.isError, true);
-	assert.match(outcome.text, /not valid any more/);
-});
-
-test("no token, an unknown token and empty code are all refusals", async () => {
-	const bridge = new StageBridge();
-	const token = bridge.issue("ada", fakeTool("ada"));
-	assert.equal((await bridge.run(undefined, "x")).isError, true);
-	assert.equal((await bridge.run("nonsense", "x")).isError, true);
-	assert.equal((await bridge.run(token, "   ")).isError, true);
-});
-
-test("a token says which agent it speaks for", () => {
-	const bridge = new StageBridge();
-	const token = bridge.issue("ada", fakeTool("ada"));
-	assert.equal(bridge.agentOf(token), "ada");
-	assert.equal(bridge.agentOf("nonsense"), undefined);
+	assert.equal(bridge.agentOf(token), undefined);
 });
 
 test("tokens are long enough not to be guessed", () => {
-	const bridge = new StageBridge();
-	assert.ok(bridge.issue("ada", fakeTool("ada")).length >= 32);
+	assert.ok(new StageBridge().issue("ada").length >= 32);
 });
 
-test("the server token with a session id reaches that session's agent", async () => {
+test("the server token with a session id reaches that session's agent, and nothing less does", () => {
 	// opencode's path: one shared server, so one token proves the caller is the process
 	// Decks spawned, and the session id names whose agent it acts for.
 	const bridge = new StageBridge();
 	bridge.setServerToken("server-token");
-	bridge.registerSession("ses_1", "ada", fakeTool("ada"));
-	bridge.registerSession("ses_2", "bo", fakeTool("bo"));
-	assert.deepEqual(await bridge.run("server-token", "x", "ses_1"), { text: "ada:x", isError: false });
-	assert.deepEqual(await bridge.run("server-token", "x", "ses_2"), { text: "bo:x", isError: false });
+	const agentToken = bridge.issue("ada");
+	bridge.registerSession("ses_1", "ada");
+	bridge.registerSession("ses_2", "bo");
+	assert.equal(bridge.agentFor("server-token", "ses_1"), "ada");
+	assert.equal(bridge.agentFor("server-token", "ses_2"), "bo");
+	assert.equal(bridge.agentFor("server-token", "ses_unknown"), undefined);
+	assert.equal(bridge.agentFor(agentToken, "ses_1"), undefined, "a per-agent token does not speak for a session");
+	assert.equal(bridge.agentFor(undefined, "ses_1"), undefined);
 });
 
-test("a session id that was never registered is refused with a sentence", async () => {
-	// A stale or foreign id is not a crash and not a guess — it is a failed tool call
-	// saying exactly which identity did not hold.
+test("a session's agent is known to the decks command, and forgotten when it goes", () => {
 	const bridge = new StageBridge();
-	bridge.setServerToken("server-token");
-	bridge.registerSession("ses_1", "ada", fakeTool("ada"));
-	const outcome = await bridge.run("server-token", "x", "ses_unknown");
-	assert.equal(outcome.isError, true);
-	assert.match(outcome.text, /not registered to a live Decks agent/);
-});
-
-test("a session whose agent is gone stops answering", async () => {
-	const bridge = new StageBridge();
-	bridge.setServerToken("server-token");
-	bridge.registerSession("ses_1", "ada", fakeTool("ada"));
+	bridge.registerSession("ses_1", "ada");
+	assert.equal(bridge.agentOfSession("ses_1"), "ada");
 	bridge.unregisterSession("ses_1");
-	assert.equal((await bridge.run("server-token", "x", "ses_1")).isError, true);
+	assert.equal(bridge.agentOfSession("ses_1"), undefined);
 	// And unregistering nothing is a no-op, not a throw.
 	bridge.unregisterSession(undefined);
+	assert.equal(bridge.agentOfSession(undefined), undefined);
 });
 
-test("a session id without the server token is refused", async () => {
-	// The session id names the agent, but only the shared server's token proves the
-	// caller is the process Decks spawned — a per-agent token or nothing at all is not
-	// enough, or any chat could speak for any other.
-	const bridge = new StageBridge();
-	bridge.setServerToken("server-token");
-	const agentToken = bridge.issue("ada", fakeTool("ada"));
-	bridge.registerSession("ses_1", "ada", fakeTool("ada"));
-	assert.equal((await bridge.run(agentToken, "x", "ses_1")).isError, true);
-	assert.equal((await bridge.run(undefined, "x", "ses_1")).isError, true);
-	// And the server token alone speaks for nobody: without a session id there is no
-	// per-agent token for it to be.
-	assert.equal((await bridge.run("server-token", "x")).isError, true);
-});
-
-test("a new server's token retires the old one", async () => {
-	// A server that died and came back mints a fresh token; a session id replayed from
-	// the dead process must not validate against the new server.
+test("a new server's token retires the old one, and each kind of server keeps its own", () => {
 	const bridge = new StageBridge();
 	bridge.setServerToken("old-server");
-	bridge.registerSession("ses_1", "ada", fakeTool("ada"));
+	bridge.registerSession("ses_1", "ada");
 	bridge.setServerToken("new-server");
-	assert.equal((await bridge.run("old-server", "x", "ses_1")).isError, true);
-	assert.deepEqual(await bridge.run("new-server", "x", "ses_1"), { text: "ada:x", isError: false });
-});
+	assert.equal(bridge.agentFor("old-server", "ses_1"), undefined);
+	assert.equal(bridge.agentFor("new-server", "ses_1"), "ada");
 
-test("opencode 1 and OpenCode 2 servers each keep their own token", async () => {
-	const bridge = new StageBridge();
-	bridge.setServerToken("v1-token");
-	bridge.registerSession("ses_v1", "ada", fakeTool("ada"));
-	// The second server starting must not invalidate the first one's tools: one shared slot did.
 	bridge.setServerToken("v2-token", "opencode2");
-	bridge.registerSession("ses_v2", "bo", fakeTool("bo"), "opencode2");
-	assert.deepEqual(await bridge.run("v1-token", "x", "ses_v1"), { text: "ada:x", isError: false });
-	assert.deepEqual(await bridge.run("v2-token", "y", "ses_v2"), { text: "bo:y", isError: false });
-	assert.equal((await bridge.run("v2-token", "x", "ses_v1")).isError, true, "one server's token does not reach the other's sessions");
+	bridge.registerSession("ses_v2", "bo", "opencode2");
 	assert.equal(bridge.agentFor("v2-token", "ses_v2"), "bo");
-	assert.equal(bridge.agentFor("v1-token", "ses_v2"), undefined);
+	assert.equal(bridge.agentFor("new-server", "ses_v2"), undefined, "one server's token does not reach the other's sessions");
+	assert.equal(bridge.agentFor("new-server", "ses_1"), "ada", "the second server starting left the first one's alone");
 });

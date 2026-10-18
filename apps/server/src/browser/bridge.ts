@@ -260,7 +260,7 @@ export class WebBridge {
 			throw new Error(
 				this.status().paired
 					? "Your Chrome is not connected. Open the Decks extension in it and share a tab."
-					: "No Chrome has been paired. Ask for the pairing code with stage.web.pairing() and put it in the Decks extension.",
+					: "No Chrome has been paired. Ask for the pairing code with decks web pairing and put it in the Decks extension.",
 			);
 		}
 		const page = browser.contexts().flatMap((context) => context.pages())[0];
@@ -448,7 +448,7 @@ export class WebBridge {
 		if (typeof target === "object" && "ref" in target) return this.byRef(page, target.ref);
 		const name = typeof target === "string" ? target : target.name;
 		const nth = typeof target === "object" && "nth" in target ? target.nth : undefined;
-		if (!name?.trim()) throw new Error("A target needs a name, or a { ref } from stage.web.read().");
+		if (!name?.trim()) throw new Error("A target needs a name, or a { ref } from decks web read.");
 		for (const candidate of candidates(name)) {
 			const count = await candidate.count();
 			if (count === 0) continue;
@@ -469,8 +469,8 @@ export class WebBridge {
 	/** The element a `[ref=…]` from the last read names, or a sentence about why it cannot. */
 	private async byRef(page: Page, ref: string): Promise<Locator> {
 		const id = String(ref ?? "").trim().replace(/^@/, "");
-		if (!/^e\d+$/.test(id)) throw new Error(`"${ref}" is not a reference. A reference looks like e42 and comes from stage.web.read().`);
-		if (!this.refs) throw new Error("References come from the page itself: read it with stage.web.read() first, then pass one of the [ref=…] ids it shows.");
+		if (!/^e\d+$/.test(id)) throw new Error(`"${ref}" is not a reference. A reference looks like e42 and comes from decks web read.`);
+		if (!this.refs) throw new Error("References come from the page itself: read it with decks web read first, then pass one of the [ref=…] ids it shows.");
 		if (this.refs.url !== page.url())
 			throw new Error(
 				`That reference was read from ${this.refs.url} and the tab is now on ${page.url()}. Read the page again — every page numbers its references from e1, so an old one can point at the wrong element.`,
@@ -588,7 +588,7 @@ function labelOf(target: WebTarget): string {
  * that navigation.
  */
 function unscriptableSaid(url: string): string {
-	return `The tab is on ${url} and nothing on it can be clicked or filled: the element resolved and then the page ran no script for thirty seconds, while reads and screenshots kept working. Navigate it once — stage.web.open("${url}") — and every verb works; nothing else will.`;
+	return `The tab is on ${url} and nothing on it can be clicked or filled: the element resolved and then the page ran no script for thirty seconds, while reads and screenshots kept working. Navigate it once — decks web open "${url}" — and every verb works; nothing else will.`;
 }
 
 /** Why a click would or would not land, as the page itself sees it. */

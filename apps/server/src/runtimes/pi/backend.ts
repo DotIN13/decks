@@ -84,18 +84,18 @@ export class PiBackend implements AgentBackend {
 			// Pi finds the user's own skills itself; these are the two that come with
 			// Decks and describe this environment.
 			additionalSkillPaths: [skillsDir()],
-			// Visible in the startup list on purpose: `stage_eval` is a tool the agent
-			// has, and where it came from should not be a mystery.
+			// Visible in the startup list on purpose: the agent's bash and its Google Docs tools
+			// come from here, and where they came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id) } }), this.commandReader()],
+			extensionFactories: [decksStage({ agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id) } }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
 			 * truth about a deck the agent can simply look at.
 			 */
 			agentsFilesOverride: (base) => ({
-				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name, briefingFor(this.context)) }],
+				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, briefingFor(this.context)) }],
 			}),
 		});
 		await loader.reload();

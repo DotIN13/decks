@@ -66,14 +66,9 @@ export function runtimeLib(): string {
 	return resolve(HERE, "lib");
 }
 
-/** The stage API, injected into an agent's context verbatim (DESIGN §6.3). */
-export function stageDts(): string {
-	return resolve(HERE, "stage.d.ts");
-}
-
-/** The canvas tool's description, shown to a model on every runtime (DESIGN §6.3). */
-export function toolDescription(): string {
-	return resolve(HERE, "tool-description.txt");
+/** The `decks` command reference, generated from the verb table and given to every agent in its context. */
+export function decksCommands(): string {
+	return resolve(HERE, "decks-commands.md");
 }
 
 /** The guidelines appended to every agent's context, one per line. Optional: the built-in list stands without it. */
@@ -119,10 +114,9 @@ export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean 
 	{ path: "skills", what: "what an agent is taught with", dir: true },
 	{ path: "examples", what: "the worked boards agents borrow from, copied into every deck", dir: true },
 	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },
-	{ path: "stage.d.ts", what: "the canvas API, injected verbatim" },
-	{ path: "tool-description.txt", what: "the canvas tool's words, for every runtime" },
+	{ path: "decks-commands.md", what: "the decks command reference, generated from the verb table" },
 	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },
-	{ path: "opencode", what: "opencode's config directory: its tool and Decks' skills", dir: true },
-	{ path: "opencode2/plugin", what: "OpenCode 2's plugin: the canvas and Google Docs tools", dir: true },
-	{ path: "antigravity/mcp-server.mjs", what: "antigravity's one-tool MCP server" },
+	{ path: "opencode", what: "opencode's config directory: its Google Docs tools, the plugin that names a session for decks, and Decks' skills", dir: true },
+	{ path: "opencode2/plugin", what: "OpenCode 2's plugin: the Google Docs tools, and the session for decks", dir: true },
+	{ path: "antigravity/mcp-server.mjs", what: "antigravity's MCP server for the Google Docs tools" },
 ];

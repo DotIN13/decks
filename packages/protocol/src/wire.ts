@@ -103,19 +103,6 @@ export type ClientMessage =
 	 */
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }
-	/**
-	 * A component on a board was pressed, and the board carries code for it.
-	 *
-	 * The browser stamps the board path from the frame the message came from
-	 * (`board/board-eval.ts`), so the path here is the app's word and not the board's. The
-	 * server reads the code out of the board's own file (`boards/eval-code.ts`), decides
-	 * whether this board is trusted (`boards/eval-trust.ts`) and runs it with the stage API
-	 * in the server process. `value` is whatever the pressed component was carrying.
-	 *
-	 * Nothing about the run comes back down this socket: the code does what it does through
-	 * `stage`, and the focused conversation gets one notice saying a board ran.
-	 */
-	| { type: "board.eval"; path: string; id: string; value?: unknown; stage?: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	/**
 	 * Put a live view of one agent's conversation on the canvas.

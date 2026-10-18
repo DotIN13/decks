@@ -32,7 +32,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 	const at = target(url);
 	if (!at) return false;
 	if (!apps.exists(at.name)) {
-		plain(res, 404, `There is no app called ${at.name}. An agent makes one with stage.apps.create("${at.name}").`);
+		plain(res, 404, `There is no app called ${at.name}. An agent makes one with decks apps create ${at.name}.`);
 		return true;
 	}
 	let manifest;
@@ -56,7 +56,7 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 	if (manifest.kind !== "server") {
 		const file = apps.file(at.name, at.inner);
 		if (!file) {
-			const built = manifest.kind === "build" ? ` A built app is served from its ${manifest.root ?? "dist"}/ folder; build it with stage.apps.build("${at.name}").` : "";
+			const built = manifest.kind === "build" ? ` A built app is served from its ${manifest.root ?? "dist"}/ folder; build it with decks apps build ${at.name}.` : "";
 			plain(res, 404, `apps/${at.name} has no file at ${at.inner}.${built}`);
 			return true;
 		}

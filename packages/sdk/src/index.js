@@ -10,8 +10,9 @@
  *     await decks.show(path);
  *     await decks.pen.edit([{ op: "insert", node: { type: "note", text: "here" }, box: { x1: 0, y1: -80 } }]);
  *
- * Who is calling is an agent (`DECKS_AGENT`, which Decks sets in each agent's shell) or an app
- * (`DECKS_APP`, set for a server app; a page under `/app/<name>/` is found from its address).
+ * Who is calling is an agent (`DECKS_AGENT`, which Decks sets in each agent's shell), an app
+ * (`DECKS_APP`, set for a server app; a page under `/app/<name>/` is found from its address), or a
+ * board's button (its page, `/api/board/<path>`, says which board).
  * The `decks` command (`bin/decks.mjs`) and the MCP server (`mcp/server.mjs`) are this file.
  *
  * The list of verbs below is generated from the table by `scripts/gen-sdk.mjs`; the rest is not.
@@ -93,8 +94,12 @@ const env = (name) => (typeof process !== "undefined" && process.env ? process.e
  */
 function fromPage() {
 	if (typeof location === "undefined") return {};
-	const match = /^(.*?)\/app\/([a-z0-9][a-z0-9-]*)(?:\/|$)/.exec(location.pathname);
-	return match ? { url: `${location.origin}${match[1]}`, app: match[2] } : { url: location.origin };
+	const app = /^(.*?)\/app\/([a-z0-9][a-z0-9-]*)(?:\/|$)/.exec(location.pathname);
+	if (app) return { url: `${location.origin}${app[1]}`, app: app[2] };
+	// A board's own page, `<prefix>/api/board/<path>`: its buttons call as the board.
+	const board = /^(.*?)\/api\/board\/(.+)$/.exec(location.pathname);
+	if (board) return { url: `${location.origin}${board[1]}`, board: decodeURIComponent(board[2]) };
+	return { url: location.origin };
 }
 
 /** Notes go to stderr in Node, where an agent's script is reading; a page has nowhere to say them. */
@@ -111,6 +116,7 @@ function defaultNotes(lines) {
  * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own.
  * @param {string} [options.agent]  The agent the calls are for, by id or name. Default: `DECKS_AGENT`.
  * @param {string} [options.app]  The app the calls are from. Default: `DECKS_APP`, or the page's app.
+ * @param {string} [options.board]  A board whose button is calling. Default: the board whose page this is.
  * @param {string} [options.session]  An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`.
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
  * @param {typeof fetch} [options.fetch]  A fetch to use instead of the global one.
@@ -122,6 +128,7 @@ export function connect(options = {}) {
 	// opencode's agents share one server, so their shell names the session, which Decks maps to the agent.
 	const session = options.session ?? env("DECKS_SESSION");
 	const app = options.app ?? env("DECKS_APP") ?? page.app;
+	const board = options.board ?? page.board;
 	const doFetch = options.fetch ?? globalThis.fetch;
 	const onNotes = options.notes ?? defaultNotes;
 	if (!base) throw new DecksError("No Decks to talk to: set DECKS_URL (Decks sets it in each agent's shell), or pass { url }.");
@@ -134,6 +141,7 @@ export function connect(options = {}) {
 		while (given.length && given[given.length - 1] === undefined) given.pop();
 		const headers = { "content-type": "application/json" };
 		if (app) headers["x-decks-app"] = app;
+		else if (board) headers["x-decks-board"] = encodeURIComponent(board);
 		else if (agent) headers["x-decks-agent"] = agent;
 		else if (session) headers["x-decks-session"] = session;
 		let response;

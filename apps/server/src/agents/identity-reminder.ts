@@ -3,8 +3,8 @@ import type { Identity } from "@decks/protocol";
 /**
  * What an agent has not yet said about itself, and the sentence that asks for it.
  *
- * An agent is addressed by its name (`@name`, `stage.send(name)`), found by its workspace
- * (`stage.agents({ filter: { workspace } })`) and read at a glance by its tags, and the
+ * An agent is addressed by its name (`@name`, `decks send <name>`), found by its workspace
+ * (`decks agents --filter.workspace …`) and read at a glance by its tags, and the
  * instructions ask for all three once. Agents skip it: the deck filled with `Agent 3`s working
  * on nothing in particular. An instruction read at the start of a session is easy to pass over,
  * so the same request now travels at the two moments it is cheap to act on: at the head of each
@@ -27,15 +27,15 @@ export function identityGaps(identity: Pick<Identity, "name" | "avatar" | "tags"
 }
 
 const ASK: Record<Gap, string> = {
-	name: "name: a short name of your own, not a number",
+	name: "--name: a short name of your own, not a number",
 	/*
 	 * The `xmlns` is in the example because an example is what gets copied. Without it an avatar is
 	 * not read as SVG when the browser draws it as an image, and renders as nothing; `stage/avatar.ts`
 	 * adds one and says so, which is the real fix, and this is the half that stops it happening.
 	 */
-	avatar: 'avatar: { svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">…</svg>" }, a small picture you draw (or { emoji: "…" })',
-	workspace: "workspace: the project you are working on",
-	tags: "tags: up to four words for what you are doing right now",
+	avatar: `--avatar.svg '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">…</svg>': a small picture you draw (or --avatar.emoji)`,
+	workspace: "--workspace: the project you are working on",
+	tags: `--tags '["…"]': up to four words for what you are doing right now`,
 };
 
 /** The request, or nothing when the agent has said everything. */
@@ -43,7 +43,7 @@ export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "t
 	const gaps = identityGaps(identity);
 	if (gaps.length === 0) return undefined;
 	if (gaps.length === 1 && gaps[0] === "tags") {
-		return "[Decks] Your tags are empty. Set them to what this turn is about with stage.me({ tags: [...] }), and to [] when you finish.";
+		return `[Decks] Your tags are empty. Set them to what this turn is about with decks me --tags '["…"]', and to '[]' when you finish.`;
 	}
-	return `[Decks] You have not said who you are: set it now with stage.me({ ${gaps.map((gap) => ASK[gap]).join("; ")} }). It is how the person and other agents find you.`;
+	return `[Decks] You have not said who you are: set it now with decks me ${gaps.map((gap) => ASK[gap]).join("; ")}. It is how the person and other agents find you.`;
 }

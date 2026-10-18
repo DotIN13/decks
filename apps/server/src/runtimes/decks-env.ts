@@ -14,12 +14,15 @@ import { fileURLToPath } from "node:url";
 
 /** The folder holding the `decks` command. */
 export const SDK_BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/bin");
+/** The SDK itself, for a node script: `const { decks } = await import(process.env.DECKS_SDK)`. */
+export const SDK_FILE = resolve(SDK_BIN, "../src/index.js");
 
 /** The variables every caller on this server shares: where Decks is, and the node to run `decks` with. */
 export function decksServerEnv(port: number, path = process.env.PATH ?? ""): Record<string, string> {
 	return {
 		DECKS_URL: `http://127.0.0.1:${port}`,
 		DECKS_NODE: process.execPath,
+		DECKS_SDK: SDK_FILE,
 		PATH: path.split(delimiter).includes(SDK_BIN) ? path : `${SDK_BIN}${delimiter}${path}`,
 	};
 }
