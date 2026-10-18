@@ -19,6 +19,7 @@ import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { conversationFor, runAsCaller } from "./stage/caller-run.ts";
+import { verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -105,7 +106,7 @@ export function createHttpApp(app: App): Express {
 		}
 		res.setHeader("Vary", "Origin");
 		res.setHeader("Access-Control-Allow-Origin", origin);
-		res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+		res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App");
 		res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 		if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
@@ -121,6 +122,8 @@ export function createHttpApp(app: App): Express {
 	});
 
 	const api = express.Router();
+	// Every verb in the table, for the SDK's three forms (`verbs/router.ts`).
+	api.use("/v1", verbRoutes(app));
 	const relay = new Relay(join(app.deck.path, ".decks", "relay.json"));
 	server.all("/c/:id/*rest", asyncRoute((req, res) => relay.pass(req, res)));
 

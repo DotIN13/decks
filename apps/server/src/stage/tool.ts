@@ -217,7 +217,24 @@ export interface StageTool {
 	 */
 	webShared(): boolean;
 	run(code: string): Promise<StageToolResult>;
+	/**
+	 * Call one verb by its name in the verb table (`move`, `pen.edit`), with its arguments as a list.
+	 *
+	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes a run would have
+	 * added to its text (the viewport after `newBoard`, what `fit` measured, the reminders), and any
+	 * pictures. A verb that throws is an answer too, `ok: false` with its sentence.
+	 */
+	call(name: string, args: readonly unknown[]): Promise<StageCallResult>;
 	snapshot(): StageSnapshot;
+}
+
+/** One verb called over HTTP: see `StageTool.call`. */
+export interface StageCallResult {
+	ok: boolean;
+	value?: unknown;
+	error?: string;
+	notes: string[];
+	images?: Array<{ data: string; mimeType: string }>;
 }
 
 const STAGE_TOOL_NAME = "stage_eval";
@@ -1204,6 +1221,31 @@ export function createStageTool(deps: {
 		stage,
 		snapshot,
 		webShared: () => service.web?.status().paired === true,
+
+		async call(name: string, args: readonly unknown[]): Promise<StageCallResult> {
+			notes = [];
+			images = [];
+			const path = name.split(".");
+			let owner: unknown = stage;
+			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown> | undefined)?.[key];
+			const verb = (owner as Record<string, unknown> | undefined)?.[path[path.length - 1]!];
+			if (typeof verb !== "function") return { ok: false, error: `${name} is not a verb.`, notes: [] };
+			let answer: StageCallResult;
+			try {
+				const value = await (verb as (...given: unknown[]) => Promise<unknown>).apply(owner, [...args]);
+				answer = { ok: true, value, notes: [] };
+			} catch (error) {
+				answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };
+			}
+			// The same lines a run adds after its value, in the same order (see `run`).
+			const said = [...notes];
+			const unsaid = identityReminder(agent.identity());
+			if (unsaid) said.push(unsaid);
+			const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
+			if (unnamed) said.push(unnamed);
+			deps.persist?.(snapshot());
+			return { ...answer, notes: said, ...(images.length > 0 ? { images: [...images] } : {}) };
+		},
 
 		async run(code: string): Promise<StageToolResult> {
 			notes = [];

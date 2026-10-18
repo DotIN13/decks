@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { App } from "../app.ts";
+import { realPathOf } from "../deck/roots.ts";
+import { createHttpApp } from "../http.ts";
+
+/** A deck with one board, its HTTP server on a free port, and the focused agent's id. */
+async function open() {
+	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-verbs-")));
+	const deck = join(dataDir, "decks");
+	mkdirSync(join(deck, "boards"), { recursive: true });
+	writeFileSync(
+		join(deck, "boards", "tall.html"),
+		`<!doctype html><html><head><title>Tall</title><meta name="board" content='{"w":900,"h":400,"bg":"grid"}' /></head><body class="board"></body></html>`,
+	);
+	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
+	const server = createHttpApp(app).listen(0, "127.0.0.1");
+	await new Promise((done) => server.once("listening", done));
+	const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
+	const agent = app.agents.focused();
+	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = { "x-decks-agent": agent.id }) => {
+		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
+		return { status: response.status, body: (await response.json()) as { ok: boolean; value?: unknown; error?: string; notes: string[] } };
+	};
+	return {
+		app,
+		deck,
+		base,
+		agent,
+		call,
+		cleanup: () => {
+			server.close();
+			app.dispose();
+			rmSync(dataDir, { recursive: true, force: true });
+		},
+	};
+}
+
+test("GET /api/v1 lists every verb with its signature", async () => {
+	const { base, cleanup } = await open();
+	try {
+		const listed = (await (await fetch(base)).json()) as { verbs: Array<{ name: string; signature: string; effect: string }> };
+		assert.equal(listed.verbs.length, 53);
+		assert.deepEqual(
+			listed.verbs.find((verb) => verb.name === "move"),
+			{ name: "move", group: "stage", effect: "change", summary: "Move a board on your stage: `at` is its top-left corner.", signature: "move(path: string, at: Point)" },
+		);
+	} finally {
+		cleanup();
+	}
+});
+
+test("a verb is called for the agent the request names, by id or by name", async () => {
+	const { call, agent, cleanup } = await open();
+	try {
+		const byId = await call("boards");
+		assert.equal(byId.status, 200);
+		assert.ok(byId.body.ok);
+		assert.ok((byId.body.value as Array<{ path: string }>).some((board) => board.path === "boards/tall.html"));
+
+		const renamed = await call("me", [{ name: "Wren", tags: ["testing"], workspace: "decks", avatar: { emoji: "🐦" } }]);
+		assert.ok(renamed.body.ok, renamed.body.error);
+		assert.equal((renamed.body.value as { name: string }).name, "Wren");
+		assert.equal(agent.name, "Wren");
+
+		const byName = await call("me", [], { "x-decks-agent": "wren" });
+		assert.equal((byName.body.value as { name: string }).name, "Wren");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a change goes to the deck, and its notes come back beside the value", async () => {
+	const { call, deck, cleanup } = await open();
+	try {
+		const made = await call("newBoard", [{ title: "The finding", at: { x1: 0, y1: 0 } }]);
+		assert.ok(made.body.ok, made.body.error);
+		const path = made.body.value as string;
+		assert.match(path, /^boards\/the-finding/);
+		assert.ok(existsSync(join(deck, path)), "the board's file was written");
+		assert.ok(made.body.notes.length > 0, "newBoard tells the caller about the viewport, as a run does");
+	} finally {
+		cleanup();
+	}
+});
+
+test("wrong calls are answered with a sentence and the verb's signature", async () => {
+	const { call, cleanup } = await open();
+	try {
+		const missing = await call("move", ["boards/tall.html"]);
+		assert.equal(missing.status, 400);
+		assert.match(missing.body.error!, /move needs at\. move\(path: string, at: Point\)/);
+
+		const unknown = await call("teleport");
+		assert.equal(unknown.status, 404);
+
+		const nobody = await call("boards", [], {});
+		assert.equal(nobody.status, 400);
+		assert.match(nobody.body.error!, /X-Decks-Agent/);
+
+		const stranger = await call("boards", [], { "x-decks-agent": "nobody-here" });
+		assert.equal(stranger.status, 404);
+
+		const refused = await call("fit", ["boards/no-such.html"]);
+		assert.equal(refused.status, 422, "a verb that throws is an answer, not a crash");
+		assert.equal(refused.body.ok, false);
+		assert.ok(refused.body.error);
+	} finally {
+		cleanup();
+	}
+});

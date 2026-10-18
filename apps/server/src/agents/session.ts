@@ -9,7 +9,7 @@ import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "../stage/tool.ts";
+import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext, IsolationContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -107,6 +107,7 @@ export class DeckAgent {
 
 	private backend: AgentBackend | undefined;
 	private starting: Promise<void> | undefined;
+	private tool: StageTool | undefined;
 	/**
 	 * Isolated mode (`agents/isolation.ts`): the runtime runs in a temporary folder of copies of
 	 * this stage's boards, and is told to leave the Decks data alone. On the record, so a restart
@@ -1098,6 +1099,23 @@ export class DeckAgent {
 	}
 
 	/**
+	 * This agent's stage tool: the `stage` its code runs against, and what `/api/v1/<verb>` calls
+	 * when a request names this agent (`verbs/router.ts`). Made once and kept, so a verb called
+	 * over HTTP before the agent's first turn acts on the same stage its turns will.
+	 */
+	stageTool(): StageTool {
+		this.tool ??= createStageTool({
+			stage: this.stage,
+			agent: this.stageHooks(),
+			port: this.host.port,
+			// Recorded after every run, so a rewind can put the canvas back to what it was
+			// at that point and a fork can inherit it (§6.2).
+			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
+		});
+		return this.tool;
+	}
+
+	/**
 	 * Start the backend, once, and remember the reason if it will not start.
 	 *
 	 * The only place that knows both runtimes exist. Which one an agent uses is fixed at
@@ -1111,14 +1129,7 @@ export class DeckAgent {
 		// called once at creation, and is not now that a prompt is what starts an agent.
 		if (this.starting) return this.starting;
 
-		const tool = createStageTool({
-			stage: this.stage,
-			agent: this.stageHooks(),
-			port: this.host.port,
-			// Recorded after every run, so a rewind can put the canvas back to what it was
-			// at that point and a fork can inherit it (§6.2).
-			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
-		});
+		const tool = this.stageTool();
 
 		const view = this.isolatedOn ? this.openView() : undefined;
 		const context: AgentBackendContext = {

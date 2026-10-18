@@ -5,7 +5,7 @@ import type { Cameras } from "../deck/cameras.ts";
 import { boardActor } from "./board-actor.ts";
 import { runEval, safeJson, type EvalOutcome } from "./eval.ts";
 import type { StageService } from "./service.ts";
-import { createStageTool } from "./tool.ts";
+import { createStageTool, type StageTool } from "./tool.ts";
 
 /**
  * Stage code run by something that is not an agent: a board's button, or an app.
@@ -63,7 +63,12 @@ export function conversationFor(context: Pick<CallerRun, "agents">, on: { board:
 	return all.find((one) => one.inPlay.includes(on.board)) ?? context.agents.focused();
 }
 
-export async function runAsCaller(context: CallerRun, spec: CallerRunSpec): Promise<EvalOutcome> {
+/**
+ * The stage tool a board or an app acts through: the conversation it acts for (`conversationFor`),
+ * under its own name. `runAsCaller` runs code against its `stage`; `/api/v1/<verb>` calls one verb
+ * on it for an app (`verbs/router.ts`).
+ */
+export function callerTool(context: CallerRun, spec: Omit<CallerRunSpec, "code" | "scope" | "what">): { tool: StageTool; focused: DeckAgent } {
 	const focused = conversationFor(context, { board: spec.board, ...(spec.stage ? { stage: spec.stage } : {}) });
 	const conversation = {
 		id: focused.id,
@@ -81,8 +86,12 @@ export async function runAsCaller(context: CallerRun, spec: CallerRunSpec): Prom
 		boardPathOf: (file: string) => context.boards.boardPathOf(file),
 	};
 	const actor = boardActor({ path: spec.board, name: spec.name, conversation });
-	const stage = createStageTool({ stage: context.stage, agent: actor, port: context.port }).stage;
-	const outcome = await runEval(spec.code, stage, { scope: spec.scope ?? {} });
+	return { tool: createStageTool({ stage: context.stage, agent: actor, port: context.port }), focused };
+}
+
+export async function runAsCaller(context: CallerRun, spec: CallerRunSpec): Promise<EvalOutcome> {
+	const { tool, focused } = callerTool(context, spec);
+	const outcome = await runEval(spec.code, tool.stage, { scope: spec.scope ?? {} });
 
 	// The first line of the code is in the notice because that is what makes it checkable.
 	const first = spec.code.split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
