@@ -694,3 +694,18 @@ impl Default for TextMeasure {
 		Self::new()
 	}
 }
+
+/// One joined arrow routed by the engine's router (`stage_scene::arrows`), for the server's reroute:
+/// its `metadata`, the boxes of what its ends name (`{ name: [x, y, w, h] }`) and its stroke width.
+/// Returns the path's fields as JSON, `{ x, y, width, height, geometry }`, or `""` when an end is
+/// not among the boxes.
+#[wasm_bindgen(js_name = routeArrow)]
+pub fn route_arrow(metadata: &str, ends: &str, stroke: f64) -> String {
+	let Ok(meta) = serde_json::from_str::<serde_json::Value>(metadata) else { return String::new() };
+	let boxes: std::collections::HashMap<String, [f64; 4]> = serde_json::from_str(ends).unwrap_or_default();
+	let find = |name: &str| boxes.get(name).map(|b| stage_scene::Rect { x: b[0], y: b[1], w: b[2], h: b[3] });
+	let Some(points) = stage_scene::arrows::points(&meta, &find) else { return String::new() };
+	let (route, heads) = stage_scene::arrows::style(&meta);
+	let s = stage_scene::arrows::shape(&points, stroke, route, heads);
+	serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "geometry": s.geometry }).to_string()
+}

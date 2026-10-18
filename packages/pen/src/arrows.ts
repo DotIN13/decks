@@ -42,16 +42,15 @@ export function isArrow(node: PenNode): boolean {
  * `placed` is the layout of the document; `extra` finds anything that is not an item — a board,
  * by its path.
  */
-export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): boolean {
+export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined, router: ArrowRouter = routeArrow): boolean {
 	const index = indexOf(doc);
 	let changed = false;
+	const end = (name: string) => placed.get(name)?.box ?? extra?.(name);
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node)) continue;
-		const points = arrowPoints(node.metadata, placed, extra);
-		if (!points) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
-		const style = arrowStyle(node.metadata);
-		const shape = arrowShape(points, stroke, style);
+		const shape = router(node.metadata, end, stroke);
+		if (!shape) continue;
 		const parent = index.get(node.id)?.parent;
 		const origin = parent ? placed.get(parent.id)?.box : undefined;
 		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
@@ -67,6 +66,19 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 	}
 	return changed;
 }
+
+/**
+ * Routes one joined arrow: its metadata, where the things its ends name are, and its stroke width,
+ * to the path's fields; undefined when an end cannot be found. pen's own is `routeArrow`; the server
+ * hands `reroute` the stage engine's Rust router, which is held to this one (`arrow-fixtures.test.ts`).
+ */
+export type ArrowRouter = (metadata: unknown, end: (name: string) => Frame | undefined, strokeWidth: number) => { x: number; y: number; width: number; height: number; viewBox: [number, number, number, number]; geometry: string } | undefined;
+
+/** pen's own router: `arrowPoints` through `arrowShape`. */
+export const routeArrow: ArrowRouter = (metadata, end, strokeWidth) => {
+	const points = arrowPoints(metadata, new Map(), end);
+	return points ? arrowShape(points, strokeWidth, arrowStyle(metadata)) : undefined;
+};
 
 /**
  * Whether moving the items `ids` (and what they hold) bends an arrow that is not itself moved: one

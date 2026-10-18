@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { rustRouter } from "./arrows.ts";
 import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
 import { runAtOpen } from "../migrations/index.ts";
 import { movedPath } from "../migrations/2026-10-16-stages-to-canvases.ts";
@@ -271,7 +272,7 @@ export class StagePens {
 		const theme = baseTheme(current.doc, "light");
 		const { doc, results } = apply(current.doc, ops, { theme, measure });
 		const placed = placements(this.withImported(name, doc), { theme, measure });
-		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path));
+		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path), rustRouter);
 		const before = current.text ?? serialize(current.doc);
 		const entry = this.write(name, doc);
 		if (options?.undoable) {
@@ -332,7 +333,7 @@ export class StagePens {
 		if (current.error || !existsSync(this.fileOf(name))) return;
 		const doc = structuredClone(current.doc);
 		const placed = placements(this.withImported(name, doc), { theme: baseTheme(doc, "light"), measure });
-		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path))) this.write(name, doc);
+		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path), rustRouter)) this.write(name, doc);
 	}
 
 	/** Imported files, read once per change on disk: path → its modification time and document. */
