@@ -710,8 +710,8 @@ export function AgentPill(props: {
 							data-on={props.stagesOpen ? "soft" : undefined}
 							aria-haspopup="dialog"
 							aria-expanded={props.stagesOpen ?? false}
-							title={props.stage ? `Stage: ${props.stage}` : "Stages"}
-							aria-label={props.stage ? `Stages — currently ${props.stage}` : "Stages — this chat is on none"}
+							title={props.stage ? `Canvas: ${props.stage}` : "Canvases"}
+							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
 							onClick={() => props.onStages?.()}
 						>
 							{/* The app's own mark, not a drawing of it: a stage is what the mark is a picture of. */}
@@ -769,8 +769,8 @@ export function AgentPill(props: {
 					class="icon-button"
 					data-on={props.drawing ? "true" : undefined}
 					aria-pressed={props.drawing}
-					title="Draw on the stage"
-					aria-label="Draw on the stage"
+					title="Draw on the canvas"
+					aria-label="Draw on the canvas"
 					onClick={() => {
 						// The pen is out only while browsing: a press in edit mode means "this component".
 						if (props.mode === "edit") props.onMode("browse");

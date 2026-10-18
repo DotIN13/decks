@@ -7,7 +7,7 @@ use stage_paint::list::{Color, DrawList, Op};
 use stage_paint::painter::{Context, IconShape, LiveInk, paint_area, paint_ink};
 use stage_scene::geometry::Mat;
 use stage_paint::tiles::{Grid, Key, TILE, overview_scale, scale_for};
-use stage_scene::{Rect, Scene, Updated};
+use stage_scene::{Rect, Scene, Updated, arrows};
 use stage_text::Text;
 use stage_text::atlas::Atlas;
 use std::cell::RefCell;
@@ -61,6 +61,8 @@ pub struct Page {
 	pub offsets: HashMap<String, (f64, f64)>,
 	/// What undoes the fields a gesture is showing (a size, a corner, a colour) before it is saved.
 	preview_undo: Vec<Change>,
+	/// The arrows a gesture bends, found once per gesture and routed again at each step.
+	bent: Option<Bent>,
 	/// Items hidden (the eraser), muted (an editor over their words), drawn as holes (live files).
 	pub view: ViewState,
 	/// The stroke still under the pen.
@@ -88,7 +90,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -396,9 +398,16 @@ impl Page {
 	/// A gesture in progress: each item moved by `dx dy` and, while resizing or restyling, with these
 	/// fields, shown here only, until the gesture ends (`None`) or the saved drawing arrives. Lifts
 	/// what it names. Returns the items whose layout changed, for the stage's outlines.
-	pub fn preview(&mut self, moving: Option<Vec<(String, Preview)>>) -> Result<(), String> {
+	///
+	/// An arrow with an end on what the gesture moves or reshapes bends with it: it is routed again
+	/// here at each step (`arrows.rs`, pen's router ported) and lifted too. Returns the arrows lifted
+	/// by this step, which the worker must leave out of its tiles as well.
+	pub fn preview(&mut self, moving: Option<Vec<(String, Preview)>>) -> Result<Vec<String>, String> {
 		self.unpreview();
-		let Some(moving) = moving else { return Ok(()) };
+		let Some(moving) = moving else {
+			self.bent = None;
+			return Ok(Vec::new());
+		};
 		let mut changes = Vec::new();
 		for (id, p) in &moving {
 			if p.dx != 0.0 || p.dy != 0.0 {
@@ -416,7 +425,71 @@ impl Page {
 			self.preview_undo = applied.undo.clone();
 			self.scene.update(&self.doc, Some(&applied), &self.text);
 		}
-		Ok(())
+		Ok(self.bend(&moving))
+	}
+
+	/// Route the arrows a gesture bends from where their ends are at this step, as preview fields
+	/// undone with the rest; returns the ones newly lifted.
+	fn bend(&mut self, moving: &[(String, Preview)]) -> Vec<String> {
+		let mut key: Vec<&str> = moving.iter().map(|(id, _)| id.as_str()).collect();
+		key.sort_unstable();
+		let mut boards: Vec<&str> = self.carry.0.iter().map(String::as_str).collect();
+		boards.sort_unstable();
+		let key = format!("{}|{}", key.join(","), boards.join(","));
+		if self.bent.as_ref().is_none_or(|b| b.key != key) {
+			self.bent = Some(Bent::find(&self.scene, moving, &self.carry.0, key));
+		}
+		let bent = self.bent.as_ref().expect("found above");
+		if bent.arrows.is_empty() {
+			return Vec::new();
+		}
+		let scene = &self.scene;
+		let place = |id: &str| -> Option<Rect> {
+			let (r, i) = match bent.at.get(id) {
+				Some(&(r, i)) if scene.roots.get(r).and_then(|root| root.tree.items.get(i as usize)).is_some_and(|it| it.id == id) => (r, i),
+				_ => scene.find(id)?,
+			};
+			Some(scene.roots[r].placed[i as usize].rect)
+		};
+		let find = |id: &str| -> Option<Rect> {
+			if let Some(mut rect) = place(id) {
+				if let Some((dx, dy)) = bent.carried.get(id).and_then(|by| self.offsets.get(by)) {
+					rect.x += dx;
+					rect.y += dy;
+				}
+				return Some(rect);
+			}
+			let board = self.boards.iter().find(|b| b.path == id)?;
+			let (dx, dy) = if self.carry.0.contains(id) { (self.carry.1, self.carry.2) } else { (0.0, 0.0) };
+			Some(Rect { x: board.x + dx, y: board.y + dy, w: board.w, h: board.h })
+		};
+		let mut changes = Vec::new();
+		for arrow in &bent.arrows {
+			let Some(points) = arrows::points(&arrow.meta, &find) else { continue };
+			let (route, heads) = arrows::style(&arrow.meta);
+			let shape = arrows::shape(&points, arrow.stroke, route, heads);
+			let origin = arrow.parent.as_deref().and_then(place).map_or((0.0, 0.0), |r| (r.x, r.y));
+			let set = |key: &str, value: Value| Change::Set { id: arrow.id.clone(), key: key.into(), value: Some(value) };
+			changes.extend([
+				set("x", json!(arrows::round(shape.x - origin.0))),
+				set("y", json!(arrows::round(shape.y - origin.1))),
+				set("width", json!(shape.width)),
+				set("height", json!(shape.height)),
+				set("viewBox", json!([0, 0, shape.width, shape.height])),
+				set("geometry", json!(shape.geometry)),
+			]);
+		}
+		let ids: Vec<String> = bent.arrows.iter().map(|a| a.id.clone()).collect();
+		if !changes.is_empty() {
+			if let Ok(applied) = self.doc.apply(&changes) {
+				// Undone first, then the gesture's own fields: the two touch different items.
+				let mut undo = applied.undo.clone();
+				undo.append(&mut self.preview_undo);
+				self.preview_undo = undo;
+				self.scene.update(&self.doc, Some(&applied), &self.text);
+			}
+		}
+		ids.into_iter().filter(|id| self.lifted.insert(id.clone())).collect()
 	}
 
 	fn unpreview_fields(&mut self) {
@@ -751,6 +824,34 @@ mod tests {
 
 	/// The whole loop: the page edits, the worker repaints what the edit touched, the page shows it.
 	#[test]
+	fn a_drag_bends_the_arrows_on_what_it_carries() {
+		let stage = r#"{"version":"2.6","children":[
+			{"type":"rectangle","id":"a","x":0,"y":0,"width":100,"height":60},
+			{"type":"rectangle","id":"b","x":300,"y":0,"width":100,"height":60},
+			{"type":"rectangle","id":"c","x":0,"y":300,"width":100,"height":60},
+			{"type":"path","id":"ab","x":98,"y":24,"width":204,"height":12,"geometry":"M2 6 L202 6","strokeWidth":2,"metadata":{"type":"decks.arrow","from":"a","to":"b"}},
+			{"type":"path","id":"bc","x":0,"y":0,"width":10,"height":10,"geometry":"M0 0 L10 10","strokeWidth":2,"metadata":{"type":"decks.arrow","from":"b","to":"c","route":"elbow"}}
+		]}"#;
+		let mut page = Page::new(stage, false, "s").unwrap();
+		let geometry = |page: &Page, id: &str| page.doc.get(id).unwrap().props.get("geometry").cloned();
+		let before = geometry(&page, "ab");
+		let lifted = page.preview(Some(vec![("a".into(), Preview { dx: 0.0, dy: 200.0, set: vec![] })])).unwrap();
+		assert_eq!(lifted, vec!["ab".to_owned()], "only the arrow joined to what moves is lifted");
+		// Routed as pen routes it, from where the moved box is now.
+		let find = |id: &str| match id { "a" => Some(Rect { x: 0.0, y: 200.0, w: 100.0, h: 60.0 }), "b" => Some(Rect { x: 300.0, y: 0.0, w: 100.0, h: 60.0 }), _ => None };
+		let meta = json!({"type":"decks.arrow","from":"a","to":"b"});
+		let want = arrows::shape(&arrows::points(&meta, &find).unwrap(), 2.0, arrows::Route::Straight, arrows::Heads::End);
+		assert_eq!(geometry(&page, "ab"), Some(json!(want.geometry)));
+		// A second step lifts nothing new and keeps routing.
+		assert!(page.preview(Some(vec![("a".into(), Preview { dx: 0.0, dy: 210.0, set: vec![] })])).unwrap().is_empty());
+		assert_ne!(geometry(&page, "ab"), Some(json!(want.geometry)));
+		// Let go: the arrow is the document's again, still drawn here until its tiles come.
+		page.preview(None).unwrap();
+		assert_eq!(geometry(&page, "ab"), before);
+		assert!(page.lifted.contains("ab"));
+	}
+
+	#[test]
 	fn page_and_worker_stay_in_step() {
 		let mut page = Page::new(STAGE, false, "s").unwrap();
 		let mut worker = Worker::new(STAGE, false).unwrap();
@@ -860,6 +961,69 @@ mod tests {
 		let over = page.frame(far, 1.0, 1200.0, 800.0, true);
 		let pictures = over.ops.iter().filter(|op| matches!(op, Op::Picture { .. })).count();
 		assert!(pictures >= 6, "the sharper tiles stand in: {pictures}");
+	}
+}
+
+/// The arrows one gesture bends: each with an end on what it moves (or in it), or on a board it
+/// carries, and not itself moved. Found once per gesture; only the routing runs at each step.
+struct Bent {
+	key: String,
+	arrows: Vec<BentArrow>,
+	/// Each item the gesture moves, and everything in one, to the moved item whose offset it takes.
+	carried: HashMap<String, String>,
+	/// Where each arrow end and parent is in the scene, so a step does not search for it.
+	at: HashMap<String, (usize, u32)>,
+}
+
+struct BentArrow {
+	id: String,
+	meta: Value,
+	stroke: f64,
+	parent: Option<String>,
+}
+
+impl Bent {
+	fn find(scene: &Scene, moving: &[(String, Preview)], boards: &HashSet<String>, key: String) -> Bent {
+		let moved: HashSet<&str> = moving.iter().map(|(id, _)| id.as_str()).collect();
+		let mut carried = HashMap::new();
+		for root in &scene.roots {
+			let items = &root.tree.items;
+			for (i, item) in items.iter().enumerate() {
+				let mut at = Some(i as u32);
+				while let Some(a) = at {
+					let up = &items[a as usize];
+					if moved.contains(up.id.as_str()) {
+						carried.insert(item.id.clone(), up.id.clone());
+						break;
+					}
+					at = up.parent;
+				}
+			}
+		}
+		let mut arrows = Vec::new();
+		let mut at = HashMap::new();
+		for root in &scene.roots {
+			let items = &root.tree.items;
+			for item in items {
+				// Arrows in the document itself: an instance's copies are routed where they are defined.
+				if item.handle.is_none() || carried.contains_key(&item.id) || !arrows::is_arrow(&item.props) {
+					continue;
+				}
+				let Some(meta) = item.get("metadata") else { continue };
+				let ends = arrows::end_items(meta);
+				if !ends.iter().flatten().any(|e| carried.contains_key(*e) || boards.contains(*e)) {
+					continue;
+				}
+				let parent = item.parent.map(|p| items[p as usize].id.clone());
+				for name in ends.iter().flatten().map(|e| e.to_string()).chain(parent.clone()) {
+					if let Some(found) = scene.find(&name) {
+						at.insert(name, found);
+					}
+				}
+				arrows.push(BentArrow { id: item.id.clone(), meta: meta.clone(), stroke: item.get("strokeWidth").and_then(Value::as_f64).unwrap_or(2.0), parent });
+			}
+		}
+		Bent { key, arrows, carried, at }
 	}
 }
 

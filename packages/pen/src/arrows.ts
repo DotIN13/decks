@@ -73,17 +73,26 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
  * with an end on any of them. Such a move cannot be shown by sliding a picture of what is carried.
  */
 export function bendsArrow(doc: PenDocument, ids: ReadonlySet<string>): boolean {
+	return bentArrows(doc, ids).length > 0;
+}
+
+/**
+ * The arrows that moving the items `ids` (and what they hold) bends: each one not itself moved with an
+ * end on any of them. A drag slides what it carries and draws only these again at each step.
+ */
+export function bentArrows(doc: PenDocument, ids: ReadonlySet<string>): PenNode[] {
 	const carried = new Set<string>();
 	for (const node of walk(doc.children)) if (ids.has(node.id)) for (const inner of walk([node])) carried.add(inner.id);
+	const bent: PenNode[] = [];
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node) || carried.has(node.id)) continue;
 		const meta = node.metadata as { from?: unknown; to?: unknown };
-		for (const end of [meta.from, meta.to]) {
+		if ([meta.from, meta.to].some((end) => {
 			const item = arrowEndItem(end);
-			if (item !== undefined && carried.has(item)) return true;
-		}
+			return item !== undefined && carried.has(item);
+		})) bent.push(node);
 	}
-	return false;
+	return bent;
 }
 
 type Point = [number, number];
@@ -131,6 +140,27 @@ export function arrowEndSide(end: unknown): ArrowSide | undefined {
 	return ARROW_SIDES.includes(side as ArrowSide) ? (side as ArrowSide) : undefined;
 }
 
+/**
+ * Where along its side an end joins, as a fraction from the side's top or left end (0) to its bottom
+ * or right end (1): `{ item, side, at }`. No `at` is the middle, the automatic place.
+ */
+export function arrowEndAt(end: unknown): number | undefined {
+	const at = end && typeof end === "object" && !Array.isArray(end) ? (end as { at?: unknown }).at : undefined;
+	return typeof at === "number" && Number.isFinite(at) ? Math.max(0, Math.min(1, at)) : undefined;
+}
+
+/**
+ * How an arrow is bent away from its automatic route, from `metadata.bend`: for an elbow, where its
+ * turn sits from start (0) to end (1); for a curve, how far its middle is pulled, `[dx, dy]` in stage
+ * pixels. Undefined when it takes the automatic route.
+ */
+export function arrowBend(metadata: unknown): number | [number, number] | undefined {
+	const bend = (metadata as { bend?: unknown } | undefined)?.bend;
+	if (typeof bend === "number" && Number.isFinite(bend)) return Math.max(0, Math.min(1, bend));
+	if (Array.isArray(bend) && bend.length === 2 && bend.every((n) => typeof n === "number" && Number.isFinite(n))) return [bend[0] as number, bend[1] as number];
+	return undefined;
+}
+
 /** Where an arrow's end is: an item's box, a board's (through `extra`), or a point as a box of no size. */
 export function arrowEnd(end: unknown, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): Frame | undefined {
 	if (isPointEnd(end)) return { x: end[0], y: end[1], w: 0, h: 0 };
@@ -138,12 +168,12 @@ export function arrowEnd(end: unknown, placed: ReadonlyMap<string, Placed>, extr
 	return item !== undefined ? (placed.get(item)?.box ?? extra?.(item)) : undefined;
 }
 
-/** The middle of one side of a box. */
-export function sidePoint(box: Frame, side: ArrowSide): Point {
-	if (side === "top") return [box.x + box.w / 2, box.y];
-	if (side === "bottom") return [box.x + box.w / 2, box.y + box.h];
-	if (side === "left") return [box.x, box.y + box.h / 2];
-	return [box.x + box.w, box.y + box.h / 2];
+/** A point on one side of a box: its middle, or `at` of the way along it from its top or left end. */
+export function sidePoint(box: Frame, side: ArrowSide, at = 0.5): Point {
+	if (side === "top") return [box.x + box.w * at, box.y];
+	if (side === "bottom") return [box.x + box.w * at, box.y + box.h];
+	if (side === "left") return [box.x, box.y + box.h * at];
+	return [box.x + box.w, box.y + box.h * at];
 }
 
 /** The line an arrow's metadata describes, through where its ends are now; undefined when an end cannot be found. */
@@ -155,7 +185,39 @@ export function arrowPoints(metadata: unknown, placed: ReadonlyMap<string, Place
 	const route = arrowStyle(metadata).route;
 	const fromSide = arrowEndSide(meta.from);
 	const toSide = arrowEndSide(meta.to);
-	return fromSide || toSide ? sidedRoute(from, to, route, fromSide, toSide) : arrowRoute(from, to, route);
+	const bend = arrowBend(metadata);
+	const points = fromSide || toSide ? sidedRoute(from, to, route, fromSide, toSide, { fromAt: arrowEndAt(meta.from), toAt: arrowEndAt(meta.to), bend }) : arrowRoute(from, to, route, bend);
+	return bent(points, route, bend);
+}
+
+/**
+ * A curve's middle pulled by `bend` (`[dx, dy]`): both controls move by 4/3 of the pull, since a
+ * cubic's middle is 3/4 of its controls' mean. A curve laid flat (its ends level) is given controls
+ * on the line first. A straight arrow is bent by making it a curve (`route: "curved"`).
+ */
+function bent(points: Point[], route: ArrowRoute, bend: number | [number, number] | undefined): Point[] {
+	if (!Array.isArray(bend) || route !== "curved") return points;
+	const [p, q] = [points[0]!, points[points.length - 1]!];
+	const controls: [Point, Point] =
+		points.length === 4 && route === "curved"
+			? [points[1]!, points[2]!]
+			: [
+					[p[0] + (q[0] - p[0]) / 3, p[1] + (q[1] - p[1]) / 3],
+					[p[0] + ((q[0] - p[0]) * 2) / 3, p[1] + ((q[1] - p[1]) * 2) / 3],
+				];
+	const k = 4 / 3;
+	return [p, [controls[0][0] + bend[0] * k, controls[0][1] + bend[1] * k], [controls[1][0] + bend[0] * k, controls[1][1] + bend[1] * k], q];
+}
+
+/** The middle of an arrow's line as drawn: a curve's at t = 1/2, an elbow's middle segment's, a line's. */
+export function arrowMiddle(points: Point[], route: ArrowRoute): Point {
+	if (route === "curved" && points.length === 4) {
+		const [a, b, c, d] = points as [Point, Point, Point, Point];
+		return [(a[0] + 3 * b[0] + 3 * c[0] + d[0]) / 8, (a[1] + 3 * b[1] + 3 * c[1] + d[1]) / 8];
+	}
+	if (points.length === 4) return [(points[1]![0] + points[2]![0]) / 2, (points[1]![1] + points[2]![1]) / 2];
+	const [p, q] = [points[0]!, points[points.length - 1]!];
+	return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
 }
 
 const NORMAL: Record<ArrowSide, Point> = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
@@ -172,12 +234,16 @@ function facing(box: Frame, toward: Point): ArrowSide {
  * middle, square to it. An end with no side meets the side of its box that faces the other end. A
  * point end (a box of no size) is the point itself.
  */
-export function sidedRoute(a: Frame, b: Frame, route: ArrowRoute, aSide?: ArrowSide, bSide?: ArrowSide): Point[] {
+export function sidedRoute(a: Frame, b: Frame, route: ArrowRoute, aSide?: ArrowSide, bSide?: ArrowSide, how: { fromAt?: number; toAt?: number; bend?: number | [number, number] } = {}): Point[] {
 	const centre = (f: Frame): Point => [f.x + f.w / 2, f.y + f.h / 2];
-	const sa = aSide ?? facing(a, bSide ? sidePoint(b, bSide) : centre(b));
-	const sb = bSide ?? facing(b, sidePoint(a, sa));
-	const p = a.w === 0 && a.h === 0 ? ([a.x, a.y] as Point) : sidePoint(a, sa);
-	const q = b.w === 0 && b.h === 0 ? ([b.x, b.y] as Point) : sidePoint(b, sb);
+	// An end's `at` counts only on the side it keeps to: a side chosen for it moves as things move.
+	const aAt = aSide ? how.fromAt : undefined;
+	const bAt = bSide ? how.toAt : undefined;
+	const sa = aSide ?? facing(a, bSide ? sidePoint(b, bSide, bAt) : centre(b));
+	const sb = bSide ?? facing(b, sidePoint(a, sa, aAt));
+	const p = a.w === 0 && a.h === 0 ? ([a.x, a.y] as Point) : sidePoint(a, sa, aAt);
+	const q = b.w === 0 && b.h === 0 ? ([b.x, b.y] as Point) : sidePoint(b, sb, bAt);
+	const turn = typeof how.bend === "number" ? how.bend : 0.5;
 	if (route === "straight") return [p, q];
 	const na = NORMAL[sa];
 	const nb = NORMAL[sb];
@@ -188,11 +254,11 @@ export function sidedRoute(a: Frame, b: Frame, route: ArrowRoute, aSide?: ArrowS
 	// Elbow: out of each side, then across, in at most three turns.
 	const across = (side: ArrowSide) => side === "left" || side === "right";
 	if (across(sa) && across(sb)) {
-		const mid = (p[0] + q[0]) / 2;
+		const mid = p[0] + (q[0] - p[0]) * turn;
 		return p[1] === q[1] ? [p, q] : [p, [mid, p[1]], [mid, q[1]], q];
 	}
 	if (!across(sa) && !across(sb)) {
-		const mid = (p[1] + q[1]) / 2;
+		const mid = p[1] + (q[1] - p[1]) * turn;
 		return p[0] === q[0] ? [p, q] : [p, [p[0], mid], [q[0], mid], q];
 	}
 	return across(sa) ? [p, [q[0], p[1]], q] : [p, [p[0], q[1]], q];
@@ -243,8 +309,10 @@ export function arrowShape(points: Point[], strokeWidth = 2, style: Partial<Arro
  * controls out from each edge by half the distance between them, and its end. `true` is the elbow
  * route and `false` the straight one, as this took before routes had names.
  */
-export function arrowRoute(a: Frame, b: Frame, route: ArrowRoute | boolean): Point[] {
+export function arrowRoute(a: Frame, b: Frame, route: ArrowRoute | boolean, bend?: number | [number, number]): Point[] {
 	const kind: ArrowRoute = route === true ? "elbow" : route === false ? "straight" : route;
+	// Where an elbow turns, from its start (0) to its end (1); the middle unless it was bent.
+	const turn = typeof bend === "number" ? bend : 0.5;
 	const elbow = kind === "elbow";
 	const curve = (start: Point, end: Point, across: boolean): Point[] => {
 		const reach = Math.max(24, (across ? Math.abs(end[0] - start[0]) : Math.abs(end[1] - start[1])) / 2);
@@ -272,7 +340,7 @@ export function arrowRoute(a: Frame, b: Frame, route: ArrowRoute | boolean): Poi
 		const end: Point = [dx >= 0 ? b.x : b.x + b.w, level ?? bc[1]];
 		if (kind === "curved" && start[1] !== end[1]) return curve(start, end, true);
 		if (!elbow || start[1] === end[1]) return [start, end];
-		const mid = (start[0] + end[0]) / 2;
+		const mid = start[0] + (end[0] - start[0]) * turn;
 		return [start, [mid, start[1]], [mid, end[1]], end];
 	}
 	const column = shared(a.x, a.x + a.w, b.x, b.x + b.w);
@@ -280,7 +348,7 @@ export function arrowRoute(a: Frame, b: Frame, route: ArrowRoute | boolean): Poi
 	const end: Point = [column ?? bc[0], dy >= 0 ? b.y : b.y + b.h];
 	if (kind === "curved" && start[0] !== end[0]) return curve(start, end, false);
 	if (!elbow || start[0] === end[0]) return [start, end];
-	const mid = (start[1] + end[1]) / 2;
+	const mid = start[1] + (end[1] - start[1]) * turn;
 	return [start, [start[0], mid], [end[0], mid], end];
 }
 

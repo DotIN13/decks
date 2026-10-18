@@ -12,7 +12,7 @@
  * - a **comment** on words selected on a board (`markup/comments.ts`), whose id is the
  *   comment's;
  * - a **board**, whose id is its path;
- * - an **item** drawn on the stage, whose id is its id in `stage.pen`.
+ * - an **item** drawn on the stage, whose id is its id in `canvas.pen`.
  *
  * The last two arrive by dragging the thing onto the input bar (`canvas/Stage.tsx`). They are
  * pills rather than typed text for the reason the comment is: what a mention stands for should

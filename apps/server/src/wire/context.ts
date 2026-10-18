@@ -107,7 +107,7 @@ export interface WireContext {
 	 * The seeding is the other half: what `Deck.arrange` computes is a *frontier* answer, and a board
 	 * that is re-placed on every send chases whatever was moved last (see `Deck.arrange`).
 	 */
-	stageState(): DeckState;
+	stageState(asked?: DeckAgent): DeckState;
 
 	/** Tell every browser what stages exist and who is on them (`app.stagesMessage`). */
 	publishStages(): void;
@@ -129,6 +129,8 @@ export interface WireContext {
 	/** Point the whole app at another data directory (§2). */
 	openDeck(path: string): void;
 
+	/** Choose the server recogniser's model, or `null` for its default. Returns a sentence when it is not one. */
+	setSttModel(model: string | null): { error: string } | undefined;
 	/** Choose the deck's timezone, or `null` for the machine's. Returns a sentence when it is not one. */
 	setTimezone(zone: string | null): { error: string } | undefined;
 

@@ -1,3 +1,4 @@
+import { canvasFile } from "../stage/canvas-files.ts";
 import { parse, serializeOuter } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
 import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
@@ -83,7 +84,7 @@ export class Acts {
 		}
 		if (act.kind === "draw") {
 			if (act.boxes.length === 0) return;
-			this.say(agentId, `stages/${act.stage}/stage.pen`, "done", "draw", act.ids.slice(0, MAX_IDS), act.boxes.slice(0, MAX_IDS));
+			this.say(agentId, canvasFile(act.stage), "done", "draw", act.ids.slice(0, MAX_IDS), act.boxes.slice(0, MAX_IDS));
 			return;
 		}
 		const { event } = act;

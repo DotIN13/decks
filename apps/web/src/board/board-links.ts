@@ -81,7 +81,7 @@ export function attachBoardOpen(frame: HTMLIFrameElement, onOpen: (path: string)
  * no canvas, no title bar and no way back.
  *
  * The stage's own folder is the base every relative link in it is read against — `/api/f/<deck
- * path>/stages/<name>/` — so the deck's prefix is that with the last two segments taken off. A
+ * path>/canvases/<name>/` — so the deck's prefix is that with the last two segments taken off. A
  * link that lands inside it and names a board file (`.html`, `.md`) is a board; everything
  * else, including an asset in the deck, is a tab, which is the same rule `lib/board.js` applies
  * on a board.
@@ -102,7 +102,7 @@ export function deckBoardLink(href: string, base: string): string | undefined {
 	// On another connection the same path is under `/c/<id>` (`connections/connection.ts`).
 	const prefix = parts[0] === "c" && parts.length > 2 ? `/c/${parts[1]}` : "";
 	if (prefix) parts = parts.slice(2);
-	// `/api/f/<deck>/stages/<name>/` — the deck is everything before the last two.
+	// `/api/f/<deck>/canvases/<name>/` — the deck is everything before the last two.
 	if (parts.length < 4 || parts[0] !== "api" || parts[1] !== "f") return undefined;
 	const root = `${prefix}/${parts.slice(0, -2).join("/")}/`;
 	if (!url.pathname.startsWith(root)) return undefined;

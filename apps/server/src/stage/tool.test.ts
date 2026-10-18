@@ -763,7 +763,7 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("stage.pen edits the drawing in pen's own words, answers with boxes, and reads it back", async () => {
+test("canvas.pen edits the drawing in pen's own words, answers with boxes, and reads it back", async () => {
 	const { tool, service, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	assert.match((await tool.run(`return await stage.pen.read()`)).text, /keeps no stage drawing/);
 	service.pens = new StagePens(deck.path, () => {});
@@ -778,9 +778,9 @@ test("stage.pen edits the drawing in pen's own words, answers with boxes, and re
 		// The arrow to the board was drawn: the board is where the deck's own list has it.
 		assert.ok(answer.results[1]!.box, "the arrow has a box once it is routed");
 		const read = JSON.parse((await tool.run(`return await stage.pen.read()`)).text) as { file: string; children: Array<{ id: string; type: string }> };
-		assert.equal(read.file, "stages/ada/stage.pen");
+		assert.equal(read.file, "canvases/ada/canvas.pen");
 		assert.deepEqual(read.children.map((c) => c.id), ["n", "to-plan"]);
-		assert.equal((await tool.run(`return await stage.pen.file()`)).text, `"stages/ada/stage.pen"`);
+		assert.equal((await tool.run(`return await stage.pen.file()`)).text, `"canvases/ada/canvas.pen"`);
 		const bad = await tool.run(`return await stage.pen.edit([{ op: "wiggle", id: "n" }])`);
 		assert.equal(bad.isError, true);
 		assert.match(bad.text, /Edit 1 \(wiggle\) failed, and nothing was saved/);

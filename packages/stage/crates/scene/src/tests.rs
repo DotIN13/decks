@@ -166,3 +166,50 @@ fn a_turned_frame_turns_its_children() {
 	assert_eq!(s.pick(110.0, 15.0, 0.0).unwrap().id, "r");
 	assert_eq!(s.pick(110.0, 95.0, 0.0).unwrap().id, "f");
 }
+
+#[test]
+fn a_hugs_number_is_its_floor() {
+	// As pen's layout.ts: empty, the number; holding less, still the number; holding more, what it holds.
+	let d = doc(json!({"children":[
+		{"type":"frame","id":"empty","layout":"vertical","width":200,"height":"fit_content(120)","children":[]},
+		{"type":"frame","id":"small","layout":"vertical","width":200,"height":"fit_content(120)","children":[
+			{"type":"rectangle","id":"s1","width":50,"height":40}
+		]},
+		{"type":"frame","id":"big","layout":"vertical","width":200,"height":"fit_content(120)","children":[
+			{"type":"rectangle","id":"b1","width":50,"height":300}
+		]}
+	]}));
+	let s = Scene::new(&d, false, &Estimate);
+	assert_eq!(rect_of(&s, &d, "empty").h, 120.0);
+	assert_eq!(rect_of(&s, &d, "small").h, 120.0);
+	assert_eq!(rect_of(&s, &d, "big").h, 300.0);
+}
+
+#[test]
+fn arrows_match_pen() {
+	// Cases pen's own router wrote (`packages/pen/src/arrow-fixtures.test.ts`): the same points to
+	// a thousandth of a pixel, and the same path, character for character.
+	let cases: Vec<Value> = serde_json::from_str(include_str!("../fixtures/arrows.json")).unwrap();
+	assert!(cases.len() >= 1000);
+	let rect = |v: &Value| Rect { x: v["x"].as_f64().unwrap(), y: v["y"].as_f64().unwrap(), w: v["w"].as_f64().unwrap(), h: v["h"].as_f64().unwrap() };
+	for (n, case) in cases.iter().enumerate() {
+		let (a, b) = (rect(&case["a"]), rect(&case["b"]));
+		let find = |id: &str| match id { "a" => Some(a), "b" => Some(b), _ => None };
+		let meta = &case["metadata"];
+		let got = arrows::points(meta, &find);
+		let want = case["points"].as_array();
+		assert_eq!(got.is_some(), want.is_some(), "case {n}: found");
+		let (Some(got), Some(want)) = (got, want) else { continue };
+		assert_eq!(got.len(), want.len(), "case {n}: {meta}");
+		for (g, w) in got.iter().zip(want) {
+			for k in 0..2 {
+				assert!((g[k] - w[k].as_f64().unwrap()).abs() < 1e-3, "case {n}: {got:?} vs {want:?} for {meta}");
+			}
+		}
+		let (route, heads) = arrows::style(meta);
+		let shape = arrows::shape(&got, case["stroke"].as_f64().unwrap(), route, heads);
+		let s = &case["shape"];
+		assert_eq!(shape.geometry, s["geometry"].as_str().unwrap(), "case {n}: {meta}");
+		assert_eq!([shape.x, shape.y, shape.width, shape.height], ["x", "y", "width", "height"].map(|k| s[k].as_f64().unwrap()), "case {n}");
+	}
+}

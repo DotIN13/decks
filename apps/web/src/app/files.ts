@@ -64,7 +64,7 @@ const isWords = (file: File) => file.size <= CARD_BYTES && (WORDS.has(extensionO
 /** Whether a file can be an item on the stage itself rather than something on a board. */
 export const onStage = (file: File) => isRaster(file) || isWords(file) || isPlayable(file);
 
-/** A deck-relative asset path as the stage file writes it: from `stages/<name>/`, two folders up. */
+/** A deck-relative asset path as the stage file writes it: from `canvases/<name>/`, two folders up. */
 const fromStage = (asset: string) => `../../${asset}`;
 
 /** A byte count as a sentence a person reads while waiting. */

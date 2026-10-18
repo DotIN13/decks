@@ -13,7 +13,7 @@ import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore, type AgentRecord } from "./store.ts";
-import { readCanvasStage } from "./from-canvas.ts";
+import { fromSharedCanvas } from "../migrations/2026-09-22-shared-canvases-to-agents.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -309,27 +309,9 @@ export class Registry {
 		return this.agents.length;
 	}
 
-	/**
-	 * A record that named a shared canvas takes that canvas's boards as its own stage, once.
-	 *
-	 * Written straight back, so the next open reads the chat's own fields and the canvas file is
-	 * never needed again. Every chat that was on one canvas gets its own copy of it: from here
-	 * on each agent's stage is its own, and moving a board in one does not move it in another.
-	 */
+	/** A record from the shared-canvas days, made the chat's own (`migrations/2026-09-22-shared-canvases-to-agents.ts`). */
 	private fromCanvas(record: AgentRecord): AgentRecord {
-		if (!record.fromCanvas) return record;
-		const { fromCanvas, ...rest } = record;
-		const canvas = rest.inPlay.length === 0 && !rest.positions ? readCanvasStage(this.deck.path, fromCanvas) : undefined;
-		if (!canvas) {
-			this.store.writeRecord(rest);
-			return rest;
-		}
-		const boards = canvas.boards.filter((path) => this.deck.board(path));
-		const context = [...boards, ...rest.context.filter((path) => !boards.includes(path))];
-		const places = Object.fromEntries(Object.entries(canvas.places).filter(([path]) => context.includes(path)));
-		const next: AgentRecord = { ...rest, context, inPlay: boards, ...(Object.keys(places).length > 0 ? { positions: places } : {}) };
-		this.store.writeRecord(next);
-		return next;
+		return fromSharedCanvas(record, this.deck.path, (path) => !!this.deck.board(path), (next) => this.store.writeRecord(next));
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, pathBounds, reroute, shapeKind, shapeOutline, SHAPES, sidedRoute, type PenDocument } from "./index.ts";
+import { apply, arrowPoints, baseTheme, emptyDocument, layout, makeLabel, makeShape, pathBounds, reroute, shapeKind, shapeOutline, shapeRadius, SHAPES, sidedRoute, type PenDocument } from "./index.ts";
 
 const theme = baseTheme(emptyDocument(), "light");
 const diamond = shapeKind("Decision")!;
@@ -84,4 +84,40 @@ test("every library shape is drawn inside its own viewBox", () => {
 		assert.ok(box, kind.name);
 		assert.ok(box.x >= -0.01 && box.y >= -0.01 && box.x + box.w <= 100.01 && box.y + box.h <= 100.01, `${kind.name} covers ${JSON.stringify(box)}`);
 	}
+});
+
+test("a shape pulled wide is built at its size: a terminator's ends stay half circles, an arrow's head keeps its run", () => {
+	const at = (name: string, w: number, h: number) => makeShape(shapeKind(name)!, { frame: "f", outline: "o" }, { w, h }).children![0]!;
+	const terminator = at("Terminator", 300, 100);
+	assert.deepEqual(terminator.viewBox, [0, 0, 300, 100]);
+	assert.match(terminator.geometry as string, /A50 50 /);
+	const head = (w: number) => {
+		const xs = [...(at("Arrow right", w, 100).geometry as string).matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+		return w - Math.min(...xs.filter((x) => x > 0 && x < w));
+	};
+	assert.equal(head(300), head(600), "the head is as long at 600 wide as at 300");
+});
+
+test("only shapes with corners to round have a radius: Rectangle, Process, Rounded and Speech", () => {
+	const rounded = SHAPES.filter((kind) => shapeRadius(makeShape(kind, { frame: "f", outline: "o" }, { w: 200, h: 100 })) !== undefined).map((kind) => kind.name);
+	assert.deepEqual(rounded.sort(), ["Process", "Rectangle", "Rounded", "Speech"]);
+});
+
+test("an arrow keeps where it joins and how it bends: `at` slides a join along its side, `bend` moves the turn or pulls the middle", () => {
+	const doc: PenDocument = { version: "2.6", children: [
+		{ id: "a", type: "rectangle", x: 0, y: 0, width: 100, height: 100 },
+		{ id: "b", type: "rectangle", x: 300, y: 200, width: 100, height: 100 },
+	] } as PenDocument;
+	const placed = layout(doc, doc.children, { theme });
+	const at = arrowPoints({ from: { item: "a", side: "right", at: 0.25 }, to: { item: "b", side: "left" } }, placed)!;
+	assert.deepEqual(at[0], [100, 25], "a quarter of the way down the right side");
+	const elbow = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "elbow", bend: 0.25 }, placed)!;
+	assert.equal(elbow[1]![0], 150, "the turn a quarter of the way across, from 100 to 300");
+	const flat = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "curved" }, placed)!;
+	const pulled = arrowPoints({ from: { item: "a", side: "right" }, to: { item: "b", side: "left" }, route: "curved", bend: [0, 60] }, placed)!;
+	const middle = (p: number[][]) => [(p[0]![1]! + 3 * p[1]![1]! + 3 * p[2]![1]! + p[3]![1]!) / 8];
+	assert.ok(Math.abs(middle(pulled)[0]! - middle(flat)[0]! - 60) < 1e-9, "the middle pulled down 60");
+	const placedB = { ...doc, children: [{ ...doc.children[0]!, x: 40 }, doc.children[1]!] } as PenDocument;
+	const moved = arrowPoints({ from: { item: "a", side: "right", at: 0.25 }, to: { item: "b", side: "left" }, route: "elbow", bend: 0.25 }, layout(placedB, placedB.children, { theme }))!;
+	assert.deepEqual(moved[0], [140, 25], "an item that moves keeps its join's fraction");
 });

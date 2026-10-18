@@ -5,7 +5,7 @@ description: Your stage is a native pen.dev .pen file — its boards, and notes,
 
 # Drawing on the stage
 
-Your stage is one file, `stages/<name>/stage.pen`, in **pen.dev's own format**: it opens in pen.dev
+Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
 - **Boards**: the HTML pages you write. Each one on the stage is a pen `browser` item pointing at
@@ -42,7 +42,7 @@ its boards and its drawing. Make a new stage for a new piece of work; open an ol
 ```ts
 const drawing = await stage.pen.read();   // every item as saved, plus its box on the stage
 await stage.pen.edit([ /* edits */ ]);    // applied together, or not at all
-const file = await stage.pen.file();      // "stages/<name>/stage.pen", to edit by hand instead
+const file = await stage.pen.file();      // "canvases/<name>/canvas.pen", to edit by hand instead
 ```
 
 - `read()` returns `{ stage, file, version, variables?, themes?, children }`. Each item is exactly
@@ -186,8 +186,10 @@ values —
 `layout: "none"` lets each child sit at its own `x`, `y`. `gap` is the space between, `padding` a
 number or `[vertical, horizontal]` or `[top, right, bottom, left]`, `justifyContent` `"start" |
 "center" | "end" | "space_between" | "space_around"`, `alignItems` `"start" | "center" | "end"`.
-A width or height is a number, `"fit_content"` (hug the children; a frame's default) or
-`"fill_container"` (take the room the parent has left). A child with `layoutPosition: "absolute"`
+A width or height is a number, `"fit_content"` (hug the children; a frame's default),
+`"fit_content(120)"` (hug them, but never less than 120) or `"fill_container"` (take the room the
+parent has left). A frame you insert with a `box` hugs what it holds, and the box's height is its floor;
+give a plain number in `height` only when it should stay that tall whatever it holds. A child with `layoutPosition: "absolute"`
 leaves the layout and sits at its own `x`, `y`. Want five notes in a tidy column? A frame with
 `layout: "vertical", gap: 16` and the notes inside: no coordinates at all.
 
@@ -208,7 +210,7 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
 Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
 with nothing to declare. `stage.pen.read("frames/ui/agent-card")` reads it and `stage.pen.edit([...],
 { path: "frames/ui/agent-card" })` edits it with the same edits a stage takes; every stage using it
-shows the change. A path is relative to the deck, as a board's is, so `"stages/<name>/stage.pen"`
+shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
 reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
@@ -267,14 +269,18 @@ that stops on bare canvas, which the person makes by letting an arrow go there. 
 keep to one side of what it joins — `{ item: "check", side: "right" }`, with `"top"`, `"right"`,
 `"bottom"` or `"left"` — and then leaves the middle of that side, square to it, however things
 move; a flowchart reads best that way (out of a decision's right and bottom, into the next box's
-top or left). An end with no side meets whichever edge faces the other end. A point end stays
+top or left). A sided end can sit elsewhere on its side with `at`, from 0 (the side's top or left
+end) to 1: `{ item: "check", side: "right", at: 0.25 }`. An end with no side meets whichever edge
+faces the other end. A point end stays
 where it is on the stage, so to move such an arrow shift its points in `metadata` along with its
 `x` and `y`, or the next redraw puts it back.
 
 Its style is three more `metadata` fields, each optional: `route` is `"straight"` (the default),
 `"curved"` (leaves and arrives square to the two edges) or `"elbow"` (right angles); `heads` is
 `"end"` (the default), `"both"` or `"none"`, for a plain connector; and `dash: true` dashes the
-line. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
+line. `bend` moves an arrow off its automatic route and is kept when things move: on an elbow, where
+its turn sits from start (0) to end (1), `bend: 0.3`; on a curve, how far its middle is pulled in
+stage pixels, `bend: [0, -40]`. Change one with `{ op: "update", id, set: { metadata: { ...its metadata, route: "curved" } } }`;
 the path is redrawn for you. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default. Words on the line — "yes", "no", "then" — are `label` in its metadata,
 drawn on the middle of the line.

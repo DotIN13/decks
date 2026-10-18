@@ -171,6 +171,8 @@ const CHECKS = [
 	 * it without ever scrolling sideways, and an arrow that keeps to the side it was drawn from.
 	 */
 	{ file: "shapes.mjs", needsAgent: false },
+	/* A drag bends the arrows joined to what it carries: routed by the engine at each step, no tile painted again. */
+	{ file: "bent-arrows.mjs", needsAgent: false },
 	/*
 	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
 	 * as a still with a badge on it, and nothing decoding until it is pressed.

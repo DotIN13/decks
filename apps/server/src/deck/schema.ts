@@ -1,3 +1,4 @@
+import { oldBoardPlaces } from "../migrations/2026-09-16-deck-json-places.ts";
 import type { Root } from "@decks/protocol";
 
 /**
@@ -69,24 +70,8 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 		warnings.push(`deck.json version ${String(source.version)} is newer than this build understands.`);
 	}
 
-	/*
-	 * And the places, which are a seed rather than state.
-	 *
-	 * Only an older `boards` map has them: a file this build wrote does not, because a place belongs to
-	 * a stage. A pair that is not two finite numbers is dropped with a warning — the board still exists,
-	 * and the auto-layout is where it would have gone anyway. Its `w`/`h`, if it had any, are ignored:
-	 * a size is the board's own file's business now.
-	 */
-	const arrangement: Record<string, { x: number; y: number }> = {};
-	if (source.boards && typeof source.boards === "object" && !Array.isArray(source.boards)) {
-		for (const [path, value] of Object.entries(source.boards as Record<string, unknown>)) {
-			const at = value as { x?: unknown; y?: unknown } | null;
-			const x = Number(at?.x);
-			const y = Number(at?.y);
-			if (Number.isFinite(x) && Number.isFinite(y)) arrangement[normalizeBoardPath(path)] = { x: Math.round(x), y: Math.round(y) };
-			else warnings.push(`deck.json: ignoring the position of "${path}". x and y must be numbers.`);
-		}
-	}
+	// And the places an older `boards` map held, a seed rather than state (`migrations/2026-09-16-deck-json-places.ts`).
+	const arrangement = oldBoardPlaces(source.boards, normalizeBoardPath, warnings);
 
 	if (source.roots !== undefined) {
 		if (Array.isArray(source.roots)) file.roots = source.roots as DeckFile["roots"];

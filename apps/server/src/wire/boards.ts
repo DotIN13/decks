@@ -2,8 +2,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { ServerMessage } from "@decks/protocol";
 import { asBoardFormat } from "../boards/templates.ts";
 import { codeFor } from "../boards/eval-code.ts";
-import { runAsCaller } from "../stage/caller-run.ts";
+import { conversationFor, runAsCaller } from "../stage/caller-run.ts";
 import type { WireContext, WirePart } from "./context.ts";
+import { putOn, takeOff } from "../stage/canvas-ops.ts";
 
 /**
  * The board frames: the user's half of the canvas, and the two ways the past comes back.
@@ -12,6 +13,20 @@ import type { WireContext, WirePart } from "./context.ts";
  * drag-and-retype gestures that arrive as patches. The agent's writes do not come through
  * here at all: it edits the file with its own tools, and the watcher tells everyone.
  */
+/**
+ * The stage a person's change goes to: the one on screen, which the browser names, or, from a browser
+ * that names none, the focused agent's. An agent on that stage carries the change when there is one,
+ * so a board it takes off is remembered where it was; with none, the change is written to the file.
+ */
+function stageFor(message: { stage?: string }, wire: WireContext): { name?: string; agent?: ReturnType<WireContext["target"]> } {
+	const pens = wire.stage.pens;
+	const target = wire.target();
+	const name = message.stage && pens?.has(message.stage) ? message.stage : target.stageName(true);
+	if (!name) return {};
+	const agent = target.stageName() === name ? target : (wire.agents.looking()?.stageName() === name ? wire.agents.looking() : wire.agents.all().find((one) => one.stageName() === name));
+	return { name, ...(agent ? { agent } : {}) };
+}
+
 export const boards = {
 	"board.move": (message, reply, wire) => {
 		if (!wire.deck.board(message.path)) {
@@ -23,9 +38,10 @@ export const boards = {
 		 * is written down is this conversation's arrangement. The board sent back is the one *this stage*
 		 * sees, which is the same object when the caller is the stage that moved it.
 		 */
-		const agent = wire.target();
-		agent.setPosition(message.path, message.x, message.y);
-		const board = wire.stageState().boards.find((one) => one.path === message.path);
+		const { name, agent } = stageFor(message, wire);
+		if (agent) agent.setPosition(message.path, message.x, message.y);
+		else if (name) wire.stage.pens?.moveBoard(name, message.path, message.x, message.y);
+		const board = wire.stageState(agent).boards.find((one) => one.path === message.path);
 		if (!board) return;
 		// Broadcast rather than reply: a second tab is looking at the same
 		// stage and the board has moved there too.
@@ -70,8 +86,11 @@ export const boards = {
 				return;
 			}
 			// The size goes to the stage on screen, in its file; the board's own file is left as its agent wrote it.
-			wire.target().setSize(message.path, { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
-			const sized = wire.stageState().boards.find((one) => one.path === message.path);
+			const size = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			const { name, agent } = stageFor(message, wire);
+			if (agent) agent.setSize(message.path, size);
+			else if (name) wire.stage.pens?.sizeBoard(name, message.path, size);
+			const sized = wire.stageState(agent).boards.find((one) => one.path === message.path);
 			if (sized) wire.send({ type: "board.changed", path: sized.path, rev: sized.rev, board: sized });
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
@@ -113,10 +132,11 @@ export const boards = {
 	 * the view.
 	 */
 	"board.play": (message, _reply, wire) => {
-		const agent = wire.target();
+		const { name, agent } = stageFor(message, wire);
 		// A board picked out of the rail is a board joining the canvas, so it is placed beside what
 		// is on it unless the place it already has is already beside it (`deck/place.ts`).
-		agent.setInPlay([...agent.inPlay, message.path], { place: true });
+		if (agent) agent.setInPlay([...agent.inPlay, message.path], { place: true });
+		else if (name && wire.stage.pens) putOn(wire.stage.pens, wire.deck, name, [message.path]);
 	},
 
 	/** The person read it, so it is no longer news on the canvas until it is written again. */
@@ -125,8 +145,9 @@ export const boards = {
 	},
 
 	"board.hide": (message, _reply, wire) => {
-		const agent = wire.target();
-		agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
+		const { name, agent } = stageFor(message, wire);
+		if (agent) agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
+		else if (name && wire.stage.pens) takeOff(wire.stage.pens, wire.deck, name, [message.path]);
 	},
 
 	/*
@@ -179,7 +200,14 @@ export const boards = {
 		} else path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
 		place(path);
 		function place(path: string) {
-			const agent = wire.target();
+			const { name, agent: onStage } = stageFor(message, wire);
+			if (!onStage) {
+				const at = message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y) ? { [path]: { x: Math.round(message.at.x), y: Math.round(message.at.y) } } : undefined;
+				if (name && wire.stage.pens) putOn(wire.stage.pens, wire.deck, name, [path], at ? { at } : {});
+				if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
+				return;
+			}
+			const agent = onStage;
 			/*
 			 * The place first, then the canvas. A drop and a double-click name the point themselves, and
 			 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
@@ -191,7 +219,7 @@ export const boards = {
 				agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
 			}
 			agent.setInPlay([...agent.inPlay, path], { place: true });
-			const placed = wire.stageState().boards.find((one) => one.path === path);
+			const placed = wire.stageState(agent).boards.find((one) => one.path === path);
 			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
 			// After the board is announced, so the asker already holds it when it hears the path.
 			if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
@@ -265,7 +293,7 @@ export const boards = {
 	 *   question with the board's name in it rather than a click.
 	 */
 	"board.eval": (message, reply, wire) => {
-		void runBoardEval(message.path, message.id, message.value, reply, wire);
+		void runBoardEval(message.path, message.id, message.value, reply, wire, message.stage);
 	},
 } satisfies WirePart;
 
@@ -282,6 +310,7 @@ async function runBoardEval(
 	value: unknown,
 	reply: (message: ServerMessage) => void,
 	wire: WireContext,
+	stage?: string,
 ): Promise<void> {
 	if (!wire.deck.board(path)) {
 		reply({ type: "notice", level: "warn", text: `There is no board at ${path} to run anything.` });
@@ -310,7 +339,7 @@ async function runBoardEval(
 	 * spoken to, which is the right answer here too: a click on a board is a thing a person
 	 * did, and it should be legible in a chat.
 	 */
-	const focused = wire.agents.focused();
+	const focused = conversationFor(wire, { board: path, ...(stage ? { stage } : {}) });
 	if (!wire.evalTrust.allows(path)) {
 		const answer = await focused.bridge.choose({
 			title: "Run this board's code?",
@@ -342,7 +371,7 @@ async function runBoardEval(
 	};
 	const outcome = await runAsCaller(
 		{ agents: wire.agents, cameras: wire.cameras, boards: wire.boards, stage: wire.stage, port: wire.port },
-		{ board: path, name: path, code, scope: { event }, what: `ran "${id}"` },
+		{ board: path, name: path, code, scope: { event }, what: `ran "${id}"`, ...(stage ? { stage } : {}) },
 	);
 	if (outcome.error) reply({ type: "notice", level: "error", text: `${path}: ${outcome.error}` });
 }

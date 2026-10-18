@@ -141,7 +141,12 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 			const siblings = childrenOf(doc, op.parent);
 			const at = clampIndex(op.index, siblings.length);
 			siblings.splice(at, 0, node);
-			const note = [op.box ? placeBox(doc, node.id, op.box, options) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
+			/*
+			 * A new frame hugs what it holds, and the height its box gives is the least it is: `fit_content(h)`,
+			 * pen's own hug with a number (`layout.ts`). Only a plain number in the node's own `height` fixes it.
+			 */
+			const floor = node.type === "frame" && typeof op.node.height !== "number";
+			const note = [op.box ? placeBox(doc, node.id, op.box, options, { floor }) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
 			return { op: "insert", id: node.id, ...(note ? { note } : {}) };
 		}
 		case "update": {
@@ -297,7 +302,7 @@ function updateInside(doc: PenDocument, path: string, set: Record<string, unknow
 }
 
 /** Turn a stage box into pen's own numbers for this item, against where its parent really is. */
-function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: ApplyOptions): string | undefined {
+function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: ApplyOptions, how: { floor?: boolean } = {}): string | undefined {
 	const found = located(doc, id);
 	const node = found.node;
 	const hasX = typeof box.x1 === "number";
@@ -336,6 +341,7 @@ function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: Appl
 	if (height !== undefined) {
 		if (height < 0) throw new PenError("y2 is above y1.");
 		if (node.type === "text" && node.textGrowth !== "fixed-width-height") notes.push(`a text's height follows its words; y2 was not kept (set textGrowth "fixed-width-height" to fix both)`);
+		else if (how.floor) node.height = `fit_content(${round(height)})`;
 		else node.height = round(height);
 	}
 	return notes.length ? notes.join("; ") : undefined;

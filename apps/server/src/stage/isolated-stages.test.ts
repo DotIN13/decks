@@ -29,9 +29,9 @@ test("an isolated copy holds its own copies of the boards, in place, and leaves 
 	const { deckPath, deck, pens, before, done } = fixture();
 	try {
 		const paths = copyStage(deck, pens, "deploy", "deploy-isolated", { isolated: true, origin: "deploy" });
-		assert.deepEqual(paths, ["stages/deploy-isolated/boards/plan.html"]);
+		assert.deepEqual(paths, ["canvases/deploy-isolated/boards/plan.html"]);
 		assert.match(readFileSync(join(deckPath, paths[0]!), "utf8"), /href="\.\.\/\.\.\/\.\.\/lib\/board\.css"/);
-		assert.deepEqual(pens.boards("deploy-isolated").map((one) => [one.path, one.x, one.y]), [["stages/deploy-isolated/boards/plan.html", 40, 60]]);
+		assert.deepEqual(pens.boards("deploy-isolated").map((one) => [one.path, one.x, one.y]), [["canvases/deploy-isolated/boards/plan.html", 40, 60]]);
 		assert.ok(isIsolatedStage(pens, "deploy-isolated") && !isIsolatedStage(pens, "deploy"));
 		assert.equal(originOf(pens, "deploy-isolated"), "deploy");
 		assert.equal(readFileSync(pens.fileOf("deploy"), "utf8"), before);
@@ -45,15 +45,15 @@ test("copying back makes an ordinary stage named <origin>-1, then -2, never over
 	const { deckPath, deck, pens, done } = fixture();
 	try {
 		copyStage(deck, pens, "deploy", "deploy-isolated", { isolated: true, origin: "deploy" });
-		writeFileSync(join(deckPath, "stages", "deploy-isolated", "boards", "plan.html"), "EDITED WHILE ISOLATED");
+		writeFileSync(join(deckPath, "canvases", "deploy-isolated", "boards", "plan.html"), "EDITED WHILE ISOLATED");
 		const first = numberedName(pens, "deploy");
 		copyStage(deck, pens, "deploy-isolated", first, { isolated: false });
 		assert.equal(first, "deploy-1");
 		assert.ok(!isIsolatedStage(pens, "deploy-1"));
-		assert.equal(readFileSync(join(deckPath, "stages", "deploy-1", "boards", "plan.html"), "utf8"), "EDITED WHILE ISOLATED");
+		assert.equal(readFileSync(join(deckPath, "canvases", "deploy-1", "boards", "plan.html"), "utf8"), "EDITED WHILE ISOLATED");
 		assert.equal(numberedName(pens, "deploy"), "deploy-2");
 		assert.throws(() => copyStage(deck, pens, "deploy", "deploy-1", { isolated: false }));
-		assert.ok(existsSync(join(deckPath, "stages", "deploy-isolated", "boards", "plan.html")), "the isolated stage stays");
+		assert.ok(existsSync(join(deckPath, "canvases", "deploy-isolated", "boards", "plan.html")), "the isolated stage stays");
 	} finally {
 		done();
 	}

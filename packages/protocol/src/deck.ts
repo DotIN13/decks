@@ -26,7 +26,17 @@ export interface Root {
  */
 export interface DeckSettings {
 	timezone?: string;
+	/** The model the server's speech recogniser uses (`stt.ts`); its default when unset. */
+	sttModel?: string;
 }
+
+/** The server's speech recognisers to choose from in Settings, cheapest first. */
+export const STT_MODELS: ReadonlyArray<{ id: string; label: string; note: string }> = [
+	{ id: "gpt-4o-mini-transcribe", label: "GPT-4o mini Transcribe", note: "$0.003 a minute; mixes languages well." },
+	{ id: "gpt-transcribe", label: "GPT Transcribe", note: "$0.0045 a minute; the newest." },
+	{ id: "gpt-4o-transcribe", label: "GPT-4o Transcribe", note: "$0.006 a minute; the most accurate." },
+	{ id: "whisper-1", label: "Whisper", note: "$0.006 a minute; the older model." },
+];
 
 export interface Board {
 	/** Deck-relative, forward slashes on every platform: "boards/plan.html". */

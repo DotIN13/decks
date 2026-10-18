@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
+import { queuedFor } from "./state/queued.ts";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
@@ -25,7 +26,7 @@ import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
 import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
-import { on, send, start } from "./state/socket.ts";
+import { on, send, setOnScreen, start } from "./state/socket.ts";
 import { api } from "./connections/connection.ts";
 import { can } from "./connections/backend.ts";
 import { Icon } from "./ui/icons.tsx";
@@ -213,7 +214,7 @@ export function App() {
 			agents: state.chats.map((chat) => ({ id: chat.id, name: agentName(chat.id) })),
 		};
 	};
-	const sendFromBar = (typed: string, commentIds: string[] = []) => {
+	const sendFromBar = (typed: string, commentIds: string[] = [], queue = false) => {
 		const dest = destination(typed, barContext());
 		/*
 		 * The comments whose pills were in the field go in front of the words, whoever the words
@@ -229,7 +230,9 @@ export function App() {
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
 				if (dest.id === state.focused) clearMarks(dest.id);
-				send({ type: "agent.prompt", id: dest.id, text: line });
+				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
+				if (queue) send({ type: "agent.queue", id: dest.id, action: "add", text: line });
+				else send({ type: "agent.prompt", id: dest.id, text: line });
 				return;
 			}
 			case "note":
@@ -250,7 +253,7 @@ export function App() {
 		const target = commenting();
 		const agentId = state.focused;
 		if (!target || !agentId) return;
-		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}) };
+		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) };
 		if (how === "keep") {
 			addComment(agentId, note);
 			if (target.range) markComment(note.id, target.range);
@@ -480,6 +483,8 @@ export function App() {
 	 * frames into the whole window and then never runs again.
 	 */
 	onMount(() => watchInsets());
+	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
+	setOnScreen(() => stageOf(state.focused)?.name);
 
 	/*
 	 * One reading at startup, so an agent knows the canvas before anybody pans.
@@ -1099,7 +1104,7 @@ export function App() {
 	   what is there, which is near but not always on screen when the middle is taken. */
 	const newBoard = (format?: "board" | "slides") => {
 		if (!state.focused) {
-			notice("info", "Make an agent first: a board is made on an agent's stage.");
+			notice("info", "Make an agent first: a board is made on an agent's canvas.");
 			return;
 		}
 		void files
@@ -1192,6 +1197,12 @@ export function App() {
 		const was = onCanvas;
 		onCanvas = { agent, stage };
 		if (!agent || was.agent !== agent || was.stage === undefined || was.stage === stage) return;
+		/*
+		 * The same canvas in a new folder: its first name was chosen, and named the folder too. The
+		 * view stays as it is, kept under the new name, rather than landing as on a canvas arrived at.
+		 */
+		const renamed = untrack(() => stageOf(agent)?.formerly?.includes(was.stage!) === true);
+		if (renamed) return void untrack(() => views().keep(agent, stage, viewToPark(camera(), selected())));
 		untrack(() => {
 			views().keep(agent, was.stage, viewToPark(camera(), selected()));
 			landOnStage(views().of(agent, stage), stage);
@@ -2052,6 +2063,12 @@ export function App() {
 						mode={focusedChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
 						onSend={sendFromBar}
+						onQueue={(text, comments) => sendFromBar(text, comments, true)}
+						{...(queuedFor(state.focused) ? { queued: queuedFor(state.focused)! } : {})}
+						onQueueAction={(action, item) => {
+							const id = state.focused;
+							if (id) send({ type: "agent.queue", id, action, ...(item ? { item } : {}) });
+						}}
 						comments={waitingComments(state.focused)}
 						onCommentsGone={(ids) => {
 							for (const id of ids) if (state.focused) removeComment(state.focused, id);

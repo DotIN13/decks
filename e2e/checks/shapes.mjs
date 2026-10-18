@@ -32,7 +32,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 // The stage's file, found from the frame the server sends after the first edit.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "shapes-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "shapes-anchor")).at(-1));
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 const onDisk = () => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { children: [] });
 const shapesNow = () => onDisk().children.filter((n) => n.metadata?.type === "decks.shape");
 say("the stage has a file to draw in", existsSync(file), file);
@@ -80,7 +80,10 @@ say("…276 px wide, and it never scrolls sideways", across.panel === 276 && acr
 await page.locator('.props-panel select[aria-label="Kind of shape"]').selectOption("Terminator");
 const swapped = await until(() => {
 	const now = onDisk().children.find((n) => n.id === made?.id);
-	return now?.metadata?.kind === "Terminator" && now.children.find((n) => n.type === "path")?.geometry.includes("A22") ? now : undefined;
+	// Built at the shape's own size (`@decks/pen`, `build`): its viewBox is the frame's, and its ends are half circles.
+	const outline = now?.children.find((n) => n.type === "path");
+	const r = typeof now?.height === "number" && typeof now?.width === "number" ? Math.min(now.width, now.height) / 2 : NaN;
+	return now?.metadata?.kind === "Terminator" && outline?.viewBox?.[2] === now.width && outline.geometry.includes(`A${Math.round(r * 100) / 100} ${Math.round(r * 100) / 100}`) ? now : undefined;
 });
 say("its kind swaps the outline and keeps the shape", !!swapped, JSON.stringify(onDisk().children.find((n) => n.id === made?.id)?.metadata));
 const words = page.locator('.props-panel input[placeholder="Double-click the shape, or type here"]');
@@ -379,6 +382,109 @@ if (diagonal) {
 		say("…and zoomed in four times, the same 5 px reaches it and 18 px still does not", inside.near && !inside.away, JSON.stringify({ zoom: close.zoom, ...inside }));
 	}
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "slash" }] });
+	await settle(page, 300);
+}
+
+/*
+ * The board's pill, over a selected drawn item, with what makes sense for one (`BoardCallout`): zoom to
+ * it, comment, duplicate, properties and delete. Its Duplicate selects the copy, and its Delete takes
+ * that copy away, leaving the first.
+ */
+{
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
+	// A fresh shape where the screen is, so what this selects does not depend on where the checks above left the camera.
+	const at = await page.evaluate(() => {
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const sx = stage.left + stage.width * 0.45, sy = stage.top + stage.height * 0.4;
+		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
+	});
+	const w = Math.round(200 / at.zoom), h = Math.round(120 / at.zoom);
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "pill-shape", name: "Process", width: w, height: h, layout: "vertical", metadata: { type: "decks.shape", kind: "Process" }, children: [{ type: "path", id: "pill-shape-o", layoutPosition: "absolute", x: 0, y: 0, width: w, height: h, viewBox: [0, 0, w, h], geometry: `M0 0H${w}V${h}H0Z`, fill: "#fde68a", stroke: "#1f2328" }] }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }] });
+	await until(() => onDisk().children.find((n) => n.id === "pill-shape"));
+	await settle(page, 800);
+	const target = onDisk().children.find((n) => n.id === "pill-shape");
+	const middle = await page.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); return r && r.width > 4 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }, target?.id);
+	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
+	if (middle) {
+		await page.mouse.click(middle.x, middle.y);
+		const labels = await until(() => page.evaluate(() => [...document.querySelectorAll(".stage > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
+		say("a selected shape gets the pill: zoom, comment, duplicate, properties and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Properties", "Delete"]), JSON.stringify(labels));
+		const before = onDisk().children.length;
+		await page.locator('.stage > .board-callout [aria-label="Duplicate"]').click();
+		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
+		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
+		// The copy is selected once the drawing has it: the outline moves onto it.
+		await until(() => page.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
+		await settle(page, 300);
+		await page.locator('.stage > .board-callout:not([data-hidden]) [aria-label="Delete"]').click();
+		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
+		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);
+	}
+}
+
+/*
+ * An arrow keeps where it joins and how it bends (`@decks/pen`, `at` and `bend`): its joined end is a
+ * diamond that slides along the side it joins, the handle in its middle moves an elbow's turn, and a
+ * double-click on either puts it back.
+ */
+{
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
+	const at = await page.evaluate(() => {
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const toStage = (sx, sy) => ({ x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d });
+		return { a: toStage(stage.left + stage.width * 0.3, stage.top + stage.height * 0.3), b: toStage(stage.left + stage.width * 0.6, stage.top + stage.height * 0.55), zoom: m.a };
+	});
+	const w = Math.round(160 / at.zoom), h = Math.round(120 / at.zoom);
+	link.send({ type: "stage.pen.edit", agentId, ops: [
+		{ op: "insert", node: { type: "rectangle", id: "bend-a", width: w, height: h, fill: "#dbeafe" }, box: { x1: Math.round(at.a.x), y1: Math.round(at.a.y) } },
+		{ op: "insert", node: { type: "rectangle", id: "bend-b", width: w, height: h, fill: "#dcfce7" }, box: { x1: Math.round(at.b.x), y1: Math.round(at.b.y) } },
+		{ op: "insert", node: { type: "path", id: "bend-arrow", stroke: "#1f2328", strokeWidth: 2, metadata: { type: "decks.arrow", from: { item: "bend-a", side: "right" }, to: { item: "bend-b", side: "left" }, route: "elbow" } } },
+	] });
+	await until(() => onDisk().children.find((n) => n.id === "bend-arrow")?.geometry);
+	await settle(page, 800);
+	// The arrow is picked on its line: its middle, where the elbow's middle segment is.
+	const line = await page.evaluate(() => { const r = globalThis.__decksPenBox?.("bend-arrow"); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+	if (line) await page.mouse.click(line.x, line.y);
+	const handles = await until(() => page.evaluate(() => {
+		const centre = (el) => { const r = el?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; };
+		const from = document.querySelector('.pen-handle[data-end="from"][data-joined]');
+		const bend = document.querySelector(".pen-handle[data-bend]");
+		return from && bend ? { from: centre(from), bend: centre(bend) } : undefined;
+	}));
+	say("a selected arrow shows a diamond on its joined end and a handle in its middle", !!handles, JSON.stringify(handles));
+	if (handles) {
+		const box = await page.evaluate(() => { const r = globalThis.__decksPenBox?.("bend-a"); return r ? { top: r.top, height: r.height } : undefined; });
+		// Down the right side to a quarter from its foot: three quarters of the way.
+		await page.mouse.move(handles.from.x, handles.from.y);
+		await page.mouse.down();
+		await page.mouse.move(handles.from.x, box.top + box.height * 0.6, { steps: 4 });
+		await page.mouse.move(handles.from.x, box.top + box.height * 0.75, { steps: 4 });
+		await page.mouse.up();
+		const slid = await until(() => { const from = onDisk().children.find((n) => n.id === "bend-arrow")?.metadata?.from; return typeof from?.at === "number" ? from : undefined; });
+		say("dragging the diamond down the side slides the join, and it clicks to three quarters", slid?.item === "bend-a" && slid?.side === "right" && Math.abs(slid.at - 0.75) < 0.02, JSON.stringify(slid));
+		await settle(page, 600);
+		const bendNow = await page.evaluate(() => { const r = document.querySelector(".pen-handle[data-bend]")?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+		await page.mouse.move(bendNow.x, bendNow.y);
+		await page.mouse.down();
+		await page.mouse.move(bendNow.x - 30, bendNow.y, { steps: 4 });
+		await page.mouse.move(bendNow.x - 60, bendNow.y, { steps: 4 });
+		await page.mouse.up();
+		const bend = await until(() => { const meta = onDisk().children.find((n) => n.id === "bend-arrow")?.metadata; return typeof meta?.bend === "number" ? meta.bend : undefined; });
+		say("dragging the middle handle moves the elbow's turn toward the start", typeof bend === "number" && bend < 0.5, String(bend));
+		await settle(page, 600);
+		await page.locator(".pen-handle[data-bend]").dblclick();
+		const unbent = await until(() => (onDisk().children.find((n) => n.id === "bend-arrow")?.metadata?.bend === undefined ? true : undefined));
+		say("a double-click on it puts the turn back on the automatic route", !!unbent);
+		await settle(page, 400);
+		await page.locator('.pen-handle[data-end="from"]').dblclick();
+		const middle = await until(() => { const from = onDisk().children.find((n) => n.id === "bend-arrow")?.metadata?.from; return from && from.at === undefined ? from : undefined; });
+		say("…and on the diamond, the join back in the middle of its side", middle?.side === "right", JSON.stringify(middle));
+	}
+	link.send({ type: "stage.pen.edit", agentId, ops: ["bend-arrow", "bend-a", "bend-b"].map((id) => ({ op: "delete", id })) });
 	await settle(page, 300);
 }
 

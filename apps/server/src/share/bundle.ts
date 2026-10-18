@@ -1,3 +1,4 @@
+import { CANVAS_FILE } from "../stage/canvas-files.ts";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 import type { Board } from "@decks/protocol";
@@ -145,7 +146,7 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 	for (const file of filesUnder(deckPath, "lib")) files.add(file);
 	for (const file of filesUnder(deckPath, stageRel)) files.add(file);
 	for (const url of penUrls(source.stage.doc)) {
-		const target = resolveRef(`${stageRel}/stage.pen`, url);
+		const target = resolveRef(`${stageRel}/${CANVAS_FILE}`, url);
 		if (target && !/\.x?html?$/i.test(target) && isFile(join(deckPath, target))) files.add(target);
 	}
 

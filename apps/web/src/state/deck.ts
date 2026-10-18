@@ -96,6 +96,8 @@ function createDeck() {
 		/** The deck's own settings, kept by the server, and the zone its machine is on. */
 		settings: DeckSettings;
 		machineZone: string;
+		/** Whether the server has a key for its speech recogniser (`OPENAI_API_KEY`, `stt.ts`). */
+		sttKey: boolean;
 		/**
 		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
 		 * Not "which one is spending": each agent records its own, on its own record
@@ -117,6 +119,7 @@ function createDeck() {
 		accounts: [] as ClaudeAccount[],
 		settings: {} as DeckSettings,
 		machineZone: "",
+		sttKey: false,
 		activeAccount: "default",
 	});
 }
@@ -210,6 +213,7 @@ export function resetDeck(): void {
 		accounts: [],
 		settings: {},
 		machineZone: "",
+		sttKey: false,
 		activeAccount: "default",
 	});
 }

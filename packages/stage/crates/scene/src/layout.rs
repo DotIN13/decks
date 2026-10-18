@@ -6,7 +6,8 @@
 //!   all (`"none"`, where each child sits at its own `x`, `y` from the frame's corner);
 //! - `gap`, `padding`, `justifyContent` and `alignItems` mean what they mean in CSS;
 //! - a size is a number, `fit_content` (hug the children; a frame's default) or `fill_container`
-//!   (the parent's room; only inside a layout), either with a fallback in brackets;
+//!   (the parent's room; only inside a layout), either with a number in brackets: for a hug the
+//!   least it is however little it holds, for a fill a fallback;
 //! - a child with `layoutPosition: "absolute"` leaves the flow and sits at its `x`, `y`;
 //! - a `group` has no size of its own: it is the box around its children;
 //! - text sizes itself by `textGrowth`: `auto` is one line, `fixed-width` wraps, `fixed-width-height`
@@ -210,7 +211,8 @@ impl Ctx<'_> {
 			let inner = self.frame_content(i, &t, known(ws, forced_w), known(hs, forced_h));
 			let pick = |s: Sizing, hug: f64| match s {
 				Sizing::Fixed(v) => v,
-				Sizing::Hug(fallback) => if inner.count == 0 { fallback.unwrap_or(hug) } else { hug },
+				// A hug's number is its floor, as in pen's layout.ts: as big as what it holds, never smaller.
+				Sizing::Hug(floor) => match floor { None => hug, Some(f) if inner.count == 0 => f, Some(f) => f.max(hug) },
 				Sizing::Fill(fallback) => fallback.unwrap_or(hug),
 			};
 			return (forced_w.unwrap_or_else(|| pick(ws, inner.w)), forced_h.unwrap_or_else(|| pick(hs, inner.h)));

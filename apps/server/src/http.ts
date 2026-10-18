@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { sttReady, transcribe } from "./stt.ts";
 import { readFile } from "node:fs/promises";
 import { renderShell } from "./boards/shell.ts";
 import { LIB_FOREVER, libVersion, splitLibVersion, versionLibRefs } from "./deck/lib-version.ts";
@@ -17,7 +18,7 @@ import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
-import { runAsCaller } from "./stage/caller-run.ts";
+import { conversationFor, runAsCaller } from "./stage/caller-run.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -634,6 +635,36 @@ export function createHttpApp(app: App): Express {
 		}),
 	);
 
+	/*
+	 * Speech to text for the composer's mic (`stt.ts`): whether this server can, and a recording's words.
+	 * The recording is the body, as an upload's file is, and nothing of it is kept.
+	 */
+	api.get("/stt", (_req, res) => {
+		res.json({ server: sttReady() });
+	});
+	api.post(
+		"/stt",
+		express.raw({ type: () => true, limit: "25mb" }),
+		asyncRoute(async (req, res) => {
+			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			if (!sttReady()) {
+				res.status(503).json({ error: "No speech recogniser on this server." });
+				return;
+			}
+			const audio = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+			if (audio.length === 0) {
+				res.status(400).json({ error: "No recording was sent." });
+				return;
+			}
+			try {
+				// The model chosen in Settings, or the default (`stt.ts`).
+				res.json({ text: await transcribe(audio, String(req.headers["content-type"] ?? "audio/webm"), app.settings.get().sttModel) });
+			} catch (error) {
+				res.status(502).json({ error: (error as Error).message });
+			}
+		}),
+	);
+
 	api.post(
 		"/upload",
 		asyncRoute(async (req, res) => {
@@ -840,7 +871,7 @@ export function createHttpApp(app: App): Express {
 			}
 			const key = `apps/${name}`;
 			if (!app.evalTrust.allows(key)) {
-				const answer = await app.agents.focused().bridge.choose({
+				const answer = await conversationFor(app, { board: app.apps.state(name).board }).bridge.choose({
 					title: "Let this app run stage code?",
 					message: `The app ${name} wants to run code with the stage API inside the Decks server, so it can do anything the server can: read files, write boards, move the canvas, message agents.`,
 					options: [

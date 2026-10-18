@@ -537,6 +537,12 @@
 	 */
 	:is(.popover, .row-list) [data-row] > .row-note,
 	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
+	/* A choice from a list, in Settings: the server's speech model, the browser's language (`VoiceSettings`). */
+	.set-select {
+		flex: none;
+		width: auto;
+		min-width: 200px;
+	}
 	.set-zone {
 		display: flex;
 		flex: none;

@@ -5,7 +5,7 @@ import { applyEdits } from "@decks/pen";
 import { send } from "./socket.ts";
 
 /**
- * Each chat's stage drawing, from `stage.pen` (`stage/pens.ts` on the server).
+ * Each chat's stage drawing, from `canvas.pen` (`stage/pens.ts` on the server).
  *
  * A signal of whole documents rather than a field of the deck store: a drawing is replaced whole
  * on every change and read whole by the renderer, so a store's per-field proxies would be work

@@ -132,10 +132,10 @@ say("Backspace deletes a pill whole, and the comment and its mark go with it", (
 const deck = await deckState();
 /** The stage file the drawing lands in: the one most recently written. */
 const stageFile = () => {
-	const dir = join(deck.path, "stages");
+	const dir = join(deck.path, "canvases");
 	if (!existsSync(dir)) return undefined;
 	return readdirSync(dir)
-		.map((name) => join(dir, name, "stage.pen"))
+		.map((name) => join(dir, name, "canvas.pen"))
 		.filter((f) => existsSync(f))
 		.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
 };
@@ -150,7 +150,7 @@ const drawn = () => inks().length - startInks;
 await selectBoard(page, path);
 await page.keyboard.press("1");
 await settle(page, 900);
-await page.click('[aria-label="Draw on the stage"]');
+await page.click('[aria-label="Draw on the canvas"]');
 await page.waitForSelector(".ink-bar");
 say("the brush brings the drawing tools", (await page.locator(".ink-bar .icon-button").count()) >= 8);
 

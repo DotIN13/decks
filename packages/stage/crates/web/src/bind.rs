@@ -315,8 +315,10 @@ impl PageEngine {
 
 	/// A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
 	#[wasm_bindgen(js_name = setPreview)]
-	pub fn set_preview(&mut self, moving: &str) -> Result<(), JsError> {
-		self.page.preview(previews(moving)).map_err(err)
+	/// Returns the arrows it bends that were not lifted before, as a JSON list, for the worker to lift.
+	pub fn set_preview(&mut self, moving: &str) -> Result<String, JsError> {
+		let bent = self.page.preview(previews(moving)).map_err(err)?;
+		Ok(serde_json::to_string(&bent).unwrap_or_else(|_| "[]".into()))
 	}
 
 	/// What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.

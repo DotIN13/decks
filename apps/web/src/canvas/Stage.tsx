@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowPoints, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMiddle, arrowPoints, arrowRoute, arrowShape, arrowStyle, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -383,6 +383,22 @@ export function Stage(props: {
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), canvasBox(view()));
 
+	/** A press is held on the canvas (not on a pill): the drawn items' pill steps aside until it lets go. */
+	const [pressHeld, setPressHeld] = createSignal(false);
+	onMount(() => {
+		const press = (event: PointerEvent) => {
+			if (!(event.target as Element | null)?.closest?.(".board-callout")) setPressHeld(true);
+		};
+		const release = () => setPressHeld(false);
+		element.addEventListener("pointerdown", press, { capture: true, passive: true });
+		window.addEventListener("pointerup", release, true);
+		window.addEventListener("pointercancel", release, true);
+		onCleanup(() => {
+			element.removeEventListener("pointerdown", press, { capture: true });
+			window.removeEventListener("pointerup", release, true);
+			window.removeEventListener("pointercancel", release, true);
+		});
+	});
 	onMount(() => {
 		// A hand on the canvas holds the view against an agent's show (`camera/touched.ts`).
 		for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.addEventListener(kind, touchedCanvas, { capture: true, passive: true });
@@ -661,7 +677,6 @@ export function Stage(props: {
 	 */
 	/** The board the action pill is for: the selected one, while it is on the canvas. */
 	const calloutBoard = createMemo(() => (props.selected ? props.boards.find((board) => board.path === props.selected) : undefined));
-
 	/**
 	 * Boards whose documents are showing, by how many of their frames say so: the sheet is a hole
 	 * over each of them, and the board's picture everywhere else. A count and not a set, so a frame
@@ -1546,6 +1561,27 @@ export function Stage(props: {
 		props.onSelect(path);
 	};
 
+	/** The words an item shows, its own or its children's, on one line: what a comment on it quotes. */
+	const quoteOf = (node: PenNode | undefined): string => {
+		if (!node) return "";
+		const said: string[] = [];
+		for (const one of walk([node])) if (typeof one.content === "string" && one.content.trim()) said.push(one.content.trim());
+		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
+	};
+	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
+	const penDeleteSelected = () => {
+		const selected = penSelection();
+		if (!selected.length) return;
+		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
+		penLayer.hide(new Set(selected));
+		const mark = penLayer.mark();
+		penEdit(selected.map((id) => ({ op: "delete", id })));
+		const clear = () => setPenSelection((now) => (now === selected ? [] : now));
+		afterFrame.push({ mark, run: clear });
+		// A sheet that shows no frame (nothing painting) does not keep the outline.
+		setTimeout(clear, 250);
+	};
+
 	/** The keys of the drawing, in edit mode; true when the key was one of them. */
 	const penKey = (event: KeyboardEvent): boolean => {
 		const selected = penSelection();
@@ -1556,14 +1592,7 @@ export function Stage(props: {
 			return true;
 		}
 		if (selected.length && (key === "Delete" || key === "Backspace")) {
-			// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
-			penLayer.hide(new Set(selected));
-			const mark = penLayer.mark();
-			penEdit(selected.map((id) => ({ op: "delete", id })));
-			const clear = () => setPenSelection((now) => (now === selected ? [] : now));
-			afterFrame.push({ mark, run: clear });
-			// A sheet that shows no frame (nothing painting) does not keep the outline.
-			setTimeout(clear, 250);
+			penDeleteSelected();
 			return true;
 		}
 		if (key === "Escape" && (selected.length || boardPicks().length || penTool() !== "select")) {
@@ -2223,6 +2252,20 @@ export function Stage(props: {
 
 	/** The eight handles round a single selection, by the edges each one moves. */
 	const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+	/**
+	 * A double-click on a frame's or a card's top or bottom handle: it hugs what it holds again, with
+	 * the floor it had (`fit_content(N)`), or 120 for a frame and 48 for a card when it had none. A
+	 * drag of either edge is what fixed its height; this undoes it.
+	 */
+	const hugAgain = (handle: (typeof HANDLES)[number]) => {
+		if (handle !== "n" && handle !== "s") return;
+		const id = penHandles()?.id;
+		const node = id ? penNode(id) : undefined;
+		if (!id || !node || node.type !== "frame" || isShape(node)) return;
+		const had = typeof node.height === "string" ? /^fit_content\(\s*([\d.]+)\s*\)$/.exec(node.height)?.[1] : undefined;
+		const floor = had ? Number(had) : isCard(node) ? 48 : 120;
+		penEdit([{ op: "update", id, set: { height: `fit_content(${floor})` } }]);
+	};
 	const resizeFrom = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
 		const box = penHandles();
 		if (event.button !== 0 || !box) return;
@@ -2295,7 +2338,11 @@ export function Stage(props: {
 			},
 			(moved) => {
 				setGuides([]);
-				if (!moved) return;
+				if (!moved) {
+					// Two presses on a frame's top or bottom handle: it hugs what it holds again (`hugAgain`).
+					if (secondTap(`size:${id}:${handle}`)) hugAgain(handle);
+					return;
+				}
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
 				// A card still following its words: its width alone, and no height written.
@@ -2404,10 +2451,28 @@ export function Stage(props: {
 		if (most < 2) return undefined;
 		const shape = shapeRadius(node);
 		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
-		if (node.type !== "rectangle" && node.type !== "frame") return undefined;
+		// A library shape with no corners to round (a terminator, an arrow) has no handle: its outline would ignore it.
+		if (isShape(node) || (node.type !== "rectangle" && node.type !== "frame")) return undefined;
 		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
 		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
 		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
+	});
+	/**
+	 * The drawn items the same pill is for, when no board has it: the selection's box together, and what
+	 * to call it. Not while one is typed into (its editor has its own toolbar) or drawn with the pen.
+	 */
+	const calloutItems = createMemo(() => {
+		if (props.selected || props.drawing || !props.onPenEdit || penText()) return undefined;
+		const outlines = penOutlines().filter((one) => one.id && !one.id.startsWith("board:"));
+		if (!outlines.length || outlines.length !== penSelection().length) return undefined;
+		const x = Math.min(...outlines.map((one) => one.x));
+		const y = Math.min(...outlines.map((one) => one.y));
+		const box = { x, y, w: Math.max(...outlines.map((one) => one.x + one.w)) - x, h: Math.max(...outlines.map((one) => one.y + one.h)) - y };
+		const ids = outlines.map((one) => one.id);
+		const words = ids.map((id) => quoteOf(penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
+		const first = penLayer.placed.get(ids[0]!)?.node;
+		const name = ids.length > 1 ? `${ids.length} items` : (words || (typeof first?.name === "string" ? first.name : first?.type) || "item");
+		return { box, ids, words, name };
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
@@ -2523,17 +2588,18 @@ export function Stage(props: {
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 		/*
 		 * A frame made by hand is a column, because that is what a frame is for: things in an order,
-		 * arranged for you. Its height is a number rather than fit-content, so an empty one is a
-		 * 300 px target you can drop into, and a half-full one keeps room under its last child.
+		 * arranged for you. It hugs what it holds, and the height it is drawn at is its floor
+		 * (`fit_content(h)`, written by the insert in `@decks/pen`'s `ops.ts`): an empty one is still
+		 * something to drop into, and it grows as things go in.
 		 */
-		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 300 },
+		frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 120 },
 		// A text's words are markdown, as a card's blocks are, typed into with the card's toolbar.
 		text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 		/*
 		 * A card is pen's own frame, a column, whose blocks are markdown texts and pictures (`madeNode`,
 		 * `pen/card-frame.ts`), so pen.dev opens it as a column and the frame's drop places things in it.
 		 */
-		card: { node: { type: "frame", name: "Card" }, w: 320, h: 0 },
+		card: { node: { type: "frame", name: "Card" }, w: 320, h: 48 },
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
@@ -2615,8 +2681,64 @@ export function Stage(props: {
 		const drag = shownDrag();
 		const [fx, fy] = points[0]!;
 		const [tx, ty] = points[points.length - 1]!;
-		return { id: node.id, from: { x: fx + drag.dx, y: fy + drag.dy }, to: { x: tx + drag.dx, y: ty + drag.dy } };
+		const route = arrowStyle(node.metadata).route;
+		const [mx, my] = arrowMiddle(points, route);
+		// What each end joins, and on which side, for a join that slides along it (`dragArrowEnd`).
+		const joined = (end: unknown, x: number, y: number) => {
+			const item = arrowEndItem(end);
+			const box = item ? (penLayer.placed.get(item)?.box ?? boards(item)) : undefined;
+			if (!item || !box) return undefined;
+			const side = arrowEndSide(end) ?? onSide(box, x, y);
+			return { item, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side, at: arrowEndAt(end) };
+		};
+		// The middle handle, where an elbow has a middle segment to slide or a line or curve a middle to pull.
+		const bendable = route !== "elbow" || points.length === 4;
+		return {
+			id: node.id,
+			route,
+			from: { x: fx + drag.dx, y: fy + drag.dy },
+			to: { x: tx + drag.dx, y: ty + drag.dy },
+			fromJoin: joined((node.metadata as { from?: unknown }).from, fx, fy),
+			toJoin: joined((node.metadata as { to?: unknown }).to, tx, ty),
+			...(bendable ? { middle: { x: mx + drag.dx, y: my + drag.dy } } : {}),
+			bent: arrowBend(node.metadata) !== undefined,
+		};
 	});
+	/** The side of a box a point on its edge lies on: the nearest. */
+	const onSide = (box: Box, x: number, y: number): ArrowSide => {
+		const d: Array<[ArrowSide, number]> = [["top", Math.abs(y - box.y)], ["bottom", Math.abs(y - (box.y + box.h))], ["left", Math.abs(x - box.x)], ["right", Math.abs(x - (box.x + box.w))]];
+		return d.sort((a, b) => a[1] - b[1])[0]![0];
+	};
+	/** A new route for an arrow, drawn dashed while one of its handles is dragged (`dragArrowEnd`, `dragArrowBend`). */
+	const [routeDraft, setRouteDraft] = createSignal<string | undefined>();
+	const draftOf = (metadata: Record<string, unknown>, node: PenNode) => {
+		const boards = (name: string) => props.boards.find((board) => board.path === name);
+		const points = arrowPoints(metadata, penLayer.placed, boards);
+		if (!points) return undefined;
+		const shape = arrowShape(points, typeof node.strokeWidth === "number" ? node.strokeWidth : 2, arrowStyle(metadata));
+		return { d: shape.geometry, x: shape.x, y: shape.y };
+	};
+	const [routeDraftAt, setRouteDraftAt] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
+	/** Within this many screen pixels of the side it joins, an end's drag slides the join; further, it re-attaches. */
+	const SLIDE_PX = 18;
+	/** A slid join clicks to a corner or the middle within this many screen pixels, unless Alt is held. */
+	const JOIN_SNAP_PX = 8;
+	const slideAt = (box: Box, side: ArrowSide, point: { x: number; y: number }, free: boolean) => {
+		const along = side === "top" || side === "bottom";
+		const length = along ? box.w : box.h;
+		let at = length > 0 ? ((along ? point.x - box.x : point.y - box.y) / length) : 0.5;
+		at = Math.max(0, Math.min(1, at));
+		if (!free) for (const stop of [0, 0.5, 1]) if (Math.abs(at - stop) * length * localCamera.zoom <= JOIN_SNAP_PX) at = stop;
+		return Math.round(at * 1000) / 1000;
+	};
+	const nearSide = (box: Box, side: ArrowSide, point: { x: number; y: number }) => {
+		const reach = SLIDE_PX / localCamera.zoom;
+		const along = side === "top" || side === "bottom";
+		const line = side === "top" ? box.y : side === "bottom" ? box.y + box.h : side === "left" ? box.x : box.x + box.w;
+		const off = Math.abs((along ? point.y : point.x) - line);
+		const within = along ? point.x >= box.x - reach && point.x <= box.x + box.w + reach : point.y >= box.y - reach && point.y <= box.y + box.h + reach;
+		return off <= reach && within;
+	};
 
 	/**
 	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
@@ -2631,10 +2753,26 @@ export function Stage(props: {
 		const node = penNode(ends.id);
 		if (!node?.metadata) return;
 		const stays = which === "from" ? ends.to : ends.from;
+		const own = which === "from" ? ends.fromJoin : ends.toJoin;
+		/* Along the side the end joins, the drag slides the join; away from it, it picks the end up. */
+		let slid: { item: string; side: ArrowSide; at: number } | undefined;
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
+				slid = own && nearSide(own.box, own.side, now) ? { item: own.item, side: own.side, at: slideAt(own.box, own.side, now, e.altKey) } : undefined;
+				if (slid) {
+					const draft = draftOf({ ...node.metadata!, [which]: slid }, node);
+					batch(() => {
+						setEndDraft(undefined);
+						setJoinHint([own!.box]);
+						setSideHint([]);
+						setRouteDraft(draft?.d);
+						if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+					});
+					return;
+				}
+				setRouteDraft(undefined);
 				const join = joinAt(now, ends.id);
 				batch(() => {
 					setEndDraft(which === "from" ? { x1: now.x, y1: now.y, x2: stays.x, y2: stays.y } : { x1: stays.x, y1: stays.y, x2: now.x, y2: now.y });
@@ -2647,8 +2785,16 @@ export function Stage(props: {
 					setEndDraft(undefined);
 					setJoinHint([]);
 					setSideHint([]);
+					setRouteDraft(undefined);
 				});
-				if (!moved) return;
+				if (!moved) {
+					if (secondTap(`end:${ends.id}:${which}`)) resetArrowEnd(which);
+					return;
+				}
+				if (slid) {
+					penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: slid } } }]);
+					return;
+				}
 				const now = worldAt(e);
 				const other = arrowEndItem(node.metadata![which === "from" ? "to" : "from"]);
 				const join = joinAt(now, ends.id);
@@ -2657,6 +2803,87 @@ export function Stage(props: {
 				penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: end } } }]);
 			},
 		);
+	};
+
+	/**
+	 * A second press on the same handle, without a drag, within 400 ms: a handle's double-click. Told
+	 * from its pointer events rather than from `dblclick`, which a handle that captures the pointer
+	 * and is drawn again in between does not reliably get.
+	 */
+	let handleTap: { key: string; at: number } | undefined;
+	const secondTap = (key: string) => {
+		const now = performance.now();
+		const again = handleTap?.key === key && now - handleTap.at < 400;
+		handleTap = again ? undefined : { key, at: now };
+		return again;
+	};
+	/** A double-click on a joined end: the join goes back to the middle of its side, the automatic place. */
+	const resetArrowEnd = (which: "from" | "to") => {
+		const ends = arrowEnds();
+		const node = ends ? penNode(ends.id) : undefined;
+		const end = node?.metadata?.[which];
+		if (!ends || !node?.metadata || !end || typeof end !== "object" || Array.isArray(end) || !("at" in end)) return;
+		const { at: _at, ...kept } = end as Record<string, unknown>;
+		penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: kept } } }]);
+	};
+
+	/**
+	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run (`bend`, 0 to
+	 * 1 from start to end), a curve's middle is pulled (`bend: [dx, dy]`), and a straight line pulled there
+	 * becomes a curve. A double-click puts it back on the automatic route.
+	 */
+	const dragArrowBend = (event: PointerEvent) => {
+		const ends = arrowEnds();
+		if (event.button !== 0 || !ends?.middle) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const node = penNode(ends.id);
+		if (!node?.metadata) return;
+		const boards = (name: string) => props.boards.find((board) => board.path === name);
+		const { bend: _was, ...unbent } = node.metadata as Record<string, unknown>;
+		const route = ends.route;
+		const auto = arrowPoints(unbent, penLayer.placed, boards);
+		if (!auto) return;
+		let next: Record<string, unknown> | undefined;
+		const bendAt = (now: { x: number; y: number }): Record<string, unknown> => {
+			if (route === "elbow") {
+				const [p, q] = [auto[0]!, auto[auto.length - 1]!];
+				// The middle segment runs down when its two points share an x, so it slides across.
+				const across = auto.length === 4 && auto[1]![0] === auto[2]![0];
+				const span = across ? q[0] - p[0] : q[1] - p[1];
+				const turn = span === 0 ? 0.5 : ((across ? now.x - p[0] : now.y - p[1]) / span);
+				return { ...unbent, bend: Math.round(Math.max(0, Math.min(1, turn)) * 1000) / 1000 };
+			}
+			const [mx, my] = arrowMiddle(route === "curved" ? auto : [auto[0]!, auto[auto.length - 1]!], route === "curved" ? "curved" : "straight");
+			return { ...unbent, route: "curved", bend: [Math.round(now.x - mx), Math.round(now.y - my)] };
+		};
+		follow(
+			event,
+			(e) => {
+				next = bendAt(worldAt(e));
+				const draft = draftOf(next, node);
+				batch(() => {
+					setRouteDraft(draft?.d);
+					if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+				});
+			},
+			(moved) => {
+				setRouteDraft(undefined);
+				if (!moved) {
+					if (secondTap(`bend:${ends.id}`)) resetArrowBend();
+					return;
+				}
+				if (!next) return;
+				penEdit([{ op: "update", id: ends.id, set: { metadata: next } }]);
+			},
+		);
+	};
+	const resetArrowBend = () => {
+		const ends = arrowEnds();
+		const node = ends ? penNode(ends.id) : undefined;
+		if (!ends || !node?.metadata || !("bend" in node.metadata)) return;
+		const { bend: _bend, ...kept } = node.metadata as Record<string, unknown>;
+		penEdit([{ op: "update", id: ends.id, set: { metadata: kept } }]);
 	};
 
 	/**
@@ -2742,9 +2969,8 @@ export function Stage(props: {
 				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
 				const parent = frameAt(at);
 				// A text grows with its words unless a width was drawn for it; its height is always its words'.
-				// A card is as tall as its words, so only its width is taken, drawn or not.
-				const box =
-					tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
+				// A card or a frame is as tall as its words, and the height drawn is the least it is.
+				const box = tool === "text" ? { x1, y1, x2: x1 + w } : tool === "note" && !moved ? { x1, y1 } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				const node = madeNode(tool, id, { w, h });
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 				// Words open an editor over the spot at once; anything else keeps its dashed outline until it is drawn.
@@ -2768,7 +2994,7 @@ export function Stage(props: {
 		const x1 = Math.round(centred ? at.x - made.w / 2 : at.x);
 		const y1 = Math.round(centred ? at.y - made.h / 2 : at.y);
 		const parent = frameAt(at);
-		const box = tool === "note" ? { x1, y1 } : tool === "card" || tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
+		const box = tool === "note" ? { x1, y1 } : tool === "text" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
 		const node = madeNode(tool, id, made);
 		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node, box }]);
 		selectMade([id]);
@@ -3255,9 +3481,15 @@ export function Stage(props: {
 	 * `frame-gestures.ts`, because a wheel event inside an iframe never reaches this
 	 * document at all. Positions arrive already in stage coordinates.
 	 */
-	/** Scroll units of a trackpad pinch per e-fold of zoom: smaller zooms faster (see `wheel`). */
-	const PINCH_TRAVEL = 80;
-	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean }) => {
+	/**
+	 * Scroll units per e-fold of zoom: smaller zooms faster (see `wheel`). A trackpad pinch, which
+	 * Chrome reports as `ctrlKey` without ⌘, has its own; every other zoom (⌘ with a wheel, a mouse
+	 * that scrolls in small steps) keeps the one it had.
+	 */
+	const PINCH_TRAVEL = 64;
+	const WHEEL_TRAVEL = 80;
+	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean; pinch?: boolean }) => {
+		const travel = gesture.pinch ? PINCH_TRAVEL : WHEEL_TRAVEL;
 		/*
 		 * A wheel over the page is the page's, in both senses.
 		 *
@@ -3268,7 +3500,7 @@ export function Stage(props: {
 		 */
 		if (props.focus) {
 			if (gesture.zooming) {
-				const factor = Math.min(1.2, Math.max(1 / 1.2, Math.exp(-gesture.deltaY / PINCH_TRAVEL)));
+				const factor = Math.min(1.2, Math.max(1 / 1.2, Math.exp(-gesture.deltaY / travel)));
 				setFocusZoom((zoom) => Math.min(4, Math.max(0.1, zoom * factor)));
 			} else if (focusEl) {
 				focusEl.scrollTop += gesture.deltaY;
@@ -3284,11 +3516,12 @@ export function Stage(props: {
 			 * The divisor is how far a finger has to travel for a given zoom, and it is the
 			 * pinch's alone: a wheel notch is past the clamp at any of these numbers, so
 			 * changing it moves the trackpad and leaves the mouse where it was. It has been
-			 * turned four times, each time because a Mac trackpad felt slow — 300 barely doubled
+			 * turned five times, each time because a Mac trackpad felt slow — 300 barely doubled
 			 * the zoom across a whole pinch, 200 was still short, 120 (about 3.8×) a little short,
-			 * 100 (about 5×) still slow. At 80 that pinch is about 7.4× (`PINCH_TRAVEL`).
+			 * 100 (about 5×) still slow, 80 (about 7.4×) asked to be faster, 60 (about 14×) a little
+			 * too fast. At 64 that pinch is about 12× (`PINCH_TRAVEL`).
 			 */
-			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / PINCH_TRAVEL)));
+			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / travel)));
 			pushCamera(zoomAbout(localCamera, view(), { x: gesture.x, y: gesture.y }, factor));
 			return;
 		}
@@ -3308,7 +3541,7 @@ export function Stage(props: {
 		const at = local(event);
 		// `ctrlKey` is a trackpad pinch, not a key anybody pressed; `metaKey` is the
 		// deliberate mouse-wheel zoom. Everything else is a two-finger scroll.
-		wheel({ x: at.x, y: at.y, deltaX: event.deltaX, deltaY: event.deltaY, zooming: event.ctrlKey || event.metaKey });
+		wheel({ x: at.x, y: at.y, deltaX: event.deltaX, deltaY: event.deltaY, zooming: event.ctrlKey || event.metaKey, pinch: event.ctrlKey && !event.metaKey });
 	};
 
 	/**
@@ -4621,7 +4854,7 @@ export function Stage(props: {
 			if (known && known.path === path && known.x === at.x && known.y === at.y) return points;
 			return { ...points, [agentId]: { path, x: at.x, y: at.y } };
 		});
-	const stagePenPath = () => (props.stageName ? `stages/${props.stageName}/stage.pen` : undefined);
+	const stagePenPath = () => (props.stageName ? `canvases/${props.stageName}/canvas.pen` : undefined);
 	const cursorAgents = createMemo<string[]>((seen) => {
 		const ids = Object.keys(props.acts ?? {}).filter((id) => props.acts?.[id] && !seen.includes(id));
 		return ids.length > 0 ? [...seen, ...ids] : seen;
@@ -4933,16 +5166,21 @@ export function Stage(props: {
 							{(which) => {
 								// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
 								const size = () => (coarse ? 18 : 11) / props.camera.zoom;
+								// A joined end is a diamond, which slides along the side it joins; a free end is a dot.
+								const joined = () => !!(which === "from" ? ends().fromJoin : ends().toJoin);
 								return (
 									<div
 										class="pen-handle"
 										data-end={which}
+										data-joined={joined() ? "true" : undefined}
+										title={joined() ? "Slide along the side, or drag off to join something else; double-click for the middle" : "Drag onto something to join it"}
 										style={{
 											left: `${ends()[which].x - size() / 2}px`,
 											top: `${ends()[which].y - size() / 2}px`,
 											width: `${size()}px`,
 											height: `${size()}px`,
-											"border-radius": "50%",
+											"border-radius": joined() ? `${2 / props.camera.zoom}px` : "50%",
+											transform: joined() ? "rotate(45deg)" : undefined,
 											"border-width": `${1.5 / props.camera.zoom}px`,
 										}}
 										onPointerDown={(event) => dragArrowEnd(event, which)}
@@ -4950,6 +5188,35 @@ export function Stage(props: {
 								);
 							}}
 						</For>
+					)}
+				</Show>
+				<Show when={arrowEnds()?.middle}>
+					{(middle) => {
+						const size = () => (coarse ? 18 : 12) / props.camera.zoom;
+						return (
+							<div
+								class="pen-handle"
+								data-bend={arrowEnds()?.route}
+								title="Drag to bend the arrow; double-click for its automatic route"
+								style={{
+									left: `${middle().x - size() / 2}px`,
+									top: `${middle().y - size() / 2}px`,
+									width: `${size()}px`,
+									height: `${size()}px`,
+									"border-radius": "50%",
+									"border-width": `${1.5 / props.camera.zoom}px`,
+									"box-shadow": arrowEnds()?.bent ? `inset 0 0 0 ${2.5 / props.camera.zoom}px var(--color-accent)` : undefined,
+								}}
+								onPointerDown={dragArrowBend}
+							/>
+						);
+					}}
+				</Show>
+				<Show when={routeDraft()}>
+					{(d) => (
+						<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
+							<path transform={`translate(${routeDraftAt().x} ${routeDraftAt().y})`} d={d()} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
+						</svg>
 					)}
 				</Show>
 				<Show when={endDraft()}>
@@ -5263,6 +5530,8 @@ export function Stage(props: {
 				{(board) => (
 					<BoardCallout
 						board={board}
+						box={boxOf(board)}
+						label={`${board.title}: board actions`}
 						hidden={moving() || panning() || scaling() || gliding() || !!boardDrag() || !!boardResize() || !!ownDrag()}
 						camera={props.camera}
 						view={view()}
@@ -5280,6 +5549,32 @@ export function Stage(props: {
 								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
 							})
 						}
+					/>
+				)}
+			</Show>
+			<Show when={!props.focus ? calloutItems() : undefined}>
+				{(items) => (
+					<BoardCallout
+						box={items().box}
+						label={`${items().name}: actions`}
+						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || penDrag().dx !== 0 || penDrag().dy !== 0 || !!penResize()}
+						camera={props.camera}
+						view={view()}
+						onOpen={() => pushCamera(frame([items().box]))}
+						onComment={() =>
+							setCommenting({
+								// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
+								path: stagePenPath() ?? "the canvas",
+								items: items().ids,
+								quote: items().words,
+								title: items().name,
+								open: true,
+								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+							})
+						}
+						onDuplicate={() => penDuplicate()}
+						onProperties={() => setPenSheet(true)}
+						onDelete={() => penDeleteSelected()}
 					/>
 				)}
 			</Show>

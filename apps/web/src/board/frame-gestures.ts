@@ -49,7 +49,7 @@ import { untilReleased } from "../canvas/held.ts";
 
 export interface FrameGestureHost {
 	/** A wheel or pinch, with the cursor position already in stage coordinates. */
-	wheel(gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean }): void;
+	wheel(gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean; pinch?: boolean }): void;
 	/**
 	 * One finger of a canvas gesture, in stage coordinates.
 	 *
@@ -187,7 +187,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 
 		event.preventDefault();
 		const at = toStage(event.clientX, event.clientY);
-		host.wheel({ x: at.x, y: at.y, deltaX: event.deltaX, deltaY: event.deltaY, zooming });
+		host.wheel({ x: at.x, y: at.y, deltaX: event.deltaX, deltaY: event.deltaY, zooming, pinch: event.ctrlKey && !event.metaKey });
 	};
 
 	/** The nearest box under the pointer that can still take this scroll, if any. */

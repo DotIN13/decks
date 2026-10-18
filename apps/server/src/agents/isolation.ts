@@ -1,3 +1,4 @@
+import { canvasFile } from "../stage/canvas-files.ts";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -30,9 +31,9 @@ export interface IsolationOptions {
 	deck: string;
 	/** The boards on the stage, deck-relative: after `localize`, all in the stage's board folder. */
 	boards: () => readonly string[];
-	/** The stage's board folder, deck-relative (`stages/<name>/boards`), where new boards go. */
+	/** The stage's board folder, deck-relative (`canvases/<name>/boards`), where new boards go. */
 	folder: () => string | undefined;
-	/** The stage's folder name, when it has one, so its `stage.pen` is copied in too. */
+	/** The stage's folder name, when it has one, so its `canvas.pen` is copied in too. */
 	stage: () => string | undefined;
 	/** A board the agent wrote as a new file: put it on the stage. */
 	adopt: (path: string) => void;
@@ -104,7 +105,7 @@ export class IsolatedView {
 		const boards = this.options.boards().filter((path) => existsSync(join(deck, path)));
 		const readable = new Set<string>();
 		const stage = this.options.stage();
-		if (stage && existsSync(join(deck, "stages", stage, "stage.pen"))) readable.add(`stages/${stage}/stage.pen`);
+		if (stage && existsSync(join(deck, canvasFile(stage)))) readable.add(canvasFile(stage));
 		for (const path of boards) {
 			let text = "";
 			try {

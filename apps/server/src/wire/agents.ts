@@ -134,6 +134,16 @@ export const agents = {
 		void wire.agents.get(message.id)?.abort();
 	},
 
+	"agent.queue": (message, _reply, wire) => {
+		const agent = wire.agents.get(message.id);
+		if (!agent) return;
+		if (message.action === "add" && typeof message.text === "string") agent.queueMine(message.text);
+		else if (message.action === "remove" && typeof message.item === "string") agent.unqueueMine(message.item);
+		else if (message.action === "send" && typeof message.item === "string") agent.sendMineNow(message.item);
+		else if (message.action === "release") agent.releaseMine();
+		agent.sayRow();
+	},
+
 	/*
 	 * A history, for the conversation a browser is about to show. To the asker alone,
 	 * like scrollback: another tab showing another chat has no use for it. An agent that

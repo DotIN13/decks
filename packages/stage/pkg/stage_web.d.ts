@@ -144,8 +144,9 @@ export class PageEngine {
     setMath(typeset: Function): void;
     /**
      * A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
+     * Returns the arrows it bends that were not lifted before, as a JSON list, for the worker to lift.
      */
-    setPreview(moving: string): void;
+    setPreview(moving: string): string;
     /**
      * What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
      */
@@ -294,7 +295,7 @@ export interface InitOutput {
     readonly pageengine_setInk: (a: number, b: number, c: number) => void;
     readonly pageengine_setMarkdownReader: (a: number, b: any) => void;
     readonly pageengine_setMath: (a: number, b: any) => void;
-    readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number];
+    readonly pageengine_setPreview: (a: number, b: number, c: number) => [number, number, number, number];
     readonly pageengine_setView: (a: number, b: number, c: number) => void;
     readonly pageengine_showLifted: (a: number, b: number) => void;
     readonly pageengine_text: (a: number) => [number, number];

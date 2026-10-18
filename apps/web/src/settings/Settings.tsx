@@ -1,4 +1,5 @@
-import type { ClaudeAccount, WebStatus } from "@decks/protocol";
+import { STT_MODELS, type ClaudeAccount, type WebStatus } from "@decks/protocol";
+import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../chat/composer/voice.ts";
 import FiveHour from "./FiveHour.tsx";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
@@ -111,7 +112,16 @@ export function Settings(props: {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
 		>
-			<div class="panel-float settings static flex max-h-[84%] w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label="Settings">
+			<div
+				class="panel-float settings static flex max-h-[84%] w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden p-0"
+				role="dialog"
+				aria-label="Settings"
+				// Every explanation is one line (`settings.css`); one cut short shows all its words on hover.
+				onPointerOver={(event) => {
+					const note = (event.target as Element | null)?.closest?.(".set-note, .row-note") as HTMLElement | null;
+					if (note) note.title = note.scrollWidth > note.clientWidth ? (note.textContent ?? "").trim() : "";
+				}}
+			>
 				{/*
 					A title, not a section label.
 					
@@ -158,8 +168,8 @@ export function Settings(props: {
 							*/}
 							<span class="set-note">
 								{props.accounts.length === 1
-									? "Add another to have somewhere to go when this one runs out. Pick per conversation in the model picker."
-									: "Each conversation spends one of these, chosen in its own model picker. Nothing switches on its own."}
+									? "Add another to switch to when this one runs out."
+									: "Each conversation picks one in its own model picker."}
 							</span>
 						</header>
 
@@ -194,6 +204,7 @@ export function Settings(props: {
 					</section>
 
 					<TimeSettings />
+					<VoiceSettings />
 					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
 					<OtherDecks />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
@@ -356,7 +367,7 @@ function OtherDecks() {
 			<section class="set-group" data-group="other-decks">
 				<header>
 					<span class="set-title">Other Decks</span>
-					<span class="set-note">Another Decks on this machine, your network or your tailnet connects with the address alone. Over the internet it also needs a code from here, typed under Connect a server.</span>
+					<span class="set-note">Another Decks connects by its address; over the internet, with a code.</span>
 				</header>
 				<div class="row-list set-rows">
 					<div class="row-act" data-row-static>
@@ -424,10 +435,10 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 	const status = () => props.web?.status;
 	const note = () => {
 		const now = status();
-		if (!now) return "Waiting for the server to say.";
-		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Agents can read and fill it; submitting asks you first, on the status board.`;
-		if (now.paired) return "Paired. Nothing is shared: press the Decks button in Chrome on the tab an agent should work in.";
-		return "Install the extension (extension/ in the repo, loaded unpacked), then paste these two lines into its Pairing section.";
+		if (!now) return "Waiting for the server.";
+		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Submitting asks you first.`;
+		if (now.paired) return "Paired. Press the Decks button on a tab to share it.";
+		return "Install the extension, then paste the two lines below into it.";
 	};
 	return (
 		<section class="set-group" data-group="web">
@@ -514,6 +525,56 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
  * hosted box is UTC, and the group says so beside this browser's own zone with one button to
  * take it: a zone chosen silently would move the person's schedules without telling them.
  */
+/**
+ * The composer's mic (`chat/composer/voice.ts`): which recogniser this browser uses, the language the
+ * browser's own listens for, and the model the server's uses, which is the deck's and every browser's.
+ */
+function VoiceSettings() {
+	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
+	const recogniserNote = () => RECOGNISERS.find((one) => one.id === recogniser())?.note ?? "";
+	return (
+		<section class="set-group" data-group="voice">
+			<header>
+				<span class="set-title">Voice</span>
+				<span class="set-note">The mic in the composer, or Ctrl+M. Nothing is sent until you send it.</span>
+			</header>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">Recogniser</span>
+					<span class="row-note">{recogniserNote()}</span>
+				</span>
+				<span class="segmented set-recogniser" role="radiogroup" aria-label="Recogniser">
+					<For each={RECOGNISERS}>
+						{(option) => (
+							<button type="button" role="radio" aria-checked={recogniser() === option.id} data-on={recogniser() === option.id} title={option.note} onClick={() => setRecogniser(option.id)}>
+								{option.label}
+							</button>
+						)}
+					</For>
+				</span>
+			</div>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">The server's model</span>
+					<span class="row-note">{state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key: set OPENAI_API_KEY on the server."}</span>
+				</span>
+				<select class="field set-select" aria-label="The server's speech model" value={model()} onChange={(event) => send({ type: "settings.set", sttModel: event.currentTarget.value === STT_MODELS[0]!.id ? null : event.currentTarget.value })}>
+					<For each={STT_MODELS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
+				</select>
+			</div>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">The browser's language</span>
+					<span class="row-note">What the browser's recogniser listens for.</span>
+				</span>
+				<select class="field set-select" aria-label="The browser's speech language" value={voiceLang()} onChange={(event) => setVoiceLang(event.currentTarget.value)}>
+					<For each={VOICE_LANGS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
+				</select>
+			</div>
+		</section>
+	);
+}
+
 function TimeSettings() {
 	const chosen = () => state.settings.timezone;
 	const mine = browserZone();
@@ -540,14 +601,13 @@ function TimeSettings() {
 		<section class="set-group" data-group="time">
 			<header>
 				<span class="set-title">Time</span>
-				<span class="set-note">One timezone for the whole deck. Schedules fire in it, agents are told it, and every time in the app is drawn in it. Changing it moves the schedules with it, and none runs twice that day.</span>
+				<span class="set-note">One timezone for the deck: schedules, agents and every clock.</span>
 			</header>
 			<div class="set-row">
 				<span class="set-k">
 					<span class="row-label">{chosen() ? chosen() : `Not set: the server's own clock, ${state.machineZone || "unknown"}`}</span>
 					<span class="row-note" data-zone-now>
 						It is {clockTime(tick(), inForce() || undefined)} there now.
-						{!chosen() && state.machineZone !== mine ? ` This browser is on ${mine}.` : ""}
 					</span>
 				</span>
 				<Show when={chosen() !== mine}>
@@ -595,14 +655,14 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 	const note = () => {
 		const chosen = RENDERERS.find((option) => option.id === props.renderer);
 		if (!props.canvasApi && props.renderer !== "dom")
-			return `This browser has no drawElementImage, so boards are documents whatever is chosen. In Chrome turn on chrome://flags/#canvas-draw-element.`;
+			return "This browser cannot: boards are documents.";
 		return chosen?.note ?? "";
 	};
 	return (
 		<section class="set-group" data-group="renderer">
 			<header>
 				<span class="set-title">Boards</span>
-				<span class="set-note">How the canvas draws them. Canvas needs Chrome's HTML-in-Canvas API{props.canvasApi ? ", which this browser has." : ", which this browser does not have."}</span>
+				<span class="set-note">How the canvas draws boards.{props.canvasApi ? "" : " This browser has no Canvas renderer."}</span>
 			</header>
 			<div class="set-row">
 				<span class="set-k">

@@ -33,10 +33,15 @@ function refuseIfBusy(context: Context, name: string, verb: string): void {
  */
 export function renameStage(context: Context, from: string, title: string): string {
 	const to = slug(title, 40);
-	if (!to) throw new Error("A stage needs a name with a letter or a number in it.");
+	if (!to) throw new Error("A canvas needs a name with a letter or a number in it.");
 	if (to === from) return from;
-	if (context.pens.names().includes(to)) throw new Error(`A stage called "${to}" already exists.`);
+	if (context.pens.names().includes(to)) throw new Error(`A canvas called "${to}" already exists.`);
 	refuseIfBusy(context, from, "rename");
+	return moveCanvas(context, from, to);
+}
+
+/** Move a canvas to a new folder; its kept boards, the isolated copies of it and its agents follow. */
+function moveCanvas(context: Context, from: string, to: string): string {
 	const before = `${stageBoardsDir(from)}/`;
 	const after = `${stageBoardsDir(to)}/`;
 	const repoint = (path: string) => (path.startsWith(before) ? after + path.slice(before.length) : path);
@@ -55,6 +60,23 @@ export function renameStage(context: Context, from: string, title: string): stri
 	}
 	for (const agent of context.agents) agent.stageRenamed(from, to, repoint);
 	return to;
+}
+
+/**
+ * Name a canvas. A canvas nobody has named yet is in a placeholder folder (`untitled-canvas`, or an
+ * agent's name from before canvases were the deck's), so the first name chosen for it names its
+ * folder as well; after that the folder stays and only the name changes. The folder is not moved
+ * while an agent on it is mid-turn with boards kept in it, since its tools hold their paths.
+ * Returns the folder the canvas is in afterwards.
+ */
+export function titleCanvas(context: Context, name: string, title: string): string {
+	const unchosen = context.pens.naming(name).provisional;
+	const clean = context.pens.setTitle(name, title);
+	if (!unchosen) return name;
+	if (slug(clean, 40) === name || !slug(clean, 40)) return name;
+	const keepsBoards = existsSync(join(context.deck.path, stageBoardsDir(name)));
+	if (keepsBoards && context.agents.some((agent) => agent.stageName(false) === name && agent.running)) return name;
+	return moveCanvas(context, name, context.pens.freshName(clean));
 }
 
 /** Delete a stage, with its drawing and any boards kept in its own folder. The deck's own boards are untouched. */

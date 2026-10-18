@@ -1,6 +1,6 @@
 /**
  * The stage as a pen.dev file: boards as `browser` items, a drawing under them, edits from the
- * wire, from the file and by hand, all ending in the same `stages/<name>/stage.pen`.
+ * wire, from the file and by hand, all ending in the same `canvases/<name>/canvas.pen`.
  *
  * Needs no model: the edits an agent would make with `stage.pen.edit` go over the wire as
  * `stage.pen.edit`, which is the same operation through the same server path.
@@ -51,7 +51,7 @@ link.send({
 });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "e2e-note")).at(-1));
 say("an edit comes back as a stage.pen frame", !!frame);
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
  * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good
@@ -255,6 +255,8 @@ if (spot) {
 	const home = await rectBox();
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
+	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
+	const quiet = await page.addStyleTag({ content: ".stage > .board-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
@@ -275,6 +277,7 @@ if (spot) {
 		`${JSON.stringify(parked)} -> ${JSON.stringify(rounding)}`,
 	);
 	await page.mouse.up();
+	await quiet.evaluate((tag) => tag.remove());
 	const round = await until(() => {
 		const r = onDisk().children.find((n) => n.id === drawnId)?.cornerRadius;
 		return typeof r === "number" && r > 8 ? r : undefined;
@@ -308,7 +311,8 @@ if (spot) {
 		const card = onDisk().children.find((n) => n.id === cardId);
 		return card && card.width !== wasCard?.width ? card : undefined;
 	});
-	say("dragging its side sets its width, and leaves its height to its words", !!widened && widened.height === undefined, JSON.stringify({ width: widened?.width, height: widened?.height }));
+	// Its words decide its height: no number in the file, only the floor it was made with (`fit_content(48)`).
+	say("dragging its side sets its width, and leaves its height to its words", !!widened && (widened.height === undefined || /^fit_content(\(\d+(\.\d+)?\))?$/.test(String(widened.height))), JSON.stringify({ width: widened?.width, height: widened?.height }));
 	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
 	const tall = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
 	const south = await page.evaluate(() => {

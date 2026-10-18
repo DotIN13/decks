@@ -14,7 +14,7 @@ import { IsolatedView } from "./isolation.ts";
  * original written, between the folder, the stage's copies and the deck.
  */
 
-const LOCAL = "stages/mine/boards";
+const LOCAL = "canvases/mine/boards";
 
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), "decks-isolation-test-"));
@@ -29,7 +29,7 @@ function fixture() {
 	writeFileSync(join(deck, "assets", "pic.png"), "PNG");
 	writeFileSync(join(deck, "assets", "other.png"), "OTHER");
 	writeFileSync(join(deck, "lib", "board.css"), "CSS");
-	writeFileSync(join(deck, "stages", "mine", "stage.pen"), "{}");
+	writeFileSync(join(deck, "canvases", "mine", "canvas.pen"), "{}");
 	const boards = [`${LOCAL}/on.html`];
 	const adopted: string[] = [];
 	const view = new IsolatedView({
@@ -69,7 +69,7 @@ test("the deck lists a stage's own boards beside the deck's", () => {
 		const paths = Deck.open(deck).boards.map((board) => board.path);
 		assert.ok(paths.includes("boards/on.html"));
 		assert.ok(paths.includes(`${LOCAL}/on.html`));
-		assert.ok(inBoardFolder(`${LOCAL}/on.html`) && inBoardFolder("boards/on.html") && !inBoardFolder("stages/mine/stage.pen"));
+		assert.ok(inBoardFolder(`${LOCAL}/on.html`) && inBoardFolder("boards/on.html") && !inBoardFolder("canvases/mine/canvas.pen"));
 	} finally {
 		done();
 	}
@@ -80,7 +80,7 @@ test("the folder holds the stage's boards at their deck paths, its drawing and t
 	try {
 		view.sync();
 		assert.equal(readFileSync(join(view.dir, LOCAL, "on.html"), "utf8"), '<img src="../../../assets/pic.png">COPY');
-		assert.equal(readFileSync(join(view.dir, "stages", "mine", "stage.pen"), "utf8"), "{}");
+		assert.equal(readFileSync(join(view.dir, "canvases", "mine", "canvas.pen"), "utf8"), "{}");
 		assert.ok(existsSync(join(view.dir, "assets", "pic.png")));
 		assert.ok(!existsSync(join(view.dir, "boards")));
 		assert.ok(!existsSync(join(view.dir, "assets", "other.png")));
@@ -113,12 +113,12 @@ test("the drawing and the assets are copied in only", () => {
 	try {
 		view.sync();
 		writeFileSync(join(view.dir, "assets", "pic.png"), "CHANGED");
-		writeFileSync(join(view.dir, "stages", "mine", "stage.pen"), '{"changed":true}');
+		writeFileSync(join(view.dir, "canvases", "mine", "canvas.pen"), '{"changed":true}');
 		later(join(view.dir, "assets", "pic.png"));
-		later(join(view.dir, "stages", "mine", "stage.pen"));
+		later(join(view.dir, "canvases", "mine", "canvas.pen"));
 		view.sync();
 		assert.equal(readFileSync(join(deck, "assets", "pic.png"), "utf8"), "PNG");
-		assert.equal(readFileSync(join(deck, "stages", "mine", "stage.pen"), "utf8"), "{}");
+		assert.equal(readFileSync(join(deck, "canvases", "mine", "canvas.pen"), "utf8"), "{}");
 	} finally {
 		done();
 	}
@@ -164,6 +164,6 @@ test("closing carries the last edit into the stage's copy and removes the folder
 test("the instructions name the folder, the boards, and the data folder to leave alone", () => {
 	const text = isolationNote({ dir: "/tmp/decks-isolation/a", data: "/home/decks/data" }, [`${LOCAL}/on.html`]);
 	assert.match(text, /\/tmp\/decks-isolation\/a/);
-	assert.match(text, /stages\/mine\/boards\/on\.html/);
+	assert.match(text, /canvases\/mine\/boards\/on\.html/);
 	assert.match(text, /Do not read, list, search or change the Decks data in `\/home\/decks\/data`/);
 });

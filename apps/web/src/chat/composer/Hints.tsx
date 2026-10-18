@@ -31,6 +31,8 @@ export function Hints(props: {
 	 * ordinary hint it displaced, so this only turns on when the mention menu is built.
 	 */
 	mentions?: boolean;
+	/** The agent is working: Enter steers it, and Ctrl+Enter (⌘ on a Mac) queues for the turn's end. */
+	busy?: boolean;
 }) {
 	return (
 		<span class="flex min-w-0 items-center gap-2">
@@ -38,9 +40,21 @@ export function Hints(props: {
 				when={props.menuOpen}
 				fallback={
 					<>
-						<span class="hint">
-							<kbd>⏎</kbd> to send
-						</span>
+						<Show
+							when={props.busy}
+							fallback={
+								<span class="hint">
+									<kbd>⏎</kbd> to send
+								</span>
+							}
+						>
+							<span class="hint">
+								<kbd>⏎</kbd> to steer
+							</span>
+							<span class="hint">
+								<kbd>{/Mac/.test(navigator.platform) ? "⌘" : "Ctrl"}</kbd>+<kbd>⏎</kbd> to queue
+							</span>
+						</Show>
 						<span class="hint max-[470px]:hidden">
 							<kbd>/</kbd> for commands
 						</span>

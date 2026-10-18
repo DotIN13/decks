@@ -177,9 +177,22 @@ export function start(onUp: () => void): Socket {
 	return live;
 }
 
+/** The canvas on screen, named by App: what a person's change to a board or the drawing is made to. */
+let onScreen: () => string | undefined = () => undefined;
+export function setOnScreen(read: () => string | undefined): void {
+	onScreen = read;
+}
+
+/** The frames that act on a canvas, and so name the one they act on (the canvas on screen). */
+const CANVAS_CHANGES = new Set<ClientMessage["type"]>(["board.move", "board.resize", "board.play", "board.hide", "board.create", "stage.pen.edit", "stage.pen.step", "board.eval"]);
+
 /** Send a frame. Queued by the socket itself if the connection is down. */
 export function send(message: ClientMessage): void {
 	if (!live) throw new Error("socket.send before socket.start — the connection is opened from App's onMount");
+	if (CANVAS_CHANGES.has(message.type) && !(message as { stage?: string }).stage) {
+		const stage = onScreen();
+		if (stage) message = { ...message, stage } as ClientMessage;
+	}
 	live.send(message);
 }
 

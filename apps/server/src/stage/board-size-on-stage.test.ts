@@ -52,3 +52,62 @@ test("a board is drawn at its stage's size, which a browser's reading does not m
 		cleanup();
 	}
 });
+
+test("two agents on one stage: a save by one does not put back a size or a place the other set", async () => {
+	const { app, cleanup } = open();
+	try {
+		writeFileSync(join(app.deck.path, "boards", "notes.html"), `<!doctype html><html><head><title>Notes</title><meta name="board" content='{"w":600,"h":300}' /></head><body class="board"></body></html>`);
+		app.deck.refresh("boards/notes.html");
+		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		one.setInPlay([PATH, "boards/notes.html"], { place: true });
+		await settle();
+		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
+		two.openStage(one.stageName()!);
+		await settle();
+		// One sizes and moves the plan, and Two moves the notes a moment later: Two's write is already
+		// waiting when One's lands, so Two never reads One's change before it writes its own copy.
+		const before = app.stage.boards(one.id).find((board) => board.path === PATH)!;
+		const notes = app.stage.boards(two.id).find((board) => board.path === "boards/notes.html")!;
+		one.setSize(PATH, { h: 640 });
+		one.setPosition(PATH, before.x + 500, before.y);
+		two.setPosition("boards/notes.html", notes.x, notes.y + 900);
+		await settle();
+		await settle();
+		const item = app.pens.boards(one.stageName()!).find((board) => board.path === PATH);
+		assert.equal(item?.h, 640, "the plan keeps the height One gave it");
+		assert.equal(item?.x, before.x + 500, "and the place");
+		const moved = app.pens.boards(one.stageName()!).find((board) => board.path === "boards/notes.html");
+		assert.equal(moved?.y, notes.y + 900, "while Two's own move is written");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a person's change goes to the canvas it names, not to the agent last focused", async () => {
+	const { app, cleanup } = open();
+	try {
+		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		one.setInPlay([PATH], { place: true });
+		const first = one.stageName()!;
+		const two = app.agents.create({ name: "Two", restored: { id: "two", context: [], inPlay: [], createdAt: 1 } });
+		two.newStage("Another canvas");
+		two.setInPlay([PATH], { place: true });
+		const second = two.stageName()!;
+		app.agents.focus(two.id);
+		const on = (name: string) => app.pens.boards(name).find((board) => board.path === PATH);
+		const before = on(second)!;
+
+		app.handle({ type: "board.move", path: PATH, x: 4000, y: 3000, stage: first }, () => {});
+		app.handle({ type: "board.resize", path: PATH, h: 777, stage: first }, () => {});
+		await settle();
+		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
+		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
+
+		app.handle({ type: "board.hide", path: PATH, stage: first }, () => {});
+		await settle();
+		assert.equal(on(first), undefined, "a hide takes it off the named canvas");
+		assert.ok(on(second), "and leaves it on the other");
+	} finally {
+		cleanup();
+	}
+});

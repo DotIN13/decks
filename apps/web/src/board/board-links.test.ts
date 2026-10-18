@@ -71,7 +71,7 @@ test("an ordinary deck path is passed through unchanged", () => {
  * against a board. The question is the same one — is this a board of this deck — and the
  * answer has to come out of a URL rather than out of a message.
  */
-const BASE = "/api/f/home/decks/data/decks/stages/plan/";
+const BASE = "/api/f/home/decks/data/decks/canvases/plan/";
 
 test("a card's link into the deck's boards is that board", () => {
 	assert.equal(deckBoardLink("../../boards/risks.html", BASE), "boards/risks.html");

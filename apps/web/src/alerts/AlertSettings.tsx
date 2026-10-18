@@ -81,7 +81,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 			<section class="set-group" data-group="sounds">
 				<header>
 					<span class="set-title">Sounds</span>
-					<span class="set-note">Played whether or not you are looking at this window.</span>
+					<span class="set-note">Played whether or not you are looking.</span>
 				</header>
 
 				<For each={ALERT_KINDS}>
@@ -99,7 +99,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 				<div class="set-row">
 					<span class="set-k">
 						<span class="row-label">Volume</span>
-						<span class="row-note">All three together. “Off” keeps each choice above and silences them.</span>
+						<span class="row-note">Off silences all three and keeps the choices.</span>
 					</span>
 					<span class="segmented set-vol">
 						<For each={VOLUMES}>

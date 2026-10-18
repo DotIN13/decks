@@ -4,6 +4,7 @@
 //! spatial index. [`Scene::update`] takes what a batch of changes touched and works out only the
 //! roots that depend on it, so an edit to one item lays out one top-level item again, not the stage.
 
+pub mod arrows;
 pub mod geometry;
 pub mod index;
 pub mod layout;

@@ -11,7 +11,7 @@
  * engines once each.
  */
 import init, { PageEngine, openStage } from "@decks/stage";
-import { diff, expand, isCard, isMarkdownText, isShape, pathBounds, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { diff, expand, isCard, isMarkdownText, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../canvas/pen/font-files.ts";
 import { iconUrl, parseIcon } from "../canvas/pen/icons.ts";
@@ -194,6 +194,7 @@ export class StageEngine {
 		if (doc === this.doc && base === this.base) return;
 		const before = this.doc;
 		this.doc = doc;
+		this.nodes = undefined;
 		this.base = base;
 		this.viewState.hidden = [];
 		if (!this.page) return;
@@ -516,7 +517,12 @@ export class StageEngine {
 			}
 			const first = moving.values().next().value;
 			this.offset = { dx: first?.dx ?? 0, dy: first?.dy ?? 0 };
-			this.page.setPreview(JSON.stringify([...moving]));
+			// The arrows joined to what moves bend with it, routed by the page's engine: lifted out of the tiles too.
+			const bent = JSON.parse(this.page.setPreview(JSON.stringify(this.withOutlines(moving)))) as string[];
+			if (bent.length) {
+				for (const id of bent) this.lifted.add(id);
+				this.post({ type: "lift", ids: bent });
+			}
 		} else {
 			this.page.setPreview("null");
 			this.offset = { dx: 0, dy: 0 };
@@ -524,6 +530,42 @@ export class StageEngine {
 		}
 		this.laidOut();
 		this.draw();
+	}
+
+	/** The drawing's items by id, made when first asked for after each new drawing. */
+	private nodes: Map<string, PenNode> | undefined;
+
+	/**
+	 * A library shape being resized or rounded shows its outline as the saved drawing will have it
+	 * (`fitShapes`): sized to the shape, and built at that size by its kind (`build`) so a curve stays
+	 * a circle, rather than left at its old size. Its radius is the shape's own, not a frame corner.
+	 */
+	private withOutlines(moving: ReadonlyMap<string, PenPreview>): Array<[string, PenPreview]> {
+		const list = [...moving];
+		if (!this.doc) return list;
+		for (const [at, [id, change]] of list.entries()) {
+			if (change.w === undefined && change.h === undefined && change.radius === undefined) continue;
+			if (!this.nodes) this.nodes = new Map([...walk(this.doc.children)].map((node) => [node.id, node]));
+			const node = this.nodes.get(id);
+			const outline = node && isShape(node) ? shapeOutline(node) : undefined;
+			if (!node || !outline) continue;
+			const w = change.w ?? node.width;
+			const h = change.h ?? node.height;
+			if (typeof w !== "number" || typeof h !== "number") continue;
+			const set: Record<string, unknown> = { x: 0, y: 0, width: w, height: h };
+			const build = shapeKind(node.metadata?.kind)?.build;
+			if (build) {
+				const metadata = change.radius === undefined ? node.metadata : ({ ...node.metadata, radius: change.radius ?? undefined } as PenNode["metadata"]);
+				set.geometry = build(w, h, shapeRadius({ ...node, width: w, height: h, metadata }) ?? 0);
+				set.viewBox = [0, 0, w, h];
+			}
+			if (change.radius !== undefined) {
+				const { radius: _, ...rest } = change;
+				list[at] = [id, rest];
+			}
+			list.push([outline.id, { dx: 0, dy: 0, set }]);
+		}
+		return list;
 	}
 
 	/** The stroke still under the pen, drawn by the page each frame. */

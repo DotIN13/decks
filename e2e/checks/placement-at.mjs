@@ -69,7 +69,7 @@ for (let i = 0; i < 10; i++) {
 
 const agentId = await until(() => LINK.last("agents")?.focused);
 const stageName = await until(() => LINK.last("stages")?.stages.find((row) => row.agents.some((agent) => agent.id === agentId))?.name);
-const file = join((await deckState()).path, "stages", stageName ?? "?", "stage.pen");
+const file = join((await deckState()).path, "canvases", stageName ?? "?", "canvas.pen");
 const placed = (title) => {
 	if (!existsSync(file)) return undefined;
 	const node = JSON.parse(readFileSync(file, "utf8")).children.find((n) => n.type === "browser" && n.name === title);

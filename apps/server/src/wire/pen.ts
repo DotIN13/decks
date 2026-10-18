@@ -1,5 +1,5 @@
 import type { Op } from "@decks/pen";
-import { deleteStage } from "../stage/stage-admin.ts";
+import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
 
 /**
@@ -15,7 +15,8 @@ export const pen = {
 		const agent = wire.agents.get(message.agentId);
 		const pens = wire.stage.pens;
 		if (!agent || !pens || !Array.isArray(message.ops)) return;
-		const name = agent.stageName(true);
+		// The drawing on screen, named by the browser; an older one names only the agent.
+		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(true);
 		if (!name) return;
 		try {
 			pens.edit(name, message.ops as Op[], undefined, { undoable: true });
@@ -77,7 +78,7 @@ export const pen = {
 		const pens = wire.stage.pens;
 		if (!pens || typeof message.name !== "string" || typeof message.to !== "string") return;
 		try {
-			pens.setTitle(message.name, message.to);
+			titleCanvas({ deck: wire.deck, pens, agents: wire.agents.all() }, message.name, message.to);
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 			return;
@@ -105,7 +106,7 @@ export const pen = {
 		const agent = wire.agents.get(message.agentId);
 		const pens = wire.stage.pens;
 		if (!agent || !pens) return;
-		const name = agent.stageName(false);
+		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(false);
 		if (!name) return;
 		try {
 			pens.step(name, message.direction === "redo" ? "redo" : "undo");

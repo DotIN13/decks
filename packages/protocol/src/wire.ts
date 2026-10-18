@@ -52,7 +52,7 @@ export interface BackendInfo {
 export interface StageRow {
 	/** The folder: the stage's id, which agents open it by and never changes. */
 	name: string;
-	/** What it is called, which the person can change freely (`stage.json` beside the drawing). */
+	/** What it is called, which the person can change freely (`canvas.json` beside the drawing). */
 	title: string;
 	/** When its drawing last changed, in ms since the epoch: the manager's order and its "2 h ago". */
 	changedAt?: number;
@@ -65,6 +65,11 @@ export interface StageRow {
 	isolated?: true;
 	/** Copied back from an isolated stage when isolation ended: badged in the manager. */
 	fromIsolation?: true;
+	/**
+	 * The folders it had before, since this server started: the first name chosen for a canvas names
+	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
+	 */
+	formerly?: string[];
 }
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
@@ -72,7 +77,7 @@ import type { WebStatus } from "./web.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
-	| { type: "board.move"; path: string; x: number; y: number }
+	| { type: "board.move"; path: string; x: number; y: number; /** The stage on screen, whose file the move is written to. */ stage?: string }
 	/**
 	 * A board dragged to a new size by the person holding the mouse.
 	 *
@@ -81,7 +86,7 @@ export type ClientMessage =
 	 * aspect instead. Either dimension on its own is allowed, and a height written there is a
 	 * floor — the content raises it when it needs more room, and never clips.
 	 */
-	| { type: "board.resize"; path: string; w?: number; h?: number }
+	| { type: "board.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
 	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
 	/**
 	 * How much room this board's content takes, measured in the frame that is showing it.
@@ -110,7 +115,7 @@ export type ClientMessage =
 	 * Nothing about the run comes back down this socket: the code does what it does through
 	 * `stage`, and the focused conversation gets one notice saying a board ran.
 	 */
-	| { type: "board.eval"; path: string; id: string; value?: unknown }
+	| { type: "board.eval"; path: string; id: string; value?: unknown; stage?: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	/**
 	 * Put a live view of one agent's conversation on the canvas.
@@ -121,10 +126,10 @@ export type ClientMessage =
 	 */
 	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */
 	| { type: "agent.mirror"; agentId: string; request?: string }
-	| { type: "board.play"; path: string }
+	| { type: "board.play"; path: string; /** The stage on screen. */ stage?: string }
 	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */
 	| { type: "board.seen"; path: string }
-	| { type: "board.hide"; path: string }
+	| { type: "board.hide"; path: string; /** The stage on screen. */ stage?: string }
 	/**
 	 * A new, empty board, put on the canvas.
 	 *
@@ -156,7 +161,7 @@ export type ClientMessage =
 	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
 	 */
 	/** `document` names a file to open as a page you type into; the board made for it opens it. */
-	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
+	| { type: "board.create"; /** The stage on screen, which the new board joins. */ stage?: string; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *
@@ -176,7 +181,7 @@ export type ClientMessage =
 	 * same pen operations an agent sends through `stage.pen.edit` (`@decks/pen`'s `Op`). Applied to
 	 * the stage the named agent has open, together or not at all.
 	 */
-	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	| { type: "stage.pen.edit"; agentId: string; ops: unknown[]; /** The stage on screen, whose drawing is edited; else the agent's. */ stage?: string }
 	/** The whole drawing again: the browser missed a revision of `stage.pen.delta`. */
 	| { type: "stage.pen.get"; agentId: string }
 	/**
@@ -193,7 +198,7 @@ export type ClientMessage =
 	/** Delete a stage from the manager, with its drawing and the boards kept in its folder. */
 	| { type: "stage.delete"; name: string }
 	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
-	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo" }
+	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo"; /** The stage on screen. */ stage?: string }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *
@@ -244,6 +249,11 @@ export type ClientMessage =
 	| { type: "agent.workspace"; id: string; workspace: string | null }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
+	/**
+	 * Your own queue for an agent that is working (`DeckAgent.queueMine`): `add` a message to send when
+	 * this turn ends, `remove` one, `send` one now as a steer, or `release` a queue that Stop held.
+	 */
+	| { type: "agent.queue"; id: string; action: "add" | "remove" | "send" | "release"; text?: string; item?: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
@@ -308,7 +318,7 @@ export type ClientMessage =
 	/** Detach from the shared tab — the Stop button on the status board. */
 	| { type: "web.stop" }
 	/** Choose the deck's timezone, or `null` to go back to the machine's. */
-	| { type: "settings.set"; timezone: string | null }
+	| { type: "settings.set"; timezone?: string | null; sttModel?: string | null }
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
@@ -382,6 +392,8 @@ export type ServerMessage =
 	 * browser made carry no flag: it already has the panel open.
 	 */
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
+	/** The messages you queued for an agent, oldest first, and whether Stop is holding them. */
+	| { type: "agent.queued"; agentId: string; items: Array<{ id: string; text: string }>; held: boolean }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	/**
 	 * The conversation as the browser should open it: the tail, and whether there is more.
@@ -431,7 +443,7 @@ export type ServerMessage =
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *
-	 * A stage is a folder — `stages/<name>/stage.pen` — and which one a chat is on is one field
+	 * A stage is a folder — `canvases/<name>/canvas.pen` — and which one a chat is on is one field
 	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and
 	 * whenever the set or who is on it changes; `rev` is the drawing's revision, which is what
 	 * makes a stage's picture cacheable for a year and still current.
@@ -484,7 +496,7 @@ export type ServerMessage =
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
 	| { type: "web.status"; status: WebStatus; code?: string }
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
-	| { type: "settings"; settings: DeckSettings; machineZone: string }
+	| { type: "settings"; settings: DeckSettings; machineZone: string; sttKey?: boolean }
 	/** The code being shown, if any, and every front end holding a token. */
 	| { type: "pairing"; code?: string; expires?: number; paired: PairedRow[] }
 	/** Who is answering, and what it can do: the first frame of every greeting. */

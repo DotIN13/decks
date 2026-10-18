@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { DeckSettings } from "@decks/protocol";
+import { STT_MODELS, type DeckSettings } from "@decks/protocol";
 import { isZone, processZone } from "./lib/clock.ts";
 
 /**
@@ -61,6 +61,17 @@ export class SettingsStore {
 		return this.get();
 	}
 
+	/** Choose the server recogniser's model, or `null` for its default. Returns a sentence when it is not one. */
+	setSttModel(model: string | null): { error: string } | DeckSettings {
+		if (model !== null && !STT_MODELS.some((one) => one.id === model)) return { error: `"${model}" is not a speech model this server knows: ${STT_MODELS.map((one) => one.id).join(", ")}.` };
+		const next: DeckSettings = { ...this.settings };
+		if (model === null) delete next.sttModel;
+		else next.sttModel = model;
+		this.settings = next;
+		this.save();
+		return this.get();
+	}
+
 	/** Another deck was opened: its settings, and its clock. */
 	setDeck(deckPath: string): void {
 		this.file = join(deckPath, ".decks", "settings.json");
@@ -82,6 +93,7 @@ export class SettingsStore {
 			// silently means UTC, which is the fault this file exists to remove.
 			return {
 				...(isZone(parsed?.timezone) ? { timezone: parsed.timezone } : {}),
+				...(STT_MODELS.some((one) => one.id === parsed?.sttModel) ? { sttModel: parsed.sttModel as string } : {}),
 			};
 		} catch (error) {
 			this.warn(`The deck's settings could not be read, so the defaults are in use: ${(error as Error).message}`);

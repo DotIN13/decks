@@ -42,7 +42,7 @@ say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
 say("…with the stage's seven tools, because the drawing is edited in both modes", browse.tools === 7, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
 say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
-say("the mode buttons are browse, edit and draw, in that order", browse.order === "Browse the boards / Edit the boards / Draw on the stage", browse.order);
+say("the mode buttons are browse, edit and draw, in that order", browse.order === "Browse the boards / Edit the boards / Draw on the canvas", browse.order);
 say("…and browse is the one pressed", browse.toggle === "Browse the boards", browse.toggle);
 
 // --- a board is a document -------------------------------------------------------------

@@ -30,7 +30,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "frames-anchor", content: "x" }, box: { x1: -4000, y1: -4000 } }] });
 const frame = await until(() => link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId && m.doc.children.some((n) => n.id === "frames-anchor")).at(-1));
-const file = frame ? join(deck.path, "stages", frame.stage, "stage.pen") : "";
+const file = frame ? join(deck.path, "canvases", frame.stage, "canvas.pen") : "";
 /*
  * The stage file as it is now. Tolerant of a torn read: the server rewrites it while a check is
  * polling, and reading it mid-write once crashed a whole check on a JSON error. The last good
@@ -211,8 +211,29 @@ if (spot) {
 		say("a frame drawn with the tool is a column", made?.layout === "vertical", JSON.stringify(made && { layout: made.layout, gap: made.gap, padding: made.padding, radius: made.cornerRadius, height: made.height }));
 		// Its corner is a card's 12 plus its own padding, so a card dropped in sits concentric with it.
 		say("…padded 18, with a corner that nests a card's inside it", made?.padding === 18 && made?.cornerRadius === 30, JSON.stringify({ padding: made?.padding, radius: made?.cornerRadius }));
-		say("…with a height in pixels, so an empty one is something to drop into", typeof made?.height === "number" && made.height > 0, JSON.stringify(made?.height));
+		// It hugs what it holds, with the height it was drawn at as its floor, so an empty one is still there to drop into.
+		say("…with the height it was drawn at as its floor, so an empty one is something to drop into", /^fit_content\(\d+(\.\d+)?\)$/.test(String(made?.height)) && Number(/\((.*)\)/.exec(made.height)[1]) > 0, JSON.stringify(made?.height));
 		if (made) {
+			// Its bottom edge dragged fixes a height; two presses on that handle make it hug again (`hugAgain`).
+			const south = await until(() => page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }));
+			if (south) {
+				await page.mouse.move(south.x, south.y);
+				await page.mouse.down();
+				await page.mouse.move(south.x, south.y + 20, { steps: 3 });
+				await page.mouse.move(south.x, south.y + 40, { steps: 3 });
+				await page.mouse.up();
+				const fixed = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "number" ? h : undefined; });
+				say("dragging its bottom edge fixes its height", typeof fixed === "number", String(fixed));
+				await settle(page, 500);
+				const again = await page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+				await page.mouse.click(again.x, again.y);
+				await page.mouse.click(again.x, again.y);
+				const hugs = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "string" ? h : undefined; });
+				say("…and a double-click on that handle makes it hug again, with a floor", /^fit_content\(\d+\)$/.test(String(hugs)), String(hugs));
+				// As it was drawn, for what follows.
+				link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: made.id, set: { height: made.height } }] });
+				await settle(page, 300);
+			}
 			await page.keyboard.press("Escape");
 			await settle(page, 200);
 			link.send({

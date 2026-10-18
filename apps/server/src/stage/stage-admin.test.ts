@@ -35,13 +35,13 @@ test("a rename moves the folder and re-points the boards kept in it, keeping the
 		const before = pens.boards("deploy-isolated");
 		const to = renameStage(context, "deploy-isolated", "Launch Plan!");
 		assert.equal(to, "launch-plan");
-		assert.ok(!existsSync(join(deckPath, "stages", "deploy-isolated")));
+		assert.ok(!existsSync(join(deckPath, "canvases", "deploy-isolated")));
 		const after = pens.boards("launch-plan");
-		assert.deepEqual(after.map((one) => one.path), ["stages/launch-plan/boards/plan.html"]);
+		assert.deepEqual(after.map((one) => one.path), ["canvases/launch-plan/boards/plan.html"]);
 		assert.deepEqual(after.map((one) => one.id), before.map((one) => one.id));
-		assert.ok(existsSync(join(deckPath, "stages", "launch-plan", "boards", "plan.html")));
-		assert.ok(deck.board("stages/launch-plan/boards/plan.html"));
-		assert.ok(!deck.board("stages/deploy-isolated/boards/plan.html"));
+		assert.ok(existsSync(join(deckPath, "canvases", "launch-plan", "boards", "plan.html")));
+		assert.ok(deck.board("canvases/launch-plan/boards/plan.html"));
+		assert.ok(!deck.board("canvases/deploy-isolated/boards/plan.html"));
 		assert.throws(() => renameStage(context, "launch-plan", "deploy"), /already exists/);
 		assert.throws(() => renameStage(context, "launch-plan", "!!!"), /letter or a number/);
 	} finally {
@@ -64,8 +64,8 @@ test("a delete takes the stage and the boards kept in its folder, and never the 
 	try {
 		deleteStage(context, "deploy-isolated");
 		assert.ok(!pens.names().includes("deploy-isolated"));
-		assert.ok(!existsSync(join(deckPath, "stages", "deploy-isolated")));
-		assert.ok(!deck.board("stages/deploy-isolated/boards/plan.html"));
+		assert.ok(!existsSync(join(deckPath, "canvases", "deploy-isolated")));
+		assert.ok(!deck.board("canvases/deploy-isolated/boards/plan.html"));
 		deleteStage(context, "deploy");
 		assert.equal(readFileSync(join(deckPath, "boards", "plan.html"), "utf8"), "<title>Plan</title>PLAN");
 	} finally {
