@@ -102,6 +102,7 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		await settle();
 		assert.deepEqual([on(first)?.x, on(first)?.y, on(first)?.h], [4000, 3000, 777], "the named canvas takes the move and the size");
 		assert.deepEqual([on(second)?.x, on(second)?.y, on(second)?.h], [before.x, before.y, before.h], "the focused agent's canvas is untouched");
+		assert.equal(app.deck.board(PATH)?.h, 777, "the drag writes the board's own file, as a fit does");
 
 		app.handle({ type: "board.hide", path: PATH, stage: first }, () => {});
 		await settle();

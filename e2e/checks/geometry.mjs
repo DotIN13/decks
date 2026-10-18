@@ -2,9 +2,9 @@
  * Board geometry, from the two gestures that change it: the resize handle, and the double-click
  * that makes a board.
  *
- * Both are the same subject — where a board's *size* comes from. A resize is the board's size on
- * this stage, kept in the stage file: the board is drawn at what the drag let go at, and its own
- * file keeps the size its agent wrote, which is what another stage takes it at. A double-click is a
+ * Both are the same subject — where a board's *size* comes from. A resize is written twice: to this
+ * stage's file, where the board is drawn at what the drag let go at, and to the board's own file,
+ * the size another stage takes it at next, as an agent's fit writes it. A double-click is a
  * creation: a name the server mints, a place the browser picked, and a board whose centre ends up
  * where the pointer was.
  */
@@ -176,7 +176,8 @@ say(
 	Math.abs(drawn.w - dragged.w) <= 2 && Math.abs(drawn.h - dragged.h) <= 2,
 	`drawn ${drawn.w}x${drawn.h}, dragged ${dragged.w}x${dragged.h}`,
 );
-say("…and leaves the board's own file as its agent wrote it", nowComponent === wasComponent, JSON.stringify(metaOf(nowComponent)));
+const writtenMeta = metaOf(nowComponent);
+say("…and writes that size to the board's own file", Math.abs(writtenMeta?.w - drawn.w) <= 1 && Math.abs(writtenMeta?.h - drawn.h) <= 1, JSON.stringify(writtenMeta));
 // The person's own resize is theirs: the board's new file time must not read as an agent's change.
 await page.waitForTimeout(600);
 const glows = await page.evaluate((wanted) => {
@@ -212,9 +213,9 @@ await dragHandle(flowPath, 120, 60);
 await page.waitForTimeout(1500);
 const flowDrawn = await drawnAt(flowPath);
 say(
-	"…and it takes both numbers, with the file left alone",
-	flowDrawn.w > flowBefore.w && flowDrawn.h > flowBefore.h && read(flow) === wasFlow,
-	`${flowBefore.w}x${flowBefore.h} → ${flowDrawn.w}x${flowDrawn.h}, ${JSON.stringify(flowMeta)}`,
+	"…and it takes both numbers, in its file too",
+	flowDrawn.w > flowBefore.w && flowDrawn.h > flowBefore.h && metaOf(read(flow))?.w === flowDrawn.w && metaOf(read(flow))?.h === flowDrawn.h,
+	`${flowBefore.w}x${flowBefore.h} → ${flowDrawn.w}x${flowDrawn.h}, ${JSON.stringify(metaOf(read(flow)))}`,
 );
 
 // --- a double-click on a board's own bar is not a double-click on empty canvas ----------

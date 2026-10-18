@@ -37,14 +37,14 @@ export interface StageHost {
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Board;
 	/** What the canvas last measured of this board, if what it measured was this revision. */
-	extent(path: string, rev: number): { w: number; h: number; page?: number } | undefined;
+	extent(path: string, rev: number, at?: number): { w: number; h: number; page?: number } | undefined;
 	/** Wait for a measurement of this revision — every frame takes one when it loads. */
-	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number; page?: number } | undefined>;
+	awaitExtent(path: string, rev: number, ms: number, at?: number): Promise<{ w: number; h: number; page?: number } | undefined>;
 	/**
 	 * Measure the board in the server's own browser, at its own size, the way a canvas would: for a
 	 * board no canvas is showing. Absent, or undefined, when there is no browser to do it with.
 	 */
-	measureAway?(path: string): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined>;
+	measureAway?(path: string, w?: number): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined>;
 	/** Words counted and the smallest type on the board at this revision, when a browser reported them. */
 	/** Press every control on the board in a headless page and report the views that break it. Advice: absent when it cannot run. */
 	views?(path: string): Promise<{ controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } | undefined>;
@@ -275,13 +275,11 @@ export class StageService {
 	}
 
 	/**
-	 * Size a board to its content — **the height, and only the height**.
-	 *
-	 * The width is the author's. It is written when the board is created, in its own `<meta>`, and a
-	 * fit that narrowed it would be undoing a decision it cannot see the reason for: 1900 wide with
-	 * room to spare is one person's mistake and another person's margin. A board pinned to a
-	 * measured width would also reflow its text every time the measurement changed. `stage.resize`
-	 * is how a width is set when somebody means it.
+	 * Size a board to its content — **the height, and only the height**, at width `w`: the width the
+	 * board has on the canvas it is fitted on (`tool.ts`), or the file's own. The width is never
+	 * measured: a board pinned to a measured width would reflow its text every time the measurement
+	 * changed. The height is measured at that width, and both go to the board's file, as a person's
+	 * resize writes them.
 	 *
 	 * The height is the one number a board cannot state for itself: it is what the content came to
 	 * once it was laid out, and only the browser knows it. So this reads what the frame measured and
@@ -292,7 +290,7 @@ export class StageService {
 	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
 	 * back was the frame's own width, so every fit added the margin and grew the board by 48px.
 	 */
-	async fit(path: string, options?: { margin?: number }): Promise<{ board: Board; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
+	async fit(path: string, options?: { margin?: number; w?: number }): Promise<{ board: Board; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
@@ -301,7 +299,8 @@ export class StageService {
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
 
-		const { reading: away, ...measured } = await this.measure(path, board.rev);
+		const w = Math.round(options?.w ?? board.w);
+		const { reading: away, ...measured } = await this.measure(path, board.rev, w);
 		/*
 		 * The margin is room under the last *placed* box, and nothing else.
 		 *
@@ -327,7 +326,7 @@ export class StageService {
 		const reading = away ?? this.host.reading?.(path, board.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);
-		return { board: h === board.h ? board : this.resize(path, { h }), content: measured, reading, ...(views ? { views } : {}) };
+		return { board: h === board.h && w === board.w ? board : this.resize(path, { w, h }), content: measured, reading, ...(views ? { views } : {}) };
 	}
 
 	/**
@@ -340,15 +339,16 @@ export class StageService {
 	 * (`measureAway`), at its own size and by the same code. Whichever answers first is used; the
 	 * error is left for when neither can.
 	 */
-	private async measure(path: string, rev: number): Promise<{ w: number; h: number; page?: number; reading?: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } }> {
-		const known = this.host.extent(path, rev);
+	private async measure(path: string, rev: number, at: number): Promise<{ w: number; h: number; page?: number; reading?: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } }> {
+		// A frame's reading counts only when it laid the board out at this width.
+		const known = this.host.extent(path, rev, at);
 		if (known) return known;
-		const canvas = this.host.awaitExtent(path, rev, FIT_WAIT_MS);
+		const canvas = this.host.awaitExtent(path, rev, FIT_WAIT_MS, at);
 		const away = this.host.measureAway
 			? new Promise<void>((done) => setTimeout(done, AWAY_AFTER_MS)).then(async () => {
 					// A canvas that answered in the meantime wins: its numbers are the person's own browser's.
-					if (this.host.extent(path, rev)) return undefined;
-					const found = await this.host.measureAway?.(path).catch(() => undefined);
+					if (this.host.extent(path, rev, at)) return undefined;
+					const found = await this.host.measureAway?.(path, at).catch(() => undefined);
 					if (!found) return undefined;
 					const { w, h, page, ...reading } = found;
 					return { w, h, ...(page === undefined ? {} : { page }), reading };

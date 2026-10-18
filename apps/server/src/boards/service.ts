@@ -72,9 +72,9 @@ export class BoardService {
 	readonly revisions: Revisions;
 	private readonly authors: Authors;
 	private readonly seenAt: Seen;
-	private readonly extents = new Map<string, { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
+	private readonly extents = new Map<string, { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	/** `stage.fit` calls waiting for the frame to load and report. */
-	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number; page?: number } | undefined) => void }>();
+	private readonly extentWaiters = new Set<{ path: string; rev: number; at?: number; resolve: (extent: { w: number; h: number; page?: number } | undefined) => void }>();
 
 	constructor(
 		private deck: Deck,
@@ -176,10 +176,10 @@ export class BoardService {
 	 * showing the same board agree, and a stale reading is filtered where it is read
 	 * rather than hoarded here.
 	 */
-	noteExtent(path: string, extent: { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
+	noteExtent(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
 		this.extents.set(path, extent);
 		for (const waiter of [...this.extentWaiters]) {
-			if (waiter.path !== path || waiter.rev !== extent.rev) continue;
+			if (waiter.path !== path || waiter.rev !== extent.rev || !atWidth(extent, waiter.at)) continue;
 			this.extentWaiters.delete(waiter);
 			waiter.resolve({ w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) });
 		}
@@ -192,9 +192,9 @@ export class BoardService {
 	 * document's own height, whichever is greater — and `page` is that second number alone, so a
 	 * caller can tell a board that ends in a placed box from one that ends in its own padding.
 	 */
-	extent(path: string, rev: number): { w: number; h: number; page?: number } | undefined {
+	extent(path: string, rev: number, at?: number): { w: number; h: number; page?: number } | undefined {
 		const extent = this.extents.get(path);
-		return extent && extent.rev === rev ? { w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) } : undefined;
+		return extent && extent.rev === rev && atWidth(extent, at) ? { w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) } : undefined;
 	}
 
 	/** How many words the browser counted on this board at this revision, and its smallest type. */
@@ -221,11 +221,11 @@ export class BoardService {
 	 * `undefined` rather than a rejection: "nobody is looking at that board" is an answer,
 	 * and the caller (`stage.fit`) turns it into a sentence that says what to do about it.
 	 */
-	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number; page?: number } | undefined> {
-		const ready = this.extent(path, rev);
+	awaitExtent(path: string, rev: number, ms: number, at?: number): Promise<{ w: number; h: number; page?: number } | undefined> {
+		const ready = this.extent(path, rev, at);
 		if (ready) return Promise.resolve(ready);
 		return new Promise((resolve) => {
-			const waiter = { path, rev, resolve };
+			const waiter = { path, rev, at, resolve };
 			this.extentWaiters.add(waiter);
 			//
 			// **Not `unref`'d.** It was, to keep a pending measurement from holding the process
@@ -682,4 +682,9 @@ export class BoardService {
 		}
 		return at;
 	}
+}
+
+/** A reading taken at the width asked for, when one is: a height is only the height at the width it was laid out at. */
+function atWidth(extent: { at?: number }, at: number | undefined): boolean {
+	return at === undefined || (extent.at !== undefined && Math.abs(extent.at - at) < 1);
 }

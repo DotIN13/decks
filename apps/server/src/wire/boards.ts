@@ -51,12 +51,13 @@ export const boards = {
 	/*
 	 * A board dragged to a new size, by the person holding the mouse.
 	 *
-	 * **The number goes into the stage file**, as the size of the board's item there (`setSize`),
-	 * which is the one record of how big a board is drawn on that stage. The board's own file keeps
-	 * the size its agent wrote, which is what it comes at when another stage takes it.
+	 * **The number goes into two files**: the board's own, the size it comes at when a canvas places
+	 * it next, as `stage.fit` and `stage.resize` write it; and the canvas file, as the size of the
+	 * board's item there (`setSize`), which is how big it is drawn on that canvas. Every other canvas
+	 * holding the board keeps its own size for it. The canvas sends this once, on letting go.
 	 *
-	 * A **slide** deck is the exception: its height follows from its aspect, so only the width is
-	 * taken, and it goes to the deck's own file — the `<meta>` tag of an HTML deck,
+	 * A **slide** deck takes only the width: its height follows from its aspect, and the width goes
+	 * to the deck's own file — the `<meta>` tag of an HTML deck,
 	 * front-matter of a markdown one. `deck.json` used to keep it, which made a deck's width the one
 	 * number you could not read off the deck.
 	 *
@@ -85,8 +86,11 @@ export const boards = {
 				}
 				return;
 			}
-			// The size goes to the stage on screen, in its file; the board's own file is left as its agent wrote it.
 			const size = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			if (!board.fills && ((w !== undefined && w !== board.w) || (h !== undefined && h !== board.h))) {
+				wire.boards.resize(message.path, size);
+				wire.boards.wrote(message.path, "you");
+			}
 			const { name, agent } = stageFor(message, wire);
 			if (agent) agent.setSize(message.path, size);
 			else if (name) wire.stage.pens?.sizeBoard(name, message.path, size);
@@ -102,6 +106,7 @@ export const boards = {
 			rev: message.rev,
 			w: message.w,
 			h: message.h,
+			...(typeof message.at === "number" ? { at: message.at } : {}),
 			...(typeof message.page === "number" ? { page: message.page } : {}),
 			...(typeof message.words === "number" ? { words: message.words } : {}),
 			...(typeof message.minFont === "number" ? { minFont: message.minFont } : {}),

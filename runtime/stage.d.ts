@@ -46,12 +46,14 @@ export interface Stage {
 	 */
 	show(target: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean; at?: { x1: number; y1: number } }): Promise<{ shown: string[] }>;
 	/**
-	 * Set a board's height from its measured content; the board must be shown first. The result
-	 * also says, in a sentence, what the browser found: the height, the word count, the smallest
-	 * type, content wider than the board, boxes that cut off their own content, and any view
-	 * that breaks when a control is pressed. Use it instead of a screenshot.
+	 * Set a board's height from its content, measured at the width it has on a canvas: `canvas` names
+	 * one as `pen.read` does (name, title, or `"canvases/<name>/canvas.pen"`), else your stage's. The
+	 * board must be on it. The size goes to the board's file and to that canvas; other canvases keep
+	 * theirs. The result also says, in a sentence, what the browser found: the height, the word count,
+	 * the smallest type, content wider than the board, boxes that cut off their own content, and any
+	 * view that breaks when a control is pressed. Use it instead of a screenshot.
 	 */
-	fit(path: string, o?: { margin?: number }): Promise<{ path: string; w: number; h: number }>;
+	fit(path: string, o?: { canvas?: string; margin?: number }): Promise<{ path: string; w: number; h: number }>;
 	/** Set a size outright. */
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 	/** Name boards you edited without showing them, so they are listed as yours. */

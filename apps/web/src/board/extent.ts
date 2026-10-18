@@ -148,7 +148,7 @@ export function documentHeight(doc: Document): number | undefined {
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 
-export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
+export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
 	const doc = frame?.contentDocument;
 	const view = frame?.contentWindow as (Window & { __boardReady?: boolean }) | null | undefined;
 	if (!doc || !view?.__boardReady) return undefined;
@@ -176,5 +176,7 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	 */
 	const page = documentHeight(doc);
 	const h = Math.max(extent.h, Math.ceil(page ?? 0));
-	return { w: extent.w, h, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc) };
+	// The width it was laid out at: `stage.fit` takes a height only from a layout at the width it fits at.
+	const at = Math.round(doc.documentElement.clientWidth);
+	return { w: extent.w, h, at, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc) };
 }

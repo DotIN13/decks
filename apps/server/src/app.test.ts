@@ -36,7 +36,8 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(before.content, undefined, "nothing has looked at it yet");
 		assert.equal(before.clipped, undefined);
 
-		app.handle({ type: "board.extent", path: "boards/tall.html", rev: before.rev, w: 648, h: 690 }, () => {});
+		// Laid out at the board's own 900: `fit` takes a height only from a layout at the width it fits at.
+		app.handle({ type: "board.extent", path: "boards/tall.html", rev: before.rev, w: 648, h: 690, at: 900 }, () => {});
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
 		/*

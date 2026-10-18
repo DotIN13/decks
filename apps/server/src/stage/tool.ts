@@ -560,15 +560,24 @@ export function createStageTool(deps: {
 		},
 
 		/**
-		 * Size a board to its content: the height, and only the height.
+		 * Size a board to its content on one canvas: the height, at the width the board has there.
 		 *
-		 * The width is left exactly as the file has it. A fit that changed it would be a call that
-		 * reflows somebody's document to a number it measured for a moment, and it was wrong in a
-		 * second way on a flow board, where the width it read back was the frame's own.
+		 * The canvas is named as `pen.read` names one (its name, its title, or `canvases/<name>/canvas.pen`),
+		 * or is the one this agent's stage is showing. The width is never measured: it is the canvas's,
+		 * and the height is measured at it. Both go to the board's file, as a person's resize writes
+		 * them, and to that canvas; every other canvas keeps the size it has for the board.
 		 */
-		fit: async (path: string, options?: { margin?: number }) => {
-			const { board, content, reading, views } = await service.fit(path, options);
-			agent.sized?.(board.path, { w: board.w, h: board.h });
+		fit: async (path: string, options?: { margin?: number; canvas?: string }) => {
+			const pens = service.pens;
+			const asked = typeof options?.canvas === "string" ? options.canvas.trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "") : undefined;
+			const named = asked && pens ? (pens.names().includes(asked) ? asked : pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase())) : undefined;
+			if (asked && !named) throw new Error(`No canvas is called "${options?.canvas}". stage.stages() lists them, by name and title.`);
+			const on = named ?? agent.stageName?.();
+			const held = on && pens ? pens.boards(on).find((one) => one.path === path) : undefined;
+			if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your stage's canvas"}, so there is no width to fit it at. Show it there first, or name a canvas that holds it: stage.fit(path, { canvas }).`);
+			const { board, content, reading, views } = await service.fit(path, { ...(options?.margin === undefined ? {} : { margin: options.margin }), w: held.w });
+			if (named) pens!.sizeBoard(named, board.path, { w: board.w, h: board.h });
+			else agent.sized?.(board.path, { w: board.w, h: board.h });
 			agent.worked?.(board.path);
 			agent.acted?.("resize", board.path);
 			/*

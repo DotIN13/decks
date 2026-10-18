@@ -183,16 +183,16 @@ export class App {
 			newMirror: (options) => this.boards.newMirror(options),
 			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
-			extent: (path, rev) => this.boards.extent(path, rev),
-			awaitExtent: (path, rev, ms) => this.boards.awaitExtent(path, rev, ms),
+			extent: (path, rev, at) => this.boards.extent(path, rev, at),
+			awaitExtent: (path, rev, ms, at) => this.boards.awaitExtent(path, rev, ms, at),
 			reading: (path, rev) => this.boards.reading(path, rev),
 			views: async (path) => {
 				const board = this.deck.board(path);
 				return board ? this.thumbs.views(board) : undefined;
 			},
-			measureAway: async (path) => {
+			measureAway: async (path, w) => {
 				const board = this.deck.board(path);
-				return board && this.stage.shots ? this.stage.shots.measure(board) : undefined;
+				return board && this.stage.shots ? this.stage.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
 			},
 			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
 			connected: () => (this.hub?.connections ?? 0) > 0,

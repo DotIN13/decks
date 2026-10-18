@@ -101,7 +101,7 @@ export type ClientMessage =
 	 * so `stage.fit` can tell the two apart — a board of placed boxes is fitted with a margin
 	 * of room under the last one, and a document that ends in its own bottom padding is not.
 	 */
-	| { type: "board.extent"; path: string; rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
+	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }
 	/**
 	 * A component on a board was pressed, and the board carries code for it.
