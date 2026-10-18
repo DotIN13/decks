@@ -1,0 +1,218 @@
+/**
+ * The editor on the page: its state (`core/model.ts`, `EditorState`) held in one signal, stepped
+ * by `core/gesture.ts`, with what each step asks for done here — ops sent (`onPenEdit`), the
+ * engine's preview, carry and settle said through the seam (`core/scene.ts`, `EngineSeam`), and
+ * every other effect run by `dom/effects.ts`.
+ *
+ * Each part of the state is handed out as its own memo, so what reads the selection is not
+ * touched by a pointer move that changes only the drag. The step keeps every part it does not
+ * change as the same value, which is what lets a memo see that nothing changed.
+ *
+ * The selection is this editor's. `state/pen-tools.ts` reads and writes it through
+ * `feedSelection`, so the drawing bar and the properties panel see the one selection the stage has.
+ */
+import { ids as penIds, type MediaItem, type Op, type PenDocument } from "@decks/pen";
+import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
+import { feedSelection } from "../../../state/pen-tools.ts";
+import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
+import type { BoardBox, DraftBox, EditorState, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
+import type { NextId } from "../core/ops.ts";
+import type { EngineSeam, SceneQuery } from "../core/scene.ts";
+import { createEffects, type EffectHost } from "./effects.ts";
+
+/** A board as the editor needs it from the app: where it is, its revision, and whether it is a slide deck. */
+export type HostBoard = { path: string; x: number; y: number; w: number; h: number; rev: number; format?: string | undefined; title?: string | undefined };
+
+export type EditorHost = {
+	scene: SceneQuery;
+	engine: EngineSeam;
+	mode: () => EditorState["mode"];
+	tool: () => PenTool;
+	zoom: () => number;
+	/** The window, in stage pixels. */
+	view: () => Rect;
+	nextIds: () => NextId;
+	boards: () => readonly HostBoard[];
+	onPenEdit: (ops: Op[]) => void;
+	/** The page's side of the effects, but for the three the controller does itself. */
+	effects: Omit<EffectHost, "settle" | "wake" | "awaitFrame" | "boards"> & { toggleMedia: (id: string, media: MediaItem) => void };
+};
+
+/** A pointer event as the editor takes it: at a stage point, with its keys, its kind and its time. */
+export function pointerInput(event: { clientX: number; clientY: number; shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean; pointerType?: string }, at: Pt): PointerInput {
+	const kind = event.pointerType;
+	return {
+		at,
+		client: { x: event.clientX, y: event.clientY },
+		mods: { shift: event.shiftKey, alt: event.altKey, meta: event.metaKey, ctrl: event.ctrlKey },
+		pointer: (kind === "touch" || kind === "pen" ? kind : "mouse") as PointerKind,
+		time: performance.now(),
+	};
+}
+
+export function createEditor(host: EditorHost) {
+	const [state, setState] = createSignal<EditorState>(initialState(untrack(host.mode), untrack(host.tool)));
+	const read = () => untrack(state);
+	const commit = (next: EditorState) => {
+		if (next !== read()) setState(next);
+	};
+
+	/** Resize steps waiting for the frame the sheet paints them in (`EngineSeam.mark`, `shows`). */
+	const frames: Array<{ mark: number; resize: ResizeBox }> = [];
+	const timers = new Set<ReturnType<typeof setTimeout>>();
+	onCleanup(() => {
+		for (const timer of timers) clearTimeout(timer);
+	});
+	/** The drawing generation: one more for every new drawing the engine draws. */
+	let generation = 0;
+	let lastDrawn: PenDocument | undefined;
+
+	const effects = createEffects({
+		...host.effects,
+		boards: host.boards,
+		settle: () => host.engine.settle(),
+		wake: (at) => {
+			const timer = setTimeout(() => {
+				timers.delete(timer);
+				dispatch({ type: "tick", time: at });
+			}, Math.max(0, at - performance.now()));
+			timers.add(timer);
+		},
+		awaitFrame: (resize) => frames.push({ mark: host.engine.mark(), resize }),
+	});
+
+	const context = (): GestureContext => ({
+		zoom: host.zoom(),
+		view: host.view(),
+		generation,
+		nextIds: host.nextIds,
+		boardRev: (path) => untrack(host.boards).find((board) => board.path === path)?.rev ?? 0,
+		linkAt: (point) => host.engine.linkAt(point),
+		overComposer: effects.overComposer,
+	});
+
+	/**
+	 * One input stepped. The state is in place before anything is said to the engine or the page,
+	 * so an engine that answers at once (a preview is laid out, and `drawn` comes, in the same call)
+	 * steps from the state this step left.
+	 */
+	const dispatch = (input: Input) => {
+		const result = step(read(), input, host.scene, untrack(context));
+		batch(() => commit(result.state));
+		if (result.preview !== undefined) host.engine.preview(result.preview ?? undefined);
+		if (result.ops.length) host.onPenEdit(result.ops);
+		for (const effect of result.effects) effects.run(effect);
+		// A resize let go of has no step left to wait for.
+		if (!read().resize) frames.length = 0;
+	};
+	const update = (change: (now: EditorState) => EditorState) => commit(change(read()));
+
+	// The mode and the tool are the app's and the drawing bar's: the state keeps a copy for the step to read.
+	createEffect(() => {
+		const mode = host.mode();
+		const tool = host.tool();
+		update((now) => (now.mode === mode && now.tool === tool ? now : { ...now, mode, tool }));
+	});
+	// Boards picked up that are no longer on the canvas are let go.
+	createEffect(() => {
+		const present = new Set(host.boards().map((board) => board.path));
+		update((now) => pruneBoards(now, present));
+	});
+
+	const part = <T>(pick: (now: EditorState) => T): Accessor<T> => createMemo(() => pick(state()));
+	const items = part((now) => now.selection.items);
+	const boardPicks = part((now) => now.selection.boards);
+	const boardResize = part((now) => now.boardResize);
+	const boardDrag = part((now) => now.boardDrag);
+	const ownDrag = part((now) => now.ownDrag);
+
+	/*
+	 * A board size let go of is held until the board is at it (`landBoardResize`): asked again
+	 * whenever the boards change, and once as it is let go.
+	 */
+	createEffect(() => {
+		const held = boardResize();
+		if (!held?.released) return;
+		const board = host.boards().find((candidate) => candidate.path === held.path);
+		update((now) => landBoardResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev, ...(board.format === "slides" ? { slides: true } : {}) } : undefined));
+	});
+	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
+	createEffect(() => {
+		const drag = boardDrag();
+		const held = ownDrag();
+		const board = held ? host.boards().find((one) => one.path === held.path) : undefined;
+		const moving = drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
+		// The boards' pictures are the engine's, and go with the drag there.
+		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
+	});
+
+	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
+	onCleanup(feedSelection({ items, select: (next) => select(next) }));
+
+	return {
+		state,
+		items,
+		boardPicks,
+		hoverItem: part((now) => now.hover.item),
+		hoverBoard: part((now) => now.hover.board),
+		hoverPicture: part((now) => now.hover.picture),
+		hoverBlock: part((now) => now.hover.block),
+		overLink: part((now) => now.hover.link),
+		gesture: part((now) => now.gesture),
+		drag: part((now) => now.drag),
+		shownDrag: part(shownDrag),
+		boardDrag,
+		ownDrag,
+		resize: part((now) => now.resize),
+		shownResize: part((now) => now.shownResize),
+		boardResize,
+		radius: part((now) => now.radius),
+		marquee: part((now) => now.marquee),
+		guides: part((now) => now.guides),
+		dropInto: part((now) => now.drop.into),
+		dropSlot: part((now) => now.drop.slot),
+		joins: part((now) => now.joins),
+		sides: part((now) => now.sides),
+		draft: part((now) => now.draft),
+		endDraft: part((now) => now.endDraft),
+		route: part((now) => now.route),
+
+		/** Step one input; true when it left a gesture in hand, for the page to follow the pointer. */
+		input: (input: Input): boolean => {
+			dispatch(input);
+			return !!read().gesture;
+		},
+		select,
+		pickBoards: (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { boards: typeof next === "function" ? next(now.selection.boards) : next })),
+		/** Select what was just asked for, which the drawing does not have until the server answers. */
+		selectMade: (made: readonly string[]) => update((now) => selectMade(now, made)),
+		hover: (next: Partial<EditorState["hover"]>) =>
+			update((now) => ((Object.keys(next) as Array<keyof EditorState["hover"]>).every((key) => now.hover[key] === next[key]) ? now : { ...now, hover: { ...now.hover, ...next } })),
+		setOwnDrag: (at: EditorState["ownDrag"]) => update((now) => (now.ownDrag === at ? now : { ...now, ownDrag: at })),
+		setDraft: (draft: DraftBox | undefined) => update((now) => (now.draft === draft ? now : { ...now, draft })),
+		setHints: (hints: { joins?: readonly Rect[]; sides?: readonly SideHintBox[] }) => update((now) => ({ ...now, ...(hints.joins ? { joins: hints.joins } : {}), ...(hints.sides ? { sides: hints.sides } : {}) })),
+
+		/**
+		 * The engine laid the drawing out (`drawnDoc`), the page having `current`: a new drawing is
+		 * one more generation, and the one that answers a gesture puts its preview down.
+		 */
+		drawn: (drawnDoc: PenDocument | undefined, current: PenDocument | undefined) => {
+			const fresh = drawnDoc !== lastDrawn;
+			lastDrawn = drawnDoc;
+			if (fresh) generation++;
+			const doc = drawnDoc ?? current;
+			dispatch({ type: "drawn", fresh, current: fresh && drawnDoc === current, present: doc ? penIds(doc) : new Set<string>() });
+		},
+		/** The sheet put a frame on screen: the resize steps it painted are what the outline follows. */
+		presented: () => {
+			let painted: ResizeBox | undefined;
+			while (frames.length && host.engine.shows(frames[0]!.mark)) painted = frames.shift()!.resize;
+			if (painted && read().resize) dispatch({ type: "frame", resize: painted });
+		},
+		carryPending: (pending: boolean) => dispatch({ type: "carry-pending", pending }),
+		openLink: effects.openLink,
+	};
+}
+
+export type Editor = ReturnType<typeof createEditor>;
+export type { BoardBox };

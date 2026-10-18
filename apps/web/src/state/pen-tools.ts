@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, untrack, type Accessor } from "solid-js";
 import type { PenTool } from "../canvas/editor/core/model.ts";
 
 /**
@@ -15,8 +15,27 @@ export type { PenTool };
 export { PEN_TOOL_KEYS } from "../canvas/editor/core/model.ts";
 
 const [penTool, setPenTool] = createSignal<PenTool>("select");
-/** Ids of the selected items, in the order they were picked. */
-const [penSelection, setPenSelection] = createSignal<readonly string[]>([]);
+/**
+ * Ids of the selected items, in the order they were picked: the stage's editor's selection
+ * (`canvas/editor/dom/controller.ts`), which feeds itself in here with `feedSelection`. With no
+ * stage up, a selection of its own that nothing draws.
+ */
+type SelectionSource = { items: Accessor<readonly string[]>; select: (items: readonly string[]) => void };
+const [selectionSource, setSelectionSource] = createSignal<SelectionSource | undefined>();
+const [looseSelection, setLooseSelection] = createSignal<readonly string[]>([]);
+const penSelection = (): readonly string[] => selectionSource()?.items() ?? looseSelection();
+const setPenSelection = (items: readonly string[]) => {
+	const source = untrack(selectionSource);
+	if (source) source.select(items);
+	else setLooseSelection(items);
+};
+/** The editor's selection, read and written here from now on; the function given back hands it back. */
+export function feedSelection(source: SelectionSource): () => void {
+	setSelectionSource(() => source);
+	return () => {
+		if (untrack(selectionSource) === source) setSelectionSource(undefined);
+	};
+}
 /** Whether a card is open for typing, or on a phone any words (`Stage.tsx`): the properties panel stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
 /**

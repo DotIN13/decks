@@ -1,0 +1,200 @@
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 3381-3447: hover, block hover, dragBlock. Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	let hoverFrame: number | undefined;
+	let hoverAt: { x: number; y: number } | undefined;
+	let hoverPoint: { clientX: number; clientY: number } | undefined;
+	/** The board under the pointer that has no node to say so (`pictureUnder`). */
+	const [pictureHover, setPictureHover] = createSignal<string | undefined>();
+	const onHover = (event: PointerEvent) => {
+		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
+		// The pointer on a block's grip keeps the grip, and the block it belongs to.
+		if ((event.target as Element | null)?.closest?.(".pen-grip")) return;
+		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
+			hoverAt = undefined;
+			if (blockHover() && event.buttons === 0) setBlockHover(undefined);
+			if (hoverId()) setHoverId(undefined);
+			if (pictureHover()) setPictureHover(undefined);
+			if (overLink()) setOverLink(false);
+			return;
+		}
+		hoverAt = worldAt(event);
+		hoverPoint = { clientX: event.clientX, clientY: event.clientY };
+		hoverFrame ??= requestAnimationFrame(() => {
+			hoverFrame = undefined;
+			const href = hoverAt ? penLayer.linkAt(hoverAt) : undefined;
+			setOverLink(!!href && props.mode === "browse");
+			setBlockHover(hoverAt ? blockUnder(hoverAt) : undefined);
+			// The outline is edit mode's; browsing shows only the hand over a link.
+			if (props.mode !== "edit") return;
+			const hit = hoverAt ? pickAt(hoverAt) : undefined;
+			setHoverId(hit && !penSelection().includes(hit.id) ? hit.id : undefined);
+			// A board with no node says nothing when the pointer is over it, so the stage asks.
+			setPictureHover(!hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined);
+		});
+	};
+	onCleanup(() => {
+		if (hoverFrame !== undefined) cancelAnimationFrame(hoverFrame);
+	});
+	/**
+	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
+	 * level with it. Not while the card is open for typing, which has its own way of moving things.
+	 */
+	const blockUnder = (at: { x: number; y: number }): string | undefined => blockAt(scene, at, penText()?.id);
+	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
+	const gripBox = createMemo(() => {
+		penDrawn();
+		return gripBoxOf({ block: blockHover(), busy: !!boardDrag() || panning() }, scene, (id, node) => {
+			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
+			const look = textLookOf(node, penLayer.placed.get(id));
+			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
+		});
+	});
+	/** A press on a block's grip picks the block up and carries it, into another place in the card or out of it. */
+	const dragBlock = (event: PointerEvent, id: string) => {
+		event.preventDefault();
+		event.stopPropagation();
+		props.onSelect(undefined);
+		setBoardPicks([]);
+		setPenSelection([id]);
+		dragSelection(event, [id], [], event.currentTarget as HTMLElement);
+	};
+
+	/** The hovered item's box as it is drawn now, or the board under the pointer. */
+	const hoverBox = createMemo(() => {
+		penDrawn();
+		return hoverBoxOf(
+			{ editing: props.mode === "edit", item: hoverId(), typing: penText()?.id, board: hoverBoard() ?? pictureHover(), selected: props.selected, busy: !!boardDrag() || panning(), boards: scene.boards() },
+			scene,
+		);
+	});
+
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 3489-3618: touchOnDrawing. Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
+	let lastTap: { id: string; at: number } | undefined;
+	/**
+	 * A finger on the drawing. On an item already selected it moves the selection (the finger is
+	 * claimed, so the camera stays put); anywhere else it is a pan unless it lifts where it landed,
+	 * which is a tap: the item is selected, and a second tap on words opens them for typing.
+	 */
+	const touchOnDrawing = (event: PointerEvent) => {
+		const at = worldAt(event);
+		const hit = pickAt(at);
+		if (!hit) return;
+		const pointer = event.pointerId;
+		const from = { x: event.clientX, y: event.clientY };
+		const since = performance.now();
+		const selected = penSelection();
+		const carrying = selected.includes(hit.id);
+		if (carrying) claimed.add(pointer);
+		let offset = { dx: 0, dy: 0 };
+		let moved = false;
+		const done = () => {
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", cancel);
+		};
+		const abandon = () => {
+			done();
+			ghostDrop();
+			setDropInto(undefined);
+			setDropAt(undefined);
+			if (moved && carrying) {
+				penLayer.preview(undefined);
+				setPenDrag({ dx: 0, dy: 0 });
+				setBoardDrag(undefined);
+			}
+		};
+		const move = (e: PointerEvent) => {
+			if (e.pointerId !== pointer) return;
+			// A second finger: this was the start of a pinch, and whatever it carried goes back.
+			if (touches.count() > 1) return abandon();
+			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 10) return;
+			// The ghost's picture is cut as the finger picks the items up, before they leave the sheet.
+			if (!moved && carrying) ghostTake(selected);
+			moved = true;
+			if (!carrying) return;
+			offset = { dx: (e.clientX - from.x) / localCamera.zoom, dy: (e.clientY - from.y) / localCamera.zoom };
+			// What it would drop into, as a mouse's drag asks (`dragSelection`): over a card, a ghost beside the finger.
+			const now = worldAt(e);
+			const onto = frameUnder(now, selected);
+			setDropInto(onto);
+			setDropAt(onto ? dropSlot(onto, now, selected) : undefined);
+			const start = onto && isCard(penNode(onto)) ? selectionBox(selected, []) : undefined;
+			if (start) {
+				// A finger hides what is under it, so the ghost goes further from it than a pointer's does.
+				const gap = 28 / localCamera.zoom;
+				offset = { dx: now.x + gap - start.x, dy: now.y + gap - start.y };
+			}
+			ghostShow(!!start, { x: e.clientX, y: e.clientY }, 28);
+			batch(() => {
+				setPenDrag(offset);
+				if (boardPicks().length) setBoardDrag({ paths: boardPicks(), ...offset });
+			});
+			penLayer.preview(new Map(selected.map((id) => [id, offset])));
+		};
+		const up = (e: PointerEvent) => {
+			if (e.pointerId !== pointer) return;
+			done();
+			if (moved) {
+				ghostDrop();
+				const into = dropInto();
+				const slot = dropAt()?.index;
+				batch(() => {
+					setDropInto(undefined);
+					setDropAt(undefined);
+				});
+				if (carrying)
+					batch(() => {
+						penMoveBy(selected, offset.dx, offset.dy, into, slot);
+						if (selected.length) settleGesture();
+						moveBoards(boardPicks(), offset.dx, offset.dy);
+						setBoardDrag(undefined);
+					});
+				return;
+			}
+			if (performance.now() - since > 600) return;
+			const deep = pickAt(at, { deep: true });
+			// A film or a sound: a tap plays it or pauses it, and selects it as any tap does.
+			const playable = deep && mediaOf(deep.node) ? deep : mediaOf(hit.node) ? hit : undefined;
+			const media = playable ? mediaOf(playable.node) : undefined;
+			if (playable && media) {
+				lastTap = undefined;
+				toggleMedia(playable.id, media);
+				props.onSelect(undefined);
+				setBoardPicks([]);
+				setPenSelection([hit.id]);
+				return;
+			}
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (openLiveFile(deep.id) || openFileOf(deep.id))) {
+				lastTap = undefined;
+				return;
+			}
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (deep.node.type !== "rectangle" || !cardOf(deep.id)) && openCardAt(deep, at, { x: e.clientX, y: e.clientY })) {
+				lastTap = undefined;
+				return;
+			}
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (TEXTY.has(deep.node.type) || shapeOf(deep.id))) {
+				lastTap = undefined;
+				const shape = shapeOf(deep.id);
+				if (shape && !TEXTY.has(deep.node.type)) openShapeWords(shape);
+				else openPenText(deep);
+				return;
+			}
+			const href = props.mode === "browse" ? penLayer.linkAt(at) : undefined;
+			if (href) return openLink(href);
+			lastTap = { id: hit.id, at: performance.now() };
+			// A second tap on the one thing selected asks for its properties: on a phone, the sheet.
+			if (selected.length === 1 && selected[0] === hit.id) {
+				setPenSheet(true);
+				return;
+			}
+			props.onSelect(undefined);
+			setBoardPicks([]);
+			setPenSelection([hit.id]);
+		};
+		const cancel = (e: PointerEvent) => {
+			if (e.pointerId === pointer) abandon();
+		};
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+		window.addEventListener("pointercancel", cancel);
+	};

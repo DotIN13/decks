@@ -1,0 +1,131 @@
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 2249-2378: arrow end and bend drags. Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	/** What an arrow's end joins at a point (`editor/core/arrows.ts`), at the camera's zoom. */
+	const joinAt = (point: { x: number; y: number }, not?: string): Join | undefined => joinAtIn(scene, point, { zoom: localCamera.zoom, not });
+
+	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
+	const arrowEnds = createMemo(() => {
+		penDrawn();
+		return arrowEndsOf({ selection: penSelection(), boardPicks: boardPicks(), drag: shownDrag() }, scene);
+	});
+	/** A new route for an arrow, drawn dashed while one of its handles is dragged (`dragArrowEnd`, `dragArrowBend`). */
+	const [routeDraft, setRouteDraft] = createSignal<string | undefined>();
+	const [routeDraftAt, setRouteDraftAt] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
+	const showRouteDraft = (draft: RouteDraft | undefined) => {
+		setRouteDraft(draft?.d);
+		if (draft) setRouteDraftAt({ x: draft.x, y: draft.y });
+	};
+
+	/**
+	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
+	 * follows it from then on; on bare canvas it stays at that point. What it would join lights up
+	 * while it is carried, as it does while the arrow is drawn.
+	 */
+	const dragArrowEnd = (event: PointerEvent, which: "from" | "to") => {
+		const ends = arrowEnds();
+		if (event.button !== 0 || !ends) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const node = penNode(ends.id);
+		if (!node?.metadata) return;
+		const stays = which === "from" ? ends.to : ends.from;
+		const own = which === "from" ? ends.fromJoin : ends.toJoin;
+		/* Along the side the end joins, the drag slides the join; away from it, it picks the end up. */
+		let slid: { item: string; side: ArrowSide; at: number } | undefined;
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				slid = slideJoin(own, now, { zoom: localCamera.zoom, free: e.altKey });
+				if (slid) {
+					const draft = routeDraftIn(scene, withEnd(node.metadata!, which, slid), node);
+					batch(() => {
+						setEndDraft(undefined);
+						setJoinHint([own!.box]);
+						setSideHint([]);
+						showRouteDraft(draft);
+					});
+					return;
+				}
+				setRouteDraft(undefined);
+				const join = joinAt(now, ends.id);
+				batch(() => {
+					setEndDraft(which === "from" ? { x1: now.x, y1: now.y, x2: stays.x, y2: stays.y } : { x1: stays.x, y1: stays.y, x2: now.x, y2: now.y });
+					setJoinHint(join ? [join.box] : []);
+					setSideHint(join ? [{ box: join.box, ...(join.side ? { side: join.side } : {}) }] : []);
+				});
+			},
+			(moved, e) => {
+				batch(() => {
+					setEndDraft(undefined);
+					setJoinHint([]);
+					setSideHint([]);
+					setRouteDraft(undefined);
+				});
+				if (!moved) {
+					if (secondTap(`end:${ends.id}:${which}`)) resetArrowEnd(which);
+					return;
+				}
+				const end = slid ?? droppedEnd(scene, ends.id, node.metadata!, which, worldAt(e), localCamera.zoom);
+				penEdit([arrowOp(ends.id, withEnd(node.metadata!, which, end))]);
+			},
+		);
+	};
+
+	/**
+	 * A second press on the same handle, without a drag, within 400 ms: a handle's double-click. Told
+	 * from its pointer events rather than from `dblclick`, which a handle that captures the pointer
+	 * and is drawn again in between does not reliably get.
+	 */
+	let handleTap: { key: string; at: number } | undefined;
+	const secondTap = (key: string) => {
+		const now = performance.now();
+		const again = handleTap?.key === key && now - handleTap.at < 400;
+		handleTap = again ? undefined : { key, at: now };
+		return again;
+	};
+	/** A double-click on a joined end: the join goes back to the middle of its side, the automatic place. */
+	const resetArrowEnd = (which: "from" | "to") => {
+		const ends = arrowEnds();
+		const op = ends ? resetEndOp(ends.id, penNode(ends.id)?.metadata, which) : undefined;
+		if (op) penEdit([op]);
+	};
+
+	/**
+	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run, a
+	 * curve's middle is pulled, and a straight line pulled there becomes a curve (`bendAt`). A
+	 * double-click puts it back on the automatic route.
+	 */
+	const dragArrowBend = (event: PointerEvent) => {
+		const ends = arrowEnds();
+		if (event.button !== 0 || !ends?.middle) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const node = penNode(ends.id);
+		if (!node?.metadata) return;
+		const route = ends.route;
+		const start = bendStart(scene, node.metadata as Record<string, unknown>);
+		if (!start) return;
+		let next: Record<string, unknown> | undefined;
+		follow(
+			event,
+			(e) => {
+				next = bendAt(start, route, worldAt(e));
+				const draft = routeDraftIn(scene, next, node);
+				batch(() => showRouteDraft(draft));
+			},
+			(moved) => {
+				setRouteDraft(undefined);
+				if (!moved) {
+					if (secondTap(`bend:${ends.id}`)) resetArrowBend();
+					return;
+				}
+				if (!next) return;
+				penEdit([arrowOp(ends.id, next)]);
+			},
+		);
+	};
+	const resetArrowBend = () => {
+		const ends = arrowEnds();
+		const op = ends ? resetBendOp(ends.id, penNode(ends.id)?.metadata) : undefined;
+		if (op) penEdit([op]);
+	};

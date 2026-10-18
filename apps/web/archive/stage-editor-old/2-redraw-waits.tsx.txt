@@ -1,0 +1,92 @@
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 1185-1213: the radius held until saved. Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	const [penRadius, setPenRadius] = createSignal<{ id: string; radius: number; done?: true } | undefined>();
+	/*
+	 * It is let go of when the drawing comes back with the change in it, not when the hand lifts.
+	 * The sheet's own preview works that way already; the outline and the handles are drawn from
+	 * these, and dropping them first shows the item upright for the frame or two the save takes.
+	 * The timeout is for an edit that is refused, which would otherwise leave the handles turned for
+	 * an item that is not.
+	 */
+	createEffect(() => {
+		penDrawn();
+		const rounding = penRadius();
+		if (!rounding?.done) return;
+		untrack(() => {
+			{
+				const node = penNode(rounding.id);
+				const now = node ? (shapeRadius(node) ?? (typeof node.cornerRadius === "number" ? node.cornerRadius : 0)) : undefined;
+				if (now !== undefined && Math.round(now) === Math.round(rounding.radius)) setPenRadius(undefined);
+			}
+		});
+	});
+	let letGo: ReturnType<typeof setTimeout> | undefined;
+	/** Hold the live radius until the drawing has it, and never longer than this. */
+	const holdUntilSaved = () => {
+		clearTimeout(letGo);
+		letGo = setTimeout(() => {
+			if (penRadius()?.done) setPenRadius(undefined);
+		}, 3000);
+	};
+	onCleanup(() => clearTimeout(letGo));
+
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 1279-1338: afterFrame and the presented handler (resize steps). Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	let editorGhost: HTMLElement | undefined;
+	/** What waits for the next frame the sheet shows: a deleted item's outline goes with the item. */
+	const afterFrame: Array<{ mark: number; run: () => void }> = [];
+	/** The copy goes with the first frame painted after the canvas heard it may draw the words (`layer.ts`, `mark`). */
+	let ghostUntil: number | undefined;
+	const leaveGhost = () => {
+		dropGhost();
+		const live = worldEl?.querySelector<HTMLElement>(":scope > .pen-text");
+		if (!live) return;
+		const copy = live.cloneNode(true) as HTMLElement;
+		if (live instanceof HTMLTextAreaElement) (copy as HTMLTextAreaElement).value = live.value;
+		// Only the words and what holds them: not the card's style bar, the caret, or the focus ring.
+		for (const extra of copy.querySelectorAll(".pce-bar, [data-editorGhost-skip]")) extra.remove();
+		copy.removeAttribute("id");
+		copy.setAttribute("aria-hidden", "true");
+		copy.setAttribute("tabindex", "-1");
+		copy.querySelectorAll("[contenteditable]").forEach((el) => el.setAttribute("contenteditable", "false"));
+		if (copy.hasAttribute("contenteditable")) copy.setAttribute("contenteditable", "false");
+		copy.style.pointerEvents = "none";
+		copy.style.boxShadow = "none";
+		copy.style.caretColor = "transparent";
+		copy.classList.add("pen-editorGhost");
+		live.after(copy);
+		editorGhost = copy;
+		ghostUntil = undefined;
+		// Never left standing: a sheet that paints nothing for a second has had its chance.
+		const left = copy;
+		setTimeout(() => {
+			if (editorGhost === left && ghostUntil !== undefined) dropGhost();
+		}, 1000);
+	};
+	const dropGhost = () => {
+		editorGhost?.remove();
+		editorGhost = undefined;
+		ghostUntil = undefined;
+	};
+	{
+		const before = penLayer.presented;
+		penLayer.presented = () => {
+			before?.();
+			if (ghostUntil !== undefined && penLayer.shows(ghostUntil)) dropGhost();
+			if (holesAsked && penLayer.shows(holesAsked.mark)) {
+				setHolesShown(holesAsked.ids);
+				holesAsked = undefined;
+			}
+			let drawnStep: (typeof resizeSteps)[number] | undefined;
+			while (resizeSteps.length && penLayer.shows(resizeSteps[0]!.mark)) drawnStep = resizeSteps.shift();
+			if (drawnStep && penResize()) setShownResize(drawnStep.resize);
+			if (draftFor && penLayer.placed.has(draftFor)) {
+				draftFor = undefined;
+				setPenDraft(undefined);
+			}
+			for (let k = afterFrame.length - 1; k >= 0; k--) {
+				const wait = afterFrame[k]!;
+				if (!penLayer.shows(wait.mark)) continue;
+				afterFrame.splice(k, 1);
+				wait.run();
+			}
+		};
+	}

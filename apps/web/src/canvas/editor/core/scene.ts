@@ -36,3 +36,25 @@ export interface SceneQuery {
 	 */
 	onLine(id: string, point: Pt): boolean | undefined;
 }
+
+/** How a gesture shows an item before the edit lands: moved, sized, rounded or with fields changed. */
+export type PreviewChange = { dx: number; dy: number; w?: number; h?: number; radius?: number | null; set?: Record<string, unknown> };
+
+/**
+ * The other half of the seam: what the editor tells the engine while a gesture is in hand. Core
+ * never calls it; it returns what to show (`core/gesture.ts`, `preview`, `Effect`) and the
+ * controller (`dom/controller.ts`) says it here.
+ */
+export interface EngineSeam {
+	/** Draw these items lifted and changed until the next drawing; `undefined` puts them back. */
+	preview(changes: ReadonlyMap<string, PreviewChange> | undefined): void;
+	/** A gesture was let go and its edit sent: what it lifted goes down when the answer is drawn. */
+	settle(): void;
+	/** The boards a drag carries, and how far: their pictures go with it. */
+	carry(paths: readonly string[], offset: { dx: number; dy: number }): void;
+	/** A mark for what has been sent so far, and whether a frame painted after it is on screen. */
+	mark(): number;
+	shows(mark: number): boolean;
+	/** The link of a card under a stage point. */
+	linkAt(point: Pt): string | undefined;
+}

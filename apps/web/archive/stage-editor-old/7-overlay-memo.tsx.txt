@@ -1,0 +1,33 @@
+// Archived verbatim from apps/web/src/canvas/Stage.tsx at 394059b, lines 4319-4350: the overlay memo. Reference only: not compiled, not imported; deleted at the end of the editor refactor.
+	/** What agents just drew on this stage, outlined in their colours. */
+	const drawActs = createMemo(() => Object.values(props.acts ?? {}).filter((act): act is AgentAct => !!act && act.what === "draw" && act.path === stagePenPath()));
+	/** A dragged arrow handle's dashed route, where it sits. */
+	const routeShown = createMemo(() => {
+		const d = routeDraft();
+		return d === undefined ? undefined : { d, ...routeDraftAt() };
+	});
+	/**
+	 * Everything the editor draws over the canvas (`editor/core/overlay.ts`), for `OverlayLayer`. Each
+	 * part keeps its own memo above, read here, so a part that has not changed hands the layer the
+	 * same value and nothing it draws is touched.
+	 */
+	const overlay = createMemo<Overlay>(() => ({
+		outlines: penOutlines(),
+		handles: penHandles(),
+		anchors: penAnchors(),
+		boardHandles: boardHandles(),
+		radius: radiusHandle(),
+		radiusDrag: penRadius(),
+		arrow: arrowEnds(),
+		hover: hoverBox(),
+		grip: gripBox(),
+		gripHidden: gripHidden(penDrag(), !!penResize()),
+		drop: dropBox(),
+		insert: dropAt()?.line,
+		joins: joinHint(),
+		sides: sideHint(),
+		guides: guides(),
+		draft: penDraft(),
+		route: routeShown(),
+		endDraft: endDraft(),
+	}));
