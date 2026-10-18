@@ -1,7 +1,7 @@
-import { readdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import { boardFolders, inBoardFolder } from "./stage-boards.ts";
 import { isBoardFile } from "./kinds.ts";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";
 
 export type DeckChange =
@@ -96,6 +96,16 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 		for (const folder of boardFolders(root)) walk(join(root, folder), folder);
 	};
 
+	// The deck's own folder, which a Mac names by its last segment, as if it were inside itself.
+	const isRootItself = (path: string): boolean => path === basename(root) && !existsSync(join(root, path));
+	const isFolder = (path: string): boolean => {
+		try {
+			return statSync(join(root, path)).isDirectory();
+		} catch {
+			return false;
+		}
+	};
+
 	/** True when this path is not the file it was — replaced, or gone. Unknown paths are not news. */
 	const replaced = (path: string): boolean => {
 		let inode = 0;
@@ -117,6 +127,10 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 			setTimeout(() => {
 				pending.delete(path);
 				if (replaced(path)) rearm();
+				// On a Mac the watcher also names the folders whose contents changed (and the deck's
+				// own folder); they are not files anyone edited, and reporting one as an asset sent a
+				// change for `boards` with every board save.
+				if (isFolder(path) || isRootItself(path)) return;
 				if (path === "deck.json") onChange({ kind: "deck" });
 				// Every format the loader lists, so a saved `.md` reloads its frame like a `.html`.
 				else if (inBoardFolder(path) && isBoardFile(path)) onChange({ kind: "board", path });

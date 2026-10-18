@@ -26,6 +26,28 @@ async function until(changes: DeckChange[], done: (seen: DeckChange[]) => boolea
 	return done(changes);
 }
 
+/**
+ * Start watching and wait until the watcher is really listening.
+ *
+ * On a Mac the watch is live a moment after `watch()` returns, and a write in that moment is
+ * never reported at all: under load (other suites running) that window grew past the 4 s the
+ * checks wait, so the first write in a test was lost and the test timed out. A probe file is
+ * written until it is heard, then forgotten, so each check starts on a watcher that hears.
+ */
+async function watching(root: string, changes: DeckChange[]): Promise<() => void> {
+	const stop = watchDeck(root, (change) => changes.push(change), 20);
+	const probe = join(root, "probe.txt");
+	const deadline = Date.now() + 10_000;
+	for (let n = 0; Date.now() < deadline && changes.length === 0; n++) {
+		writeFileSync(probe, String(n));
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	// Let the probe's last write be reported before forgetting it; the file stays, unwritten.
+	await new Promise((resolve) => setTimeout(resolve, 250));
+	changes.length = 0;
+	return stop;
+}
+
 const boards = (changes: DeckChange[]) => changes.filter((c) => c.kind === "board").map((c) => c.path);
 
 test("an in-place write to a board is reported as that board", async () => {
@@ -34,7 +56,7 @@ test("an in-place write to a board is reported as that board", async () => {
 	writeFileSync(file, board(800));
 
 	const changes: DeckChange[] = [];
-	const stop = watchDeck(root, (change) => changes.push(change), 20);
+	const stop = await watching(root, changes);
 	try {
 		writeFileSync(file, board(860));
 		assert.ok(await until(changes, (seen) => boards(seen).includes("boards/a.html")));
@@ -58,7 +80,7 @@ test("a board is still heard after a rename replaces its file", async () => {
 	writeFileSync(file, board(800));
 
 	const changes: DeckChange[] = [];
-	const stop = watchDeck(root, (change) => changes.push(change), 20);
+	const stop = await watching(root, changes);
 	try {
 		const temp = join(root, "boards", ".tmp-a");
 		writeFileSync(temp, board(860));
@@ -82,7 +104,7 @@ test("the revision store is not watched, or every save would loop", async () => 
 	mkdirSync(join(root, ".decks", "revisions"), { recursive: true });
 
 	const changes: DeckChange[] = [];
-	const stop = watchDeck(root, (change) => changes.push(change), 20);
+	const stop = await watching(root, changes);
 	try {
 		writeFileSync(join(root, ".decks", "revisions", "index.json"), "{}");
 		writeFileSync(join(root, "boards", "b.html"), board(800));
