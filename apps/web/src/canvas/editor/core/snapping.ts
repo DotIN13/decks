@@ -7,7 +7,7 @@ import type { Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
 /** Snapping reaches this many screen pixels, whatever the zoom. */
-export const SNAP_PX = 6;
+export const SNAP_PX = 5;
 
 /**
  * The items around a selection and the boards, as far as `view` (the window, in stage pixels)
@@ -29,6 +29,19 @@ export function snapTargets(scene: SceneQuery, ids: readonly string[], boards: r
 	}
 	for (const board of scene.boards()) if (!boards.includes(board.path) && seen(board)) out.push({ x: board.x, y: board.y, w: board.w, h: board.h });
 	return out;
+}
+
+/**
+ * The boards a drag of boards alone keeps the reading gap from (`snap.ts`, `READING_GAP`): every
+ * other board the window shows. None when drawn items are carried too.
+ */
+export function readingTargets(scene: SceneQuery, ids: readonly string[], boards: readonly string[], view: Rect): Rect[] {
+	if (ids.length || !boards.length) return [];
+	const seen = (box: Rect) => box.x < view.x + view.w && box.x + box.w > view.x && box.y < view.y + view.h && box.y + box.h > view.y;
+	return scene
+		.boards()
+		.filter((board) => !boards.includes(board.path) && seen(board))
+		.map((board) => ({ x: board.x, y: board.y, w: board.w, h: board.h }));
 }
 
 /** The box round everything in a selection: items as drawn, boards as placed. */

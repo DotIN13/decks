@@ -14,14 +14,23 @@ export interface Box {
 	h: number;
 }
 
-/** A line to draw: an alignment (`kind: "line"`) or one measured gap between two boxes (`"gap"`). */
+/**
+ * A line to draw: an alignment (`kind: "line"`) or one measured gap between two boxes (`"gap"`).
+ * An alignment carries the points on it that line up (`points`), each marked with a ✕; a gap that
+ * is the reading gap between two boards says its size (`label`).
+ */
 export interface Guide {
 	kind: "line" | "gap";
 	x1: number;
 	y1: number;
 	x2: number;
 	y2: number;
+	points?: { x: number; y: number }[];
+	label?: string;
 }
+
+/** The gap a board keeps from the next one, beside it or above or below it, for reading them in order. */
+export const READING_GAP = 160;
 
 const lines = (b: Box, axis: "x" | "y") => (axis === "x" ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h]);
 const start = (b: Box, axis: "x" | "y") => (axis === "x" ? b.x : b.y);
@@ -33,11 +42,16 @@ const overlaps = (a: Box, b: Box, axis: "x" | "y") => start(a, cross(axis)) < en
 const EPS = 0.5;
 
 /** The smallest correction along one axis that lines `moving` up with a target or an equal gap. */
-function bestShift(moving: Box, targets: readonly Box[], axis: "x" | "y", threshold: number): number | undefined {
+function bestShift(moving: Box, targets: readonly Box[], axis: "x" | "y", threshold: number, reading: readonly Box[] = []): number | undefined {
 	let best: number | undefined;
 	const offer = (shift: number) => {
 		if (Math.abs(shift) <= threshold && (best === undefined || Math.abs(shift) < Math.abs(best))) best = shift;
 	};
+	// The reading gap: a board settles `READING_GAP` beside, above or below another.
+	for (const board of reading) {
+		offer(end(board, axis) + READING_GAP - start(moving, axis));
+		offer(start(board, axis) - READING_GAP - end(moving, axis));
+	}
 	const mine = lines(moving, axis);
 	for (const target of targets) for (const t of lines(target, axis)) for (const m of mine) offer(t - m);
 	// Equal gaps: beside a pair keeping a gap, or centred between two.
@@ -64,7 +78,7 @@ function guidesFor(moving: Box, targets: readonly Box[], axis: "x" | "y"): Guide
 		if (hits.length === 0) continue;
 		const lo = Math.min(start(moving, other), ...hits.map((t) => start(t, other)));
 		const hi = Math.max(end(moving, other), ...hits.map((t) => end(t, other)));
-		out.push(axis === "x" ? { kind: "line", x1: m, y1: lo, x2: m, y2: hi } : { kind: "line", x1: lo, y1: m, x2: hi, y2: m });
+		out.push(axis === "x" ? { kind: "line", x1: m, y1: lo, x2: m, y2: hi, points: pointsOn(m, [moving, ...hits], axis) } : { kind: "line", x1: lo, y1: m, x2: hi, y2: m, points: pointsOn(m, [moving, ...hits], axis) });
 	}
 	const row = targets.filter((t) => overlaps(t, moving, axis));
 	const gapLine = (from: number, to: number, a: Box, b: Box): Guide => {
@@ -91,12 +105,58 @@ function guidesFor(moving: Box, targets: readonly Box[], axis: "x" | "y"): Guide
 	return out;
 }
 
-/** Snap a moved box: the correction to add to the move, and the guides to draw where it lands. */
-export function snapMove(moving: Box, targets: readonly Box[], threshold: number): { dx: number; dy: number; guides: Guide[] } {
-	const dx = bestShift(moving, targets, "x", threshold) ?? 0;
-	const dy = bestShift(moving, targets, "y", threshold) ?? 0;
+/**
+ * The points on an alignment at `at` that line up: each box's edges and middle along the line,
+ * where the box has an edge or its middle on it. Each is marked with a ✕.
+ */
+function pointsOn(at: number, boxes: readonly Box[], axis: "x" | "y"): { x: number; y: number }[] {
+	const other = cross(axis);
+	const out: { x: number; y: number }[] = [];
+	const seen = new Set<string>();
+	for (const box of boxes) {
+		if (!lines(box, axis).some((v) => Math.abs(v - at) < EPS)) continue;
+		for (const v of lines(box, other)) {
+			const point = axis === "x" ? { x: at, y: v } : { x: v, y: at };
+			const key = `${Math.round(point.x * 100)},${Math.round(point.y * 100)}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			out.push(point);
+		}
+	}
+	return out;
+}
+
+/**
+ * The reading gaps a board in place keeps: `READING_GAP` from another board beside it, above it or
+ * below it, drawn across the gap with its size. Level with the middle of what the two share, or
+ * with the moving board's middle when they share nothing.
+ */
+function readingGuides(moving: Box, boards: readonly Box[]): Guide[] {
+	const out: Guide[] = [];
+	for (const board of boards) {
+		for (const axis of ["x", "y"] as const) {
+			const other = cross(axis);
+			const after = Math.abs(start(moving, axis) - end(board, axis) - READING_GAP) < EPS;
+			const before = Math.abs(start(board, axis) - end(moving, axis) - READING_GAP) < EPS;
+			if (!after && !before) continue;
+			const [from, to] = after ? [end(board, axis), start(moving, axis)] : [end(moving, axis), start(board, axis)];
+			const shared = overlaps(moving, board, axis);
+			const mid = shared ? (Math.max(start(moving, other), start(board, other)) + Math.min(end(moving, other), end(board, other))) / 2 : start(moving, other) + size(moving, other) / 2;
+			out.push(axis === "x" ? { kind: "gap", x1: from, y1: mid, x2: to, y2: mid, label: String(READING_GAP) } : { kind: "gap", x1: mid, y1: from, x2: mid, y2: to, label: String(READING_GAP) });
+		}
+	}
+	return out;
+}
+
+/**
+ * Snap a moved box: the correction to add to the move, and the guides to draw where it lands.
+ * `reading` are boards the box keeps the reading gap from (a board being dragged: the other boards).
+ */
+export function snapMove(moving: Box, targets: readonly Box[], threshold: number, reading: readonly Box[] = []): { dx: number; dy: number; guides: Guide[] } {
+	const dx = bestShift(moving, targets, "x", threshold, reading) ?? 0;
+	const dy = bestShift(moving, targets, "y", threshold, reading) ?? 0;
 	const placed = { ...moving, x: moving.x + dx, y: moving.y + dy };
-	return { dx, dy, guides: [...guidesFor(placed, targets, "x"), ...guidesFor(placed, targets, "y")] };
+	return { dx, dy, guides: [...guidesFor(placed, targets, "x"), ...guidesFor(placed, targets, "y"), ...readingGuides(placed, reading)] };
 }
 
 /**
@@ -121,7 +181,9 @@ export function snapEdges(box: { x1: number; y1: number; x2: number; y2: number 
 		const other = cross(axis);
 		const lo = Math.min(other === "x" ? Math.min(out.x1, out.x2) : Math.min(out.y1, out.y2), start(best.target, other));
 		const hi = Math.max(other === "x" ? Math.max(out.x1, out.x2) : Math.max(out.y1, out.y2), end(best.target, other));
-		guides.push(axis === "x" ? { kind: "line", x1: best.value, y1: lo, x2: best.value, y2: hi } : { kind: "line", x1: lo, y1: best.value, x2: hi, y2: best.value });
+		const edged = { x: Math.min(out.x1, out.x2), y: Math.min(out.y1, out.y2), w: Math.abs(out.x2 - out.x1), h: Math.abs(out.y2 - out.y1) };
+		const points = pointsOn(best.value, [edged, best.target], axis);
+		guides.push(axis === "x" ? { kind: "line", x1: best.value, y1: lo, x2: best.value, y2: hi, points } : { kind: "line", x1: lo, y1: best.value, x2: hi, y2: best.value, points });
 	}
 	return { box: out, guides };
 }

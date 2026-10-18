@@ -23,7 +23,7 @@ import { boardMoves, copyOps, moveOps, type BoardMove, type NextId } from "./ops
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
 import { boardResizeEnd, boardResizeStep, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle, type RadiusStart } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
-import { selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
+import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
 
 /** How long a let-go gesture waits for the drawing that answers it before its preview goes anyway. */
 export const SETTLE_MS = 2000;
@@ -44,9 +44,10 @@ export type Tap = { do: "open-link"; href: string } | { do: "media"; id: string;
 type Carry = {
 	ids: readonly string[];
 	boards: readonly string[];
-	/** The selection's box as the press found it, and what it snaps to. */
+	/** The selection's box as the press found it, what it snaps to, and the boards it keeps the reading gap from. */
 	start: Rect | undefined;
 	targets: readonly Rect[];
+	reading: readonly Rect[];
 	from: Pt;
 	fromClient: Pt;
 	/** A finger's carry: no snapping, no axis, no copy, no composer; the ghost further off. */
@@ -203,6 +204,7 @@ function carry(state: EditorState, scene: SceneQuery, ctx: GestureContext, p: Po
 		start: selectionBox(scene, ids, boards),
 		// A finger does not snap, so it never asks what is around.
 		targets: touch ? [] : snapTargets(scene, ids, boards, ctx.view),
+		reading: touch ? [] : readingTargets(scene, ids, boards, ctx.view),
 		from: touch ? touch.from.at : p.at,
 		fromClient: touch ? touch.from.client : p.client,
 		...(touch ? { touch: true as const } : {}),
@@ -291,7 +293,7 @@ function moveCarry(state: EditorState, g: Carry, p: PointerInput, scene: SceneQu
 		}
 		// ⌘ or Ctrl turns snapping off.
 		if (start && !isFree(p.mods)) {
-			const snapped = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, g.targets, SNAP_PX / ctx.zoom);
+			const snapped = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, g.targets, SNAP_PX / ctx.zoom, g.reading);
 			if (!p.mods.shift || dx !== 0) dx += snapped.dx;
 			if (!p.mods.shift || dy !== 0) dy += snapped.dy;
 			lines = snapped.guides;

@@ -1291,7 +1291,7 @@
 	overflow: visible;
 	pointer-events: none;
 }
-	.world > .pen-guides line {
+	.world > .pen-guides :is(line, path) {
 	stroke: #f24e1e;
 }
 	/* What Alt shows between the selection and the item under the pointer: red lines, and their lengths. */

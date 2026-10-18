@@ -246,6 +246,26 @@ test("a board pressed is the app's selected board, and a drag carries it and mov
 	assert.equal(shift.state.gesture, undefined);
 });
 
+test("a board dragged near another settles 160 from it, the reading gap, and says so", () => {
+	const two = fakeScene([], [
+		{ path: "boards/one.html", x: 0, y: 0, w: 400, h: 300 },
+		{ path: "boards/two.html", x: 900, y: 0, w: 400, h: 300 },
+	]);
+	let state = initialState("edit");
+	const go = (input: Input) => {
+		const result = step(state, input, two, ctx(WIDE));
+		state = result.state;
+		return result;
+	};
+	go({ type: "press-board", path: "boards/two.html", ...at(1000, 100) });
+	// Dragged 343 left puts its left edge at 557, 157 from the first board: it settles at 560.
+	const moved = go({ type: "move", ...at(657, 140) });
+	assert.deepEqual(moved.state.boardDrag, { paths: ["boards/two.html"], dx: -340, dy: 40 });
+	assert.deepEqual(moved.state.guides.find((guide) => guide.label), { kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" });
+	// ⌘ lets it go anywhere.
+	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.boardDrag, { paths: ["boards/two.html"], dx: -343, dy: 40 });
+});
+
 test("a corner handle with Shift keeps the shape; the lift writes the size and waits for the drawing", () => {
 	const box = { id: "a", x: 10, y: 20, w: 100, h: 50 };
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [

@@ -28,7 +28,10 @@ test("the dragged edge snaps within the threshold, and draws a guide; ⌘ turns 
 	const near = { targets: [{ x: 200, y: 300, w: 10, h: 10 }], threshold: 6 };
 	const snapped = resizeStep(box, "e", { x: 97, y: 0 }, {}, near);
 	assert.deepEqual(snapped.box, { x: 0, y: 0, w: 200, h: 50 });
-	assert.deepEqual(snapped.guides, [{ kind: "line", x1: 200, y1: 0, x2: 200, y2: 310 }]);
+	// With a ✕ at each point on the line that lines up: the box's right edge, top, middle and bottom, and the target's.
+	assert.deepEqual(snapped.guides, [
+		{ kind: "line", x1: 200, y1: 0, x2: 200, y2: 310, points: [{ x: 200, y: 0 }, { x: 200, y: 25 }, { x: 200, y: 50 }, { x: 200, y: 300 }, { x: 200, y: 305 }, { x: 200, y: 310 }] },
+	]);
 	const free = resizeStep(box, "e", { x: 97, y: 0 }, { free: true }, near);
 	assert.deepEqual(free.box, { x: 0, y: 0, w: 197, h: 50 });
 	assert.deepEqual(free.guides, []);

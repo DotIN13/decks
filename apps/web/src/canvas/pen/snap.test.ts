@@ -34,3 +34,31 @@ test("a resize pulls only the edges it moves", () => {
 	assert.deepEqual(box, { x1: 10, y1: 10, x2: 100, y2: 60 });
 	assert.equal(guides.length, 1);
 });
+
+test("an alignment marks every point on it that lines up: each box's corners and middle on the line", () => {
+	const other = { x: 0, y: 0, w: 100, h: 50 };
+	const { guides } = snapMove({ x: 3, y: 200, w: 80, h: 40 }, [other], 5);
+	const left = guides.find((g) => g.kind === "line" && g.x1 === 0 && g.x2 === 0);
+	assert.deepEqual(left?.points, [
+		{ x: 0, y: 200 },
+		{ x: 0, y: 220 },
+		{ x: 0, y: 240 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 25 },
+		{ x: 0, y: 50 },
+	]);
+});
+
+test("a board keeps the reading gap: 160 beside, above or below another, marked with its size", () => {
+	const board = { x: 0, y: 0, w: 400, h: 300 };
+	// 3 short of 160 to the right of it: it settles at 560.
+	const right = snapMove({ x: 557, y: 40, w: 400, h: 300 }, [], 5, [board]);
+	assert.equal(right.dx, 3);
+	assert.deepEqual(right.guides, [{ kind: "gap", x1: 400, y1: 170, x2: 560, y2: 170, label: "160" }]);
+	// 4 past 160 above it: the bottom settles 160 over its top.
+	const above = snapMove({ x: 0, y: -464, w: 400, h: 300 }, [], 5, [board]);
+	assert.equal(above.dy, 4);
+	assert.deepEqual(above.guides.find((g) => g.label), { kind: "gap", x1: 200, y1: -160, x2: 200, y2: 0, label: "160" });
+	// Further than the reach: nothing.
+	assert.deepEqual(snapMove({ x: 570, y: 40, w: 400, h: 300 }, [], 5, [board]).guides, []);
+});
