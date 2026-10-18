@@ -196,6 +196,38 @@ const glows = await page.evaluate((wanted) => {
 }, componentPath);
 say("…and a board you resized does not glow as news", !glows.glow, JSON.stringify(glows));
 
+// Made shorter again, it stays at the new height from the moment it is let go: every frame drawn
+// after that is at most the height it was let go at. It used to come back at its old height for a
+// moment, because the file's new revision reached the page before the canvas's new size.
+await select(componentPath);
+await settle(page, 400);
+const before = await drawnAt(componentPath);
+const handle = page.locator(`.pen-handle[data-board="${componentPath}"][data-handle="se"]`);
+await handle.waitFor({ state: "visible", timeout: 6000 });
+const grip = await handle.boundingBox();
+await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+await page.mouse.down();
+await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 60, { steps: 10 });
+await settle(page, 200);
+const letGo = await drawnAt(componentPath);
+await page.evaluate((wanted) => {
+	const seen = (window.__heights = []);
+	const sample = () => {
+		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+		seen.push(Math.round(Number.parseFloat(node.style.height)));
+		if (seen.length < 120) requestAnimationFrame(sample);
+	};
+	requestAnimationFrame(sample);
+}, componentPath);
+await page.mouse.up();
+await page.waitForTimeout(2200);
+const heights = await page.evaluate(() => window.__heights);
+say(
+	"a board made shorter never draws taller than where it was let go",
+	letGo.h < before.h - 40 && Math.max(...heights) <= letGo.h + 1 && Math.abs(heights.at(-1) - letGo.h) <= 1,
+	`${before.h} → ${letGo.h}, frames after letting go reach ${Math.max(...heights)}, end at ${heights.at(-1)}; ${[...new Set(heights)].join(" ")}`,
+);
+
 // --- a board written as a document: both numbers are writable, and the height is a floor ---
 
 const flow = await boardPath("notes.html");

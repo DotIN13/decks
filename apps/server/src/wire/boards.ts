@@ -87,13 +87,19 @@ export const boards = {
 				return;
 			}
 			const size = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			/*
+			 * The canvas first, then the file. The file's write is what the canvas on screen waits for
+			 * to let go of the box it was dragged to, and it reads the board's size there from the canvas:
+			 * written the other way round, a board made shorter came back at its old height for a moment,
+			 * and only then shrank.
+			 */
+			const { name, agent } = stageFor(message, wire);
+			if (agent) agent.setSize(message.path, size);
+			else if (name) wire.stage.pens?.sizeBoard(name, message.path, size);
 			if (!board.fills && ((w !== undefined && w !== board.w) || (h !== undefined && h !== board.h))) {
 				wire.boards.resize(message.path, size);
 				wire.boards.wrote(message.path, "you");
 			}
-			const { name, agent } = stageFor(message, wire);
-			if (agent) agent.setSize(message.path, size);
-			else if (name) wire.stage.pens?.sizeBoard(name, message.path, size);
 			const sized = wire.stageState(agent).boards.find((one) => one.path === message.path);
 			if (sized) wire.send({ type: "board.changed", path: sized.path, rev: sized.rev, board: sized });
 		} catch (error) {

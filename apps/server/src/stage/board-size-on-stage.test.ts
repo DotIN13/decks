@@ -112,3 +112,26 @@ test("a person's change goes to the canvas it names, not to the agent last focus
 		cleanup();
 	}
 });
+
+test("a person's drag to a shorter board sends only the new height, so the canvas never draws it at the old one", async () => {
+	const { app, cleanup } = open();
+	try {
+		const one = app.agents.create({ name: "One", restored: { id: "one", context: [], inPlay: [], createdAt: 1 } });
+		one.setInPlay([PATH], { place: true });
+		app.agents.focus(one.id);
+		one.setSize(PATH, { h: 600 });
+		await settle();
+		const heights: number[] = [];
+		const send = app.send.bind(app);
+		app.send = (message) => {
+			if (message.type === "board.changed" && message.path === PATH && message.board) heights.push(message.board.h);
+			send(message);
+		};
+		app.handle({ type: "board.resize", path: PATH, h: 450, stage: one.stageName()! }, () => {});
+		await settle();
+		assert.ok(heights.length > 0, "the change is sent");
+		assert.deepEqual([...new Set(heights)], [450], "every board.changed carries the new height, none the old 600");
+	} finally {
+		cleanup();
+	}
+});
