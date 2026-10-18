@@ -15,7 +15,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * `GET /api/v1` lists the verbs, which is what `decks --help` prints.
  *
  * Who is calling is said, not proven, for now: `X-Decks-Agent` names an agent by id or name (the
- * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), and `X-Decks-App`
+ * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
+ * opencode session, whose agent the bridge knows, and `X-Decks-App`
  * names an app, which acts for the conversation on screen once the person has let it. Requests
  * from another site still need the pairing token (`http.ts`), as every `/api` route does.
  */
@@ -77,7 +78,9 @@ async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: u
 	const appName = header("x-decks-app") ?? (typeof body.app === "string" ? body.app : undefined);
 	if (appName) return appCaller(app, appName, allowedOnce);
 
-	const named = header("x-decks-agent") ?? (typeof body.agent === "string" ? body.agent : undefined);
+	// An opencode session names its agent through the bridge that registered it (`runtime/opencode/plugin`).
+	const session = header("x-decks-session");
+	const named = header("x-decks-agent") ?? (typeof body.agent === "string" ? body.agent : undefined) ?? app.bridge.agentOfSession(session);
 	if (!named) {
 		return {
 			status: 400,

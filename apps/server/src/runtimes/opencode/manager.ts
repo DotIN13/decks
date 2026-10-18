@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { opencodeConfigDir } from "@decks/runtime";
 import { opencodeExecutable } from "./install.ts";
+import { decksServerEnv } from "../decks-env.ts";
 /**
  * One `opencode serve` for every opencode agent on the deck (DESIGN §6.1, "the server").
  *
@@ -43,6 +44,8 @@ export interface OpencodeServerSpec {
 	cwd: string;
 	/** Where the canvas tool calls back: Decks' own `/api/stage/eval`, on this process's port. */
 	stageUrl: string;
+	/** Decks' own port, for the `decks` command in every session's shell (`runtimes/decks-env.ts`). */
+	decksPort?: number;
 	/**
 	 * The configuration `OPENCODE_CONFIG_CONTENT` carries. What it deliberately does *not*
 	 * carry is anything per agent — a permission posture, a model — because this config is
@@ -198,6 +201,9 @@ export class OpencodeManager {
 				// the session id does the rest of the naming.
 				DECKS_STAGE_URL: spec.stageUrl,
 				DECKS_STAGE_TOKEN: this.token,
+				// The `decks` command and where Decks is, for every session's shell; the plugin in
+				// `runtime/opencode/plugin/` adds the session, which names the agent (`runtimes/decks-env.ts`).
+				...(spec.decksPort ? decksServerEnv(spec.decksPort) : {}),
 			};
 			let child: OpencodeChild;
 			try {

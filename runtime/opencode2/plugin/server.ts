@@ -67,6 +67,9 @@ export default Plugin.define({
         else command.env[name] = value
       }
       delete command.env.DECKS_OPENCODE2_RESTORE
+      // The session a command runs for names its agent, for the decks command (Decks maps it back).
+      const session = (command as { sessionID?: unknown }).sessionID
+      if (typeof session === "string" && session) command.env.DECKS_SESSION = session
     })
     await ctx.tool.transform((editor) => {
       editor.add({

@@ -66,6 +66,8 @@ export interface ConnectOptions {
 	agent?: string;
 	/** The app the calls are from. Default: \`DECKS_APP\`, or the page's app. */
 	app?: string;
+	/** An opencode session, which Decks maps to its agent. Default: \`DECKS_SESSION\`. */
+	session?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */
 	notes?: (lines: string[]) => void;
 	/** A fetch to use instead of the global one. */

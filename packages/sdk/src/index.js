@@ -111,6 +111,7 @@ function defaultNotes(lines) {
  * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own.
  * @param {string} [options.agent]  The agent the calls are for, by id or name. Default: `DECKS_AGENT`.
  * @param {string} [options.app]  The app the calls are from. Default: `DECKS_APP`, or the page's app.
+ * @param {string} [options.session]  An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`.
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
  * @param {typeof fetch} [options.fetch]  A fetch to use instead of the global one.
  */
@@ -118,6 +119,8 @@ export function connect(options = {}) {
 	const page = fromPage();
 	const base = String(options.url ?? env("DECKS_URL") ?? page.url ?? "").replace(/\/+$/, "");
 	const agent = options.agent ?? env("DECKS_AGENT");
+	// opencode's agents share one server, so their shell names the session, which Decks maps to the agent.
+	const session = options.session ?? env("DECKS_SESSION");
 	const app = options.app ?? env("DECKS_APP") ?? page.app;
 	const doFetch = options.fetch ?? globalThis.fetch;
 	const onNotes = options.notes ?? defaultNotes;
@@ -132,6 +135,7 @@ export function connect(options = {}) {
 		const headers = { "content-type": "application/json" };
 		if (app) headers["x-decks-app"] = app;
 		else if (agent) headers["x-decks-agent"] = agent;
+		else if (session) headers["x-decks-session"] = session;
 		let response;
 		try {
 			response = await doFetch(`${base}/api/v1/${verb}`, { method: "POST", headers, body: JSON.stringify({ args: given }) });

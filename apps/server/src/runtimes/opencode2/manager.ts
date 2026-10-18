@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { opencode2Executable, opencode2Folders } from "./install.ts";
+import { decksServerEnv } from "../decks-env.ts";
 
 /**
  * One `opencode serve` (OpenCode 2) for every OpenCode 2 agent on the deck.
@@ -24,6 +25,8 @@ export interface Opencode2ServerSpec {
 	cwd: string;
 	/** Where Decks' tools call back: Decks' own `/api/stage/eval`. */
 	stageUrl: string;
+	/** Decks' own port, for the `decks` command in every session's shell. */
+	decksPort?: number;
 	/**
 	 * The inline config, `OPENCODE_CONFIG_CONTENT`. Decks' plugin and skills go here, by
 	 * absolute path, on top of the person's own OpenCode 2 config. Nothing per agent: this is
@@ -144,6 +147,9 @@ export class Opencode2Manager {
 			OPENCODE_DISABLE_AUTOUPDATE: "1",
 			DECKS_STAGE_URL: spec.stageUrl,
 			DECKS_STAGE_TOKEN: secret,
+			// The `decks` command and where Decks is, for every session's shell; the plugin adds the
+			// session, which names the agent (`runtimes/decks-env.ts`).
+			...(spec.decksPort ? decksServerEnv(spec.decksPort, this.baseEnv.PATH) : {}),
 		};
 	}
 

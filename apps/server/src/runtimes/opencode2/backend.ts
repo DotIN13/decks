@@ -124,6 +124,7 @@ export class Opencode2Backend implements AgentBackend {
 		const handle = await opencode2Manager.acquire({
 			cwd: this.directory,
 			stageUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksPort: this.context.port,
 			config: { plugins: [opencode2PluginDir()], skills: [skillsDir()] },
 		});
 		this.handle = handle;

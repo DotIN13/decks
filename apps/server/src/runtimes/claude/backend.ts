@@ -31,6 +31,7 @@ import { isStaleSession } from "./stale-session.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
 import { gdocsToolNames, qualifiedToolName, stageMcpServer } from "./tools.ts";
 import { gdocsCaller } from "../../google/agent-tools.ts";
+import { decksEnv } from "../decks-env.ts";
 import { eventPercent, toUsageReport } from "./usage.ts";
 
 /**
@@ -290,7 +291,8 @@ export class ClaudeBackend implements AgentBackend {
 			 * link, which made every word above true of a variable the CLI does not read a
 			 * token from. `accounts.ts` has the measurement.
 			 */
-			...(accountEnv ? { env: accountEnv } : {}),
+			// …and, whichever it is, the `decks` command and who this agent is, for its shell (`runtimes/decks-env.ts`).
+			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, (accountEnv ?? process.env).PATH) },
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");

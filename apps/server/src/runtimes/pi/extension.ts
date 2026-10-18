@@ -1,4 +1,4 @@
-import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { createBashTool, type ExtensionAPI, type InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { StageAgentHooks, StageTool } from "../../stage/tool.ts";
 import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
@@ -17,12 +17,31 @@ import { GDOCS_TOOLS, type GdocsCall } from "../../google/agent-tools.ts";
  * into the session tree.
  */
 
-export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks; gdocs?: GdocsCall }): InlineExtension {
-	const { tool, agent, gdocs } = deps;
+export function decksStage(deps: {
+	tool: StageTool;
+	agent: StageAgentHooks;
+	gdocs?: GdocsCall;
+	/** The agent's shell: where it runs, and the variables that put `decks` in it (`runtimes/decks-env.ts`). */
+	shell?: { cwd: string; env: Record<string, string> };
+}): InlineExtension {
+	const { tool, agent, gdocs, shell } = deps;
 
 	return {
 		name: "decks-stage",
 		factory: (pi: ExtensionAPI) => {
+			/*
+			 * Pi's own bash, with this agent's `decks` in it.
+			 *
+			 * Every Pi agent shares this process, so its environment cannot say which agent a
+			 * command comes from. The bash tool is registered again with a spawn hook that adds this
+			 * agent's variables as each command starts, which is Pi's way to adjust a command's env.
+			 */
+			if (shell) {
+				const bash = createBashTool(shell.cwd, {
+					spawnHook: (context) => ({ ...context, env: { ...context.env, ...shell.env, PATH: shell.env.PATH ?? context.env.PATH ?? "" } }),
+				});
+				pi.registerTool({ ...bash, execute: (id, params, signal, onUpdate) => bash.execute(id, params, signal, onUpdate) });
+			}
 			// Google Docs, read and edited as markdown (`google/docs.ts`); a failure is thrown, as the canvas tool's is.
 			for (const t of gdocs ? GDOCS_TOOLS : []) {
 				pi.registerTool({

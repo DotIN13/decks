@@ -139,6 +139,11 @@ export class StageBridge {
 		return this.agentOf(token);
 	}
 
+	/** The agent an opencode session was made for: what a `decks` command's `DECKS_SESSION` names. */
+	agentOfSession(sessionID: string | undefined): string | undefined {
+		return sessionID ? this.bySession.get(sessionID)?.agentId : undefined;
+	}
+
 	/** Which agent a token speaks for, for a caller that wants to say so. */
 	agentOf(token: string | undefined): string | undefined {
 		return token ? this.byToken.get(token)?.agentId : undefined;

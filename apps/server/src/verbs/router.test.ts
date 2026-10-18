@@ -113,3 +113,22 @@ test("wrong calls are answered with a sentence and the verb's signature", async 
 		cleanup();
 	}
 });
+
+test("an agent's shell, as a runtime sets it up, reaches its own stage with the decks command", async () => {
+	const { decksEnv } = await import("../runtimes/decks-env.ts");
+	const { execFile } = await import("node:child_process");
+	const { promisify } = await import("node:util");
+	const run = promisify(execFile);
+	const { base, agent, cleanup } = await open();
+	try {
+		const env = { ...process.env, ...decksEnv(Number(new URL(base).port), agent.id) };
+		const listed = await run("sh", ["-c", "decks boards | head -c 2000"], { env });
+		assert.ok(JSON.parse(listed.stdout).some((board: { path: string }) => board.path === "boards/tall.html"));
+		const made = await run("sh", ["-c", 'p=$(decks new-board --title "From the shell" --at.x1 0 --at.y1 900) && echo "$p"'], { env });
+		assert.match(made.stdout.trim(), /^boards\/from-the-shell/);
+		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
+		await assert.rejects(run("sh", ["-c", "decks move boards/tall.html"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /move needs at/.test(error.stderr));
+	} finally {
+		cleanup();
+	}
+});

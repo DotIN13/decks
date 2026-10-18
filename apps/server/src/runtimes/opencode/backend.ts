@@ -145,6 +145,7 @@ export class OpencodeBackend implements AgentBackend {
 		const handle = await opencodeManager.acquire({
 			cwd: deck.path,
 			stageUrl: `http://127.0.0.1:${this.context.port}/api/stage/eval`,
+			decksPort: this.context.port,
 			config: { instructions: [this.briefingFile()] },
 		});
 		this.handle = handle;

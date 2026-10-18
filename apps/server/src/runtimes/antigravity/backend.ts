@@ -6,6 +6,7 @@ import { deckContext, briefingFor } from "../../agents/context.ts";
 import { helpText, parseSlash } from "../../agents/slash.ts";
 import { agyExecutable, agyModels, antigravityHomeDir, antigravityAvailability, prepareAntigravityHome } from "./install.ts";
 import { AntigravityStream, type AntigravityResult, type AntigravityStep } from "./events.ts";
+import { decksEnv } from "../decks-env.ts";
 
 /**
  * Antigravity behind one Decks agent (DESIGN §6.1).
@@ -132,6 +133,8 @@ export class AntigravityBackend implements AgentBackend {
 				// The MCP child inherits this process's environment, so the identity rides
 				// in env rather than in any per-agent config file.
 				DECKS_AGENT: this.context.stageAgent.id,
+				// The `decks` command and where Decks is, for the CLI's shell (`runtimes/decks-env.ts`).
+				...decksEnv(this.context.port, this.context.stageAgent.id),
 			},
 			stdio: ["pipe", "pipe", "pipe"],
 		});

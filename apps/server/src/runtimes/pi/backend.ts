@@ -15,6 +15,7 @@ import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashComma
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { decksStage } from "./extension.ts";
+import { decksEnv } from "../decks-env.ts";
 import { skillsDir } from "@decks/runtime";
 import { deckContext, briefingFor } from "../../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
@@ -87,7 +88,7 @@ export class PiBackend implements AgentBackend {
 			// has, and where it came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken) }), this.commandReader()],
+			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id) } }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
