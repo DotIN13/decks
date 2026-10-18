@@ -379,7 +379,15 @@ impl Page {
 			ctx.icons = Some(&self.icons);
 			ctx.offsets = Some(&self.offsets);
 			self.view.apply(&mut ctx);
-			let lifted = paint_area(&ctx, view, s, Color::TRANSPARENT);
+			// Built again if the glyph texture had to push out glyphs this frame uses (`Atlas::begin`).
+			let mut lifted = DrawList::new(Color::TRANSPARENT);
+			for _ in 0..3 {
+				self.atlas.borrow_mut().begin();
+				lifted = paint_area(&ctx, view, s, Color::TRANSPARENT);
+				if !self.atlas.borrow_mut().take_overflow() {
+					break;
+				}
+			}
 			self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
 			over.ops.extend(lifted.ops);
 		}
@@ -810,7 +818,21 @@ impl Worker {
 	}
 
 	/// The next tiles to paint for a view, with their draw lists: missing ones first, the middle first.
+	///
+	/// For tests and measures: the lists are built one after another without being drawn, so text in
+	/// an earlier one may point at glyphs a later one has replaced. Painting goes through `paint`.
 	pub fn next(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize) -> Vec<(Key, DrawList)> {
+		let mut out = Vec::new();
+		self.paint(camera, dpr, width, height, moving, limit, &mut |key, list, _| out.push((key, list)));
+		out
+	}
+
+	/// Paint the next tiles for a view, missing ones first and the middle first, each handed to `draw`
+	/// with the glyph texture as soon as its list is built, so it is drawn before the next one can
+	/// replace a glyph it uses. A list whose own glyphs were pushed out while it was built (the texture
+	/// full of them alone) is built again. Returns how many tiles were painted.
+	#[allow(clippy::too_many_arguments)]
+	pub fn paint(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize, draw: &mut dyn FnMut(Key, DrawList, &mut Atlas)) -> usize {
 		let scale = scale_for(camera.zoom * dpr, moving);
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
@@ -835,9 +857,20 @@ impl Worker {
 		ctx.icons = Some(&self.icons);
 		self.view.apply(&mut ctx);
 		let clear = Color::TRANSPARENT;
-		let out = keys.into_iter().map(|k| (k, paint_area(&ctx, k.area(), k.scale(), clear))).collect();
+		let n = keys.len();
+		for k in keys {
+			let mut list = DrawList::new(clear);
+			for _ in 0..3 {
+				self.atlas.borrow_mut().begin();
+				list = paint_area(&ctx, k.area(), k.scale(), clear);
+				if !self.atlas.borrow_mut().take_overflow() {
+					break;
+				}
+			}
+			draw(k, list, &mut self.atlas.borrow_mut());
+		}
 		self.pictures.wanted.borrow_mut().extend(ctx.wanted.borrow_mut().drain(..));
-		out
+		n
 	}
 
 	/// The tile was painted and sent.
@@ -1202,5 +1235,124 @@ mod bend_bench {
 		}
 		let step_us = t.elapsed().as_secs_f64() * 1e6 / 200.0;
 		println!("{items} top-level items; first step {first_ms:.2} ms ({} arrows found); each later step {step_us:.0} µs", first.len());
+	}
+}
+
+#[cfg(test)]
+mod glyph_overflow {
+	use super::*;
+
+	/// Chinese text zoomed in and out at 2× pixels, as in the report of broken text at 400%: tiles are
+	/// painted as the app paints them, and as each is drawn every glyph it uses is checked against a
+	/// copy of the glyph texture: it must still be the last thing written where it points.
+	/// Returns (tiles drawn, glyphs checked, glyphs pointing at something else).
+	pub fn zoom_cycle(worker: &mut Worker, limit: usize) -> (usize, usize, usize) {
+		// Each texture's writes, in order: x, y, w, h.
+		let mut writes: HashMap<u32, Vec<[u32; 4]>> = HashMap::new();
+		let (mut tiles, mut checked, mut wrong) = (0, 0, 0);
+		for zoom in [1.0, 2.0, 0.5, 3.0, 4.0, 1.0, 2.5, 4.0, 0.7, 4.0, 3.3, 4.0] {
+			for moving in [true, false] {
+				// The view's middle stays on the text, as a pinch about it does.
+				let (w, h) = (1600.0, 1000.0);
+				let cam = Camera { x: 450.0 - w / 2.0 / zoom, y: 300.0 - h / 2.0 / zoom, zoom };
+				loop {
+					let mut sent = Vec::new();
+					worker.paint(cam, 2.0, w, h, moving, limit, &mut |key, list, atlas| {
+						for (texture, x, y, w, h, _) in atlas.uploads.drain(..) {
+							writes.entry(texture).or_default().push([x, y, w, h]);
+						}
+						for op in &list.ops {
+							let Op::Glyphs { texture, quads, .. } = op else { continue };
+							let log = writes.get(texture).map(Vec::as_slice).unwrap_or(&[]);
+							for q in quads {
+								checked += 1;
+								let want = [q.u as u32, q.v as u32, q.w as u32, q.h as u32];
+								let meets = |r: &[u32; 4]| r[0] < want[0] + want[2] && want[0] < r[0] + r[2] && r[1] < want[1] + want[3] && want[1] < r[1] + r[3];
+								if log.iter().rev().find(|r| meets(r)) != Some(&want) {
+									wrong += 1;
+								}
+							}
+						}
+						sent.push(key);
+					});
+					if sent.is_empty() {
+						break;
+					}
+					tiles += sent.len();
+					for key in sent {
+						worker.sent(key);
+					}
+				}
+			}
+		}
+		(tiles, checked, wrong)
+	}
+
+	pub fn chinese_worker() -> Option<Worker> {
+		let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts");
+		let sc = std::fs::read(format!("{dir}/noto-sans-sc_latest_chinese-simplified-400-normal.ttf")).ok()?;
+		let inter = std::fs::read(format!("{dir}/inter_latest_latin-400-normal.ttf")).ok()?;
+		// Ten paragraphs of different characters, 17 px, in a 900 px column.
+		let para = |p: u32| (0..90u32).map(|i| char::from_u32(0x4E00 + p * 211 + i * 7).unwrap()).collect::<String>();
+		let children: Vec<Value> = (0..10u32).map(|p| json!({"type":"text","id":format!("t{p}"),"x":0,"y":p * 80,"width":900,"textGrowth":"fixed-width","fontSize":17,"fontFamily":"Inter","content":para(p)})).collect();
+		let stage = json!({"version":"2.6","children":children}).to_string();
+		let mut worker = Worker::new(&stage, false).ok()?;
+		worker.add_font("Inter", inter, false);
+		worker.add_font("Noto Sans SC", sc, true);
+		Some(worker)
+	}
+
+	#[test]
+	fn zooming_chinese_text_in_and_out_never_draws_a_tile_with_another_glyph() {
+		let Some(mut worker) = chinese_worker() else { return };
+		let (tiles, checked, wrong) = zoom_cycle(&mut worker, 12);
+		println!("{tiles} tiles drawn, {checked} glyphs checked, {wrong} pointing at another glyph");
+		assert!(checked > 10_000, "{checked}");
+		assert_eq!(wrong, 0);
+	}
+}
+
+#[cfg(test)]
+mod glyph_cost {
+	use super::*;
+
+	/// What a zoom back costs when its glyphs are still in the texture, and when they were emptied:
+	/// `cargo test --release -p stage-web glyph_cost -- --ignored --nocapture`.
+	#[test]
+	#[ignore]
+	fn glyph_cost() {
+		let Some(mut worker) = super::glyph_overflow::chinese_worker() else { return };
+		let (w, h) = (1600.0, 1000.0);
+		let cam = |zoom: f64| Camera { x: 450.0 - w / 2.0 / zoom, y: 300.0 - h / 2.0 / zoom, zoom };
+		let mut screen = |worker: &mut Worker, zoom: f64| -> (f64, usize) {
+			worker.grid.invalidate_all();
+			let t = std::time::Instant::now();
+			let mut n = 0;
+			loop {
+				let batch = worker.next(cam(zoom), 2.0, w, h, false, 64);
+				if batch.is_empty() {
+					break;
+				}
+				for (key, _) in &batch {
+					worker.sent(*key);
+				}
+				n += batch.len();
+				worker.atlas.borrow_mut().uploads.clear();
+			}
+			(t.elapsed().as_secs_f64() * 1e3, n)
+		};
+		for zoom in [4.0, 2.0, 1.0] {
+			worker.atlas.replace(stage_text::atlas::Atlas::new());
+			let (cold, n) = screen(&mut worker, zoom);
+			let (warm, _) = screen(&mut worker, zoom);
+			println!("zoom {zoom}: {n} tiles; glyphs drawn anew {cold:.1} ms, glyphs kept {warm:.1} ms");
+		}
+		// The case the bands are for: 400%, out to 200% and 100%, and back to 400%.
+		worker.atlas.replace(stage_text::atlas::Atlas::new());
+		screen(&mut worker, 4.0);
+		screen(&mut worker, 2.0);
+		screen(&mut worker, 1.0);
+		let (back, _) = screen(&mut worker, 4.0);
+		println!("back to 400% after 200% and 100%: {back:.1} ms");
 	}
 }

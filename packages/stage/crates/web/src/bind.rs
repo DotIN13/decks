@@ -545,10 +545,12 @@ impl WorkerEngine {
 	pub fn paint(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, limit: u32) -> js_sys::Array {
 		let out = js_sys::Array::new();
 		let (Some(gpu), Some(canvas)) = (&mut self.gpu, &self.canvas) else { return out };
-		for (key, list) in self.worker.next(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize) {
-			stage_paint::flush_glyphs(&mut self.worker.atlas.borrow_mut(), gpu);
+		// Each tile drawn as soon as its list is built, before the next can replace one of its glyphs.
+		let mut sent = Vec::new();
+		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize, &mut |key, list, atlas| {
+			stage_paint::flush_glyphs(atlas, gpu);
 			gpu.draw(Target::Screen, &list);
-			let Ok(bitmap) = canvas.transfer_to_image_bitmap() else { break };
+			let Ok(bitmap) = canvas.transfer_to_image_bitmap() else { return };
 			let tile = js_sys::Object::new();
 			let set = |k: &str, v: JsValue| js_sys::Reflect::set(&tile, &JsValue::from_str(k), &v).ok();
 			set("scale", JsValue::from(key.scale));
@@ -556,6 +558,9 @@ impl WorkerEngine {
 			set("y", JsValue::from(key.y));
 			set("bitmap", bitmap.into());
 			out.push(&tile);
+			sent.push(key);
+		});
+		for key in sent {
 			self.worker.sent(key);
 		}
 		out
