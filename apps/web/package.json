@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "build:public": "tsc -p tsconfig.json --noEmit && VITE_DECKS_PUBLIC=1 vite build --outDir dist-public"
+    "build:public": "tsc -p tsconfig.json --noEmit && VITE_DECKS_PUBLIC=1 vite build --outDir dist-public",
+    "stage:backends": "node --import tsx scripts/stage-backends.ts"
   },
   "dependencies": {
     "@decks/board-kit": "*",

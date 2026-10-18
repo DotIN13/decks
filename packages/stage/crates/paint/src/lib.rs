@@ -2,6 +2,7 @@
 //! every graphics backend implements, the painter that writes draw lists, and the tile grid.
 
 pub mod backend;
+pub mod fixtures;
 pub mod list;
 pub mod mesh;
 pub mod painter;

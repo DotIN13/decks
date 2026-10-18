@@ -2,6 +2,32 @@
 /* eslint-disable */
 
 /**
+ * The pictures every backend must draw alike (`stage_paint::fixtures`), for
+ * `apps/web/scripts/stage-backends.ts` to hold to the native goldens (`crates/gpu/goldens/`) under
+ * WebGPU and WebGL 2. Not used by the app.
+ */
+export class Fixtures {
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * One of the fonts `list` names, under its family.
+     */
+    addFont(family: string, bytes: Uint8Array, fallback: boolean): void;
+    /**
+     * What there is to draw, as JSON: `{"fonts": [[family, file, fallback]], "names": [..],
+     * "stages": [..]}` (fonts from `packages/stage/fonts/`, stages from `crates/gpu/fixtures/`).
+     */
+    static list(): string;
+    constructor();
+    /**
+     * Draw fixture `name` (with `pen`, a `.pen` file's text: that stage, the way the worker tiles
+     * it) and lay it on the handle's canvas pixel for pixel, over white. Size the canvas to the
+     * picture first: its golden's size. Its `[width, height]`.
+     */
+    show(handle: GpuHandle, name: string, pen?: string | null): Uint32Array;
+}
+
+/**
  * WebGPU or WebGL 2, opened on a canvas: the page's own, or the worker's offscreen one.
  */
 export class GpuHandle {
@@ -289,10 +315,15 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly __wbg_fixtures_free: (a: number, b: number) => void;
     readonly __wbg_gpuhandle_free: (a: number, b: number) => void;
     readonly __wbg_pageengine_free: (a: number, b: number) => void;
     readonly __wbg_textmeasure_free: (a: number, b: number) => void;
     readonly __wbg_workerengine_free: (a: number, b: number) => void;
+    readonly fixtures_addFont: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly fixtures_list: () => [number, number];
+    readonly fixtures_new: () => number;
+    readonly fixtures_show: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly gpuhandle_backend: (a: number) => [number, number];
     readonly gpuhandle_maxPictureSize: (a: number) => number;
     readonly gpuhandle_maxTextureSize: (a: number) => number;
@@ -375,8 +406,8 @@ export interface InitOutput {
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__83: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__84: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__87: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__88: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_2572a5db769fe780___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
