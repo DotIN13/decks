@@ -8,7 +8,7 @@ import { resetHistory } from "../state/history.ts";
 import { resetToolResults } from "../chat/tool-results.ts";
 import { resetTaken } from "../canvas/shots/adaptors.ts";
 import { scratch } from "../state/agent.ts";
-import { setComponent, setMarks, setMode, setSelected } from "../state/selection.ts";
+import { setComponent, setMode, setSelected } from "../state/selection.ts";
 import { setDrawing, setInkSelection } from "../state/ink.ts";
 import { setPenSelection, setPenTool } from "../state/pen-tools.ts";
 import { setCommenting } from "../state/comments.ts";
@@ -55,7 +55,6 @@ function forget(): void {
 	setPairing({ paired: [] });
 	setSelected(undefined);
 	setComponent(undefined);
-	setMarks([]);
 	setMode("browse");
 	setDrawing(false);
 	setInkSelection(undefined);

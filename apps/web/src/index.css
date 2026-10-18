@@ -313,7 +313,6 @@
 	 */
 	--z-board-edit: 2; /* a field opened on a board: the source editor, a rename */
 	--z-over-board: 5; /* just over the boards: the focus view's exit, an agent landing */
-	--z-mark: 6; /* a mark on a board, and the handle that resizes it */
 	--z-conversation: 9; /* the conversation column */
 	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
 	--z-backdrop: 20; /* a dialog's backdrop */
@@ -438,8 +437,8 @@ body {
 /*
  * The zoom, as the one number a counter-scaled box is written with.
  *
- * A board's title bar, an agent's cursor and an annotation all stay a constant size on
- * screen, so each has a scale, and some an offset, that are functions of the zoom. Each
+ * A board's title bar and an agent's cursor both stay a constant size on screen, so each
+ * has a scale, and some an offset, that are functions of the zoom. Each
  * such element is handed the zoom as `--zoom` and the rules below derive the rest — one
  * inline write per element per frame instead of three.
  *

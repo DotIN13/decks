@@ -66,8 +66,6 @@ export interface Stage {
 	/** The room your stage has on screen, in CSS pixels. */
 	viewport(): Promise<{ width: number; height: number } | undefined>;
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
-	/** Bubbles with arrows pointing at `data-id`s you changed. Nothing is written to the board. `null` clears. */
-	annotate(path: string, marks: Array<{ to: string | { x: number; y: number }; label: string; tone?: "accent" | "ok" | "warn" | "danger" }> | null): Promise<unknown>;
 	/** The URL of a board, for a Playwright screenshot. */
 	url(path: string): Promise<string>;
 	/** A file on disk -> the URL a board should embed. */

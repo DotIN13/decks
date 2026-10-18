@@ -1,93 +1,14 @@
 /*
- * The marks an agent leaves on a board: the comment bubble, and the cursor.
+ * The marks an agent leaves on a board: its acts, and the cursor.
  *
- * `.board-mark` — the bubble an agent points at a component with, its tip and its tones —
- * and `.agent-cursor` — the dot that drifts, breathes, and puts its name away — with the
- * four keyframes that move them. Both are the same thing: the app saying "here, this" on a
- * board the agent is working from, so they are one file.
+ * `.act-*` — the block an agent holds and the block it wrote — and `.agent-cursor` — the dot
+ * that drifts, breathes, and puts its name away — with the keyframes that move them. Both are
+ * the same thing: the app saying "here, this" on a board the agent is working from, so they
+ * are one file.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
  */
 @layer components {
-	/* An agent pointing at something on a board. */
-/*
- * An agent pointing at a component: a bubble with a small arrow.
- *
- * Lives in the board's own coordinate space beside `.agent-cursor`, and is counter-scaled
- * the same way, so the words stay readable however far out the camera is. Never written to
- * the board — see `canvas/annotations.ts`.
- *
- * **A bubble and a small arrow, not a curve from the agent's avatar.** The playful version
- * was on the table (`boards/方案①`) and this is the restrained one: an arrow that starts at a
- * face in the corner has to cross whatever is between, so it draws over other boards and its
- * length carries no meaning. A tip on the component's own edge says the same thing in 12px.
- */
-.board-mark {
-	position: absolute;
-	z-index: var(--z-mark);
-	display: flex;
-	/*
-	 * `max-content`, and it is load-bearing.
-	 *
-	 * An absolutely positioned box shrink-wraps against the space left between its `left` and
-	 * its containing block's right edge. A mark on a component near the right of the board
-	 * therefore had a few dozen pixels to lay out in, and the label wrapped to three lines
-	 * *before* `translate: -100%` moved it back to where it belonged — so the flip produced a
-	 * tall narrow bubble instead of the same bubble on the other side.
-	 */
-	width: max-content;
-	align-items: center;
-	gap: 0;
-	transform: scale(calc(1 / var(--zoom, 1)));
-	transform-origin: 0 50%;
-	pointer-events: none;
-}
-	/* Flipped when the component is near the board's right edge, so the bubble stays on the
-   board rather than hanging over whatever is beside it on the canvas. */
-.board-mark[data-side="left"] {
-	flex-direction: row-reverse;
-	transform-origin: 100% 50%;
-	translate: -100% 0;
-}
-	/* The arrow: a 12px triangle whose point is *on* the component's edge. */
-.board-mark > .tip {
-	flex: none;
-	width: 0;
-	height: 0;
-	border-top: 5px solid transparent;
-	border-bottom: 5px solid transparent;
-	border-right: 7px solid var(--mark);
-}
-	.board-mark[data-side="left"] > .tip {
-	border-right: 0;
-	border-left: 7px solid var(--mark);
-}
-	.board-mark > .mark-say {
-	max-width: 220px;
-	padding: 4px 9px 5px;
-	border-radius: var(--radius-item);
-	background: var(--mark);
-	color: #fff;
-	font-size: var(--type-label);
-	font-weight: 500;
-	line-height: 1.35;
-	text-align: left;
-	/* Wraps rather than ellipsing: a label is a clause and half a clause is worse than two
-	   lines of one. `MAX_LABEL` is what stops it becoming a paragraph. */
-	white-space: normal;
-}
-	.board-mark {
-	--mark: var(--color-accent);
-}
-	.board-mark[data-tone="ok"] {
-	--mark: var(--color-ok);
-}
-	.board-mark[data-tone="warn"] {
-	--mark: var(--color-warn);
-}
-	.board-mark[data-tone="danger"] {
-	--mark: var(--color-danger);
-}
 	/*
  * An agent at work on a board (`canvas/acts.ts`): the block it holds, and the block it wrote.
  *

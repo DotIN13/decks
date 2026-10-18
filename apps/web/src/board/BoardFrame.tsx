@@ -17,7 +17,6 @@ import Scan from "lucide-solid/icons/scan";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
-import { anchorPoint, bubbleSide, type Mark } from "../canvas/annotations.ts";
 import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "../canvas/acts.ts";
 import { isRead, READ_MS, READ_ZOOM } from "./glow.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
@@ -120,8 +119,6 @@ export function BoardFrame(props: {
 	nonce?: number;
 	/** Where an agent is pointing, in board coordinates. */
 	cursor?: { x: number; y: number; label: string; color: string };
-	/** Agents pointing at components on this board. Transient; never written to the file. */
-	marks?: Mark[];
 	/** Agents at work on this board: a cursor each, and the blocks they hold or just wrote (`acts.ts`). */
 	acts?: AgentAct[];
 	/**
@@ -573,7 +570,7 @@ export function BoardFrame(props: {
 	 * The camera's scale, as the board's *chrome* uses it: held still while the camera moves.
 	 *
 	 * Everything counter-scaled here — the title bar, its buttons, the resize handle, an
-	 * agent's marks and cursor — is sized in `--unit`, which is `1px / var(--zoom)`. So a new
+	 * agent's cursor — is sized in `--unit`, which is `1px / var(--zoom)`. So a new
 	 * zoom is not a repaint, it is a **layout** of every one of those boxes, and during a
 	 * camera fly that is sixteen bars laid out on every frame. Measured on one 420ms fly over
 	 * sixteen boards: the move was drawn 21 times with the bars as they were and 25 times with
@@ -594,14 +591,13 @@ export function BoardFrame(props: {
 	/*
 	 * A clock for re-measuring the board's own DOM.
 	 *
-	 * An annotation's position comes from `offsetLeft` on an element in *another document*,
-	 * which no signal can depend on. So it is re-read when the camera moves, when the board
+	 * An act's block rectangles come from `offsetLeft` on elements in *another document*,
+	 * which no signal can depend on. So they are re-read when the camera moves, when the board
 	 * changes revision, and — while there is anything to draw — a few times a second, which
-	 * is what lets an arrow follow a component being dragged.
+	 * is what lets a hold follow a block being dragged.
 	 *
-	 * The interval runs **only while this board has marks on it**, which is almost never: it
-	 * is not a render loop, it is a poll that exists for a few seconds after an agent points
-	 * at something.
+	 * The interval runs **only while an agent is acting on this board**, which is almost never:
+	 * it is not a render loop, it is a poll that exists for the few seconds an act is drawn.
 	 */
 	/*
 	 * Tell the board's own document whether editing is on.
@@ -717,16 +713,16 @@ export function BoardFrame(props: {
 	/** Who is acting on this board, as ids: a string is a stable key where an act object is not. */
 	const actingAgents = createMemo(() => (props.acts ?? []).map((act) => act.agentId), [], { equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]) });
 	createEffect(() => {
-		if ((props.marks?.length ?? 0) === 0 && (props.acts?.length ?? 0) === 0) return;
+		if ((props.acts?.length ?? 0) === 0) return;
 		const timer = setInterval(() => setTick((n) => n + 1), 120);
 		onCleanup(() => clearInterval(timer));
 	});
 	/*
-	 * Only while there is something the tick moves: the marks and the acts are its only readers, and
+	 * Only while there is something the tick moves: the acts are its only readers, and
 	 * on a stage of hundreds of boards a tick per board per camera frame was script for nothing.
 	 */
 	createEffect(() => {
-		if ((props.marks?.length ?? 0) === 0 && (props.acts?.length ?? 0) === 0) return;
+		if ((props.acts?.length ?? 0) === 0) return;
 		void props.camera;
 		void props.board.rev;
 		setTick((n) => n + 1);
@@ -1535,42 +1531,6 @@ export function BoardFrame(props: {
 
 
 
-			{/*
-				Agents pointing at components: a bubble with a small arrow, per mark.
-
-				In the board's own coordinates and counter-scaled, exactly as the cursor below
-				is — a board component's `offsetLeft`/`offsetTop` *are* board coordinates, so
-				`anchorPoint` needs no camera maths and this file keeps its rule of having none.
-
-				Re-resolved on every draw, which is what makes an arrow follow a component that
-				is dragged: the drag rewrites the element's inline style and the next read sees
-				it. `tick` is what forces that read — the position is not reactive state, it is
-				a measurement of somebody else's DOM.
-			*/}
-			<For each={props.marks ?? []}>
-				{(mark) => {
-					const at = () => {
-						void tick();
-						return anchorPoint(frameEl?.contentDocument ?? undefined, mark.to);
-					};
-					return (
-						<Show when={at()}>
-							{(point) => (
-								<div
-									class="board-mark"
-									data-tone={mark.tone}
-									data-side={bubbleSide(point(), props.board.w)}
-									style={{ left: `${point().x}px`, top: `${point().y}px`, "--zoom": zoom() }}
-								>
-									<span class="tip" aria-hidden="true" />
-									<span class="mark-say">{mark.label}</span>
-								</div>
-							)}
-						</Show>
-					);
-				}}
-			</For>
-
 			{/* An agent pointing at something, in the board's own coordinates and
 			    counter-scaled so the label stays readable however far out you are. */}
 			<AgentCursor cursor={props.cursor} zoom={zoom()} />
@@ -1580,8 +1540,7 @@ export function BoardFrame(props: {
 
 				One row per agent, keyed on its id so the cursor is the same element from the
 				tool call to the landing and drifts between the two rather than re-mounting. The
-				block rectangles are read off the board's own document on `tick`, as the marks'
-				are, and compared by value so a poll that finds nothing moved redraws nothing.
+				block rectangles are read off the board's own document on `tick`, and compared by value so a poll that finds nothing moved redraws nothing.
 				The hold and the landing are keyed on the act's own clock, which is what restarts
 				their animations for a second act on the same block.
 			*/}

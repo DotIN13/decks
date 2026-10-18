@@ -280,6 +280,7 @@ const GONE: Record<string, string> = {
 	detach: "stage.detach is gone: stage.hide(path) takes a board off your stage.",
 	task: "stage.task is gone, with the dashboard. Hand work to an agent with stage.send(name, { task }).",
 	schedule: "stage.schedule is gone, with the dashboard's cron list. Nothing in the deck runs on a timer.",
+	annotate: "stage.annotate is gone: put what you want to point at on the board itself, or draw a note beside it with stage.pen.edit.",
 	canvas: "stage.canvas is gone: each agent has its own stage now, and stage.boards() is what is on it.",
 	canvases: "stage.canvases is gone: each agent has its own stage now. stage.agents() lists who else is working.",
 	useCanvas: "stage.useCanvas is gone: each agent has its own stage now, and there is nothing to move to.",
@@ -700,16 +701,6 @@ export function createStageTool(deps: {
 			service.cursor(agent.id, path, at, agent.identity().name, agent.identity().color),
 
 		// --- identity -------------------------------------------------------------
-		/**
-		 * Point at something on a board: a bubble with a small arrow, drawn on the canvas.
-		 *
-		 * Transient — nothing is written to the board file, so a board that has been annotated
-		 * is byte-identical to one that has not. `to` is a component's `data-id`, which is what
-		 * makes the arrow follow it when it moves; a `{ x, y }` is taken as a board coordinate.
-		 * Four at most per board, and `null` clears the ones this agent put there.
-		 */
-		annotate: async (path: string, marks: unknown) => service.annotate(agent.id, path, marks),
-
 		/**
 		 * Who you are, and what you are doing: read it with nothing, change it with a patch.
 		 *

@@ -27,7 +27,7 @@ export const DONE_LINGER_MS = 3500;
 /** A root block's box in board coordinates, or undefined when the board has no such block. */
 export function blockRect(doc: Document | undefined, id: string): Rect | undefined {
 	if (!doc) return undefined;
-	// Duck-typed, not `instanceof`: the element belongs to the iframe's realm (`annotations.ts`).
+	// Duck-typed, not `instanceof`: the element belongs to the iframe's realm, not this one.
 	const element = doc.querySelector(`[data-id="${cssEscape(id)}"]`) as HTMLElement | null;
 	if (!element || typeof element.offsetLeft !== "number" || typeof element.offsetWidth !== "number") return undefined;
 	if (element.offsetWidth === 0 && element.offsetHeight === 0) return undefined;

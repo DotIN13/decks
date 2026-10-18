@@ -453,19 +453,6 @@ export class StageService {
 	}
 
 	/**
-	 * Point at what just changed: bubbles with arrows, on the canvas, not in the file.
-	 *
-	 * `null` clears this agent's own — the browser filters by the id it is given, so one agent
-	 * clearing does not wipe another's. The result carries the count *as drawn*, because the
-	 * browser drops anything it cannot anchor and an agent that asked for four and got two
-	 * should be told rather than assume.
-	 */
-	async annotate(agentId: string, path: string, marks: unknown): Promise<unknown> {
-		if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
-		return this.ask(agentId, { op: "annotate", args: { agentId, path, marks: marks ?? null } });
-	}
-
-	/**
 	 * A board as the person's browser has it now (`stage.call` op `shot`): drawn there by
 	 * HTML-in-Canvas, or from a snapshot the server's Chrome draws, so it shows what the person did
 	 * on the page. `none` when no browser is looking or it has no live page for the board.

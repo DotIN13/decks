@@ -36,7 +36,6 @@ function host(focused: string | undefined, hands = false) {
 		select: (path) => selected.push(path),
 		reload: () => {},
 		cursor: () => {},
-		annotate: () => {},
 		handsOn: () => hands,
 		offerView: (agentId, camera, select, what) => offered.push({ agentId, camera, ...(select ? { selected: select } : {}), what }),
 	};

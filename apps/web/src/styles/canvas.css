@@ -1151,7 +1151,7 @@
 	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
 	 * at work, so they cost that only then.
 	 */
-	.world > .board-slot > .board-node > :is(.agent-cursor, .act-hold, .act-land, .board-mark) {
+	.world > .board-slot > .board-node > :is(.agent-cursor, .act-hold, .act-land) {
 	z-index: 2;
 }
 	.world > .pen-hits {

@@ -19,7 +19,7 @@ import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { boardChanged, boardSized, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
 import { notice, offer } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
-import { setComponent, setMarks, setSelected } from "../state/selection.ts";
+import { setComponent, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
@@ -531,9 +531,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
 							cursor: (cursor) => setState("cursor", cursor),
-							/* Replace one agent's marks on one board, leaving every other agent's alone. */
-							annotate: (agentId, path, next) =>
-								setMarks((was) => [...was.filter((mark) => mark.agentId !== agentId || mark.path !== path), ...next]),
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };

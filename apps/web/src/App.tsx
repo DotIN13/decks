@@ -25,7 +25,7 @@ import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
 import { frameRevs, patchBoard } from "./state/patches.ts";
-import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
+import {component, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, setOnScreen, start } from "./state/socket.ts";
 import { api } from "./connections/connection.ts";
 import { can } from "./connections/backend.ts";
@@ -229,7 +229,6 @@ export function App() {
 		switch (dest.kind) {
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
-				if (dest.id === state.focused) clearMarks(dest.id);
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
 				if (queue) send({ type: "agent.queue", id: dest.id, action: "add", text: line });
 				else send({ type: "agent.prompt", id: dest.id, text: line });
@@ -260,7 +259,6 @@ export function App() {
 			// Handed to the composer the way a dropped file is: a one-shot draft, here a pill.
 			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
 		} else {
-			clearMarks(agentId);
 			send({ type: "agent.prompt", id: agentId, text: commentBlock([note]) });
 		}
 		target.frame?.contentDocument?.getSelection()?.removeAllRanges();
@@ -1363,7 +1361,6 @@ export function App() {
 						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
 						onBoardsStarted={canvasOpened}
 						mode={mode()}
-						marks={marks()}
 						boards={stageBoards()}
 						/*
 						 * A plain prop, never a spread: a conditional spread makes every prop the stage reads

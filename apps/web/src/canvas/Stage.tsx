@@ -223,8 +223,6 @@ export function Stage(props: {
 	news?: Record<string, string>;
 	/** A board that was news was read on the canvas. */
 	onRead?: (path: string) => void;
-	/** Every agent's annotations, across all boards. Each frame takes the ones that are its. */
-	marks?: import("./annotations.ts").Mark[];
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
@@ -4430,9 +4428,8 @@ export function Stage(props: {
 		keep(props.editing?.path);
 		for (const path of boardDrag()?.paths ?? []) keep(path);
 		keep(boardResize()?.path);
-		// What is drawn on a board rather than in it: an agent's act, a mark, a cursor.
+		// What is drawn on a board rather than in it: an agent's act, a cursor.
 		for (const path of actsByPath().keys()) keep(path);
-		for (const mark of props.marks ?? []) keep(mark.path);
 		keep(props.cursor?.path);
 		const next = [...found]
 			.sort((a, b) => a - b)
@@ -4680,7 +4677,7 @@ export function Stage(props: {
 	});
 
 	/*
-	 * One board, as the canvas draws it: the frame, its title bar, its marks, its editor.
+	 * One board, as the canvas draws it: the frame, its title bar, its editor.
 	 *
 	 * A function because the focus view renders exactly one of these in a different box
 	 * (the `.focus` page below), and two copies of this — forty props, every wire the board
@@ -4764,7 +4761,6 @@ export function Stage(props: {
 								: {})}
 							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
-							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
 							acts={actsByPath().get(board.path)}
 							onActPoint={actPointOn(board.path)}
 							sizing={sizingPaths().has(board.path)}
