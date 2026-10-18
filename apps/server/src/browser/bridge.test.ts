@@ -226,9 +226,16 @@ after(async () => {
 	bridge.dispose();
 	http.close();
 	browserWs?.close();
-	chrome?.kill("SIGKILL");
-	rmSync(profile, { recursive: true, force: true });
-	rmSync(dataDir, { recursive: true, force: true });
+	// Chrome's helper processes keep writing into the profile for a moment after the main one is
+	// killed, so wait for it to go and let the delete retry: removing it at once failed about two
+	// runs in five with ENOTEMPTY, after every check had passed.
+	if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
+		const gone = new Promise<void>((resolve) => chrome.once("exit", () => resolve()));
+		chrome.kill("SIGKILL");
+		await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, 3000))]);
+	}
+	rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+	rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 });
 
 test("the pairing code is minted once, kept on disk, and a wrong one is refused at the upgrade", async () => {
