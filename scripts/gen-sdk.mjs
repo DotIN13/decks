@@ -64,11 +64,15 @@ export interface ConnectOptions {
 	/** Decks' address, as in http://127.0.0.1:4329. Default: \`DECKS_URL\`, or a page's own. */
 	url?: string;
 	/** The agent the calls are for, by id or name. Default: \`DECKS_AGENT\`. */
-	agent?: string;
+	agent?: string | (() => string | undefined);
 	/** The app the calls are from. Default: \`DECKS_APP\`, or the page's app. */
 	app?: string;
 	/** A board whose button is calling. Default: the board whose page this is. */
 	board?: string;
+	/** The person, in Decks' own page; \`stage\` and \`agent\` say whose stage, each a value or read per call. */
+	person?: boolean;
+	/** For the person: the canvas on screen. */
+	stage?: string | (() => string | undefined);
 	/** An opencode session, which Decks maps to its agent. Default: \`DECKS_SESSION\`. */
 	session?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */

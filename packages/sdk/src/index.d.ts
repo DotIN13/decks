@@ -13,7 +13,7 @@ export type Point = { x: number; y: number };
  * An edit to the drawing. Items are named by id; one inside an instance by its path,
  * "card-1/label".
  */
-export type PenEdit = { op: "insert"; node: PenItem; parent?: string; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string };
+export type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 /** One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields. */
 export type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
 export type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
@@ -207,11 +207,15 @@ export interface ConnectOptions {
 	/** Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or a page's own. */
 	url?: string;
 	/** The agent the calls are for, by id or name. Default: `DECKS_AGENT`. */
-	agent?: string;
+	agent?: string | (() => string | undefined);
 	/** The app the calls are from. Default: `DECKS_APP`, or the page's app. */
 	app?: string;
 	/** A board whose button is calling. Default: the board whose page this is. */
 	board?: string;
+	/** The person, in Decks' own page; `stage` and `agent` say whose stage, each a value or read per call. */
+	person?: boolean;
+	/** For the person: the canvas on screen. */
+	stage?: string | (() => string | undefined);
 	/** An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`. */
 	session?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */

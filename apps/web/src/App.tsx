@@ -77,6 +77,7 @@ import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
 import { workingWords } from "./chat/working-sign.ts";
+import { act, editDrawing, setPersonStage } from "./state/decks.ts";
 
 /**
  * The shell: a title bar, the stage, and the panels floating over it.
@@ -485,6 +486,8 @@ export function App() {
 	onMount(() => watchInsets());
 	// A person's change goes to the canvas they are looking at, named on the frame (`state/socket.ts`).
 	setOnScreen(() => stageOf(state.focused)?.name);
+	// The same two for the person's clicks sent as verbs (`state/decks.ts`).
+	setPersonStage(() => stageOf(state.focused)?.name, () => state.focused);
 
 	/*
 	 * One reading at startup, so an agent knows the canvas before anybody pans.
@@ -581,7 +584,7 @@ export function App() {
 		// row and reload the document that is sitting in it.
 		const index = state.boards.findIndex((board) => board.path === path);
 		if (index >= 0) setState("boards", index, { x, y });
-		send({ type: "board.move", path, x, y });
+		void act("move", [path, { x, y }]);
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
@@ -1397,7 +1400,7 @@ export function App() {
 						pen={stagePen()}
 						onPenEdit={(ops) => {
 							const agentId = state.focused;
-							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
+							if (agentId) void editDrawing(agentId, ops);
 						}}
 						onPenStep={penStep}
 						drawing={inking()}
@@ -1496,7 +1499,7 @@ export function App() {
 						 * `board.changed` at the same revision, so the page in the frame stays as it is. A deck's
 						 * slides take their width from the deck's own file, and reload at it.
 						 */
-						onResize={(path, size) => send({ type: "board.resize", path, ...size })}
+						onResize={(path, size) => void act("resize", [path, size])}
 						flowHeight={(path) => flowHeights()[path]}
 						/*
 						 * A double-click on empty canvas makes a blank board, centred where it landed.
@@ -1517,7 +1520,7 @@ export function App() {
 								setComponent(undefined);
 							})
 						}
-						onHide={(path) => send({ type: "board.hide", path })}
+						onHide={(path) => void act("hide", [path])}
 						nonces={state.nonces}
 						cursor={state.cursor}
 						acts={state.acts}
@@ -1670,12 +1673,12 @@ export function App() {
 						if (!agentId || stageOf(agentId)?.name === name) return;
 						// The camera follows when the server says the agent is there (the canvas effect above).
 						switchingFor(true);
-						send({ type: "agent.stage", id: agentId, stage: name });
+						void act("open", [name], agentId);
 					}}
 					onNew={(title) => {
 						const agentId = state.focused;
 						if (!agentId) return;
-						send({ type: "stage.new", id: agentId, title });
+						void act("newStage", [title], agentId);
 					}}
 					scheme={scheme()}
 				/>
@@ -1707,7 +1710,8 @@ export function App() {
 					 * tidying the view must not strip what it is working from.
 					 */
 					onClearStage={() => {
-						for (const board of stageBoards()) send({ type: "board.hide", path: board.path });
+						const paths = stageBoards().map((board) => board.path);
+						if (paths.length) void act("hide", [paths]);
 					}}
 					onCanvas={stageBoards().length}
 					/* Isolation belongs to the agent you are talking to; the server restarts it in its
@@ -1792,7 +1796,7 @@ export function App() {
 						onStep={penStep}
 						onDelete={(ids) => {
 							const agentId = state.focused;
-							if (agentId) send({ type: "stage.pen.edit", agentId, ops: ids.map((id) => ({ op: "delete", id })) });
+							if (agentId) void editDrawing(agentId, ids.map((id) => ({ op: "delete", id })));
 						}}
 					/>
 				</Show>
@@ -1804,7 +1808,7 @@ export function App() {
 							doc={pen().doc}
 							onEdit={(ops) => {
 								const agentId = state.focused;
-								if (agentId) send({ type: "stage.pen.edit", agentId, ops });
+								if (agentId) void editDrawing(agentId, ops);
 							}}
 							onStep={penStep}
 							onFloat={mountToolsFloat}
@@ -1883,7 +1887,7 @@ export function App() {
 						// A pen file goes on the stage as a ref, its corner at the middle of the view, as an agent places one.
 						const agentId = state.focused;
 						const at = camera();
-						if (agentId) send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }] });
+						if (agentId) void editDrawing(agentId, [{ op: "insert", node: { type: "ref", ref: pen.ref }, box: { x1: Math.round(at.x), y1: Math.round(at.y) } }]);
 					}}
 					listMayGrow={boardsStarted()}
 					current={selected()}
@@ -1929,7 +1933,7 @@ export function App() {
 					 * follow from that, where they already did.
 					 */
 					onDelete={(board) => send({ type: "board.delete", path: board.path })}
-					onHide={(board) => send({ type: "board.hide", path: board.path })}
+					onHide={(board) => void act("hide", [board.path])}
 				/>
 
 

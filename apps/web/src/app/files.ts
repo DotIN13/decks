@@ -17,6 +17,7 @@ import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
 import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
+import { editDrawing } from "../state/decks.ts";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -305,7 +306,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				ops.push({ op: "insert", node, box: { x1: Math.round(at - w / 2), y1: Math.round(middle.y - 200), x2: Math.round(at + w / 2) } });
 				at += w + GAP;
 			}
-			send({ type: "stage.pen.edit", agentId, ops });
+			void editDrawing(agentId, ops);
 		}
 		const paths = all.filter((one) => !FULL.test(one) && !LIVE.test(one));
 		if (!agentId || paths.length === 0) return;
@@ -320,7 +321,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 			ops.push({ op: "insert", node, box: { x1: x, y1: Math.round(middle.y - tall / 2), x2: x + FILE_CARD_W } });
 			x += FILE_CARD_W + GAP;
 		}
-		send({ type: "stage.pen.edit", agentId, ops });
+		void editDrawing(agentId, ops);
 	};
 
 	/**
@@ -353,7 +354,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		}
-		if (ops.length) send({ type: "stage.pen.edit", agentId, ops });
+		if (ops.length) void editDrawing(agentId, ops);
 		report.done([ops.length ? `${ops.length === 1 ? files[0]?.name : `${ops.length} files`} put in the card` : "", ...failures].filter(Boolean).join(" · ") || undefined, failures.length ? "warn" : "info");
 	};
 
@@ -432,7 +433,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				x += item.w + GAP;
 				return { op: "insert", node: { ...item.node, id: `drop-${stamp}-${i}` }, box };
 			});
-			send({ type: "stage.pen.edit", agentId, ops });
+			void editDrawing(agentId, ops);
 		}
 		const added = items.length === 0 ? "" : `${items.length === 1 ? files[0]?.name : `${items.length} files`} put on the canvas`;
 		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
@@ -587,7 +588,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const place = (node: Record<string, unknown>, w: number, h: number) => {
 			if (!agentId) return;
 			const box = { x1: Math.round(middle.x - w / 2), y1: Math.round(middle.y - h / 2), x2: Math.round(middle.x + w / 2), y2: Math.round(middle.y + h / 2) };
-			send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { ...node, id: `file-${Date.now().toString(36)}` }, box }] });
+			void editDrawing(agentId, [{ op: "insert", node: { ...node, id: `file-${Date.now().toString(36)}` }, box }]);
 		};
 		const name = picked.split("/").pop() ?? picked;
 		if (inDeck && RASTER.has(extension)) {

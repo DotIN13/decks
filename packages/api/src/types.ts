@@ -33,12 +33,13 @@ export const PenItem = named("PenItem", obj({ type: str(), id: opt(str()), child
 export const PenEdit = named(
 	"PenEdit",
 	union(
-		obj({ op: lit("insert"), node: PenItem, parent: opt(str()), index: opt(int()), box: opt(PartialBox) }),
+		obj({ op: lit("insert"), node: PenItem, parent: opt(union(str(), { type: "null" })), index: opt(int()), box: opt(PartialBox) }),
 		obj({ op: lit("update"), id: str(), set: opt(rec(true)), box: opt(PartialBox) }),
 		obj({ op: lit("replace"), id: str(), node: PenItem }),
 		obj({ op: lit("delete"), id: str() }),
 		obj({ op: lit("move"), id: str(), parent: opt(union(str(), { type: "null" })), index: opt(int()), box: opt(PartialBox) }),
-		obj({ op: lit("copy"), id: str(), parent: opt(str()), index: opt(int()), box: opt(PartialBox), as: opt(str()) }),
+		obj({ op: lit("copy"), id: str(), parent: opt(union(str(), { type: "null" })), index: opt(int()), box: opt(PartialBox), as: opt(str()) }),
+		obj({ op: lit("variables"), set: rec(true), themes: opt(union(rec(arr(str())), { type: "null" })) }),
 	),
 	'An edit to the drawing. Items are named by id; one inside an instance by its path, "card-1/label".',
 );

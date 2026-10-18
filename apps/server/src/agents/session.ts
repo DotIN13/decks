@@ -108,6 +108,7 @@ export class DeckAgent {
 	private backend: AgentBackend | undefined;
 	private starting: Promise<void> | undefined;
 	private tool: StageTool | undefined;
+	private personal: StageTool | undefined;
 	/**
 	 * Isolated mode (`agents/isolation.ts`): the runtime runs in a temporary folder of copies of
 	 * this stage's boards, and is told to leave the Decks data alone. On the record, so a restart
@@ -1113,6 +1114,20 @@ export class DeckAgent {
 			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
 		});
 		return this.tool;
+	}
+
+	/**
+	 * The stage tool for the person, acting on this agent's stage from the browser (`verbs/person.ts`):
+	 * the same verbs, and the same stage, with the person as the one who acted, so nothing they do
+	 * draws this agent's cursor or counts as its work.
+	 */
+	personTool(): StageTool {
+		this.personal ??= createStageTool({
+			stage: this.stage,
+			agent: { ...this.stageHooks(), person: true, acted: undefined, worked: undefined, drew: undefined },
+			port: this.host.port,
+		});
+		return this.personal;
 	}
 
 	/**

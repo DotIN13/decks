@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { asBoardFormat } from "../boards/templates.ts";
 import type { WireContext, WirePart } from "./context.ts";
-import { putOn, takeOff } from "../stage/canvas-ops.ts";
+import { asPerson } from "../verbs/person.ts";
+import { putOn } from "../stage/canvas-ops.ts";
 
 /**
  * The board frames: the user's half of the canvas, and the two ways the past comes back.
@@ -25,24 +26,9 @@ function stageFor(message: { stage?: string }, wire: WireContext): { name?: stri
 }
 
 export const boards = {
+	/** A board dragged on the canvas: the person's `move`, on the stage on screen (`verbs/person.ts`). */
 	"board.move": (message, reply, wire) => {
-		if (!wire.deck.board(message.path)) {
-			reply({ type: "error", text: `No such board: ${message.path}` });
-			return;
-		}
-		/*
-		 * The move belongs to the stage that made it — the focused agent — and not to the deck, so what
-		 * is written down is this conversation's arrangement. The board sent back is the one *this stage*
-		 * sees, which is the same object when the caller is the stage that moved it.
-		 */
-		const { name, agent } = stageFor(message, wire);
-		if (agent) agent.setPosition(message.path, message.x, message.y);
-		else if (name) wire.stage.pens?.moveBoard(name, message.path, message.x, message.y);
-		const board = wire.stageState(agent).boards.find((one) => one.path === message.path);
-		if (!board) return;
-		// Broadcast rather than reply: a second tab is looking at the same
-		// stage and the board has moved there too.
-		wire.send({ type: "board.changed", path: board.path, rev: board.rev, board });
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "move", [message.path, { x: message.x, y: message.y }], reply);
 	},
 
 	/*
@@ -63,45 +49,8 @@ export const boards = {
 	 * resize is not the place to discover that a number was a typo.
 	 */
 	"board.resize": (message, reply, wire) => {
-		const board = wire.deck.board(message.path);
-		if (!board) {
-			reply({ type: "error", text: `No such board: ${message.path}` });
-			return;
-		}
-		const bounded = (value: unknown, low: number, high: number) =>
-			typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
-		const w = bounded(message.w, 320, 4000);
-		const h = bounded(message.h, 200, 8000);
-		if (w === undefined && h === undefined) return;
-
-		try {
-			if (board.format === "slides") {
-				// `writeBoard` inside broadcasts the new board, so this one needs no second message.
-				if (w !== undefined) {
-					wire.boards.resize(message.path, { w });
-					wire.boards.wrote(message.path, "you");
-				}
-				return;
-			}
-			const size = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
-			/*
-			 * The canvas first, then the file. The file's write is what the canvas on screen waits for
-			 * to let go of the box it was dragged to, and it reads the board's size there from the canvas:
-			 * written the other way round, a board made shorter came back at its old height for a moment,
-			 * and only then shrank.
-			 */
-			const { name, agent } = stageFor(message, wire);
-			if (agent) agent.setSize(message.path, size);
-			else if (name) wire.stage.pens?.sizeBoard(name, message.path, size);
-			if (!board.fills && ((w !== undefined && w !== board.w) || (h !== undefined && h !== board.h))) {
-				wire.boards.resize(message.path, size);
-				wire.boards.wrote(message.path, "you");
-			}
-			const sized = wire.stageState(agent).boards.find((one) => one.path === message.path);
-			if (sized) wire.send({ type: "board.changed", path: sized.path, rev: sized.rev, board: sized });
-		} catch (error) {
-			reply({ type: "notice", level: "warn", text: (error as Error).message });
-		}
+		const size = { ...(typeof message.w === "number" ? { w: message.w } : {}), ...(typeof message.h === "number" ? { h: message.h } : {}) };
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "resize", [message.path, size], reply);
 	},
 
 	"board.extent": (message, _reply, wire) => {
@@ -152,10 +101,8 @@ export const boards = {
 		wire.boards.seen(message.path);
 	},
 
-	"board.hide": (message, _reply, wire) => {
-		const { name, agent } = stageFor(message, wire);
-		if (agent) agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
-		else if (name && wire.stage.pens) takeOff(wire.stage.pens, wire.deck, name, [message.path]);
+	"board.hide": (message, reply, wire) => {
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { ...(message.stage ? { stage: message.stage } : {}) }, "hide", [message.path], reply);
 	},
 
 	/*

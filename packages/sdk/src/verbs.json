@@ -702,7 +702,14 @@
           "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
          },
          "parent": {
-          "type": "string"
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
          },
          "index": {
           "type": "integer"
@@ -891,7 +898,14 @@
           "type": "string"
          },
          "parent": {
-          "type": "string"
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
          },
          "index": {
           "type": "integer"
@@ -921,6 +935,43 @@
         "required": [
          "op",
          "id"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "variables"
+          ]
+         },
+         "set": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+         },
+         "themes": {
+          "anyOf": [
+           {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+             "type": "array",
+             "items": {
+              "type": "string"
+             }
+            }
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "op",
+         "set"
         ],
         "additionalProperties": false
        }

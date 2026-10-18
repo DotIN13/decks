@@ -201,6 +201,7 @@ export class App {
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
+			wrote: (path, who) => this.boards.wrote(path, who),
 			retitle: (name, title) => titleCanvas({ deck: this.deck, pens: this.pens, agents: this.agents.all() }, name, title),
 			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
 			agents: () => this.agents.summaries(),

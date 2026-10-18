@@ -1,6 +1,7 @@
 import type { Op } from "@decks/pen";
 import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
+import { asPerson } from "../verbs/person.ts";
 
 /**
  * The person's edits to a stage drawing (`stage/pens.ts`).
@@ -12,19 +13,13 @@ import type { WirePart } from "./context.ts";
  */
 export const pen = {
 	"stage.pen.edit": (message, reply, wire) => {
-		const agent = wire.agents.get(message.agentId);
-		const pens = wire.stage.pens;
-		if (!agent || !pens || !Array.isArray(message.ops)) return;
-		// The drawing on screen, named by the browser; an older one names only the agent.
-		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(true);
-		if (!name) return;
-		try {
-			pens.edit(name, message.ops as Op[], undefined, { undoable: true });
-		} catch (error) {
-			reply({ type: "notice", level: "warn", text: (error as Error).message });
+		const asked = { agent: message.agentId, ...(message.stage ? { stage: message.stage } : {}) };
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, asked, "pen.edit", [message.ops as Op[]], reply).then((ok) => {
 			// Send the drawing back as it is, so a preview the browser drew for the failed edit goes away.
-			reply(pens.frame(agent.id, name));
-		}
+			const agent = wire.agents.get(message.agentId);
+			const name = agent?.stageName();
+			if (!ok && agent && name && wire.stage.pens) reply(wire.stage.pens.frame(agent.id, name));
+		});
 	},
 	/** The whole drawing again, for a browser that missed a revision of the edits. */
 	"stage.pen.get": (message, reply, wire) => {
@@ -43,31 +38,18 @@ export const pen = {
 	 * on every switch of canvas.
 	 */
 	"agent.stage": (message, reply, wire) => {
-		const agent = wire.agents.get(message.id);
-		if (!agent) return;
-		try {
-			agent.openStage(message.stage);
-		} catch (error) {
-			reply({ type: "notice", level: "warn", text: (error as Error).message });
-			return;
-		}
-		wire.publishStages();
+		if (!wire.agents.get(message.id)) return;
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "open", [message.stage], reply);
 	},
 
 	/** A stage made from a name you typed, opened for that agent at once. */
 	"stage.new": (message, reply, wire) => {
-		const agent = wire.agents.get(message.id);
-		if (!agent) return;
+		if (!wire.agents.get(message.id)) return;
 		const title = typeof message.title === "string" ? message.title.trim() : "";
 		if (!title) return;
-		try {
-			agent.newStage(title);
-		} catch (error) {
-			reply({ type: "notice", level: "warn", text: (error as Error).message });
-			return;
-		}
-		reply({ type: "deck.state", deck: wire.stageState() });
-		wire.publishStages();
+		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, { agent: message.id }, "newStage", [title], reply).then((ok) => {
+			if (ok) reply({ type: "deck.state", deck: wire.stageState() });
+		});
 	},
 
 	/**

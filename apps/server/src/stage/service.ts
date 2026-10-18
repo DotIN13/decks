@@ -56,6 +56,8 @@ export interface StageHost {
 	broadcast(message: ServerMessage): void;
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
 	stagesChanged?(): void;
+	/** Say who last wrote a board, as the person's own edits do (`BoardService.wrote`). */
+	wrote?(path: string, who: string): void;
 	/** Give a canvas a name; the first name anyone chooses names its folder too (`stage-admin.ts`). Returns the folder. */
 	retitle?(name: string, title: string): string;
 	/** The camera the browser last reported for one agent's canvas. */
@@ -158,6 +160,22 @@ export class StageService {
 	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
 	stagesChanged(): void {
 		this.host.stagesChanged?.();
+	}
+
+	/** A board as its file has it (format, whether it fills its frame), not as a stage places it. */
+	fileBoard(path: string): Board | undefined {
+		return this.deck.board(path);
+	}
+
+	/** Say who last wrote a board: `you` for the person's own resize. */
+	wrote(path: string, who: string): void {
+		this.host.wrote?.(path, who);
+	}
+
+	/** Tell every browser a board changed on this agent's stage, as that stage now places it. */
+	announce(agentId: string, path: string): void {
+		const board = this.boards(agentId).find((one) => one.path === path);
+		if (board) this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
 	}
 
 	/** Name a canvas (`StageHost.retitle`); without a host that can, only its title changes. */

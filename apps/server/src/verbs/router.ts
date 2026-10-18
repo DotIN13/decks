@@ -3,6 +3,7 @@ import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import type { DeckAgent } from "../agents/session.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
+import { personAgent } from "./person.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
 /**
@@ -16,7 +17,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  *
  * Who is calling is said, not proven, for now: `X-Decks-Agent` names an agent by id or name (the
  * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
- * opencode session, whose agent the bridge knows, `X-Decks-Board` a board's button (with
+ * opencode session, whose agent the bridge knows, `X-Decks-Person` the person in the browser (with
+ * `X-Decks-Stage` and `X-Decks-Agent` saying whose stage), `X-Decks-Board` a board's button (with
  * `X-Decks-Stage`, the canvas it was pressed on), and `X-Decks-App`
  * names an app, which acts for the conversation on screen once the person has let it. Requests
  * from another site still need the pairing token (`http.ts`), as every `/api` route does.
@@ -78,6 +80,11 @@ async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: u
 	};
 	const appName = header("x-decks-app") ?? (typeof body.app === "string" ? body.app : undefined);
 	if (appName) return appCaller(app, appName, allowedOnce);
+	// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
+	if (header("x-decks-person")) {
+		const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent")! } : {}) });
+		return { tool: agent.personTool() };
+	}
 	// A board's own button, whose code runs in the board's page (`runtime/lib/board.js`).
 	const board = header("x-decks-board");
 	if (board) return boardCaller(app, decodeURIComponent(board), header("x-decks-stage"), allowedOnce);

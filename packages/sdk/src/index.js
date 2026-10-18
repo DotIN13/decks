@@ -116,6 +116,8 @@ function defaultNotes(lines) {
  * @param {string} [options.url]  Decks' address, as in http://127.0.0.1:4329. Default: `DECKS_URL`, or the page's own.
  * @param {string} [options.agent]  The agent the calls are for, by id or name. Default: `DECKS_AGENT`.
  * @param {string} [options.app]  The app the calls are from. Default: `DECKS_APP`, or the page's app.
+ * @param {boolean} [options.person]  The person, in Decks' own page: `stage` and `agent` say whose stage (each a value or a function read per call).
+ * @param {string | (() => string | undefined)} [options.stage]  For the person: the canvas on screen.
  * @param {string} [options.board]  A board whose button is calling. Default: the board whose page this is.
  * @param {string} [options.session]  An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`.
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
@@ -129,6 +131,9 @@ export function connect(options = {}) {
 	const session = options.session ?? env("DECKS_SESSION");
 	const app = options.app ?? env("DECKS_APP") ?? page.app;
 	const board = options.board ?? page.board;
+	// The person, clicking in Decks' own page: the canvas on screen and the agent they talk to.
+	const person = options.person === true;
+	const stage = options.stage;
 	const doFetch = options.fetch ?? globalThis.fetch;
 	const onNotes = options.notes ?? defaultNotes;
 	if (!base) throw new DecksError("No Decks to talk to: set DECKS_URL (Decks sets it in each agent's shell), or pass { url }.");
@@ -140,9 +145,15 @@ export function connect(options = {}) {
 		const given = [...args];
 		while (given.length && given[given.length - 1] === undefined) given.pop();
 		const headers = { "content-type": "application/json" };
-		if (app) headers["x-decks-app"] = app;
+		if (person) {
+			headers["x-decks-person"] = "1";
+			const on = typeof stage === "function" ? stage() : stage;
+			if (on) headers["x-decks-stage"] = on;
+			const to = typeof agent === "function" ? agent() : agent;
+			if (to) headers["x-decks-agent"] = to;
+		} else if (app) headers["x-decks-app"] = app;
 		else if (board) headers["x-decks-board"] = encodeURIComponent(board);
-		else if (agent) headers["x-decks-agent"] = agent;
+		else if (agent) headers["x-decks-agent"] = typeof agent === "function" ? agent() : agent;
 		else if (session) headers["x-decks-session"] = session;
 		let response;
 		try {

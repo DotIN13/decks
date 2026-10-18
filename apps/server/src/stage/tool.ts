@@ -149,6 +149,11 @@ export interface StageAgentHooks {
 	isolated?(): boolean;
 	/** Set when the caller is a board's own code (`stage/board-actor.ts`), not an agent. */
 	board?: string;
+	/**
+	 * Set when the caller is the person, in the browser, acting on this agent's stage (`verbs/person.ts`):
+	 * their change is theirs, so it draws no agent cursor, is undoable, and hears no agent's reminders.
+	 */
+	person?: boolean;
 	/** Work on another stage: its boards become this agent's (`agents/session.ts`). */
 	openStage?(name: string): void;
 	/** Make an empty stage from a title, open it, and return its name. */
@@ -489,12 +494,43 @@ export function createStageTool(deps: {
 		 * Either dimension on its own is allowed, because the one that is usually wrong is
 		 * the height.
 		 */
+		/**
+		 * Size a board: on this stage's canvas, and in its file, so it comes at that size where a canvas
+		 * places it next. The same for an agent and for the person dragging a corner:
+		 *
+		 * - **Clamped**: 320 wide is about the narrowest board the templates use, and the ceiling is
+		 *   well past the tallest board in the deck; a resize is not the place to find a typo.
+		 * - **A slide deck takes only the width**, in its own file: its height follows from its aspect.
+		 * - **The canvas first, then the file.** The file's write is what the canvas on screen waits for
+		 *   to let go of the box it was dragged to, and it reads the board's size there from the
+		 *   canvas: the other way round, a board made shorter came back at its old height for a moment.
+		 * - A board that fills its frame has no size in its file to write.
+		 */
 		resize: async (path: string, size: { w?: number; h?: number }) => {
 			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
-			const board = service.resize(path, size);
-			agent.sized?.(board.path, { w: board.w, h: board.h });
-			agent.acted?.("resize", board.path);
-			return { path: board.path, w: board.w, h: board.h };
+			const file = service.fileBoard(path);
+			if (!file) throw new Error(`No such board: ${path}`);
+			const bounded = (value: unknown, low: number, high: number) =>
+				typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
+			const w = bounded(size.w, 320, 4000);
+			const h = bounded(size.h, 200, 8000);
+			if (w === undefined && h === undefined) throw new Error("A resize needs a width, a height, or both, as numbers");
+			const by = () => (agent.person ? service.wrote(path, "you") : agent.acted?.("resize", path));
+			if (file.format === "slides") {
+				if (w !== undefined) {
+					service.resize(path, { w });
+					by();
+				}
+				const deck = service.fileBoard(path) ?? file;
+				return { path, w: deck.w, h: deck.h };
+			}
+			const sized = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			agent.sized?.(path, { w: w ?? file.w, h: h ?? file.h });
+			if (!file.fills && ((w !== undefined && w !== file.w) || (h !== undefined && h !== file.h))) service.resize(path, sized);
+			by();
+			service.announce(agent.id, path);
+			const now = here().find((one) => one.path === path);
+			return { path, w: now?.w ?? w ?? file.w, h: now?.h ?? h ?? file.h };
 		},
 
 		/**
@@ -950,6 +986,8 @@ export function createStageTool(deps: {
 			const asked = name.trim();
 			const folder = pens && !pens.names().includes(asked) ? (pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase()) ?? asked) : asked;
 			agent.openStage(folder);
+			// Who is on which stage is in every browser's stage list.
+			service.stagesChanged();
 			return { stage: folder, boards: agent.inPlay() };
 		},
 		/**
@@ -972,7 +1010,9 @@ export function createStageTool(deps: {
 		newStage: async (title: string) => {
 			if (typeof title !== "string" || !title.trim()) throw new Error('newStage takes a title, as in decks new-stage "Launch plan".');
 			if (!agent.newStage) throw new Error("This agent cannot make stages.");
-			return { stage: agent.newStage(title.trim()) };
+			const made = agent.newStage(title.trim());
+			service.stagesChanged();
+			return { stage: made };
 		},
 
 		/**
@@ -1051,7 +1091,8 @@ export function createStageTool(deps: {
 				if (options?.path !== undefined) return pens.editFile(options.path, ops as readonly Op[]);
 				// Checked by `apply`, which answers a malformed edit with a sentence naming it.
 				const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
-				const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path));
+				// The person's own edits can be taken back with the stage's undo; an agent's are its work.
+				const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path), agent.person ? { undoable: true } : undefined);
 				const placed = placements(pens.withImported(needStage(), entry.doc), { theme: baseTheme(entry.doc, "light"), measure: serverText.measure });
 				const answered = results.map((result) => {
 					const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
@@ -1128,12 +1169,15 @@ export function createStageTool(deps: {
 			} catch (error) {
 				answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };
 			}
-			// The same lines a run adds after its value, in the same order (see `run`).
+			// After the verb's own notes, the agent's reminders: who it is, and what its canvas is called.
+			// Not for the person, whose clicks are theirs and not the agent's.
 			const said = [...notes];
-			const unsaid = identityReminder(agent.identity());
-			if (unsaid) said.push(unsaid);
-			const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
-			if (unnamed) said.push(unnamed);
+			if (!agent.person) {
+				const unsaid = identityReminder(agent.identity());
+				if (unsaid) said.push(unsaid);
+				const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
+				if (unnamed) said.push(unnamed);
+			}
 			deps.persist?.(snapshot());
 			return { ...answer, notes: said, ...(images.length > 0 ? { images: [...images] } : {}) };
 		},
