@@ -24,26 +24,14 @@ pub struct GpuHandle {
 }
 
 async fn open(target: wgpu::SurfaceTarget<'static>, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::BROWSER_WEBGPU, ..wgpu::InstanceDescriptor::new_without_display_handle() });
-	let surface = instance.create_surface(target).map_err(err)?;
-	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(err)?;
-	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(err)?;
-	let mut gpu = Gpu::new(device, queue);
-	gpu.set_surface(surface, &adapter, width, height);
-	Ok(GpuHandle { gpu })
+	Ok(GpuHandle { gpu: stage_gpu::targets::webgpu::open(target, width, height).await.map_err(err)? })
 }
 
 /// The page's two canvases on one device: `over` the boards' pages (the drawing, the screen's first
 /// surface) and `under` them (board pictures).
 #[wasm_bindgen(js_name = openStage)]
 pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: u32) -> Result<GpuHandle, JsError> {
-	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::BROWSER_WEBGPU, ..wgpu::InstanceDescriptor::new_without_display_handle() });
-	let top = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(err)?;
-	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&top), ..Default::default() }).await.map_err(err)?;
-	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(err)?;
-	let mut gpu = Gpu::new(device, queue);
-	gpu.set_surface(top, &adapter, width, height);
-	Ok(GpuHandle { gpu })
+	open(wgpu::SurfaceTarget::Canvas(canvas), width, height).await
 }
 
 /// Copy a picture into texture `id`, made the picture's size, and let the picture go.

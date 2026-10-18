@@ -288,3 +288,76 @@ fn webgl2_limits_draw_the_same() {
 	// Nothing was lost on the way: the small device reported no errors.
 	assert!(!small.lost());
 }
+
+/// Buffers, the table and layer textures are kept between draws: a picture drawn after bigger and
+/// smaller ones, into the same textures, comes out as on a device that drew nothing before.
+#[test]
+fn kept_resources_draw_the_same() {
+	let (Some(mut fresh), Some(mut used)) = (gpu(), gpu()) else { return };
+	let first = draw_effects(&mut fresh);
+	let _ = draw_card(&mut used);
+	let _ = draw_words(&mut used);
+	let _ = draw_effects(&mut used);
+	let _ = draw_shapes(&mut used);
+	assert!(first == draw_effects(&mut used), "effects after other draws");
+	assert!(draw_shapes(&mut fresh) == draw_shapes(&mut used), "shapes after other draws");
+}
+
+/// How long drawing takes, without reading back: every tile of each `STAGE_FIXTURES` stage, painted
+/// once, then drawn `STAGE_BENCH_ROUNDS` times (default 20). Run alone with `--ignored --nocapture`.
+#[test]
+#[ignore]
+fn draw_bench() {
+	let Some(mut g) = gpu() else { return };
+	let Ok(root) = std::env::var("STAGE_FIXTURES") else { return };
+	let rounds: usize = std::env::var("STAGE_BENCH_ROUNDS").ok().and_then(|r| r.parse().ok()).unwrap_or(20);
+	for name in STAGES {
+		let Ok(text) = std::fs::read_to_string(format!("{root}/{name}/stage.pen")) else { continue };
+		let doc = stage_doc::Document::parse(&text).unwrap();
+		let words = fonts();
+		let scene = stage_scene::Scene::new(&doc, false, &words);
+		let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
+		let Some(extent) = scene.roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b)) else { continue };
+		let scale = (2048.0 / extent.w.max(extent.h)).min(1.0);
+		let keys = Grid::covering(&extent, scale as f32, 0);
+		let skip = std::collections::HashSet::new();
+		let none = |_: &str| None;
+		let ctx = Context::new(&scene, &skip, &none).with_text(&words, &atlas);
+		let lists: Vec<DrawList> = keys.iter().map(|k| paint_area(&ctx, k.area(), k.scale(), Color([0.98, 0.98, 0.98, 1.0]))).collect();
+		stage_paint::flush_glyphs(&mut atlas.borrow_mut(), &mut g);
+		for i in 0..lists.len() {
+			g.texture(1000 + i as u32, TextureKind::Color, TILE, TILE, None);
+		}
+		let mut cpu = std::time::Duration::ZERO;
+		let mut wall = Vec::new();
+		for round in 0..=rounds {
+			let start = std::time::Instant::now();
+			for (i, list) in lists.iter().enumerate() {
+				let t = std::time::Instant::now();
+				g.draw(Target::Texture(1000 + i as u32), list);
+				if round > 0 {
+					cpu += t.elapsed();
+				}
+			}
+			g.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+			// The first round makes pipelines and buffers; it is not counted.
+			if round > 0 {
+				wall.push(start.elapsed().as_secs_f64() * 1000.0);
+			}
+		}
+		wall.sort_by(f64::total_cmp);
+		let draws = (lists.len() * rounds) as f64;
+		eprintln!(
+			"bench {name}: {} tiles, {:.3} ms CPU a draw, round wall median {:.2} ms (min {:.2}, max {:.2}), {:.3} ms a draw",
+			lists.len(),
+			cpu.as_secs_f64() * 1000.0 / draws,
+			wall[wall.len() / 2],
+			wall[0],
+			wall[wall.len() - 1],
+			wall[wall.len() / 2] / lists.len() as f64
+		);
+		for i in 0..lists.len() {
+			g.forget(1000 + i as u32);
+		}
+	}
+}
