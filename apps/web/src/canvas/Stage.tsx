@@ -1063,6 +1063,9 @@ export function Stage(props: {
 	});
 	/** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
 	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+	/** Where an arrow handle sits, in screen pixels: its centre this far out from the item's side, and this wide. */
+	const ANCHOR_OUT = 14;
+	const anchorSize = coarse ? 16 : 10;
 	const HANDLE_PX = coarse ? 16 : 9;
 	const TEXTY = new Set(["text", "note", "prompt", "context"]);
 	/**
@@ -5113,8 +5116,8 @@ export function Stage(props: {
 					{(box) => (
 						<For each={ARROW_SIDES}>
 							{(side) => {
-								const gap = () => 14 / props.camera.zoom;
-								const size = () => (coarse ? 16 : 10) / props.camera.zoom;
+								const gap = () => ANCHOR_OUT / props.camera.zoom;
+								const size = () => anchorSize / props.camera.zoom;
 								const at = () => {
 									const [x, y] = sidePoint(box(), side);
 									const [nx, ny] = side === "top" ? [0, -1] : side === "bottom" ? [0, 1] : side === "left" ? [-1, 0] : [1, 0];
@@ -5559,6 +5562,7 @@ export function Stage(props: {
 					<BoardCallout
 						box={items().box}
 						label={`${items().name}: actions`}
+						gap={penAnchors() ? ANCHOR_OUT + anchorSize / 2 + 6 : undefined}
 						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || penDrag().dx !== 0 || penDrag().dy !== 0 || !!penResize()}
 						camera={props.camera}
 						view={view()}

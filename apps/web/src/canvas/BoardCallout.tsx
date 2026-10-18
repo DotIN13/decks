@@ -48,6 +48,8 @@ export function BoardCallout(props: {
 	onDelete?: () => void;
 	/** Out of sight while something moves. */
 	hidden?: boolean;
+	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
+	gap?: number;
 }) {
 	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
 	const [width, setWidth] = createSignal(0);
@@ -78,9 +80,9 @@ export function BoardCallout(props: {
 		const half = width() / 2;
 		const x = half > 0 && right - left > width() ? Math.min(right - half, Math.max(left + half, aim)) : aim;
 		const arrow = half > 0 ? Math.min(width() - 18, Math.max(18, aim - (x - half))) : undefined;
-		const gap = GAP;
-		if (top.y - gap - tall() >= room.y + 4) return { x, y: top.y - GAP, below: false, arrow };
-		if (bottom.y + gap + tall() <= room.y + room.height - 4) return { x, y: bottom.y + GAP, below: true, arrow };
+		const gap = props.gap ?? GAP;
+		if (top.y - gap - tall() >= room.y + 4) return { x, y: top.y - gap, below: false, arrow };
+		if (bottom.y + gap + tall() <= room.y + room.height - 4) return { x, y: bottom.y + gap, below: true, arrow };
 		// Both edges out of the room: the board fills it, so the pill sits at the top of what is free.
 		return { x, y: room.y + 10, below: true, arrow };
 	};

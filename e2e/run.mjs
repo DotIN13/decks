@@ -173,6 +173,7 @@ const CHECKS = [
 	{ file: "shapes.mjs", needsAgent: false },
 	/* A drag bends the arrows joined to what it carries: routed by the engine at each step, no tile painted again. */
 	{ file: "bent-arrows.mjs", needsAgent: false },
+	{ file: "item-pill.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/*
