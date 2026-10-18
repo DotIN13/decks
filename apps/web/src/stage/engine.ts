@@ -767,8 +767,10 @@ export class StageEngine {
 		if (fit >= 1) return { bitmap, width, height };
 		const resizeWidth = Math.max(1, Math.floor(width * fit));
 		const resizeHeight = Math.max(1, Math.floor(height * fit));
-		const smaller = await createImageBitmap(bitmap, { premultiplyAlpha: "premultiply", resizeWidth, resizeHeight, resizeQuality: "high" });
+		// From the file again, not from `bitmap`: WebKit's WebGL takes a bitmap made from a bitmap as
+		// straight and premultiplies it a second time (every partly clear pixel too dark).
 		bitmap.close();
+		const smaller = await createImageBitmap(blob, { premultiplyAlpha: "premultiply", resizeWidth, resizeHeight, resizeQuality: "high" });
 		return { bitmap: smaller, width, height };
 	}
 

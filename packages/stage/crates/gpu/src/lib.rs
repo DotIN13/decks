@@ -64,6 +64,9 @@ pub struct Gpu {
 	next_layer: u32,
 	limits: Limits,
 	api: Api,
+	/// How pictures go into textures under WebGL 2.
+	#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
+	webgl: targets::webgl::Uploads,
 }
 
 impl Gpu {
@@ -81,7 +84,20 @@ impl Gpu {
 		let limits = Limits { max_texture: device.limits().max_texture_dimension_2d, max_samples: samples, table_width: stage_render::limits::TABLE_WIDTH };
 		let pipelines = Pipelines::new(&device, limits.max_samples);
 		let resources = Resources::new(&device, &queue, &pipelines);
-		Gpu { device, queue, surfaces: Vec::new(), textures: HashMap::new(), pipelines, resources, lost, next_layer: LAYER_IDS, limits, api }
+		Gpu {
+			device,
+			queue,
+			surfaces: Vec::new(),
+			textures: HashMap::new(),
+			pipelines,
+			resources,
+			lost,
+			next_layer: LAYER_IDS,
+			limits,
+			api,
+			#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
+			webgl: Default::default(),
+		}
 	}
 
 	/// The graphics API this backend's device is on.

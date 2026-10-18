@@ -10,10 +10,10 @@ stage-render = { path = "../render" }
 wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "metal", "std"] }
 bytemuck = { version = "1", features = ["derive"] }
 
-# The WebGL 2 target asks its canvas's context what wgpu does not say (MAX_SAMPLES), and hears when
-# the context is lost.
+# The WebGL 2 target asks its canvas's context what wgpu does not say (MAX_SAMPLES), hears when
+# the context is lost, and asks how it hands over a canvas's picture (`targets/webgl.rs`, `Uploads`).
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3", features = ["HtmlCanvasElement", "OffscreenCanvas", "WebGl2RenderingContext", "EventTarget", "Event"] }
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "OffscreenCanvas", "WebGl2RenderingContext", "EventTarget", "Event", "ImageBitmap", "WebGlTexture", "WebGlFramebuffer", "console"] }
 wasm-bindgen = "0.2.129"
 js-sys = "0.3"
 

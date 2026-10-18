@@ -66,9 +66,10 @@ pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: 
 }
 
 /// Copy a picture into texture `id`, made the picture's size (or `size`), and let the picture go.
+/// `from_canvas`: it is a canvas's `transferToImageBitmap` (a tile), not a `createImageBitmap`.
 /// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
 /// them first, so it should not come) keeps what fits, and says so.
-fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>) {
+fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) {
 	let cap = gpu.limits().max_picture();
 	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
 	let (w, h) = (w.min(cap), h.min(cap));
@@ -79,20 +80,7 @@ fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(
 		gpu.texture(id, TextureKind::Color, w, h, None);
 	}
 	let texture = gpu.texture_handle(id).expect("just made").clone();
-	// Pictures come premultiplied (`premultiplyAlpha: "premultiply"`, or a premultiplied canvas's
-	// `transferToImageBitmap`). WebGPU is told to keep them so; WebGL 2 copies an ImageBitmap as it
-	// is stored and refuses to be asked to premultiply one.
-	let premultiplied_alpha = gpu.api() != stage_gpu::Api::WebGl2;
-	gpu.queue.copy_external_image_to_texture(
-		&wgpu::CopyExternalImageSourceInfo { source: wgpu::ExternalImageSource::ImageBitmap(bitmap.clone()), origin: wgpu::Origin2d::ZERO, flip_y: false },
-		wgpu::CopyExternalImageDestInfo { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha },
-		wgpu::Extent3d { width: bitmap.width().min(w), height: bitmap.height().min(h), depth_or_array_layers: 1 },
-	);
-	// WebGPU has copied the picture by now; WebGL 2 copies it with the queue's next submission, so
-	// submit now, before the picture is let go.
-	if !premultiplied_alpha {
-		gpu.queue.submit([]);
-	}
+	gpu.copy_bitmap(bitmap, &texture, bitmap.width().min(w), bitmap.height().min(h), from_canvas);
 	bitmap.close();
 }
 
@@ -309,7 +297,7 @@ impl PageEngine {
 	pub fn put_tile(&mut self, scale: u32, x: i32, y: i32, bitmap: web_sys::ImageBitmap) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let id = self.page.tile_texture(key(scale, x, y));
-		copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)));
+		copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)), true);
 	}
 
 	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
@@ -319,7 +307,7 @@ impl PageEngine {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
-		copy_in(gpu, id, &bitmap, None);
+		copy_in(gpu, id, &bitmap, None, false);
 		self.page.picture(url, id, w, h);
 	}
 
@@ -640,7 +628,7 @@ impl WorkerEngine {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
-		copy_in(gpu, id, &bitmap, None);
+		copy_in(gpu, id, &bitmap, None, false);
 		self.worker.picture(url, id, w, h);
 	}
 

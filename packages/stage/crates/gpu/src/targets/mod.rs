@@ -34,6 +34,26 @@ impl Canvas {
 	}
 }
 
+#[cfg(target_arch = "wasm32")]
+impl Gpu {
+	/// Copy a picture, premultiplied, into the top left `width` × `height` of `texture`, kept
+	/// premultiplied as every colour texture is. `from_canvas`: it is a canvas's
+	/// `transferToImageBitmap` (a tile from the worker), else a `createImageBitmap` with
+	/// `premultiplyAlpha: "premultiply"`. The picture may be let go once this returns.
+	pub fn copy_bitmap(&mut self, bitmap: &web_sys::ImageBitmap, texture: &wgpu::Texture, width: u32, height: u32, from_canvas: bool) {
+		#[cfg(feature = "webgl")]
+		if self.api == Api::WebGl2 {
+			return webgl::copy_bitmap(self, bitmap, texture, width, height, from_canvas);
+		}
+		let _ = from_canvas;
+		self.queue.copy_external_image_to_texture(
+			&wgpu::CopyExternalImageSourceInfo { source: wgpu::ExternalImageSource::ImageBitmap(bitmap.clone()), origin: wgpu::Origin2d::ZERO, flip_y: false },
+			wgpu::CopyExternalImageDestInfo { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha: true },
+			wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+		);
+	}
+}
+
 impl Gpu {
 	/// Draw to the screen through this surface from now on, as the first screen surface.
 	pub fn set_surface(&mut self, surface: wgpu::Surface<'static>, adapter: &wgpu::Adapter, width: u32, height: u32) {
