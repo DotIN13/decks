@@ -1333,6 +1333,12 @@
 	border-radius: 2px;
 	background: var(--panel);
 }
+	/* A resize handle answers a press 15 screen pixels across, whatever its drawn size (`--hit`, `editor/core/overlay.ts`, `hitReach`). */
+	.world > .pen-handle[data-handle]:not([data-handle="radius"])::before {
+	content: "";
+	position: absolute;
+	inset: calc(-1 * var(--hit));
+}
 	.world > .pen-handle:is([data-handle="nw"], [data-handle="se"]) {
 	cursor: nwse-resize;
 }

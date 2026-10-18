@@ -9,7 +9,7 @@
 import { ARROW_SIDES, sidePoint, type ArrowSide } from "@decks/pen";
 import GripVertical from "lucide-solid/icons/grip-vertical";
 import { For, Index, Show, type Accessor, type JSX } from "solid-js";
-import { anchorAt, boardHandleList, draftBox, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
+import { anchorAt, boardHandleList, draftBox, hitReach, draftCurve, handleAt, insertBox, radiusInset, radiusShown, type Outline, type Overlay } from "../core/overlay.ts";
 import { HANDLES, type Handle } from "../core/resize.ts";
 
 /** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
@@ -359,7 +359,7 @@ export function OverlayLayer(
 								<div
 									class="pen-handle"
 									data-handle={handle}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px` }}
+									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
 									onPointerDown={(event) => props.onHandle(event, handle)}
 								/>
 							);
@@ -395,7 +395,7 @@ export function OverlayLayer(
 									class="pen-handle"
 									data-handle={handle}
 									data-board={box().path}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px` }}
+									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
 									onPointerDown={(event) => props.onBoardHandle(event, handle)}
 								/>
 							);

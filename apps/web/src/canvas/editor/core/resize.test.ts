@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
-import { BOARD_MIN, boardResizeEnd, boardResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, sizeFloor } from "./resize.ts";
+import { BOARD_MIN, boardResizeEnd, boardResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, shownBoardResize, sizeFloor } from "./resize.ts";
 
 const node = (fields: Record<string, unknown>) => ({ id: "n", type: "frame", ...fields }) as unknown as PenNode;
 const card = (fields: Record<string, unknown> = {}) => node({ metadata: { type: "decks.card" }, ...fields });
@@ -107,10 +107,15 @@ test("a board stops at 320 × 200 at the edge being dragged; the other stays put
 	assert.equal(snapped.guides.length, 1);
 });
 
-test("a slide deck is sized by its width alone and keeps its aspect", () => {
+test("a slide deck keeps its aspect: by a side or corner its width sizes it, by its top or bottom its height", () => {
 	const start = { x: 0, y: 0, w: 1600, h: 900 };
 	const slides = { ...none, slides: true };
-	assert.deepEqual(boardResizeStep(start, "s", { x: 0, y: 100 }, {}, slides).box, start);
+	// By its bottom, 90 taller: 1760 wide, about its middle.
+	assert.deepEqual(boardResizeStep(start, "s", { x: 0, y: 90 }, {}, slides).box, { x: -80, y: 0, w: 1760, h: 990 });
+	// By its top, 450 shorter: the bottom stays, half as wide, still centred.
+	assert.deepEqual(boardResizeStep(start, "n", { x: 300, y: 450 }, {}, slides).box, { x: 400, y: 450, w: 800, h: 450 });
+	// Never narrower than a board can be: 320 wide is 180 tall.
+	assert.deepEqual(boardResizeStep(start, "s", { x: 0, y: -2000 }, {}, slides).box, { x: 640, y: 0, w: 320, h: 180 });
 	assert.deepEqual(boardResizeStep(start, "se", { x: -800, y: 999 }, { shift: true }, slides).box, { x: 0, y: 0, w: 800, h: 450 });
 	assert.deepEqual(boardResizeStep(start, "w", { x: 1500, y: 0 }, {}, slides).box, { x: 1280, y: 0, w: 320, h: 180 });
 });
@@ -148,4 +153,10 @@ test("a radius is written as pen's cornerRadius, or a library shape's metadata.r
 	assert.deepEqual(radiusOp("r", 12, false, undefined), { op: "update", id: "r", set: { cornerRadius: 12 } });
 	assert.deepEqual(radiusOp("r", 0, false, undefined), { op: "update", id: "r", set: { cornerRadius: null } });
 	assert.deepEqual(radiusOp("s", 9, true, node({ metadata: { type: "decks.shape", kind: "Rounded" } })), { op: "update", id: "s", set: { metadata: { type: "decks.shape", kind: "Rounded", radius: 9 } } });
+});
+
+test("a document's resize shows it no shorter than its content, while the drag's own height is what is written", () => {
+	assert.deepEqual(shownBoardResize({ x: 0, y: 100, w: 760, h: 300 }, 642), { x: 0, y: 100, w: 760, h: 642 });
+	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 900 }, 642), { x: 0, y: 0, w: 760, h: 900 });
+	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 300 }, undefined), { x: 0, y: 0, w: 760, h: 300 });
 });

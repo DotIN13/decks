@@ -34,7 +34,7 @@ export type Outline = Rect & {
 	/** Notes and cards have a board's corners, and so does the outline round one. */
 	round?: true;
 };
-/** The selected board's eight handles (six for a slide deck, sized by its width). */
+/** The selected board's eight handles (a slide deck's too: its top and bottom size it by its height, its width following). */
 export type BoardHandles = Outline & { path: string; slides: boolean };
 /** The outline round what the pointer is over: an item (`id`) or a board (`board`). */
 export type HoverBox = Rect & { id?: string; board?: true; round?: true };
@@ -172,9 +172,19 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 	return out;
 }
 
-/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-export function itemHandles(outlines: readonly Outline[], scene: SceneQuery): Outline | undefined {
+/** Handles hide when the box they would sit on is under this many screen pixels both ways: they would cover it. */
+export const HANDLES_MIN_PX = 10;
+
+/** Whether a box is too small on the screen, both ways, at this zoom, to wear handles. */
+export const tooSmallForHandles = (box: { w: number; h: number }, zoom: number) => box.w * zoom < HANDLES_MIN_PX && box.h * zoom < HANDLES_MIN_PX;
+
+/**
+ * One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles.
+ * None while it is under `HANDLES_MIN_PX` on the screen both ways, at `zoom`.
+ */
+export function itemHandles(outlines: readonly Outline[], scene: SceneQuery, zoom = 1): Outline | undefined {
 	if (outlines.length !== 1 || outlines[0]!.role !== "item") return undefined;
+	if (tooSmallForHandles(outlines[0]!, zoom)) return undefined;
 	const node = scene.item(outlines[0]!.id)?.node;
 	// A group is as big as what is in it, and pen does not scale children, so it moves but is not sized.
 	if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
@@ -202,9 +212,10 @@ export function radiusHandle(handles: Outline | undefined, input: Omit<HandleInp
 	return node ? radiusStart(node, handles) : undefined;
 }
 
-/** The selected board's box, when it alone is selected, can be resized, and is not being carried. */
-export function boardHandles(outlines: readonly Outline[], input: { resizable: boolean; carrying: boolean; boards: readonly BoardBox[] }): BoardHandles | undefined {
+/** The selected board's box, when it alone is selected, can be resized, is not being carried, and is big enough on the screen to wear handles. */
+export function boardHandles(outlines: readonly Outline[], input: { resizable: boolean; carrying: boolean; boards: readonly BoardBox[]; zoom?: number }): BoardHandles | undefined {
 	if (!input.resizable || input.carrying || outlines.length !== 1 || outlines[0]!.role !== "board") return undefined;
+	if (tooSmallForHandles(outlines[0]!, input.zoom ?? 1)) return undefined;
 	const path = outlines[0]!.id.slice("board:".length);
 	const board = input.boards.find((candidate) => candidate.path === path);
 	if (!board) return undefined;
@@ -393,6 +404,8 @@ export type OverlayInput = OutlineInput &
 		hoverItem?: string | undefined;
 		hoverBoard?: string | undefined;
 		panning: boolean;
+		/** The camera's zoom: handles hide on a box too small on the screen to wear them. */
+		zoom?: number | undefined;
 		/** A press in hand: what is hovered is not outlined with its kin, nor measured to. */
 		gesture?: boolean | undefined;
 		/** Alt is held: the distances from the selection to what is hovered. */
@@ -417,7 +430,7 @@ export type OverlayInput = OutlineInput &
 /** Everything drawn over the canvas, from the editor's state and the scene. */
 export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const outlines = selectionOutlines(input, scene);
-	const handles = itemHandles(outlines, scene);
+	const handles = itemHandles(outlines, scene, input.zoom);
 	const handleInput = { editable: input.editable, drafting: input.drafting, resizing: input.resizing, drag: input.pointerDrag };
 	const busy = !!input.boardDrag || input.panning;
 	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards }, scene);
@@ -431,7 +444,7 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 		distances: distances({ editing: input.editing, alt: !!input.alt, busy: busy || !!input.gesture || !!input.marquee, selection: frame, over: hover }),
 		handles,
 		anchors: arrowAnchors(handles, handleInput, scene),
-		boardHandles: boardHandles(outlines, { resizable: input.resizable, carrying: !!input.boardDrag || !!input.ownDrag, boards: input.boards }),
+		boardHandles: boardHandles(outlines, { resizable: input.resizable, carrying: !!input.boardDrag || !!input.ownDrag, boards: input.boards, zoom: input.zoom }),
 		radius: radiusHandle(handles, handleInput, scene),
 		radiusDrag: input.radiusDrag,
 		arrow: arrowEnds(input, scene),
@@ -456,8 +469,17 @@ export const gripHidden = (drag: Offset, resizing: boolean) => !!(drag.dx || dra
 
 /* ---- Where things sit, in stage pixels, with screen sizes divided by the zoom by the caller. ---- */
 
-/** The handles a board has: all eight, or six for a slide deck, whose height follows its width. */
-export const boardHandleList = (slides: boolean): readonly Handle[] => (slides ? HANDLES.filter((handle) => handle !== "n" && handle !== "s") : HANDLES);
+/**
+ * The handles a board has: all eight, a slide deck's too. A deck keeps its aspect whichever it is
+ * dragged by (`resize.ts`, `boardResizeStep`). `slides` is kept for the callers that say which board.
+ */
+export const boardHandleList = (_slides: boolean): readonly Handle[] => HANDLES;
+
+/** A resize handle answers a press this many screen pixels across, whatever size it is drawn. */
+export const HANDLE_HIT_PX = 15;
+
+/** How far a handle's hit zone reaches past its drawn box on each side, in stage pixels: `size` is the drawn width, in stage pixels. */
+export const hitReach = (size: number, zoom: number) => Math.max(0, (HANDLE_HIT_PX / zoom - size) / 2);
 
 /** The top-left corner of a `size`-wide handle centred on its edge or corner of `box`. */
 export function handleAt(box: Rect, handle: Handle, size: number): Pt {

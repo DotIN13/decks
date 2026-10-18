@@ -79,11 +79,14 @@ export function resizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeM
 
 /**
  * One move of a board's handle. As an item's, but the edge being dragged stops at `BOARD_MIN`
- * (the other stays put) rather than flipping, and a slide deck is sized by its width alone: its
- * top and bottom do not move, Shift does nothing, and its height keeps the start's aspect.
+ * (the other stays put) rather than flipping, and a slide deck keeps its aspect: by a side or a
+ * corner it is sized by its width, its top staying put and its height following; by its top or
+ * bottom, by its height, its width following about its middle. Shift does nothing to a deck.
  */
 export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions & { slides?: boolean }): { box: Rect; guides: Guide[] } {
 	const slides = !!options.slides;
+	// A deck by its top or bottom: sized by its height, its width following the aspect, about its middle.
+	if (slides && (handle === "n" || handle === "s")) return deckByHeight(start, handle, delta, mods, options);
 	const moved = snapped(dragged(start, handle, delta, slides), handleEdges(handle, slides), mods, options);
 	let { x1, y1, x2, y2 } = moved.box;
 	if (!slides && mods.shift && handle.length === 2) ({ x1, y1, x2, y2 } = keepShape({ x1, y1, x2, y2 }, start, handle));
@@ -97,6 +100,33 @@ export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: Re
 	}
 	const w = Math.round(x2 - x1);
 	return { box: { x: Math.round(x1), y: Math.round(y1), w, h: slides ? Math.round((start.h * w) / start.w) : Math.round(y2 - y1) }, guides: moved.guides };
+}
+
+/**
+ * A slide deck dragged by its top or bottom handle: the dragged edge (snapped) sets its height, its
+ * width keeps the deck's aspect, centred where it was, and it is never narrower than `BOARD_MIN`.
+ */
+function deckByHeight(start: Rect, handle: "n" | "s", delta: Pt, mods: ResizeMods, snap: SnapOptions): { box: Rect; guides: Guide[] } {
+	const moved = snapped(dragged(start, handle, delta, false), handleEdges(handle), mods, snap);
+	let { y1, y2 } = moved.box;
+	const least = start.w > 0 ? (BOARD_MIN.w * start.h) / start.w : 0;
+	if (y2 - y1 < least) {
+		if (handle === "n") y1 = y2 - least;
+		else y2 = y1 + least;
+	}
+	const h = Math.round(y2 - y1);
+	const w = start.h > 0 ? Math.round((h * start.w) / start.h) : start.w;
+	return { box: { x: Math.round(start.x + (start.w - w) / 2), y: Math.round(y1), w, h }, guides: moved.guides };
+}
+
+/**
+ * A board that reads top to bottom, as its resize shows it: the height the drag gives it is the floor
+ * written to the file, and the board is drawn no shorter than its content (`least`), as it will be
+ * once that floor is written. Its top is where the drag has it, by whichever handle: a document
+ * dragged shorter by its top moves down and still holds all of its words.
+ */
+export function shownBoardResize(box: Rect, least: number | undefined): Rect {
+	return least && box.h < least ? { ...box, h: least } : box;
 }
 
 /** What a board's resize changed, on the lift: where it moved to, if a left or top edge was dragged, and its new size. */

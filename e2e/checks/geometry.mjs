@@ -71,6 +71,24 @@ const select = async (path) => {
 	}
 	await page.frameLocator(`.board-node[data-path="${path}"] iframe`).locator("h1, h3, body").first().click();
 	await settle(page, 600);
+	await cornerOnScreen(path);
+};
+
+/**
+ * Zoom out until the board's bottom corner is on the screen, where the handle this check drags is. A
+ * board that reads top to bottom is drawn as tall as its content (`App.tsx`, `stageBoards`), which at
+ * the zoom `select` picks runs past the bottom of the window.
+ */
+const cornerOnScreen = async (path) => {
+	for (let i = 0; i < 6; i++) {
+		const below = await page.evaluate((wanted) => {
+			const corner = document.querySelector(`.pen-handle[data-board="${wanted}"][data-handle="se"]`)?.getBoundingClientRect();
+			return !!corner && corner.bottom > window.innerHeight - 140;
+		}, path);
+		if (!below) break;
+		await page.keyboard.press("Control+Minus");
+		await settle(page, 300);
+	}
 };
 
 /** Drag the handle by screen pixels, and report what the node was drawn at half way through. */
@@ -258,6 +276,22 @@ say(
 	"…and it takes both numbers, in its file too",
 	flowDrawn.w > flowBefore.w && flowDrawn.h > flowBefore.h && metaOf(read(flow))?.w === flowDrawn.w && metaOf(read(flow))?.h === flowDrawn.h,
 	`${flowBefore.w}x${flowBefore.h} → ${flowDrawn.w}x${flowDrawn.h}, ${JSON.stringify(metaOf(read(flow)))}`,
+);
+
+// Dragged far shorter than its words: the file takes the shorter height as a floor, and the board stays as tall as its content.
+const content = await page.evaluate((wanted) => {
+	const doc = document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentDocument;
+	return Math.ceil(doc.querySelector(".doc").getBoundingClientRect().height);
+}, flowPath);
+await cornerOnScreen(flowPath);
+const zoomNow = await page.evaluate(() => globalThis.__decksRust.camera.zoom);
+await dragHandle(flowPath, 0, -(flowDrawn.h - 260) * zoomNow);
+await page.waitForTimeout(1500);
+const floored = await drawnAt(flowPath);
+say(
+	"…and its height is a floor: dragged shorter than its content, the file says so and the board stays as tall as the content",
+	(metaOf(read(flow))?.h ?? 0) < content - 40 && Math.abs(floored.h - content) <= 2,
+	`content ${content}, drawn ${floored.h}, file ${JSON.stringify(metaOf(read(flow)))}`,
 );
 
 // --- a double-click on a board's own bar is not a double-click on empty canvas ----------

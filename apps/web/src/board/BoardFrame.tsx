@@ -201,7 +201,7 @@ export function BoardFrame(props: {
 	 * out, and the server is where the question gets asked (`stage.fit`, and `clipped` on
 	 * `stage.boards()`). Reported once per load, with the revision it was measured at.
 	 */
-	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
+	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
 	/** Only for a deck: take it fullscreen. */
 	onPresent?: () => void;
 	/**

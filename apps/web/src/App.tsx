@@ -8,7 +8,9 @@ import Undo2 from "lucide-solid/icons/undo-2";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
-import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
+import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
+import { shownHeight } from "./board/extent.ts";
 import type { EditorHost, Tool } from "./board/Editor.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
@@ -642,10 +644,48 @@ export function App() {
 		setPenTool("select");
 	};
 
-	const stageBoards = createMemo(() => {
+	/**
+	 * How tall each board whose content flows (a document: a root-level block not placed) was last
+	 * measured, in this browser (`board/extent.ts`, `measureFrame`).
+	 */
+	const [flowHeights, setFlowHeights] = createSignal<Readonly<Record<string, number>>>({});
+	const noteFlow = (path: string, extent: { h: number; flows?: true }) => {
+		const now = flowHeights()[path];
+		const next = extent.flows ? extent.h : undefined;
+		if (now === next) return;
+		const { [path]: _gone, ...rest } = flowHeights();
+		setFlowHeights(next === undefined ? rest : { ...rest, [path]: next });
+	};
+
+	/**
+	 * The boards on the focused agent's stage, at the size the stage draws them.
+	 *
+	 * **A document's height is a floor its content raises.** The stage file's height for a board whose
+	 * content flows is what a drag or a `fit` gave it, and the board is drawn at least as tall as its
+	 * content measures here, so it never clips a paragraph. Read in each browser and never written back:
+	 * two browsers whose fonts lay it out a pixel apart each draw their own, rather than answering each
+	 * other's height for ever. A slide deck's height is its aspect's, and a board of placed boxes is
+	 * the size it is given.
+	 *
+	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or
+	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
+	 * loading it again.
+	 */
+	const [shownBoards, setShownBoards] = createStore<Board[]>([]);
+	createComputed(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
-		return state.boards.filter((board) => playing.has(board.path));
+		const flows = flowHeights();
+		const list = state.boards
+			.filter((board) => playing.has(board.path))
+			.map((board) => {
+				// A copy of its own: the merge below writes into this store's objects, never into the deck's.
+				const copy = JSON.parse(JSON.stringify(board)) as Board;
+				const h = shownHeight(board, flows[board.path]);
+				return h === board.h ? copy : { ...copy, h };
+			});
+		setShownBoards(reconcile(list, { key: "path", merge: true }));
 	});
+	const stageBoards = (): Board[] => shownBoards;
 
 	/**
 	 * Who to tell when the selection moves.
@@ -1469,6 +1509,7 @@ export function App() {
 						 * slides take their width from the deck's own file, and reload at it.
 						 */
 						onResize={(path, size) => send({ type: "board.resize", path, ...size })}
+						flowHeight={(path) => flowHeights()[path]}
 						/*
 						 * A double-click on empty canvas makes a blank board, centred where it landed.
 						 * `files.boardAt` owns the request-and-hear-the-path dance, because the server
@@ -1505,7 +1546,10 @@ export function App() {
 						news={newsGlow()}
 						onRead={(path) => send({ type: "board.seen", path })}
 						onViewport={() => reportCameraSoon(camera())}
-						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
+						onExtent={(path, { flows, ...extent }) => {
+							noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
+							send({ type: "board.extent", path, ...extent });
+						}}
 						editor={editor}
 						onTool={pickTool}
 						drops={drops}

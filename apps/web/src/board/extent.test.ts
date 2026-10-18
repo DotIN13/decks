@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { contentExtent } from "./extent.ts";
+import { contentExtent, shownHeight } from "./extent.ts";
 
 const box = (right: number, bottom: number) => ({ right, bottom, width: 10, height: 10 });
 
@@ -60,4 +60,13 @@ test("a board with no stated height is measured without the frame's own height a
 	assert.equal(documentHeight({ body } as unknown as Document), 410);
 	assert.deepEqual(asked, ["0"], "asked with the floor lifted");
 	assert.equal(style.minHeight, "100vh", "and the floor put back");
+});
+
+test("a board that reads top to bottom is drawn as tall as its content, at least, and anything else at its size", () => {
+	// The stage gave it 240; its content measured 689: drawn at 689. Dragged to 900 it stays 900.
+	assert.equal(shownHeight({ h: 240 }, 689), 689);
+	assert.equal(shownHeight({ h: 900 }, 689), 900);
+	// A board of placed boxes is never measured as flowing, and a deck keeps its aspect.
+	assert.equal(shownHeight({ h: 240 }, undefined), 240);
+	assert.equal(shownHeight({ h: 540, format: "slides" }, 800), 540);
 });

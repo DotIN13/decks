@@ -21,7 +21,7 @@ import { landingBoxes } from "./glide.ts";
 import type { BoardBox, EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
 import { boardMoves, copyOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
-import { boardResizeEnd, boardResizeStep, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle, type RadiusStart } from "./resize.ts";
+import { boardResizeEnd, boardResizeStep, shownBoardResize, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle, type RadiusStart } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
 import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
 
@@ -65,7 +65,7 @@ export type Gesture =
 	| { kind: "radius"; start: Rect & RadiusStart & { id: string }; radius: number; moved: boolean }
 	| { kind: "arrowEnd"; id: string; which: Which; node: PenNode; metadata: Record<string, unknown>; stays: Pt; own?: JoinedEnd | undefined; slid?: { item: string; side: JoinedEnd["side"]; at: number } | undefined; moved: boolean }
 	| { kind: "arrowBend"; id: string; node: PenNode; route: ArrowHandles["route"]; start: NonNullable<ReturnType<typeof bendStart>>; next?: Record<string, unknown> | undefined; moved: boolean }
-	| { kind: "boardResize"; path: string; handle: Handle; slides: boolean; start: Rect; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean };
+	| { kind: "boardResize"; path: string; handle: Handle; slides: boolean; least?: number | undefined; start: Rect; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean };
 
 /** One input to the editor. */
 export type Input =
@@ -422,7 +422,8 @@ function pressHandle(state: EditorState, input: Input & PointerInput, scene: Sce
 		case "press-board-handle": {
 			const { path, slides } = input.box;
 			const start = { x: input.box.x, y: input.box.y, w: input.box.w, h: input.box.h };
-			return done({ ...state, gesture: { kind: "boardResize", path, handle: input.handle, slides, start, targets: snapTargets(scene, [], [path], ctx.view), from: input.at, next: start, moved: false } });
+			const least = scene.boards().find((board) => board.path === path)?.least;
+			return done({ ...state, gesture: { kind: "boardResize", path, handle: input.handle, slides, least, start, targets: snapTargets(scene, [], [path], ctx.view), from: input.at, next: start, moved: false } });
 		}
 		case "press-radius":
 			return done({ ...state, gesture: { kind: "radius", start: input.handle, radius: input.handle.radius, moved: false } });
@@ -476,7 +477,8 @@ function move(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Gestu
 		}
 		case "boardResize": {
 			const step = boardResizeStep(g.start, g.handle, { x: p.at.x - g.from.x, y: p.at.y - g.from.y }, { shift: p.mods.shift, free: isFree(p.mods) }, { targets: g.targets, threshold: SNAP_PX / ctx.zoom, slides: g.slides });
-			return done({ ...state, guides: step.guides, boardResize: { path: g.path, ...step.box }, gesture: { ...g, next: step.box, moved: true } });
+			// The drag's height is written; a document is shown no shorter than its content.
+			return done({ ...state, guides: step.guides, boardResize: { path: g.path, ...shownBoardResize(step.box, g.least) }, gesture: { ...g, next: step.box, moved: true } });
 		}
 		case "radius": {
 			// Along the diagonal from the corner (`resize.ts`, `radiusAt`).
@@ -534,7 +536,7 @@ function release(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Ge
 			// The box is let go of when the board is at it (`landBoardResize`), or after a moment if the file settles elsewhere.
 			const until = p.time + BOARD_HOLD_MS;
 			effects.push({ do: "wake", at: until });
-			return done({ ...next, boardResize: { path: g.path, ...g.next, released: { rev: ctx.boardRev(g.path), until } } }, effects);
+			return done({ ...next, boardResize: { path: g.path, ...shownBoardResize(g.next, g.least), released: { rev: ctx.boardRev(g.path), until } } }, effects);
 		}
 		case "radius": {
 			if (!g.moved || g.radius === g.start.radius) return { state: { ...after, radius: undefined }, ops: [], preview: null, effects };

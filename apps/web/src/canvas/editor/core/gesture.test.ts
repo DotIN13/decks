@@ -266,6 +266,21 @@ test("a board dragged near another settles 160 from it, the reading gap, and say
 	assert.deepEqual(go({ type: "move", ...at(657, 140, { meta: true }) }).state.boardDrag, { paths: ["boards/two.html"], dx: -343, dy: 40 });
 });
 
+test("a document's bottom handle writes the height dragged, a floor, and shows it no shorter than its content", () => {
+	const doc = fakeScene([], [{ path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642, least: 642 }]);
+	let state = initialState("edit");
+	const go = (input: Input) => {
+		const result = step(state, input, doc, ctx());
+		state = result.state;
+		return result;
+	};
+	go({ type: "press-board-handle", handle: "s", box: { path: "boards/doc.html", slides: false, x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
+	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.boardResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
+	const lifted = go({ type: "release", ...at(380, 342, {}, 2000) });
+	assert.deepEqual(lifted.effects.find((one) => one.do === "board-size"), { do: "board-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
+	assert.equal(lifted.state.boardResize?.h, 642);
+});
+
 test("a corner handle with Shift keeps the shape; the lift writes the size and waits for the drawing", () => {
 	const box = { id: "a", x: 10, y: 20, w: 100, h: 50 };
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [

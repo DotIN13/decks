@@ -20,6 +20,15 @@ export interface Box {
 	height: number;
 }
 
+/**
+ * How tall a board is drawn: the height the stage gives it, raised to its content's when the board
+ * reads top to bottom (`measureFrame`, `flows`) and was measured taller. A slide deck's height is
+ * its aspect's, and a board of placed boxes is the size it is given.
+ */
+export function shownHeight(board: { h: number; format?: string }, flowing: number | undefined): number {
+	return board.format !== "slides" && flowing !== undefined && flowing > board.h ? flowing : board.h;
+}
+
 /** The bottom-right corner of everything, or nothing at all for an empty board. */
 export function contentExtent(boxes: Box[]): { w: number; h: number } | undefined {
 	let w = 0;
@@ -148,7 +157,7 @@ export function documentHeight(doc: Document): number | undefined {
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 
-export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
+export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true } | undefined {
 	const doc = frame?.contentDocument;
 	const view = frame?.contentWindow as (Window & { __boardReady?: boolean }) | null | undefined;
 	if (!doc || !view?.__boardReady) return undefined;
@@ -174,9 +183,15 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	 * to tell the two apart: a board that ends in a placed box is fitted with room under it, and a
 	 * document that ends in its own padding already has its room.
 	 */
+	/*
+	 * A board that reads top to bottom: one holding a document block (`.doc`, board.css), or one written
+	 * before the formats were one, whose body says `flow`. Its height is a floor its content raises
+	 * (`App.tsx`, `stageBoards`), where a board of placed boxes is the size it is given.
+	 */
+	const flows = !!doc.querySelector("body > .doc") || !!doc.body?.classList.contains("flow");
 	const page = documentHeight(doc);
 	const h = Math.max(extent.h, Math.ceil(page ?? 0));
 	// The width it was laid out at: `stage.fit` takes a height only from a layout at the width it fits at.
 	const at = Math.round(doc.documentElement.clientWidth);
-	return { w: extent.w, h, at, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc) };
+	return { w: extent.w, h, at, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc), ...(flows ? { flows: true as const } : {}) };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.ts";
-import { anchorAt, arrowAnchors, distances, measure, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
+import { hitReach, anchorAt, arrowAnchors, distances, measure, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
 
 const boards = [
 	{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 },
@@ -86,13 +86,32 @@ test("the radius handle: a rectangle's corners, gone while the item is carried o
 	assert.equal(radiusInset(40, 9, 25), 25);
 });
 
-test("board handles: one board alone, resizable, not carried; a slide deck has no top or bottom", () => {
+test("board handles: one board alone, resizable, not carried; a slide deck has all eight", () => {
 	const outlines = selectionOutlines(base({ selected: "boards/deck.html" }), scene);
 	assert.deepEqual(boardHandles(outlines, { resizable: true, carrying: false, boards }), { id: "board:boards/deck.html", role: "board", x: 1600, y: 0, w: 640, h: 360, path: "boards/deck.html", slides: true });
 	assert.equal(boardHandles(outlines, { resizable: false, carrying: false, boards }), undefined);
 	assert.equal(boardHandles(outlines, { resizable: true, carrying: true, boards }), undefined);
-	assert.deepEqual(boardHandleList(true), ["nw", "ne", "e", "se", "sw", "w"]);
+	assert.deepEqual(boardHandleList(true), ["nw", "n", "ne", "e", "se", "s", "sw", "w"]);
 	assert.equal(boardHandleList(false).length, 8);
+	// Under 10 screen pixels both ways the handles would cover the board: at 1%, 640 × 360 is 6.4 × 3.6.
+	assert.equal(boardHandles(outlines, { resizable: true, carrying: false, boards, zoom: 0.01 }), undefined);
+	assert.ok(boardHandles(outlines, { resizable: true, carrying: false, boards, zoom: 0.02 }));
+});
+
+test("an item's handles hide when its box is under 10 screen pixels both ways, and stay when either way is not", () => {
+	const tiny = fakeScene([{ id: "dot", box: { x: 0, y: 0, w: 8, h: 6 } }, { id: "bar", box: { x: 0, y: 20, w: 40, h: 2 } }]);
+	const outlined = (id: string) => selectionOutlines(base({ selection: [id] }), tiny);
+	assert.equal(itemHandles(outlined("dot"), tiny, 1), undefined);
+	assert.ok(itemHandles(outlined("dot"), tiny, 2), "16 × 12 on the screen at 200%");
+	assert.ok(itemHandles(outlined("bar"), tiny, 1), "40 wide, though 2 tall");
+});
+
+test("a resize handle answers a press 15 screen pixels across: its hit zone reaches past what is drawn", () => {
+	// A 9 px handle at 100% reaches 3 px past each side; at 50% one drawn 18 stage px wide hits 30, so 6.
+	assert.equal(hitReach(9, 1), 3);
+	assert.equal(hitReach(18, 0.5), 6);
+	// A finger's 16 px handle already covers it.
+	assert.equal(hitReach(16, 1), 0);
 });
 
 test("an arrow alone selected has its ends' handles, moved by the drag", () => {

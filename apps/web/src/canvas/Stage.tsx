@@ -196,6 +196,8 @@ export function Stage(props: {
 	onMove: (path: string, x: number, y: number) => void;
 	/** The board dragged to a new size, in board units. The file is what changes. */
 	onResize?: (path: string, size: { w: number; h: number }) => void;
+	/** How tall a board that reads top to bottom measured, in this browser: a drag of its height stops there (`App.tsx`, `stageBoards`). */
+	flowHeight?: (path: string) => number | undefined;
 	/**
 	 * A double-click that landed on empty canvas, in stage pixels.
 	 *
@@ -223,7 +225,7 @@ export function Stage(props: {
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
-	onExtent?: (path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
+	onExtent?: (path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
 	editor: EditorHost;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: Tool) => void;
@@ -638,7 +640,12 @@ export function Stage(props: {
 	penLayer.failed = (why) => console.error(`The stage engine did not start: ${why}`);
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
-	const sceneBoards = createMemo(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, ...(board.format === "slides" ? { slides: true } : {}) })));
+	const sceneBoards = createMemo(() =>
+		props.boards.map((board) => {
+			const least = board.format === "slides" ? undefined : props.flowHeight?.(board.path);
+			return { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, ...(board.format === "slides" ? { slides: true } : {}), ...(least ? { least } : {}) };
+		}),
+	);
 	const scene = tsScene(penLayer, () => props.pen?.doc, sceneBoards);
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
@@ -973,7 +980,7 @@ export function Stage(props: {
 		);
 	});
 	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-	const penHandles = createMemo(() => itemHandles(penOutlines(), scene));
+	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, props.camera.zoom));
 	/**
 	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
 	 * made. So it is sized by its width alone: the two side handles, and no height written to the
@@ -995,7 +1002,7 @@ export function Stage(props: {
 		setPenBoxes(boxes);
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards() }));
+	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: props.camera.zoom }));
 
 	// A new selection starts with a phone's sheet put away; a second tap on it brings the sheet (`touchOnDrawing`).
 	createEffect(on(editor.items, () => setPenSheet(false)));
