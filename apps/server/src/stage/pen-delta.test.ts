@@ -9,8 +9,8 @@ import { StagePens } from "./pens.ts";
 /** Browsers are sent what changed, and what they apply comes out as the server's drawing. */
 test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", () => {
 	const deck = mkdtempSync(join(tmpdir(), "pen-delta-"));
+	const pens = new StagePens(deck, () => {});
 	try {
-		const pens = new StagePens(deck, () => {});
 		const name = pens.claim("Delta test");
 		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
 		const first = pens.frame("agent", name) as { rev: number; doc: PenDocument };
@@ -32,6 +32,7 @@ test("stage.pen.delta carries an edit, a reroute and a hand edit of the file", (
 		writeFileSync(join(deck, "stages", name, "stage.pen"), JSON.stringify({ version: "2.14", children: [{ type: "ellipse", id: "b", x: 5 }, { type: "note", id: "n", content: "hi" }] }, null, 2));
 		take();
 	} finally {
+		pens.close();
 		rmSync(deck, { recursive: true, force: true });
 	}
 });

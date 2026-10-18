@@ -150,8 +150,8 @@ test("what is drawn on a stage, for placement: top-level items, not boards, not 
 
 test("a stage's name is its own: kept as written, changed freely, and the folder never moves", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-titles-"));
+	const pens = new StagePens(root, () => {});
 	try {
-		const pens = new StagePens(root, () => {});
 		const folder = pens.claim("Launch plan: Q4 (draft)");
 		assert.equal(folder, "launch-plan-q4-draft");
 		assert.equal(pens.titleOf(folder), "Launch plan: Q4 (draft)", "the title is kept exactly as given");
@@ -162,6 +162,7 @@ test("a stage's name is its own: kept as written, changed freely, and the folder
 		mkdirSync(join(root, "old-one"));
 		assert.equal(pens.titleOf("old-one"), "old-one", "a stage from before titles is called by its folder");
 	} finally {
+		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
@@ -220,10 +221,15 @@ test("an item saved as a frame goes to frames/, any stage places it by frames/<n
 		assert.deepEqual(pens.read(two).children[0]!.box, { x1: 0, y1: 0, x2: 200, y2: 80 });
 		assert.equal(pens.read(two).children[0]!.inside?.find((item: { id: string }) => item.id === "c2/title")?.content, "Ada");
 
+		// fs.watch on macOS (FSEvents) goes live a moment after saveFrame starts watching frames/, with no
+		// ready signal, so one write can land before it listens. Write again until both stages are heard,
+		// each try longer than the watcher's 80 ms settle so the writes do not keep putting it off.
 		heard.length = 0;
 		file.children[0].width = 300;
-		writeFileSync(join(dir, "frames", "agent-card.pen"), JSON.stringify(file));
-		await new Promise((resolve) => setTimeout(resolve, 400));
+		for (let tries = 0; tries < 10 && new Set(heard).size < 2; tries++) {
+			writeFileSync(join(dir, "frames", "agent-card.pen"), JSON.stringify(file));
+			await new Promise((resolve) => setTimeout(resolve, 200));
+		}
 		assert.deepEqual([...new Set(heard)].sort(), [one, two].sort(), "both stages are sent again");
 		assert.equal(pens.read(two).children[0]!.box.x2, 300);
 	} finally {

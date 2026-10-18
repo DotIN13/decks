@@ -27,6 +27,7 @@ test("an empty canvas is not asked about, whatever it is called", () => {
 		const stage = pens.claim("Agent 3", { provisional: true });
 		assert.equal(canvasNameReminder(pens, stage), undefined);
 	} finally {
+		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
@@ -40,6 +41,7 @@ test("a canvas with boards and only its agent's name is asked to be named, until
 		pens.setTitle(stage, "Pricing study");
 		assert.equal(canvasNameReminder(pens, stage), undefined);
 	} finally {
+		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
@@ -57,6 +59,7 @@ test("a named canvas that now holds mostly other boards is asked whether the nam
 		pens.setTitle(stage, "Pricing study");
 		assert.equal(canvasNameReminder(pens, stage), undefined);
 	} finally {
+		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
@@ -68,6 +71,7 @@ test("a canvas named before anything was on it keeps its name without asking", (
 		put(stage, ["boards/a.html", "boards/b.html", "boards/c.html", "boards/d.html"]);
 		assert.equal(canvasNameReminder(pens, stage), undefined);
 	} finally {
+		pens.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 });
