@@ -236,6 +236,11 @@ export interface Decks extends Verbs {
 	readonly stage: Verbs;
 	/** Hand work to the agent with this name, making it from the spec first when there is none. */
 	sendTo(agent: AgentSpec, work: Work | string): Promise<{ queued: true; position: number; name: string; made: boolean; agent?: string }>;
+	/**
+	 * Every change as Decks broadcasts it (`GET /api/v1/events`), as in `{ type: "board.changed", path, board }`.
+	 * `types` keeps only some. `done` settles when the stream ends; `close` stops it.
+	 */
+	events(onEvent: (event: { type: string; [key: string]: unknown }) => void, options?: { types?: string[] }): { close(): void; done: Promise<void> };
 }
 
 /** A connection to Decks; with nothing passed, the one the environment or the page names. */

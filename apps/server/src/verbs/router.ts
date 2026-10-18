@@ -13,7 +13,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * `POST /api/v1/<verb>` with `{ "args": [...] }` calls the verb for whoever the request names and
  * answers `{ ok, value, notes }`. The arguments are checked against the table before any handler
  * sees them, so a wrong call is answered with the verb's signature rather than a stack trace.
- * `GET /api/v1` lists the verbs, which is what `decks --help` prints.
+ * `GET /api/v1` lists the verbs, which is what `decks --help` prints, and `GET /api/v1/events`
+ * streams every change as it is broadcast.
  *
  * Who is calling is said, not proven, for now: `X-Decks-Agent` names an agent by id or name (the
  * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
@@ -35,6 +36,28 @@ export function verbRoutes(app: App): express.Router {
 	router.get("/", (_req, res) => {
 		res.set("cache-control", "no-store").json({
 			verbs: VERBS.map((verb) => ({ name: verb.name, group: verb.group, effect: verb.effect, summary: verb.summary, signature: signature(verb) })),
+		});
+	});
+
+	/**
+	 * Every change as it happens, for a client that is not a browser on the socket: the frames Decks
+	 * broadcasts (`board.changed`, `stage.pen.delta`, `agent.state`, …), one Server-Sent Event each.
+	 * `?types=board.changed,stage.pen.delta` keeps only those. A comment every 25 seconds keeps
+	 * proxies from closing a quiet stream.
+	 */
+	router.get("/events", (req: Request, res: Response) => {
+		const wanted = new Set(String(req.query.types ?? "").split(",").map((one) => one.trim()).filter(Boolean));
+		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
+		res.write(": decks events\n\n");
+		const stop = app.listen((message) => {
+			if (wanted.size && !wanted.has(message.type)) return;
+			res.write(`event: ${message.type}\ndata: ${JSON.stringify(message)}\n\n`);
+		});
+		const beat = setInterval(() => res.write(": still here\n\n"), 25_000);
+		beat.unref?.();
+		req.on("close", () => {
+			clearInterval(beat);
+			stop();
 		});
 	});
 

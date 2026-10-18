@@ -927,6 +927,16 @@ export class App {
 			else if (message.board) this.thumbs.changed(message.board);
 		}
 		this.hub?.each((view) => this.forView(message, view));
+		for (const listener of this.listeners) listener(message);
+	}
+
+	/** Who else hears every broadcast: the event stream (`GET /api/v1/events`, `verbs/router.ts`). */
+	private readonly listeners = new Set<(message: ServerMessage) => void>();
+
+	/** Hear every broadcast, as it goes to the browsers; the answer stops it. */
+	listen(listener: (message: ServerMessage) => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
 	}
 
 	/**

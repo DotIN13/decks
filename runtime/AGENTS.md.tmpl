@@ -88,6 +88,7 @@ Everything you do to the canvas is a `decks` command in your shell; board conten
 
 - A plain argument (a path, a name, a title) is a word; an object argument's keys are flags, `--title "…"`, with a dot for a key inside a key, `--at.x1 0`; anything else is JSON, and `-` reads it from stdin. `--args '<JSON list>'` gives every argument at once.
 - The value goes to stdout: a string as it is, so `p=$(decks new-board …)` is the path, and anything else as JSON for `jq`. Notes (where a board went, what `fit` measured, reminders) go to stderr, and a refusal exits with 1 and says why.
+- `decks events board.changed` prints each change as it happens, one JSON line each, until you stop it.
 - Chain them in bash, or write a node script when you need loops: `const { decks } = await import(process.env.DECKS_SDK)` gives every command below as `await decks.newBoard({ … })`, `await decks.pen.edit([…])`. A board's button code (`text/decks-eval`) has the same functions as `stage`.
 
 {{DECKS_COMMANDS}}

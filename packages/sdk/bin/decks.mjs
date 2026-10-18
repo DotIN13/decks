@@ -53,6 +53,7 @@ export function help(verb) {
 		for (const one of verbs) lines.push(`  ${one.command.join(" ").padEnd(16)} ${firstSentence(one.summary)}`);
 		lines.push("");
 	}
+	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
 	lines.push("decks help <command> says more about one. DECKS_URL and DECKS_AGENT say where Decks is and who is calling.");
 	return lines.join("\n");
 }
@@ -170,6 +171,13 @@ async function main(argv) {
 		const found = verbOf(words.slice(1));
 		out(found ? help(found.verb) : help());
 		return found ? 0 : 1;
+	}
+	// Not a verb: every change as it is broadcast, one JSON line each, until stopped.
+	if (words[0] === "events") {
+		const decks = connect({ notes: () => {} });
+		const stream = decks.events((event) => out(JSON.stringify(event)), { types: words.slice(1) });
+		await stream.done;
+		return 0;
 	}
 	const found = verbOf(words);
 	if (!found) {

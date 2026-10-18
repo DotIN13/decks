@@ -196,6 +196,36 @@ export function connect(options = {}) {
 		run() {
 			throw new DecksError("decks.run(code) is gone: the server runs no code now. Call the verbs themselves, as in await decks.boards().");
 		},
+		/**
+		 * Every change as Decks broadcasts it (`GET /api/v1/events`): `onEvent` hears each frame, as
+		 * in `{ type: "board.changed", path, board }`. `types` keeps only some. Answers with a way to stop.
+		 */
+		events(onEvent, options = {}) {
+			const controller = new AbortController();
+			const types = options.types?.length ? `?types=${encodeURIComponent(options.types.join(","))}` : "";
+			const done = (async () => {
+				const response = await doFetch(`${base}/api/v1/events${types}`, { signal: controller.signal });
+				if (!response.ok || !response.body) throw new DecksError(`Decks answered ${response.status} for its events`, { status: response.status });
+				const reader = response.body.getReader();
+				const decoder = new TextDecoder();
+				let buffer = "";
+				for (;;) {
+					const { value, done: ended } = await reader.read();
+					if (ended) return;
+					buffer += decoder.decode(value, { stream: true });
+					let gap;
+					while ((gap = buffer.indexOf("\n\n")) >= 0) {
+						const block = buffer.slice(0, gap);
+						buffer = buffer.slice(gap + 2);
+						const data = block.split("\n").filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("\n");
+						if (data) onEvent(JSON.parse(data));
+					}
+				}
+			})().catch((error) => {
+				if (error?.name !== "AbortError") throw error;
+			});
+			return { close: () => controller.abort(), done };
+		},
 	};
 }
 

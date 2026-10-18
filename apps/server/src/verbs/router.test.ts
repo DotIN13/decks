@@ -132,3 +132,41 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 		cleanup();
 	}
 });
+
+test("the event stream carries what a verb changed, and only the types asked for", async () => {
+	const { connect } = await import("../../../../packages/sdk/src/index.js");
+	const { base, agent, call, cleanup } = await open();
+	try {
+		const url = base.replace(/\/api\/v1$/, "");
+		const heard: Array<{ type: string; path?: string }> = [];
+		const stream = connect({ url, agent: agent.id, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["board.changed"] });
+		// The stream is open once its first comment arrives; a short wait is enough on loopback.
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const moved = await call("move", ["boards/tall.html", { x: 320, y: 160 }]);
+		assert.ok(moved.body.ok, moved.body.error);
+		for (let i = 0; i < 40 && !heard.some((event) => event.path === "boards/tall.html"); i++) await new Promise((resolve) => setTimeout(resolve, 25));
+		stream.close();
+		assert.ok(heard.some((event) => event.type === "board.changed" && event.path === "boards/tall.html"), `heard ${JSON.stringify(heard.map((event) => event.type))}`);
+		assert.ok(heard.every((event) => event.type === "board.changed"), "nothing else came through the filter");
+	} finally {
+		cleanup();
+	}
+});
+
+test("the person's verbs act on the stage on screen, and draw no agent cursor", async () => {
+	const { app, base, agent, cleanup } = await open();
+	try {
+		app.agents.focus(agent.id);
+		const response = await fetch(`${base}/move`, {
+			method: "POST",
+			headers: { "content-type": "application/json", "x-decks-person": "1", "x-decks-agent": agent.id },
+			body: JSON.stringify({ args: ["boards/tall.html", { x: 40, y: 80 }] }),
+		});
+		const answer = (await response.json()) as { ok: boolean; value?: { x: number; y: number }; notes: string[] };
+		assert.ok(answer.ok);
+		assert.deepEqual([answer.value?.x, answer.value?.y], [40, 80]);
+		assert.deepEqual(answer.notes, [], "the person hears no agent's reminders");
+	} finally {
+		cleanup();
+	}
+});
