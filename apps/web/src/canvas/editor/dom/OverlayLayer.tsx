@@ -231,6 +231,29 @@ export function OverlayLayer(
 					</For>
 				</svg>
 			</Show>
+			{/*
+			 * Alt held over another item, in edit mode: red lines from the selection to it, each with
+			 * its length in pixels, in the snapping guides' colour (`core/overlay.ts`, `measure`).
+			 */}
+			<Show when={o().distances}>
+				{(d) => (
+					<>
+						<svg class="pen-measure" width="1" height="1" overflow="visible" aria-hidden="true">
+							<For each={[d().from, d().to]}>{(box) => <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="none" stroke-width={1 / props.zoom} />}</For>
+							<For each={d().lines}>
+								{(line) => <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke-width={1 / props.zoom} stroke-dasharray={line.dashed ? `${3 / props.zoom} ${3 / props.zoom}` : undefined} />}
+							</For>
+						</svg>
+						<For each={d().lines.filter((line) => line.label)}>
+							{(line) => (
+								<div class="pen-measure-tag" style={{ left: `${(line.x1 + line.x2) / 2}px`, top: `${(line.y1 + line.y2) / 2}px`, transform: `scale(${1 / props.zoom}) translate(-50%, -50%)` }}>
+									{line.label}
+								</div>
+							)}
+						</For>
+					</>
+				)}
+			</Show>
 			<Show when={o().arrow}>
 				{(ends) => (
 					<For each={["from", "to"] as const}>

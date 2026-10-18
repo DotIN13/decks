@@ -373,6 +373,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	let hoverPoint: Client | undefined;
 	let hoverLights = false;
 	const onHover = (event: PointerEvent) => {
+		if (event.pointerType !== "touch") editor.hover({ alt: event.altKey });
 		const decided = decideHover({
 			pointer: event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse",
 			editable: host.editable(),
@@ -409,6 +410,23 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	};
 	onCleanup(() => {
 		if (hoverFrame !== undefined) cancelAnimationFrame(hoverFrame);
+	});
+	/*
+	 * Alt, held or let go, for the distances it shows from the selection to what is hovered
+	 * (`core/overlay.ts`, `distances`): from the keys, and from each pointer move, which also says
+	 * so when the key went down or up while the window was not listening.
+	 */
+	const altKey = (event: KeyboardEvent) => {
+		if (event.key === "Alt") editor.hover({ alt: event.type === "keydown" });
+	};
+	const altGone = () => editor.hover({ alt: false });
+	addEventListener("keydown", altKey);
+	addEventListener("keyup", altKey);
+	addEventListener("blur", altGone);
+	onCleanup(() => {
+		removeEventListener("keydown", altKey);
+		removeEventListener("keyup", altKey);
+		removeEventListener("blur", altGone);
 	});
 	const onLeave = () => {
 		editor.hover({ item: undefined, link: false });

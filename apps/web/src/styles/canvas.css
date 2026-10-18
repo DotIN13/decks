@@ -1176,7 +1176,7 @@
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
 }
-	.world > :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-hover, .pen-join, .pen-insert, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	.world > :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-measure, .pen-measure-tag, .pen-hover, .pen-join, .pen-insert, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
 	z-index: 3;
 }
 	/*
@@ -1273,6 +1273,31 @@
 }
 	.world > .pen-guides line {
 	stroke: #f24e1e;
+}
+	/* What Alt shows between the selection and the item under the pointer: red lines, and their lengths. */
+	.world > .pen-measure {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-measure :is(line, rect) {
+	stroke: #f24e1e;
+}
+	.world > .pen-measure-tag {
+	position: absolute;
+	transform-origin: 0 0;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: #f24e1e;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
 }
 	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
 	.world > .pen-selection {

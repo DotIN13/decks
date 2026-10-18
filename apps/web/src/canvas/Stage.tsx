@@ -55,6 +55,7 @@ import {
 	boardHandles as boardHandlesOf,
 	createStageEditor,
 	deleteOps,
+	distances as distancesOf,
 	dropBox as dropBoxOf,
 	dropSlot as dropSlotIn,
 	duplicateOps,
@@ -2097,6 +2098,14 @@ export function Stage(props: {
 	});
 	/** One box round everything selected, with its size under it. */
 	const penFrame = createMemo(() => selectionFrame(penOutlines()));
+	/** Alt held over another item or board, in edit mode: the distances to it from the selection. */
+	const penDistances = createMemo(() => {
+		const over = hoverBox();
+		// A board picked up with the selection is part of it, not something to measure to.
+		const path = editor.hoverBoard() ?? editor.hoverPicture();
+		const picked = !!over?.board && !!path && editor.boardPicks().includes(path);
+		return distancesOf({ editing: props.mode === "edit", alt: editor.altHeld(), busy: !!editor.gesture() || !!editor.boardDrag() || panning(), selection: penFrame(), over: picked ? undefined : over });
+	});
 
 	/**
 	 * The camera dragged from a press (`editor/core/dispatch.ts`, `pan`): with the middle button, with
@@ -2695,6 +2704,7 @@ export function Stage(props: {
 		hover: hoverBox(),
 		kin: kinBoxes(),
 		selectionFrame: penFrame(),
+		distances: penDistances(),
 		grip: gripBox(),
 		gripHidden: gripHidden(editor.drag(), !!editor.resize()),
 		drop: dropBox(),

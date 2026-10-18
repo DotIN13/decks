@@ -178,6 +178,8 @@ export function createEditor(host: EditorHost) {
 		hoverPicture: part((now) => now.hover.picture),
 		hoverBlock: part((now) => now.hover.block),
 		overLink: part((now) => now.hover.link),
+		/** Alt is held over the stage: the distances from the selection to what is hovered. */
+		altHeld: part((now) => !!now.hover.alt),
 		gesture: part((now) => now.gesture),
 		drag: part((now) => now.drag),
 		shownDrag: shown,

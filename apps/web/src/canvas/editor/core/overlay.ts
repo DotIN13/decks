@@ -52,6 +52,10 @@ export type KinBox = Rect & { id: string; kin: "parent" | "child"; of: "selectio
  * `many` when more than one thing is selected: each is outlined thin, and this box is the strong one.
  */
 export type SelectionFrame = Rect & { many: boolean; label: string };
+/** One red line of the distances Alt shows, and the pixels it measures at its middle; `dashed` carries an edge out to meet it. */
+export type MeasureLine = { x1: number; y1: number; x2: number; y2: number; label?: string; dashed?: true };
+/** What Alt shows between the selection and the item under the pointer: both boxes, and the lines between. */
+export type Distances = { from: Rect; to: Rect; lines: MeasureLine[] };
 /** A side an arrow end can keep to on what it would join, and the one it is near. */
 export type SideHint = { box: Box; side?: ArrowSide };
 /** A shape being drawn with a tool, corner to corner. */
@@ -75,6 +79,8 @@ export type Overlay = {
 	/** The parents and children of the selection and of what is hovered. */
 	kin: readonly KinBox[];
 	selectionFrame?: SelectionFrame;
+	/** Alt held over another item, in edit mode, with something selected. */
+	distances?: Distances;
 	grip?: GripBox;
 	/** The grip is hidden, not taken away, while anything is carried or sized: it keeps the pointer it captured. */
 	gripHidden: boolean;
@@ -301,6 +307,58 @@ export function selectionFrame(outlines: readonly Outline[]): SelectionFrame | u
 }
 
 /**
+ * The distances between two boxes, as a design tool shows them with Alt held: from `a`, the
+ * selection, to `b`, the item under the pointer. Apart along an axis, the gap between them, level
+ * with `a`'s middle, and a dashed line carrying `b`'s edge out to it when `a`'s middle misses `b`;
+ * `a` inside `b` along an axis, the two gaps either side. Each line says its length in pixels,
+ * rounded. Overlapping along an axis without one holding the other: nothing on that axis.
+ */
+export function measure(a: Rect, b: Rect): MeasureLine[] {
+	const out: MeasureLine[] = [];
+	const across = (x1: number, x2: number, y: number) => {
+		if (x2 - x1 > 0.005) out.push({ x1, y1: y, x2, y2: y, label: String(Math.round(x2 - x1)) });
+	};
+	const down = (y1: number, y2: number, x: number) => {
+		if (y2 - y1 > 0.005) out.push({ x1: x, y1, x2: x, y2, label: String(Math.round(y2 - y1)) });
+	};
+	const ay = a.y + a.h / 2;
+	const ax = a.x + a.w / 2;
+	if (a.x + a.w <= b.x || b.x + b.w <= a.x) {
+		const right = a.x + a.w <= b.x;
+		across(right ? a.x + a.w : b.x + b.w, right ? b.x : a.x, ay);
+		if (ay < b.y || ay > b.y + b.h) {
+			const ex = right ? b.x : b.x + b.w;
+			out.push({ x1: ex, y1: ay, x2: ex, y2: ay < b.y ? b.y : b.y + b.h, dashed: true });
+		}
+	} else if (b.x <= a.x && b.x + b.w >= a.x + a.w) {
+		across(b.x, a.x, ay);
+		across(a.x + a.w, b.x + b.w, ay);
+	}
+	if (a.y + a.h <= b.y || b.y + b.h <= a.y) {
+		const below = a.y + a.h <= b.y;
+		down(below ? a.y + a.h : b.y + b.h, below ? b.y : a.y, ax);
+		if (ax < b.x || ax > b.x + b.w) {
+			const ey = below ? b.y : b.y + b.h;
+			out.push({ x1: ax, y1: ey, x2: ax < b.x ? b.x : b.x + b.w, y2: ey, dashed: true });
+		}
+	} else if (b.y <= a.y && b.y + b.h >= a.y + a.h) {
+		down(b.y, a.y, ax);
+		down(a.y + a.h, b.y + b.h, ax);
+	}
+	return out;
+}
+
+/**
+ * Alt's distances: in edit mode, with something selected, Alt held and the pointer over another
+ * item or board (`over`, its box as drawn), and no press in hand. From the box round the selection.
+ */
+export function distances(input: { editing: boolean; alt: boolean; busy: boolean; selection?: Rect | undefined; over?: Rect | undefined }): Distances | undefined {
+	const { selection, over } = input;
+	if (!input.editing || !input.alt || input.busy || !selection || !over) return undefined;
+	return { from: { x: selection.x, y: selection.y, w: selection.w, h: selection.h }, to: { x: over.x, y: over.y, w: over.w, h: over.h }, lines: measure(selection, over) };
+}
+
+/**
  * Where the hovered block's grip goes, in edit mode: in the card's left margin, centred on the block's first
  * line as the layout sets it (`lineOf`, the page's measure: a heading's is taller than a paragraph's).
  */
@@ -329,8 +387,10 @@ export type OverlayInput = OutlineInput &
 		hoverItem?: string | undefined;
 		hoverBoard?: string | undefined;
 		panning: boolean;
-		/** A press in hand: what is hovered is not outlined with its kin. */
+		/** A press in hand: what is hovered is not outlined with its kin, nor measured to. */
 		gesture?: boolean | undefined;
+		/** Alt is held: the distances from the selection to what is hovered. */
+		alt?: boolean | undefined;
 		/** The drag in hand, as the pointer has it (the radius handle hides for it at once). */
 		pointerDrag: Offset;
 		resizable: boolean;
@@ -356,10 +416,12 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards }, scene);
 	const grip = gripBox({ block: input.block, busy, editing: input.editing }, scene, input.lineOf);
 	const kin = kinOutlines({ selection: input.selection, drag: input.drag, resizing: input.resizing, typing: input.typing, editing: input.editing, hover: input.hoverItem, busy: busy || !!input.gesture }, scene);
+	const frame = selectionFrame(outlines);
 	return {
 		outlines,
 		kin,
-		selectionFrame: selectionFrame(outlines),
+		selectionFrame: frame,
+		distances: distances({ editing: input.editing, alt: !!input.alt, busy: busy || !!input.gesture || !!input.marquee, selection: frame, over: hover }),
 		handles,
 		anchors: arrowAnchors(handles, handleInput, scene),
 		boardHandles: boardHandles(outlines, { resizable: input.resizable, carrying: !!input.boardDrag || !!input.ownDrag, boards: input.boards }),

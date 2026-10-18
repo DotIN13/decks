@@ -58,8 +58,8 @@ export type EditorState = {
 	 * drawing has them, and not let go for being missing until it does.
 	 */
 	selection: { items: readonly string[]; boards: readonly string[]; awaited: readonly string[] };
-	/** The item under the pointer, the board, a board's picture with no node, a card's block, a link. */
-	hover: { item?: string | undefined; board?: string | undefined; picture?: string | undefined; block?: string | undefined; link: boolean };
+	/** The item under the pointer, the board, a board's picture with no node, a card's block, a link; and whether Alt is held, for the distances. */
+	hover: { item?: string | undefined; board?: string | undefined; picture?: string | undefined; block?: string | undefined; link: boolean; alt?: boolean | undefined };
 	/** The press in hand (`core/gesture.ts`). */
 	gesture?: Gesture | undefined;
 	/** The selection's move, held after the lift until the drawing that answers it is drawn. */

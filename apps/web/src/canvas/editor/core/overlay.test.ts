@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.ts";
-import { anchorAt, arrowAnchors, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
+import { anchorAt, arrowAnchors, distances, measure, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
 
 const boards = [
 	{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 },
@@ -227,4 +227,49 @@ test("one box round everything selected, with its size in rounded pixels; none f
 	);
 	assert.equal(selectionFrame([{ id: "", role: "marquee", x: 0, y: 0, w: 10, h: 10 }]), undefined);
 	assert.equal(selectionFrame([]), undefined);
+});
+
+test("Alt's distances: the gap between two boxes apart, level with the selection's middle, with the far edge carried out dashed", () => {
+	// Side by side, level: one line across the 40 px gap, at the selection's middle.
+	assert.deepEqual(measure({ x: 0, y: 0, w: 100, h: 50 }, { x: 140, y: 0, w: 60, h: 50 }), [{ x1: 100, y1: 25, x2: 140, y2: 25, label: "40" }]);
+	// The other side round.
+	assert.deepEqual(measure({ x: 140, y: 0, w: 60, h: 50 }, { x: 0, y: 0, w: 100, h: 50 }), [{ x1: 100, y1: 25, x2: 140, y2: 25, label: "40" }]);
+	// Apart both ways: across and down, and each far edge carried out to meet the line.
+	assert.deepEqual(measure({ x: 0, y: 0, w: 100, h: 50 }, { x: 130, y: 90, w: 50, h: 50 }), [
+		{ x1: 100, y1: 25, x2: 130, y2: 25, label: "30" },
+		{ x1: 130, y1: 25, x2: 130, y2: 90, dashed: true },
+		{ x1: 50, y1: 50, x2: 50, y2: 90, label: "40" },
+		{ x1: 50, y1: 90, x2: 130, y2: 90, dashed: true },
+	]);
+	// Inside: the four gaps to the edges round it, rounded to whole pixels.
+	assert.deepEqual(measure({ x: 20.4, y: 30, w: 60, h: 40 }, { x: 0, y: 0, w: 200, h: 100 }), [
+		{ x1: 0, y1: 50, x2: 20.4, y2: 50, label: "20" },
+		{ x1: 80.4, y1: 50, x2: 200, y2: 50, label: "120" },
+		{ x1: 50.4, y1: 0, x2: 50.4, y2: 30, label: "30" },
+		{ x1: 50.4, y1: 70, x2: 50.4, y2: 100, label: "30" },
+	]);
+	// Overlapping without one holding the other: nothing along either axis.
+	assert.deepEqual(measure({ x: 0, y: 0, w: 100, h: 100 }, { x: 50, y: 50, w: 100, h: 100 }), []);
+});
+
+test("Alt's distances show in edit mode only, with a selection, Alt held and something else under the pointer, and no press in hand", () => {
+	const selection = { x: 0, y: 0, w: 100, h: 50, many: false, label: "100 × 50" };
+	const over = { x: 140, y: 0, w: 60, h: 50, id: "b" };
+	const on = { editing: true, alt: true, busy: false, selection, over };
+	assert.deepEqual(distances(on), { from: { x: 0, y: 0, w: 100, h: 50 }, to: { x: 140, y: 0, w: 60, h: 50 }, lines: [{ x1: 100, y1: 25, x2: 140, y2: 25, label: "40" }] });
+	assert.equal(distances({ ...on, editing: false }), undefined);
+	assert.equal(distances({ ...on, alt: false }), undefined);
+	assert.equal(distances({ ...on, busy: true }), undefined);
+	assert.equal(distances({ ...on, selection: undefined }), undefined);
+	assert.equal(distances({ ...on, over: undefined }), undefined);
+	// deriveOverlay measures from the box round the selection to the hovered item's drawn box.
+	const input: OverlayInput = { ...base({ selection: ["a"] }), editable: true, drafting: false, resizing: false, editing: true, hoverItem: "b", panning: false, pointerDrag: none, resizable: true, lineOf: () => ({ top: 0, height: 20 }), joins: [], sides: [], guides: [] };
+	assert.equal(deriveOverlay(input, scene).distances, undefined);
+	// b is drawn 2 px taller either side, so a sits inside it top to bottom: the two 2 px gaps too, as the mock-up has them.
+	assert.deepEqual(deriveOverlay({ ...input, alt: true }, scene).distances?.lines, [
+		{ x1: 110, y1: 45, x2: 198, y2: 45, label: "88" },
+		{ x1: 60, y1: 18, x2: 60, y2: 20, label: "2" },
+		{ x1: 60, y1: 70, x2: 60, y2: 72, label: "2" },
+	]);
+	assert.equal(deriveOverlay({ ...input, alt: true, editing: false }, scene).distances, undefined);
 });
