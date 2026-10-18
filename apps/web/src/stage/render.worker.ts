@@ -51,13 +51,14 @@ async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void
 	await init();
 	const size = WorkerEngine.tileSize();
 	const canvas = new OffscreenCanvas(size, size);
-	const gpu = await openOffscreen(canvas, size, size);
+	const gpu = await openOffscreen(canvas, size, size, message.backend || undefined);
+	const backend = gpu.backend();
 	engine = new WorkerEngine(message.doc, message.dark);
 	engine.setGpu(gpu, canvas);
 	engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 	engine.setMath(mathTypesetter());
 	for (const one of early.splice(0)) take(one);
-	scope.postMessage({ type: "ready" });
+	scope.postMessage({ type: "ready", backend });
 	paint();
 }
 
@@ -82,7 +83,7 @@ function take(message: ToWorker): void {
 			engine.addFont(message.name, message.bytes, message.fallback);
 			break;
 		case "picture":
-			engine.putPicture(message.url, message.bitmap);
+			engine.putPicture(message.url, message.bitmap, message.width, message.height);
 			break;
 		case "icon":
 			engine.putIcon(message.key, message.shape);

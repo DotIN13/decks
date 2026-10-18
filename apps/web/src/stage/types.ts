@@ -62,11 +62,13 @@ export interface PenHit {
 
 /** Messages to the render worker (`render.worker.ts`). */
 export type ToWorker =
-	| { type: "init"; doc: string; dark: boolean }
+	/** `backend` is the page's (`"webgpu"` or `"webgl2"`): the worker opens the same first. */
+	| { type: "init"; doc: string; dark: boolean; backend?: string }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
 	| { type: "font"; name: string; bytes: Uint8Array; fallback: boolean }
-	| { type: "picture"; url: string; bitmap: ImageBitmap }
+	/** `width` × `height`: the picture's own size, when the bitmap was made smaller to fit. */
+	| { type: "picture"; url: string; bitmap: ImageBitmap; width?: number; height?: number }
 	| { type: "icon"; key: string; shape: string }
 	| { type: "view"; view: string }
 	| { type: "lift"; ids: string[] }
@@ -76,7 +78,8 @@ export type ToWorker =
 
 /** Messages from it. */
 export type FromWorker =
-	| { type: "ready" }
+	/** The worker is drawing, with this graphics API (`"webgpu"` or `"webgl2"`). */
+	| { type: "ready"; backend: string }
 	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }> }
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }

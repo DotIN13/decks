@@ -130,17 +130,25 @@ export class StageEngine {
 	}
 	private started = false;
 	private lastOps = 0;
+	/** The graphics API the stage draws with, `"webgpu"` or `"webgl2"`, once open. */
+	private backend = "";
+	/** The worker's, which it opens the page's first. */
+	private workerBackend = "";
+	/** The widest and tallest a picture is kept (the device's limit, or 4096): bigger ones are resized. */
+	private maxPicture = 4096;
 
 	private async start(over: HTMLCanvasElement): Promise<void> {
 		await init();
 		this.fitCanvases();
 		const gpu = await openStage(over, over.width, over.height);
 		if (this.disposed) return;
+		this.backend = gpu.backend();
+		this.maxPicture = gpu.maxPictureSize();
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
 		const self = this;
 		(globalThis as { __decksEngine?: unknown }).__decksEngine = {
-			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust" }),
+			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture }),
 			/** The boards a drag carries as their picture, and by how far. */
 			get carried() {
 				return { paths: new Set(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedBy };
@@ -152,7 +160,7 @@ export class StageEngine {
 		this.page.setMath(mathTypesetter());
 		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
-		this.post({ type: "init", doc, dark: this.scheme === "dark" });
+		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend });
 		this.boardKey = "";
 		this.setBoards(this.boards);
 		this.laidOut();
@@ -199,6 +207,7 @@ export class StageEngine {
 				console.error(`stage render worker: ${message.message}`);
 				break;
 			case "ready":
+				this.workerBackend = message.backend;
 				this.sendCamera();
 				break;
 		}
@@ -592,13 +601,13 @@ export class StageEngine {
 				if (!response.ok) throw new Error(String(response.status));
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
 				const blob = await response.blob();
-				const forPage = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+				const { bitmap: forPage, width, height } = await this.picture(blob);
 				if (this.disposed || !this.page) return forPage.close();
-				this.page.putPicture(key, forPage);
+				this.page.putPicture(key, forPage, width, height);
 				// A board's picture is drawn by the page alone; an image fill by the worker's tiles too.
 				if (!board) {
-					const forWorker = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
-					this.post({ type: "picture", url: key, bitmap: forWorker }, [forWorker]);
+					const { bitmap: forWorker } = await this.picture(blob);
+					this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
 					this.laidOut();
 				}
 				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source), STAND_IN_RETRY_MS);
@@ -610,6 +619,22 @@ export class StageEngine {
 			.finally(() => {
 				this.fetching--;
 			});
+	}
+
+	/**
+	 * A picture's bitmap, premultiplied, no bigger across than the device keeps one, and its own size
+	 * (`width` × `height`, which lays it out).
+	 */
+	private async picture(blob: Blob): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+		const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+		const { width, height } = bitmap;
+		const fit = Math.min(1, this.maxPicture / Math.max(width, height, 1));
+		if (fit >= 1) return { bitmap, width, height };
+		const resizeWidth = Math.max(1, Math.floor(width * fit));
+		const resizeHeight = Math.max(1, Math.floor(height * fit));
+		const smaller = await createImageBitmap(bitmap, { premultiplyAlpha: "premultiply", resizeWidth, resizeHeight, resizeQuality: "high" });
+		bitmap.close();
+		return { bitmap: smaller, width, height };
 	}
 
 	private fetchIcon(key: string): void {
