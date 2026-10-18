@@ -1,5 +1,5 @@
 /**
- * The agent's half of the tiers: `attach` and `show` from inside `stage_eval`.
+ * The agent's half of the tiers: `show` and `hide` with the `decks` command in the agent's shell.
  *
  * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
@@ -39,7 +39,7 @@ await page.mouse.move(800, 500);
 // A fresh agent holds nothing, so its canvas is empty until it shows something.
 await emptyCanvas(page);
 
-await ask(page, `With one stage_eval call, show ${two[0]} and ${two[1]}, then return the boards on your canvas.`);
+await ask(page, `With the decks command, show ${two[0]} and ${two[1]}, then list the boards on your canvas.`);
 // The panel has to be up for its rows to exist at all — it is a panel now, not a rail that
 // was always mounted.
 await openPanel(page, "context");
@@ -47,7 +47,7 @@ await settle(page, 400);
 say("showing puts exactly those two up", (await onCanvas()).join() === two.slice().sort().join(), (await onCanvas()).join(" "));
 say("the panel lists the same two", (await inPanel()).join() === two.map(base).sort().join(), (await inPanel()).join(" "));
 
-await ask(page, `With one stage_eval call, hide ${two[1]}.`);
+await ask(page, `With the decks command, hide ${two[1]}.`);
 say("hide takes one off, leaving the other", (await onCanvas()).join() === two[0], (await onCanvas()).join(" "));
 say("…and the panel still lists both", (await inPanel()).length === 2, (await inPanel()).join(" "));
 

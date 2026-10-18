@@ -2,7 +2,7 @@
  * The three tiers (DESIGN §2), driven the way a user drives them.
  *
  * `board.play` attaches as well as showing, so the whole thing can be set up over the
- * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
+ * socket — no model needed. The agent-side half (`show`/`hide` from the `decks` command) is
  * checked in stage-api.mjs, which does need one.
  */
 import { deckState, emptyCanvas, freshAgent, open, openAgents, openAllBoards, openPanel, pressBoardAction, say, selectBoard, settle, socket } from "../harness.mjs";

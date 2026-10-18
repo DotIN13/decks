@@ -2,13 +2,13 @@
  * A board's own code, run by pressing something on it.
  *
  * The board carries a script typed `text/decks-eval`, which a browser reads as text and never
- * runs, and a component naming it with `data-eval`. Pressing that component sends the *name*
- * of the block up to the app, the app stamps the board path from the frame, and the server
- * reads the code out of the board's own file, asks once whether this board is trusted, and
- * runs it with the stage API. This check is the whole path in a real browser:
+ * runs on its own, and a component naming it with `data-eval`. Pressing that component runs the
+ * block in the board's own page with the SDK as `stage` (`runtime/lib/board.js`); each verb it
+ * calls goes to `/api/v1` as this board, and the server asks once whether this board may use the
+ * stage at all. This check is the whole path in a real browser:
  *
- * - the click reaches the app from a board's frame (not from the board's own script);
- * - the run is refused until the question is answered, and the question names the board;
+ * - the code runs in the board's page, and its first verb waits for the question;
+ * - the verb is refused until the question is answered, and the question names the board;
  * - once allowed, the code runs, and a `stage` verb it calls lands on the canvas — which is
  *   the part that proves the stage object was real and not a stub: `cursor` is a canvas op
  *   keyed by the conversation on screen, and its label is the board's own identity — so a
@@ -100,7 +100,6 @@ for (let i = 0; i < 20 && (await marks()).length === 0; i++) {
 	await settle(page, 200);
 }
 if (!asked.includes(PATH)) throw new Error(`the board was never asked about: the dialog said "${asked}"`);
-if (!asked.includes("pick")) throw new Error(`the question did not name the component: "${asked}"`);
 
 /*
  * Answer it here rather than relying on the harness's own `Allow` loop: this check is about
