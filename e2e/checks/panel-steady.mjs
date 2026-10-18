@@ -35,7 +35,7 @@
  * these are states that would otherwise need a dozen real sessions and several minutes each,
  * and the one thing being measured is what the DOM does when they arrive.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, say, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 980 });
 
@@ -56,7 +56,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({

@@ -13,7 +13,7 @@
  * and a minute of waiting per assertion, and the interesting cases — the same state twice,
  * a window that is not focused — cannot be produced on demand at all.
  */
-import { open, say, settle, WEB } from "../harness.mjs";
+import { open, say, settle, WEB, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -51,7 +51,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 const tab = () =>

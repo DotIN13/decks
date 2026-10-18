@@ -21,7 +21,7 @@
  * `usage.mjs`, which has been cut from the suite and is covered by nothing now. This file is
  * about which of the two is drawn at which width.
  */
-import { open, resetStage, say, settle } from "../harness.mjs";
+import { open, resetStage, say, settle, ready, rest } from "../harness.mjs";
 
 const wrap = () => {
 	if (window.top !== window.self) return;
@@ -47,7 +47,8 @@ const agent = {
 	const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 	await page.addInitScript(wrap);
 	await page.reload({ waitUntil: "load" });
-	await settle(page, 2500);
+	await ready(page);
+	await rest(page, { start: 0 });
 	const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 	await feed(agent);
 	await settle(page, 400);
@@ -114,7 +115,8 @@ const agent = {
 	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	await page.addInitScript(wrap);
 	await page.reload({ waitUntil: "load" });
-	await settle(page, 2500);
+	await ready(page);
+	await rest(page, { start: 0 });
 	const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 	await feed(agent);
 	await feed({ type: "agent.usage", id: "A", usage: { contextTokens: 148_000, contextWindow: 200_000, cost: 1.234 } });

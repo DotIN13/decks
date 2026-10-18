@@ -10,7 +10,7 @@
  * So the assertions are geometric rather than about markup: the card is never wider than the
  * column, and the disclosure is never taller than a third of the window.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, say, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 try {
@@ -24,7 +24,8 @@ try {
 		};
 	});
 	await page.reload({ waitUntil: "load" });
-	await settle(page, 2500);
+	await ready(page);
+	await rest(page, { start: 0 });
 
 	const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 

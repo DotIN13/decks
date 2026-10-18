@@ -11,7 +11,7 @@
  * is not that it half-works but that something *else* was relying on editing being on: the
  * inspector, the tools, file drops. Those are the assertions here.
  */
-import { editMode, open, say, selectBoard, settle } from "../harness.mjs";
+import { editMode, open, say, selectBoard, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -139,7 +139,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2500);
+await ready(page);
+await rest(page, { start: 0 });
 
 await feed({
 	type: "agents",

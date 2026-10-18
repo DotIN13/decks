@@ -17,7 +17,7 @@
  * than accidents: **the axis it opens on** (workspace), and **the order of the headings and the
  * rows inside them** (the names, A to Z, and the time each agent last said something).
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, say, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, context, errors } = await open({ width: 1400, height: 980 });
 
@@ -38,7 +38,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 

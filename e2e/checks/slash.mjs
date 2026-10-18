@@ -12,7 +12,7 @@
  * make the list whatever that machine's Claude install happens to declare, which is not a
  * fixture. The merge itself is unit-tested in `agents/slash.test.ts`.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, say, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 
@@ -27,7 +27,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 

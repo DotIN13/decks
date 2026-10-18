@@ -21,7 +21,7 @@
  * The socket is driven directly, as `agents-tab.mjs` does: four runtimes in one turn each would
  * otherwise be four real sessions and a model.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, say, settle, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 950 });
 
@@ -36,7 +36,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
 const chat = (id, name, kind, state) => ({

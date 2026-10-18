@@ -12,7 +12,7 @@
  * once fitted a 1600px board into the strip beside it at 3.7%. Both are checked, because
  * the difference is invisible until a fit goes wrong.
  */
-import { open, say, settle, zoom, ZOOM_IN_PAGE } from "../harness.mjs";
+import { open, say, settle, zoom, ZOOM_IN_PAGE, ready, rest } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 /* What the browser sends back, for the one press here that has to reach the server: the × on a row. */
@@ -32,7 +32,8 @@ await page.addInitScript(() => {
 	};
 });
 await page.reload({ waitUntil: "load" });
-await settle(page, 2000);
+await ready(page);
+await rest(page, { start: 0 });
 try {
 	const inset = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--inset-left").trim());
 	const mounted = () => page.locator("[data-inset='left']").count();
