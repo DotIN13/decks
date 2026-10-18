@@ -60,6 +60,9 @@ import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
 import { StageEngine } from "../stage/engine.ts";
+import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
+import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
+import { tsScene } from "./editor/scene-ts.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -647,6 +650,8 @@ export function Stage(props: {
 	const penLayer = new StageEngine();
 	penLayer.failed = (why) => console.error(`The stage engine did not start: ${why}`);
 	onCleanup(() => penLayer.dispose());
+	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
+	const scene = tsScene(penLayer, () => props.pen?.doc, () => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })));
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
@@ -1814,39 +1819,10 @@ export function Stage(props: {
 		const v = view();
 		const a = toWorld(localCamera, v, { x: 0, y: 0 });
 		const b = toWorld(localCamera, v, { x: v.width, y: v.height });
-		const seen = (box: Box) => box.x < b.x && box.x + box.w > a.x && box.y < b.y && box.y + box.h > a.y;
-		const moving = new Set(ids);
-		const parents = new Set(ids.map((id) => penLayer.placed.get(id)?.parent).filter((id): id is string => !!id));
-		const out: Box[] = [];
-		for (const placed of penLayer.placed.values()) {
-			const { node } = placed;
-			if (moving.has(node.id) || node.id.includes("/") || isArrow(node)) continue;
-			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
-			if (placed.parent && !parents.has(placed.parent)) continue;
-			const box = penLayer.bounds.get(node.id) ?? placed.box;
-			if (seen(box)) out.push(box);
-		}
-		for (const board of props.boards) if (!boards.includes(board.path) && seen(board)) out.push({ x: board.x, y: board.y, w: board.w, h: board.h });
-		return out;
+		return snapTargetsIn(scene, ids, boards, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y });
 	};
-	/** Snapping reaches this many screen pixels, whatever the zoom. */
-	const SNAP_PX = 6;
 	/** The box round everything in a selection: items as drawn, boards as placed. */
-	const selectionBox = (ids: readonly string[], boards: readonly string[]): Box | undefined => {
-		const boxes: Box[] = [
-			...ids.flatMap((id) => {
-				const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
-				return box ? [box] : [];
-			}),
-			...props.boards.filter((board) => boards.includes(board.path)).map((board) => ({ x: board.x, y: board.y, w: board.w, h: board.h })),
-		];
-		if (boxes.length === 0) return undefined;
-		const x1 = Math.min(...boxes.map((box) => box.x));
-		const y1 = Math.min(...boxes.map((box) => box.y));
-		const x2 = Math.max(...boxes.map((box) => box.x + box.w));
-		const y2 = Math.max(...boxes.map((box) => box.y + box.h));
-		return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-	};
+	const selectionBox = (ids: readonly string[], boards: readonly string[]): Box | undefined => selectionBoxIn(scene, ids, boards);
 
 	/**
 	 * Drag a selection — items and boards together — the way a design tool does: it snaps to what is
@@ -1904,15 +1880,7 @@ export function Stage(props: {
 	 * `box`); this is the half that was missing, which is knowing where the pointer is.
 	 */
 	const [dropInto, setDropInto] = createSignal<string | null | undefined>();
-	/** The frame under a point that a drag could drop into: never one of the items being carried, and never inside one. */
-	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => {
-		const found = frameAt(point, true);
-		if (!found) return null;
-		if (carrying.includes(found)) return null;
-		// Its own descendant would be a loop, which the op refuses anyway; this keeps it off the screen too.
-		for (let up = penLayer.placed.get(found)?.parent; up; up = penLayer.placed.get(up)?.parent) if (carrying.includes(up)) return null;
-		return found;
-	};
+	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => frameUnderIn(scene, point, carrying);
 	/**
 	 * Where in a frame that arranges its children a drop would land: the place among them nearest
 	 * the pointer, and the line drawn on that boundary. `undefined` for a frame with no layout,
@@ -1922,40 +1890,7 @@ export function Stage(props: {
 	 * op can take; a carried child is only skipped when asking which side of it the pointer is.
 	 */
 	const [dropAt, setDropAt] = createSignal<{ index: number; line: { x: number; y: number; w: number; h: number } } | undefined>();
-	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => {
-		const placed = penLayer.placed.get(frameId);
-		const flow = placed?.node.layout;
-		if (!placed || (flow !== "vertical" && flow !== "horizontal")) return undefined;
-		const down = flow === "vertical";
-		const box = penLayer.bounds.get(frameId) ?? placed.box;
-		const kids = (penNode(frameId)?.children ?? []).map((child) => ({ id: child.id, box: penLayer.bounds.get(child.id) ?? penLayer.placed.get(child.id)?.box }));
-		const along = down ? point.y : point.x;
-		let index = kids.length;
-		for (const [at, kid] of kids.entries()) {
-			if (!kid.box || carrying.includes(kid.id)) continue;
-			if (along < (down ? kid.box.y + kid.box.h / 2 : kid.box.x + kid.box.w / 2)) {
-				index = at;
-				break;
-			}
-		}
-		const real = (from: number, step: number) => {
-			for (let at = from; at >= 0 && at < kids.length; at += step) {
-				const kid = kids[at]!;
-				if (kid.box && !carrying.includes(kid.id)) return kid.box;
-			}
-			return undefined;
-		};
-		const before = real(index - 1, -1);
-		const after = real(index, 1);
-		const edge = (one: { x: number; y: number; w: number; h: number }, end: boolean) => (down ? one.y + (end ? one.h : 0) : one.x + (end ? one.w : 0));
-		const on = before && after ? (edge(before, true) + edge(after, false)) / 2 : after ? edge(after, false) - 5 : before ? edge(before, true) + 5 : down ? box.y + box.h / 2 : box.x + box.w / 2;
-		// As long as the frame's content is wide: inside its padding, so the line spans the words, not the paper.
-		const pad = placed.node.padding;
-		const [pt, pr, pb, pl] = typeof pad === "number" ? [pad, pad, pad, pad] : Array.isArray(pad) ? (pad.length === 2 ? [pad[0], pad[1], pad[0], pad[1]] : pad.length === 4 ? pad : [8, 8, 8, 8]) : [8, 8, 8, 8];
-		const inset = (value: unknown) => Math.max(8, typeof value === "number" ? value : 8);
-		const line = down ? { x: box.x + inset(pl), y: on, w: Math.max(8, box.w - inset(pl) - inset(pr)), h: 0 } : { x: on, y: box.y + inset(pt), w: 0, h: Math.max(8, box.h - inset(pt) - inset(pb)) };
-		return { index, line };
-	};
+	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => dropSlotIn(scene, frameId, point, carrying);
 	/** Where the frame a drag would drop into is, for the outline that says so. */
 	const dropBox = createMemo(() => {
 		const id = dropInto();
@@ -2886,17 +2821,7 @@ export function Stage(props: {
 	 * which is the plain call; `stacking` also takes the frames that arrange their children, which
 	 * is what a drop asks for. A library shape is a frame with a layout too, and never either.
 	 */
-	const frameAt = (point: { x: number; y: number }, stacking = false) => {
-		let best: { id: string; order: number } | undefined;
-		for (const placed of penLayer.placed.values()) {
-			const { node, box } = placed;
-			if (node.type !== "frame" || node.id.includes("/") || isShape(node)) continue;
-			if (node.layout !== "none" && !stacking) continue;
-			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
-			if (!best || placed.order > best.order) best = { id: node.id, order: placed.order };
-		}
-		return best?.id;
-	};
+	const frameAt = (point: { x: number; y: number }, stacking = false) => frameAtIn(scene, point, stacking);
 
 	/*
 	 * The dashed outline of what was drawn, kept on screen until the sheet shows the item it made: the
