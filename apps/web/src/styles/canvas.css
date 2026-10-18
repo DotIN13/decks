@@ -1176,8 +1176,49 @@
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
 }
-	.world > :is(.pen-selection, .pen-hover, .pen-join, .pen-insert, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	.world > :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-hover, .pen-join, .pen-insert, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
 	z-index: 3;
+}
+	/*
+	 * What the selection, or the item under the pointer, sits in and holds (`editor/core/overlay.ts`,
+	 * `kinOutlines`): its parents in a light solid line, its children in a light dashed one. Lighter
+	 * than a hover and a selection, so the item itself is still the line that reads first.
+	 */
+	.world > .pen-kin {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+	outline: 1px solid var(--color-accent);
+	outline-offset: 0;
+	opacity: 0.45;
+}
+	.world > .pen-kin[data-kin="child"] {
+	outline-style: dashed;
+	opacity: 0.55;
+}
+	.world > .pen-kin[data-round="true"] {
+	border-radius: var(--radius-board, 12px);
+}
+	/* One box round everything selected, when there is more than one thing (each has its own thin line). */
+	.world > .pen-selection-box {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+}
+	/* The selection's size in pixels, under it, in the accent: drawn at screen size whatever the zoom. */
+	.world > .pen-size {
+	position: absolute;
+	transform-origin: 0 0;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: var(--color-accent);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
 }
 	/*
 	 * What the pointer is over, before a press (`Stage.tsx`): a thin line, thinner than a selection's,
@@ -1913,7 +1954,7 @@
 	border-radius: 8px;
 	filter: drop-shadow(0 10px 14px rgb(0 0 0 / 22%));
 }
-	.stage[data-ghosting] :is(.pen-selection, .pen-handle, .pen-anchor) { visibility: hidden; }
+	.stage[data-ghosting] :is(.pen-selection, .pen-selection-box, .pen-size, .pen-kin, .pen-handle, .pen-anchor) { visibility: hidden; }
 	.pen-card-editor .pce-ghost {
 	position: absolute;
 	z-index: 5;

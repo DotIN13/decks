@@ -43,8 +43,31 @@ export function OverlayLayer(
 	},
 ) {
 	const o = () => props.overlay();
+	/** More than one thing selected: each is outlined thin, and one box round them all is the strong line. */
+	const many = () => !!o().selectionFrame?.many;
 	return (
 		<>
+			{/*
+			 * What the selection, or the item under the pointer, sits in and holds: its parents in a
+			 * light solid line, its children in a light dashed one (`core/overlay.ts`, `kinOutlines`).
+			 */}
+			<Index each={o().kin}>
+				{(box) => (
+					<div
+						class="pen-kin"
+						data-kin={box().kin}
+						data-of={box().of}
+						data-round={box().round ? "true" : undefined}
+						style={{
+							left: `${box().x}px`,
+							top: `${box().y}px`,
+							width: `${box().w}px`,
+							height: `${box().h}px`,
+							"outline-width": `${1 / props.zoom}px`,
+						}}
+					/>
+				)}
+			</Index>
 			<Index each={o().outlines}>
 				{(box) => (
 					<div
@@ -57,11 +80,36 @@ export function OverlayLayer(
 							top: `${box().y}px`,
 							width: `${box().w}px`,
 							height: `${box().h}px`,
-							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)`,
+							"box-shadow": `0 0 0 ${(many() && box().role !== "marquee" ? 1 : 1.5) / props.zoom}px var(--color-accent)`,
 						}}
 					/>
 				)}
 			</Index>
+			<Show when={o().selectionFrame}>
+				{(frame) => (
+					<>
+						<Show when={frame().many}>
+							<div
+								class="pen-selection-box"
+								style={{ left: `${frame().x}px`, top: `${frame().y}px`, width: `${frame().w}px`, height: `${frame().h}px`, "box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)` }}
+							/>
+						</Show>
+						{/* Its size in pixels, under it: below the arrow anchor when one shows there. */}
+						<Show when={frame().w > 10 || frame().h > 10}>
+							<div
+								class="pen-size"
+								style={{
+									left: `${frame().x + frame().w / 2}px`,
+									top: `${frame().y + frame().h + (o().anchors ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : 8) / props.zoom}px`,
+									transform: `scale(${1 / props.zoom}) translateX(-50%)`,
+								}}
+							>
+								{frame().label}
+							</div>
+						</Show>
+					</>
+				)}
+			</Show>
 			<Show when={o().grip}>
 				{(grip) => (
 					<div
@@ -92,7 +140,7 @@ export function OverlayLayer(
 							top: `${box().y}px`,
 							width: `${box().w}px`,
 							height: `${box().h}px`,
-							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)`,
+							"box-shadow": `0 0 0 ${2 / props.zoom}px var(--color-accent)`,
 						}}
 					/>
 				)}

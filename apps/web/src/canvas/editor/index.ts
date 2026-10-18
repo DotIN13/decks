@@ -57,5 +57,5 @@ export { InsertMenu } from "./dom/InsertMenu.tsx";
 export { tsScene, tsSeam } from "./scene-ts.ts";
 export { dropSlot, frameUnder } from "./core/drop.ts";
 export { deleteOps, duplicateOps, idMaker, moveOps } from "./core/ops.ts";
-export { arrowAnchors, arrowEnds, boardHandles, dropBox, gripBox, gripHidden, hoverBox, itemHandles, radiusHandle, selectionOutlines, type Overlay } from "./core/overlay.ts";
+export { arrowAnchors, arrowEnds, boardHandles, dropBox, gripBox, gripHidden, hoverBox, itemHandles, kinOutlines, radiusHandle, selectionFrame, selectionOutlines, type Overlay } from "./core/overlay.ts";
 export type { PenTool } from "./core/model.ts";

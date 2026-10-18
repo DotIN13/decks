@@ -15,7 +15,7 @@ import { ARROW, arrowRoute, isArrow, sidePoint, type ArrowSide, type PenNode } f
 import type { Box, Guide } from "../../pen/snap.ts";
 import { arrowHandles, type ArrowHandles, type RouteDraft } from "./arrows.ts";
 import type { BoardBox, Pt, Rect } from "./model.ts";
-import { marqueeRect } from "./pick.ts";
+import { childrenOf, marqueeRect, parentOf } from "./pick.ts";
 import { HANDLES, radiusStart, type Handle, type RadiusStart } from "./resize.ts";
 import type { SceneQuery } from "./scene.ts";
 
@@ -42,6 +42,16 @@ export type HoverBox = Rect & { id?: string; board?: true; round?: true };
 export type GripBox = { id: string; x: number; y: number };
 /** The frame a drag would drop into. */
 export type DropBox = Rect & { id: string };
+/**
+ * What the selection, or the item under the pointer, sits in and holds: a light solid outline
+ * round each parent, a light dashed one round each child.
+ */
+export type KinBox = Rect & { id: string; kin: "parent" | "child"; of: "selection" | "hover"; round?: true };
+/**
+ * One box round everything selected and its size under it, in stage pixels rounded (`"120 × 36"`).
+ * `many` when more than one thing is selected: each is outlined thin, and this box is the strong one.
+ */
+export type SelectionFrame = Rect & { many: boolean; label: string };
 /** A side an arrow end can keep to on what it would join, and the one it is near. */
 export type SideHint = { box: Box; side?: ArrowSide };
 /** A shape being drawn with a tool, corner to corner. */
@@ -62,6 +72,9 @@ export type Overlay = {
 	radiusDrag?: { id: string; radius: number };
 	arrow?: ArrowHandles;
 	hover?: HoverBox;
+	/** The parents and children of the selection and of what is hovered. */
+	kin: readonly KinBox[];
+	selectionFrame?: SelectionFrame;
 	grip?: GripBox;
 	/** The grip is hidden, not taken away, while anything is carried or sized: it keeps the pointer it captured. */
 	gripHidden: boolean;
@@ -221,6 +234,72 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
 }
 
+export type KinInput = {
+	selection: readonly string[];
+	/** The selection's drag as the canvas shows it: children are not outlined while it moves. */
+	drag: Offset;
+	resizing: boolean;
+	typing?: string | undefined;
+	/** Edit mode, which outlines what the pointer is over and its kin. */
+	editing: boolean;
+	/** The item under the pointer, and whether a gesture or a pan is in hand, which hover waits out. */
+	hover?: string | undefined;
+	busy: boolean;
+};
+
+/**
+ * What the selection sits in and holds, and what the hovered item does: each selected item's
+ * parents, all the way up, as light solid outlines; the one selected item's children, if it holds
+ * any (a group's, a frame's), as light dashed ones, not while it moves or is sized. In edit mode,
+ * the item under the pointer's parent, solid, and its children, dashed. Never what is selected
+ * itself, the item typed into, or a board's blocks (a board draws its own).
+ */
+export function kinOutlines(input: KinInput, scene: SceneQuery): KinBox[] {
+	const out: KinBox[] = [];
+	const selected = new Set(input.selection);
+	const seen = new Set<string>();
+	const add = (id: string, kin: KinBox["kin"], of: KinBox["of"]) => {
+		if (selected.has(id) || seen.has(id) || id === input.typing) return;
+		const node = scene.item(id)?.node;
+		if (node && isArrow(node)) return;
+		const box = scene.drawn(id);
+		if (!box) return;
+		seen.add(id);
+		out.push({ id, kin, of, x: box.x, y: box.y, w: box.w, h: box.h, ...(rounded(scene, id) ? { round: true as const } : {}) });
+	};
+	const moving = !!(input.drag.dx || input.drag.dy);
+	if (!input.typing) {
+		for (const id of input.selection) for (let up = parentOf(scene, id); up; up = parentOf(scene, up)) add(up, "parent", "selection");
+		const one = input.selection.length === 1 ? input.selection[0]! : undefined;
+		if (one && !moving && !input.resizing) for (const child of childrenOf(scene, one)) add(child, "child", "selection");
+	}
+	const over = input.hover;
+	if (input.editing && over && !input.busy && !selected.has(over) && over !== input.typing) {
+		const up = parentOf(scene, over);
+		if (up) add(up, "parent", "hover");
+		for (const child of childrenOf(scene, over)) add(child, "child", "hover");
+	}
+	return out;
+}
+
+/** The size a box is said to be: its width and height in stage pixels, rounded. */
+export const sizeLabel = (box: { w: number; h: number }) => `${Math.round(box.w)} × ${Math.round(box.h)}`;
+
+/**
+ * One box round every selected item and board (not the marquee), and its size. None with nothing
+ * outlined.
+ */
+export function selectionFrame(outlines: readonly Outline[]): SelectionFrame | undefined {
+	const picked = outlines.filter((one) => one.role !== "marquee");
+	if (!picked.length) return undefined;
+	const x1 = Math.min(...picked.map((one) => one.x));
+	const y1 = Math.min(...picked.map((one) => one.y));
+	const x2 = Math.max(...picked.map((one) => one.x + one.w));
+	const y2 = Math.max(...picked.map((one) => one.y + one.h));
+	const box = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+	return { ...box, many: picked.length > 1, label: sizeLabel(box) };
+}
+
 /**
  * Where the hovered block's grip goes, in edit mode: in the card's left margin, centred on the block's first
  * line as the layout sets it (`lineOf`, the page's measure: a heading's is taller than a paragraph's).
@@ -250,6 +329,8 @@ export type OverlayInput = OutlineInput &
 		hoverItem?: string | undefined;
 		hoverBoard?: string | undefined;
 		panning: boolean;
+		/** A press in hand: what is hovered is not outlined with its kin. */
+		gesture?: boolean | undefined;
 		/** The drag in hand, as the pointer has it (the radius handle hides for it at once). */
 		pointerDrag: Offset;
 		resizable: boolean;
@@ -274,8 +355,11 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const busy = !!input.boardDrag || input.panning;
 	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards }, scene);
 	const grip = gripBox({ block: input.block, busy, editing: input.editing }, scene, input.lineOf);
+	const kin = kinOutlines({ selection: input.selection, drag: input.drag, resizing: input.resizing, typing: input.typing, editing: input.editing, hover: input.hoverItem, busy: busy || !!input.gesture }, scene);
 	return {
 		outlines,
+		kin,
+		selectionFrame: selectionFrame(outlines),
 		handles,
 		anchors: arrowAnchors(handles, handleInput, scene),
 		boardHandles: boardHandles(outlines, { resizable: input.resizable, carrying: !!input.boardDrag || !!input.ownDrag, boards: input.boards }),

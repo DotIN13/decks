@@ -65,9 +65,11 @@ import {
 	idMaker,
 	InsertMenu,
 	itemHandles,
+	kinOutlines,
 	moveOps,
 	OverlayLayer,
 	radiusHandle as radiusHandleOf,
+	selectionFrame,
 	selectionOutlines,
 	TextEditor,
 	tsScene,
@@ -2085,6 +2087,17 @@ export function Stage(props: {
 		);
 	});
 
+	/** What the selection and the hovered item sit in and hold: light outlines round their parents and children. */
+	const kinBoxes = createMemo(() => {
+		penDrawn();
+		return kinOutlines(
+			{ selection: editor.items(), drag: shownDrag(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.boardDrag() || panning() || !!editor.gesture() },
+			scene,
+		);
+	});
+	/** One box round everything selected, with its size under it. */
+	const penFrame = createMemo(() => selectionFrame(penOutlines()));
+
 	/**
 	 * The camera dragged from a press (`editor/core/dispatch.ts`, `pan`): with the middle button, with
 	 * Space held, or on bare canvas, which lets the selected board go (`deselect`).
@@ -2680,6 +2693,8 @@ export function Stage(props: {
 		radiusDrag: editor.radius(),
 		arrow: arrowEnds(),
 		hover: hoverBox(),
+		kin: kinBoxes(),
+		selectionFrame: penFrame(),
 		grip: gripBox(),
 		gripHidden: gripHidden(editor.drag(), !!editor.resize()),
 		drop: dropBox(),

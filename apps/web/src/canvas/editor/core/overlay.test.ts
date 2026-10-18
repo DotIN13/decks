@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.ts";
-import { anchorAt, arrowAnchors, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, radiusHandle, radiusInset, radiusShown, selectionOutlines, type OutlineInput, type OverlayInput } from "./overlay.ts";
+import { anchorAt, arrowAnchors, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
 
 const boards = [
 	{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 },
@@ -169,5 +169,62 @@ test("deriveOverlay puts the parts together", () => {
 	assert.equal(overlay.drop?.id, "card");
 	assert.deepEqual(overlay.insert, { x: 610, y: 100, w: 280, h: 0 });
 	assert.equal(overlay.gripHidden, false);
+	assert.deepEqual(overlay.kin, []);
+	assert.deepEqual(overlay.selectionFrame, { x: 10, y: 20, w: 100, h: 50, many: false, label: "100 × 50" });
 	assert.equal(deriveOverlay({ ...input, boardDrag: { paths: [], dx: 0, dy: 0 }, hoverItem: undefined, hoverBoard: "boards/one.html" }, scene).hover, undefined);
+});
+
+/** A frame in a group, holding two items; a note beside them in the group; a shape with a part. */
+const nested = fakeScene([
+	{ id: "g", type: "group", box: { x: 0, y: 0, w: 400, h: 200 } },
+	{ id: "f", type: "frame", parent: "g", box: { x: 0, y: 0, w: 200, h: 200 } },
+	{ id: "f1", parent: "f", box: { x: 10, y: 10, w: 80, h: 40 } },
+	{ id: "f2", parent: "f", box: { x: 100, y: 10, w: 80, h: 40 } },
+	{ id: "n", type: "note", parent: "g", box: { x: 300, y: 0, w: 100, h: 100 } },
+	{ id: "sh", type: "frame", box: { x: 500, y: 0, w: 100, h: 100 }, extra: { metadata: { type: "decks.shape" } } },
+	{ id: "sh-words", type: "text", parent: "sh", box: { x: 520, y: 40, w: 60, h: 20 } },
+]);
+const kin = (fields: Partial<Parameters<typeof kinOutlines>[0]> = {}) => kinOutlines({ selection: [], drag: none, resizing: false, editing: true, busy: false, ...fields }, nested);
+const brief = (boxes: ReturnType<typeof kinOutlines>) => boxes.map((one) => `${one.of}:${one.kin}:${one.id}`);
+
+test("a selected item's parents are outlined light and solid, all the way up; a selected container's children light and dashed", () => {
+	assert.deepEqual(brief(kin({ selection: ["f1"] })), ["selection:parent:f", "selection:parent:g"]);
+	assert.deepEqual(kin({ selection: ["f1"] })[0], { id: "f", kin: "parent", of: "selection", x: 0, y: 0, w: 200, h: 200 });
+	assert.deepEqual(brief(kin({ selection: ["f"] })), ["selection:parent:g", "selection:child:f1", "selection:child:f2"]);
+	assert.deepEqual(brief(kin({ selection: ["g"] })), ["selection:child:f", "selection:child:n"]);
+	assert.deepEqual(kin({ selection: ["g"] })[1], { id: "n", kin: "child", of: "selection", x: 300, y: 0, w: 100, h: 100, round: true });
+	// Two selected: the parents of both, once each, and no children; what is selected is never its own kin.
+	assert.deepEqual(brief(kin({ selection: ["f1", "n"] })), ["selection:parent:f", "selection:parent:g"]);
+	assert.deepEqual(brief(kin({ selection: ["f1", "f"] })), ["selection:parent:g"]);
+	// The children wait out a move and a resize; the parents stay.
+	assert.deepEqual(brief(kin({ selection: ["f"], drag: { dx: 4, dy: 0 } })), ["selection:parent:g"]);
+	assert.deepEqual(brief(kin({ selection: ["f"], resizing: true })), ["selection:parent:g"]);
+	// A shape is one thing: no children; and nothing while words are typed.
+	assert.deepEqual(kin({ selection: ["sh"] }), []);
+	assert.deepEqual(kin({ selection: ["f1"], typing: "f1" }), []);
+});
+
+test("in edit mode the hovered item's parent is outlined solid and its children dashed; browsing, nothing", () => {
+	assert.deepEqual(brief(kin({ hover: "f1" })), ["hover:parent:f"]);
+	assert.deepEqual(brief(kin({ hover: "f" })), ["hover:parent:g", "hover:child:f1", "hover:child:f2"]);
+	assert.deepEqual(kin({ hover: "f", editing: false }), []);
+	assert.deepEqual(kin({ hover: "f", busy: true }), []);
+	// What the selection already outlines is not outlined again for the hover.
+	assert.deepEqual(brief(kin({ selection: ["f1"], hover: "f2" })), ["selection:parent:f", "selection:parent:g"]);
+	assert.deepEqual(brief(kin({ selection: ["f1"], hover: "f1" })), ["selection:parent:f", "selection:parent:g"]);
+});
+
+test("one box round everything selected, with its size in rounded pixels; none for the marquee alone", () => {
+	assert.equal(sizeLabel({ w: 120.4, h: 35.6 }), "120 × 36");
+	assert.deepEqual(selectionFrame([{ id: "a", role: "item", x: 10, y: 20, w: 100, h: 50 }]), { x: 10, y: 20, w: 100, h: 50, many: false, label: "100 × 50" });
+	assert.deepEqual(
+		selectionFrame([
+			{ id: "a", role: "item", x: 10, y: 20, w: 100, h: 50 },
+			{ id: "board:b", role: "board", x: 300, y: 0, w: 400, h: 300 },
+			{ id: "", role: "marquee", x: -50, y: -50, w: 1000, h: 1000 },
+		]),
+		{ x: 10, y: 0, w: 690, h: 300, many: true, label: "690 × 300" },
+	);
+	assert.equal(selectionFrame([{ id: "", role: "marquee", x: 0, y: 0, w: 10, h: 10 }]), undefined);
+	assert.equal(selectionFrame([]), undefined);
 });
