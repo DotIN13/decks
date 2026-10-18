@@ -651,16 +651,9 @@ export function Stage(props: {
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
 	 * The over canvas is inside the world only to sit after the board pages and before the
-	 * selection's outlines and handles: `writeTransform` undoes the world's transform on it, so both
-	 * canvases are the window's size and drawn with the camera.
+	 * selection's outlines and handles. The engine places it, in stage units, at the rectangle it last
+	 * drew (the window and a margin round it), so a pan moves it with the world until it is drawn again.
 	 */
-	let engineOver: HTMLCanvasElement | undefined;
-	/** The undoing of the world's transform on the over canvas, so it covers exactly the window. */
-	const placeEngineOver = (cam: Camera) => {
-		if (!engineOver) return;
-		const v = view();
-		engineOver.style.transform = `translate(${cam.x - v.width / 2 / cam.zoom}px, ${cam.y - v.height / 2 / cam.zoom}px) scale(${1 / cam.zoom})`;
-	};
 	createEffect(() => {
 		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
@@ -3143,7 +3136,6 @@ export function Stage(props: {
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
-		placeEngineOver(cam);
 		// And the title bars, which are in a layer of their own that does not zoom: the track moves, and the bars only when the zoom changes.
 		const track = barLayer();
 		if (track) {
@@ -4984,7 +4976,6 @@ export function Stage(props: {
 					class="stage-engine stage-engine-over"
 					aria-hidden="true"
 					ref={(canvas) => {
-						engineOver = canvas;
 						penLayer.attachCanvas(canvas);
 					}}
 				/>

@@ -30,6 +30,14 @@ const SMALL = [192, 480];
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
 const STAND_IN_TRIES = 50;
+/**
+ * How far past each edge of the window the canvas is drawn, in screen pixels. A pan slides the canvas
+ * last drawn rather than drawing it again, until the window reaches its edge: drawing the whole window
+ * was the most of a pan's time on the GPU (110 ms from a wheel step to its frame at 22% on a 2× screen).
+ */
+const SLACK_PX = 320;
+/** The largest canvas side a GPU is sure to take, in device pixels. */
+const MAX_SIDE = 8192;
 
 /** What the stage last did, for checks and the crash recorder to read: the old sheet's counters, and the engine's. */
 type SheetStats = Record<string, unknown> & { shown?: number; ink?: number };
@@ -59,6 +67,9 @@ export class StageEngine {
 	private boardIndex = new BoxIndex([]);
 	private boardBoxes = "";
 	private size = { w: 0, h: 0 };
+	/** The canvas's margin past the window, in screen pixels, and the stage rectangle it was last drawn for. */
+	private slack = 0;
+	private drawnAt: { x: number; y: number; zoom: number } | undefined;
 	private boards: readonly SceneBoard[] = [];
 	private boardKey = "";
 	private viewState = { hidden: [] as string[], mute: [] as string[], holes: [] as string[], scrolls: {} as Record<string, number> };
@@ -280,20 +291,51 @@ export class StageEngine {
 		this.draw();
 	}
 
-	/** Both canvases the window's size, in device pixels; the engine's surfaces follow in `frame`. */
+	/** The canvas the window's size and `SLACK_PX` more on each side, in device pixels; the engine's surface follows in `frame`. */
 	private fitCanvases(): void {
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		const w = Math.max(1, Math.round(this.view.width * dpr));
-		const h = Math.max(1, Math.round(this.view.height * dpr));
+		this.slack = Math.max(0, Math.min(SLACK_PX, Math.floor((MAX_SIDE / dpr - Math.max(this.view.width, this.view.height)) / 2)));
+		const cssW = this.view.width + 2 * this.slack;
+		const cssH = this.view.height + 2 * this.slack;
+		const w = Math.max(1, Math.round(cssW * dpr));
+		const h = Math.max(1, Math.round(cssH * dpr));
 		if (w === this.size.w && h === this.size.h) return;
 		this.size = { w, h };
+		this.drawnAt = undefined;
 		for (const canvas of [this.over]) {
 			if (!canvas) continue;
 			canvas.width = w;
 			canvas.height = h;
-			canvas.style.width = `${this.view.width}px`;
-			canvas.style.height = `${this.view.height}px`;
+			canvas.style.width = `${cssW}px`;
+			canvas.style.height = `${cssH}px`;
 		}
+	}
+
+	/** The stage rectangle the canvas covers at the camera now: the window and the slack round it. */
+	private drawRect(): { x: number; y: number; zoom: number; width: number; height: number } {
+		const { x, y } = this.corner();
+		const m = this.slack / this.camera.zoom;
+		return { x: x - m, y: y - m, zoom: this.camera.zoom, width: this.view.width + 2 * this.slack, height: this.view.height + 2 * this.slack };
+	}
+
+	/**
+	 * Whether the canvas last drawn still shows this camera, moved: the zoom is the same and the
+	 * window is inside what was drawn. Only while the camera moves; at rest it is drawn again, centred
+	 * and on whole pixels.
+	 */
+	private slides(): boolean {
+		const at = this.drawnAt;
+		if (!at || !this.moving || at.zoom !== this.camera.zoom) return false;
+		const { x, y } = this.corner();
+		const zoom = this.camera.zoom;
+		return x >= at.x && y >= at.y && x + this.view.width / zoom <= at.x + (this.view.width + 2 * this.slack) / zoom && y + this.view.height / zoom <= at.y + (this.view.height + 2 * this.slack) / zoom;
+	}
+
+	/** The canvas sits in the world (`Stage.tsx`), so it is placed in stage units at the rectangle it was drawn for, and the world's transform moves it. */
+	private place(): void {
+		const at = this.drawnAt;
+		if (!this.over || !at) return;
+		this.over.style.transform = `translate(${at.x}px, ${at.y}px) scale(${1 / at.zoom})`;
 	}
 
 	setScheme(scheme: "light" | "dark"): void {
@@ -312,7 +354,7 @@ export class StageEngine {
 	/** In the call that moves the board pages, and drawn there, so the two land in one frame. */
 	setCamera(camera: Camera): void {
 		this.camera = camera;
-		this.draw();
+		if (!this.slides()) this.draw();
 		this.sendCamera();
 		this.wantBoardPictures();
 		// The click shapes follow the window: written again once it leaves the area they cover.
@@ -328,7 +370,11 @@ export class StageEngine {
 		if (moving === this.moving) return;
 		this.moving = moving;
 		this.sendCamera();
-		if (!moving) this.wantBoardPictures();
+		if (!moving) {
+			this.wantBoardPictures();
+			// Drawn again where the camera came to rest: the slack round it again, and on whole pixels.
+			this.draw();
+		}
 	}
 
 	/** The stage point at the window's top-left, from the camera's centre. */
@@ -338,15 +384,18 @@ export class StageEngine {
 
 	private sendCamera(): void {
 		if (!this.view.width) return;
-		const { x, y } = this.corner();
-		this.post({ type: "camera", x, y, zoom: this.camera.zoom, dpr: Math.min(2, devicePixelRatio || 1), width: this.view.width, height: this.view.height, moving: this.moving });
+		// The worker paints tiles for the slack too, so a pan slides onto drawing rather than an empty margin.
+		const { x, y, zoom, width, height } = this.drawRect();
+		this.post({ type: "camera", x, y, zoom, dpr: Math.min(2, devicePixelRatio || 1), width, height, moving: this.moving });
 	}
 
-	/** Draw both canvases now: always from the call that moved the pages, or when a tile arrives. */
+	/** Draw the canvas now, for the window and its slack: from a camera that left what was drawn, or when anything else changes. */
 	draw(): void {
 		if (!this.page || !this.view.width) return;
-		const { x, y } = this.corner();
-		const ops = this.page.frame(x, y, this.camera.zoom, Math.min(2, devicePixelRatio || 1), this.view.width, this.view.height, this.moving);
+		const at = this.drawRect();
+		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.moving);
+		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
+		this.place();
 		this.lastOps = ops;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
 		const pictured = this.page.pictured();
@@ -661,10 +710,16 @@ export class StageEngine {
 	cutFromCarried(rect: { left: number; top: number; width: number; height: number }): HTMLCanvasElement | undefined {
 		const canvas = this.over;
 		if (!this.page || !canvas || !this.lifted.size || rect.width < 1 || rect.height < 1) return undefined;
+		const drawn = this.drawRect();
+		this.page.frameLifted(drawn.x, drawn.y, drawn.zoom, Math.min(2, devicePixelRatio || 1), drawn.width, drawn.height);
+		this.drawnAt = { x: drawn.x, y: drawn.y, zoom: drawn.zoom };
+		this.place();
+		// Measured once placed: the canvas may have been slid from where it now is.
 		const at = canvas.getBoundingClientRect();
-		if (!at.width || !at.height) return undefined;
-		const { x, y } = this.corner();
-		this.page.frameLifted(x, y, this.camera.zoom, Math.min(2, devicePixelRatio || 1), this.view.width, this.view.height);
+		if (!at.width || !at.height) {
+			this.draw();
+			return undefined;
+		}
 		const sx = canvas.width / at.width;
 		const sy = canvas.height / at.height;
 		const left = rect.left + this.offset.dx * this.camera.zoom - at.left;
