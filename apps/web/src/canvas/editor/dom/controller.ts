@@ -14,6 +14,7 @@
 import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type PenDocument } from "@decks/pen";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { feedSelection, keptSelection } from "../../../state/pen-tools.ts";
+import { glideShift } from "../core/overlay.ts";
 import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
 import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
@@ -165,6 +166,8 @@ export function createEditor(host: EditorHost) {
 	const ZERO: Offset = { dx: 0, dy: 0 };
 	const shown = part(shownDrag);
 	const shownResize = part((now) => now.shownResize);
+	/** A drop's glide in hand, each frame of it as the engine draws it (`stage/engine.ts`, `onGlide`). */
+	const [glide, setGlide] = createSignal<ReadonlyMap<string, Offset> | undefined>(undefined, { equals: false });
 
 	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
 	onCleanup(feedSelection({ items, select: (next) => select(next) }));
@@ -221,8 +224,16 @@ export function createEditor(host: EditorHost) {
 			const held = boardResize();
 			return held && (!live(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
 		},
-		/** How far a drawn item is carried, as the canvas shows it: the drag's, when it is selected. */
-		itemShift: (id: string): Offset => (items().includes(id) ? shown() : ZERO),
+		/** A drop's glide in hand: how far each gliding item is still drawn from where it lands. */
+		glide,
+		/** Each frame of a drop's glide, from the engine; undefined when it ends. */
+		setGlide: (shifts: ReadonlyMap<string, Offset> | undefined) => setGlide(shifts),
+		/** How far a drawn item is carried, as the canvas shows it: the drag's, when it is selected, and any glide it lands with. */
+		itemShift: (id: string): Offset => {
+			const drag = items().includes(id) ? shown() : ZERO;
+			const gliding = glideShift(glide(), host.scene, id);
+			return gliding.dx || gliding.dy ? { dx: drag.dx + gliding.dx, dy: drag.dy + gliding.dy } : drag;
+		},
 		/** The box a drawn item is being resized to, as the sheet has drawn it. */
 		itemResize: (id: string): ResizeBox | undefined => {
 			const resized = shownResize();

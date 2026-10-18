@@ -957,6 +957,8 @@ export function Stage(props: {
 	 * the sheet still draws where they were, and both go with the pointer from the same frame.
 	 */
 	penLayer.onCarryPending = editor.carryPending;
+	// A drop's glide: the outlines, handles and size round what glides ride with it, frame by frame.
+	penLayer.onGlide = editor.setGlide;
 	const shownDrag = editor.shownDrag;
 	/** Where each selected item is now, moved by any drag and sized by any resize in progress (`editor/core/overlay.ts`). */
 	const penOutlines = createMemo(() => {
@@ -966,6 +968,7 @@ export function Stage(props: {
 				selection: editor.items(),
 				typing: editor.typing(),
 				drag: shownDrag(),
+				glide: editor.glide(),
 				resize: editor.shownResize(),
 				boards: scene.boards(),
 				boardPicks: editor.boardPicks(),
@@ -2090,7 +2093,7 @@ export function Stage(props: {
 	const hoverBox = createMemo(() => {
 		penDrawn();
 		return hoverBoxOf(
-			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverBoard() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.boardDrag() || panning(), boards: scene.boards() },
+			{ editing: props.mode === "edit", item: editor.hoverItem(), typing: editor.typing(), board: editor.hoverBoard() ?? editor.hoverPicture(), selected: props.selected, busy: !!editor.boardDrag() || panning(), boards: scene.boards(), glide: editor.glide() },
 			scene,
 		);
 	});
@@ -2099,7 +2102,7 @@ export function Stage(props: {
 	const kinBoxes = createMemo(() => {
 		penDrawn();
 		return kinOutlines(
-			{ selection: editor.items(), drag: shownDrag(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.boardDrag() || panning() || !!editor.gesture() },
+			{ selection: editor.items(), drag: shownDrag(), glide: editor.glide(), resizing: !!editor.resize(), typing: editor.typing(), editing: props.mode === "edit", hover: editor.hoverItem(), busy: !!editor.boardDrag() || panning() || !!editor.gesture() },
 			scene,
 		);
 	});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene } from "./fake-scene.ts";
-import { hitReach, anchorAt, arrowAnchors, distances, measure, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
+import { hitReach, anchorAt, arrowAnchors, distances, measure, arrowEnds, boardHandleList, boardHandles, deriveOverlay, draftBox, draftCurve, dropBox, glideShift, gripBox, gripHidden, handleAt, hoverBox, insertBox, itemHandles, kinOutlines, radiusHandle, radiusInset, radiusShown, selectionFrame, selectionOutlines, sizeLabel, type OutlineInput, type OverlayInput } from "./overlay.ts";
 
 const boards = [
 	{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 },
@@ -291,4 +291,46 @@ test("Alt's distances show in edit mode only, with a selection, Alt held and som
 		{ x1: 60, y1: 70, x2: 60, y2: 72, label: "2" },
 	]);
 	assert.equal(deriveOverlay({ ...input, alt: true, editing: false }, scene).distances, undefined);
+});
+
+test("during a drop's glide, outlines ride with what glides: the item, the box round many, a parent's children, the hovered item", () => {
+	const column = fakeScene([
+		{ id: "col", type: "frame", layout: "vertical", box: { x: 0, y: 0, w: 200, h: 300 } },
+		{ id: "r1", parent: "col", box: { x: 10, y: 10, w: 180, h: 50 } },
+		{ id: "dropped", parent: "col", box: { x: 10, y: 70, w: 180, h: 50 } },
+		{ id: "r2", parent: "col", box: { x: 10, y: 130, w: 180, h: 50 } },
+		{ id: "group", type: "group", box: { x: 400, y: 0, w: 100, h: 100 } },
+		{ id: "inner", parent: "group", box: { x: 410, y: 10, w: 40, h: 40 } },
+	]);
+	// The engine's glide: only the outermost of what moved, an item carrying its children.
+	const glide = new Map([
+		["dropped", { dx: 9, dy: -28 }],
+		["r2", { dx: 0, dy: -60 }],
+		["group", { dx: 5, dy: 5 }],
+	]);
+	assert.deepEqual(glideShift(glide, column, "dropped"), { dx: 9, dy: -28 });
+	assert.deepEqual(glideShift(glide, column, "inner"), { dx: 5, dy: 5 });
+	assert.deepEqual(glideShift(glide, column, "r1"), { dx: 0, dy: 0 });
+	assert.deepEqual(glideShift(undefined, column, "dropped"), { dx: 0, dy: 0 });
+
+	const one = selectionOutlines({ selection: ["dropped"], drag: none, glide, boards: [], boardPicks: [] }, column);
+	assert.deepEqual(one, [{ id: "dropped", role: "item", x: 19, y: 42, w: 180, h: 50 }]);
+	// Its handles sit on that outline, and so does the box round the selection and its size.
+	assert.deepEqual(itemHandles(one, column), one[0]);
+	assert.deepEqual(selectionFrame(one), { x: 19, y: 42, w: 180, h: 50, many: false, label: "180 × 50" });
+
+	const many = selectionOutlines({ selection: ["dropped", "r2"], drag: none, glide, boards: [], boardPicks: [] }, column);
+	assert.deepEqual(many.map((o) => [o.id, o.x, o.y]), [["dropped", 19, 42], ["r2", 10, 70]]);
+	assert.deepEqual(selectionFrame(many), { x: 10, y: 42, w: 189, h: 78, many: true, label: "189 × 78" });
+
+	// The column selected: its children are outlined where the glide draws them.
+	const kin = kinOutlines({ selection: ["col"], drag: none, glide, resizing: false, editing: true, busy: false }, column);
+	assert.deepEqual(kin.map((k) => [k.id, k.x, k.y]), [["r1", 10, 10], ["dropped", 19, 42], ["r2", 10, 70]]);
+	// A group's child is carried by the group's glide.
+	const inGroup = kinOutlines({ selection: ["group"], drag: none, glide, resizing: false, editing: true, busy: false }, column);
+	assert.deepEqual(inGroup.map((k) => [k.id, k.x, k.y]), [["inner", 415, 15]]);
+
+	assert.deepEqual(hoverBox({ editing: true, item: "r2", busy: false, boards: [], glide }, column), { x: 10, y: 70, w: 180, h: 50, id: "r2" });
+	// With no glide, nothing moves: the drag path is as it was.
+	assert.deepEqual(selectionOutlines({ selection: ["dropped"], drag: { dx: 3, dy: 4 }, boards: [], boardPicks: [] }, column), [{ id: "dropped", role: "item", x: 13, y: 74, w: 180, h: 50 }]);
 });

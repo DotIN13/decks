@@ -108,6 +108,8 @@ export type OutlineInput = {
 	typing?: string | undefined;
 	/** The selection's drag as the canvas shows it (nothing while the carried picture is on its way). */
 	drag: Offset;
+	/** A drop's glide in hand: how far each gliding item is still drawn from where it lands (`glideShift`). */
+	glide?: ReadonlyMap<string, Offset> | undefined;
 	/** An item being resized, as the sheet has drawn it. */
 	resize?: (Rect & { id: string }) | undefined;
 	boards: readonly BoardBox[];
@@ -129,6 +131,21 @@ const rounded = (scene: SceneQuery, id: string): true | undefined => {
 	const type = scene.item(id)?.node.type;
 	return type === "note" || type === "prompt" || type === "context" ? true : undefined;
 };
+const NO_SHIFT: Offset = { dx: 0, dy: 0 };
+
+/**
+ * How far a drop's glide (`glide.ts`, the engine runs it) still draws an item from where it lands:
+ * its own shift, or that of the nearest parent that glides, which carries it. None with no glide.
+ */
+export function glideShift(glide: ReadonlyMap<string, Offset> | undefined, scene: SceneQuery, id: string): Offset {
+	if (!glide?.size) return NO_SHIFT;
+	for (let at: string | undefined = id; at; at = scene.item(at)?.parent) {
+		const shift = glide.get(at);
+		if (shift) return shift;
+	}
+	return NO_SHIFT;
+}
+
 const outline = (id: string, role: Outline["role"], box: Rect, round?: true): Outline => ({ id, role, x: box.x, y: box.y, w: box.w, h: box.h, ...(round ? { round } : {}) });
 
 /**
@@ -148,7 +165,9 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 		const item = scene.item(id)?.node;
 		if (item && isArrow(item)) continue;
 		const box = scene.drawn(id);
-		if (box) out.push(outline(id, "item", { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h }, rounded(scene, id)));
+		// Moved by the drag in hand, or, once it is let go, by the glide into where it lands.
+		const glide = glideShift(input.glide, scene, id);
+		if (box) out.push(outline(id, "item", { x: box.x + drag.dx + glide.dx, y: box.y + drag.dy + glide.dy, w: box.w, h: box.h }, rounded(scene, id)));
 	}
 	const moving = input.boardDrag;
 	const carried = input.ownDrag;
@@ -240,6 +259,8 @@ export type HoverInput = {
 	/** A board drag or a pan, which a board's hover outline waits out. */
 	busy: boolean;
 	boards: readonly BoardBox[];
+	/** A drop's glide in hand, which the hovered item's outline rides with. */
+	glide?: ReadonlyMap<string, Offset> | undefined;
 };
 
 /**
@@ -251,7 +272,8 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 	if (!input.editing) return undefined;
 	const hovered = id ? scene.item(id)?.node : undefined;
 	const bounds = id && id !== input.typing && !(hovered && isArrow(hovered)) ? scene.drawn(id) : undefined;
-	if (bounds) return { ...bounds, id, ...(rounded(scene, id!) ? { round: true as const } : {}) };
+	const glide = id ? glideShift(input.glide, scene, id) : NO_SHIFT;
+	if (bounds) return { ...bounds, x: bounds.x + glide.dx, y: bounds.y + glide.dy, id, ...(rounded(scene, id!) ? { round: true as const } : {}) };
 	const path = input.board;
 	const board = path && path !== input.selected && !input.busy ? input.boards.find((candidate) => candidate.path === path) : undefined;
 	return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
@@ -261,6 +283,8 @@ export type KinInput = {
 	selection: readonly string[];
 	/** The selection's drag as the canvas shows it: children are not outlined while it moves. */
 	drag: Offset;
+	/** A drop's glide in hand: parents and children that glide are outlined where they are drawn. */
+	glide?: ReadonlyMap<string, Offset> | undefined;
 	resizing: boolean;
 	typing?: string | undefined;
 	/** Edit mode, which outlines what the pointer is over and its kin. */
@@ -288,7 +312,8 @@ export function kinOutlines(input: KinInput, scene: SceneQuery): KinBox[] {
 		const box = scene.drawn(id);
 		if (!box) return;
 		seen.add(id);
-		out.push({ id, kin, of, x: box.x, y: box.y, w: box.w, h: box.h, ...(rounded(scene, id) ? { round: true as const } : {}) });
+		const glide = glideShift(input.glide, scene, id);
+		out.push({ id, kin, of, x: box.x + glide.dx, y: box.y + glide.dy, w: box.w, h: box.h, ...(rounded(scene, id) ? { round: true as const } : {}) });
 	};
 	const moving = !!(input.drag.dx || input.drag.dy);
 	if (!input.typing) {
@@ -433,9 +458,9 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const handles = itemHandles(outlines, scene, input.zoom);
 	const handleInput = { editable: input.editable, drafting: input.drafting, resizing: input.resizing, drag: input.pointerDrag };
 	const busy = !!input.boardDrag || input.panning;
-	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards }, scene);
+	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards, glide: input.glide }, scene);
 	const grip = gripBox({ block: input.block, busy, editing: input.editing }, scene, input.lineOf);
-	const kin = kinOutlines({ selection: input.selection, drag: input.drag, resizing: input.resizing, typing: input.typing, editing: input.editing, hover: input.hoverItem, busy: busy || !!input.gesture }, scene);
+	const kin = kinOutlines({ selection: input.selection, drag: input.drag, glide: input.glide, resizing: input.resizing, typing: input.typing, editing: input.editing, hover: input.hoverItem, busy: busy || !!input.gesture }, scene);
 	const frame = selectionFrame(outlines);
 	return {
 		outlines,

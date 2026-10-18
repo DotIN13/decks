@@ -106,6 +106,12 @@ export class StageEngine {
 	/** Not used by this engine: kept so the stage can treat both alike. */
 	drewDrawing = true;
 	onCarryPending: ((pending: boolean) => void) | undefined;
+	/**
+	 * Each frame of a drop's glide (`startGlide`): how far each item that glides is still drawn from
+	 * where it lands, so the outlines round them ride along; undefined when the glide ends or a new
+	 * gesture cancels it.
+	 */
+	onGlide: ((shifts: ReadonlyMap<string, { dx: number; dy: number }> | undefined) => void) | undefined;
 
 	/**
 	 * The canvas, once the stage has made it: among the board pages, after them. The boards'
@@ -268,7 +274,9 @@ export class StageEngine {
 		if (!shifts.size) return false;
 		this.settling = false;
 		const start = performance.now();
-		this.showPreview(glideAt(shifts, 0));
+		const first = glideAt(shifts, 0);
+		this.showPreview(first);
+		this.onGlide?.(first);
 		const step = () => {
 			const glide = this.glide;
 			if (!glide || this.disposed) return;
@@ -276,9 +284,12 @@ export class StageEngine {
 			if (elapsed >= GLIDE_MS) {
 				this.glide = undefined;
 				this.showPreview(undefined);
+				this.onGlide?.(undefined);
 				return;
 			}
-			this.showPreview(glideAt(glide.shifts, elapsed));
+			const now = glideAt(glide.shifts, elapsed);
+			this.showPreview(now);
+			this.onGlide?.(now);
 			glide.frame = requestAnimationFrame(step);
 		};
 		this.glide = { shifts, start, frame: requestAnimationFrame(step) };
@@ -667,6 +678,7 @@ export class StageEngine {
 		if (this.glide) {
 			cancelAnimationFrame(this.glide.frame);
 			this.glide = undefined;
+			this.onGlide?.(undefined);
 		}
 		this.showPreview(moving);
 	}
