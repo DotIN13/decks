@@ -5,6 +5,7 @@
 //! has one screen surface. Its limits are WebGL 2's guaranteed ones but for the biggest texture,
 //! which is the device's own. A lost context marks the `Gpu` lost.
 
+use super::Canvas;
 use crate::{Api, Gpu};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,21 +13,7 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;
 use web_sys::WebGl2RenderingContext as Gl;
 
-/// The canvas to draw on: the page's own, or the worker's.
-#[derive(Clone)]
-pub enum Canvas {
-	Element(web_sys::HtmlCanvasElement),
-	Offscreen(web_sys::OffscreenCanvas),
-}
-
 impl Canvas {
-	pub fn target(&self) -> wgpu::SurfaceTarget<'static> {
-		match self {
-			Canvas::Element(c) => wgpu::SurfaceTarget::Canvas(c.clone()),
-			Canvas::Offscreen(c) => wgpu::SurfaceTarget::OffscreenCanvas(c.clone()),
-		}
-	}
-
 	/// The canvas's WebGL 2 context, the one wgpu made: asking again gives the same one.
 	fn context(&self) -> Option<Gl> {
 		let context = match self {

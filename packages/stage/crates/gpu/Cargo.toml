@@ -7,7 +7,7 @@ license.workspace = true
 [dependencies]
 stage-paint = { path = "../paint" }
 stage-render = { path = "../render" }
-wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "webgl", "metal", "std"] }
+wgpu = { version = "30", default-features = false, features = ["wgsl", "webgpu", "metal", "std"] }
 bytemuck = { version = "1", features = ["derive"] }
 
 # The WebGL 2 target asks its canvas's context what wgpu does not say (MAX_SAMPLES), and hears when
@@ -24,3 +24,9 @@ stage-doc = { path = "../doc" }
 stage-scene = { path = "../scene" }
 stage-text = { path = "../text" }
 serde_json.workspace = true
+
+
+# WebGL 2 through wgpu's GL backend (and naga's GLSL writer): about 690 KB of brotli wasm, so the
+# browser gets two builds, WebGPU only (`pkg/`) and with WebGL 2 too (`pkg-gl/`): see build-web.sh.
+[features]
+webgl = ["wgpu/webgl"]

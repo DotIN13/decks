@@ -2,19 +2,37 @@
 //! device its own way and hands it to [`Gpu::new`]; drawing is the same on all of them.
 //!
 //! - [`webgpu`]: a browser canvas or `OffscreenCanvas`, through WebGPU.
-//! - [`webgl`]: the same, through WebGL 2, where there is no WebGPU.
+//! - [`webgl`]: the same, through WebGL 2, where there is no WebGPU (with the `webgl` feature).
 //! - [`native`]: this machine's graphics card (Metal), with no window: for tests.
 //!
 //! Screen surfaces, which a browser target configures, are set up here for all of them.
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 pub mod webgl;
 #[cfg(target_arch = "wasm32")]
 pub mod webgpu;
 
 use crate::{Api, Gpu};
+
+/// The canvas a browser target draws on: the page's own, or the worker's.
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone)]
+pub enum Canvas {
+	Element(web_sys::HtmlCanvasElement),
+	Offscreen(web_sys::OffscreenCanvas),
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Canvas {
+	pub fn target(&self) -> wgpu::SurfaceTarget<'static> {
+		match self {
+			Canvas::Element(c) => wgpu::SurfaceTarget::Canvas(c.clone()),
+			Canvas::Offscreen(c) => wgpu::SurfaceTarget::OffscreenCanvas(c.clone()),
+		}
+	}
+}
 
 impl Gpu {
 	/// Draw to the screen through this surface from now on, as the first screen surface.

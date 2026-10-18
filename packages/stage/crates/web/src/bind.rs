@@ -5,7 +5,7 @@ use crate::engine::{Camera, Page, TILE_SIZE, Worker};
 use crate::select::{self, Api};
 use crate::wire;
 use stage_gpu::Gpu;
-use stage_gpu::targets::webgl::Canvas;
+use stage_gpu::targets::Canvas;
 use stage_paint::tiles::Key;
 use stage_paint::{Backend, Target, TextureKind};
 use wasm_bindgen::prelude::*;
@@ -550,6 +550,11 @@ impl WorkerEngine {
 	pub fn set_gpu(&mut self, handle: GpuHandle, canvas: web_sys::OffscreenCanvas) {
 		self.gpu = Some(handle.gpu);
 		self.canvas = Some(canvas);
+	}
+
+	/// The device went away (WebGPU's device lost, WebGL's context lost): the page starts again.
+	pub fn lost(&self) -> bool {
+		self.gpu.as_ref().is_some_and(|g| g.lost())
 	}
 
 	#[wasm_bindgen(js_name = tileSize)]

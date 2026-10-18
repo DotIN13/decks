@@ -6,10 +6,15 @@
 //! canvas gets a WebGPU context only when there is an adapter to go with it. WebGPU present but
 //! with no adapter (a blocklisted card, WebGPU turned off) falls back to WebGL 2 as if it were not
 //! there.
+//!
+//! Only the build with the `webgl` feature (`pkg-gl/`) has WebGL 2; the other (`pkg/`) is WebGPU
+//! only, and the page chooses which to load (`apps/web/src/stage/backends/detect.ts`).
 
 use stage_gpu::Gpu;
-use stage_gpu::targets::webgl::Canvas;
-use stage_gpu::targets::{webgl, webgpu};
+use stage_gpu::targets::Canvas;
+#[cfg(feature = "webgl")]
+use stage_gpu::targets::webgl;
+use stage_gpu::targets::webgpu;
 
 /// A graphics API the page asks for by name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,7 +59,11 @@ pub async fn open(canvas: Canvas, width: u32, height: u32, prefer: Option<Api>, 
 				Ok(found) => webgpu::open(found, canvas.target(), width, height, stage_render::limits::samples(None, short)).await,
 				Err(e) => Err(e),
 			},
+			#[cfg(feature = "webgl")]
 			Api::WebGl2 => webgl::open(canvas.clone(), width, height, short).await,
+			// The WebGPU-only build (`pkg/`): the page loads `pkg-gl/` where WebGPU is missing.
+			#[cfg(not(feature = "webgl"))]
+			Api::WebGl2 => Err("this build of the stage draws with WebGPU only".to_string()),
 		};
 		match opened {
 			Ok(gpu) => return Ok(gpu),
