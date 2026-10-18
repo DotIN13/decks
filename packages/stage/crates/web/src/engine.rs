@@ -1084,3 +1084,36 @@ pub struct BoardPlace {
 	pub news: Option<[f32; 4]>,
 	pub glow: bool,
 }
+
+#[cfg(test)]
+mod bend_bench {
+	use super::*;
+
+	/// `STAGE_BENCH=path/to/stage.pen cargo test --release -p stage-web bend_cost -- --ignored --nocapture`:
+	/// a box with ten arrows joined to it, added to a real stage, dragged 200 steps.
+	#[test]
+	#[ignore]
+	fn bend_cost() {
+		let path = std::env::var("STAGE_BENCH").expect("STAGE_BENCH");
+		let mut doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+		let children = doc["children"].as_array_mut().unwrap();
+		let items = children.len();
+		children.push(json!({"type":"rectangle","id":"bench-hub","x":-5000,"y":-5000,"width":140,"height":80}));
+		for k in 0..10 {
+			let (x, y) = (-5600.0 + 130.0 * k as f64, -4600.0 - 40.0 * (k % 3) as f64);
+			children.push(json!({"type":"rectangle","id":format!("bench-{k}"),"x":x,"y":y,"width":100,"height":60}));
+			let route = ["straight", "curved", "elbow"][k % 3];
+			children.push(json!({"type":"path","id":format!("bench-a{k}"),"geometry":"M0 0 L1 1","strokeWidth":2,"metadata":{"type":"decks.arrow","from":"bench-hub","to":format!("bench-{k}"),"route":route}}));
+		}
+		let mut page = Page::new(&doc.to_string(), false, "s").unwrap();
+		let t = std::time::Instant::now();
+		let first = page.preview(Some(vec![("bench-hub".into(), Preview { dx: 1.0, dy: 1.0, set: vec![] })])).unwrap();
+		let first_ms = t.elapsed().as_secs_f64() * 1e3;
+		let t = std::time::Instant::now();
+		for s in 0..200 {
+			page.preview(Some(vec![("bench-hub".into(), Preview { dx: s as f64 * 3.0, dy: (s as f64 * 0.1).sin() * 200.0, set: vec![] })])).unwrap();
+		}
+		let step_us = t.elapsed().as_secs_f64() * 1e6 / 200.0;
+		println!("{items} top-level items; first step {first_ms:.2} ms ({} arrows found); each later step {step_us:.0} µs", first.len());
+	}
+}
