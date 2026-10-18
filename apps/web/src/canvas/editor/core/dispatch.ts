@@ -128,7 +128,7 @@ export type HoverFacts = {
  * What a hover does: nothing (a finger, a stage that cannot be edited, the pen out, or a grip,
  * which keeps itself and its block), clear what is lit (a button held, a tool armed, off the
  * canvas; the grip's block too when no button is held), or follow the pointer, once a frame:
- * for what it lights (`outlines`, edit mode) or only for a link's hand (browsing).
+ * for what it lights (`outlines`, edit mode) or, browsing, only for a link's hand and a card block's grip.
  */
 export type HoverAction = { do: "none" } | { do: "clear"; block: boolean } | { do: "track"; outlines: boolean };
 

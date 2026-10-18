@@ -454,8 +454,19 @@ await settle(page, 400);
 const blockId = (cardNode()?.children ?? []).find((n) => n.type === "text" && (n.content ?? "").startsWith("Look:"))?.id;
 const blockBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockId);
 await page.mouse.move(blockBox.x + 40, blockBox.y + 6);
-const grip = await until(() => page.evaluate(() => document.querySelector(".pen-grip")?.getBoundingClientRect().toJSON()), 2000);
+// The stage's grip, not the drawing bar's own `.pen-tools .pen-grip`.
+const grip = await until(() => page.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
 say("hovering a card's block shows its grip in the card's margin", !!grip && grip.right <= blockBox.x + 2 && Math.abs(grip.top - blockBox.y) < 12, JSON.stringify({ grip: grip && Math.round(grip.x), block: Math.round(blockBox.x) }));
+// Browsing shows it too: a card's blocks are drawn items, and those drag in both modes.
+await editMode(page, false);
+await page.mouse.move(blockBox.x + 40, blockBox.y - 80);
+await page.mouse.move(blockBox.x + 40, blockBox.y + 6, { steps: 3 });
+const browsing = await until(() => page.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
+say("…and browsing, the same grip", !!browsing && Math.abs(browsing.x - grip.x) < 2 && Math.abs(browsing.y - grip.y) < 2, JSON.stringify(browsing && { x: Math.round(browsing.x), y: Math.round(browsing.y) }));
+await editMode(page, true);
+await page.mouse.move(blockBox.x + 40, blockBox.y - 80);
+await page.mouse.move(blockBox.x + 40, blockBox.y + 6, { steps: 3 });
+await until(() => page.evaluate(() => !!document.querySelector(".world .pen-grip")), 2000);
 if (grip) {
 	await page.mouse.move(grip.x + 6, grip.y + 8);
 	await page.mouse.down();

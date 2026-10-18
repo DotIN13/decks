@@ -138,8 +138,8 @@ test("the grip sits level with the middle of the block's first line; the drop bo
 	assert.deepEqual(gripBox({ block: "block", busy: false, editing: true }, scene, line), { id: "block", x: 620, y: 56 });
 	assert.equal(gripBox({ block: "block", busy: true, editing: true }, scene, line), undefined);
 	assert.equal(gripBox({ busy: false, editing: true }, scene, line), undefined);
-	// Browsing, nothing answers the pointer before a press: no grip either.
-	assert.equal(gripBox({ block: "block", busy: false, editing: false }, scene, line), undefined);
+	// Browsing, the grip still shows: a card's blocks drag in both modes.
+	assert.deepEqual(gripBox({ block: "block", busy: false, editing: false }, scene, line), { id: "block", x: 620, y: 56 });
 	assert.equal(gripHidden(none, false), false);
 	assert.equal(gripHidden({ dx: 0, dy: 2 }, false), true);
 	assert.equal(gripHidden(none, true), true);

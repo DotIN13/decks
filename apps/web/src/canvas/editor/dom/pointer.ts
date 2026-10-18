@@ -362,9 +362,9 @@ export function createPointer(editor: Editor, host: PointerHost) {
 
 	/**
 	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
-	 * what a press there would select, and a card block's grip. Edit mode only (`decideHover`):
-	 * browsing selects and edits the drawing all the same, but nothing answers the pointer before a
-	 * press except the hand over a link. A mouse or a pen with no button down, over the drawing; a
+	 * what a press there would select, and a card block's grip. The outline is edit mode's
+	 * (`decideHover`): browsing selects and edits the drawing all the same, and before a press only
+	 * the hand over a link and a card block's grip answer the pointer. A mouse or a pen with no button down, over the drawing; a
 	 * board says when it is under the pointer (`BoardFrame`), and anything else clears the item's.
 	 * Once per frame at most.
 	 */
@@ -397,9 +397,9 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		hoverFrame ??= requestAnimationFrame(() => {
 			hoverFrame = undefined;
 			const href = hoverAt ? host.linkAt(hoverAt) : undefined;
-			// Browsing, only the hand over a link: no grip, no outline.
+			// Browsing, the hand over a link and a card block's grip, but no outline.
 			if (!hoverLights) {
-				editor.hover({ link: !!href && host.mode() === "browse", block: undefined, item: undefined, picture: undefined });
+				editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined, item: undefined, picture: undefined });
 				return;
 			}
 			editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined });

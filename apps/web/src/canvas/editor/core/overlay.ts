@@ -376,13 +376,13 @@ export function distances(input: { editing: boolean; alt: boolean; busy: boolean
 }
 
 /**
- * Where the hovered block's grip goes, in edit mode: in the card's left margin, centred on the block's first
+ * Where the hovered block's grip goes, in either mode: in the card's left margin, centred on the block's first
  * line as the layout sets it (`lineOf`, the page's measure: a heading's is taller than a paragraph's).
  */
 export function gripBox(input: { block?: string | undefined; busy: boolean; editing: boolean }, scene: SceneQuery, lineOf: (id: string, node: PenNode) => { top: number; height: number }): GripBox | undefined {
 	const id = input.block;
-	// A grip answers the pointer before a press: edit mode's, as the hover outline is.
-	if (!id || input.busy || !input.editing) return undefined;
+	// Shown browsing too: a card's blocks are drawn items, and drawn items drag in both modes.
+	if (!id || input.busy) return undefined;
 	const box = scene.box(id);
 	const node = scene.node(id);
 	if (!box || !node) return undefined;
