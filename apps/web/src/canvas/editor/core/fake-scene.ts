@@ -3,7 +3,7 @@ import type { PenNode, Placed } from "@decks/pen";
 import type { BoardBox, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
-export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown>; line?: boolean };
+export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown>; line?: boolean; undrawn?: boolean };
 
 /** How far round its box a fake item is found under a point, as a press's reach is in the engine. */
 export const FAKE_REACH = 4;
@@ -17,6 +17,10 @@ export function fakeScene(list: FakeItem[], boards: BoardBox[] = []): SceneQuery
 		items: () => placed.values(),
 		item: (id) => placed.get(id),
 		box: (id) => list.find((one) => one.id === id)?.drawn ?? placed.get(id)?.box,
+		drawn: (id) => {
+			const one = list.find((candidate) => candidate.id === id);
+			return one && !one.undrawn ? (one.drawn ?? one.box) : undefined;
+		},
 		node: (id) => nodes.get(id),
 		parent: (id) => {
 			const up = placed.get(id)?.parent;

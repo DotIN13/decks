@@ -7,8 +7,8 @@ import type { Frame } from "@decks/pen";
 export type Pt = { x: number; y: number };
 /** A box on the stage, in stage pixels. */
 export type Rect = Frame;
-/** A board as the stage places it. */
-export type BoardBox = { path: string; x: number; y: number; w: number; h: number };
+/** A board as the stage places it; a slide deck (`slides`) is sized by its width alone. */
+export type BoardBox = { path: string; x: number; y: number; w: number; h: number; slides?: boolean };
 /**
  * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
  * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).

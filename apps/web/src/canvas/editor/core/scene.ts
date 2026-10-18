@@ -14,6 +14,11 @@ export interface SceneQuery {
 	item(id: string): Placed | undefined;
 	/** Where an item is drawn (text measured, shapes at their outline), else where it is placed. */
 	box(id: string): Rect | undefined;
+	/**
+	 * Where the sheet has drawn an item, and nothing until it has: what an outline goes round, so
+	 * none shows for an item that is placed but not yet drawn. `box` falls back to the placed box.
+	 */
+	drawn(id: string): Rect | undefined;
 	/** The item's node in the document, for what the placed copy does not carry (its children). */
 	node(id: string): PenNode | undefined;
 	/** The node an item sits in, in the document; `undefined` at the top. */

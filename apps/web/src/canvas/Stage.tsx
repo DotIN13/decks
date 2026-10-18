@@ -8,7 +8,6 @@ import MessageSquare from "lucide-solid/icons/message-square";
 import Scan from "lucide-solid/icons/scan";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import Pencil from "lucide-solid/icons/pencil";
-import GripVertical from "lucide-solid/icons/grip-vertical";
 import { TOOLS } from "./pen/PenBar.tsx";
 import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
@@ -17,7 +16,7 @@ import FilePlus from "lucide-solid/icons/file-plus";
 import Paperclip from "lucide-solid/icons/paperclip";
 import FileText from "lucide-solid/icons/file-text";
 import Presentation from "lucide-solid/icons/presentation";
-import { For, Index, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
@@ -48,7 +47,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowEndItem, arrowRoute, baseTheme, isShape, mediaOf, makeLabel, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { arrowEndItem, baseTheme, isShape, mediaOf, makeLabel, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -63,10 +62,12 @@ import { StageEngine } from "../stage/engine.ts";
 import { blockAt, marqueePick, marqueeRect, pickAt as pickAtIn, pictureAt, type PickOptions } from "./editor/core/pick.ts";
 import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
 import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
-import { boardResizeEnd, boardResizeStep, givenFor, HANDLES, hugAgainOp, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle } from "./editor/core/resize.ts";
-import { arrowHandles, arrowOp, bendAt, bendStart, droppedEnd, joinAt as joinAtIn, newArrowEnds, resetBendOp, resetEndOp, routeDraft as routeDraftIn, slideJoin, withEnd, type Join, type RouteDraft } from "./editor/core/arrows.ts";
+import { boardResizeEnd, boardResizeStep, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle } from "./editor/core/resize.ts";
+import { arrowOp, bendAt, bendStart, droppedEnd, joinAt as joinAtIn, newArrowEnds, resetBendOp, resetEndOp, routeDraft as routeDraftIn, slideJoin, withEnd, type Join, type RouteDraft } from "./editor/core/arrows.ts";
 import { arrowInsertOp, boardMoves, copyOps, deleteOps, drawnOp, duplicateOps, idMaker, makeAtOp, moveOps, type MakeOptions } from "./editor/core/ops.ts";
 import { penKey as penKeyOf, type KeyAct } from "./editor/core/keys.ts";
+import { arrowAnchors, arrowEnds as arrowEndsOf, boardHandles as boardHandlesOf, dropBox as dropBoxOf, gripBox as gripBoxOf, gripHidden, hoverBox as hoverBoxOf, itemHandles, radiusHandle as radiusHandleOf, selectionOutlines, type Overlay } from "./editor/core/overlay.ts";
+import { ANCHOR_OUT, ANCHOR_PX, OverlayLayer } from "./editor/dom/OverlayLayer.tsx";
 import { tsScene } from "./editor/scene-ts.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
@@ -656,7 +657,8 @@ export function Stage(props: {
 	penLayer.failed = (why) => console.error(`The stage engine did not start: ${why}`);
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
-	const scene = tsScene(penLayer, () => props.pen?.doc, () => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })));
+	const sceneBoards = createMemo(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, ...(board.format === "slides" ? { slides: true } : {}) })));
+	const scene = tsScene(penLayer, () => props.pen?.doc, sceneBoards);
 	/** The item a press at a stage point picks (`editor/core/pick.ts`, policy "outermost"; `deep` for the item itself). */
 	const pickAt = (at: { x: number; y: number }, options?: PickOptions) => pickAtIn(scene, at, options);
 	createEffect(() => penLayer.setView(view()));
@@ -978,70 +980,36 @@ export function Stage(props: {
 	const [carryPending, setCarryPending] = createSignal(false);
 	penLayer.onCarryPending = setCarryPending;
 	const shownDrag = () => (carryPending() ? { dx: 0, dy: 0 } : penDrag());
-	/** Where each selected item is now, moved by any drag and sized by any resize in progress. */
+	/** Where each selected item is now, moved by any drag and sized by any resize in progress (`editor/core/overlay.ts`). */
 	const penOutlines = createMemo(() => {
 		penDrawn();
-		const drag = shownDrag();
-		const resize = shownResize();
-		const out: Array<{ id: string; x: number; y: number; w: number; h: number }> = [];
-		const typing = penText()?.id;
-		for (const id of penSelection()) {
-			// The item being typed into is outlined by its editor.
-			if (id === typing) continue;
-			if (resize?.id === id) {
-				out.push(resize);
-				continue;
-			}
-			// An arrow is a line, and a box round it says nothing: its own two round end handles show it.
-			const item = penLayer.placed.get(id)?.node;
-			if (item && isArrow(item)) continue;
-			const box = penLayer.bounds.get(id);
-			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
-		}
-		const moving = boardDrag();
-		const carried = ownDrag();
-		for (const path of boardPicks()) {
-			const board = props.boards.find((candidate) => candidate.path === path);
-			if (!board) continue;
-			const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
-			out.push({ id: `board:${path}`, x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h });
-		}
-		// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
-		const chosen = props.selected;
-		const board = chosen && chosen !== props.focus && !boardPicks().includes(chosen) ? props.boards.find((candidate) => candidate.path === chosen) : undefined;
-		if (board) {
-			const sized = boardResize();
-			const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
-			// Carried by a finger on its edge (`BoardFrame`'s own drag): outlined where the finger has it.
-			const at = carried?.path === board.path ? carried : { x: board.x + shift.dx, y: board.y + shift.dy };
-			out.push(sized?.path === board.path ? { id: `board:${board.path}`, x: sized.x, y: sized.y, w: sized.w, h: sized.h } : { id: `board:${board.path}`, x: at.x, y: at.y, w: board.w, h: board.h });
-		}
-		const marquee = penMarquee();
-		if (marquee) out.push({ id: "", x: Math.min(marquee.x1, marquee.x2), y: Math.min(marquee.y1, marquee.y2), w: Math.abs(marquee.x2 - marquee.x1), h: Math.abs(marquee.y2 - marquee.y1) });
-		return out;
+		return selectionOutlines(
+			{
+				selection: penSelection(),
+				typing: penText()?.id,
+				drag: shownDrag(),
+				resize: shownResize(),
+				boards: scene.boards(),
+				boardPicks: boardPicks(),
+				boardDrag: boardDrag(),
+				ownDrag: ownDrag(),
+				selected: props.selected,
+				focus: props.focus,
+				boardResize: boardResize(),
+				marquee: penMarquee(),
+			},
+			scene,
+		);
 	});
 	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-	const penHandles = createMemo(() => {
-		const outlines = penOutlines();
-		if (outlines.length !== 1 || !outlines[0]!.id || outlines[0]!.id.startsWith("board:")) return undefined;
-		const node = penLayer.placed.get(outlines[0]!.id)?.node;
-		// A group is as big as what is in it, and pen does not scale children, so it moves but is not sized.
-		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
-		return outlines[0]!;
-	});
+	const penHandles = createMemo(() => itemHandles(penOutlines(), scene));
 	/**
 	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
 	 * made. So it is sized by its width alone: the two side handles, and no height written to the
 	 * file. Dragging a corner used to pin a height on it, and from then on its words were cut off or
 	 * swam in space.
 	 */
-	const penAnchors = createMemo(() => {
-		const box = penHandles();
-		if (!box || penDraft() || penResize() || !props.onPenEdit) return undefined;
-		const node = penLayer.placed.get(box.id)?.node;
-		if (!node || node.type === "path" || node.type === "text") return undefined;
-		return box;
-	});
+	const penAnchors = createMemo(() => arrowAnchors(penHandles(), { editable: !!props.onPenEdit, drafting: !!penDraft(), resizing: !!penResize() }, scene));
 	/*
 	 * Where each selected item is, for the properties panel's position and size: the box the stage
 	 * draws, kept current as the drawing changes (`state/pen-tools.ts`).
@@ -1056,20 +1024,7 @@ export function Stage(props: {
 		setPenBoxes(boxes);
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const boardHandles = createMemo(() => {
-		const outlines = penOutlines();
-		if (!props.onResize || boardDrag() || ownDrag() || outlines.length !== 1 || !outlines[0]!.id.startsWith("board:")) return undefined;
-		const path = outlines[0]!.id.slice("board:".length);
-		const board = props.boards.find((candidate) => candidate.path === path);
-		if (!board) return undefined;
-		return { ...outlines[0]!, path, slides: board.format === "slides" };
-	});
-	/** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
-	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-	/** Where an arrow handle sits, in screen pixels: its centre this far out from the item's side, and this wide. */
-	const ANCHOR_OUT = 14;
-	const anchorSize = coarse ? 16 : 10;
-	const HANDLE_PX = coarse ? 16 : 9;
+	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!boardDrag() || !!ownDrag(), boards: scene.boards() }));
 	const TEXTY = new Set(["text", "note", "prompt", "context"]);
 	/**
 	 * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
@@ -1618,13 +1573,6 @@ export function Stage(props: {
 		return true;
 	};
 
-	/** The path of an arrow being drawn, curved as the arrow it makes will be. */
-	const draftCurve = (draft: { x1: number; y1: number; x2: number; y2: number }) => {
-		const points = arrowRoute({ x: draft.x1, y: draft.y1, w: 0, h: 0 }, { x: draft.x2, y: draft.y2, w: 0, h: 0 }, "curved");
-		const [a, ...rest] = points;
-		return points.length === 4 ? `M${a![0]} ${a![1]}C${rest.map((p) => `${p[0]} ${p[1]}`).join(" ")}` : `M${points.map((p) => `${p[0]} ${p[1]}`).join("L")}`;
-	};
-
 	const armPenTool = (tool: PenTool) => {
 		// The board palette's tool goes down first: picking one of its tools puts this one down.
 		if (tool !== "select") props.onTool?.("select");
@@ -1804,12 +1752,7 @@ export function Stage(props: {
 	const [dropAt, setDropAt] = createSignal<{ index: number; line: { x: number; y: number; w: number; h: number } } | undefined>();
 	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => dropSlotIn(scene, frameId, point, carrying);
 	/** Where the frame a drag would drop into is, for the outline that says so. */
-	const dropBox = createMemo(() => {
-		const id = dropInto();
-		if (!id) return undefined;
-		const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
-		return box ? { ...box, id } : undefined;
-	});
+	const dropBox = createMemo(() => dropBoxOf(dropInto(), scene));
 
 	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
 	let referTarget: HTMLElement | undefined;
@@ -2217,13 +2160,7 @@ export function Stage(props: {
 	 * library, or pen's own rectangle or frame. The handle that drags it sits inside the top-left
 	 * corner, as it does in a drawing program, and every corner follows it.
 	 */
-	const radiusHandle = createMemo(() => {
-		const box = penHandles();
-		if (!box || penResize() || penDrag().dx !== 0 || penDrag().dy !== 0 || !props.onPenEdit) return undefined;
-		const node = penLayer.placed.get(box.id)?.node;
-		// A library shape with no corners to round (a terminator, an arrow) has no handle: its outline would ignore it.
-		return node ? radiusStart(node, box) : undefined;
-	});
+	const radiusHandle = createMemo(() => radiusHandleOf(penHandles(), { editable: !!props.onPenEdit, resizing: !!penResize(), drag: penDrag() }, scene));
 	/**
 	 * The drawn items the same pill is for, when no board has it: the selection's box together, and what
 	 * to call it. Not while one is typed into (its editor has its own toolbar) or drawn with the pen.
@@ -2315,9 +2252,7 @@ export function Stage(props: {
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
 	const arrowEnds = createMemo(() => {
 		penDrawn();
-		const ids = penSelection();
-		if (ids.length !== 1 || boardPicks().length) return undefined;
-		return arrowHandles(scene, ids[0]!, shownDrag());
+		return arrowEndsOf({ selection: penSelection(), boardPicks: boardPicks(), drag: shownDrag() }, scene);
 	});
 	/** A new route for an arrow, drawn dashed while one of its handles is dragged (`dragArrowEnd`, `dragArrowBend`). */
 	const [routeDraft, setRouteDraft] = createSignal<string | undefined>();
@@ -3486,15 +3421,11 @@ export function Stage(props: {
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
 	const gripBox = createMemo(() => {
 		penDrawn();
-		const id = blockHover();
-		if (!id || boardDrag() || panning()) return undefined;
-		const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
-		const node = penNode(id);
-		if (!box || !node) return undefined;
-		// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
-		const look = textLookOf(node, penLayer.placed.get(id));
-		const line = firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
-		return { id, x: box.x, y: box.y + line.top + line.height / 2 };
+		return gripBoxOf({ block: blockHover(), busy: !!boardDrag() || panning() }, scene, (id, node) => {
+			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
+			const look = textLookOf(node, penLayer.placed.get(id));
+			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
+		});
 	});
 	/** A press on a block's grip picks the block up and carries it, into another place in the card or out of it. */
 	const dragBlock = (event: PointerEvent, id: string) => {
@@ -3506,26 +3437,14 @@ export function Stage(props: {
 		dragSelection(event, [id], [], event.currentTarget as HTMLElement);
 	};
 
-	/** The hovered item's box as it is drawn now. */
+	/** The hovered item's box as it is drawn now, or the board under the pointer. */
 	const hoverBox = createMemo(() => {
 		penDrawn();
-		const id = hoverId();
-		if (props.mode !== "edit") return undefined;
-		// As with the selection, no box round an arrow: hovering a line should not light up a rectangle.
-		const hovered = id ? penLayer.placed.get(id)?.node : undefined;
-		const bounds = id && id !== penText()?.id && !(hovered && isArrow(hovered)) ? penLayer.bounds.get(id) : undefined;
-		if (bounds) return { ...bounds, id };
-		// A board under the pointer, unless it is the one selected, which has its own outline, or a drag is on.
-		const path = hoverBoard() ?? pictureHover();
-		const board = path && path !== props.selected && !boardDrag() && !panning() ? props.boards.find((candidate) => candidate.path === path) : undefined;
-		return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
+		return hoverBoxOf(
+			{ editing: props.mode === "edit", item: hoverId(), typing: penText()?.id, board: hoverBoard() ?? pictureHover(), selected: props.selected, busy: !!boardDrag() || panning(), boards: scene.boards() },
+			scene,
+		);
 	});
-
-	/** Notes and cards have a board's corners, and so does the outline round one. */
-	const rounded = (id: string) => {
-		const type = penLayer.placed.get(id)?.node.type;
-		return type === "note" || type === "prompt" || type === "context";
-	};
 
 	/**
 	 * A tap on bare canvas lets go of the drawn items and boards selected, as a click there does
@@ -4399,6 +4318,36 @@ export function Stage(props: {
 	};
 	/** What agents just drew on this stage, outlined in their colours. */
 	const drawActs = createMemo(() => Object.values(props.acts ?? {}).filter((act): act is AgentAct => !!act && act.what === "draw" && act.path === stagePenPath()));
+	/** A dragged arrow handle's dashed route, where it sits. */
+	const routeShown = createMemo(() => {
+		const d = routeDraft();
+		return d === undefined ? undefined : { d, ...routeDraftAt() };
+	});
+	/**
+	 * Everything the editor draws over the canvas (`editor/core/overlay.ts`), for `OverlayLayer`. Each
+	 * part keeps its own memo above, read here, so a part that has not changed hands the layer the
+	 * same value and nothing it draws is touched.
+	 */
+	const overlay = createMemo<Overlay>(() => ({
+		outlines: penOutlines(),
+		handles: penHandles(),
+		anchors: penAnchors(),
+		boardHandles: boardHandles(),
+		radius: radiusHandle(),
+		radiusDrag: penRadius(),
+		arrow: arrowEnds(),
+		hover: hoverBox(),
+		grip: gripBox(),
+		gripHidden: gripHidden(penDrag(), !!penResize()),
+		drop: dropBox(),
+		insert: dropAt()?.line,
+		joins: joinHint(),
+		sides: sideHint(),
+		guides: guides(),
+		draft: penDraft(),
+		route: routeShown(),
+		endDraft: endDraft(),
+	}));
 
 	return (
 		<div
@@ -4526,363 +4475,62 @@ export function Stage(props: {
 					)}
 				</For>
 				<For each={cursorAgents()}>{(agentId) => <AgentCursor cursor={cursorOf(agentId)} zoom={props.camera.zoom} />}</For>
-				<Index each={penOutlines()}>
-					{(box) => (
-						<div
-							class="pen-selection"
-							data-board={box().id.startsWith("board:") ? "true" : undefined}
-							data-sizing={box().id.startsWith("board:") && sizingPaths().has(box().id.slice(6)) ? "true" : undefined}
-							data-round={rounded(box().id) ? "true" : undefined}
-							style={{
-								left: `${box().x}px`,
-								top: `${box().y}px`,
-								width: `${box().w}px`,
-								height: `${box().h}px`,
-								"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
-							}}
-						/>
-					)}
-				</Index>
-				<Show when={gripBox()}>
-					{(grip) => (
-						<div
-							class="pen-grip"
-							title="Drag to move this block"
-							// Hidden, not unmounted, while anything is carried or sized: a drag begun on the grip keeps the element it captured the pointer on.
-							data-hidden={penDrag().dx || penDrag().dy || penResize() ? "true" : undefined}
-							style={{
-								// Drawn at screen size and scaled to the world, so the dots stay centred on their background at any zoom.
-								left: `${grip().x - 19 / props.camera.zoom}px`,
-								top: `${grip().y - 12 / props.camera.zoom}px`,
-								transform: `scale(${1 / props.camera.zoom})`,
-							}}
-							onPointerDown={(event) => dragBlock(event, grip().id)}
-						>
-							<GripVertical size={16} />
-						</div>
-					)}
-				</Show>
-				<Show when={hoverBox()}>
-					{(box) => (
-						<div
-							class="pen-hover"
-							data-board={"board" in box() ? "true" : undefined}
-							data-round={"id" in box() && rounded((box() as { id: string }).id) ? "true" : undefined}
-							style={{
-								left: `${box().x}px`,
-								top: `${box().y}px`,
-								width: `${box().w}px`,
-								height: `${box().h}px`,
-								"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
-							}}
-						/>
-					)}
-				</Show>
-				<For each={joinHint()}>
-					{(box) => (
-						<div
-							class="pen-join"
-							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--color-accent)` }}
-						/>
-					)}
-				</For>
-				{/*
-				 * What a live drag would drop into: the frame under the pointer, in the same outline an
-				 * arrow's end uses to say what it would join. The one thing that makes the gesture
-				 * legible — without it, whether an item joined a frame is only knowable after letting go.
-				 */}
-				<Show when={dropBox()}>
-					{(box) => (
-						<div
-							class="pen-join"
-							data-drop="frame"
-							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--color-accent)` }}
-						/>
-					)}
-				</Show>
-				{/* And where in it: the boundary between two of its children that the drop would take. */}
-				<Show when={dropAt()}>
-					{(slot) => (
-						<div
-							class="pen-insert"
-							style={{
-								left: `${slot().line.x - (slot().line.w === 0 ? 1.5 / props.camera.zoom : 0)}px`,
-								top: `${slot().line.y - (slot().line.h === 0 ? 1.5 / props.camera.zoom : 0)}px`,
-								width: `${Math.max(slot().line.w, 3 / props.camera.zoom)}px`,
-								height: `${Math.max(slot().line.h, 3 / props.camera.zoom)}px`,
-							}}
-						/>
-					)}
-				</Show>
-				<For each={sideHint()}>
-					{(hint) => (
-						<For each={ARROW_SIDES}>
-							{(side) => {
-								const [x, y] = sidePoint(hint.box, side);
-								const size = () => ((hint.side === side ? 12 : 8) / props.camera.zoom);
-								return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={{ left: `${x - size() / 2}px`, top: `${y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.camera.zoom}px` }} />;
-							}}
-						</For>
-					)}
-				</For>
-				{/*
-					The four places an arrow can leave a selected item from, just outside the middle of each
-					side: a drag from one draws an arrow that keeps to that side (`penCreate`).
-				*/}
-				<Show when={penAnchors()}>
-					{(box) => (
-						<For each={ARROW_SIDES}>
-							{(side) => {
-								const gap = () => ANCHOR_OUT / props.camera.zoom;
-								const size = () => anchorSize / props.camera.zoom;
-								const at = () => {
-									const [x, y] = sidePoint(box(), side);
-									const [nx, ny] = side === "top" ? [0, -1] : side === "bottom" ? [0, 1] : side === "left" ? [-1, 0] : [1, 0];
-									return { x: x + nx * gap(), y: y + ny * gap() };
-								};
-								return (
-									<div
-										class="pen-anchor"
-										data-side={side}
-										title="Drag to draw an arrow from this side"
-										style={{ left: `${at().x - size() / 2}px`, top: `${at().y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.camera.zoom}px` }}
-										onPointerDown={(event) => {
-											if (event.button !== 0) return;
-											event.preventDefault();
-											event.stopPropagation();
-											const start = sidePoint(box(), side);
-											penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box().id, box: { x: box().x, y: box().y, w: box().w, h: box().h }, side });
+				<OverlayLayer
+					overlay={overlay}
+					zoom={props.camera.zoom}
+					sizing={(path) => sizingPaths().has(path)}
+					onGrip={dragBlock}
+					onAnchor={(event, box, side) => {
+						if (event.button !== 0) return;
+						event.preventDefault();
+						event.stopPropagation();
+						const start = sidePoint(box, side);
+						penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box.id, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side });
+					}}
+					onArrowEnd={dragArrowEnd}
+					onArrowBend={dragArrowBend}
+					onHandle={resizeFrom}
+					onRadius={radiusFrom}
+					onBoardHandle={resizeBoard}
+				>
+					{/*
+					 * The one player, laid over the item it belongs to.
+					 *
+					 * A real element because nothing else can play: the canvas draws in a worker and there
+					 * is no browser in there. It is the same bargain a board makes — a picture until you
+					 * are close and have asked — and it is one element, never a wall of them.
+					 */}
+					<Show when={playingBox()?.id} keyed>
+						{(id) => {
+							const now = () => playingBox()!;
+							const first = now();
+							return (
+								<Show when={playingBox()}>
+									<MediaPlayer
+										kind={first.kind}
+										src={deckFileUrl(first.file)}
+										name={first.name}
+										{...(first.seconds === undefined ? {} : { seconds: first.seconds })}
+										{...(first.peaks ? { peaks: first.peaks } : {})}
+										box={{ x: now().x, y: now().y, w: now().w, h: now().h }}
+										radius={now().radius}
+										scheme={scheme()}
+										{...(playedTo.get(id) ? { from: playedTo.get(id)! } : {})}
+										ref={(element) => (playingElement = element)}
+										onEnded={() => {
+											playedTo.delete(id);
+											setPlaying(undefined);
+										}}
+										onLeave={(at) => {
+											playingElement = undefined;
+											if (at > 0.5) playedTo.set(id, at);
 										}}
 									/>
-								);
-							}}
-						</For>
-					)}
-				</Show>
-				<Show when={guides().length > 0}>
-					<svg class="pen-guides" width="1" height="1" overflow="visible" aria-hidden="true">
-						<For each={guides()}>
-							{(guide) => (
-								<>
-									<line x1={guide.x1} y1={guide.y1} x2={guide.x2} y2={guide.y2} data-kind={guide.kind} stroke-width={1 / props.camera.zoom} />
-									<Show when={guide.kind === "gap"}>
-										{(() => {
-											const tick = 4 / props.camera.zoom;
-											const across = guide.y1 === guide.y2;
-											return (
-												<>
-													<line x1={across ? guide.x1 : guide.x1 - tick} y1={across ? guide.y1 - tick : guide.y1} x2={across ? guide.x1 : guide.x1 + tick} y2={across ? guide.y1 + tick : guide.y1} data-kind="gap" stroke-width={1 / props.camera.zoom} />
-													<line x1={across ? guide.x2 : guide.x2 - tick} y1={across ? guide.y2 - tick : guide.y2} x2={across ? guide.x2 : guide.x2 + tick} y2={across ? guide.y2 + tick : guide.y2} data-kind="gap" stroke-width={1 / props.camera.zoom} />
-												</>
-											);
-										})()}
-									</Show>
-								</>
-							)}
-						</For>
-					</svg>
-				</Show>
-				<Show when={arrowEnds()}>
-					{(ends) => (
-						<For each={["from", "to"] as const}>
-							{(which) => {
-								// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
-								const size = () => (coarse ? 18 : 11) / props.camera.zoom;
-								// A joined end is a diamond, which slides along the side it joins; a free end is a dot.
-								const joined = () => !!(which === "from" ? ends().fromJoin : ends().toJoin);
-								return (
-									<div
-										class="pen-handle"
-										data-end={which}
-										data-joined={joined() ? "true" : undefined}
-										title={joined() ? "Slide along the side, or drag off to join something else; double-click for the middle" : "Drag onto something to join it"}
-										style={{
-											left: `${ends()[which].x - size() / 2}px`,
-											top: `${ends()[which].y - size() / 2}px`,
-											width: `${size()}px`,
-											height: `${size()}px`,
-											"border-radius": joined() ? `${2 / props.camera.zoom}px` : "50%",
-											transform: joined() ? "rotate(45deg)" : undefined,
-											"border-width": `${1.5 / props.camera.zoom}px`,
-										}}
-										onPointerDown={(event) => dragArrowEnd(event, which)}
-									/>
-								);
-							}}
-						</For>
-					)}
-				</Show>
-				<Show when={arrowEnds()?.middle}>
-					{(middle) => {
-						const size = () => (coarse ? 18 : 12) / props.camera.zoom;
-						return (
-							<div
-								class="pen-handle"
-								data-bend={arrowEnds()?.route}
-								title="Drag to bend the arrow; double-click for its automatic route"
-								style={{
-									left: `${middle().x - size() / 2}px`,
-									top: `${middle().y - size() / 2}px`,
-									width: `${size()}px`,
-									height: `${size()}px`,
-									"border-radius": "50%",
-									"border-width": `${1.5 / props.camera.zoom}px`,
-									"box-shadow": arrowEnds()?.bent ? `inset 0 0 0 ${2.5 / props.camera.zoom}px var(--color-accent)` : undefined,
-								}}
-								onPointerDown={dragArrowBend}
-							/>
-						);
-					}}
-				</Show>
-				<Show when={routeDraft()}>
-					{(d) => (
-						<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-							<path transform={`translate(${routeDraftAt().x} ${routeDraftAt().y})`} d={d()} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
-						</svg>
-					)}
-				</Show>
-				<Show when={endDraft()}>
-					{(line) => (
-						<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-							<line x1={line().x1} y1={line().y1} x2={line().x2} y2={line().y2} stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
-						</svg>
-					)}
-				</Show>
-				<Show when={penHandles()}>
-					{(box) => (
-						<For each={HANDLES}>
-								{(handle) => {
-									const size = () => HANDLE_PX / props.camera.zoom;
-									return (
-										<div
-											class="pen-handle"
-											data-handle={handle}
-											style={{
-												left: `${box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2) - size() / 2}px`,
-												top: `${box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2) - size() / 2}px`,
-												width: `${size()}px`,
-												height: `${size()}px`,
-												"border-width": `${1.5 / props.camera.zoom}px`,
-											}}
-											onPointerDown={(event) => resizeFrom(event, handle)}
-										/>
-									);
-								}}
-						</For>
-					)}
-				</Show>
-				{/*
-				 * The one player, laid over the item it belongs to.
-				 *
-				 * A real element because nothing else can play: the canvas draws in a worker and there
-				 * is no browser in there. It is the same bargain a board makes — a picture until you
-				 * are close and have asked — and it is one element, never a wall of them.
-				 */}
-				<Show when={playingBox()?.id} keyed>
-					{(id) => {
-						const now = () => playingBox()!;
-						const first = now();
-						return (
-							<Show when={playingBox()}>
-								<MediaPlayer
-									kind={first.kind}
-									src={deckFileUrl(first.file)}
-									name={first.name}
-									{...(first.seconds === undefined ? {} : { seconds: first.seconds })}
-									{...(first.peaks ? { peaks: first.peaks } : {})}
-									box={{ x: now().x, y: now().y, w: now().w, h: now().h }}
-									radius={now().radius}
-									scheme={scheme()}
-									{...(playedTo.get(id) ? { from: playedTo.get(id)! } : {})}
-									ref={(element) => (playingElement = element)}
-									onEnded={() => {
-										playedTo.delete(id);
-										setPlaying(undefined);
-									}}
-									onLeave={(at) => {
-										playingElement = undefined;
-										if (at > 0.5) playedTo.set(id, at);
-									}}
-								/>
-							</Show>
-						);
-					}}
-				</Show>
-				<Show when={radiusHandle()}>
-					{(box) => {
-						const live = () => {
-							const dragged = penRadius();
-							return dragged?.id === box().id ? dragged.radius : box().radius;
-						};
-						const size = () => HANDLE_PX / props.camera.zoom;
-						// Clear of the corner handle itself, and never past the middle of the shape.
-						const inset = () => Math.min(Math.max(live(), size()), box().most);
-						return (
-							<div
-								class="pen-handle"
-								data-handle="radius"
-								title="Drag to round the corners"
-								style={{
-									left: `${box().x + inset() - size() / 2}px`,
-									top: `${box().y + inset() - size() / 2}px`,
-									width: `${size()}px`,
-									height: `${size()}px`,
-									"border-width": `${1.5 / props.camera.zoom}px`,
-								}}
-								onPointerDown={radiusFrom}
-							/>
-						);
-					}}
-				</Show>
-				<Show when={boardHandles()}>
-					{(box) => (
-						<For each={box().slides ? HANDLES.filter((handle) => handle !== "n" && handle !== "s") : HANDLES}>
-							{(handle) => {
-								const size = () => HANDLE_PX / props.camera.zoom;
-								return (
-									<div
-										class="pen-handle"
-										data-handle={handle}
-										data-board={box().path}
-										style={{
-											left: `${box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2) - size() / 2}px`,
-											top: `${box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2) - size() / 2}px`,
-											width: `${size()}px`,
-											height: `${size()}px`,
-											"border-width": `${1.5 / props.camera.zoom}px`,
-										}}
-										onPointerDown={(event) => resizeBoard(event, handle)}
-									/>
-								);
-							}}
-						</For>
-					)}
-				</Show>
-				<Show when={penDraft()}>
-					{(draft) => (
-						<Show
-							when={draft().tool !== "arrow"}
-							fallback={
-								<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
-									{/* The curve a new arrow is drawn with (`route: "curved"`), between the two points. */}
-									<path d={draftCurve(draft())} fill="none" stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
-								</svg>
-							}
-						>
-							<div
-								class="pen-draft"
-								data-tool={draft().tool}
-								style={{
-									left: `${Math.min(draft().x1, draft().x2)}px`,
-									top: `${Math.min(draft().y1, draft().y2)}px`,
-									width: `${Math.abs(draft().x2 - draft().x1)}px`,
-									height: `${Math.abs(draft().y2 - draft().y1)}px`,
-									"border-width": `${1.5 / props.camera.zoom}px`,
-								}}
-							/>
-						</Show>
-					)}
-				</Show>
+								</Show>
+							);
+						}}
+					</Show>
+				</OverlayLayer>
 				<Show when={penText()} keyed>
 					{(open) => {
 						const look = open.style;
@@ -5079,7 +4727,7 @@ export function Stage(props: {
 					<BoardCallout
 						box={items().box}
 						label={`${items().name}: actions`}
-						gap={penAnchors() ? ANCHOR_OUT + anchorSize / 2 + 6 : undefined}
+						gap={penAnchors() ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : undefined}
 						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || penDrag().dx !== 0 || penDrag().dy !== 0 || !!penResize()}
 						camera={props.camera}
 						view={view()}

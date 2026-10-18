@@ -16,6 +16,7 @@ export function tsScene(engine: Pick<StageEngine, "placed" | "bounds" | "pickAll
 		items: () => engine.placed.values(),
 		item: (id) => engine.placed.get(id),
 		box: (id) => engine.bounds.get(id) ?? engine.placed.get(id)?.box,
+		drawn: (id) => engine.bounds.get(id),
 		node: (id) => found(id)?.node,
 		parent: (id) => found(id)?.parent,
 		boards,
