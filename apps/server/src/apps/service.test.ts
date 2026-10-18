@@ -148,7 +148,7 @@ test("names are checked, and a starter will not write over an app", () => {
 	}
 });
 
-test("a server app is told where to run stage code, with a secret that is its own", async () => {
+test("a server app is told where Decks is, as itself, and where the SDK is", async () => {
 	await withDeck(async ({ deck, apps, get }) => {
 		apps.decksPort = 4999;
 		const folder = join(deck, "apps", "teller");
@@ -156,15 +156,12 @@ test("a server app is told where to run stage code, with a secret that is its ow
 		writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
 		writeFileSync(
 			join(folder, "server.js"),
-			`require("node:http").createServer((q, s) => s.end(JSON.stringify({ url: process.env.DECKS_STAGE_URL, token: process.env.DECKS_STAGE_TOKEN, app: process.env.DECKS_APP, sdk: process.env.DECKS_SDK }))).listen(process.env.PORT, "127.0.0.1");`,
+			`require("node:http").createServer((q, s) => s.end(JSON.stringify({ url: process.env.DECKS_URL, agent: process.env.DECKS_AGENT ?? null, app: process.env.DECKS_APP, sdk: process.env.DECKS_SDK }))).listen(process.env.PORT, "127.0.0.1");`,
 		);
-		const seen = (await (await get("/app/teller/")).json()) as { url: string; token: string; app: string; sdk: string };
-		assert.equal(seen.url, "http://127.0.0.1:4999/api/apps/teller/stage");
+		const seen = (await (await get("/app/teller/")).json()) as { url: string; agent: string | null; app: string; sdk: string };
+		assert.equal(seen.url, "http://127.0.0.1:4999");
 		assert.equal(seen.app, "teller");
+		assert.equal(seen.agent, null, "an app never calls as the agent whose shell started Decks");
 		assert.ok(existsSync(seen.sdk) && seen.sdk.endsWith("packages/sdk/src/index.js"), "and where the SDK is, to import");
-		assert.ok(apps.holdsToken("teller", seen.token), "the token it was given is the one Decks checks");
-		assert.equal(apps.holdsToken("teller", seen.token.slice(1)), false);
-		assert.equal(apps.holdsToken("other", seen.token), false, "and it is no other app's");
-		assert.equal(apps.holdsToken("teller", undefined), false);
 	});
 });

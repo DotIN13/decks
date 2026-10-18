@@ -5,7 +5,7 @@ import { createServer, connect } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** The SDK a server app imports to run stage code (`packages/sdk`), told to it as `DECKS_SDK`. */
+/** The SDK a server app imports to call Decks' verbs (`packages/sdk`), told to it as `DECKS_SDK`. */
 export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/src/index.js");
 
 /**
@@ -490,9 +490,8 @@ export class Apps {
 	/** The environment an app's commands run in: this server's, minus `NODE_ENV=production`, which makes npm leave out a build's tools. */
 	private env(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
 		const env: NodeJS.ProcessEnv = { ...process.env };
-		// An app's stage secret is its own, never one inherited from whoever started Decks.
-		delete env.DECKS_STAGE_URL;
-		delete env.DECKS_STAGE_TOKEN;
+		// Who an app calls Decks as is its own, never inherited from whoever started Decks (an agent's shell sets these).
+		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_URL", "DECKS_AGENT", "DECKS_APP"]) delete env[key];
 		Object.assign(env, extra);
 		if (env.NODE_ENV === "production") delete env.NODE_ENV;
 		delete env.DECKS_DATA_DIR;
@@ -527,8 +526,8 @@ export class Apps {
 				HOST: "127.0.0.1",
 				HOSTNAME: "127.0.0.1",
 				BASE_PATH: `/app/${name}`,
-				// Where the server runs stage code, as an agent would: POST { code, value } with this bearer token.
-				...(this.decksPort ? { DECKS_STAGE_URL: `http://127.0.0.1:${this.decksPort}/api/apps/${name}/stage`, DECKS_STAGE_TOKEN: this.stageToken(name) } : {}),
+				// Where Decks is, for the SDK's verbs (`/api/v1`), and the app they are called as.
+				...(this.decksPort ? { DECKS_URL: `http://127.0.0.1:${this.decksPort}` } : {}),
 				DECKS_APP: name,
 				// `const { decks } = await import(process.env.DECKS_SDK)` reads the two above; see packages/sdk.
 				DECKS_SDK: SDK_FILE,

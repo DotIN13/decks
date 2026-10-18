@@ -1,0 +1,3 @@
+#!/bin/sh
+# The decks command: bin/decks.mjs, run by the node Decks itself runs on when it says which.
+exec "${DECKS_NODE:-node}" "$(dirname "$0")/decks.mjs" "$@"

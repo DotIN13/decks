@@ -1,0 +1,1973 @@
+[
+ {
+  "name": "newBoard",
+  "command": [
+   "new-board"
+  ],
+  "group": "boards",
+  "effect": "change",
+  "summary": "Write a blank board and return its path. The title is the finding, as a sentence. `format` \"board\" (default) is one HTML page you design; \"slides\" is a reveal deck of <section>s. `at` is its top-left corner on your stage: say it every time, after reading the stage with pen.read. Left out, the board goes beside your newest board and the result says where.",
+  "signature": "newBoard(options: { title: string; format?: \"board\" | \"slides\"; w?: number; h?: number; at?: Corner })",
+  "returns": "string",
+  "params": [
+   {
+    "name": "options",
+    "type": "{ title: string; format?: \"board\" | \"slides\"; w?: number; h?: number; at?: Corner }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "title": {
+       "type": "string"
+      },
+      "format": {
+       "enum": [
+        "board",
+        "slides"
+       ]
+      },
+      "w": {
+       "type": "number"
+      },
+      "h": {
+       "type": "number"
+      },
+      "at": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "x1": {
+           "type": "number"
+          },
+          "y1": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "x1",
+          "y1"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "object",
+         "properties": {
+          "x": {
+           "type": "number"
+          },
+          "y": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "x",
+          "y"
+         ],
+         "additionalProperties": false
+        }
+       ],
+       "description": "A board's top-left corner on the stage: { x1, y1 }, or { x, y }."
+      }
+     },
+     "required": [
+      "title"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "fit",
+  "command": [
+   "fit"
+  ],
+  "group": "boards",
+  "effect": "change",
+  "summary": "Set a board's height from its content, measured at the width it has on a canvas (`canvas` names one, else your stage's). The board must be on it. The notes say what the browser found: the height, the word count, the smallest type, content wider than the board, boxes that cut off their content, and any view that breaks when a control is pressed. Use it instead of a screenshot.",
+  "signature": "fit(path: string, options?: { canvas?: string; margin?: number })",
+  "returns": "{ path: string; w: number; h: number; content?: { w: number; h: number; page?: number } }",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string; margin?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      },
+      "margin": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "resize",
+  "command": [
+   "resize"
+  ],
+  "group": "boards",
+  "effect": "change",
+  "summary": "Set a board's size outright.",
+  "signature": "resize(path: string, size: { w?: number; h?: number })",
+  "returns": "{ path: string; w: number; h: number }",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "size",
+    "type": "{ w?: number; h?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "w": {
+       "type": "number"
+      },
+      "h": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "report",
+  "command": [
+   "report"
+  ],
+  "group": "boards",
+  "effect": "change",
+  "summary": "Name boards you edited without showing them, so they are listed as yours.",
+  "signature": "report(path: string | string[])",
+  "returns": "{ reported: string[] }",
+  "params": [
+   {
+    "name": "path",
+    "variadic": true,
+    "type": "string | string[]",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "reload",
+  "command": [
+   "reload"
+  ],
+  "group": "boards",
+  "effect": "view",
+  "summary": "Reload a board's frame, if you changed something the watcher cannot see.",
+  "signature": "reload(path: string)",
+  "returns": "void",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "boards",
+  "command": [
+   "boards"
+  ],
+  "group": "stage",
+  "effect": "read",
+  "summary": "Every board in the deck, placed as your stage has them.",
+  "signature": "boards()",
+  "returns": "Board[]",
+  "params": []
+ },
+ {
+  "name": "show",
+  "command": [
+   "show"
+  ],
+  "group": "stage",
+  "effect": "change",
+  "summary": "Add these boards to your stage and move the camera to them. `at` places the one board named, top-left corner; for a board already on the stage it moves it. `highlight` outlines one data-id. A drawn item's id can be named instead of a board path: the camera goes to it.",
+  "signature": "show(target: string | string[], options?: { fit?: \"board\" | \"all\"; highlight?: string; animate?: boolean; at?: Corner })",
+  "returns": "{ shown: string[] }",
+  "params": [
+   {
+    "name": "target",
+    "type": "string | string[]",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ fit?: \"board\" | \"all\"; highlight?: string; animate?: boolean; at?: Corner }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "fit": {
+       "enum": [
+        "board",
+        "all"
+       ]
+      },
+      "highlight": {
+       "type": "string"
+      },
+      "animate": {
+       "type": "boolean"
+      },
+      "at": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "x1": {
+           "type": "number"
+          },
+          "y1": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "x1",
+          "y1"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "object",
+         "properties": {
+          "x": {
+           "type": "number"
+          },
+          "y": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "x",
+          "y"
+         ],
+         "additionalProperties": false
+        }
+       ],
+       "description": "A board's top-left corner on the stage: { x1, y1 }, or { x, y }."
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "hide",
+  "command": [
+   "hide"
+  ],
+  "group": "stage",
+  "effect": "change",
+  "summary": "Take boards off your stage, keeping them in your context.",
+  "signature": "hide(path: string | string[])",
+  "returns": "void",
+  "params": [
+   {
+    "name": "path",
+    "variadic": true,
+    "type": "string | string[]",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "move",
+  "command": [
+   "move"
+  ],
+  "group": "stage",
+  "effect": "change",
+  "summary": "Move a board on your stage: `at` is its top-left corner.",
+  "signature": "move(path: string, at: Point)",
+  "returns": "Board",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "at",
+    "type": "Point",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "x",
+      "y"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "cursor",
+  "command": [
+   "cursor"
+  ],
+  "group": "stage",
+  "effect": "view",
+  "summary": "A labelled dot on a board, at board coordinates; null removes it.",
+  "signature": "cursor(path: string, at: Point | null)",
+  "returns": "void",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "at",
+    "type": "Point | null",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "x": {
+         "type": "number"
+        },
+        "y": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "x",
+        "y"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "name": "camera",
+  "command": [
+   "camera"
+  ],
+  "group": "view",
+  "effect": "view",
+  "summary": "Where your stage is looking, or move it with { x, y, zoom }. `zoom` 1 is life size.",
+  "signature": "camera(at?: { x: number; y: number; zoom: number }, options?: { animate?: boolean })",
+  "returns": "{ x: number; y: number; zoom: number } | null",
+  "params": [
+   {
+    "name": "at",
+    "optional": true,
+    "type": "{ x: number; y: number; zoom: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      },
+      "zoom": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "x",
+      "y",
+      "zoom"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ animate?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "animate": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "viewport",
+  "command": [
+   "viewport"
+  ],
+  "group": "view",
+  "effect": "read",
+  "summary": "The room your stage has on screen, in CSS pixels.",
+  "signature": "viewport()",
+  "returns": "{ width: number; height: number } | null",
+  "params": []
+ },
+ {
+  "name": "screenshot",
+  "command": [
+   "screenshot"
+  ],
+  "group": "view",
+  "effect": "read",
+  "summary": "A picture of your stage, or part of it, as the person sees it, saved to `file`. `of` is an item's id, a board's path, a list of them, or a box; nothing is the whole stage. A .pen file's path pictures that file whole. `format` \"jpeg\" or \"pdf\", and `to` a deck path, make a file to hand on. One board's path alone is that board as the browser has it now.",
+  "signature": "screenshot(options?: { of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: \"png\" | \"jpeg\" | \"pdf\"; to?: string; scheme?: \"light\" | \"dark\" })",
+  "returns": "{ file: string; width: number; height: number; box: Box; how?: \"canvas\" | \"snapshot\" | \"server\"; note?: string }",
+  "params": [
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: \"png\" | \"jpeg\" | \"pdf\"; to?: string; scheme?: \"light\" | \"dark\" }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "of": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "object",
+         "properties": {
+          "x1": {
+           "type": "number"
+          },
+          "y1": {
+           "type": "number"
+          },
+          "x2": {
+           "type": "number"
+          },
+          "y2": {
+           "type": "number"
+          }
+         },
+         "additionalProperties": false
+        }
+       ]
+      },
+      "scale": {
+       "type": "number"
+      },
+      "format": {
+       "enum": [
+        "png",
+        "jpeg",
+        "pdf"
+       ]
+      },
+      "to": {
+       "type": "string"
+      },
+      "scheme": {
+       "enum": [
+        "light",
+        "dark"
+       ]
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "stages",
+  "command": [
+   "stages"
+  ],
+  "group": "stages",
+  "effect": "read",
+  "summary": "Every stage (canvas) and who has it open. A stage's `name` is its folder and never changes; its `title` is what the person calls it.",
+  "signature": "stages()",
+  "returns": "{ name: string; title: string; open: string[]; boards: number; mine?: true }[]",
+  "params": []
+ },
+ {
+  "name": "open",
+  "command": [
+   "open"
+  ],
+  "group": "stages",
+  "effect": "view",
+  "summary": "Move to another stage, by name or title: its boards become the ones you show, hide and move.",
+  "signature": "open(name: string)",
+  "returns": "{ stage: string; boards: string[] }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "newStage",
+  "command": [
+   "new-stage"
+  ],
+  "group": "stages",
+  "effect": "change",
+  "summary": "Make an empty stage from a title, and open it.",
+  "signature": "newStage(title: string)",
+  "returns": "{ stage: string }",
+  "params": [
+   {
+    "name": "title",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "title",
+  "command": [
+   "title"
+  ],
+  "group": "stages",
+  "effect": "change",
+  "summary": "Name the canvas you are on, or read its name with nothing. Name it for what is on it, as a few words a person would look for.",
+  "signature": "title(title?: string)",
+  "returns": "{ stage: string; title: string }",
+  "params": [
+   {
+    "name": "title",
+    "optional": true,
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "pen.read",
+  "command": [
+   "pen",
+   "read"
+  ],
+  "group": "pen",
+  "effect": "read",
+  "summary": "Your stage's drawing: every item as saved, plus its `box` on the stage. With `path`, any .pen file (\"frames/ui/button\", \"canvases/<name>/canvas.pen\").",
+  "signature": "pen.read(path?: string)",
+  "returns": "{ stage?: string; file: string; ref?: string; version: string; error?: string; children: unknown[] }",
+  "params": [
+   {
+    "name": "path",
+    "optional": true,
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "pen.edit",
+  "command": [
+   "pen",
+   "edit"
+  ],
+  "group": "pen",
+  "effect": "change",
+  "summary": "Edit your stage's drawing, or with `path` any .pen file; the edits apply together or not at all. A `box` places an item on the stage.",
+  "signature": "pen.edit(edits: PenEdit[], options?: { path?: string })",
+  "returns": "{ rev?: number; file?: string; ref?: string; results: { op: string; id: string; box?: Box; note?: string }[] }",
+  "params": [
+   {
+    "name": "edits",
+    "type": "PenEdit[]",
+    "schema": {
+     "type": "array",
+     "items": {
+      "anyOf": [
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "insert"
+          ]
+         },
+         "node": {
+          "type": "object",
+          "properties": {
+           "type": {
+            "type": "string"
+           },
+           "id": {
+            "type": "string"
+           },
+           "children": {
+            "type": "array",
+            "items": {}
+           }
+          },
+          "required": [
+           "type"
+          ],
+          "additionalProperties": true,
+          "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
+         },
+         "parent": {
+          "type": "string"
+         },
+         "index": {
+          "type": "integer"
+         },
+         "box": {
+          "type": "object",
+          "properties": {
+           "x1": {
+            "type": "number"
+           },
+           "y1": {
+            "type": "number"
+           },
+           "x2": {
+            "type": "number"
+           },
+           "y2": {
+            "type": "number"
+           }
+          },
+          "additionalProperties": false
+         }
+        },
+        "required": [
+         "op",
+         "node"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "update"
+          ]
+         },
+         "id": {
+          "type": "string"
+         },
+         "set": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+         },
+         "box": {
+          "type": "object",
+          "properties": {
+           "x1": {
+            "type": "number"
+           },
+           "y1": {
+            "type": "number"
+           },
+           "x2": {
+            "type": "number"
+           },
+           "y2": {
+            "type": "number"
+           }
+          },
+          "additionalProperties": false
+         }
+        },
+        "required": [
+         "op",
+         "id"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "replace"
+          ]
+         },
+         "id": {
+          "type": "string"
+         },
+         "node": {
+          "type": "object",
+          "properties": {
+           "type": {
+            "type": "string"
+           },
+           "id": {
+            "type": "string"
+           },
+           "children": {
+            "type": "array",
+            "items": {}
+           }
+          },
+          "required": [
+           "type"
+          ],
+          "additionalProperties": true,
+          "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
+         }
+        },
+        "required": [
+         "op",
+         "id",
+         "node"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "delete"
+          ]
+         },
+         "id": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "op",
+         "id"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "move"
+          ]
+         },
+         "id": {
+          "type": "string"
+         },
+         "parent": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "index": {
+          "type": "integer"
+         },
+         "box": {
+          "type": "object",
+          "properties": {
+           "x1": {
+            "type": "number"
+           },
+           "y1": {
+            "type": "number"
+           },
+           "x2": {
+            "type": "number"
+           },
+           "y2": {
+            "type": "number"
+           }
+          },
+          "additionalProperties": false
+         }
+        },
+        "required": [
+         "op",
+         "id"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "op": {
+          "enum": [
+           "copy"
+          ]
+         },
+         "id": {
+          "type": "string"
+         },
+         "parent": {
+          "type": "string"
+         },
+         "index": {
+          "type": "integer"
+         },
+         "box": {
+          "type": "object",
+          "properties": {
+           "x1": {
+            "type": "number"
+           },
+           "y1": {
+            "type": "number"
+           },
+           "x2": {
+            "type": "number"
+           },
+           "y2": {
+            "type": "number"
+           }
+          },
+          "additionalProperties": false
+         },
+         "as": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "op",
+         "id"
+        ],
+        "additionalProperties": false
+       }
+      ],
+      "description": "An edit to the drawing. Items are named by id; one inside an instance by its path, \"card-1/label\"."
+     }
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ path?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "pen.create",
+  "command": [
+   "pen",
+   "create"
+  ],
+  "group": "pen",
+  "effect": "change",
+  "summary": "A new .pen file at `path` (\"frames/ui/button\"), with `item` as its one reusable item. One in frames/ is placed on any stage with { type: \"ref\", ref }.",
+  "signature": "pen.create(path: string, item?: PenItem)",
+  "returns": "{ file: string; ref?: string; id: string }",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "item",
+    "optional": true,
+    "type": "PenItem",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "type": {
+       "type": "string"
+      },
+      "id": {
+       "type": "string"
+      },
+      "children": {
+       "type": "array",
+       "items": {}
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "additionalProperties": true,
+     "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
+    }
+   }
+  ]
+ },
+ {
+  "name": "pen.save",
+  "command": [
+   "pen",
+   "save"
+  ],
+  "group": "pen",
+  "effect": "change",
+  "summary": "Save an item of your stage as a frame file at `path` in frames/, and put a ref to it in its place (`replace: false` leaves the stage alone).",
+  "signature": "pen.save(id: string, path: string, options?: { replace?: boolean })",
+  "returns": "{ frame: string; ref: string; replaced: boolean; overwrote: boolean }",
+  "params": [
+   {
+    "name": "id",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ replace?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "replace": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "pen.file",
+  "command": [
+   "pen",
+   "file"
+  ],
+  "group": "pen",
+  "effect": "read",
+  "summary": "The path of your stage's .pen file, to edit it by hand instead.",
+  "signature": "pen.file()",
+  "returns": "string",
+  "params": []
+ },
+ {
+  "name": "me",
+  "command": [
+   "me"
+  ],
+  "group": "agents",
+  "effect": "outside",
+  "summary": "Who you are: read with nothing, change with a patch. Set all four first in every session: a short name of your own, an avatar (an <svg> with xmlns and a viewBox, or an emoji), the project as `workspace`, and up to four tags for what you are doing now.",
+  "signature": "me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string })",
+  "returns": "{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string; avatarChanged?: string }",
+  "params": [
+   {
+    "name": "patch",
+    "optional": true,
+    "type": "{ name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string"
+      },
+      "avatar": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "emoji": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "emoji"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "object",
+         "properties": {
+          "svg": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "svg"
+         ],
+         "additionalProperties": false
+        }
+       ]
+      },
+      "tags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "workspace": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "agents",
+  "command": [
+   "agents"
+  ],
+  "group": "agents",
+  "effect": "read",
+  "summary": "Every agent; `filter.workspace` narrows to one project.",
+  "signature": "agents(options?: { filter?: { workspace?: string } })",
+  "returns": "{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }[]",
+  "params": [
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ filter?: { workspace?: string } }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "filter": {
+       "type": "object",
+       "properties": {
+        "workspace": {
+         "type": "string"
+        }
+       },
+       "additionalProperties": false
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "send",
+  "command": [
+   "send"
+  ],
+  "group": "agents",
+  "effect": "outside",
+  "summary": "Hand work over, and carry on: to an agent by name, or to { name, kind }, which makes it first. Returns at once; `reply: true` brings their report back to you.",
+  "signature": "send(to: string | { name: string; kind?: \"pi\" | \"claude\" | \"opencode\" | \"opencode2\" | \"antigravity\"; model?: string; thinking?: string; mode?: \"manual\" | \"acceptEdits\" | \"plan\" | \"auto\"; tags?: string[]; workspace?: string }, work: { task: string; boards?: string[]; reply?: boolean })",
+  "returns": "{ queued: true; position: number; agent?: string; name?: string }",
+  "params": [
+   {
+    "name": "to",
+    "type": "string | { name: string; kind?: \"pi\" | \"claude\" | \"opencode\" | \"opencode2\" | \"antigravity\"; model?: string; thinking?: string; mode?: \"manual\" | \"acceptEdits\" | \"plan\" | \"auto\"; tags?: string[]; workspace?: string }",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "kind": {
+         "enum": [
+          "pi",
+          "claude",
+          "opencode",
+          "opencode2",
+          "antigravity"
+         ]
+        },
+        "model": {
+         "type": "string"
+        },
+        "thinking": {
+         "type": "string"
+        },
+        "mode": {
+         "enum": [
+          "manual",
+          "acceptEdits",
+          "plan",
+          "auto"
+         ]
+        },
+        "tags": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "workspace": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    }
+   },
+   {
+    "name": "work",
+    "type": "{ task: string; boards?: string[]; reply?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "task": {
+       "type": "string"
+      },
+      "boards": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "reply": {
+       "type": "boolean"
+      }
+     },
+     "required": [
+      "task"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "queue",
+  "command": [
+   "queue"
+  ],
+  "group": "agents",
+  "effect": "read",
+  "summary": "What is waiting in an agent's queue: yours, or another's.",
+  "signature": "queue(agentId?: string)",
+  "returns": "{ from: string; fromName: string; task: string; boards: string[]; at: number }[]",
+  "params": [
+   {
+    "name": "agentId",
+    "optional": true,
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.list",
+  "command": [
+   "apps",
+   "list"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "Every app in the deck's apps/ folder, with its status.",
+  "signature": "apps.list()",
+  "returns": "AppState[]",
+  "params": []
+ },
+ {
+  "name": "apps.status",
+  "command": [
+   "apps",
+   "status"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "One app's state.",
+  "signature": "apps.status(name: string)",
+  "returns": "AppState",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.create",
+  "command": [
+   "apps",
+   "create"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "Make an app folder from a starter (\"static\" default, \"node\", \"solid\", \"react\", \"next\"), and its board.",
+  "signature": "apps.create(name: string, options?: { starter?: \"static\" | \"node\" | \"solid\" | \"react\" | \"next\"; title?: string })",
+  "returns": "{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ starter?: \"static\" | \"node\" | \"solid\" | \"react\" | \"next\"; title?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "starter": {
+       "enum": [
+        "static",
+        "node",
+        "solid",
+        "react",
+        "next"
+       ]
+      },
+      "title": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.board",
+  "command": [
+   "apps",
+   "board"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "The board for an app whose folder you wrote yourself.",
+  "signature": "apps.board(name: string)",
+  "returns": "string",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.build",
+  "command": [
+   "apps",
+   "build"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "Build an app; waits up to fifteen seconds, and `pending` means ask status later.",
+  "signature": "apps.build(name: string)",
+  "returns": "AppOutcome",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.run",
+  "command": [
+   "apps",
+   "run"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "Start an app; waits up to fifteen seconds.",
+  "signature": "apps.run(name: string)",
+  "returns": "AppOutcome",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.stop",
+  "command": [
+   "apps",
+   "stop"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "Stop an app.",
+  "signature": "apps.stop(name: string)",
+  "returns": "{ stopped: boolean }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.restart",
+  "command": [
+   "apps",
+   "restart"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "After you change a server app's code: stop it and start it again. Its board reloads by itself.",
+  "signature": "apps.restart(name: string)",
+  "returns": "AppOutcome",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.logs",
+  "command": [
+   "apps",
+   "logs"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "An app's log lines.",
+  "signature": "apps.logs(name: string, options?: { tail?: number })",
+  "returns": "string[]",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ tail?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "tail": {
+       "type": "integer"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.check",
+  "command": [
+   "apps",
+   "check"
+  ],
+  "group": "apps",
+  "effect": "outside",
+  "summary": "The app opened in the server's browser: what fit is to a board. Read `verdict`; `file` is a picture.",
+  "signature": "apps.check(name: string)",
+  "returns": "{ verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.status",
+  "command": [
+   "web",
+   "status"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Whether the person is sharing a Chrome tab through the Decks extension, and which.",
+  "signature": "web.status()",
+  "returns": "{ paired: boolean; connected: boolean; tab?: { title: string; url: string }; pending?: { id: string; text: string }; closed?: string }",
+  "params": []
+ },
+ {
+  "name": "web.pairing",
+  "command": [
+   "web",
+   "pairing"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "A code to pair the Decks extension.",
+  "signature": "web.pairing()",
+  "returns": "{ code: string; path: string; note: string }",
+  "params": []
+ },
+ {
+  "name": "web.repair",
+  "command": [
+   "web",
+   "repair"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "A fresh pairing code.",
+  "signature": "web.repair()",
+  "returns": "{ code: string }",
+  "params": []
+ },
+ {
+  "name": "web.board",
+  "command": [
+   "web",
+   "board"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "The board that shows the shared tab.",
+  "signature": "web.board()",
+  "returns": "string",
+  "params": []
+ },
+ {
+  "name": "web.open",
+  "command": [
+   "web",
+   "open"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Open an address in the shared tab.",
+  "signature": "web.open(url: string)",
+  "returns": "{ url: string; title: string }",
+  "params": [
+   {
+    "name": "url",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.read",
+  "command": [
+   "web",
+   "read"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "The shared page: address, title, and an accessibility tree that names every field and button with a [ref=e42]. References die when the tab navigates.",
+  "signature": "web.read()",
+  "returns": "{ url: string; title: string; snapshot: string; truncated?: boolean }",
+  "params": []
+ },
+ {
+  "name": "web.screenshot",
+  "command": [
+   "web",
+   "screenshot"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "A picture of the shared tab.",
+  "signature": "web.screenshot(options?: { full?: boolean })",
+  "returns": "{ file: string; width: number; height: number }",
+  "params": [
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ full?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "full": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.fill",
+  "command": [
+   "web",
+   "fill"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Type into a field. Never passwords or codes.",
+  "signature": "web.fill(field: WebTarget, text: string)",
+  "returns": "{ field: string }",
+  "params": [
+   {
+    "name": "field",
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
+    }
+   },
+   {
+    "name": "text",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.select",
+  "command": [
+   "web",
+   "select"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Pick an option in a select.",
+  "signature": "web.select(field: WebTarget, option: string)",
+  "returns": "{ field: string; option: string }",
+  "params": [
+   {
+    "name": "field",
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
+    }
+   },
+   {
+    "name": "option",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.click",
+  "command": [
+   "web",
+   "click"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Click a button or link.",
+  "signature": "web.click(what: WebTarget)",
+  "returns": "{ clicked: string }",
+  "params": [
+   {
+    "name": "what",
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.press",
+  "command": [
+   "web",
+   "press"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Press a key.",
+  "signature": "web.press(key: string)",
+  "returns": "{ pressed: string }",
+  "params": [
+   {
+    "name": "key",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.submit",
+  "command": [
+   "web",
+   "submit"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Submit a form; asks the person first and may come back with allowed: false.",
+  "signature": "web.submit(what?: WebTarget, options?: { ask?: boolean })",
+  "returns": "{ submitted: string; allowed: boolean }",
+  "params": [
+   {
+    "name": "what",
+    "optional": true,
+    "type": "WebTarget",
+    "schema": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ref": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ref"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "nth": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "additionalProperties": false
+      }
+     ],
+     "description": "A field or button: its label, { ref: \"e42\" } from read, or { name, nth }."
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ ask?: boolean }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "ask": {
+       "type": "boolean"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "web.stop",
+  "command": [
+   "web",
+   "stop"
+  ],
+  "group": "web",
+  "effect": "outside",
+  "summary": "Stop driving the shared tab.",
+  "signature": "web.stop()",
+  "returns": "void",
+  "params": []
+ },
+ {
+  "name": "url",
+  "command": [
+   "url"
+  ],
+  "group": "misc",
+  "effect": "read",
+  "summary": "The URL of a board, for a Playwright screenshot.",
+  "signature": "url(path: string)",
+  "returns": "string",
+  "params": [
+   {
+    "name": "path",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "resolve",
+  "command": [
+   "resolve"
+  ],
+  "group": "misc",
+  "effect": "read",
+  "summary": "A file on disk -> the URL a board should embed.",
+  "signature": "resolve(file: string)",
+  "returns": "string",
+  "params": [
+   {
+    "name": "file",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "ports",
+  "command": [
+   "ports"
+  ],
+  "group": "misc",
+  "effect": "outside",
+  "summary": "Servers on this machine, forwarded through Decks so a board can frame them: read with nothing, { open: port, label } to forward one, { close: port } to stop. `node` passes the path on; `rnode` strips it.",
+  "signature": "ports(change?: { open?: number; close?: number; label?: string })",
+  "returns": "{ port: number; label?: string; by?: string; at: number; node: string; rnode: string }[]",
+  "params": [
+   {
+    "name": "change",
+    "optional": true,
+    "type": "{ open?: number; close?: number; label?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "open": {
+       "type": "integer"
+      },
+      "close": {
+       "type": "integer"
+      },
+      "label": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "now",
+  "command": [
+   "now"
+  ],
+  "group": "misc",
+  "effect": "read",
+  "summary": "The time where the person is.",
+  "signature": "now()",
+  "returns": "{ iso: string; timezone: string; words: string; epoch: number }",
+  "params": []
+ }
+]

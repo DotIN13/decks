@@ -1,18 +1,30 @@
 {
   "name": "@decks/sdk",
   "version": "0.1.0",
-  "description": "Control Decks from an app, an MCP server or a script: the stage API agents have, over one HTTP endpoint",
+  "description": "Every Decks verb, three ways: a TypeScript client for apps and the browser, the decks command for scripts, and an MCP server for tool-only agents",
   "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
-    }
+    },
+    "./verbs.json": "./src/verbs.json"
   },
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "bin",
+    "mcp",
+    "README.md"
+  ],
   "scripts": {
     "test": "node --test test/*.test.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "decks": "bin/decks.mjs",
+    "decks-mcp": "mcp/server.mjs"
+  }
 }

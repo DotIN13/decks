@@ -58,3 +58,10 @@ test("command names are words", () => {
 	assert.deepEqual(commandOf(VERB_BY_NAME.get("newBoard")!), ["new-board"]);
 	assert.deepEqual(commandOf(VERB_BY_NAME.get("pen.edit")!), ["pen", "edit"]);
 });
+
+test("the SDK's generated files match the table", async () => {
+	const { execFileSync } = await import("node:child_process");
+	const root = new URL("../../../", import.meta.url);
+	// Throws, with the script's sentence, when someone changed the table and not the SDK.
+	execFileSync(process.execPath, ["--import", "tsx", "scripts/gen-sdk.mjs", "--check"], { cwd: root, stdio: "pipe" });
+});
