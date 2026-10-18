@@ -18,7 +18,9 @@ const [penTool, setPenTool] = createSignal<PenTool>("select");
 /**
  * Ids of the selected items, in the order they were picked: the stage's editor's selection
  * (`canvas/editor/dom/controller.ts`), which feeds itself in here with `feedSelection`. With no
- * stage up, a selection of its own that nothing draws.
+ * stage up, a selection of its own that nothing draws: the one the last stage left, which the next
+ * stage starts with (`keptSelection`), so a stage mounted again keeps what was selected. A switch
+ * of connection clears it (`connections/switch.ts`).
  */
 type SelectionSource = { items: Accessor<readonly string[]>; select: (items: readonly string[]) => void };
 const [selectionSource, setSelectionSource] = createSignal<SelectionSource | undefined>();
@@ -29,13 +31,20 @@ const setPenSelection = (items: readonly string[]) => {
 	if (source) source.select(items);
 	else setLooseSelection(items);
 };
-/** The editor's selection, read and written here from now on; the function given back hands it back. */
+/**
+ * The editor's selection, read and written here from now on; the function given back hands it
+ * back, and keeps what it had selected for the next stage.
+ */
 export function feedSelection(source: SelectionSource): () => void {
 	setSelectionSource(() => source);
 	return () => {
-		if (untrack(selectionSource) === source) setSelectionSource(undefined);
+		if (untrack(selectionSource) !== source) return;
+		setLooseSelection(untrack(source.items));
+		setSelectionSource(undefined);
 	};
 }
+/** The selection a stage starts with: the one up now, else what the last one left, unless something cleared it since. */
+export const keptSelection = (): readonly string[] => untrack(penSelection);
 /** Whether a card is open for typing, or on a phone any words (`Stage.tsx`): the properties panel stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
 /**

@@ -16,7 +16,7 @@ import FilePlus from "lucide-solid/icons/file-plus";
 import Paperclip from "lucide-solid/icons/paperclip";
 import FileText from "lucide-solid/icons/file-text";
 import Presentation from "lucide-solid/icons/presentation";
-import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
@@ -45,7 +45,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { arrowEndItem, baseTheme, isShape, mediaOf, makeLabel, shapeLabel, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, isShape, mediaOf, makeLabel, shapeLabel, sidePoint, type ArrowSide, color, fillsOf, CARD, isCard, isMarkdown, isMarkdownText, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -57,16 +57,40 @@ import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
 import { StageEngine } from "../stage/engine.ts";
-import { blockAt, pickAt as pickAtIn, pictureAt, type PickOptions } from "./editor/core/pick.ts";
-import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
-import type { Handle } from "./editor/core/resize.ts";
-import { joinAt as joinAtIn, newArrowEnds, type Join } from "./editor/core/arrows.ts";
-import { arrowInsertOp, deleteOps, drawnOp, duplicateOps, idMaker, makeAtOp, moveOps, type MakeOptions } from "./editor/core/ops.ts";
-import { penKey as penKeyOf, type KeyAct } from "./editor/core/keys.ts";
-import { arrowAnchors, arrowEnds as arrowEndsOf, boardHandles as boardHandlesOf, dropBox as dropBoxOf, gripBox as gripBoxOf, gripHidden, hoverBox as hoverBoxOf, itemHandles, radiusHandle as radiusHandleOf, selectionOutlines, type Overlay } from "./editor/core/overlay.ts";
-import { ANCHOR_OUT, ANCHOR_PX, OverlayLayer } from "./editor/dom/OverlayLayer.tsx";
-import { tsScene, tsSeam } from "./editor/scene-ts.ts";
-import { createEditor, pointerInput } from "./editor/dom/controller.ts";
+import {
+	ANCHOR_OUT,
+	ANCHOR_PX,
+	arrowAnchors,
+	arrowEnds as arrowEndsOf,
+	arrowInsertOp,
+	boardHandles as boardHandlesOf,
+	createStageEditor,
+	deleteOps,
+	drawnOp,
+	dropBox as dropBoxOf,
+	dropSlot as dropSlotIn,
+	duplicateOps,
+	frameAt as frameAtIn,
+	frameUnder as frameUnderIn,
+	gripBox as gripBoxOf,
+	gripHidden,
+	hoverBox as hoverBoxOf,
+	idMaker,
+	itemHandles,
+	joinAt as joinAtIn,
+	makeAtOp,
+	moveOps,
+	newArrowEnds,
+	OverlayLayer,
+	pictureAt,
+	radiusHandle as radiusHandleOf,
+	selectionOutlines,
+	tsScene,
+	tsSeam,
+	type Join,
+	type MakeOptions,
+	type Overlay,
+} from "./editor/index.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
 interface TextLook {
@@ -292,15 +316,8 @@ export function Stage(props: {
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
 	let localCamera = props.camera;
-	/**
-	 * Presses in hand that want to hear the camera move. A wheel or a glide during a drag moves the
-	 * world under a pointer that has not moved, so `follow` replays its last step against the new
-	 * camera, and what is carried stays under the cursor.
-	 */
-	const cameraWatchers = new Set<() => void>();
-	const cameraChanged = () => {
-		for (const watch of [...cameraWatchers]) watch();
-	};
+	/** The camera moved: a press in hand runs its last step again (`editor/dom/pointer.ts`, `follow`). */
+	const cameraChanged = () => editor.cameraMoved();
 	/** When the camera last moved, read by `board-admission.ts`. */
 	let lastMoved = 0;
 	let rafId: number | undefined;
@@ -491,7 +508,7 @@ export function Stage(props: {
 			 * person's own edits; Escape lets go, then puts the tool down; a letter arms a tool
 			 * (`PEN_TOOL_KEYS`), from this document only.
 			 */
-			if (props.onPenEdit && !props.drawing && penKey(event)) {
+			if (editor.key(event)) {
 				event.preventDefault();
 				return;
 			}
@@ -657,8 +674,6 @@ export function Stage(props: {
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
 	const sceneBoards = createMemo(() => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, ...(board.format === "slides" ? { slides: true } : {}) })));
 	const scene = tsScene(penLayer, () => props.pen?.doc, sceneBoards);
-	/** The item a press at a stage point picks (`editor/core/pick.ts`, policy "outermost"; `deep` for the item itself). */
-	const pickAt = (at: { x: number; y: number }, options?: PickOptions) => pickAtIn(scene, at, options);
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
@@ -725,7 +740,7 @@ export function Stage(props: {
 	 * gesture in hand and what is drawn for it, stepped by `editor/core/gesture.ts`. The handlers
 	 * here follow the pointer and tell it each step.
 	 */
-	const editor = createEditor({
+	const editor = createStageEditor({
 		scene,
 		engine: tsSeam(penLayer),
 		mode: () => props.mode,
@@ -757,9 +772,53 @@ export function Stage(props: {
 			onMove: (path, x, y) => props.onMove(path, x, y),
 			onResize: (path, size) => props.onResize?.(path, size),
 			toggleMedia: (id, media) => toggleMedia(id, media),
-			panned: () => {
-				pannedAt = performance.now();
+		},
+		// The pointer's half (`editor/dom/pointer.ts`): the stage keeps the camera, its finger pool and its pan.
+		pointer: {
+			element: () => element,
+			worldAt: (event) => worldAt(event),
+			editable: () => !!props.onPenEdit,
+			drawing: () => !!props.drawing,
+			mode: () => props.mode,
+			tool: penTool,
+			spaceHeld: () => spaceHeld(),
+			picture: (event) => pictureUnder(event),
+			typing: () => penText()?.id,
+			linkAt: (at) => penLayer.linkAt(at),
+			onSelect: (path) => props.onSelect(path),
+			canCreate: () => !!props.onCreateBoard,
+			fingers: () => touches.count(),
+			claim: (pointer) => claimed.add(pointer),
+			beginTouch: (event) => beginTouch(event),
+			pan: (event, how) => panFrom(event, how),
+			make: (event, tool, at) => penCreate(event, tool, at),
+			madeAt: () => penMadeAt,
+			menuOpen: () => !!canvasMenu(),
+			openMenu: (event) => openCanvasMenu(event),
+			toggleMedia: (id, media) => toggleMedia(id, media),
+			open: {
+				liveFile: (id) => openLiveFile(id),
+				file: (id) => openFileOf(id),
+				cardAt: (hit, at, client) => openCardAt(hit, at, client),
+				shapeWords: (shape) => openShapeWords(shape),
+				text: (hit) => openPenText(hit),
+				shapeOf: (id) => shapeOf(id),
+				cardOf: (id) => cardOf(id),
 			},
+			handles: { item: () => penHandles(), board: () => boardHandles(), radius: () => radiusHandle(), arrow: () => arrowEnds() },
+		},
+		// The drawing's keys (`editor/dom/keys.ts`).
+		keys: {
+			editable: () => !!props.onPenEdit,
+			drawing: () => !!props.drawing,
+			tool: penTool,
+			boardSelected: () => !!props.selected,
+			canStep: () => !!props.onPenStep,
+			step: (direction) => props.onPenStep?.(direction),
+			deleteSelected: (selected, ops) => penDeleteSelected(selected, ops),
+			setTool: (tool) => setPenTool(tool),
+			arm: (tool) => armPenTool(tool),
+			onMove: (path, x, y) => props.onMove(path, x, y),
 		},
 	});
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
@@ -806,15 +865,7 @@ export function Stage(props: {
 	 * a different thing — the one board whose page takes the keys — and a single press on a board is
 	 * still only that.
 	 */
-	/** Whether an arrow on the drawing ends on this board. */
-	const arrowEndsOn = (path: string) => {
-		for (const { node } of penLayer.placed.values()) {
-			if (!isArrow(node)) continue;
-			const ends = (node.metadata ?? {}) as { from?: unknown; to?: unknown };
-			if (arrowEndItem(ends.from) === path || arrowEndItem(ends.to) === path) return true;
-		}
-		return false;
-	};
+
 	/**
 	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
 	 *
@@ -833,8 +884,7 @@ export function Stage(props: {
 		 * shown as a picture is drawn by the sheet, and one an arrow ends on is followed by the
 		 * arrow, so those two are still sent at every step.
 		 */
-		const held = editor.boardResize();
-		const resize = held && (!live.has(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
+		const resize = editor.sheetResize((path) => live.has(path));
 		const sendBoards = (boards: SceneBoard[]) => {
 			/*
 			 * The engine draws the boards' pictures, and hears of every board: an arrow follows the board it
@@ -975,7 +1025,7 @@ export function Stage(props: {
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards() }));
-	const TEXTY = new Set(["text", "note", "prompt", "context"]);
+
 	/**
 	 * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
 	 * over them: the same font, size, weight, spacing, line height, padding and colour, so the words do
@@ -1360,8 +1410,7 @@ export function Stage(props: {
 	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
 	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
-	/** A press on something drawn, whether or not it lies over a board. */
-	const pressOnDrawn = (event: PointerEvent) => onDrawn(event.target) || (event.target === element && !!pickAt(worldAt(event)));
+
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
 	(globalThis as { __decksPenBox?: (id: string) => DOMRect | undefined }).__decksPenBox = (id) => {
 		const placed = penLayer.placed.get(id);
@@ -1436,14 +1485,6 @@ export function Stage(props: {
 		if (!id || !card || !isCard(card)) return undefined;
 		return { card: id, index: dropSlot(id, at, [])?.index ?? (card.children ?? []).length, inner: cardInner(card) };
 	};
-	/** A board selected by a press on it, as `BoardFrame`'s own `onSelect` does: alone, unless it is part of the selection already. */
-	const selectBoard = (path: string) => {
-		if (!untrack(editor.boardPicks).includes(path) && (untrack(editor.boardPicks).length || untrack(editor.items).length)) {
-			editor.pickBoards([]);
-			editor.select([]);
-		}
-		props.onSelect(path);
-	};
 
 	/** The words an item shows, its own or its children's, on one line: what a comment on it quotes. */
 	const quoteOf = (node: PenNode | undefined): string => {
@@ -1465,45 +1506,6 @@ export function Stage(props: {
 		setTimeout(clear, 250);
 	};
 
-	/** The keys of the drawing, in edit mode (`editor/core/keys.ts` decides, this does it); true when the key was one of them. */
-	const penKey = (event: KeyboardEvent): boolean => {
-		const selected = editor.items();
-		// The document's ids are gathered only for a key that makes something (⌘D).
-		let ids: (() => string) | undefined;
-		const act: KeyAct = penKeyOf(
-			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
-			{ selection: selected, boards: editor.boardPicks(), tool: penTool(), boardSelected: !!props.selected, canStep: !!props.onPenStep, scene, nextId: () => (ids ??= freshIds())() },
-		);
-		if (!act.handled) return false;
-		switch (act.do) {
-			case "step":
-				props.onPenStep?.(act.step);
-				break;
-			case "delete":
-				penDeleteSelected(selected, act.ops);
-				break;
-			case "escape":
-				if ("tool" in act) setPenTool(act.tool);
-				else {
-					editor.select(act.select);
-					editor.pickBoards(act.boards);
-				}
-				break;
-			case "duplicate":
-				penEdit(act.ops);
-				if (act.select.length) selectMade(act.select);
-				break;
-			case "nudge":
-				penEdit(act.ops);
-				for (const move of act.boards) props.onMove(move.path, move.x, move.y);
-				break;
-			case "arm":
-				armPenTool(act.tool);
-				break;
-		}
-		return true;
-	};
-
 	const armPenTool = (tool: PenTool) => {
 		// The board palette's tool goes down first: picking one of its tools puts this one down.
 		if (tool !== "select") props.onTool?.("select");
@@ -1523,75 +1525,6 @@ export function Stage(props: {
 	};
 
 	/**
-	 * Follow one press to its release: `move` on each step past a 3px slop, `done` at the end.
-	 *
-	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
-	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
-	 * its double-click would reach the canvas and make a board.
-	 *
-	 * The camera can move while the press is held (a wheel, a glide), and then the last step runs
-	 * again: a `move` that reads the pointer in world space (`worldAt`) follows the cursor.
-	 */
-	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void, on: HTMLElement = element) => {
-		try {
-			on.setPointerCapture(event.pointerId);
-		} catch {
-			// Refused for a pointer the browser no longer has; the listeners still end the press.
-		}
-		const start = { x: event.clientX, y: event.clientY };
-		let moved = false;
-		let last: PointerEvent | undefined;
-		let over = false;
-		const onMove = (e: PointerEvent) => {
-			if (e.pointerId !== event.pointerId || released(e)) return;
-			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
-			moved = true;
-			last = e;
-			move(e);
-		};
-		const replay = () => {
-			if (moved && last) move(last);
-		};
-		/** A mouse move with no button held: the release went somewhere this never heard, so it is over. */
-		const released = (e: PointerEvent) => {
-			if (e.pointerType !== "mouse" || (e.buttons & 1) !== 0) return false;
-			finish(e);
-			return true;
-		};
-		const watch = (e: PointerEvent) => {
-			if (e.pointerId === event.pointerId) released(e);
-		};
-		cameraWatchers.add(replay);
-		/*
-		 * Ended once, by whichever of these comes first: the release or a cancel at the element that
-		 * captured the pointer, the same anywhere in the window, the capture being lost (the element
-		 * left the page, or the browser took it back), or a move with no button held. Listening on
-		 * the captured element alone, a release it never heard left the drag following the cursor and
-		 * the camera after the button was up: zoomed out to 20%, moving a board or a group.
-		 */
-		const finish = (e: PointerEvent) => {
-			if (over || e.pointerId !== event.pointerId) return;
-			over = true;
-			cameraWatchers.delete(replay);
-			on.removeEventListener("pointermove", onMove);
-			on.removeEventListener("pointerup", finish);
-			on.removeEventListener("pointercancel", finish);
-			on.removeEventListener("lostpointercapture", finish);
-			window.removeEventListener("pointermove", watch, true);
-			window.removeEventListener("pointerup", finish, true);
-			window.removeEventListener("pointercancel", finish, true);
-			done(moved, e);
-		};
-		on.addEventListener("pointermove", onMove);
-		on.addEventListener("pointerup", finish);
-		on.addEventListener("pointercancel", finish);
-		on.addEventListener("lostpointercapture", finish);
-		window.addEventListener("pointermove", watch, true);
-		window.addEventListener("pointerup", finish, true);
-		window.addEventListener("pointercancel", finish, true);
-	};
-
-	/**
 	 * The frame a drop at a point would go into, or `null` for the stage itself (`editor/core/drop.ts`):
 	 * what a live drag is aiming at is the editor's (`editor.dropInto`); this answers the page's checks.
 	 */
@@ -1601,79 +1534,8 @@ export function Stage(props: {
 	/** Where the frame a drag would drop into is, for the outline that says so. */
 	const dropBox = createMemo(() => dropBoxOf(editor.dropInto(), scene));
 
-	/** A card's link: a board of this deck opens on the canvas, anything else in a new tab (`editor/dom/effects.ts`). */
-	const openLink = (href: string) => editor.openLink(href);
 	/** A link is under the pointer: the cursor says so. */
 	const overLink = editor.overLink;
-
-	/**
-	 * Follow a press the editor took to its lift (`editor/core/gesture.ts`): each move and the lift
-	 * told to it, in stage coordinates. `on` captures the pointer, the stage unless said otherwise.
-	 */
-	const followEditor = (event: PointerEvent, on?: HTMLElement) =>
-		follow(
-			event,
-			(e) => editor.input({ type: "move", ...pointerInput(e, worldAt(e)) }),
-			(_moved, e) => editor.input({ type: "release", ...pointerInput(e, worldAt(e)) }),
-			on,
-		);
-
-	/**
-	 * A press on the drawing; true when it was the drawing's to handle. A tool makes its item; with
-	 * the select tool the editor picks up what is under the press, or draws a marquee on bare canvas.
-	 */
-	const penPress = (event: PointerEvent): boolean => {
-		const at = worldAt(event);
-		const tool = penTool();
-		if (tool !== "select") {
-			event.preventDefault();
-			props.onSelect(undefined);
-			editor.pickBoards([]);
-			penCreate(event, tool, at);
-			return true;
-		}
-		event.preventDefault();
-		if (editor.input({ type: "press-canvas", ...pointerInput(event, at) })) followEditor(event);
-		return true;
-	};
-
-	/**
-	 * A press on a board's title bar (`BoardFrame`), with a mouse or a pen: the stage moves it, so it
-	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
-	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
-	 */
-	const dragBoard = (path: string, event: PointerEvent, on = event.currentTarget as HTMLElement): boolean => {
-		if (event.button !== 0) return false;
-		event.stopPropagation();
-		event.preventDefault();
-		if (editor.input({ type: "press-board", path, ...pointerInput(event, worldAt(event)) })) followEditor(event, on);
-		return true;
-	};
-
-	/** An item's handle dragged (`editor/core/gesture.ts`, `resize`); two presses on a frame's top or bottom handle hug it again. */
-	const resizeFrom = (event: PointerEvent, handle: Handle) => {
-		const box = penHandles();
-		if (event.button !== 0 || !box) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (editor.input({ type: "press-handle", handle, box, ...pointerInput(event, worldAt(event)) })) followEditor(event);
-	};
-
-	/**
-	 * How round the corners are, dragged. The handle starts inside the top-left corner; pulling it
-	 * along the diagonal rounds every corner by as much, up to half the shorter side, where the
-	 * straight sides are gone. A shape from the library keeps it in its own `metadata.radius`, which
-	 * is what redraws its outline (`@decks/pen`, `fitShapes`); pen's rectangle and frame have a
-	 * `cornerRadius` of their own. It is written on the lift, not while dragging, so one drag is one
-	 * edit in the file's history.
-	 */
-	const radiusFrom = (event: PointerEvent) => {
-		const start = radiusHandle();
-		if (event.button !== 0 || !start) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (editor.input({ type: "press-radius", handle: start, ...pointerInput(event, worldAt(event)) })) followEditor(event);
-	};
 
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
@@ -1691,16 +1553,15 @@ export function Stage(props: {
 		const box = penLayer.bounds.get(now.id);
 		const media = mediaOf(node);
 		if (!node || !box || !media) return undefined;
-		const drag = shownDrag();
-		const moving = editor.items().includes(now.id);
+		const drag = editor.itemShift(now.id);
 		return {
 			...now,
 			name: String(node.name ?? media.file.split("/").pop() ?? ""),
 			...(media.seconds === undefined ? {} : { seconds: media.seconds }),
 			...(media.peaks ? { peaks: media.peaks } : {}),
 			radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 8,
-			x: box.x + (moving ? drag.dx : 0),
-			y: box.y + (moving ? drag.dy : 0),
+			x: box.x + drag.dx,
+			y: box.y + drag.dy,
 			w: box.w,
 			h: box.h,
 		};
@@ -1734,21 +1595,6 @@ export function Stage(props: {
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
-	/**
-	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
-	 * to not snap, Shift to keep the shape. The board is drawn at the new box at once; letting go
-	 * moves it if a left or top edge was dragged, and writes the size to its file, and the box is held
-	 * until the board is at it (`editor/core/gesture.ts`, `landBoardResize`). A slide deck's height
-	 * follows from its aspect, so it is sized by its width alone.
-	 */
-	const resizeBoard = (event: PointerEvent, handle: Handle) => {
-		const box = boardHandles();
-		if (event.button !== 0 || !box) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (editor.input({ type: "press-board-handle", handle, box, ...pointerInput(event, worldAt(event)) })) followEditor(event);
-	};
-
 	/** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
 	const makeOptions = (id: string): MakeOptions => ({ shape: penShape(), icon: penIcon(), nextId: freshIds(id), card: newCard });
 
@@ -1760,32 +1606,6 @@ export function Stage(props: {
 		penDrawn();
 		return arrowEndsOf({ selection: editor.items(), boardPicks: editor.boardPicks(), drag: shownDrag() }, scene);
 	});
-	/**
-	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
-	 * follows it from then on; on bare canvas it stays at that point. Along the side it joins, the
-	 * drag slides the join. What it would join lights up while it is carried, as it does while the
-	 * arrow is drawn. A double-click on a joined end puts the join back in the middle of its side.
-	 */
-	const dragArrowEnd = (event: PointerEvent, which: "from" | "to") => {
-		const ends = arrowEnds();
-		if (event.button !== 0 || !ends) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (editor.input({ type: "press-arrow-end", which, ends, ...pointerInput(event, worldAt(event)) })) followEditor(event);
-	};
-
-	/**
-	 * The handle in an arrow's middle, dragged: an elbow's middle segment slides along its run, a
-	 * curve's middle is pulled, and a straight line pulled there becomes a curve (`bendAt`). A
-	 * double-click puts it back on the automatic route.
-	 */
-	const dragArrowBend = (event: PointerEvent) => {
-		const ends = arrowEnds();
-		if (event.button !== 0 || !ends?.middle) return;
-		event.preventDefault();
-		event.stopPropagation();
-		if (editor.input({ type: "press-arrow-bend", ends, ...pointerInput(event, worldAt(event)) })) followEditor(event);
-	};
 
 	/**
 	 * The innermost frame under a point. An item drawn inside a free-standing frame belongs to it,
@@ -1815,7 +1635,7 @@ export function Stage(props: {
 		// An arrow lights up what each of its ends would join, from the first press to the release.
 		const startJoin = tool === "arrow" ? (from ?? joinAt(at)) : undefined;
 		if (startJoin) editor.setHints({ joins: [startJoin.box] });
-		follow(
+		editor.follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
@@ -1900,7 +1720,7 @@ export function Stage(props: {
 		setCanvasMenu(undefined);
 		if (menu) props.onOpenDocument?.(menu.stage);
 	};
-	let lastBareTap: { x: number; y: number; at: number } | undefined;
+
 	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
 		const menu = canvasMenu();
 		setCanvasMenu(undefined);
@@ -2779,46 +2599,6 @@ export function Stage(props: {
 		},
 	};
 
-	/**
-	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
-	 * what a press there would select. Edit mode only: browsing selects and edits the drawing all the
-	 * same, but without a line following the pointer about. A mouse or a pen with no button down, over
-	 * the drawing; a board says when it is under the pointer (`BoardFrame`), and anything else clears
-	 * the item's. Once per frame at most.
-	 */
-	let hoverFrame: number | undefined;
-	let hoverAt: { x: number; y: number } | undefined;
-	let hoverPoint: { clientX: number; clientY: number } | undefined;
-	const onHover = (event: PointerEvent) => {
-		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
-		// The pointer on a block's grip keeps the grip, and the block it belongs to.
-		if ((event.target as Element | null)?.closest?.(".pen-grip")) return;
-		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
-			hoverAt = undefined;
-			editor.hover({ ...(event.buttons === 0 ? { block: undefined } : {}), item: undefined, picture: undefined, link: false });
-			return;
-		}
-		hoverAt = worldAt(event);
-		hoverPoint = { clientX: event.clientX, clientY: event.clientY };
-		hoverFrame ??= requestAnimationFrame(() => {
-			hoverFrame = undefined;
-			const href = hoverAt ? penLayer.linkAt(hoverAt) : undefined;
-			editor.hover({ link: !!href && props.mode === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined });
-			// The outline is edit mode's; browsing shows only the hand over a link.
-			if (props.mode !== "edit") return;
-			const hit = hoverAt ? pickAt(hoverAt) : undefined;
-			// A board with no node says nothing when the pointer is over it, so the stage asks.
-			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: !hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined });
-		});
-	};
-	onCleanup(() => {
-		if (hoverFrame !== undefined) cancelAnimationFrame(hoverFrame);
-	});
-	/**
-	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
-	 * level with it. Not while the card is open for typing, which has its own way of moving things.
-	 */
-	const blockUnder = (at: { x: number; y: number }): string | undefined => blockAt(scene, at, penText()?.id);
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
 	const gripBox = createMemo(() => {
 		penDrawn();
@@ -2828,13 +2608,6 @@ export function Stage(props: {
 			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);
 		});
 	});
-	/** A press on a block's grip picks the block up and carries it, into another place in the card or out of it. */
-	const dragBlock = (event: PointerEvent, id: string) => {
-		event.preventDefault();
-		event.stopPropagation();
-		const on = event.currentTarget as HTMLElement;
-		if (editor.input({ type: "press-block", id, ...pointerInput(event, worldAt(event)) })) followEditor(event, on);
-	};
 
 	/** The hovered item's box as it is drawn now, or the board under the pointer. */
 	const hoverBox = createMemo(() => {
@@ -2846,260 +2619,13 @@ export function Stage(props: {
 	});
 
 	/**
-	 * A tap on bare canvas lets go of the drawn items and boards selected, as a click there does
-	 * (`penPress`, the marquee). On the lift, not the landing: a finger that pans or becomes a pinch
-	 * keeps the selection, so you can look around something you have picked.
+	 * The camera dragged from a press (`editor/core/dispatch.ts`, `pan`): with the middle button, with
+	 * Space held, or on bare canvas, which lets the selected board go (`deselect`).
 	 */
-	const tapToDeselect = (event: PointerEvent) => {
-		const pointer = event.pointerId;
-		const from = { x: event.clientX, y: event.clientY };
-		const since = performance.now();
-		let pinched = false;
-		let travelled = false;
-		const done = () => {
-			window.removeEventListener("pointermove", move);
-			window.removeEventListener("pointerup", up);
-			window.removeEventListener("pointercancel", done);
-		};
-		const move = (e: PointerEvent) => {
-			if (e.pointerId !== pointer && e.pointerType === "touch") pinched = true;
-			// Judged on the furthest the finger went: a pan that comes back to where it began is still a pan.
-			else if (e.pointerId === pointer && Math.hypot(e.clientX - from.x, e.clientY - from.y) >= 10) travelled = true;
-		};
-		const up = (e: PointerEvent) => {
-			if (e.pointerId !== pointer) return;
-			done();
-			if (pinched || travelled || performance.now() - since > 600) return;
-			batch(() => {
-				editor.select([]);
-				editor.pickBoards([]);
-			});
-			// A second tap close by, soon after: the canvas menu, as a double-click is with a mouse.
-			const now = performance.now();
-			const twice = lastBareTap && now - lastBareTap.at < 350 && Math.hypot(e.clientX - lastBareTap.x, e.clientY - lastBareTap.y) < 30;
-			lastBareTap = twice ? undefined : { x: e.clientX, y: e.clientY, at: now };
-			if (twice) openCanvasMenu(e);
-		};
-		window.addEventListener("pointermove", move);
-		window.addEventListener("pointerup", up);
-		window.addEventListener("pointercancel", done);
-	};
-
-	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
-	let lastTap: { id: string; at: number } | undefined;
-	/**
-	 * A finger on the drawing. On an item already selected it moves the selection (the finger is
-	 * claimed, so the camera stays put); anywhere else it is a pan unless it lifts where it landed,
-	 * which is a tap: the item is selected, and a second tap on words opens them for typing.
-	 */
-	const touchOnDrawing = (event: PointerEvent) => {
-		const at = worldAt(event);
-		const hit = pickAt(at);
-		if (!hit) return;
-		const pointer = event.pointerId;
-		const from = { x: event.clientX, y: event.clientY };
-		const since = performance.now();
-		const selected = editor.items();
-		const carrying = selected.includes(hit.id);
-		if (carrying) claimed.add(pointer);
-		let moved = false;
-		const done = () => {
-			window.removeEventListener("pointermove", move);
-			window.removeEventListener("pointerup", up);
-			window.removeEventListener("pointercancel", cancel);
-		};
-		const abandon = () => {
-			done();
-			editor.input({ type: "cancel" });
-		};
-		const move = (e: PointerEvent) => {
-			if (e.pointerId !== pointer) return;
-			// A second finger: this was the start of a pinch, and whatever it carried goes back.
-			if (touches.count() > 1) return abandon();
-			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 10) return;
-			// The editor carries the selection from here (`editor/core/gesture.ts`, a finger's carry): picked up as it first moves.
-			if (!moved && carrying) editor.input({ type: "carry", from: { at, client: from }, ...pointerInput(e, worldAt(e)) });
-			moved = true;
-			if (!carrying) return;
-			editor.input({ type: "move", ...pointerInput(e, worldAt(e)) });
-		};
-		const up = (e: PointerEvent) => {
-			if (e.pointerId !== pointer) return;
-			done();
-			if (moved) {
-				if (carrying) editor.input({ type: "release", ...pointerInput(e, worldAt(e)) });
-				else editor.input({ type: "cancel" });
-				return;
-			}
-			if (performance.now() - since > 600) return;
-			const deep = pickAt(at, { deep: true });
-			// A film or a sound: a tap plays it or pauses it, and selects it as any tap does.
-			const playable = deep && mediaOf(deep.node) ? deep : mediaOf(hit.node) ? hit : undefined;
-			const media = playable ? mediaOf(playable.node) : undefined;
-			if (playable && media) {
-				lastTap = undefined;
-				toggleMedia(playable.id, media);
-				props.onSelect(undefined);
-				editor.pickBoards([]);
-				editor.select([hit.id]);
-				return;
-			}
-			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (openLiveFile(deep.id) || openFileOf(deep.id))) {
-				lastTap = undefined;
-				return;
-			}
-			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (deep.node.type !== "rectangle" || !cardOf(deep.id)) && openCardAt(deep, at, { x: e.clientX, y: e.clientY })) {
-				lastTap = undefined;
-				return;
-			}
-			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && (TEXTY.has(deep.node.type) || shapeOf(deep.id))) {
-				lastTap = undefined;
-				const shape = shapeOf(deep.id);
-				if (shape && !TEXTY.has(deep.node.type)) openShapeWords(shape);
-				else openPenText(deep);
-				return;
-			}
-			const href = props.mode === "browse" ? penLayer.linkAt(at) : undefined;
-			if (href) return openLink(href);
-			lastTap = { id: hit.id, at: performance.now() };
-			// A second tap on the one thing selected asks for its properties: on a phone, the sheet.
-			if (selected.length === 1 && selected[0] === hit.id) {
-				setPenSheet(true);
-				return;
-			}
-			props.onSelect(undefined);
-			editor.pickBoards([]);
-			editor.select([hit.id]);
-		};
-		const cancel = (e: PointerEvent) => {
-			if (e.pointerId === pointer) abandon();
-		};
-		window.addEventListener("pointermove", move);
-		window.addEventListener("pointerup", up);
-		window.addEventListener("pointercancel", cancel);
-	};
-
-	/**
-	 * When the camera was last dragged, so a double-click can tell itself apart from a pan.
-	 *
-	 * Chromium fires `dblclick` after two presses whatever happened between them, and a quick
-	 * pan is two presses with a lot happening between them — so without this, dragging the
-	 * canvas about would leave a new board behind at the end of it.
-	 */
-	let pannedAt = 0;
-
-	/**
-	 * A double-click on empty canvas: the canvas menu, there (`canvasMenu`).
-	 *
-	 * "Empty" is anything that is not inside a `.board-node`. The stage's own background is the
-	 * common case, but a board's title bar is in *this* document too — a keystroke that lands in
-	 * a board never reaches here at all, because that is another document and its events do not
-	 * bubble out of a frame. So the test is the node, not the element.
-	 */
-	const onDblClick = (event: MouseEvent) => {
-		if (props.onPenEdit && !props.drawing && onCanvas(event.target)) {
-			// The second press of a quick double-click on a tool's first item is not a request for a board.
-			if (performance.now() - penMadeAt < 500) return;
-			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
-			const hit = pickAt(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
-			// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
-			// A film or a sound: its first press already started it, so the second is only a press.
-			if (hit && mediaOf(hit.node)) {
-				editor.select([hit.id]);
-				return;
-			}
-			// A file shown live: a web page taken into, an SVG opened in a tab.
-			if (hit && openLiveFile(hit.id)) return;
-			// A file's chip opens the file, in a tab of its own.
-			if (hit && openFileOf(hit.id)) return;
-			// A card opens for typing: at the words, or with a new line in the gap that was double-clicked.
-			if (hit && (hit.node.type !== "rectangle" || !cardOf(hit.id)) && openCardAt(hit, toWorld(localCamera, view(), stagePoint(event)), { x: event.clientX, y: event.clientY })) return;
-			// A shape's words open for typing, and a shape with none gets them (`openShapeWords`).
-			const shape = hit ? shapeOf(hit.id) : undefined;
-			if (shape && !(hit && TEXTY.has(hit.node.type))) {
-				openShapeWords(shape);
-				return;
-			}
-			if (hit && TEXTY.has(hit.node.type)) {
-				openPenText(hit);
-				return;
-			}
-			if (hit && !editor.items().includes(hit.id)) {
-				editor.select([hit.id]);
-				return;
-			}
-		}
-		// Nothing can be added where nothing can be written: a canvas opened from a file.
-		if (!props.onCreateBoard && !props.onPenEdit) return;
-		/*
-		 * Only on the bare stage itself. Not on a board, its title bar, something drawn, or anything
-		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
-		 * to pick a word in it opened the menu.
-		 */
-		if (event.target !== element || pictureUnder(event)) return;
-		if (performance.now() - pannedAt < 400) return;
-		// A finger's two taps already opened it (`onPointerDown`); a touch screen's own dblclick is the same gesture.
-		if (canvasMenu()) return;
-		openCanvasMenu(event);
-	};
-
-	const onPointerDown = (event: PointerEvent) => {
-		/*
-		 * Touch is its own gesture set, and it is asked of the event rather than of the
-		 * screen size: a laptop with a touchscreen has both, and each pointer should mean
-		 * what it means. `preventDefault` is deliberately not called — the frames'
-		 * `touch-action` is what stops the browser scrolling, and swallowing the default
-		 * here would take focus away from the composer mid-sentence.
-		 */
-		if (event.pointerType === "touch") {
-			/*
-			 * A finger with a tool armed makes the item, as a pencil or a mouse does. A finger on a
-			 * drawn item selects it with a tap and moves it once it is selected — the same rule a
-			 * board's components follow (`Editor.ts`), so a pan across the drawing never picks
-			 * anything up by accident. Both only for the first finger: a second is a pinch.
-			 */
-			const pen = props.onPenEdit && !props.drawing && touches.count() === 0 && onCanvas(event.target);
-			if (pen && penTool() !== "select") {
-				penPress(event);
-				return;
-			}
-			// A finger on a board's picture picks the board, and may still pan or pinch, as on its node.
-			const picture = event.target === element && touches.count() === 0 && !(pen && pressOnDrawn(event)) ? pictureUnder(event) : undefined;
-			if (picture) selectBoard(picture);
-			beginTouch(event);
-			if (picture) return;
-			if (pen && pressOnDrawn(event)) touchOnDrawing(event);
-			else if (pen) tapToDeselect(event);
-			return;
-		}
-
-		/*
-		 * The drawing, in either mode: an armed tool makes its item; otherwise a press on an item picks
-		 * it up, a shift-press adds it to the selection or takes it out, and a drag on empty canvas
-		 * draws a marquee. The camera pans with Space and a drag, the middle button, a scroll or a pinch.
-		 */
-		/*
-		 * A press on a board's picture, where the board has no node (below the live zoom): picked up and
-		 * moved as a press on its node does, unless a tool is armed or something drawn is over it.
-		 */
-		if (event.button === 0 && event.target === element && !spaceHeld() && !props.drawing && (!props.onPenEdit || penTool() === "select") && !pickAt(worldAt(event))) {
-			const picture = pictureUnder(event);
-			if (picture) {
-				if (!props.onPenEdit || !dragBoard(picture, event, element)) selectBoard(picture);
-				return;
-			}
-		}
-		if (props.onPenEdit && !props.drawing && event.button === 0 && onCanvas(event.target) && !spaceHeld()) {
-			if (penPress(event)) return;
-		}
-
-		const middle = event.button === 1;
-		// A press on a drawn item while browsing is a press on the canvas: it pans, and a board lets go.
-		const emptySpace = event.button === 0 && onCanvas(event.target);
-		if (!middle && !emptySpace && !(spaceHeld() && event.button === 0)) return;
-
+	const panFrom = (event: PointerEvent, how: { deselect: boolean; middle: boolean }) => {
+		const { middle } = how;
 		event.preventDefault();
-		if (emptySpace) props.onSelect(undefined);
+		if (how.deselect) props.onSelect(undefined);
 		element.setPointerCapture(event.pointerId);
 		setPanning(true);
 
@@ -3107,7 +2633,7 @@ export function Stage(props: {
 		const move = (moveEvent: PointerEvent) => {
 			pushCamera(pan(localCamera, moveEvent.clientX - last.x, moveEvent.clientY - last.y));
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
-			pannedAt = performance.now();
+			editor.panned();
 		};
 		// Ended on any sign the button is up, not only its release (`held.ts`).
 		const stop = untilReleased({ docs: [document], held: middle ? 4 : 1, capture: element, end: () => finish() });
@@ -3227,8 +2753,7 @@ export function Stage(props: {
 		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
 		keep(props.editing?.path);
-		for (const path of editor.boardDrag()?.paths ?? []) keep(path);
-		keep(editor.boardResize()?.path);
+		for (const path of editor.heldBoards()) keep(path);
 		// What is drawn on a board rather than in it: an agent's act, a cursor.
 		for (const path of actsByPath().keys()) keep(path);
 		keep(props.cursor?.path);
@@ -3322,12 +2847,12 @@ export function Stage(props: {
 	const liveBox = (id: string) => {
 		penDrawn();
 		const placed = penLayer.placed.get(id);
-		const resized = editor.shownResize();
-		if (resized?.id === id) return { x: resized.x, y: resized.y, w: resized.w, h: resized.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
+		const resized = editor.itemResize(id);
+		if (resized) return { x: resized.x, y: resized.y, w: resized.w, h: resized.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
 		const box = penLayer.bounds.get(id) ?? placed?.box;
 		if (!box) return undefined;
 		// Carried with the drag, from the frame the sheet carries it in (`shownDrag`).
-		const drag = editor.items().includes(id) ? shownDrag() : { dx: 0, dy: 0 };
+		const drag = editor.itemShift(id);
 		return { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h, radius: Number(placed?.node.cornerRadius ?? 0) || 0 };
 	};
 	/** A double-click on a live SVG opens it in a tab. */
@@ -3531,7 +3056,6 @@ export function Stage(props: {
 							visible={alone ? false : isVisible(board)}
 							{...(alone ? {} : { onLive: (on: boolean) => markLive(board.path, on) })}
 							kept={!alone && props.renderer === "dom" && keptPages().has(board.path)}
-							onDragging={(at) => editor.setOwnDrag(at ? { path: board.path, ...at } : undefined)}
 							pictured={onSheet().has(board.path)}
 							covering={sleepOnZoom()}
 							carried={carriedPages().has(board.path)}
@@ -3579,14 +3103,7 @@ export function Stage(props: {
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 							{...(props.onBoardEval ? { onBoardEval: props.onBoardEval } : {})}
-							onSelect={() => selectBoard(board.path)}
-							drag={(event) => (props.onPenEdit ? dragBoard(board.path, event) : false)}
-							shift={editor.boardDrag()?.paths.includes(board.path) ? editor.boardDrag() : undefined}
-							resized={editor.boardResize()?.path === board.path ? editor.boardResize() : undefined}
-							onHover={(on) => {
-								if (on) editor.hover({ board: board.path });
-								else if (untrack(editor.hoverBoard) === board.path) editor.hover({ board: undefined });
-							}}
+							view={editor.boardView(board.path)}
 							{...(props.onExtent && !sized ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onResize && !sized ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
@@ -3610,7 +3127,7 @@ export function Stage(props: {
 	const SETTLE_MS = 2500;
 	const sizingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	createEffect(() => {
-		const held = editor.boardResize()?.path;
+		const held = editor.resizingBoard();
 		const grew: string[] = [];
 		for (const board of props.boards) {
 			const size = `${board.w}x${board.h}`;
@@ -3738,15 +3255,13 @@ export function Stage(props: {
 			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`). Off in the frame a zoom starts, so the layer is never stretched. */
 			data-sliding={(moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
 			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
-			data-carrying={editor.boardDrag() || editor.boardResize() || editor.ownDrag() ? "true" : undefined}
+			data-carrying={editor.carrying() ? "true" : undefined}
 			ref={element}
 			onWheel={onWheel}
-			onPointerDown={onPointerDown}
-			onPointerMove={onHover}
-			onPointerLeave={() => {
-				editor.hover({ item: undefined, link: false });
-			}}
-			onDblClick={onDblClick}
+			onPointerDown={editor.onPointerDown}
+			onPointerMove={editor.onPointerMove}
+			onPointerLeave={editor.onPointerLeave}
+			onDblClick={editor.onDblClick}
 			style={{ cursor: spaceHeld() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
 			{/*
@@ -3837,7 +3352,7 @@ export function Stage(props: {
 					overlay={overlay}
 					zoom={props.camera.zoom}
 					sizing={(path) => sizingPaths().has(path)}
-					onGrip={dragBlock}
+					onGrip={editor.onGrip}
 					onAnchor={(event, box, side) => {
 						if (event.button !== 0) return;
 						event.preventDefault();
@@ -3845,11 +3360,11 @@ export function Stage(props: {
 						const start = sidePoint(box, side);
 						penCreate(event, "arrow", { x: start[0], y: start[1] }, { name: box.id, box: { x: box.x, y: box.y, w: box.w, h: box.h }, side });
 					}}
-					onArrowEnd={dragArrowEnd}
-					onArrowBend={dragArrowBend}
-					onHandle={resizeFrom}
-					onRadius={radiusFrom}
-					onBoardHandle={resizeBoard}
+					onArrowEnd={editor.onArrowEnd}
+					onArrowBend={editor.onArrowBend}
+					onHandle={editor.onHandle}
+					onRadius={editor.onRadius}
+					onBoardHandle={editor.onBoardHandle}
 				>
 					{/*
 					 * The one player, laid over the item it belongs to.
@@ -4049,7 +3564,7 @@ export function Stage(props: {
 				class="bar-layer"
 				data-hidden={props.focus ? "true" : undefined}
 				data-low={untrack(() => props.camera.zoom) < BAR_ZOOM ? "true" : "false"}
-				data-moving={editor.boardDrag() || editor.boardResize() || editor.ownDrag() ? "true" : undefined}
+				data-moving={editor.carrying() ? "true" : undefined}
 				ref={(el) => (barOuter = el)}
 			>
 				<div class="bar-track" ref={setBarLayer} />
@@ -4060,7 +3575,7 @@ export function Stage(props: {
 						board={board}
 						box={boxOf(board)}
 						label={`${board.title}: board actions`}
-						hidden={moving() || panning() || scaling() || gliding() || !!editor.boardDrag() || !!editor.boardResize() || !!editor.ownDrag()}
+						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
 						camera={props.camera}
 						view={view()}
 						onOpen={() => pushCamera(frame([boxOf(board)]))}

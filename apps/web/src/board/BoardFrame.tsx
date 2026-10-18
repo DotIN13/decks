@@ -16,6 +16,7 @@ import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
+import type { BoardView } from "../canvas/editor/index.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
 import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "../canvas/acts.ts";
 import { isRead, READ_MS, READ_ZOOM } from "./glow.ts";
@@ -166,22 +167,18 @@ export function BoardFrame(props: {
 	carried?: boolean;
 	/** The board was read on the canvas: zoomed in on, mostly on screen, at rest (`glow.ts`). */
 	onRead?: () => void;
-	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	/**
-	 * A mouse or pen press on the title bar, offered to the stage first: it moves the board with the
-	 * rest of a selection and snaps it (`Stage.dragBoard`). True means it took the drag.
+	 * The stage's editor, as far as this board goes (`canvas/editor`, `boardView`): a press that
+	 * selects the board (`select`); a mouse or pen press on the title bar or an edge, offered to the
+	 * editor first, which moves the board with the rest of a selection and snaps it (`press`, true
+	 * when it took the drag); the pointer coming onto the board or its bar or leaving both, for the
+	 * hover outline (`hover`); a drag of the board's own, a finger on its edge, where the board is
+	 * carried and null when it ends, so the outline goes with it and the pill and handles hide
+	 * (`dragging`); how far a drag of the selection carries the board until the move is sent
+	 * (`shift`); and the box the stage's handles are asking for (`resized`).
 	 */
-	drag?: (event: PointerEvent) => boolean;
-	/** The pointer came onto the board or its title bar, or left both: for the stage's hover outline. */
-	onHover?: (on: boolean) => void;
-	/**
-	 * A drag of the board's own (a finger on its edge): where the board is being carried, and null
-	 * when it ends. The stage moves the selection outline with it and hides the pill and handles.
-	 */
-	onDragging?: (at: { x: number; y: number } | null) => void;
-	/** How far the stage is carrying this board in a drag of its own, until the move is sent. */
-	shift?: { dx: number; dy: number };
+	view: BoardView;
 	/**
 	 * The board dragged to a new size, in board units.
 	 *
@@ -196,8 +193,6 @@ export function BoardFrame(props: {
 	 * this file).
 	 */
 	onResize?: (size: { w: number; h: number }) => void;
-	/** The box the stage's resize handles are asking for, drawn before the file has it. */
-	resized?: { x: number; y: number; w: number; h: number } | undefined;
 	onOpen: () => void;
 	/**
 	 * How much room this board's content took, once the document had finished mounting.
@@ -536,14 +531,14 @@ export function BoardFrame(props: {
 	/** Where the board sits while a drag is in flight, before the server knows. */
 	const [ghost, setGhost] = createSignal<{ x: number; y: number } | null>(null);
 	createEffect(
-		on([dragging, ghost], ([now, at]) => props.onDragging?.(now ? (at ?? { x: props.board.x, y: props.board.y }) : null), { defer: true }),
+		on([dragging, ghost], ([now, at]) => props.view.dragging(now ? (at ?? { x: props.board.x, y: props.board.y }) : null), { defer: true }),
 	);
 	/*
 	 * The box being resized, from the stage's handles (`Stage.tsx`), held from the first move until
 	 * the file comes back at it. The node is drawn at it, so the box follows the pointer without
 	 * waiting for a round trip, and keeps following after the pointer is up, while the write lands.
 	 */
-	const sizing = () => props.resized;
+	const sizing = () => props.view.resized();
 
 	/**
 	 * Where this node sits: the board's world position, or a place its caller chose.
@@ -553,12 +548,15 @@ export function BoardFrame(props: {
 	 * layout of every board. The focus view has no world and no camera, so it places the frame
 	 * itself (`canvas/Stage.tsx`).
 	 */
-	const at = () => props.origin ?? (props.carried ? undefined : ghost()) ?? (props.resized ? { x: props.resized.x, y: props.resized.y } : undefined) ?? { x: props.board.x, y: props.board.y };
+	const at = () => props.origin ?? (props.carried ? undefined : ghost()) ?? (sizing() ? { x: sizing()!.x, y: sizing()!.y } : undefined) ?? { x: props.board.x, y: props.board.y };
 	/*
 	 * The stage's drag of this board, as a transform over where it is: a move of `left` and `top`
 	 * lays the page out again on every pointer move, where a transform is the compositor's alone.
 	 */
-	const shifted = () => (props.shift && !props.carried && !props.origin && !props.resized && !ghost() ? `translate(${props.shift.dx}px, ${props.shift.dy}px)` : undefined);
+	const shifted = () => {
+		const shift = props.view.shift();
+		return shift && !props.carried && !props.origin && !sizing() && !ghost() ? `translate(${shift.dx}px, ${shift.dy}px)` : undefined;
+	};
 	const frameSrc = () => {
 		if (props.previewSha) return api(`/revision/${props.previewSha}`);
 		// 0 means unpinned: show whatever the board now is.
@@ -584,7 +582,7 @@ export function BoardFrame(props: {
 	const zoom = createMemo((previous?: number) => (props.moving && previous !== undefined ? previous : props.camera.zoom));
 	/** The board or its bar is under the pointer: the bar's buttons show for either (`canvas.css`). */
 	const [hovered, setHovered] = createSignal(false);
-	createEffect(() => props.onHover?.(hovered()));
+	createEffect(() => props.view.hover(hovered()));
 	/* Below the live zoom a board is a tile to pan across; the selected one is live and takes the pointer at any zoom. */
 	const inert = createMemo(() => zoom() < INTERACT_ZOOM && !props.selected);
 
@@ -851,8 +849,8 @@ export function BoardFrame(props: {
 		const doc = frame.contentDocument;
 		// Shift and a mouse press on a live page adds the board to the selection, as on its picture.
 		const select = (event: PointerEvent) => {
-			if (event.shiftKey && event.pointerType === "mouse" && event.button === 0 && !props.focused && props.drag?.(event)) return;
-			props.onSelect();
+			if (event.shiftKey && event.pointerType === "mouse" && event.button === 0 && !props.focused && props.view.press(event)) return;
+			props.view.select();
 		};
 		doc?.addEventListener("pointerdown", select, true);
 		// A hand inside the page is a hand on the canvas: it holds the view against an agent's show.
@@ -1128,11 +1126,11 @@ export function BoardFrame(props: {
 		 * (`claimTouch`), which leaves the board draggable by one finger and pinchable by
 		 * two. `pinching()` below is where the second finger takes the gesture back.
 		 */
-		if (!touched && props.drag?.(event)) return;
+		if (!touched && props.view.press(event)) return;
 		if (touched) props.gestures.claimTouch(event.pointerId);
 		else event.stopPropagation();
 		event.preventDefault();
-		props.onSelect();
+		props.view.select();
 
 		const handle = event.currentTarget as HTMLElement;
 		/*
@@ -1285,7 +1283,7 @@ export function BoardFrame(props: {
 			ref={(element) => {
 				nodeEl = element;
 			}}
-			data-dragging={dragging() || !!props.shift}
+			data-dragging={dragging() || !!props.view.shift()}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
 			data-hover={hovered() || undefined}
@@ -1326,7 +1324,7 @@ export function BoardFrame(props: {
 						<div
 							class="chrome"
 							data-path={props.board.path}
-							data-dragging={dragging() || !!props.shift}
+							data-dragging={dragging() || !!props.view.shift()}
 							data-hover={hovered() || undefined}
 							data-selected={props.selected || undefined}
 							data-sizing={props.sizing ? "true" : undefined}
@@ -1448,7 +1446,7 @@ export function BoardFrame(props: {
 							onPointerDown={(event) => {
 								// A finger moves the board too, and a second finger turns it into a pinch (`startDrag`).
 								if (event.pointerType === "touch") return startDrag(event);
-								props.drag?.(event);
+								props.view.press(event);
 							}}
 						/>
 					)}
@@ -1468,7 +1466,7 @@ export function BoardFrame(props: {
 				onPointerDown={(event) => {
 					// A mouse on a board's picture moves it and selects it (Shift adds it), as its bar once did.
 					if (inert() && event.pointerType !== "touch" && event.button === 0) startDrag(event);
-					else props.onSelect();
+					else props.view.select();
 				}}
 			>
 				<Switch>

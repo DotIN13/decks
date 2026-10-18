@@ -11,11 +11,11 @@
  * The selection is this editor's. `state/pen-tools.ts` reads and writes it through
  * `feedSelection`, so the drawing bar and the properties panel see the one selection the stage has.
  */
-import { ids as penIds, type MediaItem, type Op, type PenDocument } from "@decks/pen";
+import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type PenDocument } from "@decks/pen";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
-import { feedSelection } from "../../../state/pen-tools.ts";
+import { feedSelection, keptSelection } from "../../../state/pen-tools.ts";
 import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
-import type { BoardBox, DraftBox, EditorState, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
+import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
@@ -51,7 +51,11 @@ export function pointerInput(event: { clientX: number; clientY: number; shiftKey
 }
 
 export function createEditor(host: EditorHost) {
-	const [state, setState] = createSignal<EditorState>(initialState(untrack(host.mode), untrack(host.tool)));
+	/*
+	 * The selection the last stage left (`state/pen-tools.ts`, `keptSelection`): a stage mounted
+	 * again starts with what was selected, as it did when the selection was the page's own signal.
+	 */
+	const [state, setState] = createSignal<EditorState>(withSelection(initialState(untrack(host.mode), untrack(host.tool)), { items: keptSelection() }));
 	const read = () => untrack(state);
 	const commit = (next: EditorState) => {
 		if (next !== read()) setState(next);
@@ -146,6 +150,19 @@ export function createEditor(host: EditorHost) {
 		host.engine.carry(moving?.paths ?? [], moving ?? { dx: 0, dy: 0 });
 	});
 
+	/** Whether an arrow on the drawing ends on this board. */
+	const arrowEndsOn = (path: string) => {
+		for (const { node } of host.scene.items()) {
+			if (!isArrow(node)) continue;
+			const ends = (node.metadata ?? {}) as { from?: unknown; to?: unknown };
+			if (arrowEndItem(ends.from) === path || arrowEndItem(ends.to) === path) return true;
+		}
+		return false;
+	};
+	const ZERO: Offset = { dx: 0, dy: 0 };
+	const shown = part(shownDrag);
+	const shownResize = part((now) => now.shownResize);
+
 	const select = (next: readonly string[] | ((now: readonly string[]) => readonly string[])) => update((now) => withSelection(now, { items: typeof next === "function" ? next(now.selection.items) : next }));
 	onCleanup(feedSelection({ items, select: (next) => select(next) }));
 
@@ -160,11 +177,11 @@ export function createEditor(host: EditorHost) {
 		overLink: part((now) => now.hover.link),
 		gesture: part((now) => now.gesture),
 		drag: part((now) => now.drag),
-		shownDrag: part(shownDrag),
+		shownDrag: shown,
 		boardDrag,
 		ownDrag,
 		resize: part((now) => now.resize),
-		shownResize: part((now) => now.shownResize),
+		shownResize,
 		boardResize,
 		radius: part((now) => now.radius),
 		marquee: part((now) => now.marquee),
@@ -176,6 +193,32 @@ export function createEditor(host: EditorHost) {
 		draft: part((now) => now.draft),
 		endDraft: part((now) => now.endDraft),
 		route: part((now) => now.route),
+
+		/** A board is being moved or sized: title bars and news glows step aside until it lands. */
+		carrying: createMemo(() => !!boardDrag() || !!boardResize() || !!ownDrag()),
+		/** The boards a gesture holds, which keep their nodes wherever the camera goes. */
+		heldBoards: (): readonly string[] => {
+			const sized = boardResize()?.path;
+			return [...(boardDrag()?.paths ?? []), ...(sized === undefined ? [] : [sized])];
+		},
+		/** The board whose size is being dragged, if one is. */
+		resizingBoard: () => boardResize()?.path,
+		/**
+		 * The board size the sheet should draw, while one is dragged: a board shown as a picture
+		 * (not `live`) is drawn by the sheet, and one an arrow ends on is followed by the arrow. A
+		 * live board's page is drawn over the sheet at the new box, so the sheet keeps it where it was.
+		 */
+		sheetResize: (live: (path: string) => boolean) => {
+			const held = boardResize();
+			return held && (!live(held.path) || untrack(() => arrowEndsOn(held.path))) ? held : undefined;
+		},
+		/** How far a drawn item is carried, as the canvas shows it: the drag's, when it is selected. */
+		itemShift: (id: string): Offset => (items().includes(id) ? shown() : ZERO),
+		/** The box a drawn item is being resized to, as the sheet has drawn it. */
+		itemResize: (id: string): ResizeBox | undefined => {
+			const resized = shownResize();
+			return resized?.id === id ? resized : undefined;
+		},
 
 		/** Step one input; true when it left a gesture in hand, for the page to follow the pointer. */
 		input: (input: Input): boolean => {
