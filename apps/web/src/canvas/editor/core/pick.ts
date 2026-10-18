@@ -85,6 +85,7 @@ export function blockAt(scene: SceneQuery, point: Pt, typing?: string): string |
 /**
  * The board whose picture is under a point and that has no node of its own to take the press:
  * one not in `rendered`, and not the board in focus. The last in file order, as the sheet draws it on top.
+ * `boards` may be only the candidates a spatial index found near the point, as long as they keep file order.
  */
 export function pictureAt(boards: readonly BoardBox[], point: Pt, rendered: ReadonlySet<string>, focus?: string): string | undefined {
 	let top: string | undefined;

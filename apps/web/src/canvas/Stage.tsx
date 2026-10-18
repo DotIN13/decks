@@ -1530,7 +1530,15 @@ export function Stage(props: {
 	 * The board whose picture is under a point and that has no node of its own to take the press
 	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
 	 */
-	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => pictureAt(props.boards, worldAt(event), renderedPaths(), props.focus);
+	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => {
+		const at = worldAt(event);
+		// The spatial index finds the few boards near the point; core decides among them, in paint order.
+		const near = boardIndex()
+			.search({ x: at.x, y: at.y, w: 0, h: 0 })
+			.sort((a, b) => a - b)
+			.map((index) => props.boards[index]!);
+		return pictureAt(near, at, renderedPaths(), props.focus);
+	};
 	/** For the file drop (`app/files.ts`): whether a board's picture, with no node to find, is under a point on screen. */
 	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? pictureUnder({ clientX: x, clientY: y }) : undefined);
 	/*
