@@ -695,8 +695,12 @@ export function Stage(props: {
 		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
 	});
 	const markLive = (path: string, on: boolean) => {
-		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
+		// Counted first: a new `shownAt` can keep the board's page (`keptPages`), and its frame, put to
+		// sleep in that same update, says "off" at once. Counted after, that off found nothing to take
+		// away, the on landed after it, and the board stayed live with a sleeping page: a hole where its
+		// picture belongs, until a reload.
 		markLiveCount(path, on);
+		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
 	};
 	const markLiveCount = (path: string, on: boolean) =>
 		setLiveBoards((was) => {

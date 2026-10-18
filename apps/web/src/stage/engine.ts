@@ -39,6 +39,8 @@ const SHARPER_AFTER_MS = 250;
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
 const STAND_IN_TRIES = 50;
+/** How long to wait before asking again for a picture that did not load, each time it fails again. */
+const PICTURE_RETRY_MS = [2000, 5000, 15000, 30000, 60000];
 /**
  * How far past each edge of the window the canvas is drawn, in screen pixels. A pan slides the canvas
  * last drawn rather than drawing it again, until the window reaches its edge: drawing the whole window
@@ -88,7 +90,7 @@ export class StageEngine {
 	 * Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own
 	 * address for it, stand-in retries, and for a board's the copy's width (0: the whole picture).
 	 */
-	private picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number }>();
+	private picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number; failed?: number }>();
 	/** Fonts loaded, kept to give an engine started again after its device was lost. */
 	private fonts: Array<{ family: string; bytes: Uint8Array; fallback: boolean }> = [];
 	private iconsAsked = new Set<string>();
@@ -749,7 +751,14 @@ export class StageEngine {
 				this.draw();
 			})
 			.catch(() => {
-				/* Not reachable: drawn without it, as an empty place. */
+				// Not reachable now (a shot that failed, the network): drawn without it, as an empty place,
+				// and asked again later, a little longer each time, while nothing newer has been asked for.
+				const wait = PICTURE_RETRY_MS[asked.failed ?? 0];
+				if (wait === undefined) return;
+				asked.failed = (asked.failed ?? 0) + 1;
+				setTimeout(() => {
+					if (!this.disposed && this.picturesAsked.get(key) === asked) this.fetchPicture(key, url, board, asked.source, asked.size);
+				}, wait);
 			})
 			.finally(() => {
 				this.fetching--;

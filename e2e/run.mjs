@@ -179,6 +179,8 @@ const CHECKS = [
 	{ file: "item-pill.mjs", needsAgent: false },
 	{ file: "engine-slide.mjs", needsAgent: false },
 	{ file: "zoom-out-pictures.mjs", needsAgent: false },
+	/* Zoomed in for a moment and out again, no board is left to a page that went to sleep: each shows its picture. */
+	{ file: "live-pictures.mjs", needsAgent: false },
 	/*
 	 * What the stage draws with (`stage/backends/`), in Chromium and in WebKit as an iPhone: WebGL 2
 	 * with no WebGPU, the notice with neither, a lost context started again, and a board's picture
