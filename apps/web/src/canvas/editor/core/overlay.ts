@@ -222,12 +222,13 @@ export function hoverBox(input: HoverInput, scene: SceneQuery): HoverBox | undef
 }
 
 /**
- * Where the hovered block's grip goes: in the card's left margin, centred on the block's first
+ * Where the hovered block's grip goes, in edit mode: in the card's left margin, centred on the block's first
  * line as the layout sets it (`lineOf`, the page's measure: a heading's is taller than a paragraph's).
  */
-export function gripBox(input: { block?: string | undefined; busy: boolean }, scene: SceneQuery, lineOf: (id: string, node: PenNode) => { top: number; height: number }): GripBox | undefined {
+export function gripBox(input: { block?: string | undefined; busy: boolean; editing: boolean }, scene: SceneQuery, lineOf: (id: string, node: PenNode) => { top: number; height: number }): GripBox | undefined {
 	const id = input.block;
-	if (!id || input.busy) return undefined;
+	// A grip answers the pointer before a press: edit mode's, as the hover outline is.
+	if (!id || input.busy || !input.editing) return undefined;
 	const box = scene.box(id);
 	const node = scene.node(id);
 	if (!box || !node) return undefined;
@@ -272,7 +273,7 @@ export function deriveOverlay(input: OverlayInput, scene: SceneQuery): Overlay {
 	const handleInput = { editable: input.editable, drafting: input.drafting, resizing: input.resizing, drag: input.pointerDrag };
 	const busy = !!input.boardDrag || input.panning;
 	const hover = hoverBox({ editing: input.editing, item: input.hoverItem, typing: input.typing, board: input.hoverBoard, selected: input.selected, busy, boards: input.boards }, scene);
-	const grip = gripBox({ block: input.block, busy }, scene, input.lineOf);
+	const grip = gripBox({ block: input.block, busy, editing: input.editing }, scene, input.lineOf);
 	return {
 		outlines,
 		handles,

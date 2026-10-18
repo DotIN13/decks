@@ -63,10 +63,12 @@ test("press: what is under it is asked only when it decides", () => {
 	assert.equal(asked, 0, "Space asks nothing");
 });
 
-const hoverBase: HoverFacts = { pointer: "mouse", editable: true, drawing: false, onGrip: false, buttons: 0, tool: "select", target: "stage" };
+const hoverBase: HoverFacts = { pointer: "mouse", editable: true, editing: true, drawing: false, onGrip: false, buttons: 0, tool: "select", target: "stage" };
 const hovers: Array<[string, Partial<HoverFacts>, HoverAction]> = [
-	["a mouse over the stage: followed", {}, { do: "track" }],
-	["a pen over a drawn click shape: followed", { pointer: "pen", target: "drawn" }, { do: "track" }],
+	["a mouse over the stage: followed", {}, { do: "track", outlines: true }],
+	["a pen over a drawn click shape: followed", { pointer: "pen", target: "drawn" }, { do: "track", outlines: true }],
+	["browsing: followed for a link's hand only, nothing lit", { editing: false }, { do: "track", outlines: false }],
+	["browsing over a drawn click shape: the same", { editing: false, target: "drawn" }, { do: "track", outlines: false }],
 	["a finger: nothing", { pointer: "touch" }, { do: "none" }],
 	["a read-only stage: nothing", { editable: false }, { do: "none" }],
 	["the pen out: nothing", { drawing: true }, { do: "none" }],

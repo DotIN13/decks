@@ -2069,7 +2069,7 @@ export function Stage(props: {
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
 	const gripBox = createMemo(() => {
 		penDrawn();
-		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.boardDrag() || panning() }, scene, (id, node) => {
+		return gripBoxOf({ block: editor.hoverBlock(), busy: !!editor.boardDrag() || panning(), editing: props.mode === "edit" }, scene, (id, node) => {
 			// Centred on the block's first line, as the layout sets it: a heading's is taller than a paragraph's.
 			const look = editor.textEditing.lookOf(node, penLayer.placed.get(id));
 			return firstLine(parseMarkdown(String(node.content ?? ""))[0], look.size, look.line);

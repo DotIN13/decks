@@ -362,18 +362,21 @@ export function createPointer(editor: Editor, host: PointerHost) {
 
 	/**
 	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
-	 * what a press there would select. Edit mode only: browsing selects and edits the drawing all the
-	 * same, but without a line following the pointer about. A mouse or a pen with no button down, over
-	 * the drawing; a board says when it is under the pointer (`BoardFrame`), and anything else clears
-	 * the item's. Once per frame at most.
+	 * what a press there would select, and a card block's grip. Edit mode only (`decideHover`):
+	 * browsing selects and edits the drawing all the same, but nothing answers the pointer before a
+	 * press except the hand over a link. A mouse or a pen with no button down, over the drawing; a
+	 * board says when it is under the pointer (`BoardFrame`), and anything else clears the item's.
+	 * Once per frame at most.
 	 */
 	let hoverFrame: number | undefined;
 	let hoverAt: Pt | undefined;
 	let hoverPoint: Client | undefined;
+	let hoverLights = false;
 	const onHover = (event: PointerEvent) => {
 		const decided = decideHover({
 			pointer: event.pointerType === "touch" ? "touch" : event.pointerType === "pen" ? "pen" : "mouse",
 			editable: host.editable(),
+			editing: host.mode() === "edit",
 			drawing: host.drawing(),
 			// The pointer on a block's grip keeps the grip, and the block it belongs to.
 			onGrip: !!(event.target as Element | null)?.closest?.(".pen-grip"),
@@ -389,12 +392,16 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		}
 		hoverAt = worldAt(event);
 		hoverPoint = { clientX: event.clientX, clientY: event.clientY };
+		hoverLights = decided.outlines;
 		hoverFrame ??= requestAnimationFrame(() => {
 			hoverFrame = undefined;
 			const href = hoverAt ? host.linkAt(hoverAt) : undefined;
+			// Browsing, only the hand over a link: no grip, no outline.
+			if (!hoverLights) {
+				editor.hover({ link: !!href && host.mode() === "browse", block: undefined, item: undefined, picture: undefined });
+				return;
+			}
 			editor.hover({ link: !!href && host.mode() === "browse", block: hoverAt ? blockUnder(hoverAt) : undefined });
-			// The outline is edit mode's; browsing shows only the hand over a link.
-			if (host.mode() !== "edit") return;
 			const hit = hoverAt ? pickAtHere(hoverAt) : undefined;
 			// A board with no node says nothing when the pointer is over it, so the stage asks.
 			editor.hover({ item: hit && !editor.items().includes(hit.id) ? hit.id : undefined, picture: !hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined });

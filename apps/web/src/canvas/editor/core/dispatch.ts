@@ -110,6 +110,11 @@ export function decidePress(facts: PressFacts): PressAction {
 export type HoverFacts = {
 	pointer: PointerKind;
 	editable: boolean;
+	/**
+	 * Edit mode. Browsing, nothing answers the pointer before a press but a link's hand: no outline
+	 * round what is under it, no grip on a card's block, no distances.
+	 */
+	editing: boolean;
 	drawing: boolean;
 	/** Over a card block's grip. */
 	onGrip: boolean;
@@ -122,15 +127,16 @@ export type HoverFacts = {
 /**
  * What a hover does: nothing (a finger, a stage that cannot be edited, the pen out, or a grip,
  * which keeps itself and its block), clear what is lit (a button held, a tool armed, off the
- * canvas; the grip's block too when no button is held), or follow the pointer, once a frame.
+ * canvas; the grip's block too when no button is held), or follow the pointer, once a frame:
+ * for what it lights (`outlines`, edit mode) or only for a link's hand (browsing).
  */
-export type HoverAction = { do: "none" } | { do: "clear"; block: boolean } | { do: "track" };
+export type HoverAction = { do: "none" } | { do: "clear"; block: boolean } | { do: "track"; outlines: boolean };
 
 export function decideHover(facts: HoverFacts): HoverAction {
 	if (facts.pointer === "touch" || !facts.editable || facts.drawing) return { do: "none" };
 	if (facts.onGrip) return { do: "none" };
 	if (facts.buttons !== 0 || facts.tool !== "select" || !onCanvas(facts.target)) return { do: "clear", block: facts.buttons === 0 };
-	return { do: "track" };
+	return { do: "track", outlines: facts.editing };
 }
 
 /** A tap on a drawn item before this one. */

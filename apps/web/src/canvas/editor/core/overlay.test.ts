@@ -116,9 +116,11 @@ test("hover: the drawn box of an item in edit mode, else the board under the poi
 
 test("the grip sits level with the middle of the block's first line; the drop box is the frame's", () => {
 	const line = () => ({ top: 4, height: 24 });
-	assert.deepEqual(gripBox({ block: "block", busy: false }, scene, line), { id: "block", x: 620, y: 56 });
-	assert.equal(gripBox({ block: "block", busy: true }, scene, line), undefined);
-	assert.equal(gripBox({ busy: false }, scene, line), undefined);
+	assert.deepEqual(gripBox({ block: "block", busy: false, editing: true }, scene, line), { id: "block", x: 620, y: 56 });
+	assert.equal(gripBox({ block: "block", busy: true, editing: true }, scene, line), undefined);
+	assert.equal(gripBox({ busy: false, editing: true }, scene, line), undefined);
+	// Browsing, nothing answers the pointer before a press: no grip either.
+	assert.equal(gripBox({ block: "block", busy: false, editing: false }, scene, line), undefined);
 	assert.equal(gripHidden(none, false), false);
 	assert.equal(gripHidden({ dx: 0, dy: 2 }, false), true);
 	assert.equal(gripHidden(none, true), true);
