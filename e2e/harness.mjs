@@ -15,7 +15,7 @@
  * publish `window.__boardReady`, which is the thing to wait on.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { chromium, devices } from "playwright";
+import { chromium, devices, webkit } from "playwright";
 import { applyEdits } from "../packages/pen/src/diff.ts";
 
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
@@ -105,7 +105,7 @@ export function write(file, text) {
  * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
  * any more.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init } = {}) {
 	/*
 	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
 	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the renderer
@@ -115,7 +115,11 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 */
 	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
 	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
-	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu] });
+	/*
+	 * `engine: "webkit"` is Safari's engine, for what only a phone's browser does (no WebGPU, WebGL 2
+	 * in a worker): `backends.mjs`. It takes none of Chromium's flags.
+	 */
+	const browser = engine === "webkit" ? await webkit.launch() : await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
 	// `dpr` is a retina screen without a phone attached to it: a canvas renderer can be right
@@ -126,6 +130,8 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		? await browser.newContext({ ...descriptor })
 		: await browser.newContext({ viewport: { width, height }, ...(dpr ? { deviceScaleFactor: dpr } : {}) });
 	const page = await context.newPage();
+	/* `init` runs in the page before the app does, in every frame: to take an API away, say (`backends.mjs`). */
+	if (init) await page.addInitScript(init);
 	const errors = [];
 	page.on("pageerror", (error) => {
 		// The init script touches localStorage before the app has a chance to; that throw

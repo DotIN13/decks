@@ -179,6 +179,14 @@ const CHECKS = [
 	{ file: "item-pill.mjs", needsAgent: false },
 	{ file: "engine-slide.mjs", needsAgent: false },
 	{ file: "zoom-out-pictures.mjs", needsAgent: false },
+	/*
+	 * What the stage draws with (`stage/backends/`), in Chromium and in WebKit as an iPhone: WebGL 2
+	 * with no WebGPU, the notice with neither, a lost context started again, and a board's picture
+	 * fetched sharper when a zoom in outgrows its copy.
+	 */
+	{ file: "backends.mjs", needsAgent: false },
+	{ file: "context-loss.mjs", needsAgent: false },
+	{ file: "sharper-pictures.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/*
