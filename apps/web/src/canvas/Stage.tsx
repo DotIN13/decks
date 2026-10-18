@@ -60,6 +60,7 @@ import { untilReleased } from "./held.ts";
 import { springCurve } from "../app/spring.ts";
 import { lendFrame } from "./borrow.ts";
 import { StageEngine } from "../stage/engine.ts";
+import { blockAt, marqueePick, marqueeRect, pickAt as pickAtIn, pictureAt, type PickOptions } from "./editor/core/pick.ts";
 import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
 import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
 import { tsScene } from "./editor/scene-ts.ts";
@@ -652,6 +653,8 @@ export function Stage(props: {
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
 	const scene = tsScene(penLayer, () => props.pen?.doc, () => props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })));
+	/** The item a press at a stage point picks (`editor/core/pick.ts`, policy "outermost"; `deep` for the item itself). */
+	const pickAt = (at: { x: number; y: number }, options?: PickOptions) => pickAtIn(scene, at, options);
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
@@ -1464,11 +1467,11 @@ export function Stage(props: {
 	const wordsOf = (node: PenNode | undefined) => (!node ? undefined : isCard(node) ? cardMarkdown(node.children ?? []) : node.content);
 	/**
 	 * A press on a drawn item's click shape (`pen/layer.ts`). Only items over a board have one, to take
-	 * the press from the board's page; on bare canvas the press is the stage's and `hitTest` finds the item.
+	 * the press from the board's page; on bare canvas the press is the stage's and `pickAt` finds the item.
 	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
 	/** A press on something drawn, whether or not it lies over a board. */
-	const pressOnDrawn = (event: PointerEvent) => onDrawn(event.target) || (event.target === element && !!penLayer.hitTest(worldAt(event)));
+	const pressOnDrawn = (event: PointerEvent) => onDrawn(event.target) || (event.target === element && !!pickAt(worldAt(event)));
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
 	(globalThis as { __decksPenBox?: (id: string) => DOMRect | undefined }).__decksPenBox = (id) => {
 		const placed = penLayer.placed.get(id);
@@ -1526,17 +1529,7 @@ export function Stage(props: {
 	 * The board whose picture is under a point and that has no node of its own to take the press
 	 * (below the live zoom, `rendered`): the last in file order, as the sheet draws it on top.
 	 */
-	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => {
-		const at = worldAt(event);
-		const nodes = renderedPaths();
-		let top = -1;
-		for (const i of boardIndex().search({ x: at.x, y: at.y, w: 0, h: 0 })) {
-			const board = props.boards[i]!;
-			if (i <= top || nodes.has(board.path) || board.path === props.focus) continue;
-			if (at.x >= board.x && at.x <= board.x + board.w && at.y >= board.y && at.y <= board.y + board.h) top = i;
-		}
-		return top < 0 ? undefined : props.boards[top]!.path;
-	};
+	const pictureUnder = (event: { clientX: number; clientY: number }): string | undefined => pictureAt(props.boards, worldAt(event), renderedPaths(), props.focus);
 	/** For the file drop (`app/files.ts`): whether a board's picture, with no node to find, is under a point on screen. */
 	(globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt = (x, y) => (element ? pictureUnder({ clientX: x, clientY: y }) : undefined);
 	/*
@@ -2088,8 +2081,8 @@ export function Stage(props: {
 			return true;
 		}
 		// The group under the point, unless a double-click already selected the thing inside it.
-		const inner = penLayer.hitTest(at, { deep: true });
-		const hit = inner && penSelection().includes(inner.id) ? inner : penLayer.hitTest(at);
+		const inner = pickAt(at, { deep: true });
+		const hit = inner && penSelection().includes(inner.id) ? inner : pickAt(at);
 		if (hit) {
 			event.preventDefault();
 			props.onSelect(undefined);
@@ -2135,11 +2128,10 @@ export function Stage(props: {
 		}
 		setPenMarquee({ x1: at.x, y1: at.y, x2: at.x, y2: at.y });
 		const pick = (m: { x1: number; y1: number; x2: number; y2: number }) => {
-			const r = { x: Math.min(m.x1, m.x2), y: Math.min(m.y1, m.y2), w: Math.abs(m.x2 - m.x1), h: Math.abs(m.y2 - m.y1) };
-			const inside = (b: Box) => b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h;
+			const picked = marqueePick(scene, marqueeRect(m));
 			batch(() => {
-				setPenSelection([...new Set([...keptItems, ...penLayer.within(r)])]);
-				setBoardPicks([...new Set([...keptBoards, ...props.boards.filter(inside).map((board) => board.path)])]);
+				setPenSelection([...new Set([...keptItems, ...picked.items])]);
+				setBoardPicks([...new Set([...keptBoards, ...picked.boards])]);
 			});
 		};
 		follow(
@@ -2567,7 +2559,7 @@ export function Stage(props: {
 	 * and never the arrow whose end it is.
 	 */
 	const joinAt = (point: { x: number; y: number }, not?: string): { name: string; box: Box; side?: ArrowSide } | undefined => {
-		const hit = penLayer.hitTest(point, { skip: (node) => isArrow(node) || node.id === not });
+		const hit = pickAt(point, { skip: (node) => isArrow(node) || node.id === not });
 		const found = hit
 			? { name: hit.id, box: hit.box }
 			: (() => {
@@ -3856,7 +3848,7 @@ export function Stage(props: {
 			setBlockHover(hoverAt ? blockUnder(hoverAt) : undefined);
 			// The outline is edit mode's; browsing shows only the hand over a link.
 			if (props.mode !== "edit") return;
-			const hit = hoverAt ? penLayer.hitTest(hoverAt) : undefined;
+			const hit = hoverAt ? pickAt(hoverAt) : undefined;
 			setHoverId(hit && !penSelection().includes(hit.id) ? hit.id : undefined);
 			// A board with no node says nothing when the pointer is over it, so the stage asks.
 			setPictureHover(!hit && hoverAt && hoverPoint ? pictureUnder(hoverPoint) : undefined);
@@ -3869,17 +3861,7 @@ export function Stage(props: {
 	 * The text block of a card at a stage point: the one under it, or in the card's margin, the one
 	 * level with it. Not while the card is open for typing, which has its own way of moving things.
 	 */
-	const blockUnder = (at: { x: number; y: number }): string | undefined => {
-		const deep = penLayer.hitTest(at, { deep: true });
-		if (!deep) return undefined;
-		const card = isCard(deep.node) ? deep.node : cardOf(deep.id);
-		if (!card || penText()?.id === card.id) return undefined;
-		if (deep.node.id !== card.id) return isMarkdownText(deep.node) ? deep.id : undefined;
-		return (card.children ?? []).find((child) => {
-			const box = isMarkdownText(child) ? (penLayer.bounds.get(child.id) ?? penLayer.placed.get(child.id)?.box) : undefined;
-			return box && at.y >= box.y - 4 && at.y <= box.y + box.h + 4;
-		})?.id;
-	};
+	const blockUnder = (at: { x: number; y: number }): string | undefined => blockAt(scene, at, penText()?.id);
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
 	const gripBox = createMemo(() => {
 		penDrawn();
@@ -3973,7 +3955,7 @@ export function Stage(props: {
 	 */
 	const touchOnDrawing = (event: PointerEvent) => {
 		const at = worldAt(event);
-		const hit = penLayer.hitTest(at);
+		const hit = pickAt(at);
 		if (!hit) return;
 		const pointer = event.pointerId;
 		const from = { x: event.clientX, y: event.clientY };
@@ -4048,7 +4030,7 @@ export function Stage(props: {
 				return;
 			}
 			if (performance.now() - since > 600) return;
-			const deep = penLayer.hitTest(at, { deep: true });
+			const deep = pickAt(at, { deep: true });
 			// A film or a sound: a tap plays it or pauses it, and selects it as any tap does.
 			const playable = deep && mediaOf(deep.node) ? deep : mediaOf(hit.node) ? hit : undefined;
 			const media = playable ? mediaOf(playable.node) : undefined;
@@ -4117,7 +4099,7 @@ export function Stage(props: {
 			// The second press of a quick double-click on a tool's first item is not a request for a board.
 			if (performance.now() - penMadeAt < 500) return;
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
-			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
+			const hit = pickAt(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
 			// A film or a sound starts: a double-click is how a board is opened too, so it is the same gesture.
 			// A film or a sound: its first press already started it, so the second is only a press.
 			if (hit && mediaOf(hit.node)) {
@@ -4198,7 +4180,7 @@ export function Stage(props: {
 		 * A press on a board's picture, where the board has no node (below the live zoom): picked up and
 		 * moved as a press on its node does, unless a tool is armed or something drawn is over it.
 		 */
-		if (event.button === 0 && event.target === element && !spaceHeld() && !props.drawing && (!props.onPenEdit || penTool() === "select") && !penLayer.hitTest(worldAt(event))) {
+		if (event.button === 0 && event.target === element && !spaceHeld() && !props.drawing && (!props.onPenEdit || penTool() === "select") && !pickAt(worldAt(event))) {
 			const picture = pictureUnder(event);
 			if (picture) {
 				if (!props.onPenEdit || !dragBoard(picture, event, element)) selectBoard(picture);

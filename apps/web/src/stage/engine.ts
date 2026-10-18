@@ -11,16 +11,15 @@
  * engines once each.
  */
 import init, { PageEngine, openStage } from "@decks/stage";
-import { diff, expand, isCard, isMarkdownText, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../canvas/pen/font-files.ts";
 import { iconUrl, parseIcon } from "../canvas/pen/icons.ts";
-import { isFile, isLiveFile } from "../canvas/pen/card-frame.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
 import { boundsOf } from "../canvas/pen/bounds.ts";
 import { BoxIndex, type Rect } from "../canvas/spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
-import type { CardGeometry, FromWorker, LiveInk, PenHit, PenPreview, SceneBoard, ToWorker } from "./types.ts";
+import type { CardGeometry, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
@@ -768,7 +767,7 @@ export class StageEngine {
 
 	/**
 	 * One invisible shape per drawn item over a board, near the window: a press on it is the drawing's,
-	 * and one beside it reaches the board. On bare canvas the stage has the press and `hitTest` answers.
+	 * and one beside it reaches the board. On bare canvas the stage has the press and the editor's pick (`editor/core/pick.ts`) answers.
 	 */
 	private writeHits(): void {
 		const svg = this.hits;
@@ -873,53 +872,19 @@ export class StageEngine {
 	}
 
 	/**
-	 * The item under a stage point: the topmost the engine finds there. A press finds the outermost
-	 * group round what it hit, the way a design tool selects a group whole; `deep` finds the item
-	 * itself. Boards are not found here, and an item inside an instance is found as the instance.
+	 * Every item under a stage point, topmost first, with a press's reach round each so a thin line
+	 * can be hit: raw geometry, unfiltered. Which of them a press means is the editor's
+	 * (`canvas/editor/core/pick.ts`). Boards' own items are among them; nothing before a page.
 	 */
-	hitTest(point: { x: number; y: number }, options?: { deep?: boolean; skip?: (node: PenNode) => boolean }): PenHit | undefined {
-		if (!this.page) return undefined;
-		let best: Placed | undefined;
-		for (const id of JSON.parse(this.page.pickAll(point.x, point.y, (2 * BAND_PX) / this.camera.zoom)) as string[]) {
-			const placed = this.placed.get(id);
-			if (!placed) continue;
-			const { node } = placed;
-			if (node.id.includes("/") || node.type === "group") continue;
-			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
-			if (options?.skip?.(node)) continue;
-			// The reach is for lines: anything else is hit inside what it draws, so of two close shapes the nearer one wins.
-			if (node.type === "path") {
-				if (this.onPath(placed, point) === false) continue;
-			} else {
-				const box = this.bounds.get(node.id) ?? placed.box;
-				if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
-			}
-			best = placed;
-			break;
-		}
-		if (!best) return undefined;
-		if (!options?.deep) {
-			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
-				if (up.node.type === "group" || isShape(up.node) || isFile(up.node) || isLiveFile(up.node) || (isCard(up.node) && isMarkdownText(best.node))) best = up;
-			}
-		}
-		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };
+	pickAll(point: { x: number; y: number }): string[] {
+		if (!this.page) return [];
+		return JSON.parse(this.page.pickAll(point.x, point.y, (2 * BAND_PX) / this.camera.zoom)) as string[];
 	}
 
-	/** Every item wholly inside a stage rectangle, leaving out any whose parent is picked too: a marquee. */
-	within(r: Frame): string[] {
-		const inside = new Set<string>();
-		for (const [id, placed] of this.placed) {
-			const { node } = placed;
-			if (id.includes("/") || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
-			if (placed.parent && isShape(this.placed.get(placed.parent)?.node)) continue;
-			const box = this.bounds.get(id) ?? placed.box;
-			if (box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h) inside.add(id);
-		}
-		return [...inside].filter((id) => {
-			for (let parent = this.placed.get(id)?.parent; parent; parent = this.placed.get(parent)?.parent) if (inside.has(parent)) return false;
-			return true;
-		});
+	/** Whether a stage point is on what a path item draws (`onPath`); `undefined` for an item not placed or with no geometry. */
+	onLine(id: string, point: { x: number; y: number }): boolean | undefined {
+		const placed = this.placed.get(id);
+		return placed ? this.onPath(placed, point) : undefined;
 	}
 
 	private cardAt(point: { x: number; y: number }) {

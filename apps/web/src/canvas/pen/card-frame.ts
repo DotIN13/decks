@@ -1,6 +1,7 @@
 import { CARD, isCard, MARKDOWN, MEDIA, type Op, type PenNode } from "@decks/pen";
 import type { Tokens } from "marked";
 import { cardMarked, sizedAlt, toObsidian, type WikiToken } from "./card-syntax.ts";
+import { FILE, isFile, isLiveFile, LIVE_FILE } from "./file-kinds.ts";
 
 /**
  * A card as a frame of items (`@decks/pen`, `CARD`), and as the one piece of markdown it reads as.
@@ -40,8 +41,7 @@ export function markdownText(id: string, content: string): PenNode {
  * A file in the deck, as a piece: pen's own frame holding an icon and the file's name, marked
  * `metadata: { type: "decks.file", path }`, so pen.dev shows a chip and a card writes `![[path]]`.
  */
-export const FILE = "decks.file";
-export const isFile = (node: PenNode | undefined) => node?.type === "frame" && node.metadata?.type === FILE;
+export { FILE, isFile };
 export function fileItem(path: string, fresh: () => string): PenNode {
 	const name = path.split("/").pop() || path;
 	return {
@@ -109,8 +109,7 @@ export function fileCard(path: string, fresh: () => string, facts: { preview?: s
  * file's deck path, so pen.dev and a zoomed-out canvas show the still, and the stage puts the real
  * image under a hole in the sheet where it is (`Stage.tsx`, file items). A web page is a board.
  */
-export const LIVE_FILE = "decks.live-file";
-export const isLiveFile = (node: PenNode | undefined) => node?.metadata?.type === LIVE_FILE;
+export { LIVE_FILE, isLiveFile };
 /** How wide an SVG lands on the canvas. */
 export const LIVE_SVG_W = 480;
 

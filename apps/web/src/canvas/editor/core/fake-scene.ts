@@ -3,7 +3,10 @@ import type { PenNode, Placed } from "@decks/pen";
 import type { BoardBox, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
-export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown> };
+export type FakeItem = { id: string; box: Rect; parent?: string; type?: string; layout?: string; padding?: unknown; drawn?: Rect; extra?: Record<string, unknown>; line?: boolean };
+
+/** How far round its box a fake item is found under a point, as a press's reach is in the engine. */
+export const FAKE_REACH = 4;
 
 export function fakeScene(list: FakeItem[], boards: BoardBox[] = []): SceneQuery {
 	const nodes = new Map<string, PenNode>();
@@ -15,6 +18,21 @@ export function fakeScene(list: FakeItem[], boards: BoardBox[] = []): SceneQuery
 		item: (id) => placed.get(id),
 		box: (id) => list.find((one) => one.id === id)?.drawn ?? placed.get(id)?.box,
 		node: (id) => nodes.get(id),
+		parent: (id) => {
+			const up = placed.get(id)?.parent;
+			return up ? nodes.get(up) : undefined;
+		},
 		boards: () => boards,
+		// Topmost first: the last painted on top. Every box is found a little beyond its edge.
+		under: (point) =>
+			list
+				.filter((one) => {
+					const box = one.drawn ?? one.box;
+					return point.x >= box.x - FAKE_REACH && point.x <= box.x + box.w + FAKE_REACH && point.y >= box.y - FAKE_REACH && point.y <= box.y + box.h + FAKE_REACH;
+				})
+				.map((one) => one.id)
+				.reverse(),
+		// A fake line says whether the point is on it with `line`; anything else cannot tell.
+		onLine: (id) => list.find((one) => one.id === id)?.line,
 	};
 }
