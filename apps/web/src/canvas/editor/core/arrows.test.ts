@@ -94,8 +94,9 @@ test("a join slides along its side to a thousandth, clicking to the ends and mid
 	assert.equal(slideAt(box, "left", { x: 0, y: 10 }, { zoom: 1 }), 0.2);
 	assert.equal(slideAt(box, "left", { x: 0, y: 20 }, { zoom: 1 }), 0.5);
 	assert.equal(slideAt(box, "right", { x: 100, y: 99 }, { zoom: 1 }), 1);
-	// A side of no length: every stop is within reach, so it ends on the last, 1 (today's rule; free keeps the middle).
-	assert.equal(slideAt({ x: 0, y: 0, w: 0, h: 0 }, "top", { x: 5, y: 0 }, { zoom: 1 }), 1);
+	// A side of no length has one place on it, its middle: not the last stop every stop was in reach of.
+	assert.equal(slideAt({ x: 0, y: 0, w: 0, h: 0 }, "top", { x: 5, y: 0 }, { zoom: 1 }), 0.5);
+	assert.equal(slideAt({ x: 0, y: 0, w: 40, h: 0 }, "left", { x: 0, y: -3 }, { zoom: 1 }), 0.5);
 	assert.equal(slideAt({ x: 0, y: 0, w: 0, h: 0 }, "top", { x: 5, y: 0 }, { zoom: 1, free: true }), 0.5);
 });
 

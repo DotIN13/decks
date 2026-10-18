@@ -21,7 +21,7 @@ import { landingBoxes } from "./glide.ts";
 import type { BoardBox, EditorState, Mods, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox } from "./model.ts";
 import { boardMoves, copyOps, moveOps, type BoardMove, type NextId } from "./ops.ts";
 import { marqueePick, marqueeRect, pickAt, type Picked } from "./pick.ts";
-import { boardResizeEnd, boardResizeStep, shownBoardResize, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle, type RadiusStart } from "./resize.ts";
+import { boardResizeEnd, boardResizeStep, shownBoardResize, givenFor, hugAgainOp, keepsWords, radiusAt, radiusOp, resizeOp, resizePreview, resizeStep, sizeFloor, sizeNarrowest, type Handle, type RadiusStart } from "./resize.ts";
 import type { PreviewChange, SceneQuery } from "./scene.ts";
 import { readingTargets, selectionBox, SNAP_PX, snapTargets } from "./snapping.ts";
 
@@ -61,7 +61,7 @@ export type Gesture =
 	| ({ kind: "press" } & Carry)
 	| ({ kind: "move" } & Carry)
 	| { kind: "marquee"; from: Pt; kept: { items: readonly string[]; boards: readonly string[] } }
-	| { kind: "resize"; id: string; handle: Handle; start: Rect; given: Rect; words: boolean; floor: number; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean }
+	| { kind: "resize"; id: string; handle: Handle; start: Rect; given: Rect; words: boolean; floor: number; narrowest: number; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean }
 	| { kind: "radius"; start: Rect & RadiusStart & { id: string }; radius: number; moved: boolean }
 	| { kind: "arrowEnd"; id: string; which: Which; node: PenNode; metadata: Record<string, unknown>; stays: Pt; own?: JoinedEnd | undefined; slid?: { item: string; side: JoinedEnd["side"]; at: number } | undefined; moved: boolean }
 	| { kind: "arrowBend"; id: string; node: PenNode; route: ArrowHandles["route"]; start: NonNullable<ReturnType<typeof bendStart>>; next?: Record<string, unknown> | undefined; moved: boolean }
@@ -412,6 +412,7 @@ function pressHandle(state: EditorState, input: Input & PointerInput, scene: Sce
 					// A card as tall as its words stays that while only its sides are dragged.
 					words: keepsWords(node, input.handle),
 					floor: sizeFloor(node),
+					narrowest: sizeNarrowest(node),
 					targets: snapTargets(scene, [id], [], ctx.view),
 					from: input.at,
 					next: start,
@@ -465,7 +466,7 @@ function move(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Gestu
 			return done({ ...next, marquee: m }, [{ do: "panned" }]);
 		}
 		case "resize": {
-			const step = resizeStep(g.start, g.handle, { x: p.at.x - g.from.x, y: p.at.y - g.from.y }, { shift: p.mods.shift, free: isFree(p.mods) }, { targets: g.targets, threshold: SNAP_PX / ctx.zoom, floor: g.floor });
+			const step = resizeStep(g.start, g.handle, { x: p.at.x - g.from.x, y: p.at.y - g.from.y }, { shift: p.mods.shift, free: isFree(p.mods) }, { targets: g.targets, threshold: SNAP_PX / ctx.zoom, floor: g.floor, narrowest: g.narrowest });
 			const box = givenFor(g.start, g.given, step.box);
 			const resize: ResizeBox = { id: g.id, ...step.box, given: { x: box.x, y: box.y } };
 			return {

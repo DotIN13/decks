@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenNode } from "@decks/pen";
-import { BOARD_MIN, boardResizeEnd, boardResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, shownBoardResize, sizeFloor } from "./resize.ts";
+import { BOARD_MIN, boardResizeEnd, boardResizeStep, givenFor, handleEdges, hugAgainOp, hugsWords, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, shownBoardResize, sizeFloor, sizeNarrowest, CARD_MIN_W } from "./resize.ts";
 
 const node = (fields: Record<string, unknown>) => ({ id: "n", type: "frame", ...fields }) as unknown as PenNode;
 const card = (fields: Record<string, unknown> = {}) => node({ metadata: { type: "decks.card" }, ...fields });
@@ -39,13 +39,22 @@ test("the dragged edge snaps within the threshold, and draws a guide; ⌘ turns 
 	assert.equal(resizeStep({ x: 197, y: 0, w: 10, h: 10 }, "e", { x: 50, y: 0 }, {}, near).box.x, 197);
 });
 
-test("Shift on a corner keeps the shape after snapping, which can pull the snapped edge off its line", () => {
+test("Shift on a corner keeps the shape first and snaps after, so a snapped edge stays on its guide", () => {
 	const near = { targets: [{ x: 300, y: 110, w: 10, h: 10 }], threshold: 6 };
-	// The bottom snaps 107 → 110; then the larger scale (2.2) sets both, so the right edge is 220.
+	// The shape first (scale 2.14: 214 × 107), then the bottom snaps 107 → 110 and the right edge follows to 220.
 	const kept = resizeStep(box, "se", { x: 20, y: 57 }, { shift: true }, near);
 	assert.deepEqual(kept.box, { x: 0, y: 0, w: 220, h: 110 });
 	assert.equal(kept.guides.length, 1);
 	assert.equal(kept.guides[0]!.y1, 110);
+	/*
+	 * Snapping first used to lose this one: the bottom snapped 63 → 60, then the wider scale (1.6) took
+	 * it to 80, off the line its guide was drawn on. Now the shape comes first (160 × 80), the bottom snaps
+	 * 80 → 78, the right edge follows to 156, and the guide is where the edge is.
+	 */
+	const stays = resizeStep(box, "se", { x: 60, y: 13 }, { shift: true }, { targets: [{ x: 300, y: 60, w: 10, h: 18 }], threshold: 6 });
+	assert.deepEqual(stays.box, { x: 0, y: 0, w: 156, h: 78 });
+	assert.deepEqual(stays.guides.map((guide) => guide.y1), [78]);
+	assert.equal(stays.box.y + stays.box.h, stays.guides[0]!.y1);
 	// The right edge snaps 197 → 200 (scale 2); the bottom follows to 100.
 	assert.deepEqual(resizeStep(box, "se", { x: 97, y: 10 }, { shift: true }, { targets: [{ x: 200, y: 300, w: 10, h: 10 }], threshold: 6 }).box, { x: 0, y: 0, w: 200, h: 100 });
 	// The opposite corner stays put.
@@ -159,4 +168,25 @@ test("a document's resize shows it no shorter than its content, while the drag's
 	assert.deepEqual(shownBoardResize({ x: 0, y: 100, w: 760, h: 300 }, 642), { x: 0, y: 100, w: 760, h: 642 });
 	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 900 }, 642), { x: 0, y: 0, w: 760, h: 900 });
 	assert.deepEqual(shownBoardResize({ x: 0, y: 0, w: 760, h: 300 }, undefined), { x: 0, y: 0, w: 760, h: 300 });
+});
+
+test("a card is never narrower than 48, its least height, and the edge not dragged stays put", () => {
+	assert.equal(CARD_MIN_W, 48);
+	assert.equal(sizeNarrowest(card()), 48);
+	assert.equal(sizeNarrowest(undefined), 4);
+	// Dragged by its left edge to 10 wide: 48, the right edge still at 100.
+	assert.deepEqual(resizeStep(box, "w", { x: 90, y: 0 }, {}, { ...none, narrowest: 48 }).box, { x: 52, y: 0, w: 48, h: 50 });
+	// By its right edge, past its left: it does not flip.
+	assert.deepEqual(resizeStep(box, "e", { x: -150, y: 0 }, {}, { ...none, narrowest: 48 }).box, { x: 0, y: 0, w: 48, h: 50 });
+	// Anything else still flips.
+	assert.deepEqual(resizeStep(box, "e", { x: -150, y: 0 }, {}, none).box, { x: -50, y: 0, w: 50, h: 50 });
+});
+
+test("Shift on a board with no size to keep does not divide by it", () => {
+	const flat = { x: 0, y: 0, w: 0, h: 0 };
+	const step = boardResizeStep(flat, "se", { x: 500, y: 300 }, { shift: true }, none);
+	assert.deepEqual(step.box, { x: 0, y: 0, w: 500, h: 300 });
+	assert.ok(Object.values(step.box).every(Number.isFinite));
+	assert.ok(Object.values(boardResizeStep(flat, "se", { x: 500, y: 300 }, {}, { ...none, slides: true }).box).every(Number.isFinite));
+	assert.ok(Object.values(boardResizeStep(flat, "s", { x: 0, y: 300 }, {}, { ...none, slides: true }).box).every(Number.isFinite));
 });

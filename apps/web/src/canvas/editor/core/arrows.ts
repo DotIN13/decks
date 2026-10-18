@@ -149,7 +149,9 @@ export function routeDraft(scene: SceneQuery, metadata: Metadata, node: PenNode)
 export function slideAt(box: Rect, side: ArrowSide, point: Pt, options: { zoom: number; free?: boolean }): number {
 	const along = side === "top" || side === "bottom";
 	const length = along ? box.w : box.h;
-	let at = length > 0 ? (along ? point.x - box.x : point.y - box.y) / length : 0.5;
+	// A side of no length has one place on it: its middle.
+	if (!(length > 0)) return 0.5;
+	let at = (along ? point.x - box.x : point.y - box.y) / length;
 	at = Math.max(0, Math.min(1, at));
 	if (!options.free) for (const stop of [0, 0.5, 1]) if (Math.abs(at - stop) * length * options.zoom <= JOIN_SNAP_PX) at = stop;
 	return Math.round(at * 1000) / 1000;
