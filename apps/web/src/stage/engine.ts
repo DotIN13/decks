@@ -10,7 +10,7 @@
  * Fonts, pictures, icons and the markdown reader are the app's own, fetched here and handed to both
  * engines once each.
  */
-import init, { PageEngine, openStage } from "@decks/stage";
+import type { PageEngine } from "@decks/stage";
 import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../canvas/pen/font-files.ts";
@@ -21,11 +21,20 @@ import { BoxIndex, type Rect } from "../canvas/spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../canvas/editor/core/glide.ts";
 import type { CardGeometry, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
+import { detect, type Detected } from "./backends/detect.ts";
+import { noticeFor } from "./backends/notice.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
 /** The copies of a board's picture the server keeps (0 is the whole one), smallest that covers the board on screen. */
 const SMALL = [192, 480];
+/**
+ * A board's picture is fetched again, larger, once it is shown this much bigger than the copy held
+ * (a zoom in on a phone kept the first, small one, blurred): checked when the zoom has rested this
+ * long, so a pinch asks once at its end rather than at every step.
+ */
+const SHARPER_AT = 1.2;
+const SHARPER_AFTER_MS = 250;
 /** Pictures fetched at once, and a stand-in picture asked for again this often, this many times. */
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
@@ -75,15 +84,20 @@ export class StageEngine {
 	private viewState = { hidden: [] as string[], mute: [] as string[], holes: [] as string[], scrolls: {} as Record<string, number> };
 	private viewKey = "";
 	private fontsAsked = new Set<string>();
-	/** Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own address for it, and stand-in retries. */
-	private picturesAsked = new Map<string, { url: string; source: string; tries: number }>();
+	/**
+	 * Pictures fetched, by key: the address fetched (a board's may carry a size), the board's own
+	 * address for it, stand-in retries, and for a board's the copy's width (0: the whole picture).
+	 */
+	private picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number }>();
+	/** Fonts loaded, kept to give an engine started again after its device was lost. */
+	private fonts: Array<{ family: string; bytes: Uint8Array; fallback: boolean }> = [];
 	private iconsAsked = new Set<string>();
 	private fetching = 0;
 	private lifted = new Set<string>();
 	private sent = 0;
 	private shownSeen = 0;
-	/** A stage engine that could not start: the stage says so, rather than drawing nothing silently. */
-	failed: ((why: string) => void) | undefined;
+	/** A stage engine that could not start: the stage shows these words (`backends/notice.ts`) rather than drawing nothing silently. */
+	failed: ((notice: string) => void) | undefined;
 	/** After each new layout, so the stage can redraw a selection round what moved. */
 	drawn: (() => void) | undefined;
 	/** After each frame is on screen. */
@@ -121,11 +135,7 @@ export class StageEngine {
 		this.over = canvas;
 		if (!this.started) {
 			this.started = true;
-			void this.start(canvas).catch((error: unknown) => {
-				const why = String((error as Error)?.message ?? error);
-				console.error(`stage engine: ${why}`);
-				this.failed?.(why);
-			});
+			void this.start(canvas).catch((error: unknown) => this.fail(error));
 		}
 	}
 	private started = false;
@@ -136,36 +146,101 @@ export class StageEngine {
 	private workerBackend = "";
 	/** The widest and tallest a picture is kept (the device's limit, or 4096): bigger ones are resized. */
 	private maxPicture = 4096;
+	/** What this browser draws with (`backends/detect.ts`), found once. */
+	private detected: Detected | undefined;
+	/** Stops watching for the device to be lost. */
+	private unwatch: (() => void) | undefined;
+	/** The device is gone and nothing is drawn until the engine has started again. */
+	private paused = false;
+	private restarting = false;
+	/** Times the engine started again after its device was lost (WebGPU) or its context (WebGL 2). */
+	private restarts = 0;
+	/** The pictures put on the page engine, of boards and of fills: for checks. */
+	private picturesPut = 0;
+
+	private fail(error: unknown): void {
+		console.error(`stage engine: ${String((error as Error)?.message ?? error)}`);
+		this.failed?.(noticeFor(error));
+	}
 
 	private async start(over: HTMLCanvasElement): Promise<void> {
-		await init();
-		this.fitCanvases();
-		const gpu = await openStage(over, over.width, over.height);
+		const found = (this.detected ??= await detect());
+		const stage = await found.backend.load();
 		if (this.disposed) return;
+		this.fitCanvases();
+		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
+		if (this.disposed) return gpu.free();
 		this.backend = gpu.backend();
 		this.maxPicture = gpu.maxPictureSize();
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
 		const self = this;
 		(globalThis as { __decksEngine?: unknown }).__decksEngine = {
-			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture }),
+			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture, restarts: this.restarts, pictures: this.picturesPut, paused: this.paused }),
 			/** The boards a drag carries as their picture, and by how far. */
 			get carried() {
 				return { paths: new Set(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedBy };
 			},
 		};
-		this.page = new PageEngine(doc, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
+		this.page = new stage.PageEngine(doc, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
 		this.page.setMath(mathTypesetter());
+		this.paused = false;
 		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
-		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend });
+		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory });
+		for (const font of this.fonts) {
+			this.page.addFont(font.family, font.bytes, font.fallback);
+			this.post({ type: "font", name: font.family, bytes: font.bytes, fallback: font.fallback });
+		}
+		this.unwatch = found.backend.watch(over, { lost: () => this.lose(), restored: () => void this.restart(), isLost: () => this.page?.lost() ?? false });
+		this.viewKey = "";
+		this.sendView();
 		this.boardKey = "";
 		this.setBoards(this.boards);
 		this.laidOut();
 		this.needFonts();
 		this.draw();
+	}
+
+	/**
+	 * The device is gone (`backends/webgpu.ts`, `backends/webgl.ts`), or the worker's: nothing more
+	 * is drawn, and the engines are let go while their context is lost, so what they free is freed
+	 * on nothing. The drawing, the boards, the camera and the fonts stay here for `restart`.
+	 */
+	private lose(): void {
+		if (this.paused) return;
+		this.paused = true;
+		this.worker?.terminate();
+		this.worker = undefined;
+		this.page?.free();
+		this.page = undefined;
+		this.picturesAsked.clear();
+		this.iconsAsked.clear();
+		this.lifted.clear();
+		this.picturedKey = "";
+		this.carryingKey = "";
+		this.drawnAt = undefined;
+		this.shown = undefined;
+	}
+
+	/** Start both engines again on the same canvas, once its context is back. */
+	private async restart(): Promise<void> {
+		if (this.disposed || this.restarting || !this.over) return;
+		this.lose();
+		// The new engine watches its own device (`start`).
+		this.unwatch?.();
+		this.unwatch = undefined;
+		this.restarting = true;
+		this.restarts++;
+		try {
+			await this.start(this.over);
+		} catch (error) {
+			this.fail(error);
+		} finally {
+			this.restarting = false;
+		}
 	}
 
 	private post(message: ToWorker, transfer: Transferable[] = []): void {
@@ -186,11 +261,11 @@ export class StageEngine {
 					if (gone.length) this.post({ type: "dropped", keys: gone });
 				}
 				this.shownSeen = this.sent;
-				this.draw();
+				this.drawSoon();
 				break;
 			case "discarded":
 				this.page.forgetTiles(JSON.stringify(message.keys));
-				this.draw();
+				this.drawSoon();
 				break;
 			case "landed":
 				this.page.landed(JSON.stringify(message.ids));
@@ -205,6 +280,13 @@ export class StageEngine {
 				break;
 			case "error":
 				console.error(`stage render worker: ${message.message}`);
+				break;
+			case "failed":
+				this.fail(message.message);
+				break;
+			case "lost":
+				// The worker's device went: both start again, so the tiles and the page agree.
+				void this.restart();
 				break;
 			case "ready":
 				this.workerBackend = message.backend;
@@ -420,6 +502,10 @@ export class StageEngine {
 		if (!this.slides()) this.draw();
 		this.sendCamera();
 		this.wantBoardPictures();
+		if (camera.zoom !== this.sharperZoom) {
+			this.sharperZoom = camera.zoom;
+			this.sharperSoon();
+		}
 		// The click shapes follow the window: written again once it leaves the area they cover.
 		const w = this.hitWindow;
 		if (w && this.placedList.length) {
@@ -452,9 +538,24 @@ export class StageEngine {
 		this.post({ type: "camera", x, y, zoom, dpr: Math.min(2, devicePixelRatio || 1), width, height, moving: this.moving });
 	}
 
+	/**
+	 * Draw in the next frame, once, however many of the worker's messages come before it. The worker
+	 * posts tiles a few at a time, and a page busy with a pan takes them in a burst: drawing for each
+	 * drew the canvas fifteen times in three milliseconds, all in one frame (`engine-slide.mjs`).
+	 */
+	private drawSoon(): void {
+		if (this.drawQueued) return;
+		this.drawQueued = true;
+		requestAnimationFrame(() => {
+			this.drawQueued = false;
+			if (!this.disposed) this.draw();
+		});
+	}
+	private drawQueued = false;
+
 	/** Draw the canvas now, for the window and its slack: from a camera that left what was drawn, or when anything else changes. */
 	draw(): void {
-		if (!this.page || !this.view.width) return;
+		if (!this.page || !this.view.width || this.paused) return;
 		const at = this.drawRect();
 		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.moving);
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
@@ -552,8 +653,13 @@ export class StageEngine {
 		this.post({ type: "lift", ids: bent });
 	}
 
-	/** Fetch the pictures of the boards in view (and of live ones kept ready), at the size they are shown. */
-	private wantBoardPictures(): void {
+	/**
+	 * Fetch the pictures of the boards in view (and of live ones kept ready), at the size they are
+	 * shown. A board already fetched keeps its copy, unless `sharper` and it is now shown
+	 * `SHARPER_AT` times wider than that copy: then the next copy up is fetched, drawn over the old
+	 * one when it comes. Never a smaller one: a zoom out keeps the sharp copy it has.
+	 */
+	private wantBoardPictures(sharper = false): void {
 		if (!this.page || !this.view.width) return;
 		const dpr = Math.min(2, devicePixelRatio || 1);
 		const w = this.view.width / this.camera.zoom;
@@ -564,13 +670,32 @@ export class StageEngine {
 			if (!board.picture || (board.live && !board.ready)) continue;
 			if (board.x + board.w < left || board.x > left + w * 2 || board.y + board.h < top || board.y > top + h * 2) continue;
 			const key = `board:${board.path}`;
-			if (this.picturesAsked.has(key)) continue;
 			const need = board.w * this.camera.zoom * dpr;
-			const size = /^(https?:|\/)/.test(board.picture) ? (SMALL.find((one) => one >= need) ?? 0) : 0;
+			const sized = /^(https?:|\/)/.test(board.picture);
+			const asked = this.picturesAsked.get(key);
+			if (asked) {
+				// Held at a copy's size, and shown wider than it: the next one up, when the zoom rests.
+				if (!sharper || !sized || !asked.size || need <= asked.size * SHARPER_AT || asked.source !== board.picture) continue;
+				this.picturesAsked.delete(key);
+			}
+			const size = sized ? (SMALL.find((one) => one >= need) ?? 0) : 0;
 			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}` : board.picture;
-			this.fetchPicture(key, url, true, board.picture);
+			this.fetchPicture(key, url, true, board.picture, size);
 		}
 	}
+
+	/** Look for blurred boards (`wantBoardPictures`) once the zoom has stopped changing for `SHARPER_AFTER_MS`, and the camera moving. */
+	private sharperSoon(): void {
+		clearTimeout(this.sharperTimer);
+		this.sharperTimer = setTimeout(() => {
+			if (this.disposed) return;
+			if (this.moving) return this.sharperSoon();
+			this.wantBoardPictures(true);
+		}, SHARPER_AFTER_MS);
+	}
+	private sharperTimer: ReturnType<typeof setTimeout> | undefined;
+	/** The zoom the boards' pictures were last looked at for: a new one looks again (`sharperSoon`). */
+	private sharperZoom = 0;
 
 	// --- pictures, fonts, icons -----------------------------------------------------------------
 
@@ -585,8 +710,8 @@ export class StageEngine {
 		}
 	}
 
-	private fetchPicture(key: string, url: string, board: boolean, source = url): void {
-		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0 };
+	private fetchPicture(key: string, url: string, board: boolean, source = url, size?: number): void {
+		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0, size };
 		this.picturesAsked.set(key, asked);
 		if (this.fetching >= FETCHES) {
 			setTimeout(() => {
@@ -602,15 +727,17 @@ export class StageEngine {
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
 				const blob = await response.blob();
 				const { bitmap: forPage, width, height } = await this.picture(blob);
-				if (this.disposed || !this.page) return forPage.close();
+				// Asked again since (a sharper copy, an engine started again): this one is not wanted.
+				if (this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return forPage.close();
 				this.page.putPicture(key, forPage, width, height);
+				this.picturesPut++;
 				// A board's picture is drawn by the page alone; an image fill by the worker's tiles too.
 				if (!board) {
 					const { bitmap: forWorker } = await this.picture(blob);
 					this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
 					this.laidOut();
 				}
-				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source), STAND_IN_RETRY_MS);
+				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source, asked.size), STAND_IN_RETRY_MS);
 				this.draw();
 			})
 			.catch(() => {
@@ -678,13 +805,14 @@ export class StageEngine {
 				return undefined;
 			}),
 		).then((loaded) => {
+			// Kept first: an engine started again after a lost device is given them from here.
+			const fonts = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
+			this.fonts.push(...fonts);
 			if (!this.page) return;
 			// In the order the chain lists them, so fallbacks are tried in the app's order.
-			for (const one of loaded) {
-				if (!one) continue;
-				const fallback = isFallbackFamily(one.file.family);
-				this.page.addFont(one.file.family, one.bytes, fallback);
-				this.post({ type: "font", name: one.file.family, bytes: one.bytes, fallback });
+			for (const { family, bytes, fallback } of fonts) {
+				this.page.addFont(family, bytes, fallback);
+				this.post({ type: "font", name: family, bytes, fallback });
 			}
 			this.laidOut();
 			this.draw();
@@ -1027,6 +1155,8 @@ export class StageEngine {
 
 	dispose(): void {
 		this.disposed = true;
+		this.unwatch?.();
+		clearTimeout(this.sharperTimer);
 		this.worker?.terminate();
 		this.worker = undefined;
 		this.page?.free();

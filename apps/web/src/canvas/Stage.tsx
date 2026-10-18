@@ -637,7 +637,9 @@ export function Stage(props: {
 	 * pages (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
 	const penLayer = new StageEngine();
-	penLayer.failed = (why) => console.error(`The stage engine did not start: ${why}`);
+	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
+	const [engineNotice, setEngineNotice] = createSignal<string>();
+	penLayer.failed = (notice) => setEngineNotice(notice);
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
 	const sceneBoards = createMemo(() =>
@@ -2768,6 +2770,14 @@ export function Stage(props: {
 			onDblClick={editor.onDblClick}
 			style={{ cursor: spaceHeld() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
+			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
+			<Show when={engineNotice()}>
+				{(notice) => (
+					<div class="stage-notice" role="alert">
+						{notice()}
+					</div>
+				)}
+			</Show>
 			{/*
 			 * The focus view is a *sibling* of the world, and the world stays where it is.
 			 *

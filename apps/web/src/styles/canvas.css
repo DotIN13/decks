@@ -665,6 +665,26 @@
 	.stage-engine-over {
 	transform-origin: 0 0;
 }
+	/* The engine could not start (`stage/backends/notice.ts`): said once, centred over the empty stage, above the boards but under the chrome. */
+	.stage-notice {
+	position: absolute;
+	z-index: var(--z-float);
+	top: 50%;
+	left: 50%;
+	max-width: min(420px, calc(100% - 48px));
+	padding: 14px 18px;
+	transform: translate(-50%, -50%);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-panel, 12px);
+	background: var(--panel);
+	box-shadow: var(--shadow);
+	color: var(--fg);
+	font-size: var(--type-copy);
+	line-height: 1.45;
+	text-align: center;
+	text-wrap: balance;
+	pointer-events: none;
+}
 	.stage[data-engine] .board-node[data-dormant] > .surface {
 	background: transparent;
 }

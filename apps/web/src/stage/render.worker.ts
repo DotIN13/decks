@@ -1,10 +1,11 @@
 /**
  * The render worker: the Rust worker engine (`@decks/stage`), holding the same drawing as the page
- * by the same edits, painting the stage as 512-pixel tiles on its own WebGPU device and handing
- * each to the page as a picture. It never shows anything itself: the page lays the tiles in the
+ * by the same edits, painting the stage as 512-pixel tiles on its own device (the page's backend,
+ * from the same build: `backends/detect.ts`) and handing each to the page as a picture. It never shows anything itself: the page lays the tiles in the
  * same frame as the board pages, so the two cannot drift (`engine.ts`).
  */
-import init, { WorkerEngine, openOffscreen } from "@decks/stage";
+import type { WorkerEngine } from "@decks/stage";
+import { backendNamed } from "./backends/detect.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import type { FromWorker, ToWorker } from "./types.ts";
 
@@ -48,13 +49,16 @@ function report(): void {
 }
 
 async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void> {
-	await init();
-	const size = WorkerEngine.tileSize();
+	const chosen = backendNamed(message.backend);
+	const stage = await chosen.load();
+	const size = stage.WorkerEngine.tileSize();
 	const canvas = new OffscreenCanvas(size, size);
-	const gpu = await openOffscreen(canvas, size, size, message.backend || undefined);
+	const gpu = await stage.openOffscreen(canvas, size, size, chosen.name, message.lowMemory);
 	const backend = gpu.backend();
-	engine = new WorkerEngine(message.doc, message.dark);
+	engine = new stage.WorkerEngine(message.doc, message.dark);
 	engine.setGpu(gpu, canvas);
+	// A lost device or context: the page starts the worker again, with a new canvas.
+	chosen.watch(canvas, { lost: () => scope.postMessage({ type: "lost" }), restored: () => {}, isLost: () => engine?.lost() ?? false });
 	engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 	engine.setMath(mathTypesetter());
 	for (const one of early.splice(0)) take(one);
@@ -112,7 +116,7 @@ function take(message: ToWorker): void {
 
 scope.onmessage = ({ data }) => {
 	if (data.type === "init") {
-		void start(data).catch((error: unknown) => scope.postMessage({ type: "error", message: `the render worker did not start: ${String((error as Error)?.message ?? error)}` }));
+		void start(data).catch((error: unknown) => scope.postMessage({ type: "failed", message: `the render worker did not start: ${String((error as Error)?.message ?? error)}` }));
 		return;
 	}
 	take(data);

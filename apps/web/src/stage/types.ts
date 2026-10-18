@@ -62,8 +62,11 @@ export interface PenHit {
 
 /** Messages to the render worker (`render.worker.ts`). */
 export type ToWorker =
-	/** `backend` is the page's (`"webgpu"` or `"webgl2"`): the worker opens the same first. */
-	| { type: "init"; doc: string; dark: boolean; backend?: string }
+	/**
+	 * `backend` is the page's (`backends/detect.ts`): the worker loads the same build and opens the
+	 * same API. `lowMemory` is the page's guess too, so both draw with as many samples a pixel.
+	 */
+	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
 	| { type: "font"; name: string; bytes: Uint8Array; fallback: boolean }
@@ -85,4 +88,8 @@ export type FromWorker =
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }
 	| { type: "resync" }
-	| { type: "error"; message: string };
+	| { type: "error"; message: string }
+	/** The worker could not open a device: the stage shows the notice (`backends/notice.ts`). */
+	| { type: "failed"; message: string }
+	/** The worker's device or context was lost: the page starts both engines again. */
+	| { type: "lost" };
