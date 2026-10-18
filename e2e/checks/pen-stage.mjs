@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { API, deckState, editMode, open, resetStage, say, selectBoard, settle, socket } from "../harness.mjs";
+import { API, deckState, editMode, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -21,7 +21,7 @@ const until = async (test, ms = 8000) => {
 await resetStage();
 const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);

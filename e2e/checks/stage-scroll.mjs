@@ -10,7 +10,7 @@
  *
  * Needs no model: a card goes in over the wire, and the rest is one double-click.
  */
-import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -23,7 +23,7 @@ const until = async (test, ms = 8000) => {
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1200, height: 800 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);

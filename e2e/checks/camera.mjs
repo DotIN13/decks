@@ -1,5 +1,5 @@
 /** The camera, the embeds, and a file changed on disk reaching the frame. */
-import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, write } from "../harness.mjs";
+import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, write, rest } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -489,7 +489,7 @@ say(
  * the edge at half-pixel steps, since where the boundary falls depends on the zoom.
  */
 await page.keyboard.press("0");
-await settle(page, 900);
+await rest(page);
 const surface = await page.locator(".board-node .surface").first().boundingBox();
 const camNow = () => page.evaluate(() => getComputedStyle(document.querySelector(".world")).transform);
 const stuck = [];
@@ -516,7 +516,7 @@ say("a scroll landing on a board's outline pans the canvas", stuck.length === 0,
  * every document it has loaded, and none is started or stopped by the pan itself.
  */
 await page.keyboard.press("0");
-await settle(page, 900);
+await rest(page);
 await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
 await page.keyboard.press("1");
 await settle(page, 5000);
@@ -556,7 +556,8 @@ for (let i = 0; i < 20 && (await page.evaluate(() => document.querySelector(".st
 	await zoomOut();
 	await page.waitForTimeout(350);
 }
-await settle(page, 1500);
+// The wait for every page to go dormant is the poll below; this is only for the zoom to land.
+await rest(page);
 const sleeping = () => page.evaluate((paths) => paths.map((path) => {
 	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
 	// The selected board stays live at any zoom, so it is the one that is not dormant.

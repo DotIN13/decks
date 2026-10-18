@@ -14,7 +14,7 @@
  *
  * Needs no model: every stage here is made the way a drawing makes one, over the socket.
  */
-import { open, resetStage, say, settle, socket } from "../harness.mjs";
+import { open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -27,7 +27,7 @@ const until = async (test, ms = 8000) => {
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1500, height: 1000 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 
 const link = await socket();
 const focused = await until(() => link.last("agents")?.focused);

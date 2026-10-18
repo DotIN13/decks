@@ -4,7 +4,7 @@
  * the drop arrives it goes back into the tiles (`engine.ts`, `settle`), so the page stops drawing it
  * and the worker paints the margin and the overview again.
  */
-import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -17,7 +17,7 @@ const until = async (test, ms = 8000) => {
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 const cam = await page.evaluate(() => globalThis.__decksRust.camera);

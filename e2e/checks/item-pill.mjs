@@ -5,7 +5,7 @@
  * pill over it used to sit 10 px above the item, on top of the top one, so a press there opened no
  * arrow. While those handles show, the pill sits clear of them with 6 px between.
  */
-import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -18,7 +18,7 @@ const until = async (test, ms = 8000) => {
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);

@@ -7,11 +7,11 @@
  * came back. A picture is now let go only when the board's own address changes, and the old one is
  * drawn until the new one arrives.
  */
-import { liveZoom, open, resetStage, say, settle } from "../harness.mjs";
+import { liveZoom, open, resetStage, say, settle, rest } from "../harness.mjs";
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 say("the boards are live pages to start", await liveZoom(page));
 await page.waitForFunction(() => window.__decksRust?.page, null, { timeout: 15000 });
 // Long enough for every live board's picture to be fetched and kept ready.

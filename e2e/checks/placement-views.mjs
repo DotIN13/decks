@@ -13,7 +13,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { deckState, newAgent, open, say, settle, socket, WEB } from "../harness.mjs";
+import { deckState, newAgent, open, say, settle, socket, WEB, rest } from "../harness.mjs";
 
 const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 150)); } };
 const deck = await deckState();
@@ -26,7 +26,7 @@ const boards = () => doc().children.filter((n) => n.type === "browser").map((n) 
 say("agent A's stage file", existsSync(file), file);
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 const newest = boards().at(-1);
 say("A's stage has a newest board", !!newest, JSON.stringify(newest));
 

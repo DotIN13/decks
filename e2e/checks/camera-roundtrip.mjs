@@ -5,7 +5,7 @@
  * it while they were away. This reads the camera itself at each step of the round trip, so the
  * answer is a number rather than an impression.
  */
-import { open, resetStage, say, settle, socket } from "../harness.mjs";
+import { open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 10000) => {
 	const deadline = Date.now() + ms;
@@ -18,7 +18,7 @@ const until = async (test, ms = 10000) => {
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
-await settle(page, 1500);
+await rest(page, { start: 0 });
 const link = await socket();
 const focused = await until(() => link.last("agents")?.focused);
 
