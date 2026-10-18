@@ -669,7 +669,9 @@ export function Stage(props: {
 	 * a 2 to 10% zoom were what every recorded crash had in common.
 	 */
 	/** The board the action pill is for: the selected one, while it is on the canvas. */
-	const calloutBoard = createMemo(() => (props.selected ? props.boards.find((board) => board.path === props.selected) : undefined));
+	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
+	const groupPicked = () => editor.boardPicks().length + editor.items().length > 1;
+	const calloutBoard = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
 	/**
 	 * Boards whose documents are showing, by how many of their frames say so: the sheet is a hole
 	 * over each of them, and the board's picture everywhere else. A count and not a set, so a frame
@@ -1221,20 +1223,28 @@ export function Stage(props: {
 	 */
 	const radiusHandle = createMemo(() => radiusHandleOf(penHandles(), { editable: !!props.onPenEdit, resizing: !!editor.resize(), drag: editor.drag() }, scene));
 	/**
-	 * The drawn items the same pill is for, when no board has it: the selection's box together, and what
-	 * to call it. Not while one is typed into (its editor has its own toolbar) or drawn with the pen.
+	 * The drawn items the same pill is for, when no board has it, or a group picked together, boards
+	 * among them: the box round all of it, and what to call it. Not while one is typed into (its
+	 * editor has its own toolbar) or drawn with the pen.
 	 */
 	const calloutItems = createMemo(() => {
-		if (props.selected || props.drawing || !props.onPenEdit || editor.text()) return undefined;
-		const outlines = penOutlines().filter((one) => one.id && !one.id.startsWith("board:"));
-		if (!outlines.length || outlines.length !== editor.items().length) return undefined;
-		const x = Math.min(...outlines.map((one) => one.x));
-		const y = Math.min(...outlines.map((one) => one.y));
-		const box = { x, y, w: Math.max(...outlines.map((one) => one.x + one.w)) - x, h: Math.max(...outlines.map((one) => one.y + one.h)) - y };
+		if ((props.selected && !groupPicked()) || props.drawing || !props.onPenEdit || editor.text()) return undefined;
+		const all = penOutlines().filter((one) => one.id);
+		const outlines = all.filter((one) => !one.id.startsWith("board:"));
+		const boards = all.length - outlines.length;
+		if (outlines.length !== editor.items().length || boards !== editor.boardPicks().length || !all.length) return undefined;
+		const x = Math.min(...all.map((one) => one.x));
+		const y = Math.min(...all.map((one) => one.y));
+		const box = { x, y, w: Math.max(...all.map((one) => one.x + one.w)) - x, h: Math.max(...all.map((one) => one.y + one.h)) - y };
 		const ids = outlines.map((one) => one.id);
 		const words = ids.map((id) => quoteOf(penLayer.placed.get(id)?.node)).filter(Boolean).join(" / ").slice(0, 160);
 		const first = penLayer.placed.get(ids[0]!)?.node;
-		const name = ids.length > 1 ? `${ids.length} items` : (words || (typeof first?.name === "string" ? first.name : first?.type) || "item");
+		const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+		const name = boards
+			? [count(boards, "board"), ids.length ? count(ids.length, "item") : ""].filter(Boolean).join(", ")
+			: ids.length > 1
+				? `${ids.length} items`
+				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
 		return { box, ids, words, name };
 	});
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
@@ -2966,20 +2976,24 @@ export function Stage(props: {
 						camera={props.camera}
 						view={view()}
 						onOpen={() => pushCamera(frame([items().box]))}
-						onComment={() =>
-							setCommenting({
-								// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
-								path: stagePenPath() ?? "the canvas",
-								items: items().ids,
-								quote: items().words,
-								title: items().name,
-								open: true,
-								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
-							})
-						}
-						onDuplicate={() => penDuplicate()}
-						onProperties={() => setPenSheet(true)}
-						onDelete={() => penDeleteSelected()}
+						// What acts on drawn items: a group of boards alone has only Open.
+						{...(items().ids.length
+							? {
+									onComment: () =>
+										setCommenting({
+											// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
+											path: stagePenPath() ?? "the canvas",
+											items: items().ids,
+											quote: items().words,
+											title: items().name,
+											open: true,
+											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+										}),
+									onDuplicate: () => penDuplicate(),
+									onProperties: () => setPenSheet(true),
+									onDelete: () => penDeleteSelected(),
+								}
+							: {})}
 					/>
 				)}
 			</Show>

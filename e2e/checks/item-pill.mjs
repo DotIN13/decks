@@ -68,6 +68,42 @@ const both = await page.evaluate(() => ({ anchors: document.querySelectorAll(".p
 const top = Math.min(box.y, two.y);
 say("two selected have no handles, and the pill sits 10 px above them", both.anchors === 0 && Math.abs(top - both.pill - 10) < 1.5, JSON.stringify({ ...both, top }));
 
+// A group with a board in it: one pill, over the whole group, not over the board or the items alone.
+const press = await page.evaluate(() => {
+	for (const one of window.__decksBoards()) {
+		const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
+		const r = node.getBoundingClientRect();
+		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
+			const x = r.x + r.width * fx;
+			const y = r.y + r.height * fy;
+			const at = document.elementFromPoint(x, y);
+			if (x > 60 && x < 1340 && y > 90 && y < 860 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button"))
+				return { x, y, path: node.dataset.path, rect: { x: r.x, y: r.y, right: r.right, bottom: r.bottom } };
+		}
+	}
+});
+say("a board is on screen to add", !!press);
+if (press) {
+	await page.keyboard.down("Shift");
+	await page.mouse.click(press.x, press.y);
+	await page.keyboard.up("Shift");
+	await settle(page, 400);
+	const group = await page.evaluate(() => {
+		const pills = [...document.querySelectorAll(".stage > .board-callout:not([data-hidden])")];
+		const r = pills[0]?.getBoundingClientRect();
+		return { pills: pills.length, label: pills[0]?.getAttribute("aria-label") ?? pills[0]?.querySelector("[aria-label]")?.getAttribute("aria-label"), bottom: r?.bottom, middle: r && (r.left + r.right) / 2 };
+	});
+	const left = Math.min(box.x, two.x, press.rect.x);
+	const right = Math.max(box.x + box.width, two.x + two.width, press.rect.right);
+	const groupTop = Math.min(top, press.rect.y);
+	const middle = (left + right) / 2;
+	say(
+		"a group with a board has one pill, 10 px above the whole group and centred on it",
+		group.pills === 1 && Math.abs(groupTop - group.bottom - 10) < 1.5 && Math.abs(group.middle - middle) < 2,
+		JSON.stringify({ ...group, groupTop, middle }),
+	);
+}
+
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 link.close?.();
 await browser.close();
