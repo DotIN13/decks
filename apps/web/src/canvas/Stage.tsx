@@ -48,7 +48,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { insertPanel, PEN_TOOL_KEYS, penIcon, penLive, penSelection, penShape, penTool, setInsertPanel, setPenBoxes, setPenLive, setPenSelection, setPenSheet, setPenTool, setPenTyping, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMiddle, arrowPoints, arrowRoute, arrowShape, arrowStyle, baseTheme, isShape, mediaOf, makeLabel, makeShape, maxRadius, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, ARROW_SIDES, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowMiddle, arrowPoints, arrowRoute, arrowShape, arrowStyle, baseTheme, isShape, mediaOf, makeLabel, makeShape, SHAPES, shapeKind, shapeLabel, shapeRadius, sidePoint, type ArrowSide, color, fillsOf, isArrow, CARD, isCard, isMarkdown, isMarkdownText, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { CARD_PALETTE, firstLine, NOTE_RADIUS, pageFont } from "./pen/look.ts";
 import { isPhone } from "../camera/camera.ts";
 import { CardEditor } from "./pen/CardEditor.tsx";
@@ -63,6 +63,7 @@ import { StageEngine } from "../stage/engine.ts";
 import { blockAt, marqueePick, marqueeRect, pickAt as pickAtIn, pictureAt, type PickOptions } from "./editor/core/pick.ts";
 import { dropSlot as dropSlotIn, frameAt as frameAtIn, frameUnder as frameUnderIn } from "./editor/core/drop.ts";
 import { selectionBox as selectionBoxIn, SNAP_PX, snapTargets as snapTargetsIn } from "./editor/core/snapping.ts";
+import { boardResizeEnd, boardResizeStep, givenFor, HANDLES, hugAgainOp, keepsWords, radiusAt, radiusOp, radiusStart, resizeOp, resizePreview, resizeStep, sizeFloor, type Handle } from "./editor/core/resize.ts";
 import { tsScene } from "./editor/scene-ts.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
@@ -2172,91 +2173,43 @@ export function Stage(props: {
 		return true;
 	};
 
-	/** The eight handles round a single selection, by the edges each one moves. */
-	const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
 	/**
-	 * A double-click on a frame's or a card's top or bottom handle: it hugs what it holds again, with
-	 * the floor it had (`fit_content(N)`), or 120 for a frame and 48 for a card when it had none. A
-	 * drag of either edge is what fixed its height; this undoes it.
+	 * A double-click on a frame's or a card's top or bottom handle: it hugs what it holds again
+	 * (`editor/core/resize.ts`, `hugAgainOp`).
 	 */
-	const hugAgain = (handle: (typeof HANDLES)[number]) => {
-		if (handle !== "n" && handle !== "s") return;
+	const hugAgain = (handle: Handle) => {
 		const id = penHandles()?.id;
-		const node = id ? penNode(id) : undefined;
-		if (!id || !node || node.type !== "frame" || isShape(node)) return;
-		const had = typeof node.height === "string" ? /^fit_content\(\s*([\d.]+)\s*\)$/.exec(node.height)?.[1] : undefined;
-		const floor = had ? Number(had) : isCard(node) ? 48 : 120;
-		penEdit([{ op: "update", id, set: { height: `fit_content(${floor})` } }]);
+		const op = id ? hugAgainOp(id, penNode(id), handle) : undefined;
+		if (op) penEdit([op]);
 	};
-	const resizeFrom = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
+	/** An item's handle dragged: the pointer loop is here, each move's box is `resizeStep` (`editor/core/resize.ts`). */
+	const resizeFrom = (event: PointerEvent, handle: Handle) => {
 		const box = penHandles();
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
 		event.stopPropagation();
 		const { id } = box;
 		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
-		/*
-		 * A card that is as tall as its words keeps being that while only its sides are dragged: the
-		 * width goes in the file and the layout measures the words again. The top and bottom handles
-		 * are what pin a height on it, and a corner pins one too, since it drags an edge of each.
-		 */
-		const words = hugsWords(id) && !handle.includes("n") && !handle.includes("s");
 		const node = penLayer.placed.get(id)?.node;
-		// Nothing smaller than a card's own padding, which would be a card with no room for a word in it.
-		const floor = node && (isMarkdown(node) || isCard(node)) ? NOTE_PAD * 2 : 4;
-		/*
-		 * The handles are on what the item draws; the file sizes the box it was given. For most items
-		 * they are the same box. For a path drawn in a corner of its viewBox they are not, and the
-		 * given box is scaled by as much as the drawn one, about the same point.
-		 */
+		// A card as tall as its words stays that while only its sides are dragged.
+		const words = keepsWords(node, handle);
+		const floor = sizeFloor(node);
 		const given = penLayer.placed.get(id)?.box ?? start;
-		const givenFor = (drawn: { x: number; y: number; w: number; h: number }) => {
-			const sx = start.w > 0 ? drawn.w / start.w : 1;
-			const sy = start.h > 0 ? drawn.h / start.h : 1;
-			return { x: drawn.x - (start.x - given.x) * sx, y: drawn.y - (start.y - given.y) * sy, w: given.w * sx, h: given.h * sy };
-		};
 		let next = start;
 		const targets = snapTargets([id], []);
-		const edges = [
-			...(handle.includes("w") ? (["x1"] as const) : []),
-			...(handle.includes("e") ? (["x2"] as const) : []),
-			...(handle.includes("n") ? (["y1"] as const) : []),
-			...(handle.includes("s") ? (["y2"] as const) : []),
-		];
 		const from = worldAt(event);
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
-				const dx = now.x - from.x;
-				const dy = now.y - from.y;
-				let x1 = start.x + (handle.includes("w") ? dx : 0);
-				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
-				let y1 = start.y + (handle.includes("n") ? dy : 0);
-				let y2 = start.y + start.h + (handle.includes("s") ? dy : 0);
-				// The edges being dragged snap to what is around, unless ⌘ or Ctrl is held.
-				let lines: Guide[] = [];
-				if (!(e.metaKey || e.ctrlKey)) {
-					const snapped = penLayer.snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
-					({ x1, y1, x2, y2 } = snapped.box);
-					lines = snapped.guides;
-				}
-				setGuides(lines);
-				// Shift keeps the shape: the wider of the two changes sets both.
-				if (e.shiftKey && handle.length === 2 && start.w > 0 && start.h > 0) {
-					const scale = Math.max((x2 - x1) / start.w, (y2 - y1) / start.h);
-					if (handle.includes("w")) x1 = x2 - start.w * scale;
-					else x2 = x1 + start.w * scale;
-					if (handle.includes("n")) y1 = y2 - start.h * scale;
-					else y2 = y1 + start.h * scale;
-				}
-				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(floor, Math.round(Math.abs(y2 - y1))) };
-				const box = givenFor(next);
-				const step = { id, ...next, given: { x: box.x, y: box.y } };
-				setPenResize(step);
-				// A card's height is left out, so the drawing re-measures its words at the new width.
-				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, ...(words ? {} : { h: box.h }) }]]));
-				resizeSteps.push({ mark: penLayer.mark(), resize: step });
+				const step = resizeStep(start, handle, { x: now.x - from.x, y: now.y - from.y }, { shift: e.shiftKey, free: e.metaKey || e.ctrlKey }, { targets, threshold: SNAP_PX / localCamera.zoom, floor });
+				setGuides(step.guides);
+				next = step.box;
+				const box = givenFor(start, given, next);
+				const resize = { id, ...next, given: { x: box.x, y: box.y } };
+				setPenResize(resize);
+				penLayer.preview(new Map<string, PenPreview>([[id, resizePreview(given, box, words)]]));
+				resizeSteps.push({ mark: penLayer.mark(), resize });
 			},
 			(moved) => {
 				setGuides([]);
@@ -2265,12 +2218,8 @@ export function Stage(props: {
 					if (secondTap(`size:${id}:${handle}`)) hugAgain(handle);
 					return;
 				}
-				const box = givenFor(next);
-				const r = (n: number) => Math.round(n * 10) / 10;
-				// A card still following its words: its width alone, and no height written.
 				settleGesture();
-				if (words) return penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w) } }]);
-				penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w), y2: r(box.y + box.h) } }]);
+				penEdit([resizeOp(id, givenFor(start, given, next), words)]);
 			},
 		);
 	};
@@ -2292,10 +2241,8 @@ export function Stage(props: {
 		follow(
 			event,
 			(e) => {
-				const now = worldAt(e);
-				// Along the diagonal from the corner: the nearer of the two reaches, so a pull across rounds as much as a pull down.
-				const reach = Math.min(now.x - start.x, now.y - start.y);
-				radius = Math.max(0, Math.min(Math.round(reach), Math.floor(start.most)));
+				// Along the diagonal from the corner (`editor/core/resize.ts`, `radiusAt`).
+				radius = radiusAt(start, worldAt(e));
 				setPenRadius({ id: start.id, radius });
 				penLayer.preview(new Map<string, PenPreview>([[start.id, { dx: 0, dy: 0, radius }]]));
 			},
@@ -2307,24 +2254,12 @@ export function Stage(props: {
 				}
 				setPenRadius((was) => (was ? { ...was, done: true } : was));
 				holdUntilSaved();
-				if (!start.shape) return penEdit([{ op: "update", id: start.id, set: { cornerRadius: radius <= 0 ? null : radius } }]);
-				const node = penLayer.placed.get(start.id)?.node;
-				penEdit([{ op: "update", id: start.id, set: { metadata: { type: "", ...node?.metadata, radius } } }]);
+				penEdit([radiusOp(start.id, radius, start.shape, penLayer.placed.get(start.id)?.node)]);
 			},
 		);
 	};
 
 
-	/**
-	 * A markdown card as tall as its words, which is how one starts: no `height` of its own, so the
-	 * layout measures what it says at whatever width it has. Dragging its top or bottom handle pins a
-	 * height on it, and from then on it is an ordinary box — the properties panel is how it gets its
-	 * words' height back.
-	 */
-	const hugsWords = (id: string | undefined) => {
-		const node = id ? penLayer.placed.get(id)?.node : undefined;
-		return !!node && (isMarkdown(node) || isCard(node)) && typeof node.height !== "number";
-	};
 	/**
 	 * Where the player sits, while something is playing: the item's own drawn box.
 	 *
@@ -2368,16 +2303,8 @@ export function Stage(props: {
 		const box = penHandles();
 		if (!box || penResize() || penDrag().dx !== 0 || penDrag().dy !== 0 || !props.onPenEdit) return undefined;
 		const node = penLayer.placed.get(box.id)?.node;
-		if (!node) return undefined;
-		const most = maxRadius(box.w, box.h);
-		if (most < 2) return undefined;
-		const shape = shapeRadius(node);
-		if (shape !== undefined) return { ...box, radius: shape, most, shape: true };
 		// A library shape with no corners to round (a terminator, an arrow) has no handle: its outline would ignore it.
-		if (isShape(node) || (node.type !== "rectangle" && node.type !== "frame")) return undefined;
-		const set = Array.isArray(node.cornerRadius) ? node.cornerRadius[0] : node.cornerRadius;
-		const now = typeof set === "number" && Number.isFinite(set) ? set : 0;
-		return { ...box, radius: Math.max(0, Math.min(now, most)), most, shape: false };
+		return node ? radiusStart(node, box) : undefined;
 	});
 	/**
 	 * The drawn items the same pill is for, when no board has it: the selection's box together, and what
@@ -2404,8 +2331,7 @@ export function Stage(props: {
 	 * moves it if a left or top edge was dragged, and writes the size to its file. A slide deck's
 	 * height follows from its aspect, so it is sized by its width alone.
 	 */
-	const BOARD_MIN = { w: 320, h: 200 };
-	const resizeBoard = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
+	const resizeBoard = (event: PointerEvent, handle: Handle) => {
 		const box = boardHandles();
 		if (event.button !== 0 || !box) return;
 		event.preventDefault();
@@ -2413,49 +2339,15 @@ export function Stage(props: {
 		const { path, slides } = box;
 		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
 		const targets = snapTargets([], [path]);
-		const edges = [
-			...(handle.includes("w") ? (["x1"] as const) : []),
-			...(handle.includes("e") ? (["x2"] as const) : []),
-			...(!slides && handle.includes("n") ? (["y1"] as const) : []),
-			...(!slides && handle.includes("s") ? (["y2"] as const) : []),
-		];
 		let next = start;
 		const from = worldAt(event);
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
-				const dx = now.x - from.x;
-				const dy = now.y - from.y;
-				let x1 = start.x + (handle.includes("w") ? dx : 0);
-				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
-				let y1 = start.y + (!slides && handle.includes("n") ? dy : 0);
-				let y2 = start.y + start.h + (!slides && handle.includes("s") ? dy : 0);
-				let lines: Guide[] = [];
-				if (!(e.metaKey || e.ctrlKey)) {
-					const snapped = penLayer.snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
-					({ x1, y1, x2, y2 } = snapped.box);
-					lines = snapped.guides;
-				}
-				setGuides(lines);
-				if (!slides && e.shiftKey && handle.length === 2) {
-					const scale = Math.max((x2 - x1) / start.w, (y2 - y1) / start.h);
-					if (handle.includes("w")) x1 = x2 - start.w * scale;
-					else x2 = x1 + start.w * scale;
-					if (handle.includes("n")) y1 = y2 - start.h * scale;
-					else y2 = y1 + start.h * scale;
-				}
-				// Never smaller than a board can be: the edge being dragged stops, the other stays put.
-				if (x2 - x1 < BOARD_MIN.w) {
-					if (handle.includes("w")) x1 = x2 - BOARD_MIN.w;
-					else x2 = x1 + BOARD_MIN.w;
-				}
-				if (!slides && y2 - y1 < BOARD_MIN.h) {
-					if (handle.includes("n")) y1 = y2 - BOARD_MIN.h;
-					else y2 = y1 + BOARD_MIN.h;
-				}
-				const w = Math.round(x2 - x1);
-				next = { x: Math.round(x1), y: Math.round(y1), w, h: slides ? Math.round((start.h * w) / start.w) : Math.round(y2 - y1) };
+				const step = boardResizeStep(start, handle, { x: now.x - from.x, y: now.y - from.y }, { shift: e.shiftKey, free: e.metaKey || e.ctrlKey }, { targets, threshold: SNAP_PX / localCamera.zoom, slides });
+				setGuides(step.guides);
+				next = step.box;
 				setBoardResize({ path, ...next });
 			},
 			(moved) => {
@@ -2464,8 +2356,9 @@ export function Stage(props: {
 					setBoardResize(undefined);
 					return;
 				}
-				if (next.x !== start.x || next.y !== start.y) props.onMove(path, next.x, next.y);
-				if (next.w !== start.w || next.h !== start.h) props.onResize?.(path, { w: next.w, h: next.h });
+				const { move, size } = boardResizeEnd(start, next);
+				if (move) props.onMove(path, move.x, move.y);
+				if (size) props.onResize?.(path, size);
 				// The box is let go of when the board is at it, or after a moment if the file settles elsewhere.
 				const rev = props.boards.find((candidate) => candidate.path === path)?.rev ?? 0;
 				const held = { path, ...next, released: { rev } };

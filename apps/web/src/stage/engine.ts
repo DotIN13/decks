@@ -15,7 +15,7 @@ import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../canvas/pen/font-files.ts";
 import { iconUrl, parseIcon } from "../canvas/pen/icons.ts";
-import { snapEdges, snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
+import { snapMove, type Box, type Guide } from "../canvas/pen/snap.ts";
 import { boundsOf } from "../canvas/pen/bounds.ts";
 import { BoxIndex, type Rect } from "../canvas/spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
@@ -934,10 +934,6 @@ export class StageEngine {
 
 	snapMove(moving: Box, targets: readonly Box[], threshold: number): { dx: number; dy: number; guides: Guide[] } {
 		return snapMove(moving, targets, threshold);
-	}
-
-	snapEdges(box: { x1: number; y1: number; x2: number; y2: number }, edges: ReadonlyArray<"x1" | "x2" | "y1" | "y2">, targets: readonly Box[], threshold: number) {
-		return snapEdges(box, edges, targets, threshold);
 	}
 
 	dispose(): void {
