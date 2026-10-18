@@ -260,7 +260,8 @@ export class StageEngine {
 					const gone = JSON.parse(this.page.evict()) as Array<[number, number, number]>;
 					if (gone.length) this.post({ type: "dropped", keys: gone });
 				}
-				this.shownSeen = this.sent;
+				// On screen with the next frame's one draw, however many batches come before it.
+				this.seenAtDraw = this.sent;
 				this.drawSoon();
 				break;
 			case "discarded":
@@ -544,18 +545,25 @@ export class StageEngine {
 	 * drew the canvas fifteen times in three milliseconds, all in one frame (`engine-slide.mjs`).
 	 */
 	private drawSoon(): void {
-		if (this.drawQueued) return;
-		this.drawQueued = true;
-		requestAnimationFrame(() => {
-			this.drawQueued = false;
+		if (this.drawFrame) return;
+		this.drawFrame = requestAnimationFrame(() => {
+			this.drawFrame = 0;
 			if (!this.disposed) this.draw();
 		});
 	}
-	private drawQueued = false;
+	private drawFrame = 0;
+	/** What had been sent when the tiles that arrived last were asked for: shown once they are drawn. */
+	private seenAtDraw = 0;
 
 	/** Draw the canvas now, for the window and its slack: from a camera that left what was drawn, or when anything else changes. */
 	draw(): void {
 		if (!this.page || !this.view.width || this.paused) return;
+		// A draw now is the one a batch of tiles asked for in the next frame.
+		if (this.drawFrame) {
+			cancelAnimationFrame(this.drawFrame);
+			this.drawFrame = 0;
+		}
+		this.shownSeen = Math.max(this.shownSeen, this.seenAtDraw);
 		const at = this.drawRect();
 		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.moving);
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
@@ -1155,6 +1163,7 @@ export class StageEngine {
 
 	dispose(): void {
 		this.disposed = true;
+		cancelAnimationFrame(this.drawFrame);
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
 		this.worker?.terminate();

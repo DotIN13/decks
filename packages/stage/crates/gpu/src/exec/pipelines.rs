@@ -5,7 +5,7 @@
 use stage_render::batch::{Instance, Vertex};
 use std::collections::HashMap;
 
-/// The pipelines for one colour format.
+/// The pipelines for one colour format and sample count.
 pub struct Set {
 	pub shape: wgpu::RenderPipeline,
 	pub erase: wgpu::RenderPipeline,
@@ -19,9 +19,10 @@ pub struct Pipelines {
 	pub picture_layout: wgpu::BindGroupLayout,
 	layout: wgpu::PipelineLayout,
 	module: wgpu::ShaderModule,
-	/// Samples a pixel in every pass.
+	/// The most samples a pixel any pass draws with (4, or 1 on a device short of memory or of
+	/// samples). A draw with no triangles draws with one: see [`crate::exec::draw::samples_for`].
 	pub samples: u32,
-	sets: HashMap<wgpu::TextureFormat, Set>,
+	sets: HashMap<(wgpu::TextureFormat, u32), Set>,
 }
 
 impl Pipelines {
@@ -45,23 +46,23 @@ impl Pipelines {
 		Pipelines { frame_layout, picture_layout, layout, module, samples, sets: HashMap::new() }
 	}
 
-	/// Make the pipelines for drawing into `format`, once.
-	pub fn prepare(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
-		if !self.sets.contains_key(&format) {
-			let set = self.build(device, format);
-			self.sets.insert(format, set);
+	/// Make the pipelines for drawing into `format` with `samples` samples a pixel, once.
+	pub fn prepare(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, samples: u32) {
+		if !self.sets.contains_key(&(format, samples)) {
+			let set = self.build(device, format, samples);
+			self.sets.insert((format, samples), set);
 		}
 	}
 
-	/// The pipelines for `format`, made by [`prepare`](Self::prepare).
-	pub fn get(&self, format: wgpu::TextureFormat) -> &Set {
-		&self.sets[&format]
+	/// The pipelines for `format` and `samples`, made by [`prepare`](Self::prepare).
+	pub fn get(&self, format: wgpu::TextureFormat, samples: u32) -> &Set {
+		&self.sets[&(format, samples)]
 	}
 
-	fn build(&self, device: &wgpu::Device, format: wgpu::TextureFormat) -> Set {
+	fn build(&self, device: &wgpu::Device, format: wgpu::TextureFormat, samples: u32) -> Set {
 		let blend = Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING);
 		let target = [Some(wgpu::ColorTargetState { format, blend, write_mask: wgpu::ColorWrites::ALL })];
-		let multisample = wgpu::MultisampleState { count: self.samples, mask: !0, alpha_to_coverage_enabled: false };
+		let multisample = wgpu::MultisampleState { count: samples, mask: !0, alpha_to_coverage_enabled: false };
 		let instance_attrs = wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4];
 		let instances = [Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<Instance>() as u64, step_mode: wgpu::VertexStepMode::Instance, attributes: &instance_attrs })];
 		let strip = wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleStrip, ..Default::default() };

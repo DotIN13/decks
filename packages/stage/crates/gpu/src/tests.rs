@@ -226,6 +226,78 @@ fn one_sample_draws() {
 	assert!(!one.lost());
 }
 
+/// A list with no triangles is drawn with one sample even on a device with four: its shapes, clips,
+/// layers and shadows come out as they do with four, since each carries its own soft edge.
+#[test]
+fn one_sample_draws_what_four_do() {
+	use stage_paint::list::{Affine, Align, Clip, Paint, Shape};
+	let Some(mut g) = gpu() else { return };
+	let solid = |c: [f32; 4]| Paint::Solid(Color::straight(c, 1.0));
+	let draw = |g: &mut Gpu, triangle: bool| {
+		g.texture(1, TextureKind::Color, 200, 200, None);
+		let mut list = DrawList::new(Color([1.0, 1.0, 1.0, 1.0]));
+		let sq = |w: f32| Shape { w, h: w, radii: [6.0; 4], ellipse: false };
+		list.push(Op::PushLayer { opacity: 0.5 });
+		list.push(Op::Shape { shape: sq(40.0), transform: Affine::translate(10.3, 10.7), paint: solid([0.0, 0.0, 0.0, 1.0]), stroke: None });
+		list.push(Op::PopLayer);
+		// Turned a third of the way round: edges across the pixel grid.
+		list.push(Op::Shape { shape: sq(50.0), transform: Affine([0.866, 0.5, -0.5, 0.866, 90.0, 10.0]), paint: solid([0.8, 0.1, 0.1, 1.0]), stroke: Some((3.0, Align::Center)) });
+		list.push(Op::PushClip(Clip { shape: Shape { w: 40.0, h: 40.0, radii: [0.0; 4], ellipse: true }, transform: Affine::translate(110.5, 110.5) }));
+		list.push(Op::Shape { shape: sq(80.0), transform: Affine::translate(100.0, 100.0), paint: solid([0.0, 0.6, 0.0, 1.0]), stroke: None });
+		list.push(Op::PopClip);
+		list.push(Op::Shadow { shape: sq(50.0), transform: Affine::translate(20.0, 120.0), color: Color::straight([0.0, 0.0, 0.0, 0.5], 1.0), blur: 12.0, spread: 0.0 });
+		list.push(Op::Shape { shape: Shape { w: 30.0, h: 20.0, radii: [0.0; 4], ellipse: true }, transform: Affine::translate(25.5, 125.25), paint: solid([0.2, 0.3, 0.9, 1.0]), stroke: None });
+		if triangle {
+			// Nothing to see, but a triangle: the list is drawn with four samples.
+			list.push(Op::Mesh { vertices: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], indices: vec![0, 1, 2], transform: Affine::translate(0.0, 0.0), paint: solid([1.0, 1.0, 1.0, 0.0]) });
+		}
+		let mut next = LAYER_IDS;
+		let built = Built::build(&list, &mut next, &HashMap::new(), 200, 200);
+		let samples = draw::samples_for(&built, g.pipelines.samples);
+		g.draw(Target::Texture(1), &list);
+		(g.read(1).unwrap(), samples)
+	};
+	let (one, n) = draw(&mut g, false);
+	let (four, m) = draw(&mut g, true);
+	assert_eq!((n, m), (1, 4), "samples without and with a triangle");
+	save("one-sample", &one, 200, 200);
+	save("four-samples", &four, 200, 200);
+	let worst = one.iter().zip(&four).map(|(a, b)| a.abs_diff(*b)).max().unwrap();
+	assert!(worst <= 3, "the most a channel differs is {worst}");
+}
+
+/// What one page frame costs the card: the window and its slack covered in 512-pixel tiles, drawn
+/// as the page draws them. `cargo test -p stage-gpu --release page_frame_cost -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn page_frame_cost() {
+	let Some(mut g) = gpu() else { return };
+	for (name, w, h) in [("1440x900 window @2x", 4160u32, 3080u32), ("2560x1440 window @2x", 6400, 4160)] {
+		g.texture(1, TextureKind::Color, w, h, None);
+		let mut tiles = 0;
+		let pixels = vec![200u8; (TILE * TILE * 4) as usize];
+		for t in 0..64u32 {
+			g.texture(100 + t, TextureKind::Color, TILE, TILE, Some(&pixels));
+		}
+		let mut list = DrawList::new(Color::TRANSPARENT);
+		for y in 0..h.div_ceil(TILE) {
+			for x in 0..w.div_ceil(TILE) {
+				list.push(Op::Picture { texture: 100 + (tiles % 64), x: (x * TILE) as f32, y: (y * TILE) as f32, w: TILE as f32, h: TILE as f32, uv: [0.0, 0.0, 1.0, 1.0], opacity: 1.0 });
+				tiles += 1;
+			}
+		}
+		g.draw(Target::Texture(1), &list);
+		g.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+		let n = 20;
+		let started = std::time::Instant::now();
+		for _ in 0..n {
+			g.draw(Target::Texture(1), &list);
+			g.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+		}
+		eprintln!("{name}: {tiles} tiles, {:.2} ms a frame", started.elapsed().as_secs_f64() * 1000.0 / n as f64);
+	}
+}
+
 /// Buffers, the table and layer textures are kept between draws: a picture drawn after bigger and
 /// smaller ones, into the same textures, comes out as on a device that drew nothing before.
 #[test]
