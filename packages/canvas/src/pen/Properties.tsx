@@ -40,7 +40,7 @@ import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
 import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
-import { isPhone } from "../../camera/camera.ts";
+import { isPhone } from "../camera/camera.ts";
 import { penBoxes, penSelection, penSheet, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../state/pen-tools.ts";
 import { Icon } from "../ui/icons.tsx";
 import { ColorPicker } from "./ColorPicker.tsx";

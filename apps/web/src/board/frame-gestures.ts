@@ -1,13 +1,13 @@
-import { deltaToBoard, type FrameAt, pointFromBoard } from "../camera/coords.ts";
+import { deltaToBoard, type FrameAt, pointFromBoard } from "@decks/canvas/camera/coords.ts";
 import { typingInto } from "./Editor.ts";
-import { type ZoomKey, zoomKey } from "../canvas/zoom-keys.ts";
-import { type SlideAction, slideKey } from "../canvas/lib/slide-keys.ts";
+import { type ZoomKey, zoomKey } from "@decks/canvas/zoom-keys.ts";
+import { type SlideAction, slideKey } from "@decks/canvas/lib/slide-keys.ts";
 import { noteCameraMove } from "./pan-signal.ts";
-import type { Finger, TouchStep } from "../canvas/touch.ts";
-import { untilReleased } from "../canvas/held.ts";
+import type { Finger, TouchStep } from "@decks/canvas/touch.ts";
+import { untilReleased } from "@decks/canvas/held.ts";
 
-export type { FrameGestureHost } from "../canvas/frame-host.ts";
-import type { FrameGestureHost } from "../canvas/frame-host.ts";
+export type { FrameGestureHost } from "@decks/canvas/frame-host.ts";
+import type { FrameGestureHost } from "@decks/canvas/frame-host.ts";
 
 /**
  * @param place Where the board's top-left corner is, in world coordinates — including the

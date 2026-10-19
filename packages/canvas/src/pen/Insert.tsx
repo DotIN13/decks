@@ -1,7 +1,7 @@
 import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
 import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { isPhone } from "../../camera/camera.ts";
+import { isPhone } from "../camera/camera.ts";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../state/pen-tools.ts";
 import { Icon } from "../ui/icons.tsx";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "./icon-index.ts";

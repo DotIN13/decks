@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
-import { morphFrame, type WorldBox } from "../camera/morph.ts";
+import { morphFrame, type WorldBox } from "@decks/canvas/camera/morph.ts";
 import { moveCamera } from "../state/camera.ts";
-import { springCurve } from "../canvas/lib/spring.ts";
+import { springCurve } from "@decks/canvas/lib/spring.ts";
 
 let flight = 0;
 

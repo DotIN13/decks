@@ -1,7 +1,7 @@
 import type { Board, Camera } from "@decks/protocol";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { toScreen, type Viewport } from "../camera/camera.ts";
-import { canvasBox } from "../camera/insets.ts";
+import { toScreen, type Viewport } from "./camera/camera.ts";
+import { canvasBox } from "./camera/insets.ts";
 import { canvasHost } from "./host.ts";
 import { Icon } from "./ui/icons.tsx";
 import Copy from "lucide-solid/icons/copy";

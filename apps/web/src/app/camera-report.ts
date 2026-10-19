@@ -1,5 +1,5 @@
 import type { Camera } from "@decks/protocol";
-import { canvasBox } from "../camera/insets.ts";
+import { canvasBox } from "@decks/canvas/camera/insets.ts";
 import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";

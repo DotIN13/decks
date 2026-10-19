@@ -1,4 +1,4 @@
-import { touchedCanvas } from "../camera/touched.ts";
+import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
@@ -11,11 +11,11 @@ import { Icon } from "./ui/icons.tsx";
 import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
-import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
-import { canvasBox, insets } from "../camera/insets.ts";
+import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
+import { canvasBox, insets } from "./camera/insets.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
-import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
+import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import { zoomKey } from "./zoom-keys.ts";
@@ -28,7 +28,7 @@ import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import type { SceneBoard } from "../stage/types.ts";
+import type { SceneBoard } from "./stage/types.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
@@ -41,7 +41,7 @@ import { parseMarkdown } from "./pen/markdown.ts";
 import { untilReleased } from "./held.ts";
 import { springCurve } from "./lib/spring.ts";
 import { lendFrame } from "./borrow.ts";
-import { StageEngine } from "../stage/engine.ts";
+import { StageEngine } from "./stage/engine.ts";
 import {
 	ANCHOR_OUT,
 	ANCHOR_PX,

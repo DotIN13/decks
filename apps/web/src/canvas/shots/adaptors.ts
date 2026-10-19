@@ -2,7 +2,7 @@ import { api } from "../../connections/connection.ts";
 import type { Board } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { thumbUrl } from "../../lib/api.ts";
-import { canvasPixelRatio, drawScale, elementContext, hasElementGeometry } from "../picture.ts";
+import { canvasPixelRatio, drawScale, elementContext, hasElementGeometry } from "@decks/canvas/picture.ts";
 import { snapshotOf } from "./snapshot.ts";
 
 /**

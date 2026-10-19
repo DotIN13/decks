@@ -1,5 +1,5 @@
 /**
- * The stage draws on what a browser has (`apps/web/src/stage/backends/`): WebGL 2 where there is no
+ * The stage draws on what a browser has (`packages/canvas/src/stage/backends/`): WebGL 2 where there is no
  * WebGPU, in Chromium and in WebKit as an iPhone; and where there is neither, it says so.
  *
  * - `navigator.gpu` taken away: the page and its render worker open WebGL 2 (the `pkg-gl` build),

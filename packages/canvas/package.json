@@ -1,0 +1,35 @@
+{
+	"name": "@decks/canvas",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and one mount function for any host",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*"
+	},
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test \"src/**/*.test.ts\"",
+		"demo": "vite demo"
+	},
+	"dependencies": {
+		"@decks/board-kit": "*",
+		"@decks/pen": "*",
+		"@decks/protocol": "*",
+		"@decks/stage": "*",
+		"highlight.js": "^11.12.0",
+		"lucide-solid": "^1.37.0",
+		"marked": "^15.0.12",
+		"mathjax-full": "^3.2.2",
+		"solid-js": "^1.9.14"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.0",
+		"@webgpu/types": "^0.1.74",
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3",
+		"vite": "^7.1.9",
+		"vite-plugin-solid": "^2.11.10"
+	}
+}

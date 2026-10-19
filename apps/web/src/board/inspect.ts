@@ -234,5 +234,5 @@ export function applyLive(shape: Shape, edit: Edit): boolean {
 /** Whether a file's extension is one the PDF page-range field applies to. */
 export const isPdf = (path: string | undefined) => /\.pdf(\?|#|$)/i.test(path ?? "");
 
-import { cssEscape } from "../canvas/lib/css-escape.ts";
+import { cssEscape } from "@decks/canvas/lib/css-escape.ts";
 export { cssEscape };

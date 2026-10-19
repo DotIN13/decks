@@ -1,5 +1,5 @@
 import type { Board, Camera, StageCall } from "@decks/protocol";
-import { boxOf, fit } from "../camera/camera.ts";
+import { boxOf, fit } from "./camera/camera.ts";
 
 /**
  * What the browser does when an agent asks something of the canvas.

@@ -8,7 +8,7 @@ import X from "lucide-solid/icons/x";
 import LayoutDashboard from "lucide-solid/icons/layout-dashboard";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import type { StageRow } from "@decks/protocol";
-import { Icon } from "./ui/icons.tsx";
+import { Icon } from "@decks/canvas/ui/icons.tsx";
 import { searchStages } from "../state/stages.ts";
 import { AgentFace } from "../agents/AgentPill.tsx";
 

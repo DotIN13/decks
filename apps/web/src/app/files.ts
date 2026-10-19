@@ -1,10 +1,10 @@
 import { onCleanup, onMount } from "solid-js";
 import type { BoardPatch } from "@decks/protocol";
-import { toWorld } from "../camera/camera.ts";
+import { toWorld } from "@decks/canvas/camera/camera.ts";
 import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
 import { CARD, MEDIA } from "@decks/pen";
-import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "../canvas/pen/card-frame.ts";
+import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "@decks/canvas/pen/card-frame.ts";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";

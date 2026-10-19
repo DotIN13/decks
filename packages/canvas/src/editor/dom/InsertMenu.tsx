@@ -13,7 +13,7 @@ import FilePlus from "lucide-solid/icons/file-plus";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Presentation from "lucide-solid/icons/presentation";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
-import { stagePoint } from "../../../camera/coords.ts";
+import { stagePoint } from "../../camera/coords.ts";
 import { canvasHost } from "../../host.ts";
 import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";

@@ -21,7 +21,7 @@
  * another, and Settings can say which of the two is happening.
  */
 
-import type { RendererChoice } from "../canvas/lib/renderer.ts";
+import type { RendererChoice } from "@decks/canvas/lib/renderer.ts";
 export type { RendererChoice };
 
 export const RENDERERS: Array<{ id: RendererChoice; label: string; note: string }> = [

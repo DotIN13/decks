@@ -3,7 +3,7 @@
  * knows `stage/engine.ts` exists.
  */
 import { indexOf, type PenDocument } from "@decks/pen";
-import type { StageEngine } from "../../stage/engine.ts";
+import type { StageEngine } from "../stage/engine.ts";
 import type { BoardBox } from "./core/model.ts";
 import type { EngineSeam, SceneQuery } from "./core/scene.ts";
 

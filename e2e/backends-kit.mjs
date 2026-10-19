@@ -12,7 +12,7 @@ export const TARGETS = [
 	{ label: "WebKit iPhone 15 Pro", slug: "webkit-iphone", open: { engine: "webkit", device: "iPhone 15 Pro" } },
 ];
 
-/** `apps/web/src/stage/backends/notice.ts`, word for word. */
+/** `packages/canvas/src/stage/backends/notice.ts`, word for word. */
 export const NOTICE_TEXT = "This browser can't draw the stage: it needs WebGPU or WebGL 2.";
 
 /** No WebGPU on the page: the worker is told the page's backend and opens the same. */

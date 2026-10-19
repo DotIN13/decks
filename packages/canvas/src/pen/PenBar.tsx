@@ -1,5 +1,5 @@
 import type { PenDocument } from "@decks/pen";
-import { isPhone } from "../../camera/camera.ts";
+import { isPhone } from "../camera/camera.ts";
 import type { LucideIcon } from "lucide-solid";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
