@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, onCleanup } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { StageBoardProps } from "./board-slot.ts";
 
 /**
@@ -31,6 +31,19 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 		props.view.select();
 	};
 	const live = () => props.mounted && props.page !== undefined;
+	/*
+	 * Whether the page takes the pointer (`canvas.css`, `iframe:not([data-wired])`): once it has
+	 * loaded, and only while the board is selected, the way a design tool treats an embed. A
+	 * host's page is usually from another origin, so unlike `BoardFrame` nothing here can reach
+	 * into it to hand a wheel or a pinch back to the stage; an unselected board stays a picture
+	 * to the pointer, so scrolling over it pans and a press picks it (or moves it), and the
+	 * first press on a selected one goes to the page.
+	 */
+	const [loaded, setLoaded] = createSignal(false);
+	createEffect(() => {
+		if (!live()) setLoaded(false);
+	});
+	const interactive = () => live() && loaded() && props.selected;
 	/*
 	 * The stage's sheet draws a board's picture until the board says its page is showing
 	 * (`onLive`), and again once it is gone: said on the page's load, and when it is unmounted.
@@ -68,12 +81,16 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 					{props.board.title}
 				</div>
 			</Show>
-			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !live() && press(event)}>
+			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !interactive() && press(event)}>
 				<Show when={live()}>
 					<iframe
 						class="plain-board-page"
 						src={props.page}
-						onLoad={() => say(live())}
+						onLoad={() => {
+							setLoaded(true);
+							say(live());
+						}}
+						data-wired={interactive() ? "" : undefined}
 						title={props.board.title}
 						data-path={props.board.path}
 						style={{ width: "100%", height: "100%", border: "0" }}
