@@ -14,9 +14,9 @@ import Paperclip from "lucide-solid/icons/paperclip";
 import Presentation from "lucide-solid/icons/presentation";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { stagePoint } from "../../../camera/coords.ts";
-import { can } from "../../../connections/backend.ts";
-import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../../state/pen-tools.ts";
-import { Icon } from "../../../ui/icons.tsx";
+import { canvasHost } from "../../host.ts";
+import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
+import { Icon } from "../../ui/icons.tsx";
 import { newCard } from "../../pen/card-frame.ts";
 import { Insert } from "../../pen/Insert.tsx";
 import { TOOLS } from "../../pen/PenBar.tsx";
@@ -171,7 +171,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 	const [canvasMenu, setCanvasMenu] = createSignal<{ client: Pt; world: Pt; stage: Pt } | undefined>();
 	const openCanvasMenu = (event: Client) => {
 		// A canvas that can only be read (one opened from a file) has nothing to add.
-		if (!can("write")) return;
+		if (!canvasHost().canWrite()) return;
 		setCanvasMenu({ client: { x: event.clientX, y: event.clientY }, world: worldAt(event), stage: stagePoint(event as PointerEvent) });
 	};
 	const boardFromMenu = (format: "board" | "slides") => {

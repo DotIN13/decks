@@ -1,6 +1,6 @@
 import X from "lucide-solid/icons/x";
 import { For, Match, Show, Switch } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "./ui/icons.tsx";
 import { canHover } from "../lib/media.ts";
 import { tokens } from "./keycaps.ts";
 

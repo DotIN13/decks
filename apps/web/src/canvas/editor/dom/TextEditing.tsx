@@ -13,7 +13,7 @@
 import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDocument, type PenNode } from "@decks/pen";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../../camera/camera.ts";
-import { setPenTyping } from "../../../state/pen-tools.ts";
+import { setPenTyping } from "../../state/pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../pen/card-frame.ts";
 import { CardEditor } from "../../pen/CardEditor.tsx";
 import { CARD_PALETTE, NOTE_RADIUS, pageFont } from "../../pen/look.ts";

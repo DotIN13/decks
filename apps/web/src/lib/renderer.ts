@@ -21,7 +21,8 @@
  * another, and Settings can say which of the two is happening.
  */
 
-export type RendererChoice = "dom" | "canvas-per-board";
+import type { RendererChoice } from "../canvas/lib/renderer.ts";
+export type { RendererChoice };
 
 export const RENDERERS: Array<{ id: RendererChoice; label: string; note: string }> = [
 	{ id: "dom", label: "Documents", note: "Each board a live page. Works everywhere." },

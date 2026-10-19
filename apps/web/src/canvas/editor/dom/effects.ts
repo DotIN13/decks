@@ -5,8 +5,8 @@
  * sized, and when the camera was last dragged.
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
-import { deckBoardLink } from "../../../board/board-links.ts";
-import { shortLabel } from "../../../chat/composer/draft.ts";
+import { canvasHost } from "../../host.ts";
+import { shortLabel } from "../../lib/labels.ts";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
 
@@ -147,7 +147,7 @@ export function createEffects(host: EffectHost) {
 	 */
 	const openLink = (href: string) => {
 		const base = host.pen()?.base ?? "";
-		const board = deckBoardLink(href, base);
+		const board = canvasHost().boardLink(href, base);
 		if (board && host.onOpenBoard?.(board, "")) return;
 		let url: URL;
 		try {

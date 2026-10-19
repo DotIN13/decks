@@ -1,6 +1,6 @@
-import { createSignal } from "solid-js";
+import { scheme, setCanvasScheme, type Scheme } from "../canvas/lib/theme.ts";
 
-export type Scheme = "light" | "dark";
+export type { Scheme };
 
 /**
  * The colour scheme, and handing it to the boards.
@@ -26,7 +26,9 @@ function initial(): Scheme {
 	return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-const [scheme, setSchemeSignal] = createSignal<Scheme>(initial());
+/* The signal is the canvas's (`@decks/canvas`), so the canvas draws in the scheme chosen here. */
+const setSchemeSignal = setCanvasScheme;
+setCanvasScheme(initial());
 export { scheme };
 
 function setScheme(next: Scheme): void {

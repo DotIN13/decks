@@ -13,7 +13,7 @@
  */
 import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type PenDocument } from "@decks/pen";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
-import { feedSelection, keptSelection } from "../../../state/pen-tools.ts";
+import { feedSelection, keptSelection } from "../../state/pen-tools.ts";
 import { glideShift } from "../core/overlay.ts";
 import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
 import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";

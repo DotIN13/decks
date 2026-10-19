@@ -66,13 +66,8 @@ export function draftLabel(node: DraftMention): string {
 	return node.label;
 }
 
-export const LABEL_LIMIT = 28;
-
-/** Any words, on one line, short enough to sit in a sentence. */
-export function shortLabel(words: string): string {
-	const flat = words.replace(/\s+/g, " ").trim();
-	return flat.length > LABEL_LIMIT ? `${flat.slice(0, LABEL_LIMIT - 1).trimEnd()}…` : flat;
-}
+export { LABEL_LIMIT, shortLabel } from "../../canvas/lib/labels.ts";
+import { shortLabel } from "../../canvas/lib/labels.ts";
 
 /** The start of a quotation, in quotes, short enough to sit in a sentence. */
 export function commentLabel(quote: string): string {

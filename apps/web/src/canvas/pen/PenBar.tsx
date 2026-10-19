@@ -17,8 +17,8 @@ import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../../state/pen-tools.ts";
-import { Icon } from "../../ui/icons.tsx";
+import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../state/pen-tools.ts";
+import { Icon } from "../ui/icons.tsx";
 import { Properties } from "./Properties.tsx";
 
 /**

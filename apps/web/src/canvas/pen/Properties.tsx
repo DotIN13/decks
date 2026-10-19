@@ -41,8 +41,8 @@ import X from "lucide-solid/icons/x";
 import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { isPhone } from "../../camera/camera.ts";
-import { penBoxes, penSelection, penSheet, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../../state/pen-tools.ts";
-import { Icon } from "../../ui/icons.tsx";
+import { penBoxes, penSelection, penSheet, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../state/pen-tools.ts";
+import { Icon } from "../ui/icons.tsx";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { ICON_LIBRARIES } from "./icon-index.ts";
 

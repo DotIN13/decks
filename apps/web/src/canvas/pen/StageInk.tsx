@@ -1,11 +1,11 @@
 import { hitStroke, inkBounds, inkPaint, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../../state/ink.ts";
+import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../state/ink.ts";
 import { inkItem } from "./ink.ts";
 import type { StageEngine } from "../../stage/engine.ts";
 import type { LiveInk, PenPreview } from "../../stage/types.ts";
-import { scheme } from "../../lib/theme.ts";
+import { scheme } from "../lib/theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
 export const STAGE_INK = "stage";

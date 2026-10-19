@@ -9,13 +9,13 @@ import Scan from "lucide-solid/icons/scan";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import Pencil from "lucide-solid/icons/pencil";
 import { setCommenting } from "../state/comments.ts";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "./ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox, insets } from "../camera/insets.ts";
-import { deckFileUrl } from "../lib/api.ts";
+import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -23,13 +23,13 @@ import type { EditorHost, Tool } from "../board/Editor.ts";
 import type { FileDropHost } from "../board/file-drop.ts";
 import type { FrameGestureHost } from "../board/frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
-import { deckMode, type DeckHandle, type SlideAction, slideKey } from "../present/slide-keys.ts";
-import { cssEscape } from "../board/inspect.ts";
+import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./lib/slide-keys.ts";
+import { cssEscape } from "./lib/css-escape.ts";
 import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
-import { velocityFrom, type Sample } from "../chrome/float-math.ts";
-import type { RendererChoice } from "../lib/renderer.ts";
+import { velocityFrom, type Sample } from "./lib/velocity.ts";
+import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
@@ -37,14 +37,14 @@ import type { SceneBoard } from "../stage/types.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenSheet, setPenTool, type PenTool } from "../state/pen-tools.ts";
-import { scheme } from "../lib/theme.ts";
+import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenSheet, setPenTool, type PenTool } from "./state/pen-tools.ts";
+import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, indexOf, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { firstLine } from "./pen/look.ts";
 import { isLiveFile } from "./pen/card-frame.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
 import { untilReleased } from "./held.ts";
-import { springCurve } from "../app/spring.ts";
+import { springCurve } from "./lib/spring.ts";
 import { lendFrame } from "./borrow.ts";
 import { StageEngine } from "../stage/engine.ts";
 import {
@@ -2375,7 +2375,7 @@ export function Stage(props: {
 		for (let at = index?.get(id); at && !node; at = at.parent ? index?.get(at.parent.id) : undefined) if (isLiveFile(at.node)) node = at.node;
 		if (!node || typeof node.metadata?.file !== "string") return false;
 		editor.select([node.id]);
-		window.open(deckFileUrl(node.metadata.file), "_blank", "noopener");
+		window.open(canvasHost().fileUrl(node.metadata.file), "_blank", "noopener");
 		return true;
 	};
 	/**
@@ -2841,7 +2841,7 @@ export function Stage(props: {
 										data-live-file={file.id}
 										style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${at().w}px`, height: `${at().h}px`, "border-radius": `${at().radius}px`, visibility: shown() ? "visible" : "hidden" }}
 									>
-										<img src={deckFileUrl(file.file)} alt={file.name} draggable={false} />
+										<img src={canvasHost().fileUrl(file.file)} alt={file.name} draggable={false} />
 									</div>
 								)}
 							</Show>
@@ -2900,7 +2900,7 @@ export function Stage(props: {
 								<Show when={playingBox()}>
 									<MediaPlayer
 										kind={first.kind}
-										src={deckFileUrl(first.file)}
+										src={canvasHost().fileUrl(first.file)}
 										name={first.name}
 										{...(first.seconds === undefined ? {} : { seconds: first.seconds })}
 										{...(first.peaks ? { peaks: first.peaks } : {})}

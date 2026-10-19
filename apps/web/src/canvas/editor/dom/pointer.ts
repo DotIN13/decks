@@ -13,7 +13,7 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { setPenSheet } from "../../../state/pen-tools.ts";
+import { setPenSheet } from "../../state/pen-tools.ts";
 import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { BoardBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";

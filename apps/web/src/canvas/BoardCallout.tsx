@@ -2,8 +2,8 @@ import type { Board, Camera } from "@decks/protocol";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { toScreen, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
-import { deckFileUrl } from "../lib/api.ts";
-import { Icon } from "../ui/icons.tsx";
+import { canvasHost } from "./host.ts";
+import { Icon } from "./ui/icons.tsx";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
@@ -123,7 +123,7 @@ export function BoardCallout(props: {
 			</Show>
 			<Show when={props.board && !props.board.live ? props.board : undefined}>
 				{(board) => (
-				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={deckFileUrl(board().path)} target="_blank" rel="noopener">
+				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={canvasHost().fileUrl(board().path)} target="_blank" rel="noopener">
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}

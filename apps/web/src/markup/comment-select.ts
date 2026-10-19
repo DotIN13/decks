@@ -1,6 +1,6 @@
 import { quoteOf } from "./comments.ts";
 import { commentDirty, commenting, setCommenting } from "../state/comments.ts";
-import { drawing } from "../state/ink.ts";
+import { drawing } from "../canvas/state/ink.ts";
 import { mode } from "../state/selection.ts";
 
 /**
