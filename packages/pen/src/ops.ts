@@ -144,8 +144,11 @@ function one(doc: PenDocument, op: Op, options: ApplyOptions): OpResult {
 			/*
 			 * A new frame hugs what it holds, and the height its box gives is the least it is: `fit_content(h)`,
 			 * pen's own hug with a number (`layout.ts`). Only a plain number in the node's own `height` fixes it.
+			 * A frame that lays nothing out (`layout: "none"`) or clips is a scene, not a stack: its box is
+			 * the picture's edge, and a hug would grow it round whatever runs past that edge.
 			 */
-			const floor = node.type === "frame" && typeof op.node.height !== "number";
+			const scene = op.node.layout === "none" || op.node.clip === true;
+			const floor = node.type === "frame" && typeof op.node.height !== "number" && !scene;
 			const note = [op.box ? placeBox(doc, node.id, op.box, options, { floor }) : undefined, unreadableColour(node)].filter(Boolean).join(" ");
 			return { op: "insert", id: node.id, ...(note ? { note } : {}) };
 		}
