@@ -129,6 +129,18 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			try {
 				const placed = layoutOf(name, doc);
 				let pen: Op;
+				// pen.dev's own form (what the canvas editor sends): taken as it is, with a board's path for an id.
+				const raw = op as unknown as Record<string, unknown>;
+				if (raw && ("node" in raw || "box" in raw)) {
+					const given = { ...raw } as Record<string, unknown>;
+					if (typeof given.id === "string") given.id = idIn(doc, given.id);
+					if (typeof given.parent === "string") given.parent = idIn(doc, given.parent, "parent");
+					if (given.node && (given.node as { type?: unknown }).type === "board") given.node = fromItem(given.node, ids(doc));
+					pen = given as unknown as Op;
+					doc = apply(doc, [pen], { theme, measure }).doc;
+					penOps.push(pen);
+					return;
+				}
 				switch (op?.op) {
 					case "insert": {
 						const node = fromItem(op.item, ids(doc));
@@ -161,9 +173,10 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							delete set.board;
 						}
 						if (op.size) {
-							const round = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? Math.round(value) : undefined);
-							const w = round(op.size.w);
-							const h = round(op.size.h);
+							// A board is held to the sizes a resize always allowed: a resize is not the place to find a typo.
+							const round = (value: unknown, low: number, high: number) => (typeof value === "number" && Number.isFinite(value) ? (path ? Math.min(high, Math.max(low, Math.round(value))) : Math.round(value)) : undefined);
+							const w = round(op.size.w, 320, 4000);
+							const h = round(op.size.h, 200, 8000);
 							if (w === undefined && h === undefined) throw new Error("size is a width, a height or both, as numbers: { w: 1000, h: 700 }.");
 							if (w !== undefined) set.width = w;
 							if (h !== undefined) set.height = h;
@@ -299,7 +312,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const doc = needPens().get(name).doc;
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
-			batch: async (ops: readonly CanvasOpIn[], options?: { canvas?: string }) => change(canvasOf(options?.canvas), ops) as never,
+			batch: async (ops: readonly unknown[], options?: { canvas?: string }) => change(canvasOf(options?.canvas), ops as readonly CanvasOpIn[]) as never,
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);

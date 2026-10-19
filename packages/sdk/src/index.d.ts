@@ -12,6 +12,13 @@ export type Corner = { x1: number; y1: number } | { x: number; y: number };
 export type Size = { w?: number; h?: number };
 /** One change in a batch: the same as the call of that name, with the item or id in the op. */
 export type CanvasOp = { op: "insert"; item: Item; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "update"; id: string; set?: Record<string, unknown>; at?: Corner; size?: Size } | { op: "replace"; id: string; item: Item } | { op: "delete"; id: string } | { op: "move"; id: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
+/**
+ * An edit to a .pen file, as the old pen.edit took it. Items are named by id; one inside an
+ * instance by its path, "card-1/label".
+ */
+export type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
+/** One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields. */
+export type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
 /** What the browser measured while fitting a board. */
 export type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
 /** A saved image of a canvas, or of part of it. */
@@ -30,8 +37,6 @@ export type Board = { path: string; title: string; lastWrittenBy?: string };
  * past that box.
  */
 export type Placement = { board: string; canvas: string; box: Box; clipped?: boolean };
-/** One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields. */
-export type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
 /**
  * Who works. `canvas` is the agent's home canvas; `state` and `queued` say what it is doing and how
  * much is waiting for it.
@@ -53,11 +58,6 @@ export type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "buil
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
 /** A board as the old `boards` call has it, placed on the caller's canvas. */
 export type PlacedBoard = { path: string; title: string; x: number; y: number; w: number; h: number; box: Box; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string };
-/**
- * An edit to a .pen file, as the old pen.edit took it. Items are named by id; one inside an
- * instance by its path, "card-1/label".
- */
-export type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 
 /** Every call Decks answers: the new names, and the old ones kept for one release (marked deprecated). */
 export interface Verbs {
@@ -185,9 +185,10 @@ export interface Verbs {
 		/**
 		 * Several of the changes above in one call, applied together or not at all. Each op is the call of
 		 * that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set },
-		 * { op: "delete", id }. A later op can be beside an item an earlier one made.
+		 * { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev's own form, {
+		 * op: "insert", node, box }, is taken too.
 		 */
-		batch(ops: CanvasOp[], options?: { canvas?: string }): Promise<Item[]>;
+		batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string }): Promise<Item[]>;
 		/**
 		 * Set a board's height from its content, measured at the width it has on this canvas; it must be on
 		 * it. `notes` say what the browser found: the height, the word count, the smallest type, content

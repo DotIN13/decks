@@ -170,8 +170,8 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			'Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made.',
-		params: [p("ops", arr(CanvasOp)), onCanvas()],
+			'Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev\'s own form, { op: "insert", node, box }, is taken too.',
+		params: [p("ops", arr(union(CanvasOp, PenEdit))), onCanvas()],
 		result: arr(Item),
 	},
 	{

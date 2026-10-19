@@ -632,475 +632,786 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "summary": "Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: \"insert\", item, beside }, { op: \"update\", id, set }, { op: \"delete\", id }. A later op can be beside an item an earlier one made.",
-  "signature": "canvas.batch(ops: CanvasOp[], options?: { canvas?: string })",
+  "summary": "Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: \"insert\", item, beside }, { op: \"update\", id, set }, { op: \"delete\", id }. A later op can be beside an item an earlier one made. pen.dev's own form, { op: \"insert\", node, box }, is taken too.",
+  "signature": "canvas.batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string })",
   "returns": "Item[]",
   "params": [
    {
     "name": "ops",
-    "type": "CanvasOp[]",
+    "type": "(CanvasOp | PenEdit)[]",
     "schema": {
      "type": "array",
      "items": {
       "anyOf": [
        {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "insert"
-          ]
-         },
-         "item": {
+        "anyOf": [
+         {
           "type": "object",
           "properties": {
-           "type": {
+           "op": {
+            "enum": [
+             "insert"
+            ]
+           },
+           "item": {
+            "type": "object",
+            "properties": {
+             "type": {
+              "type": "string"
+             },
+             "id": {
+              "type": "string"
+             },
+             "board": {
+              "type": "string"
+             },
+             "box": {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               },
+               "x2": {
+                "type": "number"
+               },
+               "y2": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1",
+               "x2",
+               "y2"
+              ],
+              "additionalProperties": false,
+              "description": "A box on a canvas: both corners, so an edge is never a sum."
+             },
+             "children": {
+              "type": "array",
+              "items": {}
+             }
+            },
+            "required": [
+             "type"
+            ],
+            "additionalProperties": true,
+            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+           },
+           "at": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "object",
+              "properties": {
+               "x": {
+                "type": "number"
+               },
+               "y": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x",
+               "y"
+              ],
+              "additionalProperties": false
+             }
+            ],
+            "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
+           },
+           "beside": {
             "type": "string"
+           },
+           "below": {
+            "type": "string"
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "index": {
+            "type": "integer"
+           }
+          },
+          "required": [
+           "op",
+           "item"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "update"
+            ]
            },
            "id": {
             "type": "string"
            },
-           "board": {
-            "type": "string"
-           },
-           "box": {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             },
-             "x2": {
-              "type": "number"
-             },
-             "y2": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1",
-             "x2",
-             "y2"
-            ],
-            "additionalProperties": false,
-            "description": "A box on a canvas: both corners, so an edge is never a sum."
-           },
-           "children": {
-            "type": "array",
-            "items": {}
-           }
-          },
-          "required": [
-           "type"
-          ],
-          "additionalProperties": true,
-          "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
-         },
-         "at": {
-          "anyOf": [
-           {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1"
-            ],
-            "additionalProperties": false
-           },
-           {
-            "type": "object",
-            "properties": {
-             "x": {
-              "type": "number"
-             },
-             "y": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x",
-             "y"
-            ],
-            "additionalProperties": false
-           }
-          ],
-          "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
-         },
-         "beside": {
-          "type": "string"
-         },
-         "below": {
-          "type": "string"
-         },
-         "parent": {
-          "anyOf": [
-           {
-            "type": "string"
-           },
-           {
-            "type": "null"
-           }
-          ]
-         },
-         "index": {
-          "type": "integer"
-         }
-        },
-        "required": [
-         "op",
-         "item"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "update"
-          ]
-         },
-         "id": {
-          "type": "string"
-         },
-         "set": {
-          "type": "object",
-          "properties": {},
-          "additionalProperties": true
-         },
-         "at": {
-          "anyOf": [
-           {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1"
-            ],
-            "additionalProperties": false
-           },
-           {
-            "type": "object",
-            "properties": {
-             "x": {
-              "type": "number"
-             },
-             "y": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x",
-             "y"
-            ],
-            "additionalProperties": false
-           }
-          ],
-          "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
-         },
-         "size": {
-          "type": "object",
-          "properties": {
-           "w": {
-            "type": "number"
-           },
-           "h": {
-            "type": "number"
-           }
-          },
-          "additionalProperties": false,
-          "description": "A width, a height, or both."
-         }
-        },
-        "required": [
-         "op",
-         "id"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "replace"
-          ]
-         },
-         "id": {
-          "type": "string"
-         },
-         "item": {
-          "type": "object",
-          "properties": {
-           "type": {
-            "type": "string"
-           },
-           "id": {
-            "type": "string"
-           },
-           "board": {
-            "type": "string"
-           },
-           "box": {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             },
-             "x2": {
-              "type": "number"
-             },
-             "y2": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1",
-             "x2",
-             "y2"
-            ],
-            "additionalProperties": false,
-            "description": "A box on a canvas: both corners, so an edge is never a sum."
-           },
-           "children": {
-            "type": "array",
-            "items": {}
-           }
-          },
-          "required": [
-           "type"
-          ],
-          "additionalProperties": true,
-          "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
-         }
-        },
-        "required": [
-         "op",
-         "id",
-         "item"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "delete"
-          ]
-         },
-         "id": {
-          "type": "string"
-         }
-        },
-        "required": [
-         "op",
-         "id"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "move"
-          ]
-         },
-         "id": {
-          "type": "string"
-         },
-         "at": {
-          "anyOf": [
-           {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1"
-            ],
-            "additionalProperties": false
-           },
-           {
-            "type": "object",
-            "properties": {
-             "x": {
-              "type": "number"
-             },
-             "y": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x",
-             "y"
-            ],
-            "additionalProperties": false
-           }
-          ],
-          "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
-         },
-         "beside": {
-          "type": "string"
-         },
-         "below": {
-          "type": "string"
-         },
-         "parent": {
-          "anyOf": [
-           {
-            "type": "string"
-           },
-           {
-            "type": "null"
-           }
-          ]
-         },
-         "index": {
-          "type": "integer"
-         }
-        },
-        "required": [
-         "op",
-         "id"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "copy"
-          ]
-         },
-         "id": {
-          "type": "string"
-         },
-         "as": {
-          "type": "string"
-         },
-         "at": {
-          "anyOf": [
-           {
-            "type": "object",
-            "properties": {
-             "x1": {
-              "type": "number"
-             },
-             "y1": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x1",
-             "y1"
-            ],
-            "additionalProperties": false
-           },
-           {
-            "type": "object",
-            "properties": {
-             "x": {
-              "type": "number"
-             },
-             "y": {
-              "type": "number"
-             }
-            },
-            "required": [
-             "x",
-             "y"
-            ],
-            "additionalProperties": false
-           }
-          ],
-          "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
-         },
-         "parent": {
-          "anyOf": [
-           {
-            "type": "string"
-           },
-           {
-            "type": "null"
-           }
-          ]
-         }
-        },
-        "required": [
-         "op",
-         "id"
-        ],
-        "additionalProperties": false
-       },
-       {
-        "type": "object",
-        "properties": {
-         "op": {
-          "enum": [
-           "variables"
-          ]
-         },
-         "set": {
-          "type": "object",
-          "properties": {},
-          "additionalProperties": true
-         },
-         "themes": {
-          "anyOf": [
-           {
+           "set": {
             "type": "object",
             "properties": {},
-            "additionalProperties": {
-             "type": "array",
-             "items": {
-              "type": "string"
-             }
-            }
+            "additionalProperties": true
            },
-           {
-            "type": "null"
+           "at": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "object",
+              "properties": {
+               "x": {
+                "type": "number"
+               },
+               "y": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x",
+               "y"
+              ],
+              "additionalProperties": false
+             }
+            ],
+            "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
+           },
+           "size": {
+            "type": "object",
+            "properties": {
+             "w": {
+              "type": "number"
+             },
+             "h": {
+              "type": "number"
+             }
+            },
+            "additionalProperties": false,
+            "description": "A width, a height, or both."
            }
-          ]
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "replace"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "item": {
+            "type": "object",
+            "properties": {
+             "type": {
+              "type": "string"
+             },
+             "id": {
+              "type": "string"
+             },
+             "board": {
+              "type": "string"
+             },
+             "box": {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               },
+               "x2": {
+                "type": "number"
+               },
+               "y2": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1",
+               "x2",
+               "y2"
+              ],
+              "additionalProperties": false,
+              "description": "A box on a canvas: both corners, so an edge is never a sum."
+             },
+             "children": {
+              "type": "array",
+              "items": {}
+             }
+            },
+            "required": [
+             "type"
+            ],
+            "additionalProperties": true,
+            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+           }
+          },
+          "required": [
+           "op",
+           "id",
+           "item"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "delete"
+            ]
+           },
+           "id": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "move"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "at": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "object",
+              "properties": {
+               "x": {
+                "type": "number"
+               },
+               "y": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x",
+               "y"
+              ],
+              "additionalProperties": false
+             }
+            ],
+            "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
+           },
+           "beside": {
+            "type": "string"
+           },
+           "below": {
+            "type": "string"
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "index": {
+            "type": "integer"
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "copy"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "as": {
+            "type": "string"
+           },
+           "at": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {
+               "x1": {
+                "type": "number"
+               },
+               "y1": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x1",
+               "y1"
+              ],
+              "additionalProperties": false
+             },
+             {
+              "type": "object",
+              "properties": {
+               "x": {
+                "type": "number"
+               },
+               "y": {
+                "type": "number"
+               }
+              },
+              "required": [
+               "x",
+               "y"
+              ],
+              "additionalProperties": false
+             }
+            ],
+            "description": "A top-left corner on a canvas: { x1, y1 }, or { x, y }."
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "variables"
+            ]
+           },
+           "set": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+           },
+           "themes": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              }
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "op",
+           "set"
+          ],
+          "additionalProperties": false
          }
-        },
-        "required": [
-         "op",
-         "set"
         ],
-        "additionalProperties": false
+        "description": "One change in a batch: the same as the call of that name, with the item or id in the op."
+       },
+       {
+        "anyOf": [
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "insert"
+            ]
+           },
+           "node": {
+            "type": "object",
+            "properties": {
+             "type": {
+              "type": "string"
+             },
+             "id": {
+              "type": "string"
+             },
+             "children": {
+              "type": "array",
+              "items": {}
+             }
+            },
+            "required": [
+             "type"
+            ],
+            "additionalProperties": true,
+            "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "index": {
+            "type": "integer"
+           },
+           "box": {
+            "type": "object",
+            "properties": {
+             "x1": {
+              "type": "number"
+             },
+             "y1": {
+              "type": "number"
+             },
+             "x2": {
+              "type": "number"
+             },
+             "y2": {
+              "type": "number"
+             }
+            },
+            "additionalProperties": false
+           }
+          },
+          "required": [
+           "op",
+           "node"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "update"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "set": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+           },
+           "box": {
+            "type": "object",
+            "properties": {
+             "x1": {
+              "type": "number"
+             },
+             "y1": {
+              "type": "number"
+             },
+             "x2": {
+              "type": "number"
+             },
+             "y2": {
+              "type": "number"
+             }
+            },
+            "additionalProperties": false
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "replace"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "node": {
+            "type": "object",
+            "properties": {
+             "type": {
+              "type": "string"
+             },
+             "id": {
+              "type": "string"
+             },
+             "children": {
+              "type": "array",
+              "items": {}
+             }
+            },
+            "required": [
+             "type"
+            ],
+            "additionalProperties": true,
+            "description": "One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields."
+           }
+          },
+          "required": [
+           "op",
+           "id",
+           "node"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "delete"
+            ]
+           },
+           "id": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "move"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "index": {
+            "type": "integer"
+           },
+           "box": {
+            "type": "object",
+            "properties": {
+             "x1": {
+              "type": "number"
+             },
+             "y1": {
+              "type": "number"
+             },
+             "x2": {
+              "type": "number"
+             },
+             "y2": {
+              "type": "number"
+             }
+            },
+            "additionalProperties": false
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "copy"
+            ]
+           },
+           "id": {
+            "type": "string"
+           },
+           "parent": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "index": {
+            "type": "integer"
+           },
+           "box": {
+            "type": "object",
+            "properties": {
+             "x1": {
+              "type": "number"
+             },
+             "y1": {
+              "type": "number"
+             },
+             "x2": {
+              "type": "number"
+             },
+             "y2": {
+              "type": "number"
+             }
+            },
+            "additionalProperties": false
+           },
+           "as": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "op",
+           "id"
+          ],
+          "additionalProperties": false
+         },
+         {
+          "type": "object",
+          "properties": {
+           "op": {
+            "enum": [
+             "variables"
+            ]
+           },
+           "set": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+           },
+           "themes": {
+            "anyOf": [
+             {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": {
+               "type": "array",
+               "items": {
+                "type": "string"
+               }
+              }
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "op",
+           "set"
+          ],
+          "additionalProperties": false
+         }
+        ],
+        "description": "An edit to a .pen file, as the old pen.edit took it. Items are named by id; one inside an instance by its path, \"card-1/label\"."
        }
-      ],
-      "description": "One change in a batch: the same as the call of that name, with the item or id in the op."
+      ]
      }
     }
    },
