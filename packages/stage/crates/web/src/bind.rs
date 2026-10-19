@@ -68,8 +68,13 @@ pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: 
 /// Copy a picture into texture `id`, made the picture's size (or `size`), and let the picture go.
 /// `from_canvas`: it is a canvas's `transferToImageBitmap` (a tile), not a `createImageBitmap`.
 /// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
-/// them first, so it should not come) keeps what fits, and says so.
-fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) {
+/// them first, so it should not come) keeps what fits, and says so. A picture with nothing in it
+/// (closed, or transferred away) is not copied (`copy_extent`), and the answer is false.
+fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) -> bool {
+	let Some(_) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (u32::MAX, u32::MAX)) else {
+		web_sys::console::warn_1(&"stage: a picture with nothing in it (closed, or sent elsewhere) was not copied".into());
+		return false;
+	};
 	let cap = gpu.limits().max_picture();
 	let (w, h) = size.unwrap_or((bitmap.width().max(1), bitmap.height().max(1)));
 	let (w, h) = (w.min(cap), h.min(cap));
@@ -80,8 +85,10 @@ fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(
 		gpu.texture(id, TextureKind::Color, w, h, None);
 	}
 	let texture = gpu.texture_handle(id).expect("just made").clone();
-	gpu.copy_bitmap(bitmap, &texture, bitmap.width().min(w), bitmap.height().min(h), from_canvas);
+	let (cw, ch) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (w, h)).expect("not empty, checked above");
+	gpu.copy_bitmap(bitmap, &texture, cw, ch, from_canvas);
 	bitmap.close();
+	true
 }
 
 
@@ -297,7 +304,7 @@ impl PageEngine {
 	pub fn put_tile(&mut self, scale: u32, x: i32, y: i32, bitmap: web_sys::ImageBitmap) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let id = self.page.tile_texture(key(scale, x, y));
-		copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)), true);
+		let _ = copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)), true);
 	}
 
 	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
@@ -307,8 +314,9 @@ impl PageEngine {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
-		copy_in(gpu, id, &bitmap, None, false);
-		self.page.picture(url, id, w, h);
+		if copy_in(gpu, id, &bitmap, None, false) {
+			self.page.picture(url, id, w, h);
+		}
 	}
 
 	/// Pictures asked for since the last call, to load: `["url", …]`.
@@ -628,8 +636,9 @@ impl WorkerEngine {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
-		copy_in(gpu, id, &bitmap, None, false);
-		self.worker.picture(url, id, w, h);
+		if copy_in(gpu, id, &bitmap, None, false) {
+			self.worker.picture(url, id, w, h);
+		}
 	}
 
 	#[wasm_bindgen(js_name = wantedPictures)]
