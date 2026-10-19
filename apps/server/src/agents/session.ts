@@ -9,7 +9,7 @@ import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, PERSON, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext, IsolationContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -303,7 +303,7 @@ export class DeckAgent {
 			 * board as it is by then. A brief composed at send time is a snapshot of a plan
 			 * that may have moved twice while it sat in the queue.
 			 */
-			brief(task: string, boards: string[]): string;
+			brief(task: string, boards: string[], person?: boolean): string;
 			recordRevision(path: string): string | undefined;
 			/** This agent said it wrote a board. Optional: a unit fixture has no byline to keep. */
 			wrote?(path: string, who: string): void;
@@ -1141,7 +1141,19 @@ export class DeckAgent {
 	personTool(): StageTool {
 		this.personal ??= createStageTool({
 			stage: this.stage,
-			agent: { ...this.stageHooks(), person: true, acted: undefined, worked: undefined, drew: undefined },
+			agent: {
+				...this.stageHooks(),
+				person: true,
+				acted: undefined,
+				worked: undefined,
+				drew: undefined,
+				// A hand-off the person makes is signed as theirs, not as this agent's.
+				send: (target: string, spec: SendSpec) => this.host.send(PERSON, target, spec),
+				deliver: (target: string, spec: { task: string; boards?: string[] }) => {
+					if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
+					return this.host.deliver(PERSON, target, spec);
+				},
+			},
 			port: this.host.port,
 		});
 		return this.personal;
@@ -1464,15 +1476,16 @@ export class DeckAgent {
 	 * no way in mid-turn, so the work is queued, as `agent.queue` would, and the answer says so.
 	 */
 	deliver(item: QueuedWork): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
-		const text = this.host.brief(item.task, item.boards);
-		const sent = `${item.fromName} sent you this, to act on now:\n\n${text}`;
+		const text = this.host.brief(item.task, item.boards, item.person);
+		// The person's message is theirs, as if typed in the chat; an agent's says who it is from.
+		const sent = item.person ? text : `${item.fromName} sent you this, to act on now:\n\n${text}`;
 		if (this.state === "idle") {
-			this.translator.notice("info", `${item.fromName} sent you work, now: ${firstLine(item.task)}`);
+			if (!item.person) this.translator.notice("info", `${item.fromName} sent you work, now: ${firstLine(item.task)}`);
 			void this.prompt(sent);
 			return { delivered: true, turn: "new" };
 		}
 		if (STEERS[this.kind]) {
-			this.translator.notice("info", `${item.fromName} sent you work, into this turn: ${firstLine(item.task)}`);
+			if (!item.person) this.translator.notice("info", `${item.fromName} sent you work, into this turn: ${firstLine(item.task)}`);
 			void this.prompt(sent);
 			return { delivered: true, turn: "running", ...(this.kind === "claude" || this.kind === "opencode" ? { note: `${this.kind === "claude" ? "Claude" : "opencode"} takes a message mid-turn at its next step, after the model call or tool call it is in.` } : {}) };
 		}
@@ -1569,7 +1582,7 @@ export class DeckAgent {
 		const item = this.work.shift();
 		if (!item) return;
 		try {
-			const result = await this.run(this.host.brief(item.task, item.boards));
+			const result = await this.run(this.host.brief(item.task, item.boards, item.person));
 			// A report the sender asked for is delivered to them as a notice, not as a queued
 			// task. The distinction is the whole of the no-loop rule: an item in a queue runs a
 			// turn when it drains, and a turn that answers a report with another report is two

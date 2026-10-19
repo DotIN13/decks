@@ -218,6 +218,30 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 	}
 });
 
+test("work the person sends or queues is theirs: not signed by the agent in focus, and no report owed", async () => {
+	const { app, agent, must, cleanup } = await open();
+	try {
+		const other = app.agents.create({ name: "Rune" });
+		app.agents.focus(agent.id);
+		const person = { "x-decks-person": "1" };
+		const seen: string[] = [];
+		(other as unknown as { prompt: (text: string) => Promise<void> }).prompt = async (text: string) => {
+			seen.push(text);
+		};
+		const sent = (await must("agent.send", ["Rune", { task: "Draw the coffee canvas" }], person)).value;
+		assert.equal(sent.delivered, true);
+		assert.match(seen[0]!, /^Draw the coffee canvas/, "it reads as the person's own message");
+		assert.doesNotMatch(seen[0]!, new RegExp(`${agent.name} sent you|parent agent`));
+
+		await must("agent.queue", ["Rune", { task: "Then the tea one", reply: true }], person);
+		const theirs = (await must("agent.inbox", [], { "x-decks-agent": other.id })).value;
+		assert.equal(theirs[0].from, "You");
+		assert.equal(theirs[0].reply, undefined, "nobody waits on a report");
+	} finally {
+		cleanup();
+	}
+});
+
 test("the old names map onto the new calls: open moves the home canvas, report claims, url and resolve are the new addresses", async () => {
 	const { agent, must, cleanup } = await open();
 	try {

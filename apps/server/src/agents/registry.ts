@@ -8,7 +8,7 @@ import type { StageService } from "../stage/service.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
-import type { CreateSpec, SendSpec } from "../stage/tool.ts";
+import { PERSON, type CreateSpec, type SendSpec } from "../stage/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
@@ -200,7 +200,7 @@ export class Registry {
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.queue() ?? [],
-				brief: (task, boards) => brief(task, boards, this.deck),
+				brief: (task, boards, person) => brief(task, boards, this.deck, person),
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
 				act: (agentId, act) => this.host.act?.(agentId, act),
@@ -526,11 +526,10 @@ export class Registry {
 	 * a runtime that cannot be steered. The answer says which.
 	 */
 	deliver(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
-		const from = this.get(fromId);
-		if (!from) throw new Error("The sending agent is gone");
+		const from = this.sender(fromId);
 		const to = this.resolve(target);
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		const answer = to.deliver({ from: from.id, fromName: from.chat().name, task: spec.task.trim(), boards: handed, at: Date.now() });
+		const answer = to.deliver({ ...from, task: spec.task.trim(), boards: handed, at: Date.now() });
 		this.publish();
 		return answer;
 	}
@@ -548,8 +547,7 @@ export class Registry {
 	 * conversation is not a mistake you can see happening.
 	 */
 	send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number } {
-		const from = this.get(fromId);
-		if (!from) throw new Error("The sending agent is gone");
+		const from = this.sender(fromId);
 
 		const to = this.resolve(target);
 		// Only boards that exist, and no context change on the receiver: what it is holding is
@@ -557,15 +555,26 @@ export class Registry {
 		// somebody's canvas away. The source rides in the briefing instead.
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
 		const position = to.enqueue({
-			from: from.id,
-			fromName: from.chat().name,
+			...from,
 			task: spec.task.trim(),
 			boards: handed,
 			at: Date.now(),
-			...(spec.reply ? { reply: true } : {}),
+			// Nobody waits on a report from work the person sent: they read the chat.
+			...(spec.reply && !from.person ? { reply: true } : {}),
 		});
 		this.publish();
 		return { queued: true, position };
+	}
+
+	/**
+	 * Who a hand-off is from: an agent, or the person (`PERSON`), whose SDK calls run through the
+	 * focused agent's person tool and must not be signed with that agent's name.
+	 */
+	private sender(fromId: string): { from: string; fromName: string; person?: true } {
+		if (fromId === PERSON) return { from: PERSON, fromName: "You", person: true };
+		const from = this.get(fromId);
+		if (!from) throw new Error("The sending agent is gone");
+		return { from: from.id, fromName: from.chat().name };
 	}
 
 	/** One agent, by id or by a name that only one agent answers to. */
@@ -649,7 +658,7 @@ export class Registry {
  * drift within a turn. The board source is the plan of record — the child reads the
  * same bytes the user is looking at, and reports by changing them.
  */
-function brief(task: string, boards: string[], deck: Deck): string {
+function brief(task: string, boards: string[], deck: Deck, person?: boolean): string {
 	// When the work runs, not when it was queued: "since yesterday" is read against this.
 	const parts = [task.trim(), "", `It is now ${nowWords(Date.now(), processZone())}.`];
 
@@ -667,6 +676,8 @@ function brief(task: string, boards: string[], deck: Deck): string {
 		}
 	}
 
+	// The person reads the chat: no report is owed to anyone.
+	if (person) return parts.join("\n");
 	parts.push(
 		"",
 		"Boards you changed are listed with this work only if you named them: `decks canvas fit`, or `decks agent claim <paths>`.",
