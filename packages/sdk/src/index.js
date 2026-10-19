@@ -6,9 +6,13 @@
  * answers with the value:
  *
  *     import { decks } from "@decks/sdk";        // DECKS_URL and DECKS_AGENT from the environment
- *     const path = await decks.newBoard({ title: "Q3 revenue", at: { x1: 0, y1: 0 } });
- *     await decks.show(path);
- *     await decks.pen.edit([{ op: "insert", node: { type: "note", text: "here" }, box: { x1: 0, y1: -80 } }]);
+ *     const { path } = await decks.board.create({ title: "Q3 revenue is up a fifth" });
+ *     await decks.canvas.insert({ type: "board", board: path }, { at: { x1: 0, y1: 0 } });
+ *     await decks.canvas.insert({ type: "note", content: "why?" }, { below: path });
+ *     await decks.canvas.fit(path);
+ *
+ * Every canvas call takes `{ canvas }` last; left out, it is `decks.here()`. The old names
+ * (`newBoard`, `show`, `pen.edit`, …) still work for one release, and say their new call.
  *
  * Who is calling is an agent (`DECKS_AGENT`, which Decks sets in each agent's shell), an app
  * (`DECKS_APP`, set for a server app; a page under `/app/<name>/` is found from its address), or a
@@ -228,14 +232,15 @@ export function connect(options = {}) {
 		call,
 		/** The same verbs, for code written against the SDK when they lived under `stage`. */
 		stage: tree,
-		/** Hand work to the agent with this name, making it from the spec first when there is none. */
+		/** Hand work to the agent with this name, making it from the spec first when there is none; it waits in its queue. */
 		async sendTo(spec, work) {
-			const have = (await tree.agents()).some((one) => one.name === spec.name);
-			const sent = await tree.send(have ? spec.name : spec, typeof work === "string" ? { task: work } : work);
+			const have = (await tree.agent.list()).some((one) => one.name === spec.name);
+			if (!have) await tree.agent.create(spec);
+			const sent = await tree.agent.queue(spec.name, typeof work === "string" ? { task: work } : work);
 			return { ...sent, name: spec.name, made: !have };
 		},
 		run() {
-			throw new DecksError("decks.run(code) is gone: the server runs no code now. Call the verbs themselves, as in await decks.boards().");
+			throw new DecksError("decks.run(code) is gone: the server runs no code now. Call the verbs themselves, as in await decks.canvas.read().");
 		},
 		/**
 		 * Every change as Decks broadcasts it (`GET /api/v1/events`): `onEvent` hears each frame, as

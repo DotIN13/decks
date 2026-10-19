@@ -2,12 +2,16 @@
 /**
  * `decks`: every Decks verb as a command, for an agent's shell and anyone else's.
  *
- *     decks boards | jq -r '.[].path'
- *     p=$(decks new-board --title "Q3 revenue" --at.x1 0 --at.y1 0)
- *     decks show "$p"
- *     decks fit "$p"
- *     decks pen edit '[{"op":"delete","id":"n1"}]'
- *     echo '[...]' | decks pen edit -
+ *     decks canvas read | jq -r '.items[] | select(.type=="board") | .board'
+ *     p=$(decks board create --title "Q3 revenue is up a fifth" | jq -r .path)
+ *     decks canvas insert --type board --board "$p" --at.x1 0 --at.y1 0
+ *     decks canvas fit "$p" --canvas launch-plan
+ *     decks canvas delete n1
+ *     echo '[...]' | decks canvas batch -
+ *
+ * Commands are noun then verb (`decks canvas insert`, `decks agent send`); `--canvas` names the
+ * canvas, and left out it is the one `decks here` says. The old names (`decks show`, `decks pen
+ * edit`, …) still work for one release, and say their new command.
  *
  * A verb's plain arguments (a path, a name) are words; an object argument's keys are flags, with a
  * dot for a key inside a key (`--at.x1 0`); anything else is JSON, and `-` reads it from stdin.
@@ -40,19 +44,26 @@ export function verbOf(words) {
 export function help(verb) {
 	if (verb) {
 		const lines = [`decks ${verb.command.join(" ")}`, "", `  ${verb.signature}: ${verb.returns}`, "", wrap(verb.summary, "  "), ""];
+		if (verb.alias) lines.push(`  An old name, kept for one release: use ${verb.alias}.`, "");
 		for (const param of verb.params) lines.push(`  ${param.name}${param.optional ? " (optional)" : ""}: ${param.type}`);
 		const objects = verb.params.filter((param) => param.schema.type === "object" && param.schema.properties);
 		if (objects.length) lines.push("", `  Flags: ${objects.flatMap((param) => Object.keys(param.schema.properties).map((key) => `--${key}`)).join(" ")}`);
 		return lines.join("\n");
 	}
 	const groups = new Map();
-	for (const one of VERBS) groups.set(one.group, [...(groups.get(one.group) ?? []), one]);
-	const lines = ["decks <command> [arguments] [--flags]: every Decks verb, as a command.", "", "Each prints its value to stdout (JSON, or a string as it is) and its notes to stderr.", ""];
+	for (const one of VERBS.filter((verb) => !verb.alias)) groups.set(one.group, [...(groups.get(one.group) ?? []), one]);
+	const lines = [
+		"decks <noun> <verb> [arguments] [--flags]: every Decks call, as a command.",
+		"",
+		"Each prints its value to stdout (JSON, or a string as it is) and its notes to stderr. --canvas names the canvas; left out, it is decks here.",
+		"",
+	];
 	for (const [group, verbs] of groups) {
 		lines.push(`${group}:`);
-		for (const one of verbs) lines.push(`  ${one.command.join(" ").padEnd(16)} ${firstSentence(one.summary)}`);
+		for (const one of verbs) lines.push(`  ${one.command.join(" ").padEnd(18)} ${firstSentence(one.summary)}`);
 		lines.push("");
 	}
+	lines.push(`Old names, for one release: ${VERBS.filter((verb) => verb.alias).map((verb) => verb.command.join(" ")).join(", ")}.`, "");
 	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
 	lines.push("decks help <command> says more about one. DECKS_URL and DECKS_AGENT say where Decks is and who is calling.");
 	return lines.join("\n");

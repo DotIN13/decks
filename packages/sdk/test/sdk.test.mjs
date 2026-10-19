@@ -40,8 +40,11 @@ async function fakeDecks() {
 }
 
 test("the SDK has every verb in the table, groups nested", () => {
-	assert.equal(VERBS.length, 53);
+	assert.equal(VERBS.length, 94, "66 calls and 28 old names");
 	const decks = connect({ url: "http://127.0.0.1:1", agent: "a1" });
+	assert.equal(typeof decks.canvas.insert, "function");
+	assert.equal(typeof decks.agent.send, "function");
+	assert.equal(typeof decks.here, "function");
 	assert.equal(typeof decks.newBoard, "function");
 	assert.equal(typeof decks.pen.edit, "function");
 	assert.equal(typeof decks.apps.build, "function");
@@ -79,6 +82,15 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 		const { verb, rest } = verbOf(line);
 		return [verb.name, argsOf(verb, rest)];
 	};
+	// Noun then verb, with --canvas for the canvas.
+	assert.deepEqual(of(["canvas", "insert", "--type", "board", "--board", "boards/a.html", "--beside", "n1", "--canvas", "plan"]), ["canvas.insert", [{ type: "board", board: "boards/a.html" }, { beside: "n1", canvas: "plan" }]]);
+	assert.deepEqual(of(["canvas", "insert", '{"type":"note","content":"hi"}', "--at.x1", "0", "--at.y1", "160"]), ["canvas.insert", [{ type: "note", content: "hi" }, { at: { x1: 0, y1: 160 } }]]);
+	assert.deepEqual(of(["canvas", "fit", "boards/a.html", "--canvas", "plan"]), ["canvas.fit", ["boards/a.html", { canvas: "plan" }]]);
+	assert.deepEqual(of(["agent", "send", "Rune", "--task", "look"]), ["agent.send", ["Rune", { task: "look" }]]);
+	assert.deepEqual(of(["view", "goto", "plan"]), ["view.goto", ["plan"]]);
+	assert.deepEqual(of(["here"]), ["here", []]);
+	assert.deepEqual(of(["board", "create", "--title", "Q3"]), ["board.create", [{ title: "Q3" }]]);
+	// The old names still parse as they did.
 	assert.deepEqual(of(["new-board", "--title", "Q3 revenue", "--at.x1", "0", "--at.y1", "160"]), ["newBoard", [{ title: "Q3 revenue", at: { x1: 0, y1: 160 } }]]);
 	assert.deepEqual(of(["move", "boards/a.html", '{"x":10,"y":20}']), ["move", ["boards/a.html", { x: 10, y: 20 }]]);
 	assert.deepEqual(of(["move", "boards/a.html", "--x", "10", "--y", "20"]), ["move", ["boards/a.html", { x: 10, y: 20 }]]);
@@ -110,7 +122,11 @@ test("the decks command prints the value to stdout and notes to stderr, and fail
 
 		await assert.rejects(run(BIN, ["fit", "boards/x.html"], { env }), (error) => error.code === 1 && /not on your stage/.test(error.stderr));
 		const help = await run(BIN, ["--help"], { env });
-		assert.match(help.stdout, /new-board +Write a blank board and return its path\./);
+		assert.match(help.stdout, /canvas insert +Add an item to the canvas\./);
+		assert.match(help.stdout, /Old names, for one release: new-board, /);
+		assert.doesNotMatch(help.stdout, /\n  new-board /, "old names are not listed as commands");
+		const old = await run(BIN, ["help", "new-board"], { env });
+		assert.match(old.stdout, /An old name, kept for one release: use decks\.board\.create, then decks\.canvas\.insert/);
 	} finally {
 		await fake.close();
 	}
@@ -132,9 +148,11 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		child.kill();
 		const [init, list, call] = output.trim().split("\n").map((line) => JSON.parse(line));
 		assert.equal(init.result.protocolVersion, "2025-06-18");
-		assert.equal(list.result.tools.length, 53);
-		const edit = list.result.tools.find((tool) => tool.name === "decks_pen_edit");
-		assert.deepEqual(edit.inputSchema.required, ["edits"]);
+		assert.equal(list.result.tools.length, 66, "the new calls only");
+		assert.ok(list.result.tools.some((tool) => tool.name === "decks_canvas_insert"));
+		assert.ok(!list.result.tools.some((tool) => tool.name === "decks_pen_edit"), "old names are not listed");
+		const insert = list.result.tools.find((tool) => tool.name === "decks_canvas_insert");
+		assert.deepEqual(insert.inputSchema.required, ["item"]);
 		assert.equal(call.result.isError, false);
 		assert.deepEqual(JSON.parse(call.result.content[0].text), { rev: 2, results: [{ op: "delete", id: "n2" }] });
 		assert.deepEqual(fake.seen.at(-1), { verb: "pen.edit", args: [[{ op: "delete", id: "n2" }]], agent: "Wren", app: undefined });

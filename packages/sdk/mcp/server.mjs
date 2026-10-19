@@ -3,10 +3,11 @@
  * Every Decks verb as an MCP tool, for an agent that can only call tools.
  *
  * JSON-RPC 2.0 over stdio, no dependencies: the protocol is small enough to hold in one file.
- * Each verb in the table is a tool named `decks_<verb>` (`decks_pen_edit`), whose input is an
- * object keyed by the verb's parameter names; a call is one `POST /api/v1/<verb>` through the
- * SDK, as the agent named by `DECKS_AGENT`. `DECKS_TOOLS` narrows the list to some groups
- * (`stage,pen,boards`), since fifty tools is more than most agents want to read.
+ * Each call in the table is a tool named `decks_<noun>_<verb>` (`decks_canvas_insert`), whose input
+ * is an object keyed by the call's parameter names; a call is one `POST /api/v1/<name>` through
+ * the SDK, as the agent named by `DECKS_AGENT`. `DECKS_TOOLS` narrows the list to some groups
+ * (`canvas,board,view`), since sixty tools is more than most agents want to read. The old names
+ * are not listed, but a tool named for one (`decks_pen_edit`) still answers, for one release.
  */
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,7 +15,8 @@ import { connect, DecksError } from "../src/index.js";
 
 const VERBS = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
 const wanted = (process.env.DECKS_TOOLS ?? "").split(",").map((one) => one.trim()).filter(Boolean);
-const shown = wanted.length ? VERBS.filter((verb) => wanted.includes(verb.group) || wanted.includes(verb.name)) : VERBS;
+const current = VERBS.filter((verb) => !verb.alias);
+const shown = wanted.length ? current.filter((verb) => wanted.includes(verb.group) || wanted.includes(verb.name)) : current;
 
 export const toolName = (verb) => `decks_${verb.name.replace(/\./g, "_")}`;
 
@@ -31,7 +33,7 @@ export const TOOLS = shown.map((verb) => ({
 
 let decks;
 async function callTool(name, input) {
-	const verb = shown.find((one) => toolName(one) === name);
+	const verb = shown.find((one) => toolName(one) === name) ?? VERBS.find((one) => one.alias && toolName(one) === name);
 	if (!verb) throw new Error(`There is no tool called ${name}.`);
 	decks ??= connect({ notes: () => {} });
 	const args = verb.params.map((param) => input?.[param.name]);
