@@ -188,6 +188,13 @@ export function Stage(props: {
 	/** The same, named by a board: the button in its own title bar (`board/BoardFrame.tsx`). */
 	onFocusBoard?: (path: string) => void;
 	/**
+	 * The selected board gets the action pill on every device, and not only where boards have no
+	 * title bars. For a host whose boards' bars carry no actions (`PlainBoard`), as `mountCanvas`'s do.
+	 */
+	boardPill?: boolean;
+	/** The pill's Properties, for a host with its own properties panel; absent, the canvas's own opens. */
+	onProperties?: () => void;
+	/**
 	 * What the focus view's header needs from the app: the canvas's name for the trail, and the two
 	 * panels it can open and close. The canvas's own toolbars are hidden while a board is in focus, so
 	 * these are the header's, in the same row as the board's own bar (`FocusBar` below).
@@ -2946,7 +2953,7 @@ export function Stage(props: {
 			>
 				<div class="bar-track" ref={setBarLayer} />
 			</div>
-			<Show when={!BARS && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
+			<Show when={(!BARS || props.boardPill) && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout
 						board={board}
@@ -3001,7 +3008,7 @@ export function Stage(props: {
 											}
 										: {}),
 									onDuplicate: () => penDuplicate(),
-									onProperties: () => setPenSheet(true),
+									onProperties: () => (props.onProperties ? props.onProperties() : setPenSheet(true)),
 									onDelete: () => penDeleteSelected(),
 								}
 							: {})}

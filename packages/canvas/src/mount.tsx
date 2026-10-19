@@ -3,7 +3,7 @@ import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import { fitInto } from "./camera/camera.ts";
-import { canvasBox } from "./camera/insets.ts";
+import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { boardsOf, createDrawing } from "./drawing.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
@@ -65,6 +65,8 @@ export interface CanvasOptions {
 	 * and drives them with `setTool`; the properties panel still shows for what is selected.
 	 */
 	toolbar?: boolean;
+	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
+	onProperties?: () => void;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
@@ -108,6 +110,8 @@ export function fitAll(doc: PenDocument, view: { width: number; height: number }
 	return fitInto(boxes, view, canvasBox(view));
 }
 
+let insetsWatched = false;
+
 /** The empty picture: a board with no picture source is drawn as a blank sheet. */
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
 
@@ -120,6 +124,15 @@ const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
  * Decks app.
  */
 export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHandle {
+	/*
+	 * What the host's panels cover, so a fit frames into the canvas between them and the camera
+	 * keeps what is picked clear of them: each panel standing beside the canvas says so with
+	 * `data-inset="left"` (or right, top, bottom), as the Decks app's do. Once a page.
+	 */
+	if (!insetsWatched && typeof document !== "undefined") {
+		insetsWatched = true;
+		watchInsets();
+	}
 	const base = options.base ?? (typeof location === "undefined" ? "/" : location.href);
 	const answers: Partial<CanvasHost> = {
 		fileUrl: options.resolveUrl ?? ((path) => new URL(path, new URL(base, typeof location === "undefined" ? "http://canvas.invalid/" : location.href)).href),
@@ -180,6 +193,8 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 								mode={mode()}
 								renderer="dom"
 								boardsMayStart={true}
+								boardPill={true}
+								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
 								opening={{ camera: opening }}
 								boards={boards()}
 								pen={pen()}
