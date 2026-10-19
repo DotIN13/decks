@@ -1464,6 +1464,363 @@
 		}
 	}
 
+	// --- lifting parts out --------------------------------------------------------
+
+	/*
+	 * Drag (or copy) anything out of a board and it lands on the canvas as the drawing's own item.
+	 *
+	 * This side only says what was picked up: a *clip*, a small tree of the selection with what
+	 * the page alone knows (sizes on screen, colours, the language of a code block, the header
+	 * row of a table, where a picture lives in the deck). The app's converter
+	 * (`web/src/canvas/editor/core/clip.ts`) decides what it becomes. The clip goes out as
+	 * `application/x-decks-clip` beside HTML and plain text, so another app still gets words.
+	 *
+	 * Always a copy: `effectAllowed = "copy"`, so a drag out of a board being typed into never
+	 * cuts its words. And a clip is never dropped on a board, this one or another: boards are
+	 * written by their author or agent.
+	 */
+	const CLIP = "application/x-decks-clip";
+	const BLOCKISH = "p,li,td,th,h1,h2,h3,h4,h5,h6,pre,blockquote,dt,dd,figcaption";
+	const INLINE = new Set(["span", "a", "b", "strong", "em", "i", "mark", "font", "code", "u", "s", "del", "small", "sup", "sub", "kbd"]);
+	const MEDIA_TAGS = new Set(["img", "svg", "canvas", "video", "audio"]);
+	const SKIP = new Set(["script", "style", "template", "noscript", "button", "input", "select", "textarea", "iframe"]);
+
+	/** A computed colour as `#rrggbb`, or null when it is see-through. */
+	function hexOf(colour) {
+		const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(String(colour));
+		if (!m) return null;
+		if (m[4] !== undefined && parseFloat(m[4]) === 0) return null;
+		return `#${[m[1], m[2], m[3]].map((v) => Math.round(Number(v)).toString(16).padStart(2, "0")).join("")}`;
+	}
+
+	/** Screen pixels per board pixel: the canvas's zoom, as the frame is drawn in the app. */
+	function scaleOnScreen() {
+		try {
+			const frame = window.frameElement;
+			if (frame && frame.offsetWidth) return frame.getBoundingClientRect().width / frame.offsetWidth;
+		} catch {
+			/* not in the app */
+		}
+		return 1;
+	}
+
+	/** A picture's deck-relative path, when it lives in the deck (served under this board's `/api/board/`). */
+	function deckPathOf(src) {
+		try {
+			const url = new URL(src, location.href);
+			if (url.origin !== location.origin) return null;
+			if (url.pathname.startsWith(`${API}/board/`)) return decodeURIComponent(url.pathname.slice(`${API}/board/`.length));
+		} catch {
+			/* not a URL */
+		}
+		return null;
+	}
+
+	const elementOf = (node) => (node?.nodeType === 1 ? node : node?.parentElement ?? null);
+
+	/** An inline SVG with the colours its stylesheet gave it written in, so it draws the same alone. */
+	function svgMarkup(svg) {
+		const copy = svg.cloneNode(true);
+		const live = [svg, ...svg.querySelectorAll("*")];
+		const made = [copy, ...copy.querySelectorAll("*")];
+		for (let i = 0; i < live.length && i < 4000; i++) {
+			const style = getComputedStyle(live[i]);
+			const own = made[i];
+			for (const name of ["fill", "stroke", "stroke-width", "opacity", "font-size", "font-family", "font-weight", "color"]) {
+				const value = style.getPropertyValue(name);
+				if (value) own.style.setProperty(name, value);
+			}
+		}
+		const box = svg.getBoundingClientRect();
+		copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		if (!copy.getAttribute("width")) copy.setAttribute("width", String(Math.round(box.width)));
+		if (!copy.getAttribute("height")) copy.setAttribute("height", String(Math.round(box.height)));
+		return new XMLSerializer().serializeToString(copy);
+	}
+
+	/**
+	 * One node as the clip's tree: a string for words, `{ t, a?, c?, k? }` for an element (its tag,
+	 * the attributes the converter reads, a colour that is not its parent's, its children). With a
+	 * `range`, only what the range holds, words cut where it starts and ends.
+	 */
+	function treeOf(node, range) {
+		if (node.nodeType === 3) {
+			if (!range) return node.data;
+			if (!range.intersectsNode(node)) return null;
+			const from = node === range.startContainer ? range.startOffset : 0;
+			const to = node === range.endContainer ? range.endOffset : node.data.length;
+			return node.data.slice(from, to);
+		}
+		if (node.nodeType !== 1) return null;
+		const el = node;
+		const t = el.tagName.toLowerCase();
+		if (SKIP.has(t) || el.hasAttribute("data-decks-ui") || el.hidden) return null;
+		if (range && !range.intersectsNode(el)) return null;
+		const style = getComputedStyle(el);
+		if (style.display === "none" || style.visibility === "hidden") return null;
+		const a = {};
+		const out = { t };
+		if (t === "a" && el.href) a.href = el.getAttribute("href")?.startsWith("#") ? el.getAttribute("href") : el.href;
+		if (t === "ol" && el.start && el.start !== 1) a.start = String(el.start);
+		if (el.dataset?.tone) a.tone = el.dataset.tone;
+		const cls = el.getAttribute("class");
+		if (cls && /callout|lang|hljs/.test(cls)) a.class = cls;
+		if (t === "li") {
+			const box = el.querySelector(':scope > input[type="checkbox"], :scope > label > input[type="checkbox"], :scope > p > input[type="checkbox"]');
+			if (box) a.task = box.checked ? "x" : " ";
+		}
+		if (t === "td" || t === "th") {
+			a.col = String(el.cellIndex);
+			if (style.textAlign === "center" || style.textAlign === "right") a.align = style.textAlign;
+		}
+		if (MEDIA_TAGS.has(t)) {
+			const box = el.getBoundingClientRect();
+			a.w = String(Math.round(box.width));
+			a.h = String(Math.round(box.height));
+			const radius = parseFloat(style.borderTopLeftRadius);
+			if (radius) a.radius = String(Math.round(radius));
+			if (t === "img" || t === "video" || t === "audio") {
+				const src = el.currentSrc || el.src || el.querySelector("source")?.src || "";
+				if (src) a.src = src;
+				const path = src ? deckPathOf(src) : null;
+				if (path) a.path = path;
+				const alt = el.getAttribute("alt") || el.getAttribute("title") || el.getAttribute("aria-label");
+				if (alt) a.alt = alt;
+			}
+			if (t === "svg") {
+				a.svg = svgMarkup(el);
+				const label = el.getAttribute("aria-label") || el.querySelector("title")?.textContent;
+				if (label) a.alt = label;
+			}
+			if (t === "canvas") {
+				try {
+					a.data = el.toDataURL("image/png");
+				} catch {
+					return null; // a tainted canvas has no pixels to give
+				}
+			}
+			out.a = a;
+			return out;
+		}
+		if (t === "pre") {
+			const code = el.querySelector(":scope > code");
+			const lang = el.dataset.lang || code?.dataset?.lang || /(?:^|\s)lang(?:uage)?-([\w+#-]+)/.exec(`${code?.className ?? ""} ${el.className}`)?.[1] || "";
+			if (lang) a.lang = lang;
+			let text = el.textContent ?? "";
+			// Part of a block of code is that part; the whole of it, or more, is all of it.
+			if (range) {
+				const all = document.createRange();
+				all.selectNodeContents(el);
+				const covers = range.compareBoundaryPoints(Range.START_TO_START, all) <= 0 && range.compareBoundaryPoints(Range.END_TO_END, all) >= 0;
+				if (!covers) {
+					const part = range.cloneRange();
+					if (part.compareBoundaryPoints(Range.START_TO_START, all) < 0) part.setStart(all.startContainer, all.startOffset);
+					if (part.compareBoundaryPoints(Range.END_TO_END, all) > 0) part.setEnd(all.endContainer, all.endOffset);
+					text = part.toString();
+				}
+			}
+			out.a = a;
+			out.k = [text];
+			return out;
+		}
+		if (INLINE.has(t) && el.parentElement) {
+			const mine = hexOf(style.color);
+			const parent = hexOf(getComputedStyle(el.parentElement).color);
+			if (mine && parent && mine !== parent && t !== "a" && t !== "code") out.c = mine;
+			const weight = Number(style.fontWeight) || 400;
+			if (t === "span" && weight >= 600 && (Number(getComputedStyle(el.parentElement).fontWeight) || 400) < 600) a.bold = "1";
+			if (t === "span" && style.fontStyle === "italic" && getComputedStyle(el.parentElement).fontStyle !== "italic") a.italic = "1";
+		}
+		if (Object.keys(a).length) out.a = a;
+		const kids = [];
+		for (const child of el.childNodes) {
+			const tree = treeOf(child, range);
+			if (tree !== null && tree !== "") kids.push(tree);
+		}
+		if (kids.length) out.k = kids;
+		return out;
+	}
+
+	/** The font size the words of a selection are set at: its first paragraph, item or cell. */
+	function wordSize(range, common) {
+		let pick = common.closest(BLOCKISH);
+		if (!pick) {
+			for (const el of common.querySelectorAll("p,li,td,th,dd,blockquote")) {
+				if (range.intersectsNode(el)) {
+					pick = el;
+					break;
+				}
+			}
+		}
+		pick ??= common;
+		const size = parseFloat(getComputedStyle(pick).fontSize) || 16;
+		return pick.tagName === "PRE" ? size / 0.88 : size;
+	}
+
+	/** What every clip says: which board, which block, the zoom, the words' colour. */
+	function baseClip(el) {
+		const block = el?.closest?.("[data-id]");
+		return {
+			v: 1,
+			...(BOARD_PATH ? { board: BOARD_PATH } : {}),
+			...(block ? { block: block.dataset.id } : {}),
+			scale: Math.round(scaleOnScreen() * 1000) / 1000,
+			colour: hexOf(getComputedStyle(el?.closest?.(BLOCKISH) ?? document.body).color) ?? undefined,
+		};
+	}
+
+	/** What a selection is, as a clip, with the HTML and the words other apps get. */
+	function clipOfRange(source) {
+		const range = source.cloneRange();
+		// A whole item or cell picked (three clicks do it) is that item or that cell, not its words.
+		const holder = elementOf(range.commonAncestorContainer)?.closest("li,td,th");
+		if (holder && range.toString().trim() && range.toString().trim() === (holder.textContent ?? "").trim()) range.selectNode(holder);
+		const common = elementOf(range.commonAncestorContainer);
+		if (!common) return null;
+		const inside = [];
+		for (let up = common; up && up !== document.body && up !== document.documentElement; up = up.parentElement) inside.push(up.tagName.toLowerCase());
+		const top = treeOf(common, range);
+		const tree = common.tagName === "PRE" || MEDIA_TAGS.has(common.tagName.toLowerCase()) ? [top] : (top?.k ?? []);
+		const clip = baseClip(common);
+		clip.inside = inside;
+		clip.tree = tree;
+		const pre = common.closest("pre");
+		if (pre) {
+			const code = pre.querySelector(":scope > code");
+			clip.lang = pre.dataset.lang || code?.dataset?.lang || /(?:^|\s)lang(?:uage)?-([\w+#-]+)/.exec(`${code?.className ?? ""} ${pre.className}`)?.[1] || "";
+		}
+		const callout = common.closest(".callout, blockquote");
+		if (callout?.dataset?.tone) clip.tone = callout.dataset.tone;
+		if (callout?.classList.contains("callout")) clip.callout = true;
+		const table = common.closest("table");
+		if (table) {
+			const head = table.tHead?.rows[0] ?? (table.rows[0]?.querySelector("th") ? table.rows[0] : null);
+			if (head) clip.head = treeOf(head, null);
+		}
+		const box = range.getBoundingClientRect();
+		clip.width = Math.round(box.width);
+		clip.height = Math.round(box.height);
+		clip.left = Math.round(box.left);
+		clip.top = Math.round(box.top);
+		clip.fontSize = Math.round(wordSize(range, common) * 10) / 10;
+		const div = document.createElement("div");
+		div.append(range.cloneContents());
+		return { clip, html: div.innerHTML, text: range.toString() };
+	}
+
+	/** A picture, a chart, a drawing, a player or a link picked up by itself. */
+	function clipOfElement(el) {
+		const tree = treeOf(el, null);
+		if (!tree) return null;
+		const clip = baseClip(el);
+		const box = el.getBoundingClientRect();
+		clip.inside = [];
+		for (let up = el.parentElement; up && up !== document.body && up !== document.documentElement; up = up.parentElement) clip.inside.push(up.tagName.toLowerCase());
+		clip.tree = [tree];
+		clip.width = Math.round(box.width);
+		clip.height = Math.round(box.height);
+		clip.left = Math.round(box.left);
+		clip.top = Math.round(box.top);
+		clip.fontSize = parseFloat(getComputedStyle(el).fontSize) || 16;
+		const text = el.tagName === "A" ? `${el.textContent ?? ""}`.trim() : (el.getAttribute?.("alt") ?? "");
+		return { clip, html: el.outerHTML, text };
+	}
+
+	/** Where the app reads a drag's clip while it is over the canvas: drag data is sealed until the drop. */
+	function share(clip) {
+		try {
+			if (window.top && window.top !== window) window.top.__decksClip = clip;
+		} catch {
+			/* not the app's frame */
+		}
+	}
+
+	/** The clip a drag starting at `target` carries, or null when the drag is the board's own. */
+	function clipForDrag(target) {
+		const selection = getSelection();
+		const picked = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
+		const media = target.closest("img, svg, canvas, video, audio");
+		const outer = media?.tagName.toLowerCase() === "svg" ? [...[media], ...ancestorsOf(media)].filter((el) => el.tagName.toLowerCase() === "svg").pop() : media;
+		if (picked && (!media || picked.intersectsNode(media)) && picked.intersectsNode(target)) return clipOfRange(picked);
+		if (outer) return clipOfElement(outer);
+		const link = target.closest("a[href]");
+		if (link) return clipOfElement(link);
+		// A board's own drag and drop (a card in a kanban, a handle) is the board's.
+		return null;
+	}
+	function ancestorsOf(el) {
+		const out = [];
+		for (let up = el.parentElement; up; up = up.parentElement) out.push(up);
+		return out;
+	}
+
+	document.addEventListener("dragstart", (event) => {
+		if (event.defaultPrevented || !event.dataTransfer) return;
+		const target = elementOf(event.target);
+		if (!target || target.closest("[data-decks-ui]")) return;
+		// Something the board made draggable itself, and not a picture: the board's own drag.
+		if (target.closest('[draggable="true"]') && !target.closest("img, svg, canvas, video, audio") && getSelection()?.isCollapsed !== false) return;
+		const made = clipForDrag(target);
+		if (!made || !made.clip.tree?.length) return;
+		made.clip.grab = { x: Math.round(event.clientX - made.clip.left), y: Math.round(event.clientY - made.clip.top) };
+		event.dataTransfer.setData(CLIP, JSON.stringify(made.clip));
+		if (made.html) event.dataTransfer.setData("text/html", made.html);
+		if (made.text) event.dataTransfer.setData("text/plain", made.text);
+		// Copy, never move: an editable board must not lose its words.
+		event.dataTransfer.effectAllowed = "copy";
+		share(made.clip);
+	});
+	document.addEventListener("dragend", () => share(undefined));
+
+	/* ⌘C writes the same clip a drag does, so ⌘V on the canvas makes the same thing. */
+	document.addEventListener("copy", (event) => {
+		if (!event.clipboardData || event.defaultPrevented) return;
+		const active = document.activeElement;
+		if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+		const selection = getSelection();
+		if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+		const made = clipOfRange(selection.getRangeAt(0));
+		if (!made || !made.clip.tree?.length) return;
+		event.clipboardData.setData(CLIP, JSON.stringify(made.clip));
+		event.clipboardData.setData("text/html", made.html);
+		event.clipboardData.setData("text/plain", made.text);
+		event.preventDefault();
+	});
+
+	/* A clip is never dropped on a board, its own or another: the cursor says no and nothing happens. */
+	const carriesClip = (event) => Array.from(event.dataTransfer?.types ?? []).includes(CLIP);
+	window.addEventListener(
+		"dragover",
+		(event) => {
+			if (!carriesClip(event)) return;
+			event.preventDefault();
+			event.dataTransfer.dropEffect = "none";
+		},
+		true,
+	);
+	window.addEventListener(
+		"drop",
+		(event) => {
+			if (!carriesClip(event)) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		},
+		true,
+	);
+
+	/** "Open in board" on the canvas: the block an item came from, outlined for a moment. */
+	window.__decksFlash = (block) => {
+		const el = block ? document.querySelector(`[data-id="${CSS.escape(String(block))}"]`) : null;
+		(el ?? document.body).animate?.(
+			[
+				{ outline: "3px solid rgb(59 92 246 / 90%)", outlineOffset: "4px" },
+				{ outline: "3px solid rgb(59 92 246 / 0%)", outlineOffset: "4px" },
+			],
+			{ duration: 1800, easing: "ease-out" },
+		);
+		return !!el;
+	};
+
 	// --- go ----------------------------------------------------------------------
 
 	/*
