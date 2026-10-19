@@ -1,6 +1,6 @@
 import { baseTheme, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import { fitInto } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
@@ -12,7 +12,7 @@ import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type StageComment } from "./Stage.tsx";
 import { drawing as inkOn, setDrawing } from "./state/ink.ts";
-import { setPenTool } from "./state/pen-tools.ts";
+import { penTool, setPenTool, type PenTool } from "./state/pen-tools.ts";
 
 /** What a host gives `mountCanvas`. Only `text` is needed. */
 export interface CanvasOptions {
@@ -60,6 +60,13 @@ export interface CanvasOptions {
 	onComment?: (comment: StageComment) => void;
 	/** Export drawn items as a picture (the properties panel's export; absent: nothing happens). */
 	onExport?: (ids: string[]) => void;
+	/**
+	 * Draw the canvas's own column of tools. Default: true. A host with its own tools turns it off
+	 * and drives them with `setTool`; the properties panel still shows for what is selected.
+	 */
+	toolbar?: boolean;
+	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
+	onTool?: (tool: PenTool) => void;
 }
 
 /** A mounted canvas. */
@@ -74,6 +81,12 @@ export interface CanvasHandle {
 	setMode(mode: "edit" | "browse"): void;
 	/** Turn ink on (browse mode: pen, marker, eraser and lasso over the canvas) or off. */
 	setDrawing(on: boolean): void;
+	/** Take a tool in hand, in edit mode: `select` puts it down. */
+	setTool(tool: PenTool): void;
+	/** The tool in hand now. */
+	tool(): PenTool;
+	/** Fit everything on the drawing in the host. */
+	fit(): void;
 	/** Apply pen operations as the person's edit (`@decks/pen`'s `Op`s): `onEdits` hears it. */
 	edit(ops: unknown[]): void;
 	undo(): void;
@@ -144,6 +157,11 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	const editing = editable ? { onPenEdit: edit, onResize: resizeBoard } : {};
 	const commenting = options.onComment ? { onComment: options.onComment } : {};
 
+	const tools = createRoot((done) => {
+		createEffect(on(penTool, (tool) => options.onTool?.(tool), { defer: true }));
+		return done;
+	});
+
 	const dispose = render(() => {
 		const pen = createMemo(() => ({ doc: doc(), base }));
 		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
@@ -184,7 +202,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 					</div>
 				</div>
 				<Show when={editable && !inking()}>
-					<PenBar doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
+					<PenBar tools={options.toolbar !== false} doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
 				</Show>
 				<Show when={editable && inking()}>
 					<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
@@ -210,12 +228,20 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 			if (on) setModeSignal("browse");
 			setDrawing(on);
 		},
+		setTool(tool) {
+			setDrawing(false);
+			setModeSignal("edit");
+			setPenTool(tool);
+		},
+		tool: () => untrack(penTool),
+		fit: () => setCamera(fitAll(untrack(doc), { width: host.clientWidth, height: host.clientHeight }, look())),
 		edit,
 		undo: () => step("undo"),
 		redo: () => step("redo"),
 		camera: () => untrack(camera),
 		setCamera,
 		dispose() {
+			tools();
 			dispose();
 			setDrawing(false);
 			setPenTool("select");

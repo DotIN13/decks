@@ -46,6 +46,8 @@ export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key?
 ];
 
 export function PenBar(props: {
+	/** Draw the column of tools. Default: true; a host with its own tools turns it off (`mountCanvas`). */
+	tools?: boolean;
 	doc: PenDocument | undefined;
 	onEdit: (ops: unknown[]) => void;
 	onStep: (direction: "undo" | "redo") => void;
@@ -107,7 +109,7 @@ export function PenBar(props: {
 	return (
 		<>
 		{/* Not on a phone: its tools are a double-tap on bare canvas there (`Stage.tsx`, the canvas menu), and undo and redo are in `⋯`. */}
-		<Show when={!isPhone()}>
+		<Show when={!isPhone() && props.tools !== false}>
 		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
 			{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
 			<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
