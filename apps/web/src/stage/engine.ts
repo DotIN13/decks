@@ -10,7 +10,6 @@
  * Fonts, pictures, icons and the markdown reader are the app's own, fetched here and handed to both
  * engines once each.
  */
-import { pictureUrl } from "./picture-url.ts";
 import type { PageEngine } from "@decks/stage";
 import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
@@ -715,7 +714,8 @@ export class StageEngine {
 		for (const url of urls) {
 			if (url.startsWith("icon:")) this.fetchIcon(url.slice(5));
 			else if (!this.picturesAsked.has(url)) {
-				const whole = pictureUrl(url, this.base, location.href);
+				// `base` is whole (`state/whole-folder.ts`); an address that still cannot be read is not fetched.
+				const whole = URL.canParse(url, this.base || location.href) ? new URL(url, this.base || location.href).href : undefined;
 				if (whole) this.fetchPicture(url, whole, false);
 			}
 		}

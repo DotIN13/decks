@@ -3,6 +3,7 @@ import { createSignal } from "solid-js";
 import type { ServerMessage } from "@decks/protocol";
 import { applyEdits } from "@decks/pen";
 import { send } from "./socket.ts";
+import { wholeFolder } from "./whole-folder.ts";
 
 /**
  * Each chat's stage drawing, from `canvas.pen` (`stage/pens.ts` on the server).
@@ -17,10 +18,12 @@ const [pens, setPens] = createSignal<Record<string, StagePen>>({});
 
 export { pens };
 
+const folderOf = (base: string) => wholeFolder(rebase(base), location.href);
+
 export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }>): void {
 	const { type: _type, agentId, ...given } = message;
-	// The folder image fills are read against is a path on the backend, so it goes under this tab's prefix.
-	const pen = { ...given, base: rebase(given.base) };
+	// The folder image fills are read against: under this tab's prefix, and whole (`whole-folder.ts`).
+	const pen = { ...given, base: folderOf(given.base) };
 	const known = pens()[agentId];
 	if (known && known.rev === pen.rev && known.stage === pen.stage) return;
 	setPens({ ...pens(), [agentId]: pen });
@@ -40,7 +43,7 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 	try {
 		const doc = applyEdits(known.doc, message.edits);
 		lastEdits.set(message.agentId, { stage: message.stage, from: message.from, rev: message.rev, edits: message.edits });
-		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined } });
+		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: folderOf(message.base), error: undefined } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}
