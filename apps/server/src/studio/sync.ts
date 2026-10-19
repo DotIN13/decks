@@ -30,6 +30,8 @@ export interface SyncOptions {
 
 interface State {
 	studio: string;
+	/** The Studio account this state belongs to: a key for another account starts afresh. */
+	user?: string;
 	canvases: Record<string, { id: string; rev: number; pen: string }>;
 	files: Record<string, { version: number; hash: string }>;
 }
@@ -87,6 +89,7 @@ export class HarnessSync {
 			const hello = await this.call("GET", "/sync/v1/hello");
 			this.me = hello.harness.id;
 			this.user = hello.user.id;
+			if (this.state.user !== this.user) this.state = { studio: this.o.studio, user: this.user, canvases: {}, files: {} };
 			this.log(`connected to ${this.o.studio} as ${hello.user.email}, harness "${hello.harness.name}"`);
 		}
 		await this.syncCanvases();
