@@ -162,7 +162,6 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 
 	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}) });
 	const { doc, edit, step, moveBoard, resizeBoard } = drawing;
-	const boards = createMemo(() => boardsOf(doc()));
 
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
@@ -182,6 +181,13 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 
 	const dispose = render(() => {
 		const pen = createMemo(() => ({ doc: doc(), base }));
+		/*
+		 * In the canvas's own root, as every computation here is. Made beside the drawing, it belonged to
+		 * whatever was running when the host called `mountCanvas` (Studio mounts from an effect), and
+		 * went with it the next time that ran: the boards stopped following the drawing, so a board
+		 * moved once and then stayed where the stage last saw it however often it was dragged.
+		 */
+		const boards = createMemo(() => boardsOf(doc()));
 		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 		const inking = createMemo(() => inkOn() && mode() === "browse");
 		return (
