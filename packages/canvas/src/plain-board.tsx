@@ -70,7 +70,14 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !live() && press(event)}>
 				<Show when={live()}>
-					<iframe class="plain-board-page" src={props.page} onLoad={() => say(live())} title={props.board.title} data-path={props.board.path} style={{ width: "100%", height: "100%", border: "0" }} />
+					<iframe
+						class="plain-board-page"
+						src={props.page}
+						onLoad={() => say(live())}
+						title={props.board.title}
+						data-path={props.board.path}
+						style={{ width: "100%", height: "100%", border: "0" }}
+					/>
 				</Show>
 			</div>
 		</div>

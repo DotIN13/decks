@@ -1,16 +1,17 @@
-import { apply, baseTheme, diff, parse, placements, reroute, serialize, walk, type Frame, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
-import type { Board, Camera } from "@decks/protocol";
-import { batch, createMemo, createSignal, Show, untrack } from "solid-js";
+import { baseTheme, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
+import type { Camera } from "@decks/protocol";
+import { createMemo, createSignal, Show, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import { fitInto } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
+import { boardsOf, createDrawing } from "./drawing.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type StageComment } from "./Stage.tsx";
-import { drawing, setDrawing } from "./state/ink.ts";
+import { drawing as inkOn, setDrawing } from "./state/ink.ts";
 import { setPenTool } from "./state/pen-tools.ts";
 
 /** What a host gives `mountCanvas`. Only `text` is needed. */
@@ -83,30 +84,6 @@ export interface CanvasHandle {
 	dispose(): void;
 }
 
-const isBoard = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.board";
-const boardPath = (node: PenNode) => String((node.metadata as { path?: unknown }).path ?? node.id);
-const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
-
-/** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
-export function boardsOf(doc: PenDocument): Board[] {
-	const boards: Board[] = [];
-	for (const node of doc.children ?? []) {
-		if (!isBoard(node)) continue;
-		boards.push({
-			path: boardPath(node),
-			title: typeof node.name === "string" && node.name ? node.name : boardPath(node),
-			format: "board",
-			x: num(node.x, 0),
-			y: num(node.y, 0),
-			w: num(node.width, 960),
-			h: num(node.height, 640),
-			rev: 0,
-			inContext: [],
-		});
-	}
-	return boards;
-}
-
 /** A camera that shows everything on the drawing, in a host this big. */
 export function fitAll(doc: PenDocument, view: { width: number; height: number }, look: "light" | "dark" = "light"): Camera {
 	const placed = placements(doc, { theme: baseTheme(doc, look) });
@@ -135,93 +112,43 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	};
 	setCanvasHost(answers);
 
-	const [doc, setDoc] = createSignal<PenDocument>(parse(options.text));
-	const opening = options.camera ?? fitAll(untrack(doc), { width: host.clientWidth, height: host.clientHeight }, options.dark ? "dark" : "light");
+	const opening = options.camera ?? fitAll(parse(options.text), { width: host.clientWidth, height: host.clientHeight }, options.dark ? "dark" : "light");
 	const [camera, setCameraSignal] = createSignal<Camera>(opening);
 	const [mode, setModeSignal] = createSignal<"edit" | "browse">(options.mode ?? "edit");
 	const [selected, setSelected] = createSignal<string | undefined>();
 	const [dark, setDarkSignal] = createSignal(options.dark === true);
 	const look = () => (dark() ? "dark" : "light");
+	/*
+	 * On the host, and on the page's root as the Decks app does: the menus and panels the canvas
+	 * opens in a portal on <body> read their colours from there.
+	 */
+	const rootScheme = document.documentElement.dataset.colorScheme;
 	const paintScheme = () => {
 		setCanvasScheme(look());
 		host.dataset.colorScheme = look();
+		document.documentElement.dataset.colorScheme = look();
 	};
 	paintScheme();
 
-	/** The person's own edits, to step back and forward through: each entry is the document before (undo) or after (redo). */
-	const undoStack: PenDocument[] = [];
-	const redoStack: PenDocument[] = [];
-
-	/** Arrows follow what they join: the drawing's arrows are routed again after every edit, as the Decks server does. */
-	const rerouted = (next: PenDocument) => {
-		const placed = placements(next, { theme: baseTheme(next, look()) });
-		const byPath = new Map<string, string>();
-		for (const node of walk(next.children ?? [])) if (isBoard(node)) byPath.set(boardPath(node), node.id);
-		reroute(next, placed, (name): Frame | undefined => {
-			const id = byPath.get(name);
-			return id ? placed.get(id)?.box : undefined;
-		});
-		return next;
-	};
-
-	/** Show `next` and tell the host what changed. */
-	const commit = (prev: PenDocument, next: PenDocument) => {
-		const edits = diff(prev, next);
-		if (edits.length === 0) return false;
-		setDoc(next);
-		options.onEdits?.(edits, next);
-		return true;
-	};
-
-	const edit = (ops: unknown[]) => {
-		if (options.readOnly || ops.length === 0) return;
-		const prev = untrack(doc);
-		let next: PenDocument;
-		try {
-			next = rerouted(apply(prev, ops as Parameters<typeof apply>[1], { theme: baseTheme(prev, look()) }).doc);
-		} catch (error) {
-			console.warn("[canvas] an edit was refused:", error instanceof Error ? error.message : error);
-			return;
-		}
-		if (commit(prev, next)) {
-			undoStack.push(prev);
-			if (undoStack.length > 200) undoStack.shift();
-			redoStack.length = 0;
-		}
-	};
-
-	const step = (direction: "undo" | "redo") => {
-		const from = direction === "undo" ? undoStack : redoStack;
-		const to = direction === "undo" ? redoStack : undoStack;
-		const target = from.pop();
-		if (!target) return;
-		const now = untrack(doc);
-		to.push(now);
-		commit(now, target);
-	};
-
+	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}) });
+	const { doc, edit, step, moveBoard, resizeBoard } = drawing;
 	const boards = createMemo(() => boardsOf(doc()));
-	/** A board moved or resized on the canvas is its item on the drawing moved or resized. */
-	const boardId = (path: string) => untrack(doc).children?.find((node) => isBoard(node) && boardPath(node) === path)?.id;
-	const moveBoard = (path: string, x: number, y: number) => {
-		const id = boardId(path);
-		if (id) edit([{ op: "update", id, set: { x: Math.round(x), y: Math.round(y) } }]);
-	};
-	const resizeBoard = (path: string, size: { w: number; h: number }) => {
-		const id = boardId(path);
-		if (id) edit([{ op: "update", id, set: { width: Math.round(size.w), height: Math.round(size.h) } }]);
-	};
 
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
 		options.onCamera?.(next);
 	};
 
-	const pen = createMemo(() => ({ doc: doc(), base }));
-	const editable = () => !options.readOnly;
+	const editable = !options.readOnly;
+	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
+	const editing = editable ? { onPenEdit: edit, onResize: resizeBoard } : {};
+	const commenting = options.onComment ? { onComment: options.onComment } : {};
 
-	const dispose = render(
-		() => (
+	const dispose = render(() => {
+		const pen = createMemo(() => ({ doc: doc(), base }));
+		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
+		const inking = createMemo(() => inkOn() && mode() === "browse");
+		return (
 			<div class="decks-canvas app" data-mode={mode()}>
 				<div class="work">
 					<div class="surface" data-surface="stage">
@@ -233,50 +160,41 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 								opening={{ camera: opening }}
 								boards={boards()}
 								pen={pen()}
-								{...(editable() ? { onPenEdit: edit } : {})}
+								{...editing}
 								onPenStep={step}
-								drawing={drawing() && mode() === "browse"}
+								drawing={inking()}
 								camera={camera()}
 								setCamera={setCamera}
 								selected={selected()}
 								onSelect={(path) => {
 									setSelected(path);
 									options.onSelect?.(path);
+									/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
+									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
 								}}
 								onMove={moveBoard}
-								{...(editable() ? { onResize: resizeBoard } : {})}
 								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} />}
 								shots={() => ({
 									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
 									ownPicture: true,
 								})}
-								{...(options.onComment ? { onComment: options.onComment } : {})}
+								{...commenting}
 							/>
 						</div>
 					</div>
 				</div>
-				<Show when={editable() && !(drawing() && mode() === "browse")}>
-					<PenBar
-						doc={doc()}
-						onEdit={edit}
-						onStep={step}
-						onArm={() => {}}
-						onExport={(ids) => options.onExport?.(ids)}
-					/>
+				<Show when={editable && !inking()}>
+					<PenBar doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
 				</Show>
-				<Show when={editable() && drawing() && mode() === "browse"}>
+				<Show when={editable && inking()}>
 					<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
 				</Show>
 			</div>
-		),
-		host,
-	);
+		);
+	}, host);
 
 	return {
-		setDocument(next) {
-			const value = typeof next === "string" ? parse(next) : next;
-			batch(() => setDoc(value));
-		},
+		setDocument: (next) => drawing.set(next),
 		document: () => untrack(doc),
 		text: () => serialize(untrack(doc)),
 		setDark(on) {
@@ -302,7 +220,8 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 			setDrawing(false);
 			setPenTool("select");
 			delete host.dataset.colorScheme;
+			if (rootScheme === undefined) delete document.documentElement.dataset.colorScheme;
+			else document.documentElement.dataset.colorScheme = rootScheme;
 		},
 	};
 }
-
