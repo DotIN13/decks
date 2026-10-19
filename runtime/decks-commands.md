@@ -1,97 +1,118 @@
 <!-- Generated from packages/api by scripts/gen-sdk.mjs. Edit the table there, then run the script. -->
 
 ```ts
-type Corner = { x1: number; y1: number } | { x: number; y: number };
-type Board = { path: string; title: string; x: number; y: number; w: number; h: number; box: Box; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string };
+type Item = { type: string; id?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
 type Box = { x1: number; y1: number; x2: number; y2: number };
-type Point = { x: number; y: number };
-type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "update"; id: string; set?: Record<string, unknown>; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "replace"; id: string; node: PenItem } | { op: "delete"; id: string } | { op: "move"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number } } | { op: "copy"; id: string; parent?: string | null; index?: number; box?: { x1?: number; y1?: number; x2?: number; y2?: number }; as?: string } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
+type Corner = { x1: number; y1: number } | { x: number; y: number };
+type Size = { w?: number; h?: number };
+type CanvasOp = { op: "insert"; item: Item; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "update"; id: string; set?: Record<string, unknown>; at?: Corner; size?: Size } | { op: "replace"; id: string; item: Item } | { op: "delete"; id: string } | { op: "move"; id: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
+type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
+type Screenshot = { file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string };
+type Canvas = { name: string; title: string; open: string[]; boards: number };
+type Subscription = { canvas: string; watching: boolean; since: number };
+type Board = { path: string; title: string; lastWrittenBy?: string };
+type Placement = { board: string; canvas: string; box: Box; clipped?: boolean };
 type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
+type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
+type Message = { from: string; task?: string; kind?: string; canvas?: string; item?: string; boards: string[]; at: number; reply?: boolean };
+type Camera = { x: number; y: number; zoom: number };
+type Point = { x: number; y: number };
 type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
 type AppKind = "static" | "build" | "server";
 type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; ms: number; errors: string[]; pending?: true };
 type WebTarget = string | { ref: string } | { name: string; nth?: number };
 ```
 
-**Boards: make, size and refresh a board file**
+**Canvas: every call takes { canvas }; left out, it is decks.here()**
 
-- `decks new-board` · `newBoard(options: { title: string; format?: "board" | "slides"; w?: number; h?: number; at?: Corner }): string`. Write a blank board and return its path. The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design; "slides" is a reveal deck of <section>s. `at` is its top-left corner on your stage: say it every time, after reading the stage with pen.read. Left out, the board goes beside your newest board and the result says where.
-- `decks fit` · `fit(path: string, options?: { canvas?: string; margin?: number }): { path: string; w: number; h: number; content?: { w: number; h: number; page?: number } }`. Set a board's height from its content, measured at the width it has on a canvas (`canvas` names one, else your stage's). The board must be on it. The notes say what the browser found: the height, the word count, the smallest type, content wider than the board, boxes that cut off their content, and any view that breaks when a control is pressed. Use it instead of a screenshot.
-- `decks resize` · `resize(path: string, size: { w?: number; h?: number }): { path: string; w: number; h: number }`. Set a board's size outright.
-- `decks report` · `report(path: string | string[]): { reported: string[] }`. Name boards you edited without showing them, so they are listed as yours.
-- `decks reload` · `reload(path: string): void`. Reload a board's frame, if you changed something the watcher cannot see.
+- `decks canvas read` · `decks.canvas.read(options?: { canvas?: string }): { canvas: string; title: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }`. Everything on the canvas, boards included, each with its box. A board is { type: "board", board: <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
+- `decks canvas insert` · `decks.canvas.insert(item: Item, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Item`. Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item's id or a board's path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame.
+- `decks canvas update` · `decks.canvas.update(id: string, change: { set?: Record<string, unknown>; at?: Corner; size?: Size }, options?: { canvas?: string }): Item`. Change an item's fields (`set`), its place (`at`) or its size (`size`). A board can be named by its path; its size here is its size on this canvas.
+- `decks canvas replace` · `decks.canvas.replace(id: string, item: Item, options?: { canvas?: string }): Item`. Swap a whole item for another, keeping its id and its place unless the new one says otherwise.
+- `decks canvas delete` · `decks.canvas.delete(id: string, options?: { canvas?: string }): { deleted: string }`. Take an item off the canvas. A board's file stays in the deck.
+- `decks canvas move` · `decks.canvas.move(id: string, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Item`. Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).
+- `decks canvas copy` · `decks.canvas.copy(id: string, options?: { canvas?: string; as?: string; at?: Corner; parent?: string | null }): Item`. Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`.
+- `decks canvas variables` · `decks.canvas.variables(set: Record<string, unknown>, options?: { canvas?: string; themes?: Record<string, string[]> | null }): { variables: Record<string, unknown>; themes?: Record<string, unknown> }`. Set the canvas's colour tokens, per theme such as light and dark: { accent: { type: "color", value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }; null removes one.
+- `decks canvas batch` · `decks.canvas.batch(ops: CanvasOp[], options?: { canvas?: string }): Item[]`. Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made.
+- `decks canvas fit` · `decks.canvas.fit(board: string, options?: { canvas?: string; margin?: number }): Fit`. Set a board's height from its content, measured at the width it has on this canvas; it must be on it. `notes` say what the browser found: the height, the word count, the smallest type, content wider than the board, boxes that cut off their content, and views that break when a control is pressed. Use it instead of a screenshot.
+- `decks canvas save` · `decks.canvas.save(id: string, frame: string, options?: { canvas?: string; replace?: boolean }): { frame: string; ref: string; replaced: boolean; overwrote?: boolean }`. Save an item as a reusable frame in frames/ ("frames/ui/card"), and put a ref to it in its place (`replace: false` leaves the canvas alone).
+- `decks canvas screenshot` · `decks.canvas.screenshot(options?: { canvas?: string; of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Screenshot`. A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an item's id, a board's path, a list of them, or a box; one board's path alone is that board as the person's browser has it now. A .pen file's path pictures that file whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
+- `decks canvas rename` · `decks.canvas.rename(title: string, options?: { canvas?: string }): Canvas`. What the person calls this canvas: a few words for what is on it, that a person would look for. The folder never changes.
+- `decks canvas file` · `decks.canvas.file(options?: { canvas?: string }): string`. The canvas's .pen file, to edit by hand instead.
+- `decks canvas watch` · `decks.canvas.watch(options?: { canvas?: string; off?: boolean }): Subscription`. Board and drawing changes on this canvas, made by anyone else, arrive in your inbox as events { kind, canvas, item, from, at } (decks.agent.inbox). `off: true` stops the watch.
 
-**Boards on your stage**
+**Board and deck: files in the deck folder, on any number of canvases**
 
-- `decks boards` · `boards(): Board[]`. Every board in the deck, placed as your stage has them.
-- `decks show` · `show(target: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean; at?: Corner }): { shown: string[] }`. Add these boards to your stage and move the camera to them. `at` places the one board named, top-left corner; for a board already on the stage it moves it. `highlight` outlines one data-id. A drawn item's id can be named instead of a board path: the camera goes to it.
-- `decks hide` · `hide(path: string | string[]): void`. Take boards off your stage, keeping them in your context.
-- `decks move` · `move(path: string, at: Point): Board`. Move a board on your stage: `at` is its top-left corner.
-- `decks cursor` · `cursor(path: string, at: Point | null): void`. A labelled dot on a board, at board coordinates; null removes it.
+- `decks board list` · `decks.board.list(): Board[]`. Every board file in the deck, placed or not.
+- `decks board create` · `decks.board.create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Board`. Write a blank board and return it; placing it is the canvas's job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design; "slides" is a reveal deck of <section>s.
+- `decks board get` · `decks.board.get(board: string): Board`. A board's path and title (the finding it states), and who last wrote it.
+- `decks board canvases` · `decks.board.canvases(board: string): Placement[]`. The canvases this board is on, with its place and size on each.
+- `decks board url` · `decks.board.url(board: string): string`. The board's address, for a browser such as Playwright.
+- `decks canvas list` · `decks.canvas.list(): Canvas[]`. Every canvas in the deck, and which agents have it open.
+- `decks canvas create` · `decks.canvas.create(title: string): Canvas`. A new, empty canvas, named from a title. Nobody moves to it: agent.update({ canvas }) makes it your home, view.goto shows it.
+- `decks frame create` · `decks.frame.create(path: string, item?: PenItem): { file: string; ref?: string; id: string }`. A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item. Placed on any canvas with { type: "ref", ref }.
+- `decks file url` · `decks.file.url(file: string): string`. A file on disk, as the address a board embeds.
 
-**Your view**
+**Agent: you, or another agent**
 
-- `decks camera` · `camera(at?: { x: number; y: number; zoom: number }, options?: { animate?: boolean }): { x: number; y: number; zoom: number } | null`. Where your stage is looking, or move it with { x, y, zoom }. `zoom` 1 is life size.
-- `decks viewport` · `viewport(): { width: number; height: number } | null`. The room your stage has on screen, in CSS pixels.
-- `decks screenshot` · `screenshot(options?: { of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): { file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string }`. A picture of your stage, or part of it, as the person sees it, saved to `file`. `of` is an item's id, a board's path, a list of them, or a box; nothing is the whole stage. A .pen file's path pictures that file whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on. One board's path alone is that board as the browser has it now.
+- `decks agent me` · `decks.agent.me(): Agent`. You: name, avatar, colour, workspace, tags and home canvas.
+- `decks agent update` · `decks.agent.update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Agent`. Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now), or your home canvas: the one the app shows beside you, and what decks.here() means for a call that names none. Set the first four early in every session.
+- `decks here` · `decks.here(): Canvas`. The canvas a call means when it names none: your home canvas for an agent, the board's canvas for a board button, the canvas on screen for the person. Asked, never set.
+- `decks agent claim` · `decks.agent.claim(boards: string | string[]): string[]`. Say these boards carry your work, without showing them: you become their writer.
+- `decks agent inbox` · `decks.agent.inbox(): Message[]`. Hand-offs waiting for you, and changes on canvases you watch (each canvas event is given once).
+- `decks agent list` · `decks.agent.list(options?: { workspace?: string }): Agent[]`. Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits for it.
+- `decks agent get` · `decks.agent.get(name: string): Agent`. Another agent, by name or id: kind, workspace, tags, state, home canvas.
+- `decks agent send` · `decks.agent.send(name: string, message: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }`. Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.
+- `decks agent queue` · `decks.agent.queue(name: string, work: { task: string; boards?: string[]; reply?: boolean }): { queued: true; position: number }`. Put work in the agent's queue, taken up after the turn it is running. Returns at once; with `reply: true` its report comes back to you.
+- `decks agent create` · `decks.agent.create(spec: { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; workspace?: string; tags?: string[]; canvas?: string }): Agent`. Start a new agent, then send or queue it work. `kind` is the runtime ("claude", "pi", "opencode", "opencode2", "antigravity"; yours when left out), `model` any model that kind runs, `thinking` how hard it thinks as that kind names it, `mode` its permission mode, `canvas` its home canvas (a new one when left out).
 
-**Stages**
+**View: what the person is looking at, moved only on purpose (no file changes)**
 
-- `decks stages` · `stages(): { name: string; title: string; open: string[]; boards: number; mine?: true }[]`. Every stage (canvas) and who has it open. A stage's `name` is its folder and never changes; its `title` is what the person calls it.
-- `decks open` · `open(name: string): { stage: string; boards: string[] }`. Move to another stage, by name or title: its boards become the ones you show, hide and move.
-- `decks new-stage` · `newStage(title: string): { stage: string }`. Make an empty stage from a title, and open it.
-- `decks title` · `title(title?: string): { stage: string; title: string }`. Name the canvas you are on, or read its name with nothing. Name it for what is on it, as a few words a person would look for.
+- `decks view goto` · `decks.view.goto(canvas: string): { canvas: string; moved: boolean; note?: string }`. Bring the person's screen to a canvas. Only the view moves; nobody's home canvas changes.
+- `decks view focus` · `decks.view.focus(target: string | string[], options?: { canvas?: string; highlight?: string; animate?: boolean }): { canvas: string; target: string | string[]; deferred?: string }`. Move the camera to a board or a drawn item on a canvas (a list frames them all), optionally outlining one data-id block inside a board. `animate: true` glides.
+- `decks view camera` · `decks.view.camera(): Camera`. Where the person's screen is looking, and its zoom.
+- `decks view move` · `decks.view.move(camera: { x: number; y: number; zoom: number; animate?: boolean }): Camera`. Move the person's camera outright: { x, y, zoom }, zoom 1 is life size.
+- `decks view viewport` · `decks.view.viewport(): { width: number; height: number } | null`. The room the screen has, in CSS pixels, or null when no screen has said.
+- `decks view cursor` · `decks.view.cursor(board: string, at: Point | null): void`. A labelled dot on a board, at board coordinates; null removes it.
+- `decks view reload` · `decks.view.reload(options: { board: string; canvas?: string }): { reloaded: number }`. Reload the board's page in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.
 
-**The drawing on your stage**
+**Apps: folders in apps/ that Decks serves, builds or runs**
 
-- `decks pen read` · `pen.read(path?: string): { stage?: string; file: string; ref?: string; version: string; error?: string; children: unknown[] }`. Your stage's drawing: every item as saved, plus its `box` on the stage. With `path`, any .pen file ("frames/ui/button", "canvases/<name>/canvas.pen").
-- `decks pen edit` · `pen.edit(edits: PenEdit[], options?: { path?: string }): { rev?: number; file?: string; ref?: string; results: { op: string; id: string; box?: Box; note?: string }[] }`. Edit your stage's drawing, or with `path` any .pen file; the edits apply together or not at all. A `box` places an item on the stage.
-- `decks pen create` · `pen.create(path: string, item?: PenItem): { file: string; ref?: string; id: string }`. A new .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item. One in frames/ is placed on any stage with { type: "ref", ref }.
-- `decks pen save` · `pen.save(id: string, path: string, options?: { replace?: boolean }): { frame: string; ref: string; replaced: boolean; overwrote: boolean }`. Save an item of your stage as a frame file at `path` in frames/, and put a ref to it in its place (`replace: false` leaves the stage alone).
-- `decks pen file` · `pen.file(): string`. The path of your stage's .pen file, to edit it by hand instead.
-
-**Agents**
-
-- `decks me` · `me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }): { name: string; avatar?: string; color: string; tags?: string[]; workspace?: string; avatarChanged?: string }`. Who you are: read with nothing, change with a patch. Set all four first in every session: a short name of your own, an avatar (an <svg> with xmlns and a viewBox, or an emoji), the project as `workspace`, and up to four tags for what you are doing now.
-- `decks agents` · `agents(options?: { filter?: { workspace?: string } }): { id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }[]`. Every agent; `filter.workspace` narrows to one project.
-- `decks send` · `send(to: string | { name: string; kind?: "pi" | "claude" | "opencode" | "opencode2" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; tags?: string[]; workspace?: string }, work: { task: string; boards?: string[]; reply?: boolean }): { queued: true; position: number; agent?: string; name?: string }`. Hand work over, and carry on: to an agent by name, or to { name, kind }, which makes it first. Returns at once; `reply: true` brings their report back to you.
-- `decks queue` · `queue(agentId?: string): { from: string; fromName: string; task: string; boards: string[]; at: number }[]`. What is waiting in an agent's queue: yours, or another's.
-
-**Apps**
-
-- `decks apps list` · `apps.list(): AppState[]`. Every app in the deck's apps/ folder, with its status.
-- `decks apps status` · `apps.status(name: string): AppState`. One app's state.
-- `decks apps create` · `apps.create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): { name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }`. Make an app folder from a starter ("static" default, "node", "solid", "react", "next"), and its board.
-- `decks apps board` · `apps.board(name: string): string`. The board for an app whose folder you wrote yourself.
-- `decks apps build` · `apps.build(name: string): AppOutcome`. Build an app; waits up to fifteen seconds, and `pending` means ask status later.
-- `decks apps run` · `apps.run(name: string): AppOutcome`. Start an app; waits up to fifteen seconds.
-- `decks apps stop` · `apps.stop(name: string): { stopped: boolean }`. Stop an app.
-- `decks apps restart` · `apps.restart(name: string): AppOutcome`. After you change a server app's code: stop it and start it again. Its board reloads by itself.
-- `decks apps logs` · `apps.logs(name: string, options?: { tail?: number }): string[]`. An app's log lines.
-- `decks apps check` · `apps.check(name: string): { verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }`. The app opened in the server's browser: what fit is to a board. Read `verdict`; `file` is a picture.
+- `decks apps list` · `decks.apps.list(): AppState[]`. Every app in the deck's apps/ folder, with its state.
+- `decks apps status` · `decks.apps.status(name: string): AppState`. One app's state.
+- `decks apps create` · `decks.apps.create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): { name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }`. A new app folder from a starter ("static" default, "node", "solid", "react", "next"), with its board.
+- `decks apps board` · `decks.apps.board(name: string): string`. The board for an app whose folder you wrote yourself.
+- `decks apps build` · `decks.apps.build(name: string): AppOutcome`. Build it, waiting up to 15 s; `pending` means ask its status later.
+- `decks apps run` · `decks.apps.run(name: string): AppOutcome`. Start it, waiting up to 15 s.
+- `decks apps stop` · `decks.apps.stop(name: string): { stopped: boolean }`. Stop it.
+- `decks apps restart` · `decks.apps.restart(name: string): AppOutcome`. Stop and start again after a code change. Its board reloads by itself.
+- `decks apps logs` · `decks.apps.logs(name: string, options?: { tail?: number }): string[]`. Its recent output.
+- `decks apps check` · `decks.apps.check(name: string): { verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }`. Open it in the server's browser and say what is wrong: what fit is to a board. Read `verdict`; `file` is a picture.
 
 <!-- web -->
-**The person's Chrome**
+**The person's shared Chrome tab**
 
-- `decks web status` · `web.status(): { paired: boolean; connected: boolean; tab?: { title: string; url: string }; pending?: { id: string; text: string }; closed?: string }`. Whether the person is sharing a Chrome tab through the Decks extension, and which.
-- `decks web pairing` · `web.pairing(): { code: string; path: string; note: string }`. A code to pair the Decks extension.
-- `decks web repair` · `web.repair(): { code: string }`. A fresh pairing code.
-- `decks web board` · `web.board(): string`. The board that shows the shared tab.
-- `decks web open` · `web.open(url: string): { url: string; title: string }`. Open an address in the shared tab.
-- `decks web read` · `web.read(): { url: string; title: string; snapshot: string; truncated?: boolean }`. The shared page: address, title, and an accessibility tree that names every field and button with a [ref=e42]. References die when the tab navigates.
-- `decks web screenshot` · `web.screenshot(options?: { full?: boolean }): { file: string; width: number; height: number }`. A picture of the shared tab.
-- `decks web fill` · `web.fill(field: WebTarget, text: string): { field: string }`. Type into a field. Never passwords or codes.
-- `decks web select` · `web.select(field: WebTarget, option: string): { field: string; option: string }`. Pick an option in a select.
-- `decks web click` · `web.click(what: WebTarget): { clicked: string }`. Click a button or link.
-- `decks web press` · `web.press(key: string): { pressed: string }`. Press a key.
-- `decks web submit` · `web.submit(what?: WebTarget, options?: { ask?: boolean }): { submitted: string; allowed: boolean }`. Submit a form; asks the person first and may come back with allowed: false.
-- `decks web stop` · `web.stop(): void`. Stop driving the shared tab.
+- `decks web status` · `decks.web.status(): { paired: boolean; connected: boolean; tab?: { title: string; url: string }; pending?: { id: string; text: string }; closed?: string }`. Whether the person is sharing a Chrome tab through the Decks extension, and which.
+- `decks web pairing` · `decks.web.pairing(): { code: string; path: string; note: string }`. A code to pair the Decks extension.
+- `decks web repair` · `decks.web.repair(): { code: string }`. Pair the extension again: a fresh code.
+- `decks web board` · `decks.web.board(): string`. A board showing the shared tab.
+- `decks web open` · `decks.web.open(url: string): { url: string; title: string }`. Go to an address in the shared tab.
+- `decks web read` · `decks.web.read(): { url: string; title: string; snapshot: string; truncated?: boolean }`. The page as a tree of fields and buttons, each with a [ref=e42]. References die when the tab navigates.
+- `decks web screenshot` · `decks.web.screenshot(options?: { full?: boolean }): { file: string; width: number; height: number }`. A picture of the tab.
+- `decks web fill` · `decks.web.fill(field: WebTarget, text: string): { field: string }`. Type into a field. Never passwords or codes.
+- `decks web select` · `decks.web.select(field: WebTarget, option: string): { field: string; option: string }`. Choose an option in a select.
+- `decks web click` · `decks.web.click(what: WebTarget): { clicked: string }`. Click a button or link.
+- `decks web press` · `decks.web.press(key: string): { pressed: string }`. Press a key.
+- `decks web submit` · `decks.web.submit(what?: WebTarget, options?: { ask?: boolean }): { submitted: string; allowed: boolean }`. Submit a form, asking the person first; may come back with allowed: false.
+- `decks web stop` · `decks.web.stop(): void`. Stop sharing.
 
 <!-- /web -->
 
-**Addresses and time**
+**Ports and the clock**
 
-- `decks url` · `url(path: string): string`. The URL of a board, for a Playwright screenshot.
-- `decks resolve` · `resolve(file: string): string`. A file on disk -> the URL a board should embed.
-- `decks ports` · `ports(change?: { open?: number; close?: number; label?: string }): { port: number; label?: string; by?: string; at: number; node: string; rnode: string }[]`. Servers on this machine, forwarded through Decks so a board can frame them: read with nothing, { open: port, label } to forward one, { close: port } to stop. `node` passes the path on; `rnode` strips it.
-- `decks now` · `now(): { iso: string; timezone: string; words: string; epoch: number }`. The time where the person is.
+- `decks ports` · `decks.ports(change?: { open?: number; close?: number; label?: string }): { port: number; label?: string; by?: string; at: number; node: string; rnode: string }[]`. Forward a local server so a board can frame it: read with nothing, { open: port, label } to forward one, { close: port } to stop. `node` passes the path on; `rnode` strips it.
+- `decks now` · `decks.now(): { iso: string; timezone: string; words: string; epoch: number; [key: string]: unknown }`. The time where the person is.
+
+**Old names**, kept for one release; each answer through one names its new call:
+
+`newBoard` → decks.board.create, then decks.canvas.insert; `fit` → decks.canvas.fit; `resize` → decks.canvas.update(board, { size }); `report` → decks.agent.claim; `reload` → decks.view.reload({ board }); `boards` → decks.canvas.read, or decks.board.list; `show` → decks.canvas.insert({ type: "board", board }) to place it, then decks.view.focus; `hide` → decks.canvas.delete; `move` → decks.canvas.move(board, { at }); `cursor` → decks.view.cursor; `camera` → decks.view.camera to read, decks.view.move to move; `viewport` → decks.view.viewport; `screenshot` → decks.canvas.screenshot; `stages` → decks.canvas.list; `open` → decks.agent.update({ canvas }), then decks.view.goto; `newStage` → decks.canvas.create, then decks.agent.update({ canvas }); `title` → decks.canvas.rename, or decks.here() to read; `pen.read` → decks.canvas.read; `pen.edit` → decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables); `pen.create` → decks.frame.create; `pen.save` → decks.canvas.save; `pen.file` → decks.canvas.file; `me` → decks.agent.me to read, decks.agent.update to change; `agents` → decks.agent.list; `send` → decks.agent.queue (and decks.agent.create to make the agent first; decks.agent.send now delivers at once); `queue` → decks.agent.inbox; `url` → decks.board.url; `resolve` → decks.file.url.

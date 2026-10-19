@@ -6,7 +6,7 @@
 // Run: node --import tsx scripts/gen-sdk.mjs        Check only: node --import tsx scripts/gen-sdk.mjs --check
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { commandOf, jsonSchemaOf, namesIn, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
+import { ALIASES, ALL_VERBS, commandOf, jsonSchemaOf, namesIn, signature, tsOf, VERBS } from "../packages/api/src/index.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const sdk = `${root}packages/sdk/src/`;
@@ -30,20 +30,21 @@ function doc(text, indent) {
 const method = (verb, indent) => {
 	const short = verb.name.split(".").pop();
 	const params = verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}: ${tsOf(param.schema)}`).join(", ");
-	return `${doc(verb.summary, indent)}${indent}${short}(${params}): Promise<${verb.result ? tsOf(verb.result) : "void"}>;\n`;
+	const said = verb.alias ? `${verb.summary} @deprecated Use ${verb.alias}.` : verb.summary;
+	return `${doc(said, indent)}${indent}${short}(${params}): Promise<${verb.result ? tsOf(verb.result) : "void"}>;\n`;
 };
 
 export function declarations() {
 	const named = new Map();
-	for (const verb of VERBS) {
+	for (const verb of ALL_VERBS) {
 		for (const param of verb.params) namesIn(param.schema, named);
 		if (verb.result) namesIn(verb.result, named);
 	}
 	let out = HEADER;
 	for (const [name, schema] of named) out += `${schema.description ? doc(schema.description, "") : ""}export type ${name} = ${tsOf(schema, true)};\n`;
-	out += "\n/** Every verb Decks answers. */\nexport interface Verbs {\n";
+	out += "\n/** Every call Decks answers: the new names, and the old ones kept for one release (marked deprecated). */\nexport interface Verbs {\n";
 	const groups = new Map();
-	for (const verb of VERBS) {
+	for (const verb of ALL_VERBS) {
 		if (verb.name.includes(".")) {
 			const group = verb.name.split(".")[0];
 			groups.set(group, [...(groups.get(group) ?? []), verb]);
@@ -113,17 +114,19 @@ export declare const VERBS: ReadonlyArray<readonly [string, readonly string[]]>;
 }
 
 export function verbList() {
-	const rows = VERBS.map((verb) => `\t[${JSON.stringify(verb.name)},[${verb.params.map((param) => JSON.stringify(`${param.name}${param.variadic ? "..." : param.optional ? "?" : ""}`)).join(",")}]],`);
+	const rows = ALL_VERBS.map((verb) => `\t[${JSON.stringify(verb.name)},[${verb.params.map((param) => JSON.stringify(`${param.name}${param.variadic ? "..." : param.optional ? "?" : ""}`)).join(",")}]],`);
 	return `export const VERBS = [\n${rows.join("\n")}\n];`;
 }
 
 export function verbsJson() {
 	return `${JSON.stringify(
-		VERBS.map((verb) => ({
+		ALL_VERBS.map((verb) => ({
 			name: verb.name,
 			command: commandOf(verb),
 			group: verb.group,
+			touches: verb.touches,
 			effect: verb.effect,
+			...(verb.alias ? { alias: verb.alias } : {}),
 			summary: verb.summary,
 			signature: signature(verb),
 			returns: verb.result ? tsOf(verb.result) : "void",
@@ -141,15 +144,13 @@ export function verbsJson() {
 }
 
 const GROUP_TITLES = {
-	boards: "Boards: make, size and refresh a board file",
-	stage: "Boards on your stage",
-	view: "Your view",
-	stages: "Stages",
-	pen: "The drawing on your stage",
-	agents: "Agents",
-	apps: "Apps",
-	web: "The person's Chrome",
-	misc: "Addresses and time",
+	canvas: "Canvas: every call takes { canvas }; left out, it is decks.here()",
+	board: "Board and deck: files in the deck folder, on any number of canvases",
+	agent: "Agent: you, or another agent",
+	view: "View: what the person is looking at, moved only on purpose (no file changes)",
+	apps: "Apps: folders in apps/ that Decks serves, builds or runs",
+	web: "The person's shared Chrome tab",
+	misc: "Ports and the clock",
 };
 
 /**
@@ -172,10 +173,12 @@ export function commandsMarkdown() {
 	for (const [group, verbs] of groups) {
 		if (group === "web") lines.push("<!-- web -->");
 		lines.push(`**${GROUP_TITLES[group] ?? group}**`, "");
-		for (const verb of verbs) lines.push(`- \`decks ${commandOf(verb).join(" ")}\` · \`${signature(verb)}: ${verb.result ? tsOf(verb.result) : "void"}\`. ${verb.summary}`);
+		for (const verb of verbs) lines.push(`- \`decks ${commandOf(verb).join(" ")}\` · \`decks.${signature(verb)}: ${verb.result ? tsOf(verb.result) : "void"}\`. ${verb.summary}`);
 		lines.push("");
 		if (group === "web") lines.push("<!-- /web -->", "");
 	}
+	lines.push("**Old names**, kept for one release; each answer through one names its new call:", "");
+	lines.push(ALIASES.map((verb) => `\`${verb.name}\` → ${verb.alias}`).join("; ") + ".", "");
 	return `${lines.join("\n").trimEnd()}\n`;
 }
 
