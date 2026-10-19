@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { StagePens } from "./pens.ts";
-import { shotBox } from "./shots.ts";
+import { shotBox, shotTarget } from "./shots.ts";
 
 test("a picture frames what it names with a margin: an item, a board, several, everything, or a box", () => {
 	const dir = mkdtempSync(join(tmpdir(), "shots-"));
@@ -58,4 +58,16 @@ test("a WebP's kind and size are read from its header, lossy, lossless and exten
 	assert.deepEqual(imageSize(extended), { width: 3200, height: 40 });
 	assert.equal(imageKind(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))?.ext, "jpg");
 	assert.equal(imageKind(Buffer.from("not a picture")), undefined);
+});
+
+test("a picture's to is a path in the deck; a full path inside it is taken, one outside is refused", () => {
+	const deck = realpathSync(mkdtempSync(join(tmpdir(), "shots-to-")));
+	try {
+		assert.equal(shotTarget(deck, "exports/a.png"), join(deck, "exports", "a.png"));
+		assert.equal(shotTarget(deck, join(deck, "exports", "b.png")), join(deck, "exports", "b.png"));
+		assert.throws(() => shotTarget(deck, "/Users/someone/sdk-drive/rb.png"), /to is a path in the deck, such as exports\/shot\.png/);
+		assert.throws(() => shotTarget(deck, "../outside.png"), /outside the deck/);
+	} finally {
+		rmSync(deck, { recursive: true, force: true });
+	}
 });
