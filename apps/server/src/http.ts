@@ -193,6 +193,49 @@ export function createHttpApp(app: App): Express {
 	});
 
 	/**
+	 * A person's acts on an agent from another front end, such as Studio's agent rows: what this
+	 * app's own page sends on its socket (`wire/agents.ts`). `rename` takes `{ name }`, refused when
+	 * another agent has it; `stop` ends the turn it is running; `remove` takes it off this deck.
+	 */
+	api.post("/agents/:id/:act", (req, res) => {
+		const agent = app.agents.get(String(req.params.id));
+		if (!agent) {
+			res.status(404).json({ error: "No agent here has that id." });
+			return;
+		}
+		const act = String(req.params.act);
+		if (act === "rename") {
+			const name = String(((req.body ?? {}) as { name?: unknown }).name ?? "").trim().slice(0, 40);
+			if (!name) {
+				res.status(400).json({ error: "A name cannot be empty." });
+				return;
+			}
+			if (app.agents.nameTaken(name, agent.id)) {
+				res.status(409).json({ error: `Another agent is already called ${name}.` });
+				return;
+			}
+			agent.rename(name);
+			res.json({ id: agent.id, name });
+			return;
+		}
+		if (act === "stop") {
+			void agent.abort();
+			res.json({ id: agent.id, stopped: true });
+			return;
+		}
+		if (act === "remove") {
+			const outcome = app.agents.remove(agent.id);
+			if (!outcome.removed) {
+				res.status(409).json({ error: outcome.reason ?? "That agent cannot be removed." });
+				return;
+			}
+			res.json({ id: agent.id, removed: true });
+			return;
+		}
+		res.status(404).json({ error: "An agent can be renamed, stopped or removed." });
+	});
+
+	/**
 	 * Pass another server through this one, for a page with no service worker (`share/relay.ts`).
 	 * The page names the connection and its token; `/c/<id>/...` below is then that server's.
 	 */
