@@ -26,7 +26,7 @@ description: How to write a board. One format: a one-screen page you design, who
 
 **One format: a page you design, with placed blocks**
 
-- `decks new-board --title … --at.x1 … --at.y1 …` writes `<body class="board">` with `../lib/board.css`, a `<style>`
+- `decks board create --title …` writes `<body class="board">` with `../lib/board.css`, a `<style>`
   block and one block: `<div class="doc" data-id="doc">`. Write your own CSS; inside a block, lay
   out with flexbox or grid.
 - **Root-level blocks are out of the page's flow.** `board.css` puts every direct child of
@@ -43,7 +43,8 @@ description: How to write a board. One format: a one-screen page you design, who
 - Patterns that work: a highlighted row in a comparison table; before and after side by side; a
   sequence diagram with three lifelines; a row of large numbers with a one-line label each; one
   chart with a labelled axis and the winning series in the accent colour.
-- Then `decks show <path>` and `decks fit <path>`. `fit` reports the height, the word count, the
+- Then `decks canvas insert --type board --board <path> --beside <id or path>` (or `--below`,
+  `--at.x1 --at.y1`) puts it on your canvas, and `decks canvas fit <path>` sizes it. `fit` reports the height, the word count, the
   smallest type and any content wider than the board. Fix what it says is over; when it says
   "One screen", stop.
 
@@ -91,7 +92,7 @@ description: How to write a board. One format: a one-screen page you design, who
   anything else, and reach for a library with `const d3 = await import("d3")` where you draw, on
   `board:ready` if the layout has to be settled. Import inside the code path that needs it rather
   than at the top of a module, so a board that never gets there pays nothing.
-- **Title: the finding, not the topic.** The title comes from `decks new-board --title`. Write it
+- **Title: the finding, not the topic.** The title comes from `decks board create --title`. Write it
   as a statement ("Returning customer share fell after the second tab shipped"), never a question.
 - **A plot says what it shows, and what its axes are.** Give it a title of its own, both axes, a tick
   value on each, and a title on each saying what it counts and in what unit ("share of visits,

@@ -14,7 +14,7 @@ change a file, finish a build or restart the server.
 
 | Rung | Pick it when | Starter |
 | --- | --- | --- |
-| **A board** | One screen with a few controls. Not an app. | `decks new-board` |
+| **A board** | One screen with a few controls. Not an app. | `decks board create` |
 | **static** | Pages and scripts, no build. Libraries from a CDN. Data in `localStorage`. Most apps. | `static` |
 | **server** | Data shared or kept on disk, an API key, code that cannot run in a page. | `node` (no packages) |
 | **build** | You need JSX or a framework's compiler. | `react`, `solid` |
@@ -30,7 +30,7 @@ const app = await decks.apps.create("polls", { starter: "node", title: "Polls" }
 // Write the files in app.folder with your own tools, then:
 await decks.apps.run("polls");          // a server app; a built one: decks.apps.build
 const seen = await decks.apps.check("polls");   // read seen.verdict; seen.file is a picture
-await decks.show(app.board, { at: { x1: 0, y1: 0 } });
+await decks.canvas.insert({ type: "board", board: app.board }, { at: { x1: 0, y1: 0 } });
 ```
 
 - **`check` is to an app what `fit` is to a board.** It opens the app in the server's browser and
@@ -67,7 +67,7 @@ canvas. The person is asked once to allow it, and every call is noted in their c
 const { decks } = await import(process.env.DECKS_SDK);
 // A page: import { decks } from "../../api/sdk/decks.mjs";
 
-await decks.boards();                                                 // any verb, as the decks command has it
+await decks.canvas.read();                                             // any call, as the decks command has it
 await decks.sendTo({ name: "Helper", kind: "claude" }, { task: "…" }); // made when missing
 ```
 

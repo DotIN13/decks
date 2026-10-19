@@ -1,6 +1,6 @@
 ---
 name: pen-stage
-description: Your stage is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, pen edits and boxes, moving between stages, and patterns for arranging boards. Read before your first decks pen edit.
+description: A canvas is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, canvas calls and boxes, beside and below, canvases, and patterns for arranging boards. Read before your first decks canvas insert or batch.
 ---
 
 # Drawing on the stage
@@ -8,11 +8,12 @@ description: Your stage is a native pen.dev .pen file — its boards, and notes,
 Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
-- **Boards**: the HTML pages you write. Each one on the stage is a pen `browser` item pointing at
-  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`. `decks.show`, `decks.hide`
-  and `decks.move` add, remove and move them; you can also move them with `decks.pen.edit`, or put
-  them inside a frame that lays them out. Never make a board by inserting a `browser` item: write it
-  with `decks.newBoard` and show it.
+- **Boards**: the HTML pages you write. In the file each one is a pen `browser` item pointing at
+  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`; every canvas call reads
+  and writes it as **`{ type: "board", board: "boards/…" }`**, and takes a board's path wherever
+  it takes an item's id. Make the file with `decks.board.create`, then place it with
+  `decks.canvas.insert({ type: "board", board: path }, { beside })`; `canvas.move`, `canvas.update`
+  (`{ size: { w, h } }`) and `canvas.delete` (the file stays) do the rest, or put it inside a frame.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
   boards — a note beside one, an arrow from one to the next, an outline round a group. Put an
   answer on a board; put the arrangement around it here.
@@ -27,51 +28,70 @@ The person can move, delete and rewrite drawn items by hand in edit mode, so rea
 the file may have changed since you last looked.
 
 The examples below are a node script, where `const { decks } = await import(process.env.DECKS_SDK)`
-gives every verb as a function; a big edit reads best that way. The same calls are commands in bash:
-`decks pen read`, `decks pen edit '[…]'` (or `… | decks pen edit -` from a file), `decks show <id>`.
+gives every call as a function; a big edit reads best that way. The same calls are commands in
+bash: `decks canvas read`, `decks canvas insert '{…}' --beside <id>`, `decks canvas batch '[…]'`
+(or `… | decks canvas batch -` from a file), `decks view focus <id>`.
 
-## Stages
+## Canvases
 
-```ts
-await decks.stages();                  // every stage: { name, open: [agents], boards, mine? }
-await decks.open("deploy");            // work on another stage: its boards become yours
-await decks.newStage("Launch plan");   // an empty stage, opened; answers its folder name
-```
-
-The person sees the stage the agent they are talking to has open. Two agents on one stage share
-its boards and its drawing. Make a new stage for a new piece of work; open an old one to continue it.
-
-## The three calls
+Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. Left out, it is
+`decks.here()`, your home canvas, the one the person sees beside you. None of these moves you:
 
 ```ts
-const drawing = await decks.pen.read();   // every item as saved, plus its box on the stage
-await decks.pen.edit([ /* edits */ ]);    // applied together, or not at all
-const file = await decks.pen.file();      // "canvases/<name>/canvas.pen", to edit by hand instead
+await decks.canvas.list();                    // every canvas: { name, title, open: [agents], boards }
+await decks.canvas.create("Launch plan");     // a new, empty canvas; nobody is moved to it
+await decks.canvas.read({ canvas: "deploy" }); // another canvas, read where it is
+await decks.agent.update({ canvas: "deploy" }); // make it your home: the person sees it beside you
+await decks.view.goto("deploy");              // bring the person's screen there
 ```
 
-- `read()` returns `{ stage, file, version, variables?, themes?, children }`. Each item is exactly
-  what the file holds, plus **`box: { x1, y1, x2, y2 }`**: where it is on the stage. An instance
-  (`type: "ref"`) also lists `inside`, the items in its copy with their id paths and boxes.
-- `edit(edits)` answers `{ rev, results: [{ op, id, box, note? }] }`. `note` says what happened that
-  you did not ask for (a size the layout overrode, a text that now wraps). If any edit fails, none
-  is saved, and the error names the edit and why.
+Two agents with one home canvas share its boards and its drawing. Make a new canvas for a new
+piece of work; make an old one your home to continue it.
+
+## The calls
+
+```ts
+const { items } = await decks.canvas.read();          // every item as saved, plus its box
+await decks.canvas.insert(item, { beside: "boards/plan.html" });  // or { below }, { at }, { parent }
+await decks.canvas.update("check", { set: { content: "Done" } }); // fields, { at }, { size }
+await decks.canvas.move("check", { below: "boards/plan.html" });
+await decks.canvas.delete("check");
+await decks.canvas.batch([ /* ops */ ]);              // applied together, or not at all
+const file = await decks.canvas.file();               // "canvases/<name>/canvas.pen", to edit by hand
+```
+
+- `read()` returns `{ canvas, title, version, variables?, themes?, items }`. Each item is exactly
+  what the file holds, plus **`box: { x1, y1, x2, y2 }`**: where it is on the canvas; a board reads
+  as `{ type: "board", board, title, width, height, box }`. An instance (`type: "ref"`) also lists
+  `inside`, the items in its copy with their id paths and boxes.
+- **`beside` and `below`** take an item's id or a board's path and put the item 160 px clear of
+  that item's box: `beside` to its right with the tops aligned, `below` under it with the lefts
+  aligned. They work for any item, a note under a board or a board beside a note.
+- Each call answers with the item as it now is, box included; `batch` with one per op. A note says
+  what happened that you did not ask for (a size the layout overrode, a place chosen because you
+  gave none). If any op of a batch fails, none is saved, and the error names the op and why.
+- `batch` takes each op as the call of that name with its item or id inside —
+  `{ op: "insert", item, beside }`, `{ op: "update", id, set }`, `{ op: "move", id, below }`,
+  `{ op: "delete", id }` — and pen.dev's own form below (`node`, `box`) too, so a later op can be
+  beside an item an earlier one made.
 - Hand edits work too: keep it valid JSON, keep ids unique and free of `/`. A file that stops
   parsing is reported by `read()`, and the canvas keeps the last good version until you fix it.
+- `decks.canvas.watch()` puts the changes others make on a canvas into your `decks.agent.inbox()`.
 
 ## Boxes, not sums
 
 Every position you read is a box with both corners, and every position you write can be one:
 
 ```ts
-await decks.pen.edit([
+await decks.canvas.batch([
   { op: "insert", node: { type: "note", id: "check", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } },
 ]);
 ```
 
 The server turns the box into pen's own numbers — `x` and `y` from the parent's corner, `width`,
 `height` — against wherever the parent really is. Give `x1, y1` alone to move without resizing.
-`decks.boards()` gives each board a `box` too, so a note beside a board is
-`{ x1: board.box.x2 + 40, y1: board.box.y1, … }`. Inside a frame that lays out its children (a row
+`decks.canvas.read()` gives each board a `box` too, so a note 40 px beside a board is
+`{ x1: board.box.x2 + 40, y1: board.box.y1, … }`; `beside` is the same at 160 px. Inside a frame that lays out its children (a row
 or a column), the frame decides where they go, so only the size is taken from a box.
 
 ## Edits
@@ -111,7 +131,7 @@ no field for: `{ type: "…", … }`).
 | `group` | a container, no layout: its box is its children's | `children` |
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
-| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — put up with `decks.show`, not inserted |
+| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — read and written as `{ type: "board", board }` through the canvas calls |
 | `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
 
 Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;
@@ -206,15 +226,15 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
 **Saved frames.** A frame worth using again goes in the deck's `frames/` folder, as a board goes in
 `boards/`, in folders if you like. Two ways in:
 
-- `decks.pen.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
+- `decks.frame.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
   `frames/ui/agent-card.pen` with that frame as its one reusable item;
-- `decks.pen.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
+- `decks.canvas.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
   puts a ref to it where the item was.
 
 Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
-with nothing to declare. `decks.pen.read("frames/ui/agent-card")` reads it and `decks.pen.edit([...],
-{ path: "frames/ui/agent-card" })` edits it with the same edits a stage takes; every stage using it
-shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
+with nothing to declare. A frame file is not a canvas: for this release it is read and edited with the
+old `decks.pen.read("frames/ui/agent-card")` and `decks.pen.edit([...], { path: "frames/ui/agent-card" })`,
+or by hand; every canvas using it shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
 reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
@@ -263,7 +283,7 @@ nothing else — the server draws the line and its head between the facing edges
 whenever either end moves**, a board included:
 
 ```ts
-await decks.pen.edit([
+await decks.canvas.batch([
   { op: "insert", node: { type: "path", id: "then", metadata: { type: "decks.arrow", from: "boards/draft.html", to: "boards/final.html" } } },
 ]);
 ```
@@ -291,30 +311,29 @@ drawn on the middle of the line.
 
 ## Look at it
 
-`decks.screenshot()` takes a picture of your stage as the person sees it, boards and drawing
+`decks.canvas.screenshot()` takes a picture of your canvas as the person sees it, boards and drawing
 together, and hands it to you in the call's result. Check with it after a big change: text that
 overflows a note, an arrow that crosses a board, a frame that clips what is in it are plain in a
 picture and invisible in `read()`.
 
-**Point the person's camera at one item** with `decks.show`, the same verb that puts a board up:
-an item's id is taken where a board's path is, and the canvas flies to it. Nothing is held and
-nothing moves — the item is on the stage already — and naming an item and a board together frames
-both.
+**Point the person's camera at one item** with `decks.view.focus`: an item's id or a board's path,
+and the screen flies to it. Nothing on the canvas changes, and naming an item and a board together
+frames both. It is the only thing that moves the person's view; nothing else does.
 
 ```ts
-await decks.show("summary");                          // look at this note
-await decks.show(["boards/plan.html", "summary"]);    // the board and the note beside it
+await decks.view.focus("summary");                          // look at this note
+await decks.view.focus(["boards/plan.html", "summary"]);    // the board and the note beside it
 ```
 
 The person can drag an item **into the composer** to talk about it, and it arrives in their
 message as `@item:<id>` — the id to look up in `read()`.
 
 ```ts
-await decks.screenshot();                               // the whole stage
-await decks.screenshot({ of: "summary" });             // one item, with a margin
-await decks.screenshot({ of: ["boards/plan.html", "then"] });
-await decks.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
-await decks.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
+await decks.canvas.screenshot();                               // the whole stage
+await decks.canvas.screenshot({ of: "summary" });             // one item, with a margin
+await decks.canvas.screenshot({ of: ["boards/plan.html", "then"] });
+await decks.canvas.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
+await decks.canvas.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
 ```
 
 ## Ink
@@ -332,8 +351,9 @@ near. Leave it as they drew it: move or delete a stroke only when asked.
 
 ## Patterns
 
-- **A note beside a board:** read the board's `box` from `decks.boards()`, insert a `note` with
-  `box: { x1: box.x2 + 40, y1: box.y1, x2: box.x2 + 300 }`.
+- **A note beside a board:** `decks.canvas.insert({ type: "note", content: "…" }, { beside: "boards/plan.html" })`,
+  or, closer than 160 px, read the board's `box` from `decks.canvas.read()` and insert with
+  `at: { x1: box.x2 + 40, y1: box.y1 }`.
 - **A titled area behind boards:** a `frame` with `layout: "none"`, a soft `fill`
   (`"#3b82f614"`), `cornerRadius: 16`, boxed 40 px outside the boards it gathers, and a `text`
   above its top edge. Insert it at `index: 0` so it paints first.
