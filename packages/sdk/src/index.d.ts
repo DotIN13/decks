@@ -22,7 +22,7 @@ export type PenItem = { type: string; id?: string; children?: unknown[]; [key: s
 /** What the browser measured while fitting a board. */
 export type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
 /** A saved image of a canvas, or of part of it. */
-export type Screenshot = { file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string };
+export type Screenshot = { file: string; width: number; height: number; box: Box; how?: string; note?: string };
 /**
  * A canvas (a stage file) and who has it open. `name` is its folder and never changes; `title` is
  * what the person calls it.
@@ -107,7 +107,7 @@ export interface Verbs {
 	/** Old name: the room the screen has. @deprecated Use decks.view.viewport. */
 	viewport(): Promise<{ width: number; height: number } | null>;
 	/** Old name: a picture of your canvas or part of it. @deprecated Use decks.canvas.screenshot. */
-	screenshot(options?: { of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<{ file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string }>;
+	screenshot(options?: { of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark"; live?: boolean }): Promise<{ file: string; width: number; height: number; box: Box; how?: string; note?: string }>;
 	/** Old name: every canvas and who has it open. @deprecated Use decks.canvas.list. */
 	stages(): Promise<{ name: string; title: string; open: string[]; boards: number; mine?: true }[]>;
 	/**
@@ -204,10 +204,13 @@ export interface Verbs {
 		/**
 		 * A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an
 		 * item's id, a board's path, a list of them, or a box; one board's path alone is that board as the
-		 * person's browser has it now. A .pen file's path pictures that file whole. `format` "jpeg" or
-		 * "pdf", and `to` a deck path, make a file to hand on.
+		 * person's browser has it now, without the drawing round it. A .pen file's path pictures that file
+		 * whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on. Drawn natively
+		 * over each board's current picture (`how` "native"), or in the browser with live boards when asked
+		 * (`live: true`) or when it must be: math, a picture it cannot load, a board not yet pictured, a
+		 * PDF (`how` "chromium: <why>").
 		 */
-		screenshot(options?: { canvas?: string; of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<Screenshot>;
+		screenshot(options?: { canvas?: string; of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark"; live?: boolean }): Promise<Screenshot>;
 		/**
 		 * What the person calls this canvas: a few words for what is on it, that a person would look for.
 		 * The folder never changes.

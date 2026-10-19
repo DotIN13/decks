@@ -373,7 +373,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const entry = pens.get(name);
 						return pens.saveFrame(name, idIn(entry.doc, id), frame, options?.replace !== false);
 			},
-			screenshot: async (options?: { canvas?: string; of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark" }) => {
+			screenshot: async (options?: { canvas?: string; of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) => {
 				const { canvas, ...rest } = options ?? {};
 				return shootOn(ctx, canvasOf(canvas), rest) as never;
 			},

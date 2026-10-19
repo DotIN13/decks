@@ -33,7 +33,7 @@ export const Fit = named("Fit", obj({ board: str(), canvas: str(), w: num(), h: 
 
 export const Screenshot = named(
 	"Screenshot",
-	obj({ file: str(), width: num(), height: num(), box: Box, how: opt(lit("canvas", "snapshot", "server")), note: opt(str()) }),
+	obj({ file: str(), width: num(), height: num(), box: Box, how: opt(str()), note: opt(str()) }),
 	"A saved image of a canvas, or of part of it.",
 );
 

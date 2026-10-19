@@ -197,8 +197,8 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an item\'s id, a board\'s path, a list of them, or a box; one board\'s path alone is that board as the person\'s browser has it now. A .pen file\'s path pictures that file whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.',
-		params: [onCanvas({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")) })],
+			'A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an item\'s id, a board\'s path, a list of them, or a box; one board\'s path alone is that board as the person\'s browser has it now, without the drawing round it. A .pen file\'s path pictures that file whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on. Drawn natively over each board\'s current picture (`how` "native"), or in the browser with live boards when asked (`live: true`) or when it must be: math, a picture it cannot load, a board not yet pictured, a PDF (`how` "chromium: <why>").',
+		params: [onCanvas({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")), live: opt(bool()) })],
 		result: Screenshot,
 	},
 	{
@@ -482,8 +482,8 @@ export const ALIASES: readonly Verb[] = [
 		...deckRead,
 		alias: "decks.canvas.screenshot",
 		summary: "Old name: a picture of your canvas or part of it.",
-		params: [o("options", obj({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")) }))],
-		result: obj({ file: str(), width: num(), height: num(), box: Box, how: opt(lit("canvas", "snapshot", "server")), note: opt(str()) }),
+		params: [o("options", obj({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")), live: opt(bool()) }))],
+		result: obj({ file: str(), width: num(), height: num(), box: Box, how: opt(str()), note: opt(str()) }),
 	},
 	{
 		name: "stages",
