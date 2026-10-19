@@ -36,7 +36,7 @@ export interface StageCall {
 	 * that is not on your canvas at all.
 	 */
 	agentId: string;
-	op: "show" | "camera" | "reload" | "cursor" | "shot";
+	op: "show" | "camera" | "reload" | "cursor" | "shot" | "goto";
 	args: unknown;
 }
 

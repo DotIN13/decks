@@ -19,6 +19,14 @@ export interface StageOpsHost {
 	viewport(): { width: number; height: number };
 	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
 	focused(): string | undefined;
+	/** The canvas on this screen, by folder name. */
+	stageOnScreen?(): string | undefined;
+	/** A conversation on that canvas, `prefer` first when it is on it. */
+	agentOn?(stage: string, prefer?: string): string | undefined;
+	/** Show that conversation, and so its canvas (`view.goto`). */
+	goto?(agentId: string): void;
+	/** Offer a button that goes there instead. */
+	offerGoto?(agentId: string, stage: string, target: string): void;
 	/**
 	 * Move the view, and *arrive* at it when the caller asked for that.
 	 *
@@ -77,6 +85,10 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 
 	switch (call.op) {
 		case "show": {
+			// A canvas named (`view.focus`) that is not the one on this screen: nothing here to move to.
+			if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) {
+				return { shown: [], deferred: "the person's screen shows another canvas; decks view goto brings it to this one first" };
+			}
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
 			const boards = host.boards().filter((board) => paths.includes(board.path));
 			/*
@@ -119,8 +131,30 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 
 		case "reload": {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
+			// Counted (`view.reload`): this page reloads the board only if its canvas shows it.
+			if (args.count === true) {
+				if (typeof args.stage === "string" && host.stageOnScreen && host.stageOnScreen() !== args.stage) return { pages: 0 };
+				if (!host.boards().some((board) => board.path === args.path)) return { pages: 0 };
+				host.reload(args.path);
+				return { reloaded: args.path, pages: 1 };
+			}
 			host.reload(args.path);
 			return { reloaded: args.path };
+		}
+
+		case "goto": {
+			const stage = args.stage;
+			if (typeof stage !== "string" || !stage) return { error: "goto needs a canvas" };
+			if (host.stageOnScreen?.() === stage) return { moved: true, note: "the person's screen was on that canvas already" };
+			const target = host.agentOn?.(stage, call.agentId);
+			if (!target || !host.goto) return { moved: false, note: "no conversation is on that canvas, and a screen shows a canvas beside a conversation: decks agent update --canvas makes it your home, then view goto shows it" };
+			// Someone else's call, or the person mid-gesture: offered, not done.
+			if (call.agentId !== host.focused() || host.handsOn?.()) {
+				host.offerGoto?.(call.agentId, stage, target);
+				return { moved: false, deferred: "the person was offered a button to go there, since the screen is theirs right now" };
+			}
+			host.goto(target);
+			return { moved: true };
 		}
 
 		case "cursor": {

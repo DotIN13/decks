@@ -713,6 +713,7 @@ export function App() {
 		setAtTurn,
 		raise,
 		landed,
+		focusAgent: (id) => focusAgent(id),
 	};
 
 	const editor: EditorHost = {

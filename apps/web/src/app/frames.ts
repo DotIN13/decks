@@ -43,6 +43,8 @@ export interface FrameHooks {
 	landed(): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
+	/** Open another conversation, as a click on its row does: what `view.goto` uses to show its canvas. */
+	focusAgent?(id: string): void;
 }
 
 /**
@@ -507,6 +509,15 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							 * in `canvas/stage-ops.ts`, which is where the reasoning lives.
 							 */
 							focused: () => state.focused,
+							stageOnScreen: () => stageOf(state.focused)?.name,
+							// The caller's own conversation when it is on that canvas, else any that is.
+							agentOn: (stage, prefer) => {
+								if (prefer && stageOf(prefer)?.name === stage) return prefer;
+								return state.chats.map((chat) => chat.id).find((id) => stageOf(id)?.name === stage);
+							},
+							goto: (agentId) => hooks.focusAgent?.(agentId),
+							offerGoto: (agentId, stage, target) =>
+								offer(`${nameOf(agentId)} wants to show you the canvas ${stage}`, { label: "Go", run: () => hooks.focusAgent?.(target) }, "agent-view"),
 							setCamera: (next, options) => moveCamera(next, options),
 							handsOn,
 							offerView: (agentId, camera, selected, what) =>
