@@ -2486,6 +2486,7 @@
   "params": [
    {
     "name": "target",
+    "variadic": true,
     "type": "string | string[]",
     "schema": {
      "anyOf": [
@@ -3741,6 +3742,7 @@
   "params": [
    {
     "name": "target",
+    "variadic": true,
     "type": "string | string[]",
     "schema": {
      "anyOf": [

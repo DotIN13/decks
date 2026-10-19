@@ -286,7 +286,8 @@ export function argsOf(verb, words) {
 		if (args[index] !== undefined) continue;
 		if (param.variadic) {
 			const rest = positional.slice(next);
-			args[index] = rest.length === 1 ? rest[0] : rest;
+			// One word may be the list itself, as JSON: '["boards/a.html","boards/b.html"]'.
+			args[index] = rest.length === 1 ? valueOf(rest[0], param.schema) : rest;
 			next = positional.length;
 			break;
 		}
