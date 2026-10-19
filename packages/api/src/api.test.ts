@@ -13,9 +13,9 @@ test("the table has every call of the redesign, each named once, and the old nam
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
 		"apps.list", "apps.status", "apps.create", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.logs", "apps.check",
 		"web.status", "web.pairing", "web.repair", "web.board", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
-		"ports", "now",
+		"ports", "now", "studio.connect", "studio.status", "studio.disconnect",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 65);
+	assert.equal(VERBS.length, 68);
 	assert.ok(VERBS.every((verb) => !verb.alias), "no new call is an alias");
 	assert.ok(ALIASES.every((verb) => verb.alias && !names.has(verb.name)), "every old name says its new call and is not a new name");
 });
