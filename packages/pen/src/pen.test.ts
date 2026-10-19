@@ -429,7 +429,7 @@ test("a scene frame, laid out by hand or clipped, keeps its box's height when wh
 	const theme = { theme: baseTheme(doc, "light") };
 	const earth = { type: "ellipse", id: "earth", x: 700, y: 1400, width: 2500, height: 2500 };
 	const box = { x1: 0, y1: 0, x2: 3000, y2: 1750 };
-	for (const frame of [{ layout: "none", clip: true }, { layout: "none" }, { layout: "vertical", clip: true }]) {
+	for (const frame of [{ layout: "none", clip: true }, { layout: "none" }, { layout: "vertical", clip: true }] as const) {
 		const made = apply(doc, [{ op: "insert", node: { type: "frame", id: "scene", ...frame, children: [earth] }, box }], theme).doc;
 		assert.equal(made.children[0]!.height, 1750, JSON.stringify(frame));
 	}
