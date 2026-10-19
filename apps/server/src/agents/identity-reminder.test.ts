@@ -23,3 +23,8 @@ test("a fresh agent is asked for everything, in one sentence it can act on", () 
 test("only the tags missing is its own, shorter reminder", () => {
 	assert.match(identityReminder({ ...whole, tags: [] }) ?? "", /Your tags are empty/);
 });
+
+test("after a stage call, empty tags are left alone: clearing them is how a turn ends", () => {
+	assert.equal(identityReminder({ ...whole, tags: [] }, { afterCall: true }), undefined);
+	assert.match(identityReminder({ ...whole, name: "Agent 2", tags: [] }, { afterCall: true }) ?? "", /--name/, "a missing name is still asked for");
+});
