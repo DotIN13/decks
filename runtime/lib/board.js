@@ -39,6 +39,21 @@
 
 	const loaded = new Map();
 
+	/*
+	 * Framed by a page of another origin (Decks Studio showing a harness's board): that page cannot
+	 * listen in here as the Decks app does (`frame-gestures.ts`), so the gestures the canvas needs are
+	 * posted up to it by the same bridge an embed uses (`embed-guest.js`): a scroll nothing here can
+	 * take, a pinch, fingers, Space and a middle-drag.
+	 */
+	const foreignParent = (() => {
+		if (window.parent === window) return false;
+		try {
+			return !window.parent.document;
+		} catch {
+			return true;
+		}
+	})();
+
 	/** Load a classic script once, resolving when its global is there. */
 	function needScript(file) {
 		if (loaded.has(file)) return loaded.get(file);
@@ -52,6 +67,7 @@
 		loaded.set(file, promise);
 		return promise;
 	}
+	if (foreignParent) void needScript("embed-guest.js").catch(() => {});
 
 	function needStyle(file) {
 		const key = `style:${file}`;
