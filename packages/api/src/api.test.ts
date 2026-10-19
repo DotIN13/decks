@@ -112,3 +112,9 @@ test("the SDK's generated files match the table", async () => {
 	// Throws, with the script's sentence, when someone changed the table and not the SDK.
 	execFileSync(process.execPath, ["--import", "tsx", "scripts/gen-sdk.mjs", "--check"], { cwd: root, stdio: "pipe" });
 });
+
+test("canvas.screenshot says what scale is measured against and where to writes", () => {
+	const shot = VERBS.find((verb) => verb.name === "canvas.screenshot")!;
+	assert.match(shot.summary, /long side is at most 1,600 px; `scale` multiplies/);
+	assert.match(shot.summary, /`to` a path in the deck/);
+});
