@@ -64,6 +64,7 @@ nothing. Only the web build produces artifacts.
 | Node | **>= 22.19** (`engines.node`). Match your development version if you can. |
 | git | to clone and to update |
 | Private network client | see §1 |
+| Rust (optional) | `cargo`, for the native stage pictures in §5. Without it every picture is taken in Chromium, about 1 s each instead of a few milliseconds. |
 
 Nothing else. No database, no reverse proxy of your own, no process manager beyond systemd.
 
@@ -120,6 +121,27 @@ sudo -u decks -H mkdir -p /srv/decks/data
 - A lockfile committed from one platform installs fine on another; the optional
   platform packages for every architecture are recorded in it.
 - `npm test` is a fair smoke test of a fresh deployment, and it needs no credentials.
+
+### Native stage pictures (optional)
+
+A picture of a stage (`decks.canvas.screenshot`, and Export) is drawn natively by
+`stage-shot`, a small Rust program in `packages/stage/crates/shot`: the stage engine paints the
+drawing over each board's stored picture, in 3–11 ms a shot warm, against about 1 s in Chromium.
+It is not part of `npm run build` and has to be built once on each machine:
+
+```bash
+sudo -u decks -H bash -c "cd /srv/decks/app/packages/stage && cargo build --release -p stage-shot"
+```
+
+- The server looks for `packages/stage/target/release/stage-shot`, or the path in
+  `DECKS_STAGE_SHOT`. It keeps one process running and stops it after 10 minutes idle.
+- **It draws with Metal only, so today it works on a Mac.** On Linux, or with no binary, or
+  no graphics card, every picture falls back to Chromium (below), which is correct, only slower.
+- A picture also goes to Chromium when it holds math, a picture or icon that cannot be loaded,
+  a board with no picture of its current revision (that picture is then taken in the
+  background), or when the caller asks for `live: true`.
+- The answer says which it was: `how` is `"native"`, or `"chromium: <why>"`. §11 shows how to
+  check.
 
 ### The browser
 
@@ -306,6 +328,9 @@ build` is required for any change under `apps/web/`, because the browser is serv
 anyway also typechecks the server, which is a better default than remembering which kind of
 change you made.
 
+When `packages/stage/` changed, build `stage-shot` again as in §5 before the restart; an old
+binary still runs, but draws with the old engine.
+
 Rolling back is `git checkout <sha>` plus the same two lines. Boards and revisions live in
 `DECKS_DATA_DIR`, not in the repo, so they are untouched by either direction.
 
@@ -354,6 +379,15 @@ sudo awk '{print $5, $6}' /proc/$(systemctl show -p MainPID --value decks)/mount
   | grep -E '^(/|/home|/tmp) '
 ```
 
+A stage picture should say how it was drawn. With `stage-shot` built, a box on any stage answers
+`"how": "native"`:
+
+```bash
+curl -s -X POST http://127.0.0.1:4329/api/v1/canvas.screenshot \
+  -H 'content-type: application/json' -H 'X-Decks-Person: 1' \
+  -d '{"args":[{"of":{"x1":0,"y1":0,"x2":800,"y2":600}}]}' | grep -o '"how":"[^"]*"'
+```
+
 ## 12. Known edges
 
 - **One deck per deployment.** A deck is a working directory, so "which deck" and "which
@@ -365,5 +399,7 @@ sudo awk '{print $5, $6}' /proc/$(systemctl show -p MainPID --value decks)/mount
   you would rather it could not.
 - **No backups are configured.** `DECKS_DATA_DIR` holds the boards, their revisions and the
   arrangement; nothing here replicates it.
+- **Native stage pictures are Mac-only.** `stage-shot` opens Metal; elsewhere every picture is
+  taken in Chromium (§5).
 - **Restarting is not resuming.** Each start is a new conversation; older ones are reachable
   with `pi -r` from inside the deck directory.
