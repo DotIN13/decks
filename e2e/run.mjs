@@ -200,6 +200,12 @@ const CHECKS = [
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/*
+	 * Dragged or pasted out of a board onto the canvas: words, a heading, list items, table rows,
+	 * code, a picture, a selection across blocks, each as the drawing's own item; into a card as a
+	 * block; markdown, plain text, a screenshot and a board's copy pasted; an editable board keeps its words.
+	 */
+	{ file: "drag-from-boards.mjs", needsAgent: false },
+	/*
 	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
 	 * as a still with a badge on it, and nothing decoding until it is pressed.
 	 */
