@@ -509,6 +509,17 @@ export class StagePens {
 		return { doc, base: `${fileUrl(dirname(target.file))}/`, ...(box ? { box } : {}) };
 	}
 
+	/**
+	 * A frame file, for the canvas calls given `{ frame }`: its document read fresh, how to lay it out
+	 * with the frames it uses (refs resolve from its own folder), and the ref that places it.
+	 */
+	framePen(path: string): { doc: PenDocument; ref: string; shown: string; imported: (doc: PenDocument) => PenDocument } {
+		const target = this.penFile(path);
+		if (!target.ref?.startsWith("frames/")) throw new PenError(`${path} is not a frame: a frame is a .pen file in frames/, named as in { frame: "frames/agent-card" }. A canvas is named with { canvas }.`);
+		const here = dirname(target.file);
+		return { doc: this.loadPen(target.file, target.shown), ref: target.ref, shown: target.shown, imported: (doc) => this.withImportedAt(here, doc) };
+	}
+
 	/** What an agent reads of any .pen file: its items, each with its box in the file's own space. */
 	readFile(path: string) {
 		const target = this.penFile(path);
@@ -541,7 +552,7 @@ export class StagePens {
 	createFile(path: string, item?: Partial<PenNode>): { file: string; ref?: string; id: string } {
 		const target = this.penFile(path);
 		if (target.stage) throw new PenError(`${target.shown} is a canvas; make one with decks canvas create.`);
-		if (existsSync(target.file)) throw new PenError(`${target.shown} is already there: read it, or edit it with { path: "${path}" }.`);
+		if (existsSync(target.file)) throw new PenError(`${target.shown} is already there: read it with decks canvas read --frame ${target.ref ?? path}, and change it with the canvas calls given { frame }.`);
 		const id = slug(basename(target.file, ".pen"), 60) || "frame";
 		const node = { type: "frame", layout: "vertical", width: 320, height: "fit_content", children: [], ...(item ?? {}), id, reusable: true } as PenNode;
 		delete node.x;

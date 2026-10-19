@@ -75,6 +75,7 @@ export const Item = named(
 /** Where an item goes: a corner, or 160 px clear of another item; and which frame it goes into. */
 export const Place = obj({
 	canvas: opt(str()),
+	frame: opt(str()),
 	at: opt(Corner),
 	beside: opt(str()),
 	below: opt(str()),

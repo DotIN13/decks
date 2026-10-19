@@ -84,6 +84,8 @@ const o = (name: string, schema: Schema, more: Partial<Param> = {}): Param => ({
 const paths = (name = "path"): Param => ({ name, schema: union(str(), arr(str())), variadic: true });
 /** The `{ canvas }` every canvas call takes last. */
 const onCanvas = (more: Record<string, Schema | { optional: Schema }> = {}) => o("options", obj({ canvas: opt(str()), ...more }));
+/** The item calls' options: a canvas, or a frame file in frames/ (never both), and whatever else the call takes. */
+const onItems = (more: Record<string, Schema | { optional: Schema }> = {}) => o("options", obj({ canvas: opt(str()), frame: opt(str()), ...more }));
 
 const deckRead = { touches: "deck", effect: "read" } as const;
 const deckChange = { touches: "deck", effect: "change" } as const;
@@ -103,9 +105,9 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'Everything on the canvas, boards included, each with its box. A board is { type: "board", board: <path>, box }; every other item has pen.dev\'s own fields. Read it before placing anything.',
-		params: [onCanvas()],
-		result: obj({ canvas: str(), title: str(), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
+			'Everything on the canvas, boards included, each with its box. A board is { type: "board", board: <path>, box }; every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it.',
+		params: [onItems()],
+		result: obj({ canvas: opt(str()), frame: opt(str()), title: opt(str()), file: opt(str()), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
 	},
 	{
 		name: "canvas.insert",
@@ -121,7 +123,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary: "Change an item's fields (`set`), its place (`at`) or its size (`size`). A board can be named by its path; its size here is its size on this canvas.",
-		params: [p("id", str()), p("change", obj({ set: opt(rec(true)), at: opt(Corner), size: opt(Size) })), onCanvas()],
+		params: [p("id", str()), p("change", obj({ set: opt(rec(true)), at: opt(Corner), size: opt(Size) })), onItems()],
 		result: Item,
 	},
 	{
@@ -129,7 +131,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary: "Swap a whole item for another, keeping its id and its place unless the new one says otherwise.",
-		params: [p("id", str()), p("item", Item), onCanvas()],
+		params: [p("id", str()), p("item", Item), onItems()],
 		result: Item,
 	},
 	{
@@ -137,7 +139,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary: "Take an item off the canvas. A board's file stays in the deck.",
-		params: [p("id", str()), onCanvas()],
+		params: [p("id", str()), onItems()],
 		result: obj({ deleted: str() }),
 	},
 	{
@@ -153,7 +155,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary: "Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`.",
-		params: [p("id", str()), o("options", obj({ canvas: opt(str()), as: opt(str()), at: opt(Corner), parent: opt(union(str(), nul)) }))],
+		params: [p("id", str()), o("options", obj({ canvas: opt(str()), frame: opt(str()), as: opt(str()), at: opt(Corner), parent: opt(union(str(), nul)) }))],
 		result: Item,
 	},
 	{
@@ -161,7 +163,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary: 'Set the canvas\'s colour tokens, per theme such as light and dark: { accent: { type: "color", value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }; null removes one.',
-		params: [p("set", rec(true)), onCanvas({ themes: opt(union(rec(arr(str())), nul)) })],
+		params: [p("set", rec(true)), onItems({ themes: opt(union(rec(arr(str())), nul)) })],
 		result: obj({ variables: rec(true), themes: opt(rec(true)) }),
 	},
 	{
@@ -170,7 +172,7 @@ export const VERBS: readonly Verb[] = [
 		...deckChange,
 		summary:
 			'Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev\'s own form, { op: "insert", node, box }, is taken too.',
-		params: [p("ops", arr(union(CanvasOp, PenEdit))), onCanvas()],
+		params: [p("ops", arr(union(CanvasOp, PenEdit))), onItems()],
 		result: arr(Item),
 	},
 	{
@@ -243,7 +245,7 @@ export const VERBS: readonly Verb[] = [
 		name: "frame.create",
 		group: "board",
 		...deckChange,
-		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item. Placed on any canvas with { type: "ref", ref }.',
+		summary: 'A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item. Placed on any canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }.',
 		params: [p("path", str()), o("item", PenItem)],
 		result: obj({ file: str(), ref: opt(str()), id: str() }),
 	},
@@ -507,7 +509,7 @@ export const ALIASES: readonly Verb[] = [
 		name: "pen.read",
 		group: "canvas",
 		...deckRead,
-		alias: "decks.canvas.read",
+		alias: "decks.canvas.read (a frame file: decks.canvas.read({ frame }))",
 		summary: "Old name: your canvas's drawing, or any .pen file by `path`.",
 		params: [o("path", str())],
 		result: obj({ stage: opt(str()), file: str(), ref: opt(str()), version: str(), error: opt(str()), children: arr(any()) }),
@@ -516,7 +518,7 @@ export const ALIASES: readonly Verb[] = [
 		name: "pen.edit",
 		group: "canvas",
 		...deckChange,
-		alias: "decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables)",
+		alias: "decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables; a frame file with { frame })",
 		summary: "Old name: edit your canvas's drawing, or any .pen file by `path`, all or nothing.",
 		params: [p("edits", arr(PenEdit)), o("options", obj({ path: opt(str()) }))],
 		result: obj({ rev: opt(num()), file: opt(str()), ref: opt(str()), results: arr(obj({ op: str(), id: str(), box: opt(Box), note: opt(str()) })) }),

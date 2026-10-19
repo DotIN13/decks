@@ -18,12 +18,20 @@ import type { VerbContext } from "./context.ts";
  * and anywhere an item's id is taken a board's path is taken too. Every call names its canvas or
  * means `decks.here()`; none changes which canvas anybody is on. Every change is one edit of the
  * canvas's file, all of a batch or none of it.
+ *
+ * The item calls (read, insert, update, replace, delete, move, copy, variables, batch) take
+ * `{ frame: "frames/<name>" }` instead to act on a frame file, with the same items and answers; the
+ * change shows on every canvas placing the frame. A frame holds drawn items, never a board.
  */
 
 /** How far clear of another item `beside` and `below` put one. */
 export const GAP = 160;
 
 type Corner = { x1: number; y1: number } | { x: number; y: number };
+/** What an item call acts on: a canvas by its folder name, or a frame file by its ref. */
+type Target = { canvas: string; frame?: undefined } | { frame: string; canvas?: undefined };
+/** The options every item call takes to say what it acts on. */
+type On = { canvas?: string; frame?: string };
 type ItemIn = { type: string; [key: string]: unknown };
 export type CanvasOpIn =
 	| { op: "insert"; item: ItemIn; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }
@@ -64,8 +72,30 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	const { service, agent, notes, needPens, canvasOf, canvasRow, isolated } = ctx;
 	const measure = serverText.measure;
 
-	/** Lay a document out as the canvas would: what `beside` and every answered box are measured on. */
-	const layoutOf = (name: string, doc: PenDocument): Map<string, Placed> => placements(needPens().withImported(name, doc), { theme: baseTheme(doc, "light"), measure });
+	/** A canvas, or a frame file when the caller says `frame`; both at once is a mistake worth saying. */
+	const targetOf = (options?: On): Target => {
+		const frame = options?.frame;
+		if (frame === undefined || frame === null) return { canvas: canvasOf(options?.canvas) };
+		if (options?.canvas !== undefined && options.canvas !== null) throw new Error("Say a canvas or a frame, not both: { frame } edits the frame file itself, and that shows on every canvas placing it.");
+		if (typeof frame !== "string" || !frame.trim()) throw new Error('frame names a frame file, as in { frame: "frames/agent-card" }.');
+		return { frame: needPens().framePen(frame).ref };
+	};
+
+	/**
+	 * What a target holds, read fresh, and how to lay a version of it out as the canvas would: what
+	 * `beside` and every answered box are measured on. A frame's refs resolve from its own folder.
+	 */
+	const surfaceOf = (target: Target): { doc: PenDocument; layout: (doc: PenDocument) => Map<string, Placed> } => {
+		const pens = needPens();
+		const lay = (doc: PenDocument, imported: PenDocument) => placements(imported, { theme: baseTheme(doc, "light"), measure });
+		if (target.frame !== undefined) {
+			const frame = pens.framePen(target.frame);
+			return { doc: frame.doc, layout: (doc) => lay(doc, frame.imported(doc)) };
+		}
+		const entry = pens.get(target.canvas);
+		if (entry.error) throw new Error(`${entry.error}. Fix the file, or replace it whole, before editing it.`);
+		return { doc: entry.doc, layout: (doc) => lay(doc, pens.withImported(target.canvas, doc)) };
+	};
 
 	/** An item's id, or a board's path on this document turned into its item's id. */
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
@@ -75,12 +105,13 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	};
 
 	/** A caller's item as pen's: a board becomes its `browser` item, sized as its file says unless told. */
-	const fromItem = (raw: unknown, taken: Set<string>): Record<string, unknown> => {
+	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
 		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "board", board: "boards/plan.html" }.');
 		const item = raw as Record<string, unknown>;
 		const { box: _box, children: kids, ...rest } = item;
-		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken)) : undefined;
+		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken, frame)) : undefined;
 		if (item.type !== "board") return { ...rest, ...(children ? { children } : {}) };
+		if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items, not boards: place the board on a canvas, beside the frame.`);
 		const { type: _type, board, title: _title, ...own } = rest as Record<string, unknown>;
 		if (typeof board !== "string" || !board) throw new Error('A board item names its file: { type: "board", board: "boards/plan.html" }.');
 		const file = service.fileBoard(board);
@@ -113,11 +144,10 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	 * Turn the caller's ops into pen's, one at a time against the document as the earlier ones left it,
 	 * so a later op can be beside an item an earlier one made. Nothing is written here.
 	 */
-	const translate = (name: string, ops: readonly CanvasOpIn[]): { penOps: Op[]; sized: Array<{ path: string; w?: number; h?: number }>; deleted: Set<string>; placedFor: string[] } => {
-		const pens = needPens();
-		const entry = pens.get(name);
-		if (entry.error) throw new Error(`${entry.error}. Fix the file, or replace it whole, before editing it.`);
-		let doc = entry.doc;
+	const translate = (target: Target, ops: readonly CanvasOpIn[]): { penOps: Op[]; sized: Array<{ path: string; w?: number; h?: number }>; deleted: Set<string>; placedFor: string[] } => {
+		const surface = surfaceOf(target);
+		const frame = target.frame;
+		let doc = surface.doc;
 		const theme = baseTheme(doc, "light");
 		const penOps: Op[] = [];
 		const sized: Array<{ path: string; w?: number; h?: number }> = [];
@@ -127,7 +157,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		ops.forEach((op, index) => {
 			const where = ops.length > 1 ? `Op ${index + 1} (${op?.op ?? "?"}): ` : "";
 			try {
-				const placed = layoutOf(name, doc);
+				const placed = surface.layout(doc);
 				let pen: Op;
 				// pen.dev's own form (what the canvas editor sends): taken as it is, with a board's path for an id.
 				const raw = op as unknown as Record<string, unknown>;
@@ -135,7 +165,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					const given = { ...raw } as Record<string, unknown>;
 					if (typeof given.id === "string") given.id = idIn(doc, given.id);
 					if (typeof given.parent === "string") given.parent = idIn(doc, given.parent, "parent");
-					if (given.node && (given.node as { type?: unknown }).type === "board") given.node = fromItem(given.node, ids(doc));
+					if (given.node && (given.node as { type?: unknown }).type === "board") given.node = fromItem(given.node, ids(doc), frame);
 					pen = given as unknown as Op;
 					doc = apply(doc, [pen], { theme, measure }).doc;
 					penOps.push(pen);
@@ -143,7 +173,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				}
 				switch (op?.op) {
 					case "insert": {
-						const node = fromItem(op.item, ids(doc));
+						const node = fromItem(op.item, ids(doc), frame);
 						const path = boardOf(node as unknown as PenNode);
 						if (path) {
 							const there = [...walk(doc.children)].find((one) => boardOf(one) === path);
@@ -190,7 +220,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						const id = idIn(doc, op.id);
 						const taken = ids(doc);
 						taken.delete(id);
-						const node = fromItem({ ...op.item, id }, taken);
+						const node = fromItem({ ...op.item, id }, taken, frame);
 						pen = { op: "replace", id, node: node as never };
 						break;
 					}
@@ -230,24 +260,37 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	};
 
 	/**
-	 * Apply ops to a canvas, all or nothing, and answer with each item as it now is.
-	 * The canvas first, then a board's file when a board was sized, as a person's resize does.
+	 * Apply ops to a canvas or a frame, all or nothing, and answer with each item as it now is.
+	 * The canvas first, then a board's file when a board was sized, as a person's resize does. A
+	 * frame's file is written once, and every canvas placing it is sent it again (`StagePens.editFile`).
 	 */
-	const change = (name: string, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
+	const change = (target: Target, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
 		const pens = needPens();
-		const { penOps, sized, deleted, placedFor } = translate(name, ops);
-		const { entry, results } = pens.edit(name, penOps, undefined, agent.person ? { undoable: true } : undefined);
+		const { penOps, sized, deleted, placedFor } = translate(target, ops);
+		let results: ReadonlyArray<{ op: string; id: string; note?: string }>;
+		let variables: () => Record<string, unknown>;
+		let children: Record<string, unknown>[];
+		if (target.frame !== undefined) {
+			results = pens.editFile(target.frame, penOps).results;
+			variables = () => (pens.framePen(target.frame).doc.variables ?? {}) as Record<string, unknown>;
+			children = pens.readFile(target.frame).children as unknown as Record<string, unknown>[];
+		} else {
+			const name = target.canvas;
+			const edited = pens.edit(name, penOps, undefined, agent.person ? { undoable: true } : undefined);
+			results = edited.results;
+			variables = () => (edited.entry.doc.variables ?? {}) as Record<string, unknown>;
+			for (const one of sized) {
+				const file = service.fileBoard(one.path);
+				if (!file || file.fills) continue;
+				if (file.format === "slides") {
+					if (one.w !== undefined) service.resize(one.path, { w: one.w });
+				} else service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
+				if (agent.person) service.wrote(one.path, "you");
+			}
+			children = pens.read(name).children as unknown as Record<string, unknown>[];
+		}
 		notes.push(...placedFor);
 		for (const result of results) if (result.note) notes.push(result.note);
-		for (const one of sized) {
-			const file = service.fileBoard(one.path);
-			if (!file || file.fills) continue;
-			if (file.format === "slides") {
-				if (one.w !== undefined) service.resize(one.path, { w: one.w });
-			} else service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
-			if (agent.person) service.wrote(one.path, "you");
-		}
-		const read = pens.read(name);
 		const byId = new Map<string, Record<string, unknown>>();
 		const index = (list: readonly Record<string, unknown>[]) => {
 			for (const node of list) {
@@ -255,12 +298,12 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				if (Array.isArray(node.children)) index(node.children as Record<string, unknown>[]);
 			}
 		};
-		index(read.children as unknown as Record<string, unknown>[]);
+		index(children);
 		const drawn: string[] = [];
 		const boxes: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 		const answer = results.map((result) => {
 			if (result.op === "delete" || deleted.has(result.id)) return { type: "deleted", id: result.id };
-			if (result.op === "variables") return { type: "variables", id: result.id, variables: entry.doc.variables ?? {} };
+			if (result.op === "variables") return { type: "variables", id: result.id, variables: variables() };
 			const node = byId.get(result.id);
 			if (!node) return { type: "unknown", id: result.id };
 			const item = toItem(node);
@@ -272,46 +315,53 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			}
 			return item;
 		});
-		if (drawn.length) agent.drew?.(name, drawn, boxes);
+		// What an agent drew is marked on its canvas; a frame is drawn wherever it is placed, so it is not.
+		if (drawn.length && target.canvas !== undefined) agent.drew?.(target.canvas, drawn, boxes);
 		return answer;
 	};
-	const one = (name: string, op: CanvasOpIn) => change(name, [op])[0]!;
+	const one = (target: Target, op: CanvasOpIn) => change(target, [op])[0]!;
 
 	return {
 		canvas: {
-			read: async (options?: { canvas?: string }) => {
-				const name = canvasOf(options?.canvas);
+			read: async (options?: On) => {
+				const target = targetOf(options);
 				const pens = needPens();
+				if (target.frame !== undefined) {
+					const { file, children, ...rest } = pens.readFile(target.frame) as { file: string; children: unknown[]; ref?: string; stage?: string };
+					delete rest.ref;
+					delete rest.stage;
+					return { frame: target.frame, file, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
+				}
+				const name = target.canvas;
 				const { stage: _stage, file: _file, children, ...rest } = pens.read(name);
 				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 			},
-			insert: async (item: ItemIn, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
-				const { canvas, ...place } = options ?? {};
-				return one(canvasOf(canvas), { op: "insert", item, ...place }) as never;
+			insert: async (item: ItemIn, options?: On & { at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
+				const { canvas, frame, ...place } = options ?? {};
+				return one(targetOf({ canvas, frame }), { op: "insert", item, ...place }) as never;
 			},
-			update: async (id: string, changeOf: { set?: Record<string, unknown>; at?: Corner; size?: { w?: number; h?: number } }, options?: { canvas?: string }) =>
-				one(canvasOf(options?.canvas), { op: "update", id, ...(changeOf ?? {}) }) as never,
-			replace: async (id: string, item: ItemIn, options?: { canvas?: string }) => one(canvasOf(options?.canvas), { op: "replace", id, item }) as never,
-			delete: async (id: string, options?: { canvas?: string }) => {
-				const name = canvasOf(options?.canvas);
-				one(name, { op: "delete", id });
+			update: async (id: string, changeOf: { set?: Record<string, unknown>; at?: Corner; size?: { w?: number; h?: number } }, options?: On) =>
+				one(targetOf(options), { op: "update", id, ...(changeOf ?? {}) }) as never,
+			replace: async (id: string, item: ItemIn, options?: On) => one(targetOf(options), { op: "replace", id, item }) as never,
+			delete: async (id: string, options?: On) => {
+				one(targetOf(options), { op: "delete", id });
 				return { deleted: id };
 			},
-			move: async (id: string, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
-				const { canvas, ...place } = options ?? {};
-				return one(canvasOf(canvas), { op: "move", id, ...place }) as never;
+			move: async (id: string, options?: On & { at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
+				const { canvas, frame, ...place } = options ?? {};
+				return one(targetOf({ canvas, frame }), { op: "move", id, ...place }) as never;
 			},
-			copy: async (id: string, options?: { canvas?: string; as?: string; at?: Corner; parent?: string | null }) => {
-				const { canvas, ...rest } = options ?? {};
-				return one(canvasOf(canvas), { op: "copy", id, ...rest }) as never;
+			copy: async (id: string, options?: On & { as?: string; at?: Corner; parent?: string | null }) => {
+				const { canvas, frame, ...rest } = options ?? {};
+				return one(targetOf({ canvas, frame }), { op: "copy", id, ...rest }) as never;
 			},
-			variables: async (set: Record<string, unknown>, options?: { canvas?: string; themes?: Record<string, string[]> | null }) => {
-				const name = canvasOf(options?.canvas);
-				one(name, { op: "variables", set, ...(options?.themes !== undefined ? { themes: options.themes } : {}) });
-				const doc = needPens().get(name).doc;
+			variables: async (set: Record<string, unknown>, options?: On & { themes?: Record<string, string[]> | null }) => {
+				const target = targetOf(options);
+				one(target, { op: "variables", set, ...(options?.themes !== undefined ? { themes: options.themes } : {}) });
+				const doc = target.frame !== undefined ? needPens().framePen(target.frame).doc : needPens().get(target.canvas).doc;
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
-			batch: async (ops: readonly unknown[], options?: { canvas?: string }) => change(canvasOf(options?.canvas), ops as readonly CanvasOpIn[]) as never,
+			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);

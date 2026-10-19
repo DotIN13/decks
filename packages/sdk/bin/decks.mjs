@@ -10,7 +10,8 @@
  *     echo '[...]' | decks canvas batch -
  *
  * Commands are noun then verb (`decks canvas insert`, `decks agent send`); `--canvas` names the
- * canvas, and left out it is the one `decks here` says. The old names (`decks show`, `decks pen
+ * canvas, and left out it is the one `decks here` says; `--frame frames/<name>` points the item
+ * calls at a frame file instead. The old names (`decks show`, `decks pen
  * edit`, …) still work for one release, and say their new command.
  *
  * A verb's plain arguments (a path, a name) are words; an object argument's keys are flags, with a
@@ -55,7 +56,7 @@ export function help(verb) {
 	const lines = [
 		"decks <noun> <verb> [arguments] [--flags]: every Decks call, as a command.",
 		"",
-		"Each prints its value to stdout (JSON, or a string as it is) and its notes to stderr. --canvas names the canvas; left out, it is decks here.",
+		"Each prints its value to stdout (JSON, or a string as it is) and its notes to stderr. --canvas names the canvas; left out, it is decks here. The item calls (read, insert, update, replace, delete, move, copy, variables, batch) take --frame frames/<name> instead, to edit a frame file.",
 		"",
 	];
 	for (const [group, verbs] of groups) {

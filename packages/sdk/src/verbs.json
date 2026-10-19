@@ -8,18 +8,21 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "read",
-  "summary": "Everything on the canvas, boards included, each with its box. A board is { type: \"board\", board: <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.",
-  "signature": "canvas.read(options?: { canvas?: string })",
-  "returns": "{ canvas: string; title: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }",
+  "summary": "Everything on the canvas, boards included, each with its box. A board is { type: \"board\", board: <path>, box }; every other item has pen.dev's own fields. Read it before placing anything. `frame: \"frames/<name>\"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it.",
+  "signature": "canvas.read(options?: { canvas?: string; frame?: string })",
+  "returns": "{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }",
   "params": [
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string }",
+    "type": "{ canvas?: string; frame?: string }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       }
      },
@@ -38,7 +41,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Add an item to the canvas. A board is { type: \"board\", board: <path>, width? }; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item's id or a board's path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame.",
-  "signature": "canvas.insert(item: Item, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
+  "signature": "canvas.insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
   "returns": "Item",
   "params": [
    {
@@ -96,11 +99,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }",
+    "type": "{ canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       },
       "at": {
@@ -175,7 +181,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Change an item's fields (`set`), its place (`at`) or its size (`size`). A board can be named by its path; its size here is its size on this canvas.",
-  "signature": "canvas.update(id: string, change: { set?: Record<string, unknown>; at?: Corner; size?: Size }, options?: { canvas?: string })",
+  "signature": "canvas.update(id: string, change: { set?: Record<string, unknown>; at?: Corner; size?: Size }, options?: { canvas?: string; frame?: string })",
   "returns": "Item",
   "params": [
    {
@@ -253,11 +259,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string }",
+    "type": "{ canvas?: string; frame?: string }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       }
      },
@@ -276,7 +285,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Swap a whole item for another, keeping its id and its place unless the new one says otherwise.",
-  "signature": "canvas.replace(id: string, item: Item, options?: { canvas?: string })",
+  "signature": "canvas.replace(id: string, item: Item, options?: { canvas?: string; frame?: string })",
   "returns": "Item",
   "params": [
    {
@@ -341,11 +350,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string }",
+    "type": "{ canvas?: string; frame?: string }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       }
      },
@@ -364,7 +376,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Take an item off the canvas. A board's file stays in the deck.",
-  "signature": "canvas.delete(id: string, options?: { canvas?: string })",
+  "signature": "canvas.delete(id: string, options?: { canvas?: string; frame?: string })",
   "returns": "{ deleted: string }",
   "params": [
    {
@@ -377,11 +389,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string }",
+    "type": "{ canvas?: string; frame?: string }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       }
      },
@@ -400,7 +415,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
-  "signature": "canvas.move(id: string, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
+  "signature": "canvas.move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
   "returns": "Item",
   "params": [
    {
@@ -413,11 +428,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }",
+    "type": "{ canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       },
       "at": {
@@ -492,7 +510,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`.",
-  "signature": "canvas.copy(id: string, options?: { canvas?: string; as?: string; at?: Corner; parent?: string | null })",
+  "signature": "canvas.copy(id: string, options?: { canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null })",
   "returns": "Item",
   "params": [
    {
@@ -505,11 +523,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string; as?: string; at?: Corner; parent?: string | null }",
+    "type": "{ canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       },
       "as": {
@@ -578,7 +599,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Set the canvas's colour tokens, per theme such as light and dark: { accent: { type: \"color\", value: [{ value: \"#e5484d\" }, { value: \"#ff6369\", theme: { mode: \"dark\" } }] } }; null removes one.",
-  "signature": "canvas.variables(set: Record<string, unknown>, options?: { canvas?: string; themes?: Record<string, string[]> | null })",
+  "signature": "canvas.variables(set: Record<string, unknown>, options?: { canvas?: string; frame?: string; themes?: Record<string, string[]> | null })",
   "returns": "{ variables: Record<string, unknown>; themes?: Record<string, unknown> }",
   "params": [
    {
@@ -593,11 +614,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string; themes?: Record<string, string[]> | null }",
+    "type": "{ canvas?: string; frame?: string; themes?: Record<string, string[]> | null }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       },
       "themes": {
@@ -633,7 +657,7 @@
   "touches": "deck",
   "effect": "change",
   "summary": "Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: \"insert\", item, beside }, { op: \"update\", id, set }, { op: \"delete\", id }. A later op can be beside an item an earlier one made. pen.dev's own form, { op: \"insert\", node, box }, is taken too.",
-  "signature": "canvas.batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string })",
+  "signature": "canvas.batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string; frame?: string })",
   "returns": "Item[]",
   "params": [
    {
@@ -1418,11 +1442,14 @@
    {
     "name": "options",
     "optional": true,
-    "type": "{ canvas?: string }",
+    "type": "{ canvas?: string; frame?: string }",
     "schema": {
      "type": "object",
      "properties": {
       "canvas": {
+       "type": "string"
+      },
+      "frame": {
        "type": "string"
       }
      },
@@ -1828,7 +1855,7 @@
   "group": "board",
   "touches": "deck",
   "effect": "change",
-  "summary": "A new reusable .pen file at `path` (\"frames/ui/button\"), with `item` as its one reusable item. Placed on any canvas with { type: \"ref\", ref }.",
+  "summary": "A new reusable .pen file at `path` (\"frames/ui/button\"), with `item` as its one reusable item. Placed on any canvas with { type: \"ref\", ref }; read and edited with the canvas item calls given { frame: ref }.",
   "signature": "frame.create(path: string, item?: PenItem)",
   "returns": "{ file: string; ref?: string; id: string }",
   "params": [
@@ -3839,7 +3866,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "read",
-  "alias": "decks.canvas.read",
+  "alias": "decks.canvas.read (a frame file: decks.canvas.read({ frame }))",
   "summary": "Old name: your canvas's drawing, or any .pen file by `path`.",
   "signature": "pen.read(path?: string)",
   "returns": "{ stage?: string; file: string; ref?: string; version: string; error?: string; children: unknown[] }",
@@ -3863,7 +3890,7 @@
   "group": "canvas",
   "touches": "deck",
   "effect": "change",
-  "alias": "decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables)",
+  "alias": "decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables; a frame file with { frame })",
   "summary": "Old name: edit your canvas's drawing, or any .pen file by `path`, all or nothing.",
   "signature": "pen.edit(edits: PenEdit[], options?: { path?: string })",
   "returns": "{ rev?: number; file?: string; ref?: string; results: { op: string; id: string; box?: Box; note?: string }[] }",

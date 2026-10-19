@@ -231,10 +231,12 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
   puts a ref to it where the item was.
 
 Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
-with nothing to declare. A frame file is not a canvas: for this release it is read and edited with the
-old `decks.pen.read("frames/ui/agent-card")` and `decks.pen.edit([...], { path: "frames/ui/agent-card" })`,
-or by hand; every canvas using it shows the change. A path is relative to the deck, as a board's is, so `"canvases/<name>/canvas.pen"`
-reads another stage; an absolute path reaches any `.pen` file. `.pen` may be left off.
+with nothing to declare. To change the frame itself, give the canvas item calls `{ frame }` in place of
+`{ canvas }`: `decks.canvas.read({ frame: "frames/ui/agent-card" })`, then `insert`, `update`, `replace`,
+`delete`, `move`, `copy`, `variables` or `batch` with the same items, as in
+`decks.canvas.update("title", { set: { content: "Agent" } }, { frame: "frames/ui/agent-card" })`
+(`decks canvas update title --set.content Agent --frame frames/ui/agent-card`). Every canvas placing it
+shows the change. A frame holds drawn items, never a board, and a call names a canvas or a frame, not both.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
 the stage file names it (relative to the stage file, inside the deck), and `ref: "kit:<id>"` places a

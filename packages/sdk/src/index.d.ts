@@ -148,44 +148,47 @@ export interface Verbs {
 		/**
 		 * Everything on the canvas, boards included, each with its box. A board is { type: "board", board:
 		 * <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
+		 * `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the
+		 * item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas
+		 * placing it.
 		 */
-		read(options?: { canvas?: string }): Promise<{ canvas: string; title: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
+		read(options?: { canvas?: string; frame?: string }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**
 		 * Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is
 		 * a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its
 		 * top-left corner; `beside` or `below` (an item's id or a board's path) puts it 160 px clear of
 		 * that item, tops or lefts aligned; `parent` and `index` put it inside a frame.
 		 */
-		insert(item: Item, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
+		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
 		 * Change an item's fields (`set`), its place (`at`) or its size (`size`). A board can be named by
 		 * its path; its size here is its size on this canvas.
 		 */
-		update(id: string, change: { set?: Record<string, unknown>; at?: Corner; size?: Size }, options?: { canvas?: string }): Promise<Item>;
+		update(id: string, change: { set?: Record<string, unknown>; at?: Corner; size?: Size }, options?: { canvas?: string; frame?: string }): Promise<Item>;
 		/** Swap a whole item for another, keeping its id and its place unless the new one says otherwise. */
-		replace(id: string, item: Item, options?: { canvas?: string }): Promise<Item>;
+		replace(id: string, item: Item, options?: { canvas?: string; frame?: string }): Promise<Item>;
 		/** Take an item off the canvas. A board's file stays in the deck. */
-		delete(id: string, options?: { canvas?: string }): Promise<{ deleted: string }>;
+		delete(id: string, options?: { canvas?: string; frame?: string }): Promise<{ deleted: string }>;
 		/**
 		 * Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame
 		 * (`parent`, `index`; null for the canvas itself).
 		 */
-		move(id: string, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
+		move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/** Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`. */
-		copy(id: string, options?: { canvas?: string; as?: string; at?: Corner; parent?: string | null }): Promise<Item>;
+		copy(id: string, options?: { canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null }): Promise<Item>;
 		/**
 		 * Set the canvas's colour tokens, per theme such as light and dark: { accent: { type: "color",
 		 * value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }; null removes
 		 * one.
 		 */
-		variables(set: Record<string, unknown>, options?: { canvas?: string; themes?: Record<string, string[]> | null }): Promise<{ variables: Record<string, unknown>; themes?: Record<string, unknown> }>;
+		variables(set: Record<string, unknown>, options?: { canvas?: string; frame?: string; themes?: Record<string, string[]> | null }): Promise<{ variables: Record<string, unknown>; themes?: Record<string, unknown> }>;
 		/**
 		 * Several of the changes above in one call, applied together or not at all. Each op is the call of
 		 * that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set },
 		 * { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev's own form, {
 		 * op: "insert", node, box }, is taken too.
 		 */
-		batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string }): Promise<Item[]>;
+		batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string; frame?: string }): Promise<Item[]>;
 		/**
 		 * Set a board's height from its content, measured at the width it has on this canvas; it must be on
 		 * it. `notes` say what the browser found: the height, the word count, the smallest type, content
@@ -239,7 +242,8 @@ export interface Verbs {
 	frame: {
 		/**
 		 * A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item.
-		 * Placed on any canvas with { type: "ref", ref }.
+		 * Placed on any canvas with { type: "ref", ref }; read and edited with the canvas item calls given
+		 * { frame: ref }.
 		 */
 		create(path: string, item?: PenItem): Promise<{ file: string; ref?: string; id: string }>;
 	};
@@ -373,11 +377,15 @@ export interface Verbs {
 		stop(): Promise<void>;
 	};
 	pen: {
-		/** Old name: your canvas's drawing, or any .pen file by `path`. @deprecated Use decks.canvas.read. */
+		/**
+		 * Old name: your canvas's drawing, or any .pen file by `path`. @deprecated Use decks.canvas.read (a
+		 * frame file: decks.canvas.read({ frame })).
+		 */
 		read(path?: string): Promise<{ stage?: string; file: string; ref?: string; version: string; error?: string; children: unknown[] }>;
 		/**
 		 * Old name: edit your canvas's drawing, or any .pen file by `path`, all or nothing. @deprecated Use
-		 * decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables).
+		 * decks.canvas.batch (or the single calls: insert, update, replace, delete, move, copy, variables;
+		 * a frame file with { frame }).
 		 */
 		edit(edits: PenEdit[], options?: { path?: string }): Promise<{ rev?: number; file?: string; ref?: string; results: { op: string; id: string; box?: Box; note?: string }[] }>;
 		/** Old name: a new .pen file in frames/. @deprecated Use decks.frame.create. */

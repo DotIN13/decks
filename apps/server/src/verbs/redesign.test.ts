@@ -238,3 +238,47 @@ test("the old names map onto the new calls: open moves the home canvas, report c
 		cleanup();
 	}
 });
+
+test("the item calls take a frame file instead of a canvas, and its change shows on every canvas placing it", async () => {
+	const { deck, must, call, cleanup } = await open();
+	try {
+		const made = (await must("frame.create", ["frames/card", { type: "frame", width: 200, height: "fit_content", layout: "vertical", children: [] }])).value;
+		assert.equal(made.ref, "frames/card");
+		// Placed on two canvases by its ref.
+		const home = (await must("here")).value.name;
+		const other = (await must("canvas.create", ["Second"])).value.name;
+		for (const canvas of [home, other]) await must("canvas.insert", [{ type: "ref", id: "c", ref: "frames/card" }, { canvas, at: { x1: 0, y1: 0 } }]);
+		const revs = async () => Promise.all([home, other].map(async (canvas) => (await must("canvas.read", [{ canvas }])).value.rev as number));
+		const before = await revs();
+
+		const read = (await must("canvas.read", [{ frame: "frames/card" }])).value;
+		assert.equal(read.frame, "frames/card");
+		assert.deepEqual(read.items.map((one: { id: string }) => one.id), [made.id]);
+		// The same item shapes and answers as on a canvas.
+		const note = (await must("canvas.insert", [{ type: "text", id: "t1", content: "Hello" }, { frame: "frames/card", parent: made.id }])).value;
+		assert.equal(note.id, "t1");
+		assert.ok(note.box, "an inserted item answers with its box");
+		await must("canvas.update", ["t1", { set: { content: "Hello there" } }, { frame: "frames/card" }]);
+		const batch = (await must("canvas.batch", [[{ op: "insert", item: { type: "text", id: "t2", content: "Two" }, parent: made.id }, { op: "delete", id: "t1" }], { frame: "frames/card" }])).value;
+		assert.deepEqual(batch.map((one: { id: string; type: string }) => [one.id, one.type]), [["t2", "text"], ["t1", "deleted"]]);
+		await must("canvas.variables", [{ ink: { type: "color", value: "#123456" } }, { frame: "frames/card" }]);
+		const file = JSON.parse(readFileSync(join(deck, "frames", "card.pen"), "utf8"));
+		assert.deepEqual(file.children[0].children.map((one: { id: string }) => one.id), ["t2"], "the frame's own file is what changed");
+		assert.equal(file.variables.ink.value, "#123456");
+		const after = await revs();
+		assert.ok(after[0]! > before[0]! && after[1]! > before[1]!, `every canvas placing the frame is sent it again: ${before} -> ${after}`);
+		// Nothing on either canvas was written: the canvases still hold only the ref.
+		for (const canvas of [home, other]) assert.deepEqual((await must("canvas.read", [{ canvas }])).value.items.map((one: { type: string }) => one.type), ["ref"]);
+
+		const both = await call("canvas.read", [{ canvas: home, frame: "frames/card" }]);
+		assert.ok(!both.ok && /canvas or a frame, not both/.test(both.error ?? ""), both.error);
+		const board = await call("canvas.insert", [{ type: "board", board: "boards/a.html" }, { frame: "frames/card" }]);
+		assert.ok(!board.ok && /not boards/.test(board.error ?? ""), board.error);
+		const notFrame = await call("canvas.read", [{ frame: `canvases/${home}/canvas.pen` }]);
+		assert.ok(!notFrame.ok && /not a frame/.test(notFrame.error ?? ""), notFrame.error);
+		const missing = await call("canvas.read", [{ frame: "frames/nope" }]);
+		assert.ok(!missing.ok && /There is no frames\/nope/.test(missing.error ?? ""), missing.error);
+	} finally {
+		cleanup();
+	}
+});
