@@ -93,6 +93,9 @@ export interface CreateSpec {
 }
 
 /** One item waiting in an agent's queue. */
+/** The sender of a hand-off the person made through the SDK, where an agent's id would go. */
+export const PERSON = "person";
+
 export interface QueuedWork {
 	/** The agent that sent it, and what it was calling itself at the time. */
 	from: string;
@@ -102,6 +105,8 @@ export interface QueuedWork {
 	at: number;
 	/** The sender asked for the report back — see `SendSpec.reply`. */
 	reply?: boolean;
+	/** The person sent it, through the SDK: it reads as their message, with no report owed. */
+	person?: true;
 }
 
 export interface StageAgentHooks {
