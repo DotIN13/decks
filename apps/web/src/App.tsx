@@ -584,7 +584,7 @@ export function App() {
 		// row and reload the document that is sitting in it.
 		const index = state.boards.findIndex((board) => board.path === path);
 		if (index >= 0) setState("boards", index, { x, y });
-		void act("move", [path, { x, y }]);
+		void act("canvas.move", [path, { at: { x1: x, y1: y } }]);
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
@@ -1500,7 +1500,7 @@ export function App() {
 						 * `board.changed` at the same revision, so the page in the frame stays as it is. A deck's
 						 * slides take their width from the deck's own file, and reload at it.
 						 */
-						onResize={(path, size) => void act("resize", [path, size])}
+						onResize={(path, size) => void act("canvas.update", [path, { size }])}
 						flowHeight={(path) => flowHeights()[path]}
 						/*
 						 * A double-click on empty canvas makes a blank board, centred where it landed.
@@ -1521,7 +1521,7 @@ export function App() {
 								setComponent(undefined);
 							})
 						}
-						onHide={(path) => void act("hide", [path])}
+						onHide={(path) => void act("canvas.delete", [path])}
 						nonces={state.nonces}
 						cursor={state.cursor}
 						acts={state.acts}
@@ -1674,12 +1674,12 @@ export function App() {
 						if (!agentId || stageOf(agentId)?.name === name) return;
 						// The camera follows when the server says the agent is there (the canvas effect above).
 						switchingFor(true);
-						void act("open", [name], agentId);
+						void act("agent.update", [{ canvas: name }], agentId);
 					}}
 					onNew={(title) => {
 						const agentId = state.focused;
 						if (!agentId) return;
-						void act("newStage", [title], agentId);
+						void act<{ name: string }>("canvas.create", [title], agentId).then((made) => made && act("agent.update", [{ canvas: made.name }], agentId));
 					}}
 					scheme={scheme()}
 				/>
@@ -1712,7 +1712,7 @@ export function App() {
 					 */
 					onClearStage={() => {
 						const paths = stageBoards().map((board) => board.path);
-						if (paths.length) void act("hide", [paths]);
+						if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
 					}}
 					onCanvas={stageBoards().length}
 					/* Isolation belongs to the agent you are talking to; the server restarts it in its
@@ -1934,7 +1934,7 @@ export function App() {
 					 * follow from that, where they already did.
 					 */
 					onDelete={(board) => send({ type: "board.delete", path: board.path })}
-					onHide={(board) => void act("hide", [board.path])}
+					onHide={(board) => void act("canvas.delete", [board.path])}
 				/>
 
 

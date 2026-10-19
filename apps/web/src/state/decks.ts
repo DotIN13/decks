@@ -49,6 +49,6 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
  * the canvas drew ahead of the answer goes away.
  */
 export async function editDrawing(agentId: string, ops: unknown[]): Promise<void> {
-	const done = await act("pen.edit", [ops]);
+	const done = await act("canvas.batch", [ops]);
 	if (done === undefined) send({ type: "stage.pen.get", agentId });
 }

@@ -57,7 +57,8 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 				const { canvas, ...rest } = patch ?? {};
 				const said = Object.keys(rest).length ? await old.me(rest) : undefined;
 				if (canvas !== undefined) {
-					if (!agent.setHome || agent.board || agent.person) throw new Error("Only an agent has a home canvas to change.");
+					// The person may move a conversation to a canvas, as the canvas manager does; a board may not.
+					if (!agent.setHome || agent.board) throw new Error("Only an agent has a home canvas to change.");
 					const name = canvasOf(canvas);
 					agent.setHome(name);
 					// Who is on which canvas is in every browser's canvas list.
