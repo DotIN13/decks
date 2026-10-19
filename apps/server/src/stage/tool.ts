@@ -292,6 +292,33 @@ export function createStageTool(deps: {
 		...webVerbs(ctx),
 	};
 
+	/*
+	 * The old names whose new call answers the same question take that call's answer, so there is
+	 * one implementation of each; the rest keep their own code, for the answer shape and placement
+	 * their callers were written against (`ALIASES` in @decks/api says which new call each maps to).
+	 */
+	stage.url = (path) => stage.board.url(path);
+	stage.resolve = (file) => stage.file.url(file);
+	stage.viewport = () => stage.view.viewport();
+	stage.cursor = (path, at) => stage.view.cursor(path, at);
+	stage.reload = async (path) => {
+		await stage.view.reload({ board: path });
+	};
+	stage.report = async (path) => ({ reported: await stage.agent.claim(path) });
+	stage.pen = {
+		...stage.pen,
+		file: () => stage.canvas.file(),
+		create: (path, item) => stage.frame.create(path, item),
+		save: async (id, path, options) => ({ overwrote: false, ...(await stage.canvas.save(id, path, options?.replace === undefined ? {} : { replace: options.replace })) }),
+	};
+	const openStage = stage.open;
+	// `open` is agent.update({ canvas }) and then view.goto: the home moves, and the screen follows.
+	stage.open = async (name) => {
+		const opened = await openStage(name);
+		if (!agent.person && !agent.board) await service.goto(agent.id, opened.stage).catch(() => undefined);
+		return opened;
+	};
+
 	const snapshot = (): StageSnapshot => ({
 		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards
 		// were and not merely which ones were up.

@@ -249,3 +249,24 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 		cleanup();
 	}
 });
+
+test("the old names map onto the new calls: open moves the home canvas, report claims, url and resolve are the new addresses", async () => {
+	const { agent, must, cleanup } = await open();
+	try {
+		const other = (await must("canvas.create", ["Elsewhere"])).value.name;
+		const opened = await must("open", [other]);
+		assert.equal(opened.value.stage, other);
+		assert.equal((await must("here")).value.name, other, "open is agent.update({ canvas })");
+		assert.ok(opened.notes.some((note) => /agent\.update\(\{ canvas \}\), then decks\.view\.goto/.test(note)));
+		const reported = await must("report", ["boards/a.html"]);
+		assert.deepEqual(reported.value, { reported: ["boards/a.html"] });
+		assert.ok(reported.notes.some((note) => /decks\.agent\.claim/.test(note)));
+		assert.equal((await must("url", ["boards/a.html"])).value, (await must("board.url", ["boards/a.html"])).value);
+		const made = await must("newStage", ["Third"]);
+		assert.equal((await must("here")).value.name, made.value.stage, "newStage still moves you, as it always did");
+		assert.ok(made.notes.some((note) => /decks\.canvas\.create/.test(note)));
+		void agent;
+	} finally {
+		cleanup();
+	}
+});
