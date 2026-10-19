@@ -3181,6 +3181,63 @@
   ]
  },
  {
+  "name": "studio.connect",
+  "command": [
+   "studio",
+   "connect"
+  ],
+  "group": "misc",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there in the background. Only the person can call it, from a browser paired with this harness.",
+  "signature": "studio.connect(url: string, key: string)",
+  "returns": "{ connected: boolean; url: string }",
+  "params": [
+   {
+    "name": "url",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "studio.status",
+  "command": [
+   "studio",
+   "status"
+  ],
+  "group": "misc",
+  "touches": "outside",
+  "effect": "read",
+  "summary": "Whether this harness syncs with Decks Studio, and with which.",
+  "signature": "studio.status()",
+  "returns": "{ connected: boolean; url?: string }",
+  "params": []
+ },
+ {
+  "name": "studio.disconnect",
+  "command": [
+   "studio",
+   "disconnect"
+  ],
+  "group": "misc",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "Stop syncing with Decks Studio and forget the key. Only the person can call it.",
+  "signature": "studio.disconnect()",
+  "returns": "{ connected: boolean }",
+  "params": []
+ },
+ {
   "name": "now",
   "command": [
    "now"

@@ -379,6 +379,17 @@ export interface Verbs {
 		/** Stop sharing. */
 		stop(): Promise<void>;
 	};
+	studio: {
+		/**
+		 * Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there
+		 * in the background. Only the person can call it, from a browser paired with this harness.
+		 */
+		connect(url: string, key: string): Promise<{ connected: boolean; url: string }>;
+		/** Whether this harness syncs with Decks Studio, and with which. */
+		status(): Promise<{ connected: boolean; url?: string }>;
+		/** Stop syncing with Decks Studio and forget the key. Only the person can call it. */
+		disconnect(): Promise<{ connected: boolean }>;
+	};
 	pen: {
 		/**
 		 * Old name: your canvas's drawing, or any .pen file by `path`. @deprecated Use decks.canvas.read (a

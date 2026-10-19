@@ -192,6 +192,11 @@ export class StageService {
 		return name;
 	}
 
+	/** The deck folder, for verbs that keep a file of their own there (`studio.connect`). */
+	deckPath(): string {
+		return this.deck.path;
+	}
+
 	setDeck(deck: Deck): void {
 		this.deck = deck;
 	}

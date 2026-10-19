@@ -7,6 +7,7 @@ import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
 import { installDir } from "@decks/runtime";
 import { Hub } from "./ws.ts";
+import { startStudio } from "./studio/index.ts";
 
 const config = loadConfig();
 
@@ -30,6 +31,9 @@ const hub = new Hub(
 	(reply, view) => app.greet(reply, view),
 );
 app.attach(hub);
+
+// Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
+const studio = startStudio(app.deck.path);
 
 /*
  * One upgrade listener, two websockets.
@@ -66,6 +70,7 @@ httpServer.listen(config.port, config.host, () => {
 });
 
 const shutdown = () => {
+	void studio.stop();
 	app.dispose();
 	hub.close();
 	httpServer.close(() => process.exit(0));

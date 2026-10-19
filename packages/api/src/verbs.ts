@@ -415,6 +415,16 @@ export const VERBS: readonly Verb[] = [
 		params: [o("change", obj({ open: opt(int()), close: opt(int()), label: opt(str()) }))],
 		result: arr(obj({ port: num(), label: opt(str()), by: opt(str()), at: num(), node: str(), rnode: str() })),
 	},
+	{
+		name: "studio.connect",
+		group: "misc",
+		...outsideChange,
+		summary: "Connect this harness to Decks Studio with the key Studio made for it: the deck then syncs there in the background. Only the person can call it, from a browser paired with this harness.",
+		params: [p("url", str()), p("key", str())],
+		result: obj({ connected: bool(), url: str() }),
+	},
+	{ name: "studio.status", group: "misc", ...outsideRead, summary: "Whether this harness syncs with Decks Studio, and with which.", params: [], result: obj({ connected: bool(), url: opt(str()) }) },
+	{ name: "studio.disconnect", group: "misc", ...outsideChange, summary: "Stop syncing with Decks Studio and forget the key. Only the person can call it.", params: [], result: obj({ connected: bool() }) },
 	{ name: "now", group: "misc", ...outsideRead, summary: "The time where the person is.", params: [], result: obj({ iso: str(), timezone: str(), words: str(), epoch: num() }, true) },
 ];
 

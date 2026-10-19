@@ -1,9 +1,11 @@
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
-/** Addresses and time: a board's URL, a file's, forwarded ports, and the clock. */
-export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now"> {
+/** Addresses and time: a board's URL, a file's, forwarded ports, the clock, and the link to Decks Studio. */
+export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now" | "studio"> {
 	const { service, agent, port, isolated, notWhileIsolated } = ctx;
 	return {
 		resolve: async (file: string) => {
@@ -52,6 +54,40 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "po
 				words: nowWords(at, zone),
 				epoch: at,
 			};
+		},
+
+		/**
+		 * Decks Studio's key for this harness, handed over by the person's browser once it has paired
+		 * (decks-studio). Written to `.decks/studio.json`, which `studio/index.ts` watches: the deck
+		 * starts syncing at once, and a later key replaces it. Only the person: an agent or a board
+		 * that could set it could send the whole deck to an address of its choosing.
+		 */
+		studio: {
+			connect: async (url: string, key: string) => {
+				if (!agent.person) throw new Error("Only the person can connect this harness to Decks Studio, from a browser paired with it.");
+				const address = new URL(url);
+				if (address.protocol !== "https:" && address.protocol !== "http:") throw new Error("Studio's address is an http or https URL.");
+				if (!/^dsk_[A-Za-z0-9_-]{20,}$/.test(key)) throw new Error("That is not a Studio key: they start with dsk_.");
+				const dir = join(service.deckPath(), ".decks");
+				mkdirSync(dir, { recursive: true });
+				writeFileSync(join(dir, "studio.json"), JSON.stringify({ url: address.origin, key }), { mode: 0o600 });
+				return { connected: true, url: address.origin };
+			},
+			status: async () => {
+				const file = join(service.deckPath(), ".decks", "studio.json");
+				if (process.env.DECKS_STUDIO_KEY) return { connected: true, url: process.env.DECKS_STUDIO_URL };
+				if (!existsSync(file)) return { connected: false };
+				try {
+					return { connected: true, url: (JSON.parse(readFileSync(file, "utf8")) as { url?: string }).url };
+				} catch {
+					return { connected: false };
+				}
+			},
+			disconnect: async () => {
+				if (!agent.person) throw new Error("Only the person can disconnect this harness from Decks Studio.");
+				rmSync(join(service.deckPath(), ".decks", "studio.json"), { force: true });
+				return { connected: false };
+			},
 		},
 	};
 }
