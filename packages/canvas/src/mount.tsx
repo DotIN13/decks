@@ -1,6 +1,7 @@
 import { baseTheme, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
-import type { Camera } from "@decks/protocol";
-import { createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
+import type { Board, Camera } from "@decks/protocol";
+import { createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { render } from "solid-js/web";
 import { fitInto } from "./camera/camera.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
@@ -187,7 +188,13 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		 * went with it the next time that ran: the boards stopped following the drawing, so a board
 		 * moved once and then stayed where the stage last saw it however often it was dragged.
 		 */
-		const boards = createMemo(() => boardsOf(doc()));
+		/*
+		 * The same object for a board from one drawing to the next, its fields changed in place, as the
+		 * Decks app's store keeps them: the stage keys each board's slot on its object, and a fresh list
+		 * on every edit rebuilt every slot and reloaded every board's page after any drag.
+		 */
+		const [boards, setBoards] = createStore<Board[]>([]);
+		createComputed(() => setBoards(reconcile(boardsOf(doc()), { key: "path" })));
 		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 		const inking = createMemo(() => inkOn() && mode() === "browse");
 		return (
@@ -202,7 +209,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 								boardPill={true}
 								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
 								opening={{ camera: opening }}
-								boards={boards()}
+								boards={boards}
 								pen={pen()}
 								{...editing}
 								onPenStep={step}
