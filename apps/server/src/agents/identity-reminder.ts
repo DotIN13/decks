@@ -38,11 +38,18 @@ const ASK: Record<Gap, string> = {
 	tags: `--tags '["…"]': up to four words for what you are doing right now`,
 };
 
-/** The request, or nothing when the agent has said everything. */
-export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">): string | undefined {
+/**
+ * The request, or nothing when the agent has said everything.
+ *
+ * `afterCall` is the reminder after a stage call, which leaves empty tags alone: an agent is told
+ * to set them to `[]` when it finishes, and that last call was answered with a request to set them.
+ * The head of the next message still asks (`agents/session.ts`), which is when a turn starts.
+ */
+export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "tags" | "workspace">, options: { afterCall?: boolean } = {}): string | undefined {
 	const gaps = identityGaps(identity);
 	if (gaps.length === 0) return undefined;
 	if (gaps.length === 1 && gaps[0] === "tags") {
+		if (options.afterCall) return undefined;
 		return `[Decks] Your tags are empty. Set them to what this turn is about with decks agent update --tags '["…"]', and to '[]' when you finish.`;
 	}
 	return `[Decks] You have not said who you are: set it now with decks agent update ${gaps.map((gap) => ASK[gap]).join("; ")}. It is how the person and other agents find you.`;

@@ -242,6 +242,18 @@ test("work the person sends or queues is theirs: not signed by the agent in focu
 	}
 });
 
+test("clearing your tags at the end of a turn is answered without a request to set them", async () => {
+	const { must, cleanup } = await open();
+	try {
+		await must("agent.update", [{ name: "Linnet", avatar: { emoji: "🐦" }, workspace: "decks", tags: ["drawing"] }]);
+		const cleared = await must("agent.update", [{ tags: [] }]);
+		assert.deepEqual(cleared.value.tags, []);
+		assert.ok(!cleared.notes.some((note) => /tags are empty/.test(note)), cleared.notes.join(" | "));
+	} finally {
+		cleanup();
+	}
+});
+
 test("the old names map onto the new calls: open moves the home canvas, report claims, url and resolve are the new addresses", async () => {
 	const { agent, must, cleanup } = await open();
 	try {

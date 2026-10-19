@@ -366,7 +366,7 @@ export function createStageTool(deps: {
 			if (renamed) said.push(renamed);
 			ctx.callOn.stage = undefined;
 			if (!agent.person) {
-				const unsaid = identityReminder(agent.identity());
+				const unsaid = identityReminder(agent.identity(), { afterCall: true });
 				if (unsaid) said.push(unsaid);
 				const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
 				if (unnamed) said.push(unnamed);
