@@ -1,0 +1,49 @@
+/*
+ * What the Decks app's shell gives the canvas, for a host that mounts it on its own
+ * (`mountCanvas`): a box to fill, the page's type and colours, and the floating panel's card.
+ * The Decks app has these in `shell.css`, `panel.css` and `index.css`, and does not import this.
+ */
+@layer components {
+	.decks-canvas {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		overflow: clip;
+		background: var(--bg);
+		color: var(--fg);
+		font-family: var(--font-sans);
+		font-size: var(--type-body);
+		-webkit-font-smoothing: antialiased;
+		touch-action: manipulation;
+	}
+
+	.decks-canvas .work,
+	.decks-canvas .surface-layer {
+		position: absolute;
+		inset: 0;
+	}
+
+	.panel-float {
+		position: absolute;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+	}
+
+	/* A board drawn by `PlainBoard`: its title above it, to move it by. */
+	.plain-board-bar {
+		position: absolute;
+		left: 0;
+		bottom: 100%;
+		max-width: 100%;
+		padding: 0 2px 4px;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: calc(12px / var(--zoom, 1));
+		color: var(--muted);
+		cursor: grab;
+		user-select: none;
+	}
+}

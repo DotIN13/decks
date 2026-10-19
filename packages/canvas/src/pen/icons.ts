@@ -27,8 +27,22 @@ export interface IconShape {
 
 const CDN = "https://cdn.jsdelivr.net/npm";
 
+/** Where a host keeps its icons, asked before the CDN (`host.ts`, `iconUrl`); undefined there falls through. */
+export type IconSource = (library: string, name: string, weight: number) => string | undefined;
+let source: IconSource | undefined;
+
+/** Read icons from the host first (Decks Studio, a page with no network); `undefined` goes back to the CDN alone. */
+export function setIconSource(next: IconSource | undefined): void {
+	source = next;
+}
+
 /** Where an icon's SVG is, or undefined for a library this build does not know. */
 export function iconUrl(library: string, name: string, weight: number): string | undefined {
+	return source?.(library, name, weight) ?? cdnIconUrl(library, name, weight);
+}
+
+/** The icon on the CDN every library publishes to. */
+function cdnIconUrl(library: string, name: string, weight: number): string | undefined {
 	const lib = library.trim().toLowerCase();
 	const icon = encodeURIComponent(name.trim());
 	if (!icon) return undefined;

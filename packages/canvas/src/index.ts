@@ -1,0 +1,12 @@
+/**
+ * The Decks canvas, for any host: `mountCanvas` puts the whole editor in an element, editing a
+ * `.pen` document, and reports the person's edits. The Decks app mounts the parts itself
+ * (`Stage.tsx`, `pen/PenBar.tsx`, …, through `@decks/canvas/<path>`), with its own boards.
+ */
+export { boardsOf, fitAll, mountCanvas, type CanvasHandle, type CanvasOptions } from "./mount.tsx";
+export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
+export { PlainBoard } from "./plain-board.tsx";
+export { Stage, type StageComment, type StageShots } from "./Stage.tsx";
+export type { StageBoardProps } from "./board-slot.ts";
+export type { FrameGestureHost } from "./frame-host.ts";
+export type { PenEdit, PenDocument } from "@decks/pen";

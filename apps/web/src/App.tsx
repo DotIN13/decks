@@ -44,7 +44,7 @@ import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice,
 import { FilePicker } from "./board/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./board/inspect.ts";
 import { Inspector } from "./board/Inspector.tsx";
-import { InkBar } from "./markup/InkBar.tsx";
+import { InkBar } from "@decks/canvas/ink/InkBar.tsx";
 import { PenBar } from "@decks/canvas/pen/PenBar.tsx";
 import { setPenTool } from "@decks/canvas/state/pen-tools.ts";
 import { pageKey } from "./chat/composer/parked.ts";

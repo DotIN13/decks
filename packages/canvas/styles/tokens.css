@@ -1,0 +1,330 @@
+/*
+ * The app's tokens, handed to Tailwind so utilities speak the design language.
+ *
+ * Tailwind has been in this build from the start and not one utility class used it, which
+ * is the worst of both: preflight's resets applied — it is what strips `list-style` from
+ * every list, which the markdown renderer has to put back — and nothing was gained. This
+ * `@theme` is what makes it worth its place: `bg-panel`, `text-muted`, `rounded-control`
+ * and `size-control` now mean the same thing in a component as `var(--panel)` means in
+ * this file, so the two systems cannot drift apart.
+ *
+ * **`inline` is load-bearing.** Without it Tailwind emits `var(--color-panel)` and freezes
+ * the value it had at build time, which would break the one thing these tokens exist for:
+ * `[data-color-scheme="dark"]` swaps them at runtime. `inline` makes a utility emit
+ * `var(--panel)` directly, so it re-resolves under whichever scheme is on.
+ *
+ * Only what a component would reasonably reach for. The grey ramp underneath stays private
+ * — a component asking for `--color-grey-700` rather than `muted` is a component deciding
+ * something the token was invented to decide.
+ */
+@theme inline {
+	--color-bg: var(--bg);
+	--color-bg-deep: var(--bg-deep);
+	--color-panel: var(--panel);
+	--color-stage: var(--stage);
+	--color-fg: var(--fg);
+	--color-muted: var(--muted);
+	--color-faint: var(--faint);
+	--color-line: var(--line);
+	--color-line-strong: var(--line-strong);
+	--color-fill: var(--fill);
+	--color-accent: var(--color-accent);
+	--color-ok: var(--color-ok);
+	--color-warn: var(--color-warn);
+	--color-danger: var(--color-danger);
+
+	/* The control scale from the title bar and the palette (see the note on `--control`). */
+	--spacing-control: var(--control);
+	--spacing-control-md: var(--control-md);
+	--spacing-control-sm: var(--control-sm);
+	--spacing-field: var(--field);
+	--radius-control: var(--control-radius);
+	--radius-row: var(--row-radius);
+	/* `.panel-float`'s corner, named so a one-off surface can match it without copying 12. */
+	--radius-panel: 12px;
+
+	--shadow-panel: var(--shadow);
+	--shadow-row: var(--shadow-row);
+	--shadow-menu: var(--shadow-menu);
+
+	/* The type scale, as utilities: `text-ui`, `text-note`, `text-label` … — the names the
+	   sheets use, so a class attribute and a sheet cannot drift apart. */
+	--text-tag: var(--type-tag);
+	--text-micro: var(--type-micro);
+	--text-hint: var(--type-hint);
+	--text-note: var(--type-note);
+	--text-label: var(--type-label);
+	--text-ui: var(--type-ui);
+	--text-copy: var(--type-copy);
+	--text-body: var(--type-body);
+	--text-name: var(--type-name);
+	--text-title: var(--type-title);
+
+	--font-mono: var(--font-mono);
+}
+
+/*
+ * The app's own tokens.
+ *
+ * The same ramp `runtime/lib/board.css` uses, so a board on the stage and the
+ * chrome around it are visibly one piece of software. Boards cannot import this —
+ * they are standalone documents — so the two files carry the same values on
+ * purpose, and the comment in each says so.
+ */
+@theme {
+	--color-grey-50: #ffffff;
+	--color-grey-100: #fafafa;
+	--color-grey-200: #f2f2f2;
+	--color-grey-300: #eeeeee;
+	--color-grey-400: #dbdbdb;
+	--color-grey-500: #aeaeae;
+	--color-grey-600: #808080;
+	--color-grey-700: #5c5c5c;
+	--color-grey-800: #3a3a3a;
+	--color-grey-900: #2e2e2e;
+	--color-grey-1000: #242424;
+	--color-grey-1100: #161616;
+	--color-grey-1200: #080808;
+	--color-accent: #3b5cf6;
+	--color-accent-soft: #d7e2fc;
+	--color-warn: #e7af36;
+	--color-danger: #d92e3c;
+	--color-ok: #2eaf5a;
+	--font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+	/*
+	 * How much of the window the browser is covering from below — the on-screen
+	 * keyboard, mostly. Kept true by `app/viewport.ts`; 0 everywhere else, so every
+	 * rule that adds it reads exactly as it did before it existed.
+	 */
+	--keyboard: 0px;
+	/*
+	 * The conversation's radius, in one place because every row shares it — bubbles either
+	 * way round, tool pills, notices, chips.
+	 *
+	 * A *fixed* radius rather than `999px`. Half the height reads beautifully on a row of
+	 * three words and badly on anything longer: the ends become semicircles as tall as the
+	 * text block, which eats the width a paragraph needs and leaves the first and last
+	 * lines floating inside a lens. 14px is round enough to read as a pill at one line and
+	 * still a rectangle-with-soft-corners at six, so one value covers the whole range and
+	 * nothing in the column has to be special-cased — including the bubbles carrying code,
+	 * which needed squaring off when the radius was a stadium.
+	 */
+	--row-radius: 14px;
+	/*
+	 * The rest of the corner scale, for the radii that are shared rather than one element's.
+	 *
+	 * Measured the same way as the type scale: 118 `border-radius` declarations used twelve
+	 * values, and eight of them are shared — a pill on every avatar and round button, a chip,
+	 * a row inside a menu, a tag, a thumbnail, a document being read. Those eight are here (or
+	 * were already: `--control-radius`, `--row-radius`), and the four that belong to one
+	 * element each — 3px, 2px, 13px, and 14px where it is not a row — stay literals.
+	 *
+	 * `--radius-panel` is the ninth and it lives in the `@theme` block instead, because
+	 * `rounded-panel` in a class attribute needs Tailwind to see it. It is 12px, and the
+	 * sheets read it with the fallback spelled out, as they always have.
+	 */
+	--radius-pill: 999px; /* a pill, an avatar, a dot: not a corner at all */
+	--radius-inline: 4px; /* a tag, a key, something inline and small */
+	--radius-thumb: 5px; /* a small picture */
+	--radius-chip: 6px; /* a chip, or a card inside a card */
+	--radius-item: 7px; /* a row inside a menu or a list */
+	--radius-doc: 10px; /* a document, or a preview of one, being read */
+	/*
+	 * The control scale, taken from the title bar and the tool palette.
+	 *
+	 * Those two are the app's reference for what a control looks like here: a fixed square
+	 * with the icon gridded into the middle, no border of its own, quiet at rest, and a wash
+	 * of `--line` under the cursor — the container carries the border, the control carries
+	 * the intent. Everything else had drifted: what is conceptually *one* button existed at
+	 * 20, 22, 26, 28 and 30px with radii of 6, 7, 8 and 999, so a panel's close button and a
+	 * toolbar's tool were visibly different species.
+	 *
+	 * Two sizes rather than one, because a 28px target inside a 200px list row dominates it:
+	 * `--control` for toolbars, panel headers and the conversation, `--control-sm` for a
+	 * control that lives inside a dense row. One radius for both — a square's corner does not
+	 * need to scale, and one number is the simplification worth having.
+	 */
+	--control: 28px;
+	/*
+	 * Two more, and the reason each earns its place.
+	 *
+	 * `--control-md` is a *labelled* control — the mode and model chips in the dock, the
+	 * zoom readout in the corner. It is shorter than a toolbar button because it is wider:
+	 * a 28px-tall pill with a word in it reads as a button you are meant to hunt for, and
+	 * these are read far more often than they are pressed.
+	 *
+	 * `--field` is a number or a name you type. 24px, and it is the one size on this scale
+	 * chosen by the thing inside it rather than the thing around it: four of them fit a
+	 * 320px panel in one row at 24, and not at 26.
+	 */
+	--control-md: 26px;
+	--control-sm: 22px;
+	--field: 24px;
+	--control-radius: 8px;
+	/* The ground under the white chrome, one step deeper than it (`styles/shell.css`, `--layer`). */
+	--bg: #f1f1f3;
+	--bg-deep: var(--color-grey-200);
+	/*
+	 * Opaque, where it used to be 88% over a blur.
+	 *
+	 * Frosted chrome is the fashion and it was the wrong call here: every panel floats over
+	 * a *canvas*, and a canvas is not a wallpaper — it is boards with text on them, at
+	 * whatever zoom the camera happens to be at. Whatever showed through was words at 40%
+	 * behind words at 100%, which reads as grime rather than as depth, and it moved when the
+	 * camera did. A panel that covers the boards is honest about covering them.
+	 */
+	--panel: var(--color-grey-50);
+	--fg: var(--color-grey-1100);
+	--muted: var(--color-grey-700);
+	--faint: var(--color-grey-600);
+	--line: rgb(0 0 0 / 10%);
+	--line-strong: rgb(0 0 0 / 20%);
+	/* The hairline around a *floating window*: the toolbars, the composer, the conversation,
+	   the sidebar, a menu, the preview panel. Quieter than `--line-strong` in both schemes: a
+	   white float on the grey ground is told apart by its colour and shadow, and needs little
+	   edge; in dark, 24% rimmed every float in white. Chips, fields and rings keep the token. */
+	--border-strong: rgb(0 0 0 / 8%);
+	/*
+	 * The ground under a small filled thing: a tag, a runtime, a provider chip.
+	 *
+	 * There was no such token, so all three reached for `--line` — a *line* colour, used as a
+	 * fill. Two things went wrong with that and both are visible in the agents panel. It is
+	 * pale, because a hairline wants to be barely there and a chip does not; and it is
+	 * translucent, so the same tag came out `#e6e6e6` on a plain row and `#dadada` on the
+	 * selected one — one list, two chip colours, for a reason nobody could name.
+	 *
+	 * Solid, and off the app's own ramp, so a chip is the same chip wherever it is put.
+	 */
+	--fill: var(--color-grey-400);
+	/* The board's own `--b-shadow`: 12px of reach, not 24. A float in the shell is drawn with
+	   the same weight as a card on a board, so the two read as one program. */
+	--shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 18px rgb(0 0 0 / 6%);
+	/*
+	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
+	 *
+	 * `--shadow` reaches 24px, which is right under a 380px panel and wrong under a 40px
+	 * row: it is most of the row's own height, and it has to fit inside the padding of a
+	 * scroll container that clips. This one reaches 12px, which reads as lift on something
+	 * small and costs the column a third of the gutter.
+	 */
+	--shadow-row: 0 1px 2px rgb(0 0 0 / 8%), 0 3px 10px rgb(0 0 0 / 7%);
+	/*
+	 * The third rung, for anything summoned over the floats: menus, popovers, the agent
+	 * hover card. Three layers where `--shadow` has two — a summoned surface has to read as
+	 * being above a panel that is itself above the canvas, and there are only so many ways
+	 * to say "higher" without a border.
+	 */
+	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
+	/* A step below white, so the white floats (`--layer`) and the white boards read as things on it. */
+	--stage: #f1f1f3;
+	/*
+	 * The type scale: ten sizes with names, because thirteen sizes without them is what the
+	 * app had.
+	 *
+	 * Measured before naming anything: 152 `font-size` declarations in the sheets and 136
+	 * `[Npx]` one-offs in markup, using thirteen distinct sizes between them. Ten of those
+	 * sizes are shared — five or more places each, across sheets that do not know about each
+	 * other — and they are the ones here, named for what they are for rather than for their
+	 * size, so a reader can tell whether the thing in front of them is a tag, a note, or a
+	 * label without holding a ruler to it.
+	 *
+	 * **Three sizes are not here, because they belong to one element each:** 16px is the
+	 * composer's input, 22px is the big number in the usage modal, and 20px is the Claude
+	 * frame's wordmark. A token for one element is a name nobody else may use.
+	 *
+	 * `@theme inline` hands the same ten to Tailwind as `text-tag`, `text-ui` and so on, so a
+	 * class attribute and a sheet spell the same size the same way — which is the other half
+	 * of the drift: the markup's `text-[11px]` and the sheets' `11px` were the same decision
+	 * written twice.
+	 */
+	--type-tag: 9.5px; /* a tag, or a count badge */
+	--type-micro: 10px; /* counts, kbd, segmented buttons, the usage line */
+	--type-hint: 10.5px; /* a hint under a field, a chip, a picture's label */
+	--type-note: 11px; /* a note, a secondary label, a field's own text */
+	--type-label: 11.5px; /* a label you read in order to act, and metadata */
+	--type-ui: 12px; /* a button, a chip, a placeholder: the working size */
+	--type-copy: 12.5px; /* the text of something being read: a document, a preview */
+	--type-body: 13px; /* the app's base, and the fields that match it */
+	--type-name: 14px; /* a name in a card, a heading */
+	--type-title: 15px; /* the largest text in a panel, a heading over a name */
+	/*
+	 * The stack, in one place: who is above whom.
+	 *
+	 * The numbers *are* the order — read them down the list and that is what covers what —
+	 * and they live here because the question "why is this above that" is asked across files:
+	 * a notice floats over the work, a menu opens over the notice, and the comment popup opens
+	 * over the menu. Before this, the same answer was spread over seventeen declarations in
+	 * nine sheets as bare integers, and the only way to know whether 30 was above 40 was to
+	 * find both and read the CSS.
+	 *
+	 * **Not here, on purpose.** The fan inside `.agent-stack` (4 down to 1) is one component's
+	 * own order, and a panel's resize handle (1) is above its own panel and nothing else — both
+	 * are specific to one element, so both stay literals next to the thing they order.
+	 */
+	--z-board-edit: 2; /* a field opened on a board: the source editor, a rename */
+	--z-over-board: 5; /* just over the boards: the focus view's exit, an agent landing */
+	--z-conversation: 9; /* the conversation column */
+	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
+	--z-backdrop: 20; /* a dialog's backdrop */
+	--z-float: 30; /* over the work and under a menu: a notice, the ink tools */
+	--z-menu: 40; /* menus and popovers */
+	--z-popup: 60; /* the comment popup, which opens over a menu */
+	--z-present: 200; /* the present view: a board filling the window */
+	color-scheme: light;
+}
+
+[data-color-scheme="dark"] {
+	--bg: var(--color-grey-1100);
+	--bg-deep: var(--color-grey-1200);
+	--panel: var(--color-grey-1000);
+	--fg: var(--color-grey-100);
+	--muted: var(--color-grey-500);
+	--faint: var(--color-grey-600);
+	--line: rgb(255 255 255 / 12%);
+	--line-strong: rgb(255 255 255 / 24%);
+	--border-strong: #ffffff1f;
+	/* One rung up from `--panel` here, where light is a few down from it: the eye reads a
+	   chip by how far it is from its ground, not by which way. */
+	--fill: var(--color-grey-800);
+	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
+	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
+	--stage: #101010;
+	color-scheme: dark;
+}
+
+/*
+ * The control scale, where a fingertip is what is pointing.
+ *
+ * Redefining the tokens does every control at once, which is the point of having them: named
+ * per surface before there was a shared rule, the ops sheet's close, the inspector's actions
+ * and the conversation's `×` all stayed at 28px on a touchscreen, under half the area a
+ * fingertip needs.
+ *
+ * Outside the component layer, with the other token definitions, and that placement is
+ * load-bearing: unlayered CSS beats every layer, so a `:root` override inside the layer would
+ * lose to the base values above it and touch targets would silently stay small.
+ */
+@media (pointer: coarse) {
+	:root {
+		/* 40, not 44: a 44px control in a 40px pill made every toolbar a row of squares
+		   taller than the bar, and two toolbars of them overlapped on a 390px phone. 40 is
+		   still a fingertip, and the pill grows to hold it. */
+		--control: 40px;
+		--control-sm: 30px;
+		/*
+		 * The phone's corners, as the Claude app on iOS draws them: a button is a circle, a labelled
+		 * control a capsule, and a floating bar half its own height, so the 52px toolbars are
+		 * capsules too and the 40px buttons in them sit concentric at a 6px inset. Larger floats (the
+		 * composer, the sheet, a menu) take the same 26px, which on them reads as a soft card.
+		 */
+		--radius-panel: 26px;
+		--control-radius: 999px;
+		--row-radius: 26px;
+		--radius-item: 14px;
+	}
+}

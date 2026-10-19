@@ -9,7 +9,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import Undo2 from "lucide-solid/icons/undo-2";
 import X from "lucide-solid/icons/x";
 import { For, onCleanup, onMount, Show } from "solid-js";
-import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/state/ink.ts";
+import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../state/ink.ts";
 import { Icon } from "../ui/icons.tsx";
 import { inkKey } from "./ink-keys.ts";
 

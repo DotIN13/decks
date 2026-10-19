@@ -1,0 +1,14 @@
+/*
+ * The canvas's stylesheet for a host other than the Decks app: import this once (it needs
+ * Tailwind v4, `@tailwindcss/vite`, for the `@theme` tokens, as the Decks app does).
+ *
+ * The same sheets the app's `index.css` imports, in the same order, so a canvas looks the same
+ * wherever it is mounted: the shared material, the canvas, ink, the properties panel, the tokens.
+ */
+@import "tailwindcss";
+@import "./chrome.css";
+@import "./canvas.css";
+@import "./ink.css";
+@import "./properties.css";
+@import "./tokens.css";
+@import "./host.css";

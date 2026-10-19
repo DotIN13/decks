@@ -1,3 +1,5 @@
+import { setIconSource, type IconSource } from "./pen/icons.ts";
+
 /**
  * What the canvas asks of whoever mounted it, in the few places it reaches past its own state.
  *
@@ -17,6 +19,8 @@ export interface CanvasHost {
 	 * canvas, read against the drawing's own folder `base`. Undefined opens it in a tab.
 	 */
 	boardLink(href: string, base: string): string | undefined;
+	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
+	iconUrl?: IconSource;
 }
 
 const fallback: CanvasHost = {
@@ -30,6 +34,7 @@ let current: CanvasHost = fallback;
 /** Answer the canvas's questions; fields left out keep what they had. */
 export function setCanvasHost(next: Partial<CanvasHost>): void {
 	current = { ...current, ...next };
+	if ("iconUrl" in next) setIconSource(next.iconUrl);
 }
 
 /** The host's answers, read at the moment they are needed. */

@@ -1,0 +1,20 @@
+{
+  "version": "2.14",
+  "children": [
+    { "type": "note", "id": "note-hello", "content": "Hello from @decks/canvas", "x": 0, "y": 0, "width": 320, "height": 160, "fontSize": 24 },
+    { "type": "note", "id": "note-try", "content": "Select me, drag me, resize me, double-click to type", "x": 380, "y": 0, "width": 320, "height": 160, "fontSize": 18 },
+    { "type": "rectangle", "id": "rect-blue", "x": 0, "y": 230, "width": 260, "height": 150, "fill": "#bfdbfe", "cornerRadius": 14 },
+    { "type": "text", "id": "text-title", "content": "No Decks server here", "x": 300, "y": 270, "fontSize": 30 },
+    {
+      "type": "browser",
+      "id": "board-hello",
+      "name": "A board",
+      "url": "boards/hello.html",
+      "width": 520,
+      "height": 340,
+      "metadata": { "type": "decks.board", "path": "boards/hello.html" },
+      "x": 780,
+      "y": 20
+    }
+  ]
+}
