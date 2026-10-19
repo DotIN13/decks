@@ -11,7 +11,7 @@ import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type StageComment } from "./Stage.tsx";
-import { drawing as inkOn, setDrawing } from "./state/ink.ts";
+import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
 
 /** What a host gives `mountCanvas`. Only `text` is needed. */
@@ -83,8 +83,8 @@ export interface CanvasHandle {
 	text(): string;
 	setDark(dark: boolean): void;
 	setMode(mode: "edit" | "browse"): void;
-	/** Turn ink on (browse mode: pen, marker, eraser and lasso over the canvas) or off. */
-	setDrawing(on: boolean): void;
+	/** Turn ink on (browse mode: pen, marker, eraser and lasso over the canvas) or off, with that ink tool in hand. */
+	setDrawing(on: boolean, tool?: InkTool): void;
 	/** Take a tool in hand, in edit mode: `select` puts it down. */
 	setTool(tool: PenTool): void;
 	/** The tool in hand now. */
@@ -244,8 +244,9 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 			setPenTool("select");
 			setModeSignal(next);
 		},
-		setDrawing(on) {
+		setDrawing(on, tool) {
 			if (on) setModeSignal("browse");
+			if (tool) setInkTool(tool);
 			setDrawing(on);
 		},
 		setTool(tool) {

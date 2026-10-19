@@ -4,6 +4,7 @@
  * (`Stage.tsx`, `pen/PenBar.tsx`, …, through `@decks/canvas/<path>`), with its own boards.
  */
 export { fitAll, mountCanvas, type CanvasHandle, type CanvasOptions } from "./mount.tsx";
+export type { InkTool } from "./state/ink.ts";
 export { boardsOf, createDrawing, type Drawing, type DrawingOptions } from "./drawing.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
 export { PlainBoard } from "./plain-board.tsx";
