@@ -12,7 +12,7 @@ import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type StageComment } from "./Stage.tsx";
 import { drawing as inkOn, setDrawing } from "./state/ink.ts";
-import { penTool, setPenTool, type PenTool } from "./state/pen-tools.ts";
+import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
 
 /** What a host gives `mountCanvas`. Only `text` is needed. */
 export interface CanvasOptions {
@@ -67,6 +67,8 @@ export interface CanvasOptions {
 	toolbar?: boolean;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
+	/** The drawn items selected changed (their ids), by the person or by `select`. */
+	onSelection?: (ids: readonly string[]) => void;
 }
 
 /** A mounted canvas. */
@@ -87,6 +89,8 @@ export interface CanvasHandle {
 	tool(): PenTool;
 	/** Fit everything on the drawing in the host. */
 	fit(): void;
+	/** Select these drawn items (a host's list of layers), or none. */
+	select(ids: readonly string[]): void;
 	/** Apply pen operations as the person's edit (`@decks/pen`'s `Op`s): `onEdits` hears it. */
 	edit(ops: unknown[]): void;
 	undo(): void;
@@ -159,6 +163,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 
 	const tools = createRoot((done) => {
 		createEffect(on(penTool, (tool) => options.onTool?.(tool), { defer: true }));
+		createEffect(on(penSelection, (ids) => options.onSelection?.(ids), { defer: true }));
 		return done;
 	});
 
@@ -234,6 +239,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 			setPenTool(tool);
 		},
 		tool: () => untrack(penTool),
+		select: (ids) => setPenSelection(ids),
 		fit: () => setCamera(fitAll(untrack(doc), { width: host.clientWidth, height: host.clientHeight }, look())),
 		edit,
 		undo: () => step("undo"),
