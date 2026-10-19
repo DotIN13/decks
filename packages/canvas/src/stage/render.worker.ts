@@ -391,5 +391,10 @@ scope.onmessage = ({ data }) => {
 		void start(data).catch((error: unknown) => scope.postMessage({ type: "failed", message: `the render worker did not start: ${String((error as Error)?.message ?? error)}` }));
 		return;
 	}
-	take(data);
+	// An engine that throws here (a picture it cannot copy, a panic) is said, so the page starts both again.
+	try {
+		take(data);
+	} catch (error) {
+		scope.postMessage({ type: "error", message: String((error as Error)?.message ?? error) });
+	}
 };

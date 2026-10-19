@@ -16,6 +16,7 @@ import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
 import { iconUrl, parseIcon } from "../pen/icons.ts";
 import { pictureAddress } from "../host.ts";
+import { Recovery } from "./recovery.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
 import { boundsOf } from "../pen/bounds.ts";
 import { docIndex, drawnNodes } from "../pen/doc-index.ts";
@@ -286,6 +287,25 @@ export class StageEngine {
 	/** The pictures put on the page engine, of boards and of fills: for checks. */
 	private picturesPut = 0;
 
+	/** Restarts after an engine error, capped (`recovery.ts`). */
+	private recovery = new Recovery();
+
+	/**
+	 * An error out of an engine: it cannot be trusted to draw again, so both are started again, as
+	 * after a lost GPU. The drawing, boards, camera and fonts are held here and given back to them.
+	 */
+	private recover(error: unknown, where: string): void {
+		const message = String((error as Error)?.message ?? error);
+		if (this.recovery.note() === "stop") {
+			console.error(`stage engine: ${where} failed again (${message}); stopped`);
+			this.lose();
+			this.fail(new Error(`The stage kept failing (${message}). Reload the page to draw it again.`));
+			return;
+		}
+		console.error(`stage engine: ${where} failed (${message}); starting the engines again`);
+		void this.restart();
+	}
+
 	private fail(error: unknown): void {
 		console.error(`stage engine: ${String((error as Error)?.message ?? error)}`);
 		this.failed?.(noticeFor(error));
@@ -484,7 +504,13 @@ export class StageEngine {
 					message.bitmap.close();
 					break;
 				}
-				this.page.putPicture(message.url, message.bitmap, message.width, message.height, true);
+				try {
+					this.page.putPicture(message.url, message.bitmap, message.width, message.height, true);
+				} catch (error) {
+					message.bitmap.close();
+					this.recover(error, `the picture ${message.url}`);
+					break;
+				}
 				this.picturesPut++;
 				this.layOutPicturesSoon();
 				break;
@@ -492,7 +518,8 @@ export class StageEngine {
 				this.post({ type: "doc", doc: this.doc ? JSON.stringify(this.doc) : EMPTY, dark: this.scheme === "dark" });
 				break;
 			case "error":
-				console.error(`stage render worker: ${message.message}`);
+				// The worker's engine failed (a tile, a picture): it paints nothing more until both start again.
+				this.recover(new Error(message.message), "the render worker");
 				break;
 			case "failed":
 				this.fail(message.message);
@@ -1139,6 +1166,15 @@ export class StageEngine {
 	private drawNow(): void {
 		this.dirty = false;
 		if (!this.page || !this.view.width || this.paused) return;
+		try {
+			this.drawUnguarded();
+		} catch (error) {
+			this.recover(error, "a frame");
+		}
+	}
+
+	private drawUnguarded(): void {
+		if (!this.page) return;
 		this.shownSeen = Math.max(this.shownSeen, this.seenAtDraw);
 		const at = this.drawRect();
 		// At the scale the worker's latest camera wants: shown once its tiles cover the window (`Page::frame`).
@@ -1363,7 +1399,13 @@ export class StageEngine {
 				const { bitmap: forPage, width, height } = await this.picture(blob);
 				// Asked again since (a sharper copy, an engine started again): this one is not wanted.
 				if (this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return forPage.close();
-				this.page.putPicture(key, forPage, width, height);
+				try {
+					this.page.putPicture(key, forPage, width, height);
+				} catch (error) {
+					// The engine's, not the network's: asking again would fail the same way.
+					forPage.close();
+					return this.recover(error, `the picture ${key}`);
+				}
 				this.picturesPut++;
 				// A board's picture is drawn by the page alone; an image fill by the worker's tiles too.
 				if (!board) {
