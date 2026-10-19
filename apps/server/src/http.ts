@@ -105,7 +105,7 @@ export function createHttpApp(app: App): Express {
 		}
 		res.setHeader("Vary", "Origin");
 		res.setHeader("Access-Control-Allow-Origin", origin);
-		res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App");
+		res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage");
 		res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 		if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
