@@ -236,4 +236,14 @@ test("a stored turn the server stopped in is closed, with a notice saying so", (
 	const calm = new Translator("a2", () => {});
 	calm.load([{ kind: "user", id: "a2:u1", text: "hi", at: 1 }, { kind: "assistant", id: "a2:a2", text: "Hi", at: 2, streaming: false }]);
 	assert.equal(calm.history().length, 2, "a finished turn gets no notice");
+
+	const later = new Translator("a3", () => {});
+	later.load([
+		{ kind: "assistant", id: "a3:a1", text: "", at: 5, streaming: true },
+		{ kind: "user", id: "a3:u2", text: "Carry on", at: 9 },
+		{ kind: "assistant", id: "a3:a3", text: "Done", at: 10, streaming: false },
+	]);
+	assert.deepEqual(later.history().map((item) => item.kind), ["assistant", "notice", "user", "assistant"], "the notice sits where the turn stopped");
+	const placed = later.history()[1]!;
+	assert.equal(placed.kind === "notice" ? placed.at : 0, 5);
 });
