@@ -1571,7 +1571,8 @@
 		}
 		if (t === "td" || t === "th") {
 			a.col = String(el.cellIndex);
-			if (style.textAlign === "center" || style.textAlign === "right") a.align = style.textAlign;
+			// A body cell's alignment is the column's; a header cell is centred by the browser whatever the author meant.
+			if (t === "td" && (style.textAlign === "center" || style.textAlign === "right")) a.align = style.textAlign;
 		}
 		if (MEDIA_TAGS.has(t)) {
 			const box = el.getBoundingClientRect();

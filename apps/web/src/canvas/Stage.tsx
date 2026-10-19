@@ -77,7 +77,8 @@ import {
 	tsSeam,
 	type Overlay,
 } from "./editor/index.ts";
-
+import { attachClipDrop, pasteClip, type ClipHost } from "./editor/dom/clip-drop.ts";
+import { placePicture } from "../app/clip-pictures.ts";
 
 /**
  * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
@@ -1179,6 +1180,64 @@ export function Stage(props: {
 	const frameUnder = (point: { x: number; y: number }, carrying: readonly string[]): string | null => frameUnderIn(scene, point, carrying);
 	/** Where in a frame that arranges its children a drop would land (`editor/core/drop.ts`, `dropSlot`). */
 	const dropSlot = (frameId: string, point: { x: number; y: number }, carrying: readonly string[]) => dropSlotIn(scene, frameId, point, carrying);
+
+	/*
+	 * Dragged or pasted onto the canvas, and not files: a clip out of a board, HTML or text from
+	 * another app (`editor/dom/clip-drop.ts`). What lands is the drawing's own item, in one batch.
+	 */
+	let clipPointer: { clientX: number; clientY: number } | undefined;
+	const clipHost = (): ClipHost => ({
+		element,
+		zoom: () => localCamera.zoom,
+		worldAt: (client) => worldAt(client),
+		clientOf: (world) => {
+			const at = toScreen(localCamera, view(), world);
+			const r = element.getBoundingClientRect();
+			return { x: r.left + at.x, y: r.top + at.y };
+		},
+		cardAt: (client) => {
+			const at = worldAt(client);
+			const id = frameUnder(at, []);
+			const card = id ? penNode(id) : undefined;
+			if (!id || !card || !isCard(card)) return undefined;
+			const slot = dropSlot(id, at, []);
+			const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
+			if (!box) return undefined;
+			return { card: id, index: slot?.index ?? (card.children ?? []).length, inner: editor.textEditing.cardInner(card), box, line: slot?.line };
+		},
+		selectedCard: () => {
+			const picked = editor.items();
+			const card = picked.length === 1 ? penNode(picked[0]!) : undefined;
+			return card && isCard(card) ? { card: card.id, index: (card.children ?? []).length, inner: editor.textEditing.cardInner(card) } : undefined;
+		},
+		boardAt: (client) => !!editor.pictureUnder(client) || !!document.elementFromPoint(client.clientX, client.clientY)?.closest(".board-node"),
+		editable: () => !!props.onPenEdit && !props.preview,
+		place: placePicture,
+		edit: (ops) => penEdit(ops),
+		freshId: () => freshId(),
+		pointer: () => clipPointer,
+	});
+	onMount(() => {
+		const host = clipHost();
+		const moved = (event: PointerEvent) => (clipPointer = { clientX: event.clientX, clientY: event.clientY });
+		const left = () => (clipPointer = undefined);
+		element.addEventListener("pointermove", moved, { passive: true });
+		element.addEventListener("pointerleave", left, { passive: true });
+		const detach = attachClipDrop(host);
+		(globalThis as { __decksPaste?: (data: { clip?: string; html?: string; text?: string; plain?: boolean }) => Promise<boolean> }).__decksPaste = (data) => pasteClip(host, data);
+		// Where pasted files go (`app/files.ts`): into the selected card, else under the pointer.
+		(globalThis as { __decksPastePlace?: () => { pointer?: { clientX: number; clientY: number }; card?: { card: string; index: number; inner: number } } }).__decksPastePlace = () => {
+			const card = host.selectedCard();
+			return { ...(clipPointer ? { pointer: clipPointer } : {}), ...(card ? { card } : {}) };
+		};
+		onCleanup(() => {
+			element.removeEventListener("pointermove", moved);
+			element.removeEventListener("pointerleave", left);
+			detach();
+			delete (globalThis as { __decksPaste?: unknown }).__decksPaste;
+			delete (globalThis as { __decksPastePlace?: unknown }).__decksPastePlace;
+		});
+	});
 	/** Where the frame a drag would drop into is, for the outline that says so. */
 	const dropBox = createMemo(() => dropBoxOf(editor.dropInto(), scene));
 
@@ -1249,6 +1308,32 @@ export function Stage(props: {
 				: words || (typeof first?.name === "string" ? first.name : first?.type) || "item";
 		return { box, ids, words, name };
 	});
+	/**
+	 * Where one picked item came out of a board (`metadata.source`, written when it was dragged or
+	 * pasted from one): the pill's "Open in board". Only while that board is still on the canvas.
+	 */
+	const sourceOf = (ids: readonly string[]): { board: string; block?: string } | undefined => {
+		if (ids.length !== 1) return undefined;
+		const source = penNode(ids[0]!)?.metadata?.source as { board?: unknown; block?: unknown } | undefined;
+		if (typeof source?.board !== "string" || !props.boards.some((board) => board.path === source.board)) return undefined;
+		return { board: source.board, ...(typeof source.block === "string" ? { block: source.block } : {}) };
+	};
+	/** Fly to the board an item came from, select it, and outline the block once its page is up (`board.js`, `__decksFlash`). */
+	const openSource = (source: { board: string; block?: string }) => {
+		const board = props.boards.find((one) => one.path === source.board);
+		if (!board) return;
+		editor.select([]);
+		pushCamera(frame([boxOf(board)]));
+		props.onSelect(board.path);
+		let tries = 0;
+		const flash = () => {
+			const frameEl = element.querySelector<HTMLIFrameElement>(`iframe[data-path="${cssEscape(board.path)}"]`);
+			const win = frameEl?.contentWindow as (Window & { __decksFlash?: (block?: string) => boolean; __boardReady?: boolean }) | null | undefined;
+			if (win?.__decksFlash && win.__boardReady) win.__decksFlash(source.block);
+			else if (tries++ < 40) setTimeout(flash, 150);
+		};
+		setTimeout(flash, 350);
+	};
 	/** One drawn item selected, not a line or a group, and nothing being drawn: it shows where an arrow can leave it. */
 
 	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
@@ -2995,6 +3080,7 @@ export function Stage(props: {
 									onDelete: () => penDeleteSelected(),
 								}
 							: {})}
+						{...(sourceOf(items().ids) ? { onSource: () => openSource(sourceOf(items().ids)!) } : {})}
 					/>
 				)}
 			</Show>

@@ -32,13 +32,17 @@
  */
 
 import { GRID, snap, typingInto } from "./Editor.ts";
+import { CLIP_MIME } from "../canvas/editor/core/clip.ts";
 
 /** Whether a drag is carrying files, as opposed to text or a component of its own. */
 export function carriesFiles(transfer: DataTransfer | null): boolean {
 	if (!transfer) return false;
 	// `types` is the only thing readable during a drag — the files themselves are
 	// withheld until the drop — so this is what "is this a file drag" has to be.
-	return Array.from(transfer.types).includes("Files");
+	// A picture dragged out of a board carries its file too, but it is a clip, and the canvas's
+	// (`canvas/editor/dom/clip-drop.ts`): never an upload onto a board.
+	const types = Array.from(transfer.types);
+	return types.includes("Files") && !types.includes(CLIP_MIME);
 }
 
 export interface FileDropHost {

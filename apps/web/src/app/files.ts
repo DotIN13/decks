@@ -18,6 +18,7 @@ import { can } from "../connections/backend.ts";
 import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing } from "../state/decks.ts";
+import { CLIP_MIME } from "../canvas/editor/core/clip.ts";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -456,17 +457,27 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	const paste = (files: File[]) => {
 		if (files.length === 0) return;
 		const path = selected();
-		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
+		// A board selected and live in edit mode takes the files as embeds, as it always has; otherwise they go on the canvas.
+		const board = path && deps.editor.enabled() ? state.boards.find((candidate) => candidate.path === path) : undefined;
 		if (!board) {
-			// Nothing selected: pictures and text land on the canvas, in the middle of the view.
+			/*
+			 * No board selected: what dropping the files would make, into the selected card if there is
+			 * one, else under the pointer when it is over the canvas, else in the middle of the screen.
+			 */
 			const stage = document.querySelector(".stage");
-			const direct = files.filter(onStage);
-			if (stage && direct.length > 0) {
-				void ontoStage(direct, toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 }));
-				if (direct.length < files.length) notice("info", "Only pictures and text files can go straight on the canvas. Pick a board to paste the rest onto it.");
+			if (!stage || !can("write")) return;
+			const place = (globalThis as { __decksPastePlace?: () => { pointer?: { clientX: number; clientY: number }; card?: { card: string; index: number; inner: number } } }).__decksPastePlace?.();
+			if (place?.card) {
+				void (async () => {
+					const allowed: File[] = [];
+					for (const file of files) if (await mayUpload(file)) allowed.push(file);
+					if (allowed.length) await intoCard(allowed, place.card!);
+				})();
 				return;
 			}
-			notice("info", "Pick a board first. A pasted file becomes an embed, and an embed lives on a board.");
+			const r = stage.getBoundingClientRect();
+			const at = place?.pointer ? { x: place.pointer.clientX - r.left, y: place.pointer.clientY - r.top } : { x: stage.clientWidth / 2, y: stage.clientHeight / 2 };
+			void onEmptyCanvas(files, at);
 			return;
 		}
 		if (!deps.editor.enabled()) {
@@ -657,18 +668,48 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 */
 	const install = (deps: { preview(): unknown }) => {
 		onMount(() => {
+			/* ⇧⌘V is paste as plain text: the key is heard, since a paste event does not say it. */
+			let plainUntil = 0;
+			const onKey = (event: KeyboardEvent) => {
+				if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "v") plainUntil = Date.now() + 1000;
+			};
 			const onPaste = (event: ClipboardEvent) => {
 				// `closest` is asked for rather than assumed: a paste with nothing focused
 				// targets the document, which is not an element.
 				const target = event.target as HTMLElement | null;
 				if (target?.closest?.("input, textarea, [contenteditable]")) return;
-				const files = Array.from(event.clipboardData?.files ?? []);
-				if (files.length === 0) return;
-				event.preventDefault();
-				paste(files);
+				const data = event.clipboardData;
+				const types = Array.from(data?.types ?? []);
+				const plain = Date.now() < plainUntil;
+				plainUntil = 0;
+				/*
+				 * Not files: a board's clip (⌘C on a board), HTML or text from another app, as the drawing's
+				 * own items (`canvas/editor/dom/clip-drop.ts`). A board's clip goes first, since a copy out of
+				 * a board also carries HTML; files next, so a copied picture is the picture, not its markup.
+				 */
+				const words = (globalThis as { __decksPaste?: (data: { clip?: string; html?: string; text?: string; plain?: boolean }) => Promise<boolean> }).__decksPaste;
+				if (words && data && types.includes(CLIP_MIME) && !plain) {
+					event.preventDefault();
+					if (can("write")) void words({ clip: data.getData(CLIP_MIME) });
+					return;
+				}
+				const files = Array.from(data?.files ?? []);
+				if (files.length > 0) {
+					event.preventDefault();
+					paste(files);
+					return;
+				}
+				if (words && data && (types.includes("text/html") || types.includes("text/plain"))) {
+					event.preventDefault();
+					if (can("write")) void words({ html: data.getData("text/html"), text: data.getData("text/plain"), plain });
+				}
 			};
+			document.addEventListener("keydown", onKey, true);
 			document.addEventListener("paste", onPaste);
-			onCleanup(() => document.removeEventListener("paste", onPaste));
+			onCleanup(() => {
+				document.removeEventListener("keydown", onKey, true);
+				document.removeEventListener("paste", onPaste);
+			});
 		});
 
 		/*

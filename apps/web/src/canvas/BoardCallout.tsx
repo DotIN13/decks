@@ -13,6 +13,7 @@ import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import Maximize from "lucide-solid/icons/maximize-2";
 import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
+import FileSymlink from "lucide-solid/icons/file-symlink";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
@@ -46,6 +47,8 @@ export function BoardCallout(props: {
 	onDuplicate?: () => void;
 	onProperties?: () => void;
 	onDelete?: () => void;
+	/** For an item that came out of a board: go to that board, its block outlined (`metadata.source`). */
+	onSource?: () => void;
 	/** Out of sight while something moves. */
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
@@ -127,6 +130,11 @@ export function BoardCallout(props: {
 					<Icon of={ExternalLink} size={16} />
 				</a>
 				)}
+			</Show>
+			<Show when={props.onSource}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="Open in board" title="Open in the board it came from" onClick={() => props.onSource?.()}>
+					<Icon of={FileSymlink} size={16} />
+				</button>
 			</Show>
 			<Show when={props.onComment}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Comment" title={props.board ? "Comment on this board" : "Comment on this"} onClick={() => props.onComment?.()}>

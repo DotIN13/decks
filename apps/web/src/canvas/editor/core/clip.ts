@@ -263,7 +263,7 @@ function tableMarkdown(rows: Row[], head?: Tree): string {
 	const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
 	const pad = (row: Row) => Array.from({ length: width }, (_, i) => row.cells[i]?.md ?? " ");
 	const rule = Array.from({ length: width }, (_, i) => {
-		const align = header!.cells[i]?.align ?? body[0]?.cells[i]?.align;
+		const align = body[0]?.cells[i]?.align ?? header!.cells[i]?.align;
 		return align === "center" ? ":---:" : align === "right" ? "---:" : "---";
 	});
 	return [line(pad(header)), line(rule), ...body.map((row) => line(pad(row)))].join("\n");
@@ -606,7 +606,8 @@ function pictureNode(picture: Picture, placed: Placed | undefined, w: number, h:
 	if (!placed) return undefined;
 	const name = picture.alt || (placed.file ?? placed.url).split("/").pop() || "Picture";
 	const radius = picture.radius ? { cornerRadius: picture.radius } : {};
-	if (picture.kind === "svg" && placed.file) {
+	// An SVG, drawn on the board or a file of one, is shown live: the engine cannot paint one as a fill.
+	if ((picture.kind === "svg" || /\.svg$/i.test(placed.file ?? "")) && placed.file && picture.kind !== "video" && picture.kind !== "audio") {
 		return { type: "rectangle", id: "", name, width: w, height: h, ...(placed.still ? { fill: { type: "image", url: placed.url, mode: "fill" } } : {}), metadata: { type: LIVE_FILE, kind: "svg", file: placed.file, ...(placed.still ? { still: placed.still } : {}), ...metadata } } as PenNode;
 	}
 	if ((picture.kind === "video" || picture.kind === "audio") && placed.media && placed.file) {
