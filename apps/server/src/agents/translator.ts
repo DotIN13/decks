@@ -82,19 +82,22 @@ export class Translator {
 	 * the person and the agent see in place of a chat that simply went quiet mid-turn.
 	 */
 	private endCutTurn(stored: ChatItem[]): void {
-		let cut = false;
-		for (const item of stored) {
+		let last = -1;
+		for (const [index, item] of stored.entries()) {
 			if (item.kind === "assistant" && item.streaming) {
 				item.streaming = false;
-				cut = true;
+				last = index;
 			} else if (item.kind === "tool" && item.state === "running") {
 				item.state = "error";
 				item.result = item.result ? `${item.result}\nStopped: the Decks server restarted.` : "Stopped: the Decks server restarted.";
-				cut = true;
+				last = index;
 			}
 		}
-		if (!cut) return;
-		this.items.push({ kind: "notice", id: this.id("n"), level: "warn", text: "The Decks server restarted in the middle of this turn, so the turn did not finish. Send a message to carry on.", at: Date.now() });
+		if (last < 0) return;
+		// Where the turn stopped, not at the end: a later turn may have run since and finished.
+		const at = stored.slice(0, last + 1).reduce((latest, item) => ("at" in item && typeof item.at === "number" && item.at > latest ? item.at : latest), 0) || Date.now();
+		const notice: ChatItem = { kind: "notice", id: this.id("n"), level: "warn", text: "The Decks server restarted in the middle of this turn, so the turn did not finish. Send a message to carry on.", at };
+		this.items.splice(this.items.indexOf(stored[last]!) + 1, 0, notice);
 		this.onChange?.();
 	}
 
