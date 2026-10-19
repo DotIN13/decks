@@ -1,0 +1,251 @@
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { App } from "../app.ts";
+import { realPathOf } from "../deck/roots.ts";
+import { createHttpApp } from "../http.ts";
+import { placeBy, toItem } from "./canvas.ts";
+
+/**
+ * The calls of the SDK redesign, end to end over `/api/v1`: a board as a canvas item, beside and
+ * below, batch's all or nothing, `here()`, watches into the inbox, the old names' notes, and
+ * `send` against `queue`.
+ */
+
+const board = (title: string, w = 900, h = 400) =>
+	`<!doctype html><html><head><title>${title}</title><meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' /></head><body class="board"></body></html>`;
+
+async function open() {
+	const dataDir = realPathOf(mkdtempSync(join(tmpdir(), "decks-redesign-")));
+	const deck = join(dataDir, "decks");
+	mkdirSync(join(deck, "boards"), { recursive: true });
+	writeFileSync(join(deck, "boards", "a.html"), board("Revenue is up"));
+	writeFileSync(join(deck, "boards", "b.html"), board("Costs are flat", 600, 300));
+	const app = App.open({ host: "127.0.0.1", port: 0, dataDir, deck, backend: "pi" });
+	const server = createHttpApp(app).listen(0, "127.0.0.1");
+	await new Promise((done) => server.once("listening", done));
+	const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
+	const agent = app.agents.focused();
+	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
+	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = { "x-decks-agent": agent.id }): Promise<Answer> => {
+		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
+		return (await response.json()) as Answer;
+	};
+	const must = async (verb: string, args: unknown[] = [], headers?: Record<string, string>) => {
+		const answer = await call(verb, args, headers);
+		assert.ok(answer.ok, `${verb}: ${answer.error}`);
+		return answer;
+	};
+	return {
+		app,
+		deck,
+		agent,
+		call,
+		must,
+		cleanup: () => {
+			server.close();
+			app.dispose();
+			rmSync(dataDir, { recursive: true, force: true });
+		},
+	};
+}
+
+test("beside and below sit 160 px clear, tops or lefts aligned", () => {
+	assert.deepEqual(placeBy({ x: 100, y: 50, w: 900, h: 400 }, "beside"), { x1: 1160, y1: 50 });
+	assert.deepEqual(placeBy({ x: 100, y: 50, w: 900, h: 400 }, "below"), { x1: 100, y1: 610 });
+});
+
+test("a pen browser item tagged decks.board reads as a board item, and other items as they are", () => {
+	const item = toItem({ type: "browser", id: "a", name: "Revenue is up", url: "../../boards/a.html", width: 900, height: 400, metadata: { type: "decks.board", path: "boards/a.html" }, box: { x1: 0, y1: 0, x2: 900, y2: 400 } });
+	assert.deepEqual(item, { type: "board", id: "a", width: 900, height: 400, box: { x1: 0, y1: 0, x2: 900, y2: 400 }, board: "boards/a.html", title: "Revenue is up" });
+	assert.deepEqual(toItem({ type: "note", id: "n", content: "hi" }), { type: "note", id: "n", content: "hi" });
+	// A browser item that is not a deck board stays pen's own.
+	assert.equal(toItem({ type: "browser", id: "w", url: "https://example.com" }).type, "browser");
+});
+
+test("a board goes on a canvas as an item, is written as pen's browser item, and is named by its path", async () => {
+	const { app, deck, must, call, cleanup } = await open();
+	try {
+		const here = (await must("here")).value;
+		assert.ok(here.name, "an agent always has a canvas here");
+		const put = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value;
+		assert.equal(put.type, "board");
+		assert.equal(put.board, "boards/a.html");
+		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
+		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
+		const node = file.children.find((one: { id: string }) => one.id === put.id);
+		assert.equal(node.type, "browser");
+		assert.deepEqual(node.metadata, { type: "decks.board", path: "boards/a.html" });
+
+		const next = (await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: "boards/a.html" }])).value;
+		assert.deepEqual(next.box, { x1: 1060, y1: 0, x2: 1660, y2: 300 }, "beside a board named by its path");
+		const note = (await must("canvas.insert", [{ type: "note", id: "n1", content: "Why?" }, { below: "boards/a.html" }])).value;
+		assert.equal(note.box.x1, 0);
+		assert.equal(note.box.y1, 560, "below works for a note too");
+
+		const moved = (await must("canvas.move", ["boards/b.html", { below: "n1" }])).value;
+		assert.equal(moved.box.x1, 0, "and a board below a note");
+		const sized = (await must("canvas.update", ["boards/a.html", { size: { w: 1000 } }])).value;
+		assert.equal(sized.box.x2 - sized.box.x1, 1000);
+
+		const again = await call("canvas.insert", [{ type: "board", board: "boards/a.html" }]);
+		assert.equal(again.ok, false);
+		assert.match(again.error!, /already on this canvas/);
+		const missing = await call("canvas.insert", [{ type: "board", board: "boards/nope.html" }]);
+		assert.match(missing.error!, /no board boards\/nope\.html/);
+
+		const read = (await must("canvas.read")).value;
+		assert.equal(read.canvas, here.name);
+		assert.deepEqual(read.items.filter((one: { type: string }) => one.type === "board").map((one: { board: string }) => one.board).sort(), ["boards/a.html", "boards/b.html"]);
+
+		const gone = (await must("canvas.delete", ["boards/b.html"])).value;
+		assert.equal(gone.deleted, "boards/b.html");
+		assert.ok(app.deck.board("boards/b.html"), "a board's file stays in the deck");
+		assert.deepEqual((await must("board.canvases", ["boards/a.html"])).value.map((one: { canvas: string }) => one.canvas), [here.name]);
+		assert.deepEqual((await must("board.canvases", ["boards/b.html"])).value, []);
+	} finally {
+		cleanup();
+	}
+});
+
+test("a batch is all or nothing, and a later op can be beside what an earlier one made", async () => {
+	const { must, call, cleanup } = await open();
+	try {
+		const made = (await must("canvas.batch", [[
+			{ op: "insert", item: { type: "board", board: "boards/a.html" }, at: { x1: 0, y1: 0 } },
+			{ op: "insert", item: { type: "note", id: "why", content: "Why?" }, beside: "boards/a.html" },
+		]])).value;
+		assert.equal(made.length, 2);
+		assert.equal(made[1].box.x1, 1060);
+		const before = (await must("canvas.read")).value.items.length;
+		const failed = await call("canvas.batch", [[{ op: "insert", item: { type: "note", id: "n2", content: "x" }, at: { x1: 0, y1: 900 } }, { op: "delete", id: "nothing-here" }]]);
+		assert.equal(failed.ok, false);
+		assert.match(failed.error!, /Op 2 \(delete\)/);
+		assert.match(failed.error!, /Nothing was changed/);
+		assert.equal((await must("canvas.read")).value.items.length, before, "the first op did not land either");
+	} finally {
+		cleanup();
+	}
+});
+
+test("calls are stateless: a canvas named is acted on, and nobody moves to it", async () => {
+	const { agent, must, call, cleanup } = await open();
+	try {
+		const home = (await must("here")).value.name;
+		const other = (await must("canvas.create", ["Launch plan"])).value;
+		assert.equal(other.title, "Launch plan");
+		assert.notEqual(other.name, home);
+		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
+		assert.equal((await must("here")).value.name, home, "making and writing a canvas does not move you to it");
+		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { board?: string }) => one.board), ["boards/a.html"]);
+		assert.deepEqual((await must("canvas.read")).value.items, [], "your own canvas is untouched");
+		const unknown = await call("canvas.read", [{ canvas: "no such canvas" }]);
+		assert.match(unknown.error!, /No canvas is called "no such canvas"/);
+
+		// The home canvas moves only when asked.
+		const updated = (await must("agent.update", [{ canvas: other.name }])).value;
+		assert.equal(updated.canvas, other.name);
+		assert.equal((await must("here")).value.name, other.name);
+		assert.equal(agent.stageName(), other.name);
+		// The person's here is the canvas on screen they name.
+		const person = { "x-decks-person": "1", "x-decks-agent": agent.id, "x-decks-stage": home };
+		assert.equal((await must("here", [], person)).value.name, home);
+	} finally {
+		cleanup();
+	}
+});
+
+test("board.create writes the file and places nothing", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const made = (await must("board.create", [{ title: "Churn halved" }])).value;
+		assert.match(made.path, /^boards\/.+\.html$/);
+		assert.equal(made.title, "Churn halved");
+		assert.deepEqual((await must("board.canvases", [made.path])).value, []);
+		assert.ok((await must("board.list")).value.some((one: { path: string }) => one.path === made.path));
+		assert.equal((await must("board.get", [made.path])).value.title, "Churn halved");
+	} finally {
+		cleanup();
+	}
+});
+
+test("an old name still answers as it did, and says its new call", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const listed = await must("boards");
+		assert.ok(Array.isArray(listed.value));
+		assert.ok(listed.notes.some((note) => /boards is an old name, kept for one release: use decks\.canvas\.read/.test(note)), listed.notes.join("\n"));
+		const read = await must("pen.read");
+		assert.ok(Array.isArray(read.value.children), "pen.read keeps its old shape");
+		assert.ok(read.notes.some((note) => /decks\.canvas\.read/.test(note)));
+		const fresh = await must("canvas.read");
+		assert.ok(!fresh.notes.some((note) => /old name/.test(note)), "a new call carries no such note");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a watched canvas's changes by others land in the watcher's inbox, once", async () => {
+	const { app, agent, must, cleanup } = await open();
+	try {
+		const other = app.agents.create({ name: "Rune" });
+		const home = (await must("here")).value.name;
+		const sub = (await must("canvas.watch")).value;
+		assert.deepEqual([sub.canvas, sub.watching], [home, true]);
+		// Rune changes the watcher's canvas.
+		const rune = { "x-decks-agent": other.id };
+		await must("canvas.insert", [{ type: "note", id: "r1", content: "from Rune" }, { canvas: home, at: { x1: 0, y1: 0 } }], rune);
+		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: home, beside: "r1" }], rune);
+		// The watcher's own change is not news to it.
+		await must("canvas.insert", [{ type: "note", id: "mine", content: "mine" }, { at: { x1: 0, y1: 900 } }]);
+		const inbox = (await must("agent.inbox")).value;
+		const events = inbox.filter((one: { kind?: string }) => one.kind);
+		assert.deepEqual(
+			events.map((one: { kind: string; item: string; from: string; canvas: string }) => [one.kind, one.item, one.from, one.canvas]),
+			[
+				["drawing.changed", "r1", "Rune", home],
+				["board.added", "boards/a.html", "Rune", home],
+			],
+		);
+		assert.deepEqual((await must("agent.inbox")).value.filter((one: { kind?: string }) => one.kind), [], "each event is read once");
+		await must("canvas.watch", [{ off: true }]);
+		await must("canvas.delete", ["r1", { canvas: home }], rune);
+		assert.deepEqual((await must("agent.inbox")).value, [], "a stopped watch hears nothing");
+		void agent;
+	} finally {
+		cleanup();
+	}
+});
+
+test("queue waits for the turn; send to an idle agent starts one; inbox lists the hand-offs", async () => {
+	const { app, agent, must, cleanup } = await open();
+	try {
+		const other = app.agents.create({ name: "Rune" });
+		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", boards: ["boards/a.html"] }])).value;
+		assert.deepEqual(queued, { queued: true, position: 1 });
+		const theirs = (await must("agent.inbox", [], { "x-decks-agent": other.id })).value;
+		assert.equal(theirs.length, 1);
+		assert.equal(theirs[0].task, "Read the plan");
+		assert.equal(theirs[0].from, agent.name);
+		assert.deepEqual(theirs[0].boards, ["boards/a.html"]);
+
+		const seen: string[] = [];
+		(other as unknown as { prompt: (text: string) => Promise<void> }).prompt = async (text: string) => {
+			seen.push(text);
+		};
+		const sent = (await must("agent.send", ["Rune", { task: "Stop and look at a.html" }])).value;
+		assert.deepEqual([sent.delivered, sent.turn], [true, "new"], "an idle agent starts a turn on it");
+		assert.equal(seen.length, 1);
+		assert.match(seen[0]!, /Stop and look at a\.html/);
+
+		const got = (await must("agent.get", ["Rune"])).value;
+		assert.equal(got.name, "Rune");
+		assert.equal(got.kind, "pi");
+		assert.ok((await must("agent.list")).value.some((one: { name: string }) => one.name === "Rune"));
+	} finally {
+		cleanup();
+	}
+});
