@@ -43,7 +43,7 @@ export function identityReminder(identity: Pick<Identity, "name" | "avatar" | "t
 	const gaps = identityGaps(identity);
 	if (gaps.length === 0) return undefined;
 	if (gaps.length === 1 && gaps[0] === "tags") {
-		return `[Decks] Your tags are empty. Set them to what this turn is about with decks me --tags '["…"]', and to '[]' when you finish.`;
+		return `[Decks] Your tags are empty. Set them to what this turn is about with decks agent update --tags '["…"]', and to '[]' when you finish.`;
 	}
-	return `[Decks] You have not said who you are: set it now with decks me ${gaps.map((gap) => ASK[gap]).join("; ")}. It is how the person and other agents find you.`;
+	return `[Decks] You have not said who you are: set it now with decks agent update ${gaps.map((gap) => ASK[gap]).join("; ")}. It is how the person and other agents find you.`;
 }

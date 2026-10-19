@@ -172,7 +172,7 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
 
 			Lead with the finding and stop when it is said. A table beats a paragraph about a
 			comparison, a diagram beats a paragraph about a structure, a number beats an
-			adjective. Then \`stage.fit\` it, so the board is the size of what is on it rather
+			adjective. Then \`decks canvas fit\` it, so the board is the size of what is on it rather
 			than the size you guessed.
 
 			For what a finished board can look like, read the examples in \`examples/\` beside

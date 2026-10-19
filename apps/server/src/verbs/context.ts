@@ -152,7 +152,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		// A board shown again that came back to the place it had: nothing was chosen for it.
 		if (!named && before && before.x === box.x && before.y === box.y) return;
 		if (!named) {
-			notes.push(`No at was given, so ${path} went beside your newest board, at ${corner}. Say where each board goes with at: { x1, y1 }: decks pen read lists what is on your stage and where.`);
+			notes.push(`No at was given, so ${path} went beside your newest board, at ${corner}. Say where each board goes with at: { x1, y1 }: decks canvas read lists what is on your canvas and where.`);
 			return;
 		}
 		const hits = (other: { x: number; y: number; w: number; h: number }) =>
@@ -170,7 +170,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		}
 		if (under.length || drawn) {
 			const what = [...under, ...(drawn ? [`${drawn} drawn item${drawn === 1 ? "" : "s"}`] : [])].join(", ");
-			notes.push(`${path} is at ${corner}, as asked, and sits on ${what}. Move it with stage.move if that was not meant.`);
+			notes.push(`${path} is at ${corner}, as asked, and sits on ${what}. Move it with decks canvas move if that was not meant.`);
 		}
 	};
 	const notWhileIsolated = (what: string): never => {

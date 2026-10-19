@@ -244,7 +244,7 @@ export interface StageCallResult {
 
 /** What an agent is told when `runtime/guidelines.txt` is missing: the one rule the rest hang from. */
 const BUILT_IN_GUIDELINES = [
-	"Answer on a board: stage.newBoard for the page, write/edit for the content, stage.show then stage.fit to put it in front of the person. A board is one screen, read in about ten seconds.",
+	"Answer on a board: decks board create for the page, write/edit for the content, decks canvas insert to place it, decks canvas fit to size it, decks view focus to show it. A board is one screen, read in about ten seconds.",
 ];
 
 /**

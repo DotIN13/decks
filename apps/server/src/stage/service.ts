@@ -385,7 +385,7 @@ export class StageService {
 		const first = await Promise.race([canvas.then((extent) => extent ?? away), away.then((extent) => extent ?? canvas)]);
 		if (!first) {
 			throw new Error(
-				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — stage.show("${path}") — and ask again.`,
+				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — decks canvas insert '{"type":"board","board":"${path}"}' — and ask again.`,
 			);
 		}
 		return first;

@@ -74,7 +74,7 @@ export function isolationNote(isolated: { dir: string; data: string }, boards: r
 	const list = boards.length ? boards.map((path) => `\`${path}\``).join(", ") : "none yet";
 	return [
 		`**Isolated mode is on.** You are working in \`${isolated.dir}\`, a temporary folder holding only your stage: ${list}.`,
-		"Your stage's boards are its own copies now, in its `canvases/<name>/boards/` folder; the paths above are those copies, at the same paths in your folder. Read and edit them there, and your edits reach the canvas. A board you make with `newBoard`, or a new file you write in that folder, joins your stage.",
+		"Your stage's boards are its own copies now, in its `canvases/<name>/boards/` folder; the paths above are those copies, at the same paths in your folder. Read and edit them there, and your edits reach the canvas. A board you make with `decks board create` and place on your canvas, or a new file you write in that folder, joins your stage.",
 		`Do not read, list, search or change the Decks data in \`${isolated.data}\` (the original boards, other stages, other agents' files), with your file tools or your shell. Work only with what is in your folder.`,
 	].join(" ");
 }

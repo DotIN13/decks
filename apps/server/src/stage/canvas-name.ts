@@ -28,14 +28,14 @@ export function canvasNameReminder(pens: StagePens | undefined, stage: string | 
 	if (boards.length === 0) return undefined;
 	const naming = pens.naming(stage);
 	if (!naming.title || naming.provisional) {
-		return `[Decks] Your canvas is called "${pens.titleOf(stage)}", which says nothing about what is on it. Name it for its content with decks title "…".`;
+		return `[Decks] Your canvas is called "${pens.titleOf(stage)}", which says nothing about what is on it. Name it for its content with decks canvas rename "…".`;
 	}
 	// Named before anything was on it: that was a choice about what would go there, and it stands.
 	const then = new Set(naming.boards ?? []);
 	if (then.size === 0) return undefined;
 	const fresh = boards.filter((path) => !then.has(path)).length;
 	if (fresh >= NEW_AT_LEAST && fresh > boards.length / 2) {
-		return `[Decks] Your canvas "${naming.title}" now holds mostly boards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks title "…"; to keep it, say decks title "${naming.title}".`;
+		return `[Decks] Your canvas "${naming.title}" now holds mostly boards it did not have when it was named (${fresh} of ${boards.length}). If the name no longer fits, rename it with decks canvas rename "…"; to keep it, say decks title "${naming.title}".`;
 	}
 	return undefined;
 }

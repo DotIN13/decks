@@ -57,7 +57,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 						files,
 						board,
 						url: `/app/${text}/`,
-						next: STARTER_KIND[starter] === "static" ? `Edit the files, then decks apps check ${text} and decks show ${board}.` : STARTER_KIND[starter] === "build" ? `Edit the files, decks apps build ${text}, then decks apps check ${text} and decks show ${board}.` : `Edit the files, decks apps run ${text}, then decks apps check ${text} and decks show ${board}.`,
+						next: STARTER_KIND[starter] === "static" ? `Edit the files, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.` : STARTER_KIND[starter] === "build" ? `Edit the files, decks apps build ${text}, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.` : `Edit the files, decks apps run ${text}, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.`,
 					};
 				},
 				/** The board for an app whose folder was written by hand. */

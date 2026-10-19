@@ -947,7 +947,7 @@ test("newBoard says where a board went when it was not told, and what a named pl
 test("every stage result asks an agent that has not said who it is, until it has", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { identity: { name: "Agent 3", tags: [] } });
 	const result = await runCode(tool, `return (await stage.boards()).length`);
-	assert.match(result.text, /^1\n\[Decks\] You have not said who you are: set it now with decks me --name: .*; --tags .*\./);
+	assert.match(result.text, /^1\n\[Decks\] You have not said who you are: set it now with decks agent update --name: .*; --tags .*\./);
 	assert.doesNotMatch(result.text, /--avatar|--workspace/, "only what is missing is asked for");
 	cleanup();
 	const whole = toolOn({ x: 0, y: 0, zoom: 1 });

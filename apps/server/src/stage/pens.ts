@@ -427,7 +427,7 @@ export class StagePens {
 		const target = this.penFile(path);
 		if (!target.ref) throw new PenError(`A frame is saved in frames/ or boards/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
 		const found = indexOf(entry.doc).get(id);
-		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: decks pen read lists the items.`);
+		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: decks canvas read lists the items.`);
 		const node = clone(found.node);
 		const { x, y } = node;
 		delete node.x;
@@ -476,7 +476,7 @@ export class StagePens {
 		try {
 			text = readFileSync(file, "utf8");
 		} catch {
-			throw new PenError(`There is no ${shown}. Make it with stage.pen.create.`);
+			throw new PenError(`There is no ${shown}. Make it with decks frame create.`);
 		}
 		try {
 			return parse(text);
@@ -540,7 +540,7 @@ export class StagePens {
 	 */
 	createFile(path: string, item?: Partial<PenNode>): { file: string; ref?: string; id: string } {
 		const target = this.penFile(path);
-		if (target.stage) throw new PenError(`${target.shown} is a canvas; make one with stage.newStage.`);
+		if (target.stage) throw new PenError(`${target.shown} is a canvas; make one with decks canvas create.`);
 		if (existsSync(target.file)) throw new PenError(`${target.shown} is already there: read it, or edit it with { path: "${path}" }.`);
 		const id = slug(basename(target.file, ".pen"), 60) || "frame";
 		const node = { type: "frame", layout: "vertical", width: 320, height: "fit_content", children: [], ...(item ?? {}), id, reusable: true } as PenNode;

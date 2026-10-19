@@ -572,9 +572,9 @@ export class Registry {
 	private resolve(target: string): DeckAgent {
 		const byId = this.get(target);
 		const named = this.agents.filter((agent) => agent.chat().name.toLowerCase() === target.toLowerCase());
-		if (!byId && named.length > 1) throw new Error(`More than one agent is called ${target}; use the id from decks agents.`);
+		if (!byId && named.length > 1) throw new Error(`More than one agent is called ${target}; use the id from decks agent list.`);
 		const to = byId ?? named[0];
-		if (!to) throw new Error(`No agent ${target}. Use an id or a name from decks agents.`);
+		if (!to) throw new Error(`No agent ${target}. Use an id or a name from decks agent list.`);
 		return to;
 	}
 
@@ -669,7 +669,7 @@ function brief(task: string, boards: string[], deck: Deck): string {
 
 	parts.push(
 		"",
-		"Boards you changed are listed with this work only if you named them: `decks fit`, a `decks show` of one board, or `decks report <paths>`.",
+		"Boards you changed are listed with this work only if you named them: `decks canvas fit`, or `decks agent claim <paths>`.",
 		"When you are done, reply with a short report: what you changed, and anything the parent agent needs to decide.",
 	);
 	return parts.join("\n");
