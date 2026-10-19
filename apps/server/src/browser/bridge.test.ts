@@ -291,7 +291,7 @@ test("fill, select and click find things by their names, and every action is not
 	assert.equal(value.result.value, "ada@example.org|Iceland");
 	await assert.rejects(bridge.fill("Telephone", "1"), /Nothing on the page is called "Telephone"/);
 	const texts = bridge.status().actions.map((action) => action.text);
-	assert.deepEqual(texts.slice(-3), ["filled Email", "chose Iceland for Country", 'could not fill Telephone: Nothing on the page is called "Telephone". Read the page (stage.web.read) to see the names it uses.']);
+	assert.deepEqual(texts.slice(-3), ["filled Email", "chose Iceland for Country", 'could not fill Telephone: Nothing on the page is called "Telephone". Read the page (decks.web.read) to see the names it uses.']);
 	assert.equal(bridge.status().actions.at(-1)?.ok, false);
 });
 

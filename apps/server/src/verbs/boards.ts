@@ -193,7 +193,7 @@ export async function fitOn(ctx: VerbContext, path: string, named: string | unde
 	 * An agent told "one screen, about 120 words, nothing under 14px" used to find out
 	 * whether it had managed it by driving Playwright and reading a picture, which was
 	 * a third of what a board cost. The frame that measures the height can count the
-	 * words and find the smallest type in the same pass, so `fit` says them. Only what
+	 * words and find the smallest type in the same pass, so `decks.canvas.fit` says them. Only what
 	 * is over is mentioned: a board inside all three gets the numbers and no advice.
 	 */
 	const screen = Math.round(board.w * 0.72);

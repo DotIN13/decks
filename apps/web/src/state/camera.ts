@@ -56,7 +56,7 @@ export const reducedMotion = () => typeof matchMedia === "function" && matchMedi
  * Move the camera — and *glide* to it when it is something else that decided where to look.
  *
  * `animate` is on for the two gestures that move the camera **for** you, a board link and a row in
- * the panel, and behind `stage.show`/`stage.camera`'s own `animate: true`. Everything you drive
+ * the panel, and behind `decks.view.focus`/`decks.view.move`'s own `animate: true`. Everything you drive
  * yourself — a wheel, a pinch, a drag, the zoom menu — never comes through here at all, and must
  * not: smoothing input is lag, and the whole point of the pan work was to remove it.
  *

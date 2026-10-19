@@ -5,7 +5,7 @@
  * is simply not drawn. Nothing complains — which is why a clipped board is usually found
  * by a reader missing a paragraph rather than by whoever wrote it. The frame showing the
  * board is the only place it is laid out, so this is measured here and sent to the server,
- * where `stage.boards()` reports it and `stage.fit` acts on it.
+ * where `decks.canvas.read()` reports it and `decks.canvas.fit` acts on it.
  *
  * The reading is deliberately of the *components* — the direct children carrying a
  * `data-id` — and not of `scrollWidth`. A board's body is sized to the meta, backgrounds
@@ -55,7 +55,7 @@ export function contentExtent(boxes: Box[]): { w: number; h: number } | undefine
 /**
  * How much there is to read, and how small the smallest of it is.
  *
- * Sent with the extent so `stage.fit` can tell an agent that a board ran past one screen's
+ * Sent with the extent so `decks.canvas.fit` can tell an agent that a board ran past one screen's
  * worth of words, or set type nobody can read once the board is fitted to a window, without
  * the agent taking a screenshot to find out. Visible text only, and only elements that hold
  * words of their own, so a wrapper's inherited size is not counted for its children.
@@ -179,7 +179,7 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	 * collapsed out of the last block — are worth a `scrollHeight` whatever the board is made of.
 	 * On a board of placed boxes the two numbers come out the same, so nothing changes for one.
 	 *
-	 * `page` travels beside the height rather than being folded into it, because `stage.fit` needs
+	 * `page` travels beside the height rather than being folded into it, because `decks.canvas.fit` needs
 	 * to tell the two apart: a board that ends in a placed box is fitted with room under it, and a
 	 * document that ends in its own padding already has its room.
 	 */
@@ -191,7 +191,7 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	const flows = !!doc.querySelector("body > .doc") || !!doc.body?.classList.contains("flow");
 	const page = documentHeight(doc);
 	const h = Math.max(extent.h, Math.ceil(page ?? 0));
-	// The width it was laid out at: `stage.fit` takes a height only from a layout at the width it fits at.
+	// The width it was laid out at: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
 	const at = Math.round(doc.documentElement.clientWidth);
 	return { w: extent.w, h, at, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc), ...(flows ? { flows: true as const } : {}) };
 }

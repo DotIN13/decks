@@ -493,7 +493,7 @@ export class StagePens {
 	}
 
 	/**
-	 * Any .pen file as a page draws it (`shot.html`, for `stage.screenshot`): its document with what it
+	 * Any .pen file as a page draws it (`shot.html`, for `decks.canvas.screenshot`): its document with what it
 	 * imports and the saved frames it uses, the folder its relative links resolve from, and the box
 	 * round all its items. A stage's own file answers as the stage does, its boards included.
 	 */

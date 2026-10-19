@@ -1,7 +1,7 @@
 /**
  * The pen ops an edit of the drawing writes: moving items (into a frame, out of one, along its
  * order), copying them, duplicating, deleting, and making a new one with a tool. Each builder
- * returns the ops `onPenEdit` / `stage.pen.edit` receives, and the ids of what it made where the
+ * returns the ops `onPenEdit` / `decks.canvas.batch` receives, and the ids of what it made where the
  * selection should follow them; sending them, and selecting, is the page's.
  *
  * Ids come from a generator passed in (`idMaker` over the document's ids on the page, a counter in

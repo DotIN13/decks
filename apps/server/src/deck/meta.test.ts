@@ -52,7 +52,7 @@ test("a board that is still broken falls back rather than throwing", () => {
 });
 
 /*
- * `withBoardSize` is the write behind `stage.resize` and `stage.fit`. Everything it does
+ * `withBoardSize` is the write behind `decks.canvas.update` and `decks.canvas.fit`. Everything it does
  * wrong is quiet — a lost `bg`, a mangled attribute, a second meta tag — so the cases
  * here are mostly "what else was in the file, and is it still there".
  */
@@ -166,7 +166,7 @@ test("a markdown board with no front-matter gets one, and keeps its heading for 
 });
 
 test("a height on its own writes nothing to a markdown board", () => {
-	// Its height is its content's, and `stage.fit` asks for one on every call: a number written
+	// Its height is its content's, and `decks.canvas.fit` asks for one on every call: a number written
 	// here would be one nothing reads and every later write has to carry.
 	const md = `---\nw: 700\n---\n\n# T\n`;
 	assert.equal(withBoardSize("boards/notes.md", md, { h: 1400 }), md);

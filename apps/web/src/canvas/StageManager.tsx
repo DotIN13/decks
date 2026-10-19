@@ -17,7 +17,7 @@ import { AgentFace } from "../agents/AgentPill.tsx";
  *
  * A stage is a folder of work — its boards and its drawing — and until this there was no way for
  * a person to see that more than one existed, let alone move between them. An agent could
- * (`stage.stages`, `stage.open`); the browser was never told.
+ * (`decks.canvas.list`, `decks.view.goto`); the browser was never told.
  *
  * ### Why a panel and not the canvas itself
  *

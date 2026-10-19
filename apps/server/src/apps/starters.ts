@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { AppKind } from "./service.ts";
 
 /**
- * What a new app starts from (`stage.apps.create`): the fewest files that run, on the rung the
+ * What a new app starts from (`decks.apps.create`): the fewest files that run, on the rung the
  * starter is for. Each is small on purpose — the agent writes the app; this only saves it the
  * part every app of that kind has, and gets the two things right that are easy to get wrong
  * here: addresses relative to the app's own (it is served under `/app/<name>/`), and a server

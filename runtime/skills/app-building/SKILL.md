@@ -33,7 +33,7 @@ const seen = await decks.apps.check("polls");   // read seen.verdict; seen.file 
 await decks.canvas.insert({ type: "board", board: app.board }, { at: { x1: 0, y1: 0 } });
 ```
 
-- **`check` is to an app what `fit` is to a board.** It opens the app in the server's browser and
+- **`check` is to an app what `decks canvas fit` is to a board.** It opens the app in the server's browser and
   reports uncaught errors, failed requests and a page with no text. Fix what it says before you
   show the board. Look at its picture when the page is visual.
 - After you change a **server's** code, call `decks.apps.restart(name)`. The old process keeps

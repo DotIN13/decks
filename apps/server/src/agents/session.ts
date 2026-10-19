@@ -181,11 +181,11 @@ export class DeckAgent {
 	/**
 	 * The boards this agent is holding, most-recently-touched first.
 	 *
-	 * The order used to be insertion order, which is how `stage.agents()` ended up answering
+	 * The order used to be insertion order, which is how `decks.agent.list()` ended up answering
 	 * "what is this agent working on" with everything it had ever held, oldest first. A held
 	 * board is a decision the agent made — attaching one is it saying *this is what I am
 	 * working from* — so the recent end is the answer to the question, and the rest of the
-	 * list is history. The touch sites (`stage.attach`, a new board, a first `show`) put the
+	 * list is history. The touch sites (`stage.attach`, a new board, a first `decks.canvas.insert`) put the
 	 * newest board at the front; `setContext` keeps whatever order it is given. Re-attaching a
 	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
 	 * it where it sat.
@@ -288,7 +288,7 @@ export class DeckAgent {
 			 * turn of their own, which is what keeps a reply from becoming a conversation.
 			 */
 			report(agentId: string, text: string): void;
-			/** What is waiting for one agent, for `stage.queue`. */
+			/** What is waiting for one agent, for `decks.agent.inbox`. */
 			queue(agentId: string): QueuedWork[];
 			/**
 			 * This agent is acting on a board — a write or edit tool call, or a stage verb — so
@@ -757,7 +757,7 @@ export class DeckAgent {
 
 	/**
 	 * Size one board on this agent's stage, in its file. Nothing else sizes a board: a browser's
-	 * measurement does not, and neither does a new revision of its file. `stage.fit` and `stage.resize`
+	 * measurement does not, and neither does a new revision of its file. `decks.canvas.fit` and `decks.canvas.update`
 	 * call this; a person's drag sizes the board on the stage on screen, by name (`wire/boards.ts`).
 	 */
 	setSize(path: string, size: { w?: number; h?: number }): void {
@@ -1353,7 +1353,7 @@ export class DeckAgent {
 		 * prediction stood **for ever**.
 		 *
 		 * What that cost: the chat list said "working" about an agent that was finished, so did
-		 * `stage.agents()` for every other agent that asked, and — the part that actually bites —
+		 * `decks.agent.list()` for every other agent that asked, and — the part that actually bites —
 		 * **the queue never drained**, because its clock starts on the return to idle. Work
 		 * another agent had handed over sat behind a `/compact` until somebody pressed stop.
 		 *
@@ -1485,7 +1485,7 @@ export class DeckAgent {
 		return [...this.work];
 	}
 
-	/** How much is waiting, for the chat list and for `stage.agents()`. */
+	/** How much is waiting, for the chat list and for `decks.agent.list()`. */
 	get queued(): number {
 		return this.work.length;
 	}
@@ -1946,7 +1946,7 @@ export class DeckAgent {
 		this.save();
 	}
 
-	/** The agent naming itself, from M3's `stage.me.setName`. */
+	/** The agent naming itself, from `decks.agent.update({ name })`. */
 	rename(name: string): void {
 		this.identity = { ...this.identity, name };
 		this.backend?.setName(name);
@@ -1961,7 +1961,7 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The agent saying what it is doing, from `stage.me.setTags`. Replaces the list.
+	 * The agent saying what it is doing, from `decks.agent.update({ tags })`. Replaces the list.
 	 *
 	 * Cleaned here rather than at the tool, so the one caller that is *not* a tool — a
 	 * restored snapshot — cannot reintroduce a tag this build would refuse. Returns the
@@ -1983,7 +1983,7 @@ export class DeckAgent {
 	 * 		 * Your tags on this agent, from the customise popup. A separate field, on purpose.
 	 *
 	 * `setTags` above replaces, so a shared list would mean the agent's next call silently
-	 * deleted what you typed. The agent cannot read this field either — `stage.agents()`
+	 * deleted what you typed. The agent cannot read this field either — `decks.agent.list()`
 	 * reports `tags` and not `userTags`, because what you think of an agent is not something
 	 * it should be steering on.
 	 */
@@ -1997,7 +1997,7 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The workspace this agent is in, from `stage.me.setWorkspace` or from the customise popup.
+	 * The workspace this agent is in, from `decks.agent.update({ workspace })` or from the customise popup.
 	 *
 	 * Replaces — one value, not a list — and `null` or an empty string leaves it, which is the
 	 * same absence as never having had one. Returns what was **stored**, which is not always what

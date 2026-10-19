@@ -535,7 +535,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 								// browser that was told, which is the same scope as the ones parked on
 								// a switch.
 								agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
-								// So `stage.camera()` answers for that agent's stage rather than falling
+								// So `decks.view.camera()` answers for that agent's stage rather than falling
 								// back to wherever the last person to look at anything was.
 								reportCamera(camera, agentId);
 							},

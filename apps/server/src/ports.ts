@@ -15,7 +15,7 @@ import type { Duplex } from "node:stream";
  *
  * Websockets go through both. Only `127.0.0.1` is ever dialled, whatever host the URL names.
  *
- * **A port is forwarded only once an agent opens it** (`stage.ports`), and stays open until one
+ * **A port is forwarded only once an agent opens it** (`decks.ports`), and stays open until one
  * closes it; the list is kept in `.decks/ports.json` so a restart keeps it. Decks has no sign-in
  * (DEPLOYMENT §1): whoever can open the app can open what it forwards, and a forwarded VS Code
  * is a shell. That is the same reach an agent's own shell already gives, which is why agents

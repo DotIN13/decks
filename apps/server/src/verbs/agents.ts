@@ -11,7 +11,7 @@ export function agentsVerbs(ctx: VerbContext): Pick<Stage, "me" | "send" | "queu
 		 * Who you are, and what you are doing: read it with nothing, change it with a patch.
 		 *
 		 * One verb where there were five, because they were one act with five names — and the
-		 * patch is what a model can hold in its head: `stage.me({ name: "Sable", tags: ["panel"] })`.
+		 * patch is what a model can hold in its head: `decks.agent.update({ name: "Sable", tags: ["panel"] })`.
 		 * What comes back is the identity **as stored**, which is not always what was passed:
 		 * tags are slugged, deduped and capped at four, so `["Reading panel.css and measuring"]`
 		 * comes back as `["reading-panel-css-and"]`. Returning it is the only way a model finds

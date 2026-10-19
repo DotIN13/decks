@@ -7,9 +7,9 @@ import { boardActor, type BoardConversation } from "./board-actor.ts";
  *
  * Two decisions are worth a test each, and both are about *not* inheriting something:
  *
- * - the id is the conversation's, so a board's `show` moves the canvas the person is
+ * - the id is the conversation's, so a board's `decks.view.focus` moves the canvas the person is
  *   looking at rather than being deferred against a conversation nobody will open;
- * - the identity is the board's, so `stage.me.setName` cannot rename a colleague.
+ * - the identity is the board's, so `decks.agent.update({ name })` cannot rename a colleague.
  */
 
 function conversation(over: Partial<BoardConversation> = {}) {

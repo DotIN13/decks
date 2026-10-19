@@ -59,7 +59,7 @@ export interface BoardHooks {
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
- *   kept here so `stage.fit` can await it, and it is deliberately not in the deck record: a
+ *   kept here so `decks.canvas.fit` can await it, and it is deliberately not in the deck record: a
  *   headless server has no readings, and the deck is what is on disk.
  * - **It is where a stale write is refused.** A patch carries the revision it was composed
  *   against, and that comparison is the guard that stops an agent's work being silently
@@ -73,7 +73,7 @@ export class BoardService {
 	private readonly authors: Authors;
 	private readonly seenAt: Seen;
 	private readonly extents = new Map<string, { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
-	/** `stage.fit` calls waiting for the frame to load and report. */
+	/** `decks.canvas.fit` calls waiting for the frame to load and report. */
 	private readonly extentWaiters = new Set<{ path: string; rev: number; at?: number; resolve: (extent: { w: number; h: number; page?: number } | undefined) => void }>();
 
 	constructor(
@@ -106,7 +106,7 @@ export class BoardService {
 	 *
 	 * The time is the act's own clock rather than the file's. `seen()` takes the later of the two
 	 * because a read must never leave a mark behind; here the opposite is wanted, because an
-	 * agent's `show` or `report` touches no file and the file's time would be somebody else's.
+	 * agent's `decks.canvas.insert` or `decks.agent.claim` touches no file and the file's time would be somebody else's.
 	 */
 	wrote(path: string, who: string, now = Date.now()): void {
 		const board = this.deck.board(path);
@@ -219,7 +219,7 @@ export class BoardService {
 	 * Wait for a frame to report this revision, giving up quietly.
 	 *
 	 * `undefined` rather than a rejection: "nobody is looking at that board" is an answer,
-	 * and the caller (`stage.fit`) turns it into a sentence that says what to do about it.
+	 * and the caller (`decks.canvas.fit`) turns it into a sentence that says what to do about it.
 	 */
 	awaitExtent(path: string, rev: number, ms: number, at?: number): Promise<{ w: number; h: number; page?: number } | undefined> {
 		const ready = this.extent(path, rev, at);
@@ -250,14 +250,14 @@ export class BoardService {
 	 * `newBoard` is the path a new one takes.
 	 *
 	 * Deliberately not left to the watcher. The watcher would get there in 80ms and the
-	 * caller would have to wait to see its own write; refreshing here means a `resize`
+	 * caller would have to wait to see its own write; refreshing here means a `decks.canvas.update` with a size
 	 * returns the board as it now is, and the browser is told once rather than twice
 	 * (the watcher's event finds the same bytes and the same revision, and says nothing).
 	 */
 	/**
 	 * Set a board's size by editing the one number in its own file.
 	 *
-	 * The same write `stage.resize` makes, here rather than in the stage service because this
+	 * The same write `decks.canvas.update` makes, here rather than in the stage service because this
 	 * is the object that owns writing a board and recording a revision — a resize that skipped
 	 * the record would be the one edit the time machine did not have.
 	 *

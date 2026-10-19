@@ -68,7 +68,7 @@ A board is an ordinary, self-contained HTML page that you design. There is no co
 
 The person edits, draws on and comments on boards too. Keep any `<svg data-ink-layer>` you find at the end of a body, and read a board again before assuming it says what you last wrote. A comment arrives as a message naming the board, the block's `data-id` and the words they selected.
 
-A screenshot (the board-debug skill has the script) is for a drawing you cannot check any other way: an SVG diagram or a chart. Not for text, tables or layout, which `fit` has already measured.
+A screenshot (the board-debug skill has the script) is for a drawing you cannot check any other way: an SVG diagram or a chart. Not for text, tables or layout, which `decks canvas fit` has already measured.
 
 ## Your canvas
 
@@ -89,7 +89,7 @@ The old command names (`decks new-board`, `decks show`, `decks pen edit`, `decks
 Everything you do to the canvas is a `decks` command in your shell; board content is files, which you write with your ordinary tools. `decks --help` lists the commands and `decks help <command>` explains one.
 
 - A plain argument (a path, a name, a title) is a word; an object argument's keys are flags, `--title "…"`, with a dot for a key inside a key, `--at.x1 0`; anything else is JSON, and `-` reads it from stdin. `--args '<JSON list>'` gives every argument at once.
-- The value goes to stdout: a string as it is, so `u=$(decks board url <path>)` is the address, and anything else as JSON for `jq`. Notes (where a board went, what `fit` measured, reminders) go to stderr, and a refusal exits with 1 and says why.
+- The value goes to stdout: a string as it is, so `u=$(decks board url <path>)` is the address, and anything else as JSON for `jq`. Notes (where a board went, what `decks canvas fit` measured, reminders) go to stderr, and a refusal exits with 1 and says why.
 - `decks events board.changed` prints each change as it happens, one JSON line each, until you stop it.
 - Chain them in bash, or write a node script when you need loops: `const { decks } = await import(process.env.DECKS_SDK)` gives every command below as `await decks.board.create({ … })`, `await decks.canvas.insert(item, { beside })`. A board's button code (`text/decks-eval`) has the same functions as `stage`.
 

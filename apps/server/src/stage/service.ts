@@ -64,7 +64,7 @@ export interface StageHost {
 	retitle?(name: string, title: string): string;
 	/** The camera the browser last reported for one agent's canvas. */
 	camera(agentId: string): Camera;
-	/** Agents, for `stage.agents()` and for `inContext` on every board. */
+	/** Agents, for `decks.agent.list()` and for `inContext` on every board. */
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 	/**
 	 * Move a board on the stage this host is serving, and answer with the board as that stage sees it.
@@ -79,7 +79,7 @@ export interface StageHost {
 	 * **Answered for the agent that asked.** A move is written on the caller's own canvas
 	 * (`place`), so a read served from whichever conversation the browser happens to be looking
 	 * at would tell an agent that its own move did not happen — which is what it did, until an
-	 * agent moved four boards while the person was reading another chat and `stage.boards()`
+	 * agent moved four boards while the person was reading another chat and `decks.canvas.read()`
 	 * gave back all four places from before.
 	 *
 	 * Optional, like `StageAgentHooks.positions`, so a host that does not arrange omits it and a
@@ -119,12 +119,12 @@ export interface WebHost {
 	board(): string;
 }
 
-/** The room `fit` leaves under the content — the margin a board's own components start at. */
+/** The room `decks.canvas.fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
 
-/** How long `fit` waits for the frame to load and report, before saying nobody looked. */
+/** How long `decks.canvas.fit` waits for the frame to load and report, before saying nobody looked. */
 const FIT_WAIT_MS = 5000;
-/** How long `fit` waits for a canvas before measuring the board in the server's own browser as well. */
+/** How long `decks.canvas.fit` waits for a canvas before measuring the board in the server's own browser as well. */
 const AWAY_AFTER_MS = 1200;
 
 export class StageService {
@@ -311,7 +311,7 @@ export class StageService {
 	 * writes that, plus — on a component board — the margin its boxes start at.
 	 *
 	 * It used to take the width too, in two passes: set the width, wait for the reflow, measure the
-	 * height that produced. That made `fit` the one call that could silently reflow a board — and on
+	 * height that produced. That made `decks.canvas.fit` the one call that could silently reflow a board — and on
 	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
 	 * back was the frame's own width, so every fit added the margin and grew the board by 48px.
 	 */

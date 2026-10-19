@@ -2,7 +2,7 @@ import type { PenDocument } from "@decks/pen";
 import { StageEngine } from "./stage/engine.ts";
 
 /**
- * One stage, drawn for a picture: the page the server's Chromium loads to take `stage.screenshot`
+ * One stage, drawn for a picture: the page the server's Chromium loads to take `decks.canvas.screenshot`
  * and the drawing's Export (`server/stage/shots.ts`).
  *
  * The same pieces as the canvas, and nothing else: the stage's engine (`stage/engine.ts`) on its

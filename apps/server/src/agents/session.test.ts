@@ -282,7 +282,7 @@ test("showing a board holds it, and taking it off the stage keeps holding it", (
 	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
 	assert.equal(context(), "boards/a.html boards/b.html");
 
-	// What `stage.hide` and the board's × both do: off the stage, still held.
+	// What `decks.canvas.delete` and the board's × both do: off the stage, still held.
 	agent.setInPlay(["boards/b.html"]);
 	assert.equal(inPlay(), "boards/b.html");
 	assert.equal(context(), "boards/a.html boards/b.html", "a board taken off stays held");

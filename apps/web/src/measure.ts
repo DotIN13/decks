@@ -1,7 +1,7 @@
 import { measureFrame } from "./board/extent.ts";
 
 /**
- * One board, measured for `stage.fit` when no canvas has measured it (`server/stage/shots.ts`).
+ * One board, measured for `decks.canvas.fit` when no canvas has measured it (`server/stage/shots.ts`).
  *
  * A board is measured in the frame that shows it, and a board nobody is looking at has no frame:
  * an agent writing on its own stage while the person looks at another one was told "nothing has

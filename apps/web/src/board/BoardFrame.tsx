@@ -115,7 +115,7 @@ export function BoardFrame(props: {
 	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
 	visible: boolean;
 	selected: boolean;
-	/** Bumped by `stage.reload`, for a change the watcher cannot see. */
+	/** Bumped by `decks.view.reload`, for a change the watcher cannot see. */
 	nonce?: number;
 	/** Where an agent is pointing, in board coordinates. */
 	cursor?: { x: number; y: number; label: string; color: string };
@@ -197,8 +197,8 @@ export function BoardFrame(props: {
 	 * How much room this board's content took, once the document had finished mounting.
 	 *
 	 * Sent up rather than kept here because the frame is the only place a board is laid
-	 * out, and the server is where the question gets asked (`stage.fit`, and `clipped` on
-	 * `stage.boards()`). Reported once per load, with the revision it was measured at.
+	 * out, and the server is where the question gets asked (`decks.canvas.fit`, and `clipped` on
+	 * `decks.canvas.read()`). Reported once per load, with the revision it was measured at.
 	 */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
 	/** Only for a deck: take it fullscreen. */
@@ -1190,7 +1190,7 @@ export function BoardFrame(props: {
 	 *
 	 * The move drag's shape with the arithmetic turned through ninety degrees: the pointer's
 	 * travel in screen pixels divided by the zoom is world pixels, added to the size the board
-	 * had when the gesture started. No snapping — a board's size comes from `fit` and from what
+	 * had when the gesture started. No snapping — a board's size comes from `decks.canvas.fit` and from what
 	 * its content needs, and the values in this deck are 1008 and 1354 rather than multiples of
 	 * anything, so a grid here would fight the numbers it is supposed to be producing.
 	 *

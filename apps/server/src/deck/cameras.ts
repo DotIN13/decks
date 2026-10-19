@@ -5,7 +5,7 @@ import type { Camera } from "@decks/protocol";
  *
  * **A reading belongs to one agent.** The browser says whose stage it is showing (the wire frame
  * requires it), and one that does not say is dropped, not guessed at. There is deliberately no
- * "last reading of anything": answering `stage.camera()` with another agent's view is wrong in
+ * "last reading of anything": answering `decks.view.camera()` with another agent's view is wrong in
  * the same way placing a board by it was.
  *
  * **And to one canvas, on one device.** A reading is keyed by agent, canvas and device together: an

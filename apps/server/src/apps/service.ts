@@ -83,7 +83,7 @@ export interface AppOutcome {
 	ms: number;
 	/** The lines that look like errors, last first-to-last, at most twenty. */
 	errors: string[];
-	/** Still going after the wait: ask again with `stage.apps.status`. */
+	/** Still going after the wait: ask again with `decks.apps.status`. */
 	pending?: true;
 }
 

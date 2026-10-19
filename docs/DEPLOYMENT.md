@@ -11,8 +11,8 @@ Everything below follows from a single fact, so it comes first.
 ## 1. Decks has no authentication
 
 There is no login and no token. `ws.ts` accepts every frame that arrives on `/ws`, and
-those frames drive a Pi session with live tool execution — `bash`, `write`, `edit`,
-`stage_eval`. Decks ships no permission gate either, deliberately (§6.8): that is an
+those frames drive a Pi session with live tool execution — `bash`, `write`, `edit`, and
+through `bash` the `decks` command; `/api/v1` answers every call in the verb table to anyone who asks. Decks ships no permission gate either, deliberately (§6.8): that is an
 extension's job, and if no extension is installed there is nothing in the way.
 
 There is exactly one origin check in the codebase, and it is worth naming so it is not

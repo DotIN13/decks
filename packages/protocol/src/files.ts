@@ -14,7 +14,7 @@ export const CONFIRM_UPLOAD_BYTES = 100 * 1024 * 1024;
 /**
  * Where a dropped file landed, as `POST /api/upload` answers.
  *
- * `path` is deck-relative — the same currency `stage.newBoard` and the file
+ * `path` is deck-relative — the same currency `decks.board.create` and the file
  * picker deal in — so the caller turns it into a board-relative `data-embed`
  * itself rather than the server guessing which board asked.
  */

@@ -31,7 +31,7 @@ export interface StageCall {
 	 * Which agent asked.
 	 *
 	 * The canvas is *per conversation* — it draws the focused agent's in-play set and
-	 * nothing else — so the browser has to know whose `show` it is carrying out. Without
+	 * nothing else — so the browser has to know whose `decks.view.focus` it is carrying out. Without
 	 * this it could not tell, and an agent you were not watching flew your camera to a board
 	 * that is not on your canvas at all.
 	 */

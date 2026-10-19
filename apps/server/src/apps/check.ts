@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Browser } from "playwright";
 
 /**
- * `stage.apps.check`: the app opened in the server's own Chromium, the way `fit` measures a board.
+ * `decks.apps.check`: the app opened in the server's own Chromium, the way `decks.canvas.fit` measures a board.
  * What a person would hit first — a page that throws, a request that fails, a blank screen — comes
  * back to the agent as sentences before anyone opens the board, with a picture to look at.
  */

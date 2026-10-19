@@ -12,7 +12,7 @@ import { realPathOf } from "./deck/roots.ts";
  * A board's size is the one number nothing could check: the browser is the only place a
  * board is laid out, so the reading has to travel from a frame to the server and back out
  * as a write to the file. Each half is easy to get right on its own and the join is where
- * it would quietly stop working — a reading kept under the wrong revision, a `fit` that
+ * it would quietly stop working — a reading kept under the wrong revision, a `decks.canvas.fit` that
  * writes a number nobody measured.
  */
 function open() {
@@ -36,7 +36,7 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(before.content, undefined, "nothing has looked at it yet");
 		assert.equal(before.clipped, undefined);
 
-		// Laid out at the board's own 900: `fit` takes a height only from a layout at the width it fits at.
+		// Laid out at the board's own 900: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
 		app.handle({ type: "board.extent", path: "boards/tall.html", rev: before.rev, w: 648, h: 690, at: 900 }, () => {});
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });

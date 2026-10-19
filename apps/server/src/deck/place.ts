@@ -2,7 +2,7 @@
  * Where a board goes when nobody said where.
  *
  * One rule, in one place, because the app has five ways for a board to arrive on a stage —
- * an agent's `stage.newBoard`, `stage.show`, the ＋ in the corner, a board picked out of the
+ * an agent's `decks.board.create`, `decks.canvas.insert`, the ＋ in the corner, a board picked out of the
  * panel, a mirror — and each of them used to fall through to the deck's own auto-layout, which
  * put a new board below every board the stage had ever had a place for: a column a million
  * pixels tall.
@@ -16,7 +16,7 @@
  * whichever browser panned last, on any stage. Both times boards landed tens of thousands of
  * pixels from their own. A stage's contents are the same for every viewer, so the answer is too, and no
  * camera is taken as input anywhere in this file. Keep it that way: arriving where the person is
- * looking is the camera's job (`stage.show` moves it onto the board), not the placement's.
+ * looking is the camera's job (`decks.view.focus` moves it onto the board), not the placement's.
  *
  * Nothing here reads or writes state. The caller is `agents/session.ts`, which owns the places,
  * the list of what is on the stage and the drawing around it.

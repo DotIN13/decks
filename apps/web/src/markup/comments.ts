@@ -19,7 +19,7 @@ export interface BoardComment {
 	/**
 	 * Drawn items on a canvas, by id, when the comment is on them rather than on a board: `board` is
 	 * then the canvas's file (`canvases/<name>/canvas.pen`) and `quote` their words, so the agent finds
-	 * them with `stage.pen.read()`.
+	 * them with `decks.canvas.read()`.
 	 */
 	items?: string[];
 	/** The selected words, spaces collapsed, cut at `QUOTE_LIMIT`. */

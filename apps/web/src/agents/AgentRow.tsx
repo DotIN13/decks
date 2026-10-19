@@ -53,12 +53,12 @@ export function AgentRow(props: {
 	 * Move this agent into a workspace, or out of one with `null`.
 	 *
 	 * Both writers of this field land on the same value — the agent through
-	 * `stage.me.setWorkspace`, you through here — so this is not "your workspace" the way the
+	 * `decks.agent.update({ workspace })`, you through here — so this is not "your workspace" the way the
 	 * tags beside it are yours. Absent means the row cannot be moved.
 	 */
 	onWorkspace?: (workspace: string | null) => void;
 	/**
-	 * Rename this agent — the same field `stage.me({ name })` writes.
+	 * Rename this agent — the same field `decks.agent.update({ name })` writes.
 	 *
 	 * Yours as well as the agent's, because a chat called `Agent 3` is a chat you should be
 	 * able to name without asking it to name itself. Absent means the window's name field is

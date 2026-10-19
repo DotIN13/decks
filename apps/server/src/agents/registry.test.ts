@@ -484,7 +484,7 @@ test("an address that cannot be resolved is refused rather than guessed at", () 
 });
 
 /*
- * What `stage.agents()` reports about every agent — the twenty newest boards, the true
+ * What `decks.agent.list()` reports about every agent — the twenty newest boards, the true
  * total, and the runtime.
  *
  * The cap is a screen of the held list, not a truncation: `holding` rides beside it so a

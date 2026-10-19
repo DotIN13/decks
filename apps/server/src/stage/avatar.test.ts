@@ -57,7 +57,7 @@ test("what cannot be repaired is refused with a sentence that says what to do", 
 });
 
 test("the emoji avatar the tool writes is already valid, so the check leaves it alone", () => {
-	// The same markup as `stage.me`'s emoji branch (`stage/tool.ts`).
+	// The same markup as `decks.agent.me`'s emoji branch (`stage/tool.ts`).
 	const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><text x="32" y="44" font-size="44" text-anchor="middle">🫖</text></svg>';
 	const checked = checkAvatar(svg);
 	assert.equal(checked.svg, svg);
@@ -65,7 +65,7 @@ test("the emoji avatar the tool writes is already valid, so the check leaves it 
 });
 
 /*
- * And through the service, which is the path `stage.me` takes: what lands on disk is what the
+ * And through the service, which is the path `decks.agent.me` takes: what lands on disk is what the
  * browser is served, so this is the assertion that actually pins the bug.
  */
 test("writeAvatar puts the repaired svg on disk and hands back what changed", async () => {

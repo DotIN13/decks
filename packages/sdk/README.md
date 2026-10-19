@@ -56,7 +56,7 @@ is noted in the conversation on screen. Who is calling is said, not proven, for 
 
 ## What to know
 
-- A call answers with its value. The notes it adds (what `fit` measured, where an item went) go to
+- A call answers with its value. The notes it adds (what `decks.canvas.fit` measured, where an item went) go to
   stderr in Node, or to `connect({ notes })`; `decks.call(verb, args)` gives value, notes and
   pictures together.
 - A refused or failed call is a `DecksError` with `message`, `status` and `notes`.

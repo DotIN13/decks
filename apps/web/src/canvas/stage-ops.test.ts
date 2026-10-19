@@ -8,7 +8,7 @@ import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
  *
  * The canvas is per conversation, and the camera has to follow the same rule or it is the one
  * part of the view an agent you are not watching can reach into. It could: a call carried no
- * agent id, so the browser could not tell whose `show` it was carrying out, and an agent
+ * agent id, so the browser could not tell whose `decks.view.focus` it was carrying out, and an agent
  * working in another corner of the deck flew the camera to a board that was not on screen.
  *
  * The DOM is never touched by these two operations — `highlight` is the only one that reaches

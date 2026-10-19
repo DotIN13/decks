@@ -831,7 +831,7 @@ export class ThumbService {
 	 * Press every control on a board and say which views break it.
 	 *
 	 * A board that keeps its depth behind tabs and rows has views its writer never looked at:
-	 * `fit` measures the board as it rests, and a screenshot is of the resting view too. The
+	 * `decks.canvas.fit` measures the board as it rests, and a screenshot is of the resting view too. The
 	 * first board checked this way had a tab whose text was squeezed into a 24px column and ran
 	 * to 3,460px, and nothing had said so. This loads the board in the same headless browser
 	 * the pictures use, presses each control in turn, and measures after each press: the height,

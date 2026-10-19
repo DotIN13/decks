@@ -494,7 +494,7 @@ export function App() {
 	 *
 	 * Until now the server only ever heard about the camera *after* a gesture: a session
 	 * where the user asked one question and never touched the canvas reported nothing, and
-	 * `stage.viewport()` had nothing to answer with. Read at fire time rather than now,
+	 * `decks.view.viewport()` had nothing to answer with. Read at fire time rather than now,
 	 * because the deck arrives and fits itself in the first moments and this should carry
 	 * where that left the camera, not the {0,0,1} it started at.
 	 *
@@ -664,7 +664,7 @@ export function App() {
 	 * The boards on the focused agent's stage, at the size the stage draws them.
 	 *
 	 * **A document's height is a floor its content raises.** The stage file's height for a board whose
-	 * content flows is what a drag or a `fit` gave it, and the board is drawn at least as tall as its
+	 * content flows is what a drag or a `decks.canvas.fit` gave it, and the board is drawn at least as tall as its
 	 * content measures here, so it never clips a paragraph. Read in each browser and never written back:
 	 * two browsers whose fonts lay it out a pixel apart each draw their own, rather than answering each
 	 * other's height for ever. A slide deck's height is its aspect's, and a board of placed boxes is
@@ -1183,7 +1183,7 @@ export function App() {
 	 *
 	 * A function over a list rather than one board, because the two things that fly — a row in
 	 * the rail, and a board a link on another board opened (below) — want the same arithmetic,
-	 * and a list is also what an agent's `stage.show` of several boards asks for.
+	 * and a list is also what an agent's `decks.view.focus` on several boards asks for.
 	 *
 	 * `animate` is what the two of them ask for and nothing else does: after a link or a press a
 	 * camera that *arrives* says which way it went, where a camera that jumps leaves you to work

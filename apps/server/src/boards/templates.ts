@@ -80,14 +80,14 @@ export function asBoardFormat(value: unknown): BoardFormat | undefined {
 /**
  * The width a board is worth keeping under, and it is **guidance, not a limit**.
  *
- * There used to be a hard cap here: 1600, clamped by `boardWidth` and again by `stage.fit`,
+ * There used to be a hard cap here: 1600, clamped by `boardWidth` and again by `decks.canvas.fit`,
  * so a board that needed to be wider was quietly narrowed and its content left clipped.
  * That is the wrong trade — the thing being protected is readability, and a caller who
  * means 1800 has a reason that cannot be seen from in here. **Nothing is clamped now.**
  * What is left is a number to aim under, and defaults that are small on a small screen.
  *
  * 1200, because past it the eye loses its place coming back for the next line — and because
- * a board is read at the size the canvas has: `stage.viewport()` is the room on screen, not
+ * a board is read at the size the canvas has: `decks.view.viewport()` is the room on screen, not
  * divided by the zoom, so a board wider than the viewport is read scaled down.
  */
 export const WIDE_BOARD_W = 1200;
@@ -95,7 +95,7 @@ export const WIDE_BOARD_W = 1200;
 /**
  * A width a board may actually be: what was asked for, or the format's own, clamped.
  *
- * `viewport` is the room the canvas has (`stage.viewport()`), and `undefined` means nobody
+ * `viewport` is the room the canvas has (`decks.view.viewport()`), and `undefined` means nobody
  * is looking — a board written by an agent nobody is watching gets the format's default
  * rather than a guess, because a guess would be indistinguishable from a measurement at the
  * point it got used. The format's own default is 1000 for a board, which is about as wide as
@@ -128,7 +128,7 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
  *
  * **No height in the meta tag.** A height there is a floor the content can raise and never
  * a ceiling, so leaving it out is what makes a new board exactly as tall as what gets
- * written on it. `stage.fit` writes one in once there is something to measure.
+ * written on it. `decks.canvas.fit` writes one in once there is something to measure.
  *
  * The one block it starts with is the document: `.doc`, which board.css puts at the origin at
  * the full width of the board, as tall as its own content. A block beside it that states a
@@ -293,7 +293,7 @@ export const MIRROR_SIZE = { w: 560, h: 900 };
  * watcher event, no revision churn, and a board file somebody can read and understand.
  *
  * The component fills the board and carries an explicit height, so `contentExtent`
- * measures it exactly: a mirror never clips and `stage.fit` has nothing to do to it. The
+ * measures it exactly: a mirror never clips and `decks.canvas.fit` has nothing to do to it. The
  * growth happens inside, where the list scrolls.
  */
 export function renderMirror(name: string, agentId: string, size?: { w?: number; h?: number }): string {

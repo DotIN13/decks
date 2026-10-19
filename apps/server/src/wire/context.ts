@@ -97,7 +97,7 @@ export interface WireContext {
 	penMessage(agentId: string): ServerMessage | undefined;
 	/** Which boards may run their own code, and the list the question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
-	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
+	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
 	readonly port: number;
 
 	/**

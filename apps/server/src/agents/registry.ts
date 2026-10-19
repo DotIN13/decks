@@ -110,7 +110,7 @@ export class Registry {
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
 				queued: agent.queued,
-				// The stage it has open, so `stage.stages()` can say who is on each (`stage/pens.ts`).
+				// The stage it has open, so `decks.canvas.list()` can say who is on each (`stage/pens.ts`).
 				stage: agent.stageName(),
 			};
 		});
@@ -220,7 +220,7 @@ export class Registry {
 				 * Every unnamed chat used to be called `Agent`: six of them on this machine, and
 				 * a name is how an agent is addressed — `@Agent` from the bar could mean any of
 				 * them. The number is the whole of the fix, and it stops mattering the moment the
-				 * agent gives itself a name (`stage.me({ name })`), which is the first thing most
+				 * agent gives itself a name (`decks.agent.update({ name })`), which is the first thing most
 				 * of them do.
 				 */
 				name: options.name ?? numberedName("Agent", (name) => this.nameTaken(name)),
@@ -543,7 +543,7 @@ export class Registry {
 	 * came back. This hands the work over and returns; `reply` is how the answer arrives.
 	 *
 	 * The target may be given as an id or as a name, because a model reading
-	 * `stage.agents()` has both in front of it and will reach for whichever reads better. A
+	 * `decks.agent.list()` has both in front of it and will reach for whichever reads better. A
 	 * name that two agents share is refused rather than guessed at: sending work to the wrong
 	 * conversation is not a mistake you can see happening.
 	 */

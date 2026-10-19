@@ -8,7 +8,7 @@ import { slug } from "./slug.ts";
  * with sentences unless the shape refuses them, and "does it refuse them" is a question that
  * should be answerable without starting a runtime and reading a menu.
  *
- * Two callers, and they are deliberately the same code. `stage.me.setTags` is the agent
+ * Two callers, and they are deliberately the same code. `decks.agent.update({ tags })` is the agent
  * tagging itself; `agent.tags` is you tagging it from the customise popup. Both go through
  * here, so a tag you type and a tag an agent sets are the same kind of object — which is what
  * makes them comparable at a glance in the panel, and what stops one surface accepting

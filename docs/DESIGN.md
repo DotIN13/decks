@@ -48,10 +48,10 @@ an agent is *holding* is the rail; what it has put *in play* is the canvas.
 |---|---|---|---|
 | **deck** | every board under `boards/` | the filesystem | writing or deleting a file |
 | **context** | what an agent holds — the rail | the agent | `attach` / `detach` |
-| **in play** | what the canvas renders | the agent, narrowed by the user | `show` / `hide`, or a click in the rail |
+| **in play** | what the canvas renders | the agent, narrowed by the user | `decks.canvas.insert` / `decks.canvas.delete`, or a click in the rail |
 
-Attaching a board puts it in play, so holding something still surfaces it; `show` is how an
-agent narrows to what matters now, and `hide` takes a board off the canvas *without*
+Attaching a board puts it in play, so holding something still surfaces it; `decks.canvas.insert` is how an
+agent narrows to what matters now, and `decks.canvas.delete` takes a board off the canvas *without*
 dropping it from context. That asymmetry is deliberate: the canvas is the user's view and
 they may clear it, but an agent's context is its own, and a user quietly removing a board
 the agent is reasoning from would be a bug they could not see.
@@ -409,16 +409,11 @@ is handed the *source* of the boards it needs, because that is the point of boar
 being files — alignment is a paste, not a briefing. Four children at a time, which is
 a legibility limit rather than a resource one.
 
-**The canvas tool is defined once.** `stage/tool.ts` holds its guidelines and the `stage`
-object; `runtimes/pi/extension.ts` registers it with a TypeBox schema and
-`runtimes/claude/tools.ts` wraps it in an in-process MCP server with a Zod one. That split is forced:
-`tool()` inside `createSdkMcpServer` is the SDK's only route for your own tools — the `tools`
-option is an availability filter over Claude's built-ins — and "MCP" oversells it, because
-the server runs in this process with no subprocess and no transport. Two consequences are
-real: the model sees `mcp__decks__stage_eval`, so the instruction text names the tool through
-a `{{STAGE_TOOL}}` placeholder rather than hardcoding it; and tool search defers SDK MCP
-tools by default, so `alwaysLoad` keeps the schema in the initial prompt instead of costing
-a discovery call.
+**The canvas calls are defined once.** The verb table in `packages/api` declares them and
+`stage/tool.ts` answers them (§6.3); no runtime registers a canvas tool of its own. Every agent
+reaches them with the `decks` command in its own shell (`decks canvas insert`, `decks view focus`),
+which each runtime puts on the PATH with the agent's identity, and reads what they are in
+`runtime/decks-commands.md`, generated from the same table.
 
 **Two things Pi did through its session tree now live in the shell**, because they had no
 Claude counterpart and one mechanism is better than two. The stage snapshot — what an agent
@@ -436,18 +431,18 @@ edited a board" nudge was `pi.sendMessage({ deliverAs: "nextTurn" })`; it is now
 the agent, prepended to the next prompt, which keeps the property it was chosen for — a
 board edit is not an interruption — without needing the runtime's cooperation.
 
-**Its words are one file, because four runtimes show them.** The description a model reads
-before it calls the tool lives in `runtime/tool-description.txt`. Pi and Claude are handed it
-by the server; opencode's tool loader and antigravity's MCP server read the same file. Two of
-those four used to carry their own shortened copy under a comment claiming they were "in the
-same words", and the model on those runtimes was told something different about what a board
-is for.
+**Its words are one file, because five runtimes show them.** What a model reads about the
+calls is `runtime/decks-commands.md`, beside `runtime/AGENTS.md.tmpl`, handed to every runtime by
+the server. Two runtimes once carried their own shortened copy of the tool's description under a
+comment claiming they were "in the same words", and the model on those runtimes was told
+something different about what a board is for.
 
 **A board has to be cheaper than a paragraph.** If answering on a board costs fifteen
 lines of boilerplate and answering in chat costs nothing, the chat wins every time — so
-`stage.newBoard({ title })` writes the shell, mints a unique slug from the title,
-attaches the board, puts it in play, and returns the deck-relative path. It does not move
-the camera, and it refuses to overwrite an existing board.
+`decks.board.create({ title })` writes the shell, mints a unique slug from the title, and
+returns the deck-relative path; `decks.canvas.insert({ type: "board", board })` puts it on a
+canvas. Neither moves the camera (that is `decks.view.focus`), and create refuses to overwrite
+an existing board.
 
 **The shell is blank, and there are no templates.** A board is a heading and the import
 map, and nothing else: a served shape decided too much of the board before the writer had
@@ -462,9 +457,8 @@ files, because they are meant to be read and copied.
 
 The write itself lives in `boards/service.ts`, which is where board writes and their
 revisions live; the extension reaches it through `StageService`. The old `kind` and
-`template` arguments are still accepted and ignored, because the signature is in the
-`stage.d.ts` every agent has already read and breaking it mid-turn would cost somebody a
-turn to save a deprecation.
+`template` arguments are still accepted and ignored, because an agent may have read them in an
+older reference and breaking it mid-turn would cost somebody a turn to save a deprecation.
 
 ### 6.3 The verb table, `/api/v1` and the `decks` command
 
@@ -493,7 +487,7 @@ stage at all, and each of its calls is noted in the conversation it acts for.
 declares and the server lacks, or a signature that disagrees, is a compile error; a test checks
 the same at run time.
 
-Reads the server can answer (`boards`, `resolve`, `url`) are answered directly. Anything only the
+Reads the server can answer (`decks.canvas.read`, `decks.file.url`, `decks.board.url`) are answered directly. Anything only the
 browser can do becomes a `stage.call` frame and is awaited; with no browser connected it resolves
 as a no-op that says so, because an agent working while nobody watches should finish and report,
 not block.
@@ -867,7 +861,7 @@ spine keeps one job (open the conversation at a turn) and the messages carry the
 Decks ships no policy of its own. What it ships is the surface a runtime needs to ask a
 human: `bindExtensions({mode: "rpc", uiContext})` for Pi, `canUseTool` for Claude, and one
 bridge (`agents/extension-ui.ts`) that turns either into frames the browser draws. Under Pi
-a permission extension then covers `bash`, `write`, `edit` and `stage_eval` alike, and
+a permission extension then covers `bash`, `write` and `edit` alike (a `decks` call is a `bash` call), and
 nothing about it is Decks-specific. Under Claude the CLI decides what is worth asking about
 and Decks answers. The path guards on the HTTP routes stay regardless: that is web-server
 hygiene, not agent policy.
@@ -1375,7 +1369,7 @@ hover preview on the timeline — the spine is hidden below 760px and rewinding 
 through the transcript, so the tap is the whole gesture rather than a preview and then a
 commitment. A pinch whose fingers land inside a *nested* sandboxed embed (an HTML embed is
 an iframe two levels in) is not forwarded, exactly as a wheel over one is not. And the
-agent-facing side is untouched: `stage_eval`, the time machine and the permission dialogs
+agent-facing side is untouched: the `decks` calls, the time machine and the permission dialogs
 are the same code on any device.
 
 ## 8. What is built

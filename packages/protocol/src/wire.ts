@@ -98,7 +98,7 @@ export type ClientMessage =
 	 *
 	 * `h` is the room the content needs: the furthest edge of the root-level blocks, or the
 	 * document's own height, whichever is greater. `page` is that second number on its own,
-	 * so `stage.fit` can tell the two apart — a board of placed boxes is fitted with a margin
+	 * so `decks.canvas.fit` can tell the two apart — a board of placed boxes is fitted with a margin
 	 * of room under the last one, and a document that ends in its own bottom padding is not.
 	 */
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
@@ -165,14 +165,14 @@ export type ClientMessage =
 	| { type: "board.delete"; path: string }
 	/**
 	 * The person's own edits to a stage drawing — a drag, a deletion, new words in a note — in the
-	 * same pen operations an agent sends through `stage.pen.edit` (`@decks/pen`'s `Op`). Applied to
+	 * same pen operations an agent sends through `decks.canvas.batch` (`@decks/pen`'s `Op`). Applied to
 	 * the stage the named agent has open, together or not at all.
 	 */
 	| { type: "stage.pen.edit"; agentId: string; ops: unknown[]; /** The stage on screen, whose drawing is edited; else the agent's. */ stage?: string }
 	/** The whole drawing again: the browser missed a revision of `stage.pen.delta`. */
 	| { type: "stage.pen.get"; agentId: string }
 	/**
-	 * Put an agent on a stage — the person's half of `stage.open`, from the manager.
+	 * Put an agent on a stage — the person's half of `decks.agent.update({ canvas })`, from the manager.
 	 *
 	 * The same call the agent makes for itself, so there is no second path and no second
 	 * record: whoever moved last is where the agent is.
@@ -190,7 +190,7 @@ export type ClientMessage =
 	 * Where the browser is looking, and which conversation's view that is.
 	 *
 	 * The camera belongs to the conversation, so the server keeps one reading per agent and
-	 * `stage.camera()` answers "where is my canvas looking" rather than "where is the user
+	 * `decks.view.camera()` answers "where is my canvas looking" rather than "where is the user
 	 * looking" — which is what it always claimed to mean.
 	 */
 	/** Where the person is looking. `agentId` names a parked conversation's view. */
@@ -215,14 +215,14 @@ export type ClientMessage =
 	/**
 	 * Your own tags on an agent, from the customise popup. Replaces the list.
 	 *
-	 * Separate from `stage.me.setTags`, which is the agent's, and stored in a separate field —
+	 * Separate from `decks.agent.update({ tags })`, which is the agent's, and stored in a separate field —
 	 * the two never write to each other.
 	 */
 	| { type: "agent.tags"; id: string; tags: string[] }
 	/**
 	 * Rename an agent, from its own name in the pill or from the edit modal.
 	 *
-	 * The same field `stage.me({ name })` writes: an agent names itself and you may rename
+	 * The same field `decks.agent.update({ name })` writes: an agent names itself and you may rename
 	 * it, and there is one name either way. Refused with a notice when another agent already
 	 * answers to it, because a name is how the bar addresses one.
 	 */
@@ -230,7 +230,7 @@ export type ClientMessage =
 	/**
 	 * The workspace an agent is in, from the row's customise popup. `null` leaves it.
 	 *
-	 * The same field `stage.me.setWorkspace` writes, and deliberately not a second one: a
+	 * The same field `decks.agent.update({ workspace })` writes, and deliberately not a second one: a
 	 * workspace is a location, so there is one value and whoever wrote last owns it.
 	 */
 	| { type: "agent.workspace"; id: string; workspace: string | null }

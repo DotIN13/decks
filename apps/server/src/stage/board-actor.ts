@@ -15,7 +15,7 @@ import type { CreateSpec, QueuedWork, SendSpec, StageAgentHooks } from "./tool.t
  * stay its own, so a cursor or a notice says which board did it.
  *
  * **Who it is.** `identity()` is the board's, never a real agent's. That is what keeps
- * `stage.me.setName` from renaming a colleague: a board may call it (the snippet is the
+ * `decks.agent.update({ name })` from renaming a colleague: a board may call it (the snippet is the
  * board's own words) and it changes only the label used for the rest of that run.
  *
  * Everything that is *about the conversation* — what it holds, what is on its canvas, where
@@ -23,7 +23,7 @@ import type { CreateSpec, QueuedWork, SendSpec, StageAgentHooks } from "./tool.t
  * acting for the conversation in front of it, which is also what makes the delegation
  * legible: the board's changes appear in the chat the user is reading.
  *
- * A board hands work over with `stage.send`, which queues it and returns: a board's run is
+ * A board hands work over with `decks.agent.queue`, which queues it and returns: a board's run is
  * abandoned by `runEval` at 20 seconds, so nothing here can wait for an answer either.
  */
 export interface BoardConversation {
@@ -35,7 +35,7 @@ export interface BoardConversation {
 	positions?(): Record<string, { x: number; y: number }>;
 	setPosition?(path: string, x: number, y: number): void;
 	camera(): Camera;
-	/** This conversation's own queue, which `stage.queue()` answers with. */
+	/** This conversation's own queue, which `decks.agent.inbox()` answers with. */
 	queue(): QueuedWork[];
 	agents(): Array<{
 		id: string;
@@ -103,7 +103,7 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		send: (target, spec) => conversation.send(conversation.id, target, spec),
 		...(conversation.deliver ? { deliver: (target: string, spec: { task: string; boards?: string[] }) => conversation.deliver!(conversation.id, target, spec) } : {}),
 		...(conversation.here ? { here: () => conversation.here!() } : {}),
-		// `stage.send({ name, kind }, …)` makes the agent first; it is made for the conversation, like a send.
+		// `decks.agent.create` (and the old send with `{ name, kind }`) makes the agent first; it is made for the conversation, like a send.
 		...(conversation.create ? { create: (spec: CreateSpec) => conversation.create!(conversation.id, spec) } : {}),
 		queue: () => conversation.queue(),
 		recordRevision: (board) => conversation.recordRevision(board),

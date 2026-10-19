@@ -20,7 +20,7 @@ test("a board is news until the person reads it, and again once it is named afte
 });
 
 /*
- * The mark is about the act, not the file. `report` and `show` name a board and write nothing, so
+ * The mark is about the act, not the file. `decks.agent.claim` and `decks.canvas.insert` name a board and write nothing, so
  * before `namedAt` the most common thing an agent does left no trace at all, while a person's own
  * drag was marked as news.
  */
@@ -28,7 +28,7 @@ test("an act names a board as news even though no file moved", () => {
 	const reported = board("boards/plan.html", { modifiedAt: NOW - 3 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 60_000 });
 	assert.equal(isNews(reported, NOW), true);
 	assert.equal(isNews({ ...reported, seenAt: NOW - 30_000 }, NOW), false, "read after the act: no longer news");
-	// The act decides even when the file is older than the last read, which is every `report`.
+	// The act decides even when the file is older than the last read, which is every `decks.agent.claim`.
 	assert.equal(isNews({ ...reported, seenAt: NOW - 2 * HOUR }, NOW), true, "named after the last look");
 });
 

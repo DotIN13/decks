@@ -13,7 +13,7 @@ logged into and fill it in — with you watching, in your own browser.
 1. Click the Decks button in Chrome's toolbar, open **Pairing**.
 2. Address and code: both are in Decks' own Settings, under **Your Chrome**, each with a
    Copy button. (The code is also on the deck's "Your Chrome" status board, and an agent
-   can read it with `stage.web.pairing()`.) **New code** there invalidates the old one.
+   can read it with `decks.web.pairing()`.) **New code** there invalidates the old one.
 3. Save.
 
 ## Share a tab

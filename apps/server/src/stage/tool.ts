@@ -143,14 +143,14 @@ export interface StageAgentHooks {
 	recordRevision(path: string): string | undefined;
 	/**
 	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
-	 * reports. Called by `newBoard`, `fit`, a one-board `show` and `report`. Optional so a host
+	 * reports. Called by `decks.board.create`, `decks.canvas.fit`, `decks.agent.claim` and the old names behind them. Optional so a host
 	 * with no deck record (a board actor) can leave it out.
 	 */
 	worked?(path: string): void;
 	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
 	acted?(what: ActKind, path: string): void;
 	/**
-	 * The agent sized a board (`fit`, `resize`): the size goes to its own stage, in the stage file,
+	 * The agent sized a board (`decks.canvas.fit`, `decks.canvas.update` with a size): the size goes to its own stage, in the stage file,
 	 * which is the one record of how big a board is drawn there (`DeckAgent.setSize`).
 	 */
 	sized?(path: string, size: { w: number; h: number }): void;
@@ -223,10 +223,10 @@ export interface StageTool {
 	 */
 	webShared(): boolean;
 	/**
-	 * Call one verb by its name in the verb table (`move`, `pen.edit`), with its arguments as a list.
+	 * Call one verb by its name in the verb table (`canvas.move`, `canvas.batch`, or an old name), with its arguments as a list.
 	 *
 	 * What `/api/v1/<verb>` answers with (`verbs/router.ts`): the value, the notes the verb added
-	 * (the viewport after `newBoard`, what `fit` measured, the reminders), and any pictures. A verb
+	 * (where an item went, what `decks.canvas.fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
 	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<StageCallResult>;

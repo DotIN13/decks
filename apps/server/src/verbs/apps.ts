@@ -85,7 +85,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					return service_().run(text);
 				},
 				logs: async (name: string, options?: { tail?: number }) => service_().log(known(name), options?.tail ?? 80),
-				/** The app opened in the server's own browser: errors, failed requests and a picture, as `fit` is for a board. */
+				/** The app opened in the server's own browser: errors, failed requests and a picture, as `decks.canvas.fit` is for a board. */
 				check: async (name: string) => {
 					agentOnly("check");
 					const text = known(name);

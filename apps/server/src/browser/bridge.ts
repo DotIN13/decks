@@ -4,7 +4,7 @@
  * Nothing here reaches out to the laptop — nothing on it is listening. The Decks extension
  * opens a websocket to this server (`/api/web/relay?code=…`), the same address the browser
  * already uses for the app, and this class turns that socket into a Playwright page through
- * `Relay`. From then on an agent's `stage.web.fill("Email", "…")` is a Playwright call on a
+ * `Relay`. From then on an agent's `decks.web.fill("Email", "…")` is a Playwright call on a
  * tab that is logged in as the user, on the user's own screen.
  *
  * Three rules, and they are the whole design:
@@ -459,11 +459,11 @@ export class WebBridge {
 			}
 			if (count > 1)
 				throw new Error(
-					`"${name}" matches ${count} elements on this page, so I did not guess. Take one by position with { name: "${name}", nth: 1 } — 1 is the first — or read the page (stage.web.read) and pass one of its references, like { ref: "e42" }.`,
+					`"${name}" matches ${count} elements on this page, so I did not guess. Take one by position with { name: "${name}", nth: 1 } — 1 is the first — or read the page (decks.web.read) and pass one of its references, like { ref: "e42" }.`,
 				);
 			return candidate.first();
 		}
-		throw new Error(`Nothing on the page is called "${name}". Read the page (stage.web.read) to see the names it uses.`);
+		throw new Error(`Nothing on the page is called "${name}". Read the page (decks.web.read) to see the names it uses.`);
 	}
 
 	/** The element a `[ref=…]` from the last read names, or a sentence about why it cannot. */
@@ -584,7 +584,7 @@ function labelOf(target: WebTarget): string {
  * the accessibility tree and screenshots answer normally, which is what makes the connection
  * look healthy. A navigation of the same address ends it — measured on a live OneTrust page,
  * where three clicks in a row timed out at thirty seconds each and four clicks after a
- * navigation landed in about two seconds each — and `stage.web.open` of a tab's own address is
+ * navigation landed in about two seconds each — and `decks.web.open` of a tab's own address is
  * that navigation.
  */
 function unscriptableSaid(url: string): string {

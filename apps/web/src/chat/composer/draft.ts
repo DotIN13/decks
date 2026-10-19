@@ -84,7 +84,7 @@ export function commentLabel(quote: string): string {
  *
  * A board is `@boards/plan.html`, which is how a file dropped on the bar is already spelled,
  * because the path is what an agent opens it by. A drawn item has no file, so it is the same
- * spelling with the kind said: its id on the stage, which is what `stage.pen.read()` lists.
+ * spelling with the kind said: its id on the stage, which is what `decks.canvas.read()` lists.
  */
 export function mentionAddress(node: DraftMention): string {
 	return node.kind === "board" ? `@${node.id}` : `@item:${node.id}`;

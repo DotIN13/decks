@@ -3,7 +3,7 @@
  *
  * Two problems, one answer. A deck used to fill with chats all called `Agent` — six of them
  * on this machine — and a *name* is how an agent is addressed: `@name` from the bar, and
- * `stage.send(name)`. Two sharing a name is an ambiguity the app has to resolve by guessing.
+ * `decks.agent.queue(name)`. Two sharing a name is an ambiguity the app has to resolve by guessing.
  *
  * So a default name is the kind and **the first free number**, counting from one. Not a
  * random tail and not a running total: the number is small enough to say out loud, and it is

@@ -8,7 +8,7 @@ import { realPathOf } from "../deck/roots.ts";
 
 /*
  * How big a board is drawn is its stage's: the size of its item in the stage file. Only an agent's
- * `fit` or `resize` and a person's drag set it; a browser's reading never does, since two browsers
+ * `decks.canvas.fit` or `decks.canvas.update` with a size, and a person's drag, set it; a browser's reading never does, since two browsers
  * read a board a pixel or two apart and, when both readings sized it, answered each other for ever.
  * A board joining a stage comes at the size its own file states.
  */

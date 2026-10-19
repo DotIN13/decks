@@ -133,7 +133,7 @@ export interface SlashCommand {
  */
 export interface AgentChat {
 	id: string;
-	/** The agent named itself, through `stage.me.setName`. */
+	/** The agent named itself, through `decks.agent.update({ name })`. */
 	name: string;
 	/** `/api/avatar/<id>?rev=N`, if it drew one. */
 	avatar?: string;
@@ -194,7 +194,7 @@ export interface Identity {
 	/**
 	 * What the agent says it is doing, in its own words: `["panel-css", "measuring"]`.
 	 *
-	 * Set through `stage.me.setTags`, which **replaces** the list rather than adding to it —
+	 * Set through `decks.agent.update({ tags })`, which **replaces** the list rather than adding to it —
 	 * an `addTag` is never un-called, so every agent would accumulate its whole history and
 	 * the list would stop meaning "what it is up to". Slugged, deduped and capped by
 	 * `cleanTags` on the way in, so a row can draw them without measuring anything.
@@ -215,7 +215,7 @@ export interface Identity {
 	/**
 	 * The workspace this agent works in, as a slug: `"political-llm"`.
 	 *
-	 * Set through `stage.me.setWorkspace`, and by you from the row's customise popup; **one
+	 * Set through `decks.agent.update({ workspace })`, and by you from the row's customise popup; **one
 	 * field, both writers, last write wins.** Tags needed two fields because a list can hold
 	 * two truths — the agent's and yours — but a workspace is a location, and an agent in two
 	 * locations is a contradiction rather than a richer answer.

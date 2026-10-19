@@ -77,7 +77,7 @@ export const agents = {
 	},
 
 	/*
-	 * A rename from a person, which is the same act as `stage.me({ name })` from the agent.
+	 * A rename from a person, which is the same act as `decks.agent.update({ name })` from the agent.
 	 *
 	 * Refused when the name is taken, and said out loud: a name is an address — the bar reads
 	 * `@Sable` and the deck has to know which Sable — so two agents cannot share one. The
@@ -99,7 +99,7 @@ export const agents = {
 	/*
 	 * The workspace, from the row's customise popup or from dragging the row onto a heading.
 	 *
-	 * One field and one writer at a time: this is the same value `stage.me.setWorkspace` writes,
+	 * One field and one writer at a time: this is the same value `decks.agent.update({ workspace })` writes,
 	 * so whoever moved last is where the agent is. Silent when the agent is gone, like the tags
 	 * above — the row a popup was opened from can be removed by another tab.
 	 *

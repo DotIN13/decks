@@ -16,8 +16,8 @@ import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
  * - **The file lands.** The watcher says the board changed; the file as it was when the tool
  *   call started is diffed against the new one by root-level `data-id`, and the blocks whose
  *   markup differs are what changed.
- * - **A stage verb.** `newBoard`, `fit`, `resize`, `move`, `show` and `hide` name a board and
- *   need no diff.
+ * - **A canvas call.** `decks.board.create`, `decks.canvas.fit`, and `decks.canvas.insert`,
+ *   `update`, `move` or `delete` on a board name a board and need no diff.
  *
  * Two phases go out: `start` when the tool call begins, so the held outline can be drawn
  * while the agent writes, and `done` when the file lands or the tool ends without a landing.
@@ -39,7 +39,7 @@ export interface ToolEvent {
 }
 
 /**
- * `draw` is an edit to a stage's drawing (`stage.pen.edit`): the items it touched and their boxes
+ * `draw` is an edit to a stage's drawing (`decks.canvas.batch`): the items it touched and their boxes
  * on the stage, which the server already has, so the canvas outlines them without a lookup.
  */
 export type Act = { kind: "tool"; event: ToolEvent } | { kind: "verb"; what: ActKind; path: string } | { kind: "draw"; stage: string; ids: string[]; boxes: ActBox[] };

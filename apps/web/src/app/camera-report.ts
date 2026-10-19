@@ -27,7 +27,7 @@ let timer: number | undefined;
  * A camera reading, with how much room the canvas has to draw in.
  *
  * The size rides on the camera rather than travelling as its own frame because they
- * change together and are read together: `stage.viewport()` and `stage.newBoard` want
+ * change together and are read together: `decks.view.viewport()` and `decks.board.create` want
  * the number a board has to fit into, and that is the window minus the chrome standing
  * beside it — not `innerWidth`, which counts the boards panel as space a board could use.
  *

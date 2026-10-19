@@ -107,7 +107,7 @@ export class App {
 	readonly pairing: Pairing;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
-	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
+	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
 	get port(): number {
 		return this.config.port;
 	}
@@ -172,8 +172,8 @@ export class App {
 			},
 
 			/*
-			 * `stage.boards()` reads the arrangement **of the agent that asked** — the same stage
-			 * `stage.move` writes to. Served from the conversation on screen instead, an agent
+			 * `decks.canvas.read()` reads the arrangement **of the agent that asked** — the same stage
+			 * `decks.canvas.move` writes to. Served from the conversation on screen instead, an agent
 			 * working while the person read another chat moved a board and read back the place it
 			 * had before, with the move itself correct on disk.
 			 *

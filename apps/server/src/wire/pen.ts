@@ -7,7 +7,7 @@ import { asPerson } from "../verbs/person.ts";
  * The person's edits to a stage drawing (`stage/pens.ts`).
  *
  * The same operations an agent sends, applied the same way, so a drag in the browser and a
- * `stage.pen.edit` from a model are one code path with one set of refusals. The change reaches
+ * `decks.canvas.batch` from a model are one code path with one set of refusals. The change reaches
  * every browser as a `stage.pen` frame from the watcher's own announcement; a refusal goes back to
  * the one browser that asked, as a notice it can show.
  */
@@ -31,7 +31,7 @@ export const pen = {
 	/**
 	 * Put an agent on a stage, because the person picked it in the manager.
 	 *
-	 * The same call the agent makes with `stage.open`, so nothing here knows anything the agent's
+	 * The same call the agent makes with `decks.agent.update({ canvas })`, so nothing here knows anything the agent's
 	 * own path does not: the session takes that stage's boards as its own and sends its browser the
 	 * drawing. The arrangement goes to every browser from `openStage` itself (`arranged`), so it is
 	 * not sent again here: a second copy of the deck state was 400 KB more for the page to take in

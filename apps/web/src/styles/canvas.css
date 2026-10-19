@@ -609,7 +609,7 @@
  * (`.stage[data-moving="true"] .world`, with a 300ms tail, then narrowed to gestures that change
  * the scale) does restore the cheap pan — and it flashes: a layer built and torn down under the
  * pointer, worst over a board, where the frame's own layer is recomposed at the same moment. It
- * also leaked: a camera moved without a gesture (an agent's `stage.show`, a restored view) could
+ * also leaked: a camera moved without a gesture (an agent's `decks.view.focus`, a restored view) could
  * leave the promise held over a scale it no longer matched, which is the softness back through a
  * side door. Two bugs for one optimisation, so the promise is gone and the pan pays for itself.
  *

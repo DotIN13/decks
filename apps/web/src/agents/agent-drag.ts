@@ -1,7 +1,7 @@
 /**
  * Dragging an agent from one workspace heading to another, in the panel's Agents tab.
  *
- * The workspace was already both writers' field — the agent writes it with `stage.me({ workspace })`
+ * The workspace was already both writers' field — the agent writes it with `decks.agent.update({ workspace })`
  * and you with the row's edit window — so this adds no state and no message: a drop is the same
  * call the window makes, with the heading it landed under as the value. What it adds is the
  * gesture, which is the one a list of things filed under headings invites.

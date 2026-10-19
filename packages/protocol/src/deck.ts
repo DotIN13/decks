@@ -125,7 +125,7 @@ export interface Board {
 	 * stage tool, or the person's own edit in the canvas.
 	 *
 	 * The "changed" mark is about the act, not the file. `modifiedAt` moves for any write at all,
-	 * which cannot tell an agent's work from the person's own drag, and `show` and `report` write no
+	 * which cannot tell an agent's work from the person's own drag, and `decks.canvas.insert` and `decks.agent.claim` write no
 	 * file at all — so the most common act of all left no trace to mark. This is the trace: said by
 	 * the writer, never read off the disk, and kept beside the byline in `.decks/authors.json`.
 	 */

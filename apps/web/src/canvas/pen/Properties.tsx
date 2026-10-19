@@ -55,7 +55,7 @@ import { ICON_LIBRARIES } from "./icon-index.ts";
  * turn and opacity, shadow and blur, and the arrange buttons are for everything. With several items
  * picked, a value they do not share reads Mixed, and setting it sets all of them.
  *
- * Every control sends the pen edit an agent would send (`stage.pen.edit`), so what the panel does
+ * Every control sends the pen edit an agent would send (`decks.canvas.batch`), so what the panel does
  * is what the file says. It is 276 px wide and scrolls only down: every row is built from columns
  * that shrink and sets of buttons that wrap, so a long value wraps rather than pushing the panel
  * sideways.

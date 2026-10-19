@@ -35,7 +35,7 @@ export const boards = {
 	 * A board dragged to a new size, by the person holding the mouse.
 	 *
 	 * **The number goes into two files**: the board's own, the size it comes at when a canvas places
-	 * it next, as `stage.fit` and `stage.resize` write it; and the canvas file, as the size of the
+	 * it next, as `decks.canvas.fit` and `decks.canvas.update` write it; and the canvas file, as the size of the
 	 * board's item there (`setSize`), which is how big it is drawn on that canvas. Every other canvas
 	 * holding the board keeps its own size for it. The canvas sends this once, on letting go.
 	 *
@@ -67,8 +67,8 @@ export const boards = {
 			...(typeof message.overlaps === "number" ? { overlaps: message.overlaps } : {}),
 		});
 		/*
-		 * Kept for the agent who asks (`stage.fit`, and what it reports) and nothing else. A browser's
-		 * reading never sizes a board: the size is the stage file's, set by `fit`, `resize` or a drag.
+		 * Kept for the agent who asks (`decks.canvas.fit`, and what it reports) and nothing else. A browser's
+		 * reading never sizes a board: the size is the stage file's, set by `decks.canvas.fit`, `decks.canvas.update` or a drag.
 		 * Two browsers with different fonts read the same board a pixel or two apart, and when both
 		 * readings sized it, each answered the other's for ever.
 		 */

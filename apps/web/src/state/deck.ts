@@ -75,7 +75,7 @@ function createDeck() {
 		 * `panelSections`, which indexes it itself. Moving it means changing that signature.
 		 */
 		contexts: Record<string, string[]>;
-		/** Reload counters from `stage.reload`, per board. */
+		/** Reload counters from `decks.view.reload`, per board. */
 		nonces: Record<string, number>;
 		defaultKind: AgentKind;
 		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;

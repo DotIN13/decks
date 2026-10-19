@@ -249,7 +249,7 @@ export interface AgentBackend {
 	 */
 	report?(): Promise<UsageReport>;
 
-	/** The name the agent gave itself, if it has (M3: `stage.me.setName`). */
+	/** The name the agent gave itself, if it has (`decks.agent.update({ name })`). */
 	name(): string | undefined;
 	setName(name: string): void;
 

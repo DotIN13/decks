@@ -56,7 +56,7 @@ export interface RosterEntry {
 export interface Workspace {
 	/** The slug every member shares. */
 	name: string;
-	/** Members, in the order they were handed in — the same order `stage.agents()` reports. */
+	/** Members, in the order they were handed in — the same order `decks.agent.list()` reports. */
 	agents: Array<{ id: string; name: string; state: AgentState; tags: string[] }>;
 	/**
 	 * Every board at least one member holds, **the ones most of them hold first**.

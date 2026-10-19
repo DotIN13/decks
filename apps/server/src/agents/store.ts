@@ -131,7 +131,7 @@ export interface AgentRecord {
 	 * transcript costs to send, which is as true after a restart as it was before one.
 	 */
 	usage?: AgentUsage;
-	/** What the agent said it was doing, from `stage.me.setTags` — see `agents/tags.ts`. */
+	/** What the agent said it was doing, from `decks.agent.update({ tags })` — see `agents/tags.ts`. */
 	tags?: string[];
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
 	userTags?: string[];

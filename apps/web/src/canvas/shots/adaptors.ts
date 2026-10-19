@@ -207,7 +207,7 @@ export function chooseShotAdaptor(id: ShotAdaptorId): void {
 }
 
 /**
- * A board as the person's browser has it now, for an agent's `stage.screenshot` (`stage.call` op
+ * A board as the person's browser has it now, for an agent's `decks.canvas.screenshot` (`stage.call` op
  * `shot`), in the pictures' order from the one chosen in Settings: HTML-in-Canvas when the page can
  * be drawn by it, a snapshot when not, and `none` (the server's picture, taken by the server) when
  * neither can or this browser has no live page for the board. The first two show what the person

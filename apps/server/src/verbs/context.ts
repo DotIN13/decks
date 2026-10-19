@@ -12,7 +12,7 @@ export interface VerbContext {
 	service: StageService;
 	agent: StageAgentHooks;
 	port: number;
-	/** Lines a verb adds beside its value: where a board went, what `fit` measured. */
+	/** Lines a verb adds beside its value: where a board went, what `decks.canvas.fit` measured. */
 	notes: string[];
 	/** Pictures a verb produced, which go back beside its value. */
 	images: Array<{ data: string; mimeType: string }>;
@@ -66,7 +66,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 	/**
 	 * Where a drawn item is on this stage, or nothing when there is no item by that id.
 	 *
-	 * What makes `show` work on the drawing as well as on the boards. An id is looked up in the
+	 * What makes `decks.view.focus` work on the drawing as well as on the boards. An id is looked up in the
 	 * layout rather than in the file, because the layout is the only thing that knows where a
 	 * note inside a frame ends up, and "fly to it" is a question about the stage, not the JSON.
 	 */
@@ -105,7 +105,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 	};
 
 	/**
-	 * The boards as **this agent** sees them: its own stage, which is the one `stage.move` writes
+	 * The boards as **this agent** sees them: its own stage, which is the one `decks.canvas.move` writes
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */

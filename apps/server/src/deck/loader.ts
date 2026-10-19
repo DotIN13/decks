@@ -59,7 +59,7 @@ export class Deck {
 	/**
 	 * The height each board's file states, or 0 for a board that states none.
 	 *
-	 * **A stated height is a floor, not a ceiling.** It is what a drag or a `stage.fit` wrote, and the
+	 * **A stated height is a floor, not a ceiling.** It is what a drag or a `decks.canvas.fit` wrote, and the
 	 * browser's measurement raises the board above it whenever the content needs more room — so a board
 	 * can be given space under its last box and can still never clip. Kept here rather than on the
 	 * `Board` because nothing outside this file has a use for it: what everything else wants is `h`,
@@ -399,7 +399,7 @@ export class Deck {
 		 */
 		const width = meta.w ?? defaultWidth(format);
 		/*
-		 * **A stated height is a floor.** It is the room somebody dragged out or the number `stage.fit`
+		 * **A stated height is a floor.** It is the room somebody dragged out or the number `decks.canvas.fit`
 		 * wrote, and the browser's measurement raises the board above it the moment the content needs
 		 * more — so a board keeps the space it was given and still cannot clip. A file that states none
 		 * is the ordinary case and is exactly as tall as what is on it.

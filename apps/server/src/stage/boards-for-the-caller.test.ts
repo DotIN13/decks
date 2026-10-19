@@ -7,9 +7,9 @@ import { App } from "../app.ts";
 import { realPathOf } from "../deck/roots.ts";
 
 /*
- * Whose arrangement `stage.boards()` answers with.
+ * Whose arrangement `decks.canvas.read()` answers with.
  *
- * A move is written on the canvas of the agent that made it (`stage.move` → `host.place`), and
+ * A move is written on the canvas of the agent that made it (`decks.canvas.move` → `host.place`), and
  * the read used to be served from **whichever conversation the browser was last looking at**
  * (`stageState()` with no argument → `agents.looking()`). An agent working while the person is
  * reading another chat therefore moved a board and then read back the other stage's number for

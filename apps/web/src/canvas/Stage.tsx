@@ -139,7 +139,7 @@ export function Stage(props: {
 	 */
 	pen?: { doc: PenDocument; base: string };
 	/**
-	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire). Absent
+	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire, `decks.canvas.batch` for an agent). Absent
 	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
 	 * never picks a note up by accident.
 	 */
@@ -209,7 +209,7 @@ export function Stage(props: {
 	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
-	/** Per-board reload counters, from `stage.reload`. */
+	/** Per-board reload counters, from `decks.view.reload`. */
 	nonces?: Record<string, number>;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
@@ -222,7 +222,7 @@ export function Stage(props: {
 	news?: Record<string, string>;
 	/** A board that was news was read on the canvas. */
 	onRead?: (path: string) => void;
-	/** So the server can answer `stage.camera()` with what the user can see. */
+	/** So the server can answer `decks.view.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
 	onExtent?: (path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
@@ -2627,7 +2627,7 @@ export function Stage(props: {
 
 
 	/*
-	 * Boards whose size just changed from outside a drag (`fit`, an agent's `resize`, a write that
+	 * Boards whose size just changed from outside a drag (`decks.canvas.fit`, an agent's `decks.canvas.update`, a write that
 	 * measured taller): for `SIZE_MS` their box, title bar and outline ease to the new size rather
 	 * than jump (`canvas.css`, `[data-sizing]`). A size the person drags is never eased: it follows
 	 * the pointer, and the board takes it while `boardResize` still holds it, so nothing changes here.

@@ -113,7 +113,7 @@ export function withBoardSize(path: string, source: string, size: { w?: number; 
  *
  * **A height called on its own is nothing to write.** A markdown board's height is its content's and
  * the browser measures it, so a number in the file would be one nothing reads and every later write
- * has to carry — which is what `stage.fit` would otherwise add on every call.
+ * has to carry — which is what `decks.canvas.fit` would otherwise add on every call.
  */
 function withFrontMatterWidth(source: string, size: { w?: number; h?: number }): string {
 	if (size.w === undefined) return source;

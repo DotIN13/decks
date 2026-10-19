@@ -19,7 +19,7 @@
  * `--args '<JSON list>'` gives every argument as JSON at once.
  *
  * The value goes to stdout: a string as it is, anything else as JSON. The notes a verb adds (what
- * `fit` measured, where a board went) go to stderr, and a refusal goes to stderr with exit code 1.
+ * `canvas fit` measured, where a board went) go to stderr, and a refusal goes to stderr with exit code 1.
  * Who is calling is `DECKS_AGENT`, and where Decks is is `DECKS_URL`; Decks sets both in every
  * agent's shell.
  */
