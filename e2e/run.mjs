@@ -191,6 +191,8 @@ const CHECKS = [
 	{ file: "sharper-pictures.mjs", needsAgent: false },
 	/* A note's soft edge, painted in a tile and sent as an ImageBitmap, is not drawn too bright on WebGL 2. */
 	{ file: "note-edges.mjs", needsAgent: false },
+	/* The server's picture of the stage (`stage.screenshot`) has each drawn item where the canvas draws it, at zoom 1 and below. */
+	{ file: "stage-shot.mjs", needsAgent: false },
 	/* The engine's fixtures drawn alike on all three backends, and like the native goldens. */
 	{ file: "stage-goldens.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */

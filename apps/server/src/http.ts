@@ -442,7 +442,9 @@ export function createHttpApp(app: App): Express {
 
 	/**
 	 * A picture of what is selected on an agent's stage, to download: the drawing's Export
-	 * button. `of` is a comma-separated list of item ids, or nothing for the whole stage.
+	 * button. `of` is a comma-separated list of item ids, or nothing for the whole stage; `box` is
+	 * `x1,y1,x2,y2` on the stage instead, and `scale` the pixels per CSS pixel (2 by default). The
+	 * box taken is answered in `X-Shot-Box`, so a caller can line the picture up with the stage.
 	 */
 	api.get(
 		"/stage-shot",
@@ -454,10 +456,13 @@ export function createHttpApp(app: App): Express {
 				res.status(404).type("text").send("That agent has no stage to picture.");
 				return;
 			}
-			const of = typeof req.query.of === "string" && req.query.of ? req.query.of.split(",") : undefined;
+			const box = typeof req.query.box === "string" ? req.query.box.split(",").map(Number) : undefined;
+			const of = box ? { x1: box[0], y1: box[1], x2: box[2], y2: box[3] } : typeof req.query.of === "string" && req.query.of ? req.query.of.split(",") : undefined;
 			const format = req.query.format === "jpeg" || req.query.format === "pdf" ? req.query.format : "png";
+			const scale = typeof req.query.scale === "string" && Number.isFinite(Number(req.query.scale)) ? Number(req.query.scale) : 2;
 			try {
-				const shot = await shots.take({ stage, of, format, scale: 2, scheme: req.query.scheme === "dark" ? "dark" : "light" });
+				const shot = await shots.take({ stage, of, format, scale, scheme: req.query.scheme === "dark" ? "dark" : "light" });
+				res.setHeader("X-Shot-Box", JSON.stringify(shot.box));
 				res.setHeader("Content-Disposition", `attachment; filename="${stage}.${format === "jpeg" ? "jpg" : format}"`);
 				res.type(format === "pdf" ? "application/pdf" : format === "jpeg" ? "jpeg" : "png");
 				res.send(shot.bytes);
