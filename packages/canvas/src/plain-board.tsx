@@ -33,17 +33,26 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 	const live = () => props.mounted && props.page !== undefined;
 	/*
 	 * Whether the page takes the pointer (`canvas.css`, `iframe:not([data-wired])`): once it has
-	 * loaded, and only while the board is selected, the way a design tool treats an embed. A
-	 * host's page is usually from another origin, so unlike `BoardFrame` nothing here can reach
-	 * into it to hand a wheel or a pinch back to the stage; an unselected board stays a picture
-	 * to the pointer, so scrolling over it pans and a press picks it (or moves it), and the
-	 * first press on a selected one goes to the page.
+	 * loaded, and only after a double-click on the board, the way a design tool treats an embed.
+	 * A host's page is usually from another origin, so unlike `BoardFrame` nothing here can reach
+	 * into it to hand a wheel or a pinch back to the stage. Until then the board is a picture to
+	 * the pointer: a press picks it, a drag moves it (selected or not), scrolling over it pans.
+	 * Entered, its buttons, fields and scrolling are its own, until it stops being selected.
 	 */
 	const [loaded, setLoaded] = createSignal(false);
+	const [entered, setEntered] = createSignal(false);
 	createEffect(() => {
 		if (!live()) setLoaded(false);
 	});
-	const interactive = () => live() && loaded() && props.selected;
+	createEffect(() => {
+		if (!props.selected || !live()) setEntered(false);
+	});
+	const interactive = () => live() && loaded() && entered();
+	const enter = () => {
+		if (!live()) return;
+		props.view.select();
+		setEntered(true);
+	};
 	/*
 	 * The stage's sheet draws a board's picture until the board says its page is showing
 	 * (`onLive`), and again once it is gone: said on the page's load, and when it is unmounted.
@@ -81,7 +90,13 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 					{props.board.title}
 				</div>
 			</Show>
-			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !interactive() && press(event)}>
+			<div
+				class="surface"
+				style={{ width: `${size().w}px`, height: `${size().h}px` }}
+				title={live() && !interactive() ? "Double-click to use the board" : undefined}
+				onPointerDown={(event) => !interactive() && press(event)}
+				onDblClick={() => !interactive() && enter()}
+			>
 				<Show when={live()}>
 					<iframe
 						class="plain-board-page"
