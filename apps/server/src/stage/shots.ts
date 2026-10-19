@@ -163,8 +163,30 @@ export class StageShots {
 		});
 	}
 
+	/**
+	 * A picture in another format, drawn again by the server's Chromium: a board's picture is WebP,
+	 * and a caller who asked for PNG or JPEG gets that.
+	 */
+	async convert(bytes: Buffer, format: "png" | "jpeg"): Promise<Buffer> {
+		const kind = imageKind(bytes);
+		if (!kind || kind.format === format) return bytes;
+		const { width, height } = imageSize(bytes);
+		if (!width || !height) return bytes;
+		return this.host.borrow(async (browser) => {
+			const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+			try {
+				const page = await context.newPage();
+				await page.setContent(`<!doctype html><style>html,body{margin:0;background:transparent}img{display:block}</style><img src="data:${kind.mime};base64,${bytes.toString("base64")}" width="${width}" height="${height}">`);
+				await page.waitForFunction("document.images[0].complete && document.images[0].naturalWidth > 0", undefined, { timeout: READY_MS });
+				return await page.screenshot({ type: format, ...(format === "jpeg" ? { quality: 90 } : { omitBackground: true }), clip: { x: 0, y: 0, width, height }, timeout: 15_000 });
+			} finally {
+				await context.close().catch(() => {});
+			}
+		});
+	}
+
 	/** Keep a picture of one board where a screenshot keeps its pictures, or at `to`: the deck-relative file. */
-	keepBoard(path: string, bytes: Buffer, ext: "png" | "jpg", to?: string): string {
+	keepBoard(path: string, bytes: Buffer, ext: "png" | "jpg" | "webp", to?: string): string {
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "board";
 		const target = to ? resolveInDeck(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
@@ -213,9 +235,29 @@ export class StageShots {
 	private readonly thumbing = new Map<string, Promise<string>>();
 }
 
-/** A PNG's or JPEG's size in pixels, read from its header; zeros when it is neither. */
+/** What a picture's bytes are, by their first ones: a board's whole picture and a browser's snapshot are WebP. */
+export function imageKind(bytes: Buffer): { format: "png" | "jpeg" | "webp"; mime: string; ext: "png" | "jpg" | "webp" } | undefined {
+	if (bytes.length > 8 && bytes.readUInt32BE(0) === 0x89504e47) return { format: "png", mime: "image/png", ext: "png" };
+	if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8) return { format: "jpeg", mime: "image/jpeg", ext: "jpg" };
+	if (bytes.length > 12 && bytes.toString("latin1", 0, 4) === "RIFF" && bytes.toString("latin1", 8, 12) === "WEBP") return { format: "webp", mime: "image/webp", ext: "webp" };
+	return undefined;
+}
+
+/** A PNG's, JPEG's or WebP's size in pixels, read from its header; zeros when it is none of them. */
 export function imageSize(bytes: Buffer): { width: number; height: number } {
 	if (bytes.length > 24 && bytes.readUInt32BE(0) === 0x89504e47) return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+	if (imageKind(bytes)?.format === "webp" && bytes.length >= 25) {
+		const chunk = bytes.toString("latin1", 12, 16);
+		// Lossy: a 14-bit width and height after the frame tag and start code.
+		if (chunk === "VP8 " && bytes.length >= 30) return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+		// Lossless: 14 bits each, minus one, packed after the 0x2f signature.
+		if (chunk === "VP8L" && bytes.length >= 25) {
+			const bits = bytes.readUInt32LE(21);
+			return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+		}
+		// Extended: the canvas's size, 24 bits each, minus one.
+		if (chunk === "VP8X" && bytes.length >= 30) return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
+	}
 	if (bytes[0] === 0xff && bytes[1] === 0xd8) {
 		let at = 2;
 		while (at + 9 < bytes.length) {

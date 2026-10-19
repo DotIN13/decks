@@ -15,7 +15,7 @@ import { serverText } from "./text.ts";
 import { runEval, safeJson } from "./eval.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { StageService, WebTarget } from "./service.ts";
-import { imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
+import { imageKind, imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
 
 /**
  * The canvas tool, defined once for every runtime (DESIGN §6.3).
@@ -1065,13 +1065,18 @@ export function createStageTool(deps: {
 				} else {
 					if (!service.boardPicture) throw new Error("This server cannot take pictures of a board.");
 					bytes = await service.boardPicture(of, scheme === "dark" ? "dark" : "light");
-					mime = "image/jpeg";
+					mime = imageKind(bytes)?.mime ?? "image/jpeg";
 					note = `Taken by the server from the board's file, because ${seen.why}. It does not show anything the person did on the page (tabs pressed, text typed, boxes scrolled); ask them to open the board if that matters.`;
 				}
+				// What the bytes are, not what they were said to be: the snapshot and the board's whole picture are WebP.
+				if ((format === "png" || format === "jpeg") && imageKind(bytes)?.format !== format) bytes = await service.shots.convert(bytes, format);
+				const kind = imageKind(bytes);
+				if (kind) mime = kind.mime;
 				const size = imageSize(bytes);
-				const file = service.shots.keepBoard(of, bytes, mime === "image/jpeg" ? "jpg" : "png", to);
+				const file = service.shots.keepBoard(of, bytes, kind?.ext ?? (mime === "image/jpeg" ? "jpg" : "png"), to);
 				images.push({ data: bytes.toString("base64"), mimeType: mime });
 				const at = here().find((board) => board.path === of)!;
+				note += " Only the board: the drawing around it (arrows, labels, notes touching it) is not in this picture; pass its box as `of` to see that too.";
 				return { file, width: size.width, height: size.height, box: { x1: at.x, y1: at.y, x2: at.x + at.w, y2: at.y + at.h }, how: seen.how === "none" ? ("server" as const) : seen.how, note };
 			}
 			/*

@@ -41,3 +41,21 @@ test("a PNG's and a JPEG's size are read from their headers", async () => {
 	assert.deepEqual(imageSize(jpeg), { width: 880, height: 576 });
 	assert.deepEqual(imageSize(Buffer.from("not a picture")), { width: 0, height: 0 });
 });
+
+test("a WebP's kind and size are read from its header, lossy, lossless and extended", async () => {
+	const { imageKind, imageSize } = await import("./shots.ts");
+	const riff = (chunk: string, body: number[]) => Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WEBP"), Buffer.from(chunk), Buffer.alloc(4), Buffer.from(body)]);
+	// VP8: a 3-byte frame tag, the start code 9d 01 2a, then width and height (14 bits each, little-endian).
+	const lossy = riff("VP8 ", [0, 0, 0, 0x9d, 0x01, 0x2a, 1000 & 0xff, 1000 >> 8, 708 & 0xff, 708 >> 8, 0, 0]);
+	assert.deepEqual(imageKind(lossy), { format: "webp", mime: "image/webp", ext: "webp" });
+	assert.deepEqual(imageSize(lossy), { width: 1000, height: 708 });
+	// VP8L: the 0x2f signature, then width-1 and height-1 in 14 bits each.
+	const bits = (2000 - 1) | ((1416 - 1) << 14);
+	const lossless = riff("VP8L", [0x2f, bits & 0xff, (bits >> 8) & 0xff, (bits >> 16) & 0xff, (bits >>> 24) & 0xff, 0, 0, 0, 0]);
+	assert.deepEqual(imageSize(lossless), { width: 2000, height: 1416 });
+	// VP8X: flags, then the canvas's width-1 and height-1 in 24 bits each.
+	const extended = riff("VP8X", [0, 0, 0, 0, (3200 - 1) & 0xff, (3200 - 1) >> 8, 0, (40 - 1) & 0xff, 0, 0, 0, 0]);
+	assert.deepEqual(imageSize(extended), { width: 3200, height: 40 });
+	assert.equal(imageKind(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))?.ext, "jpg");
+	assert.equal(imageKind(Buffer.from("not a picture")), undefined);
+});
