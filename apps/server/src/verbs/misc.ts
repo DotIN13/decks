@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { saveStudioLink } from "../studio/index.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
 /** Addresses and time: a board's URL, a file's, forwarded ports, the clock, and the link to Decks Studio. */
-export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now" | "studio"> {
+export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now" | "studio" | "pair"> {
 	const { service, agent, port, isolated, notWhileIsolated } = ctx;
 	return {
 		resolve: async (file: string) => {
@@ -62,16 +63,25 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "po
 		 * starts syncing at once, and a later key replaces it. Only the person: an agent or a board
 		 * that could set it could send the whole deck to an address of its choosing.
 		 */
+		/**
+		 * A pairing code for another Decks front end, such as Studio, to connect with
+		 * (`share/pairing.ts`): the same code Settings, Other Decks makes, for a harness with no
+		 * screen. Not a board's: its page could make one and hand it to anyone.
+		 */
+		pair: {
+			code: async () => {
+				if (agent.board) throw new Error("A board's own code cannot make a pairing code.");
+				if (!service.pairCode) throw new Error("This server pairs with no one.");
+				const made = service.pairCode();
+				ctx.notes.push(`Type it where the other Decks asks for a code, within ${Math.round((made.expires - Date.now()) / 60_000)} minutes. It works once.`);
+				return made;
+			},
+		},
+
 		studio: {
 			connect: async (url: string, key: string) => {
 				if (!agent.person) throw new Error("Only the person can connect this harness to Decks Studio, from a browser paired with it.");
-				const address = new URL(url);
-				if (address.protocol !== "https:" && address.protocol !== "http:") throw new Error("Studio's address is an http or https URL.");
-				if (!/^dsk_[A-Za-z0-9_-]{20,}$/.test(key)) throw new Error("That is not a Studio key: they start with dsk_.");
-				const dir = join(service.deckPath(), ".decks");
-				mkdirSync(dir, { recursive: true });
-				writeFileSync(join(dir, "studio.json"), JSON.stringify({ url: address.origin, key }), { mode: 0o600 });
-				return { connected: true, url: address.origin };
+				return saveStudioLink(service.deckPath(), url, key);
 			},
 			status: async () => {
 				const file = join(service.deckPath(), ".decks", "studio.json");

@@ -147,6 +147,8 @@ export class StageService {
 	forwards: Forwards | undefined;
 	/** The deck's apps (`apps/service.ts`). `undefined` in tests without one. */
 	apps: Apps | undefined;
+	/** A fresh pairing code for another Decks front end (`share/pairing.ts`), for `decks pair code`. */
+	pairCode: (() => { code: string; expires: number }) | undefined;
 	/** An app opened in the server's own Chromium (`apps/check.ts`). */
 	appCheck: ((name: string) => Promise<AppCheck>) | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */

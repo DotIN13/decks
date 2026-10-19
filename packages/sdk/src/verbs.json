@@ -3210,6 +3210,20 @@
   ]
  },
  {
+  "name": "pair.code",
+  "command": [
+   "pair",
+   "code"
+  ],
+  "group": "misc",
+  "touches": "outside",
+  "effect": "change",
+  "summary": "A pairing code for another Decks front end, such as Studio, to connect to this harness with: six digits, ten minutes, once. Replaces the code on show in Settings.",
+  "signature": "pair.code()",
+  "returns": "{ code: string; expires: number }",
+  "params": []
+ },
+ {
   "name": "studio.status",
   "command": [
    "studio",

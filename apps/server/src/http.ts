@@ -26,6 +26,7 @@ import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
 import { fromAnotherSite, fromPrivateNetwork, tokenOf } from "./share/pairing.ts";
 import { Relay } from "./share/relay.ts";
+import { saveStudioLink, studioOrigin } from "./studio/index.ts";
 
 /**
  * The HTTP surface: reading files, writing one kind of file, and the built UI.
@@ -71,6 +72,9 @@ function wildcard(req: Request): string {
 	return Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
 }
 
+/** What a harness that requires a pairing code says to a connect without one. */
+const NEEDS_CODE = "This harness asks every other Decks for a pairing code. Make one in its Settings, under Other Decks, or run decks pair code in its shell.";
+
 export function createHttpApp(app: App): Express {
 	const server = express();
 	server.disable("x-powered-by");
@@ -113,7 +117,7 @@ export function createHttpApp(app: App): Express {
 			res.status(204).end();
 			return;
 		}
-		if (req.path === "/api/pair" || req.path === "/api/hello" || app.pairing.check(tokenOf(req.headers, req.originalUrl))) {
+		if (req.path === "/api/pair" || req.path === "/api/studio/connect" || req.path === "/api/hello" || app.pairing.check(tokenOf(req.headers, req.originalUrl))) {
 			next();
 			return;
 		}
@@ -135,7 +139,11 @@ export function createHttpApp(app: App): Express {
 		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
 		const origin = String(req.headers.origin ?? "");
 		const label = typeof body.label === "string" ? body.label : "";
-		// No code from this machine or a private network; over the internet, only with one.
+		// No code from this machine or a private network, unless the owner made it a must; over the internet, only with one.
+		if (!code && app.pairing.required) {
+			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
+			return;
+		}
 		if (!code && !fromPrivateNetwork(req.socket.remoteAddress, req.headers)) {
 			res.status(403).json({ needsCode: true, error: "This server is reached over the internet, so it needs a pairing code. Make one in its Settings, under Other Decks." });
 			return;
@@ -147,6 +155,41 @@ export function createHttpApp(app: App): Express {
 		}
 		app.send(app.pairingMessage());
 		res.json({ token, name: app.deck.name });
+	});
+
+	/**
+	 * Decks Studio connecting this harness in one call: the Studio key to sync with, and a token
+	 * back for the page to call this harness with, so there is no separate `/api/pair`. Nothing is
+	 * checked by default, not even where the call comes from; a harness deployed where others can
+	 * reach it sets `DECKS_REQUIRE_PAIR_CODE=1`, and then a connect without a working code is refused.
+	 */
+	api.post("/studio/connect", (req, res) => {
+		const body = (req.body ?? {}) as { url?: unknown; key?: unknown; code?: unknown; label?: unknown };
+		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
+		const origin = String(req.headers.origin ?? "");
+		const label = typeof body.label === "string" && body.label.trim() ? body.label : "Decks Studio";
+		if (typeof body.url !== "string" || typeof body.key !== "string") {
+			res.status(400).json({ error: "Send Studio's address as url and this harness's key as key." });
+			return;
+		}
+		if (app.pairing.required && !code) {
+			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
+			return;
+		}
+		try {
+			studioOrigin(body.url, body.key);
+		} catch (error) {
+			res.status(400).json({ error: (error as Error).message });
+			return;
+		}
+		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
+		if (!token) {
+			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one in the harness's Settings, or with decks pair code." });
+			return;
+		}
+		const linked = saveStudioLink(app.deck.path, body.url, body.key);
+		app.send(app.pairingMessage());
+		res.json({ token, name: app.deck.name, ...linked });
 	});
 
 	/**
@@ -169,7 +212,7 @@ export function createHttpApp(app: App): Express {
 	 */
 	api.get("/hello", (req, res) => {
 		res.setHeader("Cache-Control", "no-store");
-		res.json({ decks: true, name: app.deck.name, paired: app.pairing.check(tokenOf(req.headers, req.originalUrl)) });
+		res.json({ decks: true, name: app.deck.name, paired: app.pairing.check(tokenOf(req.headers, req.originalUrl)), needsCode: app.pairing.required });
 	});
 
 	api.get("/deck", (_req, res) => {

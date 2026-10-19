@@ -99,6 +99,7 @@ export const VERBS = [
 	["web.stop",[]],
 	["ports",["change?"]],
 	["studio.connect",["url","key"]],
+	["pair.code",[]],
 	["studio.status",[]],
 	["studio.disconnect",[]],
 	["now",[]],

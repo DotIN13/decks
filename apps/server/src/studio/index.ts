@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { HarnessSync } from "./sync.ts";
 
@@ -17,6 +17,32 @@ export interface StudioLink {
 }
 
 const DEFAULT_URL = "https://studio.decks.app";
+
+/**
+ * Save Studio's address and this harness's key to `.decks/studio.json`, which `startStudio` watches,
+ * so the deck starts syncing at once. Both the `studio.connect` verb and `POST /api/studio/connect`
+ * come here; neither checks the key with Studio first.
+ */
+export function saveStudioLink(deck: string, url: string, key: string): { connected: true; url: string } {
+	const origin = studioOrigin(url, key);
+	const dir = join(deck, ".decks");
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(join(dir, "studio.json"), JSON.stringify({ url: origin, key }), { mode: 0o600 });
+	return { connected: true, url: origin };
+}
+
+/** Studio's origin, once its address and the key both look right; otherwise a sentence saying which is wrong. */
+export function studioOrigin(url: string, key: string): string {
+	let address: URL;
+	try {
+		address = new URL(url);
+	} catch {
+		throw new Error("Studio's address is an http or https URL.");
+	}
+	if (address.protocol !== "https:" && address.protocol !== "http:") throw new Error("Studio's address is an http or https URL.");
+	if (!/^dsk_[A-Za-z0-9_-]{20,}$/.test(key)) throw new Error("That is not a Studio key: they start with dsk_.");
+	return address.origin;
+}
 
 export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string): StudioLink {
 	const file = join(deck, ".decks", "studio.json");

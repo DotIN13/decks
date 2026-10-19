@@ -390,6 +390,13 @@ export interface Verbs {
 		/** Stop syncing with Decks Studio and forget the key. Only the person can call it. */
 		disconnect(): Promise<{ connected: boolean }>;
 	};
+	pair: {
+		/**
+		 * A pairing code for another Decks front end, such as Studio, to connect to this harness with: six
+		 * digits, ten minutes, once. Replaces the code on show in Settings.
+		 */
+		code(): Promise<{ code: string; expires: number }>;
+	};
 	pen: {
 		/**
 		 * Old name: your canvas's drawing, or any .pen file by `path`. @deprecated Use decks.canvas.read (a

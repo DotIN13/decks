@@ -17,7 +17,15 @@ import type { PairedRow } from "@decks/protocol";
  * A code is six digits, lasts ten minutes, and dies after five wrong tries, which together put a
  * guess at one in two hundred thousand per code shown. A token is 32 random bytes, kept here only
  * as its hash, and can be revoked from Settings.
+ *
+ * Whoever deploys a harness where others can reach it can make the code a must
+ * (`DECKS_REQUIRE_PAIR_CODE=1`): then no front end from another site gets a token without one, from
+ * wherever it calls. Codes come from Settings, Other Decks, or `decks pair code` in a shell.
  */
+export function codeRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+	return ["1", "true", "yes", "on"].includes(String(env.DECKS_REQUIRE_PAIR_CODE ?? "").trim().toLowerCase());
+}
+
 const CODE_MS = 10 * 60_000;
 const CODE_TRIES = 5;
 
@@ -38,8 +46,15 @@ export class Pairing {
 	private code: { value: string; expires: number; tries: number } | undefined;
 	private tokens: Stored[];
 
-	constructor(private readonly file: string) {
+	/** Whether every pairing needs a code, wherever it comes from (`codeRequired`). */
+	readonly required: boolean;
+
+	constructor(
+		private readonly file: string,
+		options: { required?: boolean } = {},
+	) {
 		this.tokens = this.load();
+		this.required = options.required ?? false;
 	}
 
 	private load(): Stored[] {

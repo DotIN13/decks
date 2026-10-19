@@ -21,13 +21,24 @@
  * The value goes to stdout: a string as it is, anything else as JSON. The notes a verb adds (what
  * `canvas fit` measured, where a board went) go to stderr, and a refusal goes to stderr with exit code 1.
  * Who is calling is `DECKS_AGENT`, and where Decks is is `DECKS_URL`; Decks sets both in every
- * agent's shell.
+ * agent's shell. With neither, it is the person at a terminal on this machine (`caller`).
  */
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { connect, DecksError } from "../src/index.js";
 
 const VERBS = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
+
+/**
+ * Who this command calls as. In an agent's shell Decks sets DECKS_AGENT (or DECKS_SESSION, or
+ * DECKS_APP); with none of them it is the person at a terminal on the harness, as for
+ * `decks pair code`, and Decks is on this machine at DECKS_PORT unless DECKS_URL says otherwise.
+ */
+function caller() {
+	const env = process.env;
+	if (env.DECKS_AGENT || env.DECKS_SESSION || env.DECKS_APP) return { notes: () => {} };
+	return { notes: () => {}, person: true, url: env.DECKS_URL || `http://127.0.0.1:${env.DECKS_PORT || 4329}` };
+}
 
 const out = (text) => process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
 const err = (text) => process.stderr.write(text.endsWith("\n") ? text : `${text}\n`);
@@ -186,7 +197,7 @@ async function main(argv) {
 	}
 	// Not a verb: every change as it is broadcast, one JSON line each, until stopped.
 	if (words[0] === "events") {
-		const decks = connect({ notes: () => {} });
+		const decks = connect(caller());
 		const stream = decks.events((event) => out(JSON.stringify(event)), { types: words.slice(1) });
 		await stream.done;
 		return 0;
@@ -201,7 +212,7 @@ async function main(argv) {
 		return 0;
 	}
 	const args = argsOf(found.verb, found.rest);
-	const decks = connect({ notes: () => {} });
+	const decks = connect(caller());
 	const { value, notes } = await decks.call(found.verb.name, args);
 	if (value !== undefined && value !== null) out(typeof value === "string" ? value : JSON.stringify(value, null, 2));
 	for (const note of notes) err(note);
