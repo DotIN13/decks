@@ -196,6 +196,7 @@ export class Registry {
 				runtimesChanged: () => this.host.publishRuntimes?.(),
 				agents: () => this.summaries(),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
+				deliver: (fromId, target, spec) => this.deliver(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.queue() ?? [],
@@ -466,7 +467,7 @@ export class Registry {
 		return best?.name;
 	}
 
-	async createFor(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }> {
+	async createFor(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string; kind: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }> {
 		const from = this.get(fromId);
 		if (!from) throw new Error("The creating agent is gone");
 		const workspace = spec.workspace ?? from.workspace;
@@ -500,8 +501,38 @@ export class Registry {
 				from.translator.notice("warn", `${made.chat().name} stays in its default mode: ${made.chat().kind} cannot do "${spec.mode}".`);
 			}
 		}
+		/*
+		 * Its home canvas: the one named, or (for agent.create) a new one of its own. Left to itself
+		 * (the old send's { name, kind }), it joins its workspace's latest canvas on first use.
+		 */
+		if (spec.canvas) made.openStage(spec.canvas);
+		else if (spec.newCanvas && this.stage.pens) made.newStage("");
 		this.publish();
-		return { agent: made.id, name: made.chat().name };
+		const model = made.model;
+		const mode = made.mode;
+		return {
+			agent: made.id,
+			name: made.chat().name,
+			kind: made.kind,
+			...(model ? { model: `${model.provider}/${model.model}`, thinking: model.thinking } : spec.thinking ? { thinking: spec.thinking } : {}),
+			...(mode ? { mode } : {}),
+			...(made.stageName() ? { canvas: made.stageName()! } : {}),
+		};
+	}
+
+	/**
+	 * Deliver work now (`agent.send`): into the turn the agent is running when its runtime takes a
+	 * message mid-turn, as a turn of its own when it is idle, and into its queue when it is busy on
+	 * a runtime that cannot be steered. The answer says which.
+	 */
+	deliver(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
+		const from = this.get(fromId);
+		if (!from) throw new Error("The sending agent is gone");
+		const to = this.resolve(target);
+		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const answer = to.deliver({ from: from.id, fromName: from.chat().name, task: spec.task.trim(), boards: handed, at: Date.now() });
+		this.publish();
+		return answer;
 	}
 
 	/**

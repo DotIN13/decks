@@ -70,6 +70,14 @@ export function callerTool(context: CallerRun, spec: CallerSpec): { tool: StageT
 		queue: () => focused.queue(),
 		agents: () => context.agents.summaries(),
 		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => context.agents.send(fromId, target, spec),
+		deliver: (fromId: string, target: string, spec: Parameters<Registry["deliver"]>[2]) => context.agents.deliver(fromId, target, spec),
+		// The board's canvas: the one the press came from, else the conversation's when it holds the board, else any that does.
+		here: () => {
+			if (spec.stage) return spec.stage;
+			if (focused.inPlay.includes(spec.board)) return focused.stageName?.();
+			const pens = context.stage.pens;
+			return pens?.names().find((name) => pens.boards(name).some((one) => one.path === spec.board)) ?? focused.stageName?.();
+		},
 		...(spec.mayCreate ? { create: (fromId: string, made: Parameters<Registry["createFor"]>[1]) => context.agents.createFor(fromId, made) } : {}),
 		recordRevision: (board: string) => context.boards.recordRevision(board),
 		boardPathOf: (file: string) => context.boards.boardPathOf(file),

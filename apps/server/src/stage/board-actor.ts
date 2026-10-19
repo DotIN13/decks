@@ -49,6 +49,9 @@ export interface BoardConversation {
 		queued?: number;
 	}>;
 	send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+	deliver?(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+	/** The canvas the board's button was pressed on. */
+	here?(): string | undefined;
 	/** Make an agent, as the conversation would: on its runtime, account and workspace unless the spec says otherwise. */
 	create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }>;
 	recordRevision(path: string): string | undefined;
@@ -98,6 +101,8 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		// The sender is the conversation, because a queue's reply has to find somebody to
 		// land in and a board has no inbox of its own.
 		send: (target, spec) => conversation.send(conversation.id, target, spec),
+		...(conversation.deliver ? { deliver: (target: string, spec: { task: string; boards?: string[] }) => conversation.deliver!(conversation.id, target, spec) } : {}),
+		...(conversation.here ? { here: () => conversation.here!() } : {}),
 		// `stage.send({ name, kind }, …)` makes the agent first; it is made for the conversation, like a send.
 		...(conversation.create ? { create: (spec: CreateSpec) => conversation.create!(conversation.id, spec) } : {}),
 		queue: () => conversation.queue(),

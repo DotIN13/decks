@@ -48,6 +48,13 @@ function quietMs(): number {
  * against a chat is already more than anybody watching can follow, and the ninth is a sign
  * that the sender should have done the work or spawned somebody to.
  */
+/**
+ * Which runtimes take a message in the middle of a turn: Pi and opencode 2 steer it
+ * (`streamingBehavior: "steer"`), Claude's message stream takes it at the turn's next step. opencode 1
+ * queues a prompt behind the turn, and Antigravity's print mode reads one prompt per turn.
+ */
+const STEERS: Record<AgentKind, boolean> = { pi: true, opencode2: true, claude: true, opencode: false, antigravity: false };
+
 const QUEUE_LIMIT = 8;
 
 /**
@@ -267,8 +274,10 @@ export class DeckAgent {
 			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+			/** Deliver now (`agent.send`); optional so a host with no registry can leave it out. */
+			deliver?(fromId: string, target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
 			/** Make an agent, idle, for a send to follow. Optional: a host without a registry has none. */
-			create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }>;
+			create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string; kind?: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }>;
 			/**
 			 * Deliver a finished item's report to the agent that asked for it.
 			 *
@@ -665,6 +674,11 @@ export class DeckAgent {
 
 			openStage: (name: string) => this.openStage(name),
 			newStage: (title: string) => this.newStage(title),
+			setHome: (name: string) => this.openStage(name),
+			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
+				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
+				return this.host.deliver(this.id, target, spec);
+			},
 		};
 	}
 
@@ -1436,6 +1450,31 @@ export class DeckAgent {
 		// a model process open for as long as the queue is long.
 		this.armDrain();
 		return this.work.length;
+	}
+
+	/**
+	 * Work handed over to be read now (`agent.send`), not after the turn running.
+	 *
+	 * Idle (or dormant), it starts a turn of its own. Mid-turn, it goes into that turn where the
+	 * runtime can take a message there (`steers`): Pi and opencode 2 steer the turn, and Claude's
+	 * stream takes the message at its next step. opencode 1 and Antigravity have no way in mid-turn,
+	 * so the work is queued, as `agent.queue` would, and the answer says it was not delivered.
+	 */
+	deliver(item: QueuedWork): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string } {
+		const text = this.host.brief(item.task, item.boards);
+		const sent = `${item.fromName} sent you this, to act on now:\n\n${text}`;
+		if (this.state === "idle") {
+			this.translator.notice("info", `${item.fromName} sent you work, now: ${firstLine(item.task)}`);
+			void this.prompt(sent);
+			return { delivered: true, turn: "new" };
+		}
+		if (STEERS[this.kind]) {
+			this.translator.notice("info", `${item.fromName} sent you work, into this turn: ${firstLine(item.task)}`);
+			void this.prompt(sent);
+			return { delivered: true, turn: "running", ...(this.kind === "claude" ? { note: "Claude takes a message mid-turn at its next step, after the tool call it is in." } : {}) };
+		}
+		const position = this.enqueue(item);
+		return { delivered: false, turn: "queued", position, note: `${this.kind} cannot take a message in the middle of a turn, so it waits in ${this.identity.name}'s queue (position ${position}) and runs when this turn ends.` };
 	}
 
 	/** What is waiting, oldest first. A copy: the queue is drained here and nowhere else. */
