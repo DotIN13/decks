@@ -1,0 +1,20 @@
+[package]
+name = "stage-shot"
+description = "A picture of part of a stage, drawn natively: the drawing over the boards' pictures, for the server's canvas.screenshot."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "stage-shot"
+path = "src/main.rs"
+
+[dependencies]
+stage-doc = { path = "../doc" }
+stage-scene = { path = "../scene" }
+stage-paint = { path = "../paint" }
+stage-gpu = { path = "../gpu" }
+stage-text = { path = "../text" }
+serde_json.workspace = true
+pollster = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
