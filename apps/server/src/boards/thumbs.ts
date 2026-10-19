@@ -930,7 +930,8 @@ export interface BoardViews {
 
 /**
  * Runs in the page. Every visible control, twelve at most, pressed in document order; after
- * each press the far bottom of the body's children and the horizontal spill are read.
+ * each press the far bottom of the body's children and the horizontal spill are read. A control
+ * that carries code is left alone: it does something rather than show something.
  *
  * A view is reported when it spills sideways, when it runs past one screen (0.8 of the board's
  * width), **or when it is taller than the board it is on**. That last one is the case this
@@ -939,7 +940,9 @@ export interface BoardViews {
  * 667px on a 542px board passed a test written against the width.
  */
 const PRESS_EVERY_CONTROL = `(async () => {
-	const controls = [...document.querySelectorAll("button, summary, [role=tab], [data-tab], select")].filter((el) => el.getBoundingClientRect().width > 0);
+	// Not a control that carries code (\`data-eval\`): it acts rather than opens a view, and pressing it
+	// would run its code as the board, which asks the person to allow it each time a board is fitted.
+	const controls = [...document.querySelectorAll("button, summary, [role=tab], [data-tab], select")].filter((el) => el.getBoundingClientRect().width > 0 && !el.closest("[data-eval]"));
 	const bottom = () => { let b = 0; for (const el of document.querySelectorAll("body > *")) { const r = el.getBoundingClientRect(); if (r.width && r.height) b = Math.max(b, r.bottom + scrollY); } return Math.round(b); };
 	const opening = bottom();
 	const limit = Math.min(document.documentElement.clientWidth * 0.8, opening + 2);
