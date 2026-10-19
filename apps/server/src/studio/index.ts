@@ -18,7 +18,7 @@ export interface StudioLink {
 
 const DEFAULT_URL = "https://studio.decks.app";
 
-export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env): StudioLink {
+export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
 	let current = "";
@@ -43,7 +43,7 @@ export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env):
 		await sync?.stop();
 		sync = undefined;
 		if (!want) return;
-		sync = new HarnessSync({ deck, studio: want.url, key: want.key });
+		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}) });
 		sync.start().catch((error) => console.error(`[decks] studio: ${(error as Error).message}`));
 	};
 

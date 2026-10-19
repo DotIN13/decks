@@ -26,6 +26,11 @@ export interface SyncOptions {
 	/** Files bigger than this wait until something opens them (not yet: they are skipped and listed). */
 	eagerBytes?: number;
 	log?: (line: string) => void;
+	/**
+	 * This harness's own address (`http://127.0.0.1:4329`), for a picture of each canvas: Studio
+	 * shows it on the canvas's card. Absent: no canvas pictures, only boards'.
+	 */
+	harness?: string;
 }
 
 interface State {
@@ -50,6 +55,9 @@ export class HarnessSync {
 	private running = Promise.resolve();
 	private stopped = false;
 	readonly skipped = new Set<string>();
+	/** Canvases whose drawing changed since their picture was last taken, and when each was taken. */
+	private pictureDue = new Set<string>();
+	private pictureAt = new Map<string, number>();
 	readonly conflicts: string[] = [];
 
 	constructor(private readonly o: SyncOptions) {
@@ -121,6 +129,7 @@ export class HarnessSync {
 			this.state.canvases[name] = { id: canvas.id, rev: full.rev, pen: serialize(full.pen) };
 			this.writePen(name, full.pen, text);
 			known.add(canvas.id);
+			this.pictureDue.add(name);
 			this.log(`uploaded canvas ${name}`);
 		}
 		remote = (await this.call("GET", "/sync/v1/canvases")).canvases;
@@ -161,11 +170,13 @@ export class HarnessSync {
 		const base = parse(s.pen);
 		const edits = diff(base, local);
 		if (edits.length && remote.role !== "view") {
+			this.pictureDue.add(name);
 			const r = await this.call("POST", `/sync/v1/canvases/${s.id}/edits`, { base: s.rev, edits });
 			if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
 			this.state.canvases[name] = { id: s.id, rev: r.rev, pen: serialize(r.pen) };
 			this.writePen(name, r.pen, text);
 		} else if (remote.rev !== s.rev || edits.length) {
+			this.pictureDue.add(name);
 			const full = await this.call("GET", `/sync/v1/canvases/${s.id}`);
 			this.state.canvases[name] = { id: s.id, rev: full.rev, pen: serialize(full.pen) };
 			this.writePen(name, full.pen, text);
@@ -253,6 +264,7 @@ export class HarnessSync {
 			await this.download(path, f);
 		}
 		await this.syncPictures(remote);
+		await this.syncCanvasPictures(remote);
 	}
 
 	private async download(path: string, f: SyncFile) {
@@ -262,6 +274,34 @@ export class HarnessSync {
 		writeFileSync(full, bytes);
 		this.state.files[path] = { version: f.version, hash: f.hash };
 		this.log(`downloaded ${path}`);
+	}
+
+	/**
+	 * A picture of each canvas whose drawing changed, taken by this harness's own `canvas.screenshot`
+	 * (native, a few milliseconds), for its card in Studio. At most one a minute per canvas; a canvas
+	 * Studio has no picture of yet is taken first.
+	 */
+	private async syncCanvasPictures(remote: Map<string, SyncFile>) {
+		if (!this.o.harness) return;
+		for (const name of Object.keys(this.state.canvases)) if (!remote.has(`${PICTURES}/canvases/${name}.light.jpg`)) this.pictureDue.add(name);
+		for (const name of [...this.pictureDue]) {
+			if (Date.now() - (this.pictureAt.get(name) ?? 0) < 60_000) continue;
+			this.pictureDue.delete(name);
+			this.pictureAt.set(name, Date.now());
+			try {
+				const res = await fetch(new URL("/api/v1/canvas.screenshot", this.o.harness), {
+					method: "POST",
+					headers: { "Content-Type": "application/json", "X-Decks-Person": "studio-sync" },
+					body: JSON.stringify({ args: [{ canvas: name, format: "jpeg", scheme: "light" }] }),
+				});
+				const shot = (await res.json()) as { ok?: boolean; value?: { file?: string } };
+				if (!shot.ok || !shot.value?.file) continue;
+				const file = shot.value.file.startsWith("/") ? shot.value.file : join(this.o.deck, shot.value.file);
+				await this.call("PUT", `/sync/v1/files?path=${encodeURIComponent(`${PICTURES}/canvases/${name}.light.jpg`)}`, undefined, readFileSync(file));
+			} catch (error) {
+				this.log(`no picture of canvas ${name}: ${(error as Error).message}`);
+			}
+		}
 	}
 
 	/** Each board's newest whole picture, so Studio can show it when no harness can serve the page. */
