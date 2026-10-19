@@ -423,3 +423,14 @@ test("a frame inserted with a box hugs, the box's height its floor; a number in 
 	const fixed = apply(doc, [{ op: "insert", node: { type: "frame", id: "f", height: 140 }, box: { x1: 0, y1: 0, x2: 200, y2: 140 } }], theme).doc;
 	assert.equal(fixed.children[0]!.height, 140);
 });
+
+test("a scene frame, laid out by hand or clipped, keeps its box's height when what it holds runs past it", () => {
+	const doc = emptyDocument();
+	const theme = { theme: baseTheme(doc, "light") };
+	const earth = { type: "ellipse", id: "earth", x: 700, y: 1400, width: 2500, height: 2500 };
+	const box = { x1: 0, y1: 0, x2: 3000, y2: 1750 };
+	for (const frame of [{ layout: "none", clip: true }, { layout: "none" }, { layout: "vertical", clip: true }]) {
+		const made = apply(doc, [{ op: "insert", node: { type: "frame", id: "scene", ...frame, children: [earth] }, box }], theme).doc;
+		assert.equal(made.children[0]!.height, 1750, JSON.stringify(frame));
+	}
+});
