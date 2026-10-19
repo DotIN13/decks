@@ -73,6 +73,29 @@ export class Translator {
 			const used = Number(/(\d+)$/.exec(item.id)?.[1] ?? 0);
 			if (used > this.counter) this.counter = used;
 		}
+		this.endCutTurn(items);
+	}
+
+	/**
+	 * A stored reply still streaming, or a tool still running, is a turn the server stopped in: no
+	 * process of this one's is writing them. They are closed, and a notice says so, which is what
+	 * the person and the agent see in place of a chat that simply went quiet mid-turn.
+	 */
+	private endCutTurn(stored: ChatItem[]): void {
+		let cut = false;
+		for (const item of stored) {
+			if (item.kind === "assistant" && item.streaming) {
+				item.streaming = false;
+				cut = true;
+			} else if (item.kind === "tool" && item.state === "running") {
+				item.state = "error";
+				item.result = item.result ? `${item.result}\nStopped: the Decks server restarted.` : "Stopped: the Decks server restarted.";
+				cut = true;
+			}
+		}
+		if (!cut) return;
+		this.items.push({ kind: "notice", id: this.id("n"), level: "warn", text: "The Decks server restarted in the middle of this turn, so the turn did not finish. Send a message to carry on.", at: Date.now() });
+		this.onChange?.();
 	}
 
 	private id(prefix: string): string {

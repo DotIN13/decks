@@ -217,3 +217,23 @@ test("a conversation inside the window evicts nothing", () => {
 	for (let i = 0; i < 40; i++) translator.user(`message ${i}`);
 	assert.equal(calls, 0, "and so a short chat writes no log and offers no scrollback");
 });
+
+test("a stored turn the server stopped in is closed, with a notice saying so", () => {
+	const restored = new Translator("a1", () => {});
+	restored.load([
+		{ kind: "user", id: "a1:u1", text: "Draw the coffee canvas", at: 1 },
+		{ kind: "tool", id: "a1:t:1", name: "Bash", title: "decks canvas read", state: "running" },
+		{ kind: "assistant", id: "a1:a2", text: "", at: 2, streaming: true },
+	]);
+	const items = restored.history();
+	assert.equal(items.find((item) => item.kind === "assistant")?.streaming, false);
+	const tool = items.find((item) => item.kind === "tool");
+	assert.equal(tool?.kind === "tool" ? tool.state : undefined, "error");
+	const last = items.at(-1)!;
+	assert.equal(last.kind, "notice");
+	assert.match(last.kind === "notice" ? last.text : "", /server restarted in the middle of this turn/);
+
+	const calm = new Translator("a2", () => {});
+	calm.load([{ kind: "user", id: "a2:u1", text: "hi", at: 1 }, { kind: "assistant", id: "a2:a2", text: "Hi", at: 2, streaming: false }]);
+	assert.equal(calm.history().length, 2, "a finished turn gets no notice");
+});
