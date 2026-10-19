@@ -180,7 +180,10 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							if (there) throw new Error(`${path} is already on this canvas, as ${there.id}: move it with decks canvas move.`);
 						}
 						let box = placeOf(doc, placed, op);
-						if (!box && (op.parent === undefined || op.parent === null)) {
+						// An arrow with both ends is drawn between them: there is no corner to choose.
+						const meta = (node as { metadata?: { type?: unknown; from?: unknown; to?: unknown } }).metadata;
+						const joined = meta?.type === ARROW && meta.from !== undefined && meta.to !== undefined;
+						if (!box && !joined && (op.parent === undefined || op.parent === null)) {
 							// Nowhere said: beside the newest thing on the canvas, and the caller is told so.
 							const newest = [...doc.children].reverse().find((one) => one.metadata?.type !== ARROW && placed.get(one.id));
 							box = newest ? placeBy(placed.get(newest.id)!.box, "beside") : { x1: 0, y1: 0 };

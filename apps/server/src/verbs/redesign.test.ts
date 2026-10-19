@@ -254,6 +254,21 @@ test("clearing your tags at the end of a turn is answered without a request to s
 	}
 });
 
+test("an arrow joined at both ends goes between them, with no note to say where", async () => {
+	const { must, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: "boards/a.html" }]);
+		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: "boards/a.html", side: "right" }, to: { item: "boards/b.html", side: "left" } } }]);
+		assert.ok(!arrow.notes.some((note) => /say where/.test(note)), arrow.notes.join(" | "));
+		assert.ok(arrow.value.box.x1 >= 880 && arrow.value.box.x2 <= 1080, `between the boards: ${JSON.stringify(arrow.value.box)}`);
+		const note = await must("canvas.insert", [{ type: "note", content: "Loose" }]);
+		assert.ok(note.notes.some((one) => /say where/.test(one)), "an item with no place still hears it");
+	} finally {
+		cleanup();
+	}
+});
+
 test("the old names map onto the new calls: open moves the home canvas, report claims, url and resolve are the new addresses", async () => {
 	const { agent, must, cleanup } = await open();
 	try {
