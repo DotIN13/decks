@@ -886,10 +886,27 @@ impl Worker {
 
 pub const TILE_SIZE: u32 = TILE;
 
+/// How much of a picture `bitmap` (its width, height) is copied into a texture `texture` big, or
+/// nothing when there is none to copy. A closed or transferred `ImageBitmap` reads as 0 × 0, and
+/// the browser refuses to copy it; wgpu unwraps that refusal (`copyExternalImageToTexture`), which
+/// is a panic, and a panic leaves the engine unusable. So such a picture is never handed over.
+pub fn copy_extent(bitmap: (u32, u32), texture: (u32, u32)) -> Option<(u32, u32)> {
+	let (w, h) = (bitmap.0.min(texture.0), bitmap.1.min(texture.1));
+	(w > 0 && h > 0).then_some((w, h))
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use stage_paint::{Backend, Recording, Target, TextureKind};
+
+	#[test]
+	fn a_closed_picture_is_not_copied_and_a_big_one_keeps_what_fits() {
+		assert_eq!(copy_extent((0, 0), (1920, 1080)), None, "a closed ImageBitmap reads as 0 × 0");
+		assert_eq!(copy_extent((1920, 0), (1920, 1080)), None);
+		assert_eq!(copy_extent((1920, 1080), (1920, 1080)), Some((1920, 1080)));
+		assert_eq!(copy_extent((8000, 1080), (4096, 4096)), Some((4096, 1080)));
+	}
 
 	const STAGE: &str = r##"{"version":"2.14","children":[
 		{"type":"rectangle","id":"a","x":10,"y":10,"width":100,"height":100,"fill":"#f00"},
