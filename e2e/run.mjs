@@ -212,6 +212,8 @@ const CHECKS = [
 	 * search, and the landing.
 	 */
 	{ file: "stages.mjs", needsAgent: false },
+	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
+	{ file: "view-calls.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
