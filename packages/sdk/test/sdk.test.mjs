@@ -99,6 +99,12 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 	assert.deepEqual(of(["move", "boards/a.html", "--x", "10", "--y", "20"]), ["move", ["boards/a.html", { x: 10, y: 20 }]]);
 	assert.deepEqual(of(["hide", "boards/a.html", "boards/b.html"]), ["hide", [["boards/a.html", "boards/b.html"]]]);
 	assert.deepEqual(of(["hide", "boards/a.html"]), ["hide", ["boards/a.html"]]);
+	// A list of boards is several words or one JSON list, for every call that takes one.
+	assert.deepEqual(of(["agent", "claim", '["boards/a.html","boards/b.html"]']), ["agent.claim", [["boards/a.html", "boards/b.html"]]]);
+	assert.deepEqual(of(["agent", "claim", "boards/a.html", "boards/b.html"]), ["agent.claim", [["boards/a.html", "boards/b.html"]]]);
+	assert.deepEqual(of(["view", "focus", "boards/a.html", "boards/b.html", "--canvas", "plan"]), ["view.focus", [["boards/a.html", "boards/b.html"], { canvas: "plan" }]]);
+	assert.deepEqual(of(["view", "focus", '["title","p4"]']), ["view.focus", [["title", "p4"]]]);
+	assert.deepEqual(of(["view", "focus", "boards/a.html"]), ["view.focus", ["boards/a.html"]]);
 	assert.deepEqual(of(["show", "boards/a.html", "--fit", "all"]), ["show", ["boards/a.html", { fit: "all" }]]);
 	assert.deepEqual(of(["pen", "edit", '[{"op":"delete","id":"n1"}]']), ["pen.edit", [[{ op: "delete", id: "n1" }]]]);
 	assert.deepEqual(of(["camera"]), ["camera", []]);
