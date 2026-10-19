@@ -476,6 +476,12 @@
 
 	function onEvalClick(event) {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		/*
+		 * Only a person's press runs a board's code. A script's `el.click()` is not one: the page that
+		 * measures a board for `canvas.fit` presses its controls to see each view, and every such press
+		 * ran the code as the board and asked the person to allow it, on a board nobody had touched.
+		 */
+		if (!event.isTrusted) return;
 		const target = event.target instanceof Element ? event.target.closest("[data-eval]") : null;
 		if (!target) return;
 		const id = (target.getAttribute("data-eval") ?? "").trim();

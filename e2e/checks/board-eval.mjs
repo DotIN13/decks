@@ -18,7 +18,7 @@
  * `Allow`, which is why the first option has no description — a description would be inside
  * the button and the label would stop being the whole of its text.
  */
-import { boardPath, open, resetStage, say, settle, socket, write } from "../harness.mjs";
+import { API, boardPath, open, resetStage, say, settle, socket, write } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
@@ -39,6 +39,7 @@ const BOARD = `<!doctype html>
 		<section class="card" data-id="go" data-eval="pick" data-value="round-20" style="left: 40px; top: 40px; width: 560px">
 			<h3>Promote round 20</h3>
 			<p>Pressing this runs the code the file carries.</p>
+			<button type="button" data-eval="pick" data-value="round-21">Promote round 21</button>
 		</section>
 		<script type="text/decks-eval" data-for="pick">
 			await stage.cursor(event.board, { x: 40, y: 40 });
@@ -85,7 +86,20 @@ const focus = async (path) => {
 
 await focus(PATH);
 
-const card = page.frameLocator(`.board-node[data-path="${PATH}"] iframe`).locator('[data-id="go"]');
+/*
+ * Fitting the board presses its controls to measure each view. A button that carries code is not
+ * one of them: pressing it ran the code as the board, and the person was asked to allow a board
+ * nobody had touched, every time an agent fitted one.
+ */
+const fitted = await fetch(`${API}/api/v1/canvas.fit`, { method: "POST", headers: { "content-type": "application/json", "X-Decks-Person": "1" }, body: JSON.stringify({ args: [PATH] }) }).then((r) => r.json());
+let askedByFit = "";
+for (let i = 0; i < 10; i++) {
+	askedByFit ||= await dialogText();
+	await settle(page, 200);
+}
+say("fitting a board with a code button asks nothing and runs nothing", fitted.ok === true && !askedByFit && (await marks()).length === 0, JSON.stringify({ fit: fitted.ok ? fitted.value?.h : fitted.error, asked: askedByFit, marks: await marks() }));
+
+const card = page.frameLocator(`.board-node[data-path="${PATH}"] iframe`).locator('[data-id="go"] h3');
 await card.click();
 
 /*
