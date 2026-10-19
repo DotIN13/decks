@@ -17,7 +17,7 @@
  *
  * `DECKS_E2E_SHOTS=<dir>` keeps every picture and the two canvas screenshots.
  */
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { API, deckState, open, say, settle, socket } from "../harness.mjs";
 
 /** Picture pixels an edge may be off by: antialiasing and the canvas's own zoom not being exactly the picture's. */
@@ -203,7 +203,7 @@ async function shot(query) {
 	const ms = Date.now() - started;
 	if (!response.ok) return { error: `${response.status} ${await response.text()}`, ms };
 	const box = JSON.parse(response.headers.get("x-shot-box") ?? "null");
-	return { png: Buffer.from(await response.arrayBuffer()), box, ms, how: response.headers.get("x-shot-how") ?? "" };
+	return { png: Buffer.from(await response.arrayBuffer()), box, ms, how: decodeURIComponent(response.headers.get("x-shot-how") ?? "") };
 }
 
 const all = Object.values(items);
@@ -213,12 +213,26 @@ const CASES = [
 	{ name: "the text item alone (zoom 1)", query: { of: TEXT }, ids: [TEXT] },
 	{ name: "the rectangle alone (zoom 1)", query: { of: RECT }, ids: [RECT] },
 	{ name: "a list of both (zoom 1)", query: { of: `${TEXT},${RECT}` }, ids: [TEXT, RECT] },
-	{ name: "a wide box (below zoom 1)", query: { box: [both.x1 - 1500, both.y1 - 300, both.x2 + 1500, both.y2 + 300].map(Math.round).join(",") }, ids: [TEXT, RECT] },
-	{ name: "the whole stage (below zoom 1)", query: {}, ids: [TEXT, RECT] },
+	{ name: "a wide box (below zoom 1)", boards: true, query: { box: [both.x1 - 1500, both.y1 - 300, both.x2 + 1500, both.y2 + 300].map(Math.round).join(",") }, ids: [TEXT, RECT] },
+	{ name: "the whole stage (below zoom 1)", boards: true, query: {}, ids: [TEXT, RECT] },
 ];
 
-for (const c of CASES) {
+/*
+ * Each case both ways: as the server takes it by default (drawn natively when it can be,
+ * `native-shots.ts`) and in the browser with live boards (`live=1`, `shot.html`). `how` says which
+ * it was; the drawing-only boxes must be native when the native renderer is built.
+ */
+const PATHS = [
+	{ label: "", extra: {} },
+	{ label: " [browser]", extra: { live: "1" } },
+];
+const nativeBuilt = existsSync(new URL("../../packages/stage/target/release/stage-shot", import.meta.url));
+for (const path of PATHS)
+for (const raw of CASES) {
+	const c = { ...raw, name: `${raw.name}${path.label}`, query: { ...raw.query, ...path.extra } };
 	const taken = await shot(c.query);
+	if (!path.label && nativeBuilt && !raw.boards) say(`${c.name}: drawn natively`, taken.how === "native", taken.how);
+	if (path.label) say(`${c.name}: taken in the browser`, taken.how.startsWith("chromium"), taken.how);
 	if (taken.error) {
 		say(`${c.name}: the server takes the picture`, false, taken.error);
 		continue;
