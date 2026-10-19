@@ -20,6 +20,14 @@ await page.addInitScript(() => {
 	if (window.top !== window.self) return;
 	const Real = window.WebSocket;
 	window.__sent = [];
+	// The × goes through the SDK as the person now (`canvas.delete`): its calls are heard as frames too.
+	const realFetch = window.fetch.bind(window);
+	window.fetch = (input, init) => {
+		const url = String(typeof input === "string" ? input : input?.url ?? "");
+		const verb = /\/api\/v1\/([^/?]+)$/.exec(url)?.[1];
+		if (verb && init?.body) window.__sent.push(JSON.stringify({ type: verb, args: JSON.parse(String(init.body)).args }));
+		return realFetch(input, init);
+	};
 	window.WebSocket = class extends Real {
 		constructor(...args) {
 			super(...args);
@@ -209,11 +217,11 @@ try {
 		await row.hover();
 		await row.locator(".board-hide").click();
 		await page.waitForTimeout(250);
-		const sent = await page.evaluate(() => window.__sent.map((raw) => JSON.parse(raw)).filter((message) => message.type === "board.hide"));
+		const sent = await page.evaluate(() => window.__sent.map((raw) => JSON.parse(raw)).filter((message) => message.type === "canvas.delete"));
 		await page.mouse.move(700, 500);
 		return sent;
 	})();
-	say("…and one press takes the board off the canvas, no arming", hid === null || (hid.length === 1 && typeof hid[0].path === "string"), JSON.stringify(hid));
+	say("…and one press takes the board off the canvas, no arming", hid === null || (hid.length === 1 && typeof hid[0].args?.[0] === "string"), JSON.stringify(hid));
 
 	/*
 	 * And the name clears the bin on the rows that have no dot to reserve its column for.
