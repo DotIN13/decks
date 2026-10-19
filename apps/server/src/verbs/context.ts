@@ -1,4 +1,5 @@
 import { cleanWorkspace } from "../agents/workspaces.ts";
+import { isIsolatedStage } from "../stage/isolated-stages.ts";
 import type { StageService, WebTarget } from "../stage/service.ts";
 import type { StageAgentHooks } from "../stage/tool.ts";
 
@@ -28,6 +29,20 @@ export interface VerbContext {
 	reportPlace(path: string, named: { x: number; y: number } | undefined, before?: { x: number; y: number }): void;
 	notWhileIsolated(what: string): never;
 	askedWorkspace(raw: unknown): string;
+	/**
+	 * The canvas a call means when it names none (`decks.here()`): the one the call says it was made
+	 * on (a person's or a board's `X-Decks-Stage`), else the caller's own: an agent's home canvas, the
+	 * canvas holding a board whose button is pressed.
+	 */
+	hereCanvas(): string | undefined;
+	/** A canvas as a caller names it (folder, title, or `canvases/<name>/canvas.pen`), or `here()` when it names none. */
+	canvasOf(asked?: unknown): string;
+	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
+	canvasRow(name: string): { name: string; title: string; open: string[]; boards: number };
+	/** Who is making a change, as an inbox event names them. */
+	byName(): string;
+	/** The canvas the request says it was made on, for this one call (`StageTool.call`). */
+	callOn: { stage?: string };
 }
 
 export function verbContext(deps: { stage: StageService; agent: StageAgentHooks; port: number }): VerbContext {
@@ -167,7 +182,48 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		if (!clean) throw new Error('workspace is a project name, as in { workspace: "political-llm" }.');
 		return clean;
 	};
-	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, isolated, here, cornerOf, reportPlace, notWhileIsolated, askedWorkspace };
+	const callOn: { stage?: string } = {};
+	const hereCanvas = (): string | undefined => {
+		const pens = service.pens;
+		if (callOn.stage && pens?.has(callOn.stage)) return callOn.stage;
+		return agent.here?.() ?? agent.stageName?.();
+	};
+	const canvasOf = (asked?: unknown): string => {
+		const pens = needPens();
+		if (asked === undefined || asked === null || asked === "") {
+			const name = hereCanvas();
+			if (!name) throw new Error("There is no canvas here to act on: name one with { canvas }. decks canvas list names them.");
+			return name;
+		}
+		if (typeof asked !== "string") throw new Error('canvas is a canvas\'s name or title, as in { canvas: "launch-plan" }.');
+		const raw = asked.trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "");
+		const names = pens.names();
+		const name = names.includes(raw) ? raw : names.find((one) => pens.titleOf(one).toLowerCase() === raw.toLowerCase());
+		if (!name) throw new Error(`No canvas is called "${asked}". decks canvas list names them, by name and title.`);
+		if (isolated() && name !== agent.stageName?.() && !isIsolatedStage(pens, name)) notWhileIsolated(`the canvas "${name}"`);
+		return name;
+	};
+	const canvasRow = (name: string) => {
+		const pens = needPens();
+		const mine = agent.stageName?.();
+		let boards = 0;
+		try {
+			boards = pens.boards(name).length;
+		} catch {
+			/* a canvas whose file does not parse holds no boards we can count */
+		}
+		return {
+			name,
+			title: pens.titleOf(name),
+			open: agent
+				.agents()
+				.filter((other) => (other.id === agent.id && !agent.board ? mine : other.stage) === name)
+				.map((other) => other.name),
+			boards,
+		};
+	};
+	const byName = () => (agent.person ? "person" : agent.identity().name);
+	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, isolated, here, cornerOf, reportPlace, notWhileIsolated, askedWorkspace, hereCanvas, canvasOf, canvasRow, byName, callOn };
 }
 
 /** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */

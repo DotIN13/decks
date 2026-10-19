@@ -24,6 +24,11 @@ import { penVerbs } from "../verbs/pen.ts";
 import { appsVerbs } from "../verbs/apps.ts";
 import { webVerbs } from "../verbs/web.ts";
 import { miscVerbs } from "../verbs/misc.ts";
+import { canvasVerbs } from "../verbs/canvas.ts";
+import { boardVerbs } from "../verbs/board.ts";
+import { agentVerbs } from "../verbs/agent.ts";
+import { viewVerbs } from "../verbs/view.ts";
+import { aliasNote, VERB_BY_NAME } from "@decks/api";
 
 /**
  * One caller's stage (DESIGN §6.3): the verbs bound to an agent, the person, a board or an app.
@@ -82,6 +87,10 @@ export interface CreateSpec {
 	model?: string;
 	thinking?: ThinkingLevel;
 	mode?: AgentMode;
+	/** Its home canvas, by folder name. */
+	canvas?: string;
+	/** With no `canvas`: give it a new, empty canvas of its own (`agent.create`). */
+	newCanvas?: boolean;
 }
 
 /** One item waiting in an agent's queue. */
@@ -121,7 +130,7 @@ export interface StageAgentHooks {
 	/** Queue work for an agent that already exists, and return without waiting. */
 	send(target: string, spec: SendSpec): { queued: true; position: number };
 	/** Make an agent and return at once; optional so a host with no registry can omit it. */
-	create?(spec: CreateSpec): Promise<{ agent: string; name: string }>;
+	create?(spec: CreateSpec): Promise<{ agent: string; name: string; kind?: AgentKind; model?: string; thinking?: string; mode?: string; canvas?: string }>;
 	/** What is waiting for an agent — this one, unless another is named. */
 	queue(agentId?: string): QueuedWork[];
 	/**
@@ -164,6 +173,15 @@ export interface StageAgentHooks {
 	openStage?(name: string): void;
 	/** Make an empty stage from a title, open it, and return its name. */
 	newStage?(title: string): string;
+	/**
+	 * The canvas this caller is on when a call names none (`decks.here()`), where that is not its own
+	 * stage: a board's button is on the board's canvas. Left out, it is `stageName()`.
+	 */
+	here?(): string | undefined;
+	/** Deliver a message now: steer the running turn, start one, or queue it (`agent.send`). */
+	deliver?(target: string, spec: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string };
+	/** Make another canvas this agent's home (`agent.update({ canvas })`). */
+	setHome?(name: string): void;
 }
 
 /**
@@ -211,7 +229,7 @@ export interface StageTool {
 	 * (the viewport after `newBoard`, what `fit` measured, the reminders), and any pictures. A verb
 	 * that throws is an answer too, `ok: false` with its sentence.
 	 */
-	call(name: string, args: readonly unknown[]): Promise<StageCallResult>;
+	call(name: string, args: readonly unknown[], on?: { stage?: string }): Promise<StageCallResult>;
 	snapshot(): StageSnapshot;
 }
 
@@ -258,12 +276,18 @@ export function createStageTool(deps: {
 	 * routes and these handlers cannot disagree about a verb's name or its arguments.
 	 */
 	const stage: Stage = {
+		// The old names, kept for one release (`ALIASES` in @decks/api); each answer says its new call.
 		...boardsVerbs(ctx),
 		...stageVerbs(ctx),
 		...stagesVerbs(ctx),
 		...agentsVerbs(ctx),
 		...miscVerbs(ctx),
 		...penVerbs(ctx),
+		// The calls of the redesign.
+		...canvasVerbs(ctx),
+		...boardVerbs(ctx),
+		...agentVerbs(ctx),
+		...viewVerbs(ctx),
 		...appsVerbs(ctx),
 		...webVerbs(ctx),
 	};
@@ -284,9 +308,11 @@ export function createStageTool(deps: {
 		snapshot,
 		webShared: () => service.web?.status().paired === true,
 
-		async call(name: string, args: readonly unknown[]): Promise<StageCallResult> {
+		async call(name: string, args: readonly unknown[], on: { stage?: string } = {}): Promise<StageCallResult> {
 			notes.length = 0;
 			images.length = 0;
+			// The canvas the request says it was made on, which is what `here()` means for this call.
+			ctx.callOn.stage = on.stage;
 			const path = name.split(".");
 			let owner: unknown = stage;
 			for (const key of path.slice(0, -1)) owner = (owner as Record<string, unknown> | undefined)?.[key];
@@ -302,6 +328,11 @@ export function createStageTool(deps: {
 			// After the verb's own notes, the agent's reminders: who it is, and what its canvas is called.
 			// Not for the person, whose clicks are theirs and not the agent's.
 			const said = [...notes];
+			// An old name says its new call, every time, so a caller learns it from using the old.
+			const known = VERB_BY_NAME.get(name);
+			const renamed = known ? aliasNote(known) : undefined;
+			if (renamed) said.push(renamed);
+			ctx.callOn.stage = undefined;
 			if (!agent.person) {
 				const unsaid = identityReminder(agent.identity());
 				if (unsaid) said.push(unsaid);

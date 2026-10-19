@@ -1,4 +1,4 @@
-import { checkArgs, signature, VERB_BY_NAME, VERBS } from "@decks/api";
+import { ALL_VERBS, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import type { DeckAgent } from "../agents/session.ts";
@@ -35,7 +35,7 @@ export function verbRoutes(app: App): express.Router {
 
 	router.get("/", (_req, res) => {
 		res.set("cache-control", "no-store").json({
-			verbs: VERBS.map((verb) => ({ name: verb.name, group: verb.group, effect: verb.effect, summary: verb.summary, signature: signature(verb) })),
+			verbs: ALL_VERBS.map((verb) => ({ name: verb.name, group: verb.group, touches: verb.touches, effect: verb.effect, summary: verb.summary, signature: signature(verb), ...(verb.alias ? { alias: verb.alias } : {}) })),
 		});
 	});
 
@@ -85,7 +85,7 @@ export function verbRoutes(app: App): express.Router {
 			res.status(caller.status).json({ ok: false, error: caller.error, notes: [] });
 			return;
 		}
-		const answer = await caller.tool.call(name, args);
+		const answer = await caller.tool.call(name, args, caller.on ?? {});
 		if (caller.announce) caller.announce(name, answer);
 		res.status(answer.ok ? 200 : 422).json(answer satisfies VerbAnswer);
 	});
@@ -93,7 +93,7 @@ export function verbRoutes(app: App): express.Router {
 	return router;
 }
 
-type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void } | { error: string; status: number };
+type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string } } | { error: string; status: number };
 
 /** The stage tool a request acts through: an agent's own, or an app's on the conversation on screen. */
 async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: unknown }, allowedOnce: Set<string>): Promise<Caller> {
@@ -106,7 +106,7 @@ async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: u
 	// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
 	if (header("x-decks-person")) {
 		const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent")! } : {}) });
-		return { tool: agent.personTool() };
+		return { tool: agent.personTool(), on: { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}) } };
 	}
 	// A board's own button, whose code runs in the board's page (`runtime/lib/board.js`).
 	const board = header("x-decks-board");
@@ -160,6 +160,7 @@ async function boardCaller(app: App, path: string, stage: string | undefined, al
 	const { tool, focused } = callerTool({ agents: app.agents, cameras: app.cameras, boards: app.boards, stage: app.stage, port: app.port }, { ...on, name: path });
 	return {
 		tool,
+		on: stage ? { stage } : {},
 		announce: (verb, answer) => {
 			if (answer.ok) focused.translator.notice("info", `${path} called ${verb}`);
 			else focused.translator.notice("error", `${path} called ${verb} and failed: ${answer.error}`);

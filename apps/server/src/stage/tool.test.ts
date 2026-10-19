@@ -433,7 +433,7 @@ test("fit says what to do when the board is not on the canvas, rather than picki
 	write("boards/loose.html", `<!doctype html><title>loose</title><body class="board"></body>`);
 	const loose = await runCode(tool, `return await stage.fit("boards/loose.html")`);
 	assert.equal(loose.isError, true);
-	assert.match(loose.text, /not on your stage's canvas/);
+	assert.match(loose.text, /not on your canvas/);
 	cleanup();
 });
 

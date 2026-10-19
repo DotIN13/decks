@@ -43,6 +43,7 @@ import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
+import { Watches } from "./stage/watches.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -127,7 +128,7 @@ export class App {
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** Stage calls waiting for the browser to carry them out. */
-	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
+	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
 
@@ -198,6 +199,7 @@ export class App {
 				return board && this.stage.shots ? this.stage.shots.measure(w === undefined ? board : { ...board, w }) : undefined;
 			},
 			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
+			callAll: (call, timeoutMs) => this.callStageAll(call, timeoutMs),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
@@ -212,6 +214,17 @@ export class App {
 		 */
 		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
 		this.stage.pens = this.pens;
+		// Who watches which canvas (`decks.canvas.watch`), and what they have not read yet.
+		this.stage.watches = new Watches({
+			nameOf: (agentId) => this.agents?.get(agentId)?.name,
+			canvasesOf: (path) => this.pens.names().filter((name) => {
+				try {
+					return this.pens.boards(name).some((one) => one.path === path);
+				} catch {
+					return false;
+				}
+			}),
+		});
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
 		this.apps = new Apps(deck.path);
@@ -532,6 +545,25 @@ export class App {
 				resolve({ skipped: "the canvas did not answer in time" });
 			}, timeoutMs);
 			this.pendingStage.set(id, { resolve, timer });
+			this.send({ type: "stage.call", call: { ...call, id } });
+		});
+	}
+
+	/**
+	 * Ask every browser, and wait for each to answer or for the time to run out: for a call whose
+	 * answer is a count over all of them (`view.reload`). The answers that came are what it resolves with.
+	 */
+	private callStageAll(call: Omit<StageCall, "id">, timeoutMs = 1500): Promise<unknown[]> {
+		const id = randomUUID();
+		const expected = this.hub?.connections ?? 0;
+		if (expected === 0) return Promise.resolve([]);
+		return new Promise((resolve) => {
+			const many = { answers: [] as unknown[], expected };
+			const timer = setTimeout(() => {
+				this.pendingStage.delete(id);
+				resolve(many.answers);
+			}, timeoutMs);
+			this.pendingStage.set(id, { resolve: (value) => resolve(value as unknown[]), timer, many });
 			this.send({ type: "stage.call", call: { ...call, id } });
 		});
 	}
@@ -925,6 +957,7 @@ export class App {
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.board) this.thumbs.changed(message.board);
+			this.stage.watches?.boardChanged(message.path, message.rev, message.board?.lastWrittenBy);
 		}
 		this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
@@ -975,7 +1008,8 @@ export class App {
 	 * A stage drawing changed: every session on that stage takes its boards from it, and every
 	 * browser is sent it once per agent whose stage it is.
 	 */
-	private publishPen(name: string, _entry: PenEntry): void {
+	private publishPen(name: string, entry: PenEntry): void {
+		this.stage.watches?.canvasChanged(name, entry.doc);
 		const on = (this.agents?.all() ?? []).filter((agent) => agent.stageName() === name);
 		for (const agent of on) agent.penChanged();
 		// What changed, not the whole drawing: a browser that missed a revision asks for it whole.

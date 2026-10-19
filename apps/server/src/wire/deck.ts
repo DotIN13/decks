@@ -32,8 +32,18 @@ export const deck = {
 	"stage.result": (message, _reply, wire) => {
 		const pending = wire.pendingStage.get(message.result.id);
 		if (!pending) return;
+		const value = message.result.error ? { error: message.result.error } : (message.result.value ?? null);
+		// Asked of every browser: wait for each, or for the timer.
+		if (pending.many) {
+			pending.many.answers.push(value);
+			if (pending.many.answers.length < pending.many.expected) return;
+			wire.pendingStage.delete(message.result.id);
+			clearTimeout(pending.timer);
+			pending.resolve(pending.many.answers);
+			return;
+		}
 		wire.pendingStage.delete(message.result.id);
 		clearTimeout(pending.timer);
-		pending.resolve(message.result.error ? { error: message.result.error } : (message.result.value ?? null));
+		pending.resolve(value);
 	},
 } satisfies WirePart;

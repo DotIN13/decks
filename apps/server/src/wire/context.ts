@@ -53,6 +53,8 @@ export type WirePart = Partial<WireTable>;
 export interface PendingStage {
 	resolve: (value: unknown) => void;
 	timer: NodeJS.Timeout;
+	/** A call sent to every browser (`App.callStageAll`): the answers so far, and how many are expected. */
+	many?: { answers: unknown[]; expected: number };
 }
 
 /**

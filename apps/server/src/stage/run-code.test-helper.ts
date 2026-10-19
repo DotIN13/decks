@@ -1,5 +1,7 @@
 import type { StageTool } from "./tool.ts";
 
+const OLD_NAME = / is an old name, kept for one release: use /;
+
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...names: string[]) => (...args: unknown[]) => Promise<unknown>;
 
 /**
@@ -15,7 +17,9 @@ export async function runCode(tool: StageTool, code: string): Promise<{ text: st
 			get: (_target, key) => (typeof key === "string" && key !== "then" ? verbs([...path, key]) : undefined),
 			apply: async (_target, _self, args: unknown[]) => {
 				const answer = await tool.call(path.join("."), args);
-				notes.push(...answer.notes);
+				// The note an old name carries is checked on its own (`verbs/aliases.test.ts`); the tests
+				// written against the old names read the rest as they always did.
+				notes.push(...answer.notes.filter((note) => !OLD_NAME.test(note)));
 				images.push(...(answer.images ?? []));
 				if (!answer.ok) throw new Error(answer.error);
 				return answer.value;

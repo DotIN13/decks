@@ -43,12 +43,18 @@ async function open() {
 test("GET /api/v1 lists every verb with its signature", async () => {
 	const { base, cleanup } = await open();
 	try {
-		const listed = (await (await fetch(base)).json()) as { verbs: Array<{ name: string; signature: string; effect: string }> };
-		assert.equal(listed.verbs.length, 53);
-		assert.deepEqual(
-			listed.verbs.find((verb) => verb.name === "move"),
-			{ name: "move", group: "stage", effect: "change", summary: "Move a board on your stage: `at` is its top-left corner.", signature: "move(path: string, at: Point)" },
-		);
+		const listed = (await (await fetch(base)).json()) as { verbs: Array<{ name: string; signature: string; effect: string; alias?: string }> };
+		const { ALL_VERBS } = await import("@decks/api");
+		assert.equal(listed.verbs.length, ALL_VERBS.length);
+		assert.deepEqual(listed.verbs.find((verb) => verb.name === "canvas.move"), {
+			name: "canvas.move",
+			group: "canvas",
+			touches: "deck",
+			effect: "change",
+			summary: "Move an item: to a corner (`at`), 160 px clear of another (`beside`, `below`), or into a frame (`parent`, `index`; null for the canvas itself).",
+			signature: "canvas.move(id: string, options?: { canvas?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number })",
+		});
+		assert.equal(listed.verbs.find((verb) => verb.name === "move")?.alias, "decks.canvas.move(board, { at })", "an old name is listed with its new call");
 	} finally {
 		cleanup();
 	}
@@ -157,14 +163,18 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	const { app, base, agent, cleanup } = await open();
 	try {
 		app.agents.focus(agent.id);
-		const response = await fetch(`${base}/move`, {
+		// On screen first, so there is a board to move (`canvas.insert`, as the person).
+		const person = { "content-type": "application/json", "x-decks-person": "1", "x-decks-agent": agent.id };
+		const put = await fetch(`${base}/canvas.insert`, { method: "POST", headers: person, body: JSON.stringify({ args: [{ type: "board", board: "boards/tall.html" }, { at: { x1: 0, y1: 0 } }] }) });
+		assert.ok(((await put.json()) as { ok: boolean }).ok);
+		const response = await fetch(`${base}/canvas.move`, {
 			method: "POST",
-			headers: { "content-type": "application/json", "x-decks-person": "1", "x-decks-agent": agent.id },
-			body: JSON.stringify({ args: ["boards/tall.html", { x: 40, y: 80 }] }),
+			headers: person,
+			body: JSON.stringify({ args: ["boards/tall.html", { at: { x1: 40, y1: 80 } }] }),
 		});
-		const answer = (await response.json()) as { ok: boolean; value?: { x: number; y: number }; notes: string[] };
+		const answer = (await response.json()) as { ok: boolean; value?: { box: { x1: number; y1: number } }; notes: string[] };
 		assert.ok(answer.ok);
-		assert.deepEqual([answer.value?.x, answer.value?.y], [40, 80]);
+		assert.deepEqual([answer.value?.box.x1, answer.value?.box.y1], [40, 80]);
 		assert.deepEqual(answer.notes, [], "the person hears no agent's reminders");
 	} finally {
 		cleanup();
