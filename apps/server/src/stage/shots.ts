@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import type { Box } from "@decks/pen";
 import { resolveInDeck } from "../deck/roots.ts";
 import type { StagePens } from "./pens.ts";
+import type { NativeShots } from "./native-shots.ts";
 
 type Browser = import("playwright").Browser;
 
@@ -10,10 +11,13 @@ type Browser = import("playwright").Browser;
  * A picture of a stage, or of part of one: what pen.dev's `get_screenshot` and `export_nodes` are,
  * for a Decks stage.
  *
- * Taken in the server's own Chromium — the one the dashboard's board pictures come from — loading
- * `shot.html`, a page that draws one stage the way the canvas does: the drawing under and over the
- * boards, and the boards themselves, live, between them. So the picture is what the person sees,
- * boards included, which a render of the drawing alone could not be. Nobody's open canvas is used.
+ * Drawn natively when it can be (`native-shots.ts`): the stage engine's own painter on this
+ * machine's graphics card, the drawing over each board's picture of its current revision, with no
+ * browser. Otherwise — a PDF, live boards asked for, math, a picture it cannot load, a board not yet
+ * pictured — taken in the server's own Chromium, the one the dashboard's board pictures come from,
+ * loading `shot.html`, a page that draws one stage the way the canvas does: the drawing under and
+ * over the boards, and the boards themselves, live, between them. `how` says which. Nobody's open
+ * canvas is used.
  *
  * `of` says what to take: nothing for everything on the stage, an item's id or a board's path, a
  * list of them, or a box. It is framed with a margin, and drawn at a zoom that keeps the long side
@@ -33,6 +37,8 @@ export interface ShotRequest {
 	format?: ShotFormat;
 	/** A deck-relative file to write; a fresh one under `.decks/shots/` otherwise. */
 	to?: string;
+	/** The boards as live pages, in the browser, rather than their pictures. */
+	live?: boolean;
 }
 
 export interface Shot {
@@ -43,6 +49,8 @@ export interface Shot {
 	width: number;
 	height: number;
 	box: Box;
+	/** How it was taken: `native`, or `chromium: <why not native>`. */
+	how: "native" | `chromium: ${string}`;
 }
 
 export interface ShotHost {
@@ -51,6 +59,8 @@ export interface ShotHost {
 	/** Where the web app is served, as the server can reach it: `shot.html` is part of it. */
 	webOrigin: () => string;
 	borrow: <T>(use: (browser: Browser) => Promise<T>) => Promise<T>;
+	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
+	native?: NativeShots;
 }
 
 /** The long side of the page, in CSS pixels: a whole stage is shrunk to fit it. */
@@ -116,6 +126,29 @@ export class StageShots {
 		const zoom = Math.min(1, MAX_CSS / Math.max(w, h));
 		const width = Math.max(1, Math.round(w * zoom));
 		const height = Math.max(1, Math.round(h * zoom));
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : stage;
+		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
+		mkdirSync(dirname(target), { recursive: true });
+		const shot = { file: relative(this.host.deck, target), format, width: Math.round(width * scale), height: Math.round(height * scale), box };
+
+		/*
+		 * Natively when it can be (`native-shots.ts`): the drawing over the boards' pictures, with no
+		 * browser. A PDF, live boards, and whatever the native renderer says it cannot draw as the
+		 * person would see it go to the browser page below, and `how` says why.
+		 */
+		const native = this.host.native;
+		const why = format === "pdf" ? "a PDF is printed by the browser" : request.live ? "live boards were asked for" : !native ? "this server has no native renderer" : undefined;
+		let notNative = why;
+		if (native && !why) {
+			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(stage);
+			const onStage = fileFrame?.stage ?? (fileFrame ? undefined : stage);
+			const boards = onStage ? this.host.pens.boards(onStage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
+			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target });
+			if (outcome.ok) return { ...shot, bytes: readFileSync(target), how: "native" as const };
+			notNative = outcome.why;
+		}
+
 		const query = new URLSearchParams({ ...(fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage }), x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
@@ -133,13 +166,8 @@ export class StageShots {
 				await context.close().catch(() => {});
 			}
 		});
-
-		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : stage;
-		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
-		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, bytes);
-		return { file: relative(this.host.deck, target), bytes, format, width: Math.round(width * scale), height: Math.round(height * scale), box };
+		return { ...shot, bytes, how: `chromium: ${notNative}` as const };
 	}
 
 	/**

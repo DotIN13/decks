@@ -773,6 +773,11 @@ export class StagePens {
 	}
 
 	/** The `stage.pen` frame for one agent looking at this stage. */
+	/** A stage's drawing as the page is given it (imports in place) and the folder its fills are read against, without counting as sent. */
+	drawingOf(name: string): { doc: PenDocument; base: string } {
+		return { doc: this.withImported(name, this.get(name).doc), base: `${fileUrl(join(this.dir, name))}/` };
+	}
+
 	frame(agentId: string, name: string): ServerMessage {
 		const entry = this.get(name);
 		const doc = this.withImported(name, entry.doc);

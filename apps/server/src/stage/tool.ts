@@ -1042,11 +1042,13 @@ export function createStageTool(deps: {
 		 * A picture of your stage, or of part of it, as the person sees it: the drawing and the live
 		 * boards together. Attached to this call's result so you see it at once, and saved to `file`.
 		 * `of` is an item's id, a board's path, a list of them, or a box; nothing is the whole stage.
-		 * `to` saves it where you say instead, and `format: "pdf"` or `"jpeg"` for other kinds.
+		 * `to` saves it where you say instead, and `format: "pdf"` or `"jpeg"` for other kinds. It is
+		 * drawn natively over the boards' pictures when it can be, and in the browser otherwise or with
+		 * `live: true` (the boards as live pages); `how` says which, and why.
 		 */
-		screenshot: async (options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark" }) => {
+		screenshot: async (options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark"; live?: boolean }) => {
 			if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
-			const { of, scale, format, to, scheme } = options ?? {};
+			const { of, scale, format, to, scheme, live } = options ?? {};
 			/*
 			 * One board, by its path: as the person's browser has it now, so the picture shows what
 			 * they did on the page — drawn there by HTML-in-Canvas when it can be, from a snapshot of
@@ -1094,9 +1096,9 @@ export function createStageTool(deps: {
 				}
 			};
 			const file = penFileOf(of);
-			const shot = await service.shots.take({ stage: needStage(), ...(file ? { file } : { of }), ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}) });
+			const shot = await service.shots.take({ stage: needStage(), ...(file ? { file } : { of }), ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}), ...(live ? { live: true } : {}) });
 			if (shot.format !== "pdf") images.push({ data: shot.bytes.toString("base64"), mimeType: shot.format === "jpeg" ? "image/jpeg" : "image/png" });
-			return { file: shot.file, width: shot.width, height: shot.height, box: shot.box };
+			return { file: shot.file, width: shot.width, height: shot.height, box: shot.box, how: shot.how };
 		},
 
 		pen: {

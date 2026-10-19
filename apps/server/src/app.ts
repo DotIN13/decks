@@ -40,6 +40,7 @@ import { DocLibrary, DocService } from "@decks/docs/server";
 import { compileTex } from "./docs/compile.ts";
 import { gitSync } from "./docs/git.ts";
 import { GoogleDocs } from "./google/docs.ts";
+import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
 
@@ -115,6 +116,8 @@ export class App {
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: ThumbService;
+	/** Stage pictures drawn without a browser (`stage/native-shots.ts`). */
+	readonly nativeShots: NativeShots;
 	private hub: Hub | undefined;
 	/** The browser whose frame is being handled right now, if any — see `handle`. */
 	viewing: View | undefined;
@@ -266,11 +269,30 @@ export class App {
 		 * Vite in development, whose port the dev scripts put in `DECKS_WEB_PORT`.
 		 */
 		const apiOrigin = () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`;
+		/*
+		 * Stage pictures are drawn natively over each board's picture of its current revision: a 192 or
+		 * 480 px copy when the board is drawn that small, the whole picture otherwise. A board with none
+		 * sends the shot to the browser, and is pictured in the background for the next one.
+		 */
+		this.nativeShots = new NativeShots({
+			boardPicture: (path, scheme, px) => {
+				const board = deck.board(path);
+				if (!board) return { why: `there is no board ${path}` };
+				const size = px <= 192 ? 192 : px <= 480 ? 480 : "whole";
+				for (const want of size === "whole" ? (["whole"] as const) : [size, "whole" as const]) {
+					const found = this.thumbs.nearest(board, scheme, want);
+					if (found?.exact) return { file: found.file };
+				}
+				void this.thumbs.picture(board, scheme, size, () => false, true).catch(() => {});
+				return { why: `the board ${path} has no picture of its current revision yet (one is being taken)` };
+			},
+		});
 		this.stage.shots = new StageShots({
 			deck: deck.path,
 			pens: this.pens,
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
 			borrow: (use) => this.thumbs.borrow(use),
+			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
 		});
 		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.stage.boardPicture = async (path, scheme) => {
@@ -1007,6 +1029,7 @@ export class App {
 		this.limitsTimer = undefined;
 		this.web.dispose();
 		this.thumbs.dispose();
+		this.nativeShots.stop();
 		this.apps.dispose();
 		this.pens.close();
 		this.agents.dispose();

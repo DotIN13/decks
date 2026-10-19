@@ -133,9 +133,14 @@ export interface Stage {
 	 * One board's path alone is that board as the person's browser has it now, with what they did on
 	 * the page (tabs pressed, text typed, boxes scrolled): `how` is "canvas" or "snapshot". When the
 	 * board has no live page there, `how` is "server": a picture from the file, without any of that,
-	 * and `note` says so.
+	 * and `note` says so; the drawing round the board is not in it.
+	 *
+	 * Anything else is drawn natively, the drawing over each board's current picture: `how` is
+	 * "native". It is taken in the browser with the boards as live pages when you ask (`live: true`)
+	 * or when it must be (math in the box, a picture it cannot load, a board not yet pictured, a PDF):
+	 * `how` is "chromium: <why>".
 	 */
-	screenshot(o?: { of?: string | string[] | Partial<Box>; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<{ file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string }>;
+	screenshot(o?: { of?: string | string[] | Partial<Box>; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark"; live?: boolean }): Promise<{ file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server" | "native" | `chromium: ${string}`; note?: string }>;
 	/**
 	 * Your stage's drawing — notes, text, shapes, arrows and frames, all drawn over the boards — kept as a
 	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.

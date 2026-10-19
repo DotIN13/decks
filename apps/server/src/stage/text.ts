@@ -118,6 +118,21 @@ class ServerText {
 		return false;
 	}
 
+	/**
+	 * A font file on this machine's disk, fetched into the cache first if it is not there, for a
+	 * reader that wants a path rather than bytes (`native-shots.ts`); undefined when it cannot be had.
+	 */
+	async fontPath(file: FontFile): Promise<{ path: string; fallback: boolean } | undefined> {
+		const path = join(CACHE, `${file.key.replaceAll("/", "_")}.ttf`);
+		const at = { path, fallback: isFallbackFamily(file.family) };
+		if (existsSync(path)) return at;
+		if (existsSync(`${path}.missing`)) return undefined;
+		const bytes = await this.fetch(file);
+		if (bytes === null) return undefined;
+		this.store(file.key, bytes);
+		return bytes === false ? undefined : at;
+	}
+
 	private register(file: FontFile, bytes: Uint8Array | false): void {
 		if (bytes === false) {
 			this.files.set(file.key, false);
