@@ -1,9 +1,24 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { Box } from "@decks/pen";
-import { resolveInDeck } from "../deck/roots.ts";
+import { containedIn, realPathOf, resolveInDeck } from "../deck/roots.ts";
 import type { StagePens } from "./pens.ts";
 import type { NativeShots } from "./native-shots.ts";
+
+/**
+ * Where `to` puts a picture: a path in the deck (`exports/plan.png`). A full path is taken as it is
+ * when it is inside the deck, and refused when it is not: stripping its slash used to write
+ * `/Users/me/shot.png` to `<deck>/Users/me/shot.png` and answer as if that were what was asked.
+ */
+export function shotTarget(deck: string, to: string): string {
+	if (isAbsolute(to)) {
+		const root = realPathOf(deck);
+		const asked = realPathOf(to);
+		if (!containedIn(root, asked)) throw new Error(`to is a path in the deck, such as exports/shot.png; ${to} is outside the deck (${deck}).`);
+		return asked;
+	}
+	return resolveInDeck(deck, to);
+}
 
 type Browser = import("playwright").Browser;
 
@@ -138,7 +153,7 @@ export class StageShots {
 		// Placeholder frames are marked as on the canvas: in the colour and name of the canvas's last writer.
 		const writerStage = fileFrame ? fileFrame.stage : stage;
 		const writer = writerStage ? this.host.writer?.(writerStage) : undefined;
-		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
+		const target = request.to ? shotTarget(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
 		mkdirSync(dirname(target), { recursive: true });
 		const shot = { file: relative(this.host.deck, target), format, width: Math.round(width * scale), height: Math.round(height * scale), box };
 
@@ -229,7 +244,7 @@ export class StageShots {
 	keepBoard(path: string, bytes: Buffer, ext: "png" | "jpg" | "webp", to?: string): string {
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "board";
-		const target = to ? resolveInDeck(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
+		const target = to ? shotTarget(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
 		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, bytes);
 		return relative(this.host.deck, target);
