@@ -20,6 +20,7 @@ const stage = query.get("stage") ?? "";
 const penPath = query.get("pen");
 const box = { x1: Number(query.get("x1")), y1: Number(query.get("y1")), x2: Number(query.get("x2")), y2: Number(query.get("y2")) };
 const scheme = query.get("scheme") === "dark" ? "dark" : "light";
+document.documentElement.dataset.colorScheme = scheme;
 
 /** How long the drawing must go without a redraw before it counts as finished. */
 const QUIET_MS = 500;

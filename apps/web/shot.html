@@ -5,18 +5,17 @@
 		<title>Stage picture</title>
 		<!-- One stage, drawn for a picture the server takes of it (`src/shot.ts`, `server/stage/shots.ts`). -->
 		<style>
+			/* The stage's own colour, `--stage` in `src/index.css`, in the scheme the address asks for (`src/shot.ts` sets it). */
 			html,
 			body {
 				margin: 0;
 				height: 100%;
 				overflow: hidden;
-				background: #fafafa;
+				background: #f1f1f3;
 			}
-			@media (prefers-color-scheme: dark) {
-				html,
-				body {
-					background: #101010;
-				}
+			html[data-color-scheme="dark"],
+			html[data-color-scheme="dark"] body {
+				background: #101010;
 			}
 			#stage {
 				position: fixed;
@@ -36,21 +35,24 @@
 				background: #fff;
 				box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
 			}
-			/* The engine's canvas, the window's size and drawn with the camera, over the boards. */
-			#stage > canvas {
+			/*
+			 * The engine's canvas, over the boards and inside the world exactly as on the canvas
+			 * (`Stage.tsx`, `.stage-engine-over` in `styles/canvas.css`): the engine places it in stage
+			 * units at the rectangle it drew (`StageEngine.place`), and the world's transform does the rest.
+			 */
+			#world > canvas.over {
 				position: absolute;
 				top: 0;
 				left: 0;
-			}
-			#stage > canvas.over {
 				z-index: 1;
+				transform-origin: 0 0;
+				pointer-events: none;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="stage">
-			<div id="world"></div>
-			<canvas class="over"></canvas>
+			<div id="world"><canvas class="over"></canvas></div>
 		</div>
 		<script type="module" src="/src/shot.ts"></script>
 	</body>
