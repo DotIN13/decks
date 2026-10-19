@@ -17,7 +17,7 @@ import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
-import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
+import { fetchPictureAsset, refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
@@ -684,6 +684,19 @@ export function createHttpApp(app: App): Express {
 			if (declared > MAX_UPLOAD_BYTES) throw new UploadRefused(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`, 413);
 			const name = typeof req.query.name === "string" ? req.query.name : "";
 			res.json(await storeAssetStream(app.deck.path, name, req));
+		}),
+	);
+
+	/*
+	 * A picture on the web, copied into the deck by the server (`fetchPictureAsset`): what a board
+	 * showed from elsewhere, dragged or pasted onto the canvas, lands next to it and not linked.
+	 */
+	api.post(
+		"/upload-url",
+		asyncRoute(async (req, res) => {
+			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			const url = String((req.body as { url?: unknown } | undefined)?.url ?? "");
+			res.json(await fetchPictureAsset(app.deck.path, url));
 		}),
 	);
 

@@ -252,3 +252,50 @@ export async function withMedia(deckRoot: string, asset: UploadedAsset): Promise
 	const peaks = facts.kind === "audio" ? await soundPeaks(join(deckRoot, asset.path)).catch(() => undefined) : undefined;
 	return { ...asset, media: { kind: facts.kind, ...(poster ? { poster } : {}), ...(peaks ? { peaks } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.w ? { w: facts.w, h: facts.h } : {}) } };
 }
+
+/** The pictures a web address may bring in, by the type the server answered with. */
+const PICTURE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/avif": "avif", "image/svg+xml": "svg", "image/bmp": "bmp" };
+
+/**
+ * A picture on the web, copied into the deck's `assets/` (dragged or pasted onto the canvas from a
+ * board that showed it): so the canvas still shows it offline, and it never changes under the canvas.
+ *
+ * Only `http`/`https`, only an answer that says it is a picture, and no more than the upload cap,
+ * counted as it arrives. The name is the address's last part, given the picture's extension when
+ * it has none; the rest is `storeAsset`, so the same picture twice is one file.
+ */
+export async function fetchPictureAsset(deckRoot: string, address: string, get: typeof fetch = fetch): Promise<UploadedAsset> {
+	let url: URL;
+	try {
+		url = new URL(address);
+	} catch {
+		throw new UploadRefused("that is not a web address");
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:") throw new UploadRefused("only a picture on the web (http or https) can be fetched");
+	const answer = await get(url, { redirect: "follow", signal: AbortSignal.timeout(20_000) }).catch((error: Error) => {
+		throw new UploadRefused(`the picture could not be fetched: ${error.message}`, 502);
+	});
+	if (!answer.ok) throw new UploadRefused(`the picture's server answered ${answer.status}`, 502);
+	const type = (answer.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+	const extension = PICTURE_TYPES[type];
+	if (!extension) throw new UploadRefused(`that address is not a picture (${type || "no type"})`, 415);
+	if (Number(answer.headers.get("content-length") ?? 0) > MAX_UPLOAD_BYTES) throw new UploadRefused(`that picture is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB`, 413);
+	const chunks: Buffer[] = [];
+	let bytes = 0;
+	const reader = answer.body?.getReader();
+	if (reader) {
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			bytes += value.length;
+			if (bytes > MAX_UPLOAD_BYTES) {
+				await reader.cancel();
+				throw new UploadRefused(`that picture is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB`, 413);
+			}
+			chunks.push(Buffer.from(value));
+		}
+	}
+	const last = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() ?? "") || "picture";
+	const name = /\.[A-Za-z0-9]{2,5}$/.test(last) ? last : `${last}.${extension}`;
+	return storeAsset(deckRoot, name, Buffer.concat(chunks));
+}
