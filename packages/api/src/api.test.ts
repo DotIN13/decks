@@ -7,7 +7,7 @@ test("the table has every call of the redesign, each named once, and the old nam
 	const names = new Set(VERBS.map((verb) => verb.name));
 	for (const name of [
 		"canvas.read", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy", "canvas.variables", "canvas.batch",
-		"canvas.fit", "canvas.save", "canvas.screenshot", "canvas.rename", "canvas.file", "canvas.watch", "canvas.list", "canvas.create",
+		"canvas.fit", "canvas.save", "canvas.screenshot", "canvas.rename", "canvas.file", "canvas.list", "canvas.create",
 		"board.list", "board.create", "board.get", "board.canvases", "board.url", "frame.create", "file.url",
 		"agent.me", "agent.update", "here", "agent.claim", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create",
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
@@ -15,7 +15,7 @@ test("the table has every call of the redesign, each named once, and the old nam
 		"web.status", "web.pairing", "web.repair", "web.board", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
 		"ports", "now",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 66);
+	assert.equal(VERBS.length, 65);
 	assert.ok(VERBS.every((verb) => !verb.alias), "no new call is an alias");
 	assert.ok(ALIASES.every((verb) => verb.alias && !names.has(verb.name)), "every old name says its new call and is not a new name");
 });
@@ -32,7 +32,6 @@ test("every call says what it touches and whether it changes it, in the redesign
 	assert.equal(count("screen", "read"), 2, "camera and viewport only read the screen");
 	assert.equal(count("screen", "change"), 5);
 	assert.ok(VERBS.filter((verb) => verb.group === "view").every((verb) => verb.touches === "screen"), "view calls never write files");
-	assert.equal(VERB_BY_NAME.get("canvas.watch")!.effect, "read");
 	assert.equal(VERB_BY_NAME.get("web.board")!.touches, "deck");
 });
 

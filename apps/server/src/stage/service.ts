@@ -12,7 +12,6 @@ import type { StagePens } from "./pens.ts";
 import type { Forwards } from "../ports.ts";
 import type { Apps } from "../apps/service.ts";
 import type { AppCheck } from "../apps/check.ts";
-import type { Watches } from "./watches.ts";
 
 /**
  * The single path from a tool to the canvas.
@@ -154,8 +153,6 @@ export class StageService {
 	shots: StageShots | undefined;
 	/** The server's own picture of a whole board, fresh from its file (`boards/thumbs.ts`): what a screenshot falls back to. */
 	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;
-	/** Who watches which canvas, and their unread events (`stage/watches.ts`). `undefined` in tests without one. */
-	watches: Watches | undefined;
 
 	constructor(
 		private deck: Deck,

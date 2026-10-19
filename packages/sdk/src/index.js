@@ -48,7 +48,6 @@ export const VERBS = [
 	["canvas.screenshot",["options?"]],
 	["canvas.rename",["title","options?"]],
 	["canvas.file",["options?"]],
-	["canvas.watch",["options?"]],
 	["board.list",[]],
 	["board.create",["options"]],
 	["board.get",["board"]],

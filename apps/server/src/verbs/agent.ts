@@ -75,8 +75,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 			},
 			inbox: async () => {
 				const handed = agent.queue().map((item) => ({ from: item.fromName, task: item.task, boards: item.boards, at: item.at, ...(item.reply ? { reply: true } : {}) }));
-				const events = agent.board || agent.person ? [] : (service.watches?.take(agent.id) ?? []).map((event) => ({ from: event.from, kind: event.kind, canvas: event.canvas, ...(event.item ? { item: event.item } : {}), boards: event.kind.startsWith("board.") && event.item ? [event.item] : [], at: event.at }));
-				return [...handed, ...events].sort((a, b) => a.at - b.at);
+				return handed;
 			},
 			list: async (options?: { workspace?: string }) => {
 				const workspace = options?.workspace === undefined || options.workspace === null ? undefined : askedWorkspace(options.workspace);

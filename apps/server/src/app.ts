@@ -43,7 +43,6 @@ import { GoogleDocs } from "./google/docs.ts";
 import { NativeShots } from "./stage/native-shots.ts";
 import { resolveDoc } from "./docs/resolve.ts";
 import { Writers } from "./docs/writers.ts";
-import { Watches } from "./stage/watches.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -214,17 +213,6 @@ export class App {
 		 */
 		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
 		this.stage.pens = this.pens;
-		// Who watches which canvas (`decks.canvas.watch`), and what they have not read yet.
-		this.stage.watches = new Watches({
-			nameOf: (agentId) => this.agents?.get(agentId)?.name,
-			canvasesOf: (path) => this.pens.names().filter((name) => {
-				try {
-					return this.pens.boards(name).some((one) => one.path === path);
-				} catch {
-					return false;
-				}
-			}),
-		});
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;
 		this.apps = new Apps(deck.path);
@@ -957,7 +945,6 @@ export class App {
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.board) this.thumbs.changed(message.board);
-			this.stage.watches?.boardChanged(message.path, message.rev, message.board?.lastWrittenBy);
 		}
 		this.hub?.each((view) => this.forView(message, view));
 		for (const listener of this.listeners) listener(message);
@@ -1009,7 +996,6 @@ export class App {
 	 * browser is sent it once per agent whose stage it is.
 	 */
 	private publishPen(name: string, entry: PenEntry): void {
-		this.stage.watches?.canvasChanged(name, entry.doc);
 		const on = (this.agents?.all() ?? []).filter((agent) => agent.stageName() === name);
 		for (const agent of on) agent.penChanged();
 		// What changed, not the whole drawing: a browser that missed a revision asks for it whole.

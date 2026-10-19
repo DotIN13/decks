@@ -28,8 +28,6 @@ export type Screenshot = { file: string; width: number; height: number; box: Box
  * what the person calls it.
  */
 export type Canvas = { name: string; title: string; open: string[]; boards: number };
-/** A watch on one canvas: its board and drawing changes arrive in your inbox. */
-export type Subscription = { canvas: string; watching: boolean; since: number };
 /** A board file in the deck. `title` is the finding it states. */
 export type Board = { path: string; title: string; lastWrittenBy?: string };
 /**
@@ -43,11 +41,10 @@ export type Placement = { board: string; canvas: string; box: Box; clipped?: boo
  */
 export type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
 /**
- * A hand-off or a canvas event in an inbox. A hand-off has `task`; a canvas event has `kind`
- * ("board.added", "board.removed", "board.moved", "board.changed", "drawing.changed"), `canvas` and
- * usually `item`, and `from` is who made the change.
+ * A hand-off in an inbox: who sent it, the task, the boards it names, when, and whether they want a
+ * reply.
  */
-export type Message = { from: string; task?: string; kind?: string; canvas?: string; item?: string; boards: string[]; at: number; reply?: boolean };
+export type Message = { from: string; task: string; boards: string[]; at: number; reply?: boolean };
 /** Where a screen looks on a canvas, and its zoom (1 is life size). */
 export type Camera = { x: number; y: number; zoom: number };
 export type Point = { x: number; y: number };
@@ -215,11 +212,6 @@ export interface Verbs {
 		rename(title: string, options?: { canvas?: string }): Promise<Canvas>;
 		/** The canvas's .pen file, to edit by hand instead. */
 		file(options?: { canvas?: string }): Promise<string>;
-		/**
-		 * Board and drawing changes on this canvas, made by anyone else, arrive in your inbox as events {
-		 * kind, canvas, item, from, at } (decks.agent.inbox). `off: true` stops the watch.
-		 */
-		watch(options?: { canvas?: string; off?: boolean }): Promise<Subscription>;
 		/** Every canvas in the deck, and which agents have it open. */
 		list(): Promise<Canvas[]>;
 		/**
@@ -267,7 +259,10 @@ export interface Verbs {
 		update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Promise<Agent>;
 		/** Say these boards carry your work, without showing them: you become their writer. */
 		claim(boards: string | string[]): Promise<string[]>;
-		/** Hand-offs waiting for you, and changes on canvases you watch (each canvas event is given once). */
+		/**
+		 * Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you
+		 * with your next message.
+		 */
 		inbox(): Promise<Message[]>;
 		/**
 		 * Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits

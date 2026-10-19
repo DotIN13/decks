@@ -60,8 +60,8 @@ export const Agent = named(
 
 export const Message = named(
 	"Message",
-	obj({ from: str(), task: opt(str()), kind: opt(str()), canvas: opt(str()), item: opt(str()), boards: arr(str()), at: num(), reply: opt(bool()) }),
-	'A hand-off or a canvas event in an inbox. A hand-off has `task`; a canvas event has `kind` ("board.added", "board.removed", "board.moved", "board.changed", "drawing.changed"), `canvas` and usually `item`, and `from` is who made the change.',
+	obj({ from: str(), task: str(), boards: arr(str()), at: num(), reply: opt(bool()) }),
+	"A hand-off in an inbox: who sent it, the task, the boards it names, when, and whether they want a reply.",
 );
 
 export const Camera = named("Camera", obj({ x: num(), y: num(), zoom: num() }), "Where a screen looks on a canvas, and its zoom (1 is life size).");
@@ -71,8 +71,6 @@ export const Item = named(
 	obj({ type: str(), id: opt(str()), board: opt(str()), box: opt(Box), children: opt(arr(any())) }, true),
 	'Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: "board", board: <path>, width? }.',
 );
-
-export const Subscription = named("Subscription", obj({ canvas: str(), watching: bool(), since: num() }), "A watch on one canvas: its board and drawing changes arrive in your inbox.");
 
 /** Where an item goes: a corner, or 160 px clear of another item; and which frame it goes into. */
 export const Place = obj({

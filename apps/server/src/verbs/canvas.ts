@@ -61,7 +61,7 @@ export function placeBy(box: { x: number; y: number; w: number; h: number }, how
 }
 
 export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
-	const { service, agent, notes, needPens, canvasOf, canvasRow, byName, isolated } = ctx;
+	const { service, agent, notes, needPens, canvasOf, canvasRow, isolated } = ctx;
 	const measure = serverText.measure;
 
 	/** Lay a document out as the canvas would: what `beside` and every answered box are measured on. */
@@ -236,7 +236,6 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	const change = (name: string, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
 		const pens = needPens();
 		const { penOps, sized, deleted, placedFor } = translate(name, ops);
-		service.watches?.writing(name, byName());
 		const { entry, results } = pens.edit(name, penOps, undefined, agent.person ? { undoable: true } : undefined);
 		notes.push(...placedFor);
 		for (const result of results) if (result.note) notes.push(result.note);
@@ -322,8 +321,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const name = canvasOf(options?.canvas);
 				const pens = needPens();
 				const entry = pens.get(name);
-				service.watches?.writing(name, byName());
-				return pens.saveFrame(name, idIn(entry.doc, id), frame, options?.replace !== false);
+						return pens.saveFrame(name, idIn(entry.doc, id), frame, options?.replace !== false);
 			},
 			screenshot: async (options?: { canvas?: string; of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark" }) => {
 				const { canvas, ...rest } = options ?? {};
@@ -336,15 +334,6 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return canvasRow(folder);
 			},
 			file: async (options?: { canvas?: string }) => canvasFile(canvasOf(options?.canvas)),
-			watch: async (options?: { canvas?: string; off?: boolean }) => {
-				const name = canvasOf(options?.canvas);
-				const watches = service.watches;
-				if (!watches) throw new Error("This server keeps no watches.");
-				if (agent.board || agent.person) throw new Error("Only an agent can watch a canvas: the events go to its inbox.");
-				if (options?.off) return watches.unwatch(agent.id, name);
-				const revs = Object.fromEntries(needPens().boards(name).map((one) => [one.path, service.fileBoard(one.path)?.rev ?? 0]));
-				return watches.watch(agent.id, name, needPens().get(name).doc, revs);
-			},
 			list: async () => {
 				const pens = needPens();
 				const { isIsolatedStage } = await import("../stage/isolated-stages.ts");

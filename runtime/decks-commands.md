@@ -11,11 +11,10 @@ type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]:
 type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
 type Screenshot = { file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string };
 type Canvas = { name: string; title: string; open: string[]; boards: number };
-type Subscription = { canvas: string; watching: boolean; since: number };
 type Board = { path: string; title: string; lastWrittenBy?: string };
 type Placement = { board: string; canvas: string; box: Box; clipped?: boolean };
 type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
-type Message = { from: string; task?: string; kind?: string; canvas?: string; item?: string; boards: string[]; at: number; reply?: boolean };
+type Message = { from: string; task: string; boards: string[]; at: number; reply?: boolean };
 type Camera = { x: number; y: number; zoom: number };
 type Point = { x: number; y: number };
 type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
@@ -40,7 +39,6 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks canvas screenshot` · `decks.canvas.screenshot(options?: { canvas?: string; of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Screenshot`. A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an item's id, a board's path, a list of them, or a box; one board's path alone is that board as the person's browser has it now. A .pen file's path pictures that file whole. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
 - `decks canvas rename` · `decks.canvas.rename(title: string, options?: { canvas?: string }): Canvas`. What the person calls this canvas: a few words for what is on it, that a person would look for. The folder never changes.
 - `decks canvas file` · `decks.canvas.file(options?: { canvas?: string }): string`. The canvas's .pen file, to edit by hand instead.
-- `decks canvas watch` · `decks.canvas.watch(options?: { canvas?: string; off?: boolean }): Subscription`. Board and drawing changes on this canvas, made by anyone else, arrive in your inbox as events { kind, canvas, item, from, at } (decks.agent.inbox). `off: true` stops the watch.
 
 **Board and deck: files in the deck folder, on any number of canvases**
 
@@ -60,7 +58,7 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks agent update` · `decks.agent.update(patch: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string; canvas?: string }): Agent`. Change your name, avatar (an <svg> with xmlns and a viewBox, or { emoji }), workspace (the project) or tags (up to four, for what you are doing now), or your home canvas: the one the app shows beside you, and what decks.here() means for a call that names none. Set the first four early in every session.
 - `decks here` · `decks.here(): Canvas`. The canvas a call means when it names none: your home canvas for an agent, the board's canvas for a board button, the canvas on screen for the person. Asked, never set.
 - `decks agent claim` · `decks.agent.claim(boards: string | string[]): string[]`. Say these boards carry your work, without showing them: you become their writer.
-- `decks agent inbox` · `decks.agent.inbox(): Message[]`. Hand-offs waiting for you, and changes on canvases you watch (each canvas event is given once).
+- `decks agent inbox` · `decks.agent.inbox(): Message[]`. Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.
 - `decks agent list` · `decks.agent.list(options?: { workspace?: string }): Agent[]`. Every agent, or the ones on one project (`workspace`), with what each is doing and how much waits for it.
 - `decks agent get` · `decks.agent.get(name: string): Agent`. Another agent, by name or id: kind, workspace, tags, state, home canvas.
 - `decks agent send` · `decks.agent.send(name: string, message: { task: string; boards?: string[] }): { delivered: boolean; turn: "running" | "new" | "queued"; position?: number; note?: string }`. Deliver now: the message reaches the agent in the turn it is running and steers it, where its runtime can take a message mid-turn; an idle agent starts a turn on it. A runtime that cannot be steered mid-turn gets it queued, and the answer says delivered: false.

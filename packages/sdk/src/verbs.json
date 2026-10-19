@@ -1661,38 +1661,6 @@
   ]
  },
  {
-  "name": "canvas.watch",
-  "command": [
-   "canvas",
-   "watch"
-  ],
-  "group": "canvas",
-  "touches": "deck",
-  "effect": "read",
-  "summary": "Board and drawing changes on this canvas, made by anyone else, arrive in your inbox as events { kind, canvas, item, from, at } (decks.agent.inbox). `off: true` stops the watch.",
-  "signature": "canvas.watch(options?: { canvas?: string; off?: boolean })",
-  "returns": "Subscription",
-  "params": [
-   {
-    "name": "options",
-    "optional": true,
-    "type": "{ canvas?: string; off?: boolean }",
-    "schema": {
-     "type": "object",
-     "properties": {
-      "canvas": {
-       "type": "string"
-      },
-      "off": {
-       "type": "boolean"
-      }
-     },
-     "additionalProperties": false
-    }
-   }
-  ]
- },
- {
   "name": "board.list",
   "command": [
    "board",
@@ -2057,7 +2025,7 @@
   "group": "agent",
   "touches": "agents",
   "effect": "read",
-  "summary": "Hand-offs waiting for you, and changes on canvases you watch (each canvas event is given once).",
+  "summary": "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.",
   "signature": "agent.inbox()",
   "returns": "Message[]",
   "params": []

@@ -25,7 +25,6 @@ import {
 	Screenshot,
 	Size,
 	Sized,
-	Subscription,
 	WebTarget,
 } from "./types.ts";
 
@@ -216,14 +215,6 @@ export const VERBS: readonly Verb[] = [
 		params: [onCanvas()],
 		result: str(),
 	},
-	{
-		name: "canvas.watch",
-		group: "canvas",
-		...deckRead,
-		summary: "Board and drawing changes on this canvas, made by anyone else, arrive in your inbox as events { kind, canvas, item, from, at } (decks.agent.inbox). `off: true` stops the watch.",
-		params: [onCanvas({ off: opt(bool()) })],
-		result: Subscription,
-	},
 
 	// --- board and deck: files in the deck folder ------------------------------------------------
 	{ name: "board.list", group: "board", ...deckRead, summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
@@ -278,7 +269,7 @@ export const VERBS: readonly Verb[] = [
 		result: Canvas,
 	},
 	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these boards carry your work, without showing them: you become their writer.", params: [paths("boards")], result: arr(str()) },
-	{ name: "agent.inbox", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you, and changes on canvases you watch (each canvas event is given once).", params: [], result: arr(Message) },
+	{ name: "agent.inbox", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
 	{
 		name: "agent.list",
 		group: "agent",

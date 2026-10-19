@@ -76,7 +76,6 @@ const file = await decks.canvas.file();               // "canvases/<name>/canvas
   beside an item an earlier one made.
 - Hand edits work too: keep it valid JSON, keep ids unique and free of `/`. A file that stops
   parsing is reported by `read()`, and the canvas keeps the last good version until you fix it.
-- `decks.canvas.watch()` puts the changes others make on a canvas into your `decks.agent.inbox()`.
 
 ## Boxes, not sums
 

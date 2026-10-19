@@ -39,8 +39,6 @@ export interface VerbContext {
 	canvasOf(asked?: unknown): string;
 	/** A canvas as the `Canvas` type has it: its name, title, who has it open, how many boards. */
 	canvasRow(name: string): { name: string; title: string; open: string[]; boards: number };
-	/** Who is making a change, as an inbox event names them. */
-	byName(): string;
 	/** The canvas the request says it was made on, for this one call (`StageTool.call`). */
 	callOn: { stage?: string };
 }
@@ -222,8 +220,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 			boards,
 		};
 	};
-	const byName = () => (agent.person ? "person" : agent.identity().name);
-	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, isolated, here, cornerOf, reportPlace, notWhileIsolated, askedWorkspace, hereCanvas, canvasOf, canvasRow, byName, callOn };
+	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, isolated, here, cornerOf, reportPlace, notWhileIsolated, askedWorkspace, hereCanvas, canvasOf, canvasRow, callOn };
 }
 
 /** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */

@@ -11,7 +11,7 @@ import { placeBy, toItem } from "./canvas.ts";
 
 /**
  * The calls of the SDK redesign, end to end over `/api/v1`: a board as a canvas item, beside and
- * below, batch's all or nothing, `here()`, watches into the inbox, the old names' notes, and
+ * below, batch's all or nothing, `here()`, the old names' notes, and
  * `send` against `queue`.
  */
 
@@ -183,38 +183,6 @@ test("an old name still answers as it did, and says its new call", async () => {
 		assert.ok(read.notes.some((note) => /decks\.canvas\.read/.test(note)));
 		const fresh = await must("canvas.read");
 		assert.ok(!fresh.notes.some((note) => /old name/.test(note)), "a new call carries no such note");
-	} finally {
-		cleanup();
-	}
-});
-
-test("a watched canvas's changes by others land in the watcher's inbox, once", async () => {
-	const { app, agent, must, cleanup } = await open();
-	try {
-		const other = app.agents.create({ name: "Rune" });
-		const home = (await must("here")).value.name;
-		const sub = (await must("canvas.watch")).value;
-		assert.deepEqual([sub.canvas, sub.watching], [home, true]);
-		// Rune changes the watcher's canvas.
-		const rune = { "x-decks-agent": other.id };
-		await must("canvas.insert", [{ type: "note", id: "r1", content: "from Rune" }, { canvas: home, at: { x1: 0, y1: 0 } }], rune);
-		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: home, beside: "r1" }], rune);
-		// The watcher's own change is not news to it.
-		await must("canvas.insert", [{ type: "note", id: "mine", content: "mine" }, { at: { x1: 0, y1: 900 } }]);
-		const inbox = (await must("agent.inbox")).value;
-		const events = inbox.filter((one: { kind?: string }) => one.kind);
-		assert.deepEqual(
-			events.map((one: { kind: string; item: string; from: string; canvas: string }) => [one.kind, one.item, one.from, one.canvas]),
-			[
-				["drawing.changed", "r1", "Rune", home],
-				["board.added", "boards/a.html", "Rune", home],
-			],
-		);
-		assert.deepEqual((await must("agent.inbox")).value.filter((one: { kind?: string }) => one.kind), [], "each event is read once");
-		await must("canvas.watch", [{ off: true }]);
-		await must("canvas.delete", ["r1", { canvas: home }], rune);
-		assert.deepEqual((await must("agent.inbox")).value, [], "a stopped watch hears nothing");
-		void agent;
 	} finally {
 		cleanup();
 	}
