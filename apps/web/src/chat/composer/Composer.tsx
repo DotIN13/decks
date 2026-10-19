@@ -6,8 +6,9 @@ import Paperclip from "lucide-solid/icons/paperclip";
 import Pencil from "lucide-solid/icons/pencil";
 import X from "lucide-solid/icons/x";
 import Square from "lucide-solid/icons/square";
+import Check from "lucide-solid/icons/check";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
-import { micMissing, startRecording, type Recording } from "./voice.ts";
+import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../board/file-drop.ts";
 import type { BoardComment } from "../../markup/comments.ts";
@@ -349,12 +350,19 @@ export function Composer(props: {
 	/*
 	 * Voice (`voice.ts`): the mic records, and what was said goes in at the caret when it stops, to be
 	 * edited and sent like anything typed. Ctrl+M starts and stops it; Esc throws it away.
+	 *
+	 * While it records, the controls row is the recording's alone: one ✕ that throws the take away, the
+	 * level and the time with the whole row to themselves, and one ✓ that keeps the words. It used to sit
+	 * beside the turn's own red stop, two identical buttons meaning different things, with the meter and
+	 * the timer squeezed into dots and no way to throw a take away on a phone. What the browser's
+	 * recogniser hears shows above the row as you speak: settled words dark, words it may still change grey.
 	 */
 	const [recording, setRecording] = createSignal<Recording | undefined>();
 	const [listening, setListening] = createSignal(false);
 	const [transcribing, setTranscribing] = createSignal(false);
 	const [levels, setLevels] = createSignal<number[]>([]);
-	const [heard, setHeard] = createSignal("");
+	const [settled, setSettled] = createSignal("");
+	const [pending, setPending] = createSignal("");
 	const [since, setSince] = createSignal(0);
 	const [now, setNow] = createSignal(0);
 	let clock: ReturnType<typeof setInterval> | undefined;
@@ -363,15 +371,19 @@ export function Composer(props: {
 		clock = undefined;
 		setListening(false);
 		setLevels([]);
-		setHeard("");
+		setSettled("");
+		setPending("");
 	};
 	const startVoice = async () => {
 		if (listening() || transcribing()) return;
 		setListening(true);
 		try {
 			const started = await startRecording({
-				onLevel: (level) => setLevels((was) => [...was.slice(-12), level]),
-				onHeard: setHeard,
+				onLevel: (level) => setLevels((was) => [...was.slice(-47), level]),
+				onHeard: (done, still) => {
+					setSettled(done);
+					setPending(still);
+				},
 			});
 			setRecording(started);
 			setSince(Date.now());
@@ -689,9 +701,37 @@ export function Composer(props: {
 					}}
 				/>
 
+				{/* What the browser's recogniser has heard so far: settled words dark, the rest grey. */}
+				<Show when={recording()}>
+					<p class="composer-live" aria-live="polite">
+						<Show when={settled() || pending()} fallback={<span class="composer-live-wait">Listening…</span>}>
+							<span>{settled()}</span>
+							<Show when={pending()}>
+								<span class="composer-live-pending">{joinHeard(settled(), pending()).length > settled().length + pending().length ? " " : ""}{pending()}</span>
+							</Show>
+						</Show>
+					</p>
+				</Show>
 				{/* The controls row. `dockrow` is only the two control sizes the board fixes
 				    for this row (26px, 34 under a finger); the layout is here. */}
 				<div class="dock-row mt-2 flex items-center gap-1.5">
+					<Show
+						when={!recording()}
+						fallback={
+							<div class="composer-recording" role="group" aria-label="Recording">
+								<button class="icon-button composer-discard" type="button" title="Throw this take away (Esc)" aria-label="Discard recording" onClick={() => cancelVoice()}>
+									<Icon of={X} size={16} />
+								</button>
+								<span class="composer-wave" aria-hidden="true">
+									<For each={levels()}>{(level) => <i style={{ height: `${Math.round(4 + level * 18)}px` }} />}</For>
+								</span>
+								<span class="composer-clock">{clockText()}</span>
+								<button class="send-button composer-done" type="button" title="Keep the words: they go in the box (Ctrl+M)" aria-label="Done recording" onClick={() => void stopVoice()}>
+									<Icon of={Check} size={15} />
+								</button>
+							</div>
+						}
+					>
 					<Show when={props.onHistory}>
 						<button
 							class="icon-button history-btn"
@@ -727,36 +767,18 @@ export function Composer(props: {
 
 					<span class="flex-1" />
 
-					{/* The mic, left of send: recording shows how loud, how long, and a stop. */}
-					<Show
-						when={recording()}
-						fallback={
-							<button
-								class="icon-button composer-mic"
-								type="button"
-								data-busy={transcribing() || listening() ? "true" : undefined}
-								disabled={transcribing()}
-								title={micMissing() ?? (transcribing() ? "Turning it into words…" : "Speak instead of typing (Ctrl+M)")}
-								aria-label="Speak"
-								onClick={() => void startVoice()}
-							>
-								<Icon of={Mic} size={15} />
-							</button>
-						}
+					{/* The mic, left of send. While it records, the whole row is the recording's (below). */}
+					<button
+						class="icon-button composer-mic"
+						type="button"
+						data-busy={transcribing() || listening() ? "true" : undefined}
+						disabled={transcribing()}
+						title={micMissing() ?? (transcribing() ? "Turning it into words…" : "Speak instead of typing (Ctrl+M)")}
+						aria-label="Speak"
+						onClick={() => void startVoice()}
 					>
-						<span class="composer-voice" role="status" aria-label="Recording">
-							<Show when={heard()}>
-								<span class="composer-heard">{heard()}</span>
-							</Show>
-							<span class="composer-wave" aria-hidden="true">
-								<For each={levels()}>{(level) => <i style={{ height: `${Math.round(4 + level * 18)}px` }} />}</For>
-							</span>
-							<span class="composer-clock">{clockText()}</span>
-						</span>
-						<button class="send-button composer-mic-stop" type="button" title="Stop and put the words in the box (Esc throws them away)" aria-label="Stop recording" onClick={() => void stopVoice()}>
-							<Icon of={Square} size={11} class="fill-current" />
-						</button>
-					</Show>
+						<Icon of={Mic} size={15} />
+					</button>
 
 					{/*
 					 * Stop is what an **empty** box offers while a turn is running. The moment
@@ -794,6 +816,7 @@ export function Composer(props: {
 						>
 							<Icon of={Square} size={11} class="fill-current" />
 						</button>
+					</Show>
 					</Show>
 				</div>
 			</div>

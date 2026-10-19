@@ -71,8 +71,11 @@ export interface Recording {
 export interface VoiceOptions {
 	/** How loud it is now, 0 to 1, about 20 times a second: the bars beside the timer. */
 	onLevel?: (level: number) => void;
-	/** Words the browser's recogniser has heard so far, before you stop: shown as you speak. */
-	onHeard?: (words: string) => void;
+	/**
+	 * Words the browser's recogniser has heard so far, before you stop, shown as you speak: what it has
+	 * settled on, and what it is still hearing and may change.
+	 */
+	onHeard?: (settled: string, pending: string) => void;
 	/** The language the browser's recogniser listens for; the server's hears any. */
 	lang?: string;
 }
@@ -111,6 +114,38 @@ export function micMissing(): string | undefined {
 	return undefined;
 }
 
+/**
+ * Two stretches of heard words as one: a space between them when both sides are words of a language
+ * written with spaces, none for Chinese or Japanese, and none when one is already there. A recogniser
+ * hands its pieces over as it settles them, and Chrome's usually but not always begin with a space.
+ */
+export function joinHeard(before: string, after: string): string {
+	if (!before) return after;
+	if (!after) return before;
+	if (/\s$/.test(before) || /^\s/.test(after)) return before + after;
+	const spaceless = /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/;
+	if (spaceless.test(before.slice(-1)) || spaceless.test(after[0]!)) return before + after;
+	return `${before} ${after}`;
+}
+
+/**
+ * Why the browser would not give the microphone, in a sentence: the real reason, not one sentence for
+ * all of them. A Mac mini has no microphone, and that read as "not allowed" while the permission was on.
+ */
+export function micError(error: unknown): string {
+	const name = (error as { name?: string } | undefined)?.name ?? "";
+	const message = String((error as { message?: string } | undefined)?.message ?? "");
+	if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "No microphone is connected to this computer.";
+	if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+		// Chrome says "Permission denied by system" when the operating system holds the microphone back.
+		if (/system/i.test(message)) return "The computer is keeping the microphone from this browser: on a Mac, System Settings › Privacy & Security › Microphone.";
+		return "This site's microphone permission is off: the browser's site settings can change that.";
+	}
+	if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") return "The microphone could not start: another app may be holding it.";
+	if (name === "SecurityError") return "The browser gives the microphone only to an HTTPS address or localhost.";
+	return `The microphone could not start${name ? ` (${name})` : ""}.`;
+}
+
 /** Start listening. Throws a sentence when it cannot: no microphone, no permission, no recogniser. */
 export async function startRecording(options: VoiceOptions = {}): Promise<Recording> {
 	const missing = micMissing();
@@ -125,8 +160,8 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 	let stream: MediaStream;
 	try {
 		stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-	} catch {
-		throw new Error("The microphone was not allowed: the browser's site settings can change that.");
+	} catch (error) {
+		throw new Error(micError(error));
 	}
 	const levels = meter(stream, options.onLevel);
 	const release = () => {
@@ -175,8 +210,8 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 	recognition.onresult = (event) => {
 		finals = "";
 		interim = "";
-		for (const result of Array.from(event.results)) (result.isFinal ? (finals += result[0]!.transcript) : (interim += result[0]!.transcript));
-		options.onHeard?.(`${finals}${interim}`.trim());
+		for (const result of Array.from(event.results)) (result.isFinal ? (finals = joinHeard(finals, result[0]!.transcript)) : (interim = joinHeard(interim, result[0]!.transcript)));
+		options.onHeard?.(finals.trim(), interim.trim());
 	};
 	recognition.onerror = (event) => {
 		if (event.error !== "aborted" && event.error !== "no-speech") failed = event.error;
@@ -188,7 +223,7 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 				recognition.onend = () => {
 					release();
 					if (failed) fail(new Error(`The browser's recogniser stopped: ${failed}.`));
-					else done(`${finals}${interim}`.trim());
+					else done(joinHeard(finals, interim).trim());
 				};
 				recognition.stop();
 			});

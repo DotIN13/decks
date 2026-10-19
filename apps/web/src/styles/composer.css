@@ -88,21 +88,28 @@
 	.composer-mic[data-busy="true"] {
 		color: var(--color-accent);
 	}
-	.composer-voice {
+	/* While recording, the controls row is the recording's alone (`Composer`, voice). */
+	.composer-recording {
 		display: flex;
+		flex: 1;
 		align-items: center;
-		gap: 8px;
+		gap: 10px;
 		min-width: 0;
 	}
-	.composer-heard {
-		min-width: 0;
-		max-width: 260px;
+	.composer-recording .composer-wave {
+		flex: 1;
+		justify-content: center;
 		overflow: hidden;
-		white-space: nowrap;
-		text-overflow: ellipsis;
-		font-style: italic;
-		color: var(--muted);
-		font-size: var(--type-ui);
+	}
+	.composer-live {
+		margin: 6px 2px 0;
+		font-size: var(--type-body, 15px);
+		line-height: 1.4;
+		color: var(--color-fg);
+	}
+	.composer-live-pending,
+	.composer-live-wait {
+		color: var(--color-muted);
 	}
 	.composer-wave {
 		display: flex;
@@ -121,9 +128,9 @@
 		font-variant-numeric: tabular-nums;
 		color: var(--color-danger);
 	}
-	.send-button.composer-mic-stop {
-		background: var(--color-danger);
-		border-color: var(--color-danger);
+	.send-button.composer-done {
+		background: var(--color-accent);
+		border-color: var(--color-accent);
 		color: #fff;
 	}
 }
