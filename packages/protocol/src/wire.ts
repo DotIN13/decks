@@ -311,7 +311,6 @@ export type ClientMessage =
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
 	| { type: "web.repair" }
 	/** A fresh code another Decks can pair with. Answered with `pairing`. */
-	| { type: "pair.code" }
 	/** Take a token back: that front end can no longer reach this server. */
 	/** A document page: the messages are `@decks/docs`'s, carried on this socket as they are. */
 	| DocClientMessage

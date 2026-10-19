@@ -20,7 +20,8 @@ import type { PairedRow } from "@decks/protocol";
  *
  * Whoever deploys a harness where others can reach it can make the code a must
  * (`DECKS_REQUIRE_PAIR_CODE=1`): then no front end from another site gets a token without one, from
- * wherever it calls. Codes come from Settings, Other Decks, or `decks pair code` in a shell.
+ * wherever it calls. A code comes only from `decks pair code` in a shell on the harness's own machine
+ * (`fromThisMachine`): it is never shown in Settings, so reaching the harness's page is not enough.
  */
 export function codeRequired(env: NodeJS.ProcessEnv = process.env): boolean {
 	return ["1", "true", "yes", "on"].includes(String(env.DECKS_REQUIRE_PAIR_CODE ?? "").trim().toLowerCase());
@@ -172,6 +173,16 @@ export function tokenOf(headers: Record<string, string | string[] | undefined>, 
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * Whether a request was made on this machine itself: from loopback, and not passed on by a proxy
+ * there (`tailscale serve`, a tunnel, Vite's dev proxy), which all connect from loopback too but say
+ * whom they pass on in `X-Forwarded-For` or `Forwarded`.
+ */
+export function fromThisMachine(remote: string | undefined, headers: Record<string, string | string[] | undefined>): boolean {
+	if (!/^(?:127\.|::1$|::ffff:127\.)/.test(remote ?? "")) return false;
+	return !headers["x-forwarded-for"] && !headers.forwarded && !headers["x-real-ip"];
 }
 
 /** Loopback, the private ranges, link-local, and the 100.64/10 block Tailscale's addresses are in; IPv6 alike. */

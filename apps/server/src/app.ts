@@ -810,8 +810,8 @@ export class App {
 
 	/** The code on show and every front end holding a token, for Settings. */
 	pairingMessage(): ServerMessage {
-		const shown = this.pairing.current();
-		return { type: "pairing", ...(shown ? { code: shown.code, expires: shown.expires } : {}), paired: this.pairing.list() };
+		// The code itself never goes to a browser: it is made and shown only by decks pair code.
+		return { type: "pairing", paired: this.pairing.list() };
 	}
 
 	settingsMessage(): ServerMessage {

@@ -1,17 +1,12 @@
 import type { WirePart } from "./context.ts";
 
 /**
- * Letting another Decks in, from Settings: a fresh code to type there, and taking a token back.
+ * Who else uses this server, from Settings: taking a token back. A code is not made here, only by
+ * `decks pair code` on the harness's own machine (`share/pairing.ts`).
  *
- * Both answers go to every browser, since Settings may be open in two of them and the list is the
- * same for both.
+ * The answer goes to every browser, since Settings may be open in two of them.
  */
 export const share = {
-	"pair.code": (_message, _reply, wire) => {
-		wire.pairing.newCode();
-		wire.send(wire.pairingMessage());
-	},
-
 	"pair.revoke": (message, _reply, wire) => {
 		wire.pairing.revoke(message.id);
 		wire.send(wire.pairingMessage());

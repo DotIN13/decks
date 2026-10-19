@@ -3,6 +3,7 @@ import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import type { DeckAgent } from "../agents/session.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
+import { fromThisMachine } from "../share/pairing.ts";
 import { personAgent } from "./person.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
@@ -80,6 +81,11 @@ export function verbRoutes(app: App): express.Router {
 			return;
 		}
 
+		// A pairing code lets another Decks in, so only someone at the harness's own machine may make one.
+		if (name === "pair.code" && !fromThisMachine(req.socket.remoteAddress, req.headers)) {
+			res.status(403).json({ ok: false, error: "A pairing code is made only on the harness's own machine: run decks pair code in a shell there.", notes: [] });
+			return;
+		}
 		const caller = await callerOf(app, req, body, allowedOnce);
 		if ("error" in caller) {
 			res.status(caller.status).json({ ok: false, error: caller.error, notes: [] });

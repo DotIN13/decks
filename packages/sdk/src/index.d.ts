@@ -393,7 +393,7 @@ export interface Verbs {
 	pair: {
 		/**
 		 * A pairing code for another Decks front end, such as Studio, to connect to this harness with: six
-		 * digits, ten minutes, once. Replaces the code on show in Settings.
+		 * digits, ten minutes, once. Only on the harness's own machine; Settings never shows one.
 		 */
 		code(): Promise<{ code: string; expires: number }>;
 	};

@@ -239,7 +239,7 @@ export function Switcher(props: { label?: string } = {}) {
 										autocomplete="one-time-code"
 										maxLength={6}
 										class="min-w-0 flex-1 border-0 bg-none text-ui tracking-[0.12em] text-fg outline-none placeholder:tracking-normal placeholder:text-faint pointer-coarse:text-[16px]"
-										placeholder="From that server's Settings"
+										placeholder="From decks pair code on that machine"
 										value={code()}
 										onInput={(event) => setCode(event.currentTarget.value)}
 										data-connect-code

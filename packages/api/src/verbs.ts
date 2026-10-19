@@ -427,7 +427,7 @@ export const VERBS: readonly Verb[] = [
 		name: "pair.code",
 		group: "misc",
 		...outsideChange,
-		summary: "A pairing code for another Decks front end, such as Studio, to connect to this harness with: six digits, ten minutes, once. Replaces the code on show in Settings.",
+		summary: "A pairing code for another Decks front end, such as Studio, to connect to this harness with: six digits, ten minutes, once. Only on the harness's own machine; Settings never shows one.",
 		params: [],
 		result: obj({ code: str(), expires: num() }),
 	},

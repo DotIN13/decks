@@ -343,18 +343,11 @@ function Row(props: {
 /**
  * Other Decks front ends using this server (`server/src/share/pairing.ts`).
  *
- * A code made here is typed into the other Decks' "Connect a server"; it lasts ten minutes and works
- * once. Each front end that paired is a row, with a way to take its token back. Only on a backend
- * that can share: a canvas opened from a file has no one to let in.
+ * A code is never made here: only `decks pair code` in a shell on this machine makes one, so reaching
+ * this page is not enough to let another Decks in. Each front end that paired is a row, with a way to
+ * take its token back. Only on a backend that can share: a canvas opened from a file has no one to let in.
  */
 function OtherDecks() {
-	const [now, setNow] = createSignal(Date.now());
-	const tick = setInterval(() => setNow(Date.now()), 1000);
-	onCleanup(() => clearInterval(tick));
-	const shown = () => {
-		const one = pairing();
-		return one.code && one.expires && one.expires > now() ? { code: one.code, left: Math.max(1, Math.round((one.expires - now()) / 60_000)) } : undefined;
-	};
 	const ago = (at: number) => {
 		const minutes = Math.round((Date.now() - at) / 60_000);
 		if (minutes < 2) return "just now";
@@ -376,19 +369,11 @@ function OtherDecks() {
 								<span class="truncate">Pairing code</span>
 							</span>
 							<span class="row-note flex w-full items-baseline gap-1.5">
-								<Show when={shown()} fallback={<span class="truncate text-muted">None on show</span>}>
-									{(code) => (
-										<>
-											<span class="pair-code font-mono" data-pair-code>{code().code}</span>
-											<span class="truncate text-muted">works once, for {code().left} min</span>
-										</>
-									)}
-								</Show>
+								<span class="truncate text-muted">
+									Made only on this machine: run <span class="font-mono">decks pair code</span> in a shell there
+								</span>
 							</span>
 						</div>
-						<button class="set-mini" type="button" data-make-pair-code onClick={() => send({ type: "pair.code" })}>
-							{shown() ? "New code" : "Make a code"}
-						</button>
 					</div>
 					<For each={pairing().paired}>
 						{(row) => (

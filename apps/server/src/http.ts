@@ -73,7 +73,7 @@ function wildcard(req: Request): string {
 }
 
 /** What a harness that requires a pairing code says to a connect without one. */
-const NEEDS_CODE = "This harness asks every other Decks for a pairing code. Make one in its Settings, under Other Decks, or run decks pair code in its shell.";
+const NEEDS_CODE = "This harness asks every other Decks for a pairing code. Run decks pair code in a shell on its machine.";
 
 export function createHttpApp(app: App): Express {
 	const server = express();
@@ -121,7 +121,7 @@ export function createHttpApp(app: App): Express {
 			next();
 			return;
 		}
-		res.status(401).type("text").send("This Decks has not been paired with that server. Ask it for a pairing code in its Settings.");
+		res.status(401).type("text").send("This Decks has not been paired with that server. Make a pairing code with decks pair code on its machine.");
 	});
 
 	const api = express.Router();
@@ -145,12 +145,12 @@ export function createHttpApp(app: App): Express {
 			return;
 		}
 		if (!code && !fromPrivateNetwork(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "This server is reached over the internet, so it needs a pairing code. Make one in its Settings, under Other Decks." });
+			res.status(403).json({ needsCode: true, error: "This server is reached over the internet, so it needs a pairing code. Run decks pair code in a shell on its machine." });
 			return;
 		}
 		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
 		if (!token) {
-			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one in the server's Settings." });
+			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the server's machine." });
 			return;
 		}
 		app.send(app.pairingMessage());
@@ -184,7 +184,7 @@ export function createHttpApp(app: App): Express {
 		}
 		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
 		if (!token) {
-			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one in the harness's Settings, or with decks pair code." });
+			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine." });
 			return;
 		}
 		const linked = saveStudioLink(app.deck.path, body.url, body.key);

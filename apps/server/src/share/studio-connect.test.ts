@@ -92,10 +92,13 @@ test("with the code required, every connect and pairing without one is refused, 
 		assert.equal((await post("/pair", { label: "Other" })).status, 403, "the old pairing route asks for it too");
 
 		const agent = app.agents.focused();
+		const passedOn = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-agent": agent.id, "x-forwarded-for": "100.101.102.103" });
+		assert.equal(passedOn.status, 403, "a call a proxy passed on, as tailscale serve does, is not from this machine");
 		const made = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-agent": agent.id });
 		assert.equal(made.status, 200);
 		const code = (made.body.value as { code: string }).code;
 		assert.match(code, /^\d{6}$/);
+		assert.ok(!JSON.stringify(app.pairingMessage()).includes(code), "the code never goes to a browser");
 
 		const wrong = await post("/studio/connect", { url: "https://studio.test", key: KEY, code: code === "000000" ? "111111" : "000000" });
 		assert.equal(wrong.status, 403);
