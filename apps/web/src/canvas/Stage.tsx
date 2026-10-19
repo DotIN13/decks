@@ -1,16 +1,14 @@
-import { shotAdaptor } from "./shots/adaptors.ts";
 import { touchedCanvas } from "../camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
-import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
+import type { Board, Camera } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Scan from "lucide-solid/icons/scan";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import Pencil from "lucide-solid/icons/pencil";
-import { setCommenting } from "../state/comments.ts";
 import { Icon } from "./ui/icons.tsx";
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
 import { between, boxOf, fitInto, hasTitleBars, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
@@ -18,14 +16,11 @@ import { canvasBox, insets } from "../camera/insets.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
-import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
-import type { EditorHost, Tool } from "../board/Editor.ts";
-import type { FileDropHost } from "../board/file-drop.ts";
-import type { FrameGestureHost } from "../board/frame-gestures.ts";
+import type { StageBoardProps } from "./board-slot.ts";
+import type { FrameGestureHost } from "./frame-host.ts";
 import { zoomKey } from "./zoom-keys.ts";
 import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./lib/slide-keys.ts";
 import { cssEscape } from "./lib/css-escape.ts";
-import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
 import { velocityFrom, type Sample } from "./lib/velocity.ts";
@@ -83,7 +78,7 @@ import {
  * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
  * by `PEN_TOOL_KEYS` (`state/pen-tools.ts`); the ones that inserted components into a board are gone.
  */
-const TOOL_KEYS: Record<string, Tool> = { v: "select" };
+const TOOL_KEYS: Record<string, "select"> = { v: "select" };
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.
@@ -105,6 +100,25 @@ const TOOL_KEYS: Record<string, Tool> = { v: "select" };
  * finger on the canvas moves the canvas unless it landed on something that says
  * otherwise, which on a board means a title bar or a component already selected.
  */
+/** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
+export interface StageShots {
+	/** The picture of a board with no live page, as an address the sheet can fetch. */
+	picture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string;
+	/** Under the Canvas renderer, whether a live page draws its own picture (true) or hands it to the sheet. */
+	ownPicture: boolean;
+	/** A picture of a live page as it is now, taken as it is let go. Absent: only the host's pictures. */
+	capture?(frame: HTMLIFrameElement, board: Board): Promise<void>;
+}
+
+/** What a comment is about (`Stage`'s `onComment`). */
+export interface StageComment {
+	path: string;
+	title: string;
+	quote: string;
+	items?: string[];
+	anchor: () => DOMRect | undefined;
+}
+
 export function Stage(props: {
 	/**
 	 * Browse or edit. The stage draws the difference so it cannot be entered unnoticed.
@@ -190,8 +204,26 @@ export function Stage(props: {
 	/** Open a flow or slides board as its own source. */
 	onEditSource?: (path: string) => void;
 	/** The document editor's own way in, from a button in the board's bar. */
-	/** The board currently being edited as text, and how to finish. */
-	editing?: { path: string; editing: BoardEditing };
+	/** The board currently being edited as text: it stays live, and the stage's keys leave it alone. */
+	editingPath?: string;
+	/**
+	 * What draws one board: the stage says where it is and what it may do (`board-slot.ts`), the host
+	 * draws it. The Decks app's is `board/BoardFrame.tsx`; `mount.tsx` has a plain one.
+	 */
+	frame: Component<StageBoardProps>;
+	/**
+	 * Where a board's picture comes from, for the sheet that draws every board with no live page:
+	 * its address (`picture`), whether a live page draws its own picture rather than handing it to the
+	 * sheet (`ownPicture`, false for HTML-in-Canvas), and a picture taken of a live page as it is let
+	 * go (`capture`). The Decks app's are its shot adaptors (`canvas/shots/adaptors.ts`).
+	 */
+	shots: () => StageShots;
+	/**
+	 * Comment on a board or on drawn items, from the button in a bar or a pill: `path` is the board
+	 * (or the drawing's file, with the item ids in `items`), `anchor` where the button is on screen.
+	 * Absent: no comment buttons.
+	 */
+	onComment?: (comment: StageComment) => void;
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	/** The board dragged to a new size, in board units. The file is what changes. */
@@ -209,8 +241,6 @@ export function Stage(props: {
 	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
-	/** Per-board reload counters, from `decks.view.reload`. */
-	nonces?: Record<string, number>;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
 	acts?: Record<string, AgentAct | undefined>;
@@ -226,23 +256,8 @@ export function Stage(props: {
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
 	onExtent?: (path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
-	editor: EditorHost;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
-	onTool?: (tool: Tool) => void;
-	/** A file dropped from the desktop onto a board, per board (`file-drop.ts`). */
-	drops: (path: string) => FileDropHost;
-	/** Which revision each frame is showing; see `selfEdited` in App. */
-	frameRevs?: Record<string, number>;
-	/** A conversation, for boards that are a live view of one (`live-chat.ts`). */
-	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
-	/** Who an agent is, so a mirror can wear their colour. */
-	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
-	/** What that agent is doing, in the sign's own words (`chat/working-sign.ts`). */
-	working?: (agentId: string) => string | undefined;
-	/** The shared Chrome's state, for its status card (`live-web.js`). */
-	webStatus?: () => { status: WebStatus; code?: string } | undefined;
-	/** Allow, Deny or Stop pressed on that card. */
-	onWebReply?: (reply: LiveWebReply) => void;
+	onTool?: (tool: "select") => void;
 	/**
 	 * A link on a board pointing at another board — `true` once the deck has opened it.
 	 *
@@ -279,6 +294,8 @@ export function Stage(props: {
 	 */
 	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
 }) {
+	/* The host's board, read once: a component, not a value that changes. */
+	const Frame = untrack(() => props.frame);
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
 	let localCamera = props.camera;
@@ -467,7 +484,7 @@ export function Stage(props: {
 			 * put the whole canvas into the focus view and threw the edit away — and every `v s c t e`
 			 * picked a tool. While something is being edited, none of it is a shortcut.
 			 */
-			if (props.editing) return;
+			if (props.editingPath !== undefined) return;
 			/*
 			 * The drawing's own keys, in either mode but not while drawing. None of them fire while a text box has the caret
 			 * (above). Delete, the arrows and ⌘D act on what is selected; ⌘Z and ⇧⌘Z step through the
@@ -891,10 +908,10 @@ export function Stage(props: {
 						h: sized?.h ?? board.h,
 						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
 						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
-						live: (own && shotAdaptor().id !== "canvas") || live.has(board.path),
+						live: (own && props.shots().ownPicture) || live.has(board.path),
 						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
-						picture: shotAdaptor().picture(board, look),
+						picture: props.shots().picture(board, look),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !paged(board) } : {}),
 					};
 				}),
@@ -2265,7 +2282,7 @@ export function Stage(props: {
 		for (const path of keptPages()) keep(path);
 		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
-		keep(props.editing?.path);
+		keep(props.editingPath);
 		for (const path of editor.heldBoards()) keep(path);
 		// What is drawn on a board rather than in it: an agent's act, a cursor.
 		for (const path of actsByPath().keys()) keep(path);
@@ -2523,7 +2540,7 @@ export function Stage(props: {
 	 * needs — is how the two views would drift apart.
 	 */
 	const boardNode = (board: Board, alone = false, sized = false) => (
-						<BoardFrame
+						<Frame
 							board={board}
 							/*
 							 * The focus view's board is the whole screen, so: it is mounted (the
@@ -2544,7 +2561,7 @@ export function Stage(props: {
 								props.presenting === board.path ||
 								/* The selected board and the edited one are live at any zoom, on any device. */
 								props.selected === board.path ||
-								props.editing?.path === board.path ||
+								props.editingPath === board.path ||
 								(ONE_LIVE
 									? centreBoard() === board.path
 									: /*
@@ -2572,48 +2589,36 @@ export function Stage(props: {
 							pictured={onSheet().has(board.path)}
 							covering={sleepOnZoom()}
 							carried={carriedPages().has(board.path)}
-							asleep={!alone && props.renderer === "dom" && props.editing?.path !== board.path && props.focus !== board.path && props.presenting !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
-							{...(!alone && shotAdaptor().capture ? { capture: (frame: HTMLIFrameElement) => shotAdaptor().capture!(frame, board) } : {})}
+							asleep={!alone && props.renderer === "dom" && props.editingPath !== board.path && props.focus !== board.path && props.presenting !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
+							{...(!alone && props.shots().capture ? { capture: (frame: HTMLIFrameElement) => props.shots().capture!(frame, board) } : {})}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
 							{...(!alone && BARS && (barWorth(board) || props.selected === board.path) ? { barLayer: barLayer(), placeBar } : {})}
-							{...(!alone && BARS
+							{...(!alone && BARS && props.onComment
 								? {
 										onComment: () =>
-											setCommenting({
+											// Under the bar, which follows the board as the camera moves.
+											props.onComment?.({
 												path: board.path,
 												quote: "",
 												title: board.title,
-												open: true,
-												// Under the bar, which follows the board as the camera moves.
 												anchor: () => document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(board.path)}"]`)?.getBoundingClientRect(),
 											}),
 									}
 								: {})}
-							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
 							{...(props.onPresent
 								? {
 										onPresent: () =>
 											props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0),
 									}
 								: {})}
-							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							acts={actsByPath().get(board.path)}
 							onActPoint={actPointOn(board.path)}
 							sizing={sizingPaths().has(board.path)}
 							news={alone || paged(board) ? props.news?.[board.path] : undefined}
 							onRead={() => props.onRead?.(board.path)}
-							editor={props.editor}
 							gestures={gestures}
-							drops={props.drops(board.path)}
-							showRev={props.frameRevs?.[board.path]}
-							previewSha={props.preview?.[board.path]}
-							{...(props.transcript ? { transcript: props.transcript } : {})}
-							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
-							{...(props.working ? { working: props.working } : {})}
-							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
-							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 							view={editor.boardView(board.path)}
 							{...(props.onExtent && !sized ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
@@ -2954,16 +2959,18 @@ export function Stage(props: {
 						{...(props.onFocusBoard ? { onFocus: () => props.onFocusBoard?.(board.path) } : {})}
 						{...(props.onPresent ? { onPresent: () => props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0) } : {})}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-						onComment={() =>
-							setCommenting({
-								path: board.path,
-								quote: "",
-								title: board.title,
-								open: true,
-								// Under the pill, which follows the board as the camera moves.
-								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
-							})
-						}
+						{...(props.onComment
+							? {
+									onComment: () =>
+										props.onComment?.({
+											path: board.path,
+											quote: "",
+											title: board.title,
+											// Under the pill, which follows the board as the camera moves.
+											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+										}),
+								}
+							: {})}
 					/>
 				)}
 			</Show>
@@ -2980,16 +2987,19 @@ export function Stage(props: {
 						// What acts on drawn items: a group of boards alone has only Open.
 						{...(items().ids.length
 							? {
-									onComment: () =>
-										setCommenting({
-											// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
-											path: stagePenPath() ?? "the canvas",
-											items: items().ids,
-											quote: items().words,
-											title: items().name,
-											open: true,
-											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
-										}),
+									...(props.onComment
+										? {
+												onComment: () =>
+													props.onComment?.({
+														// A drawn item is found by its canvas's file and its id (`BoardComment.items`).
+														path: stagePenPath() ?? "the canvas",
+														items: items().ids,
+														quote: items().words,
+														title: items().name,
+														anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+													}),
+											}
+										: {}),
 									onDuplicate: () => penDuplicate(),
 									onProperties: () => setPenSheet(true),
 									onDelete: () => penDeleteSelected(),

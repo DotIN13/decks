@@ -54,7 +54,10 @@ import { markComment, unmarkComments } from "./markup/comment-select.ts";
 import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "./canvas/state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
+import "./app/canvas-host.ts";
 import { Stage } from "./canvas/Stage.tsx";
+import { BoardFrame } from "./board/BoardFrame.tsx";
+import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Present } from "./present/Present.tsx";
@@ -1436,35 +1439,7 @@ export function App() {
 							},
 						}}
 						onFocusBoard={(path) => toggleFocus(path)}
-						{...(editingSource()
-							? {
-									editing: {
-										path: editingSource()!.path,
-										editing: {
-											/*
-											 * Committed as bytes, because that is what this editor edits.
-											 *
-											 * There used to be a second commit here — a batch of ops from a GrapesJS
-											 * model, with a fallback to the bytes when the ops could not express the
-											 * change. Both are gone with that editor, and this is the `source` op:
-											 * the whole file, written as the person typed it. Unchanged text is
-											 * dropped here rather than sent, so opening the editor and closing it
-											 * without touching anything is not a write.
-											 */
-											source: editingSource()!.source,
-											onCommit: (text: string) => {
-												const open = editingSource();
-												setEditingSource(undefined);
-												if (!open) return;
-												const board = state.boards.find((candidate) => candidate.path === open.path);
-												if (!board || text === open.source) return;
-												send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
-											},
-											onCancel: () => setEditingSource(undefined),
-										},
-									},
-								}
-							: {})}
+						{...(editingSource() ? { editingPath: editingSource()!.path } : {})}
 						/*
 						 * A press on the canvas outside the component lets it go.
 						 *
@@ -1522,7 +1497,6 @@ export function App() {
 							})
 						}
 						onHide={(path) => void act("canvas.delete", [path])}
-						nonces={state.nonces}
 						cursor={state.cursor}
 						acts={state.acts}
 						stageName={state.focused ? pens()[state.focused]?.stage : undefined}
@@ -1542,27 +1516,89 @@ export function App() {
 							noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
 							send({ type: "board.extent", path, ...extent });
 						}}
-						editor={editor}
+						/* A board is drawn by the app's own frame, with what only the app has: its editor, drops, live chats and revisions. */
+						frame={(slot) => (
+							<BoardFrame
+								{...slot}
+								nonce={state.nonces?.[slot.board.path]}
+								editor={editor}
+								drops={drops(slot.board.path)}
+								showRev={frameRevs[slot.board.path]}
+								previewSha={preview()?.boards?.[slot.board.path]}
+								/*
+								 * A live board draws itself from a conversation this app is already
+								 * holding — every agent's, not only the focused one, because the registry
+								 * greets the browser with all of them. Accessors rather than values: which
+								 * conversation a board wants is only known once it has loaded and asked.
+								 */
+								transcript={(agentId) => {
+									// A mirror of a chat nobody has opened here asks for it, like opening it would.
+									ensureHistory(agentId);
+									return state.agents[agentId]?.transcript;
+								}}
+								webStatus={() => state.web}
+								onWebReply={(reply) => {
+									if (reply.decks === "live.web.answer") send({ type: "web.answer", id: reply.id, ok: reply.ok });
+									else send({ type: "web.stop" });
+								}}
+								agentIdentity={(agentId) => {
+									const identity = state.identities[agentId];
+									return identity ? { name: identity.name, color: identity.color } : undefined;
+								}}
+								/*
+								 * What that agent is doing, in the sign's own words.
+								 *
+								 * The mirror draws a working line at the foot of its transcript, and it is the same
+								 * sentence the dock and the column say — `workingWords` is the one place that decides
+								 * between "working…", "typing…" and "running tools…". A board that read the words off
+								 * the transcript instead, as it used to, could only tell that *something* was
+								 * happening, and called all three of them "working…".
+								 */
+								working={(agentId) => {
+									const chat = state.chats.find((one) => one.id === agentId);
+									const identity = state.identities[agentId];
+									return chat && identity ? workingWords(chat.state, identity.name) : undefined;
+								}}
+								{...(editingSource()?.path === slot.board.path
+									? {
+											editing: {
+												/*
+												 * Committed as bytes, because that is what this editor edits.
+												 *
+												 * There used to be a second commit here — a batch of ops from a GrapesJS
+												 * model, with a fallback to the bytes when the ops could not express the
+												 * change. Both are gone with that editor, and this is the `source` op:
+												 * the whole file, written as the person typed it. Unchanged text is
+												 * dropped here rather than sent, so opening the editor and closing it
+												 * without touching anything is not a write.
+												 */
+												source: editingSource()!.source,
+												onCommit: (text: string) => {
+													const open = editingSource();
+													setEditingSource(undefined);
+													if (!open) return;
+													const board = state.boards.find((candidate) => candidate.path === open.path);
+													if (!board || text === open.source) return;
+													send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
+												},
+												onCancel: () => setEditingSource(undefined),
+											},
+										}
+									: {})}
+							/>
+						)}
+						shots={() => {
+							const adaptor = shotAdaptor();
+							const capture = adaptor.capture;
+							return {
+								picture: (board, look) => adaptor.picture(board, look),
+								ownPicture: adaptor.id !== "canvas",
+								...(capture ? { capture: (frame: HTMLIFrameElement, board: Board) => capture.call(adaptor, frame, board) } : {}),
+							};
+						}}
+						onComment={(comment) => setCommenting({ ...comment, open: true })}
 						onTool={pickTool}
-						drops={drops}
-						frameRevs={frameRevs}
 						preview={preview()?.boards}
-						/*
-						 * A live board draws itself from a conversation this app is already
-						 * holding — every agent's, not only the focused one, because the registry
-						 * greets the browser with all of them. Accessors rather than values: which
-						 * conversation a board wants is only known once it has loaded and asked.
-						 */
-						transcript={(agentId) => {
-							// A mirror of a chat nobody has opened here asks for it, like opening it would.
-							ensureHistory(agentId);
-							return state.agents[agentId]?.transcript;
-						}}
-						webStatus={() => state.web}
-						onWebReply={(reply) => {
-							if (reply.decks === "live.web.answer") send({ type: "web.answer", id: reply.id, ok: reply.ok });
-							else send({ type: "web.stop" });
-						}}
 						/*
 						 * A link on a board, pointing at another board.
 						 *
@@ -1594,24 +1630,6 @@ export function App() {
 								...(state.focused ? { agentId: state.focused } : {}),
 							})
 						}
-						agentIdentity={(agentId) => {
-							const identity = state.identities[agentId];
-							return identity ? { name: identity.name, color: identity.color } : undefined;
-						}}
-						/*
-						 * What that agent is doing, in the sign's own words.
-						 *
-						 * The mirror draws a working line at the foot of its transcript, and it is the same
-						 * sentence the dock and the column say — `workingWords` is the one place that decides
-						 * between "working…", "typing…" and "running tools…". A board that read the words off
-						 * the transcript instead, as it used to, could only tell that *something* was
-						 * happening, and called all three of them "working…".
-						 */
-						working={(agentId) => {
-							const chat = state.chats.find((one) => one.id === agentId);
-							const identity = state.identities[agentId];
-							return chat && identity ? workingWords(chat.state, identity.name) : undefined;
-						}}
 						/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
 						   the browser's copy is the whole of it: the server keeps no preview state,
 						   which is also why a reload has always been an accidental escape hatch. */
