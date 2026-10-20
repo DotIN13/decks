@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import { HarnessSync } from "./sync.ts";
+import { HarnessSync, type SyncOptions } from "./sync.ts";
 
 /**
  * Decks Studio, from the harness's side: when this harness has a Studio key, its deck syncs with
@@ -44,7 +44,7 @@ export function studioOrigin(url: string, key: string): string {
 	return address.origin;
 }
 
-export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string): StudioLink {
+export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string, inventory?: SyncOptions["inventory"]): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
 	let current = "";
@@ -69,7 +69,7 @@ export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, 
 		await sync?.stop();
 		sync = undefined;
 		if (!want) return;
-		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}) });
+		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}) });
 		sync.start().catch((error) => console.error(`[decks] studio: ${(error as Error).message}`));
 	};
 

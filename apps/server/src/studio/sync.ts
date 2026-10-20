@@ -31,6 +31,11 @@ export interface SyncOptions {
 	 * shows it on the canvas's card. Absent: no canvas pictures, only boards'.
 	 */
 	harness?: string;
+	/**
+	 * This harness's apps (`apps/service.ts`), told to Studio so it can list them beside the
+	 * canvases. Absent: nothing is told.
+	 */
+	inventory?: () => Array<{ name: string; title: string; kind: string; board: string }>;
 }
 
 interface State {
@@ -39,6 +44,8 @@ interface State {
 	user?: string;
 	canvases: Record<string, { id: string; rev: number; pen: string }>;
 	files: Record<string, { version: number; hash: string }>;
+	/** The hash of the app list last told to Studio. */
+	inventory?: string;
 }
 
 const SYNCED = ["boards", "assets"];
@@ -124,6 +131,8 @@ export class HarnessSync {
 	private pictureDue = new Set<string>();
 	private pictureAt = new Map<string, number>();
 	readonly conflicts: string[] = [];
+	/** Whether this connection has told Studio the app list yet: once on connecting, then on a change. */
+	private inventorySent = false;
 
 	constructor(private readonly o: SyncOptions) {
 		this.file = join(o.deck, ".decks", "studio-sync.json");
@@ -173,6 +182,7 @@ export class HarnessSync {
 		}
 		await this.syncCanvases();
 		await this.syncFiles();
+		await this.syncInventory();
 		this.save();
 	}
 
@@ -455,6 +465,31 @@ export class HarnessSync {
 				await this.call("PUT", `/sync/v1/files?path=${encodeURIComponent(target)}`, undefined, bytes);
 			}
 		}
+	}
+
+	// ---- apps ----
+
+	/** The app list, to `PUT /sync/v1/inventory`, when it changed. A Studio too old to have the route (404) is left alone. */
+	private async syncInventory() {
+		if (!this.o.inventory) return;
+		let apps;
+		try {
+			apps = this.o.inventory().map(({ name, title, kind, board }) => ({ name, title, kind, board }));
+		} catch (error) {
+			this.log(`no app list: ${(error as Error).message}`);
+			return;
+		}
+		const body = JSON.stringify({ apps });
+		const hash = sha256(Buffer.from(body));
+		if (this.inventorySent && this.state.inventory === hash) return;
+		const res = await fetch(new URL("/sync/v1/inventory", this.o.studio), { method: "PUT", headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": "application/json" }, body });
+		await res.arrayBuffer().catch(() => undefined);
+		if (!res.ok && res.status !== 404) {
+			this.log(`the app list was not taken: ${res.status}`);
+			return;
+		}
+		this.inventorySent = true;
+		this.state.inventory = hash;
 	}
 
 	// ---- staying in step ----

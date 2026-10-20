@@ -34,7 +34,8 @@ const hub = new Hub(
 app.attach(hub);
 
 // Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
-const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`);
+// Its app list goes to Studio too, so Studio can list the apps beside the canvases.
+const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list());
 
 /*
  * One upgrade listener, two websockets.
