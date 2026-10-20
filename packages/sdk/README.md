@@ -20,7 +20,7 @@ One file, no dependencies, Node 18+ or a browser. The server runs no code of you
 one call with its arguments as JSON, checked against the table before anything runs.
 
 ```js
-import { decks } from "@decks/sdk";          // DECKS_URL and DECKS_AGENT from the environment
+import { decks } from "@decks/sdk";          // DECKS_URL and DECKS_TOKEN from the environment
 
 const { path } = await decks.board.create({ title: "Q3 revenue is up a fifth" });
 await decks.canvas.insert({ type: "board", board: path }, { beside: "boards/plan.html" });
@@ -44,15 +44,18 @@ list them.
 
 ## Who is calling
 
-| Caller | How it connects |
+Every call carries a token (`Authorization: Bearer`), and who is calling is that token alone: no
+header, address or machine says it.
+
+| Caller | Its token |
 | --- | --- |
-| An **agent** | Decks puts `DECKS_URL`, `DECKS_AGENT` and the `decks` command in each agent's shell |
-| A Decks **server app** | Decks sets `DECKS_URL`, `DECKS_APP` and `DECKS_SDK` (this file's path): `const { decks } = await import(process.env.DECKS_SDK)` |
-| A Decks **app page** | `import { decks } from "../../api/sdk/decks.mjs"`; the app is found from the page's address |
-| Anything else | `connect({ url, agent })` |
+| An **agent** | Decks puts `DECKS_URL`, `DECKS_TOKEN` (the agent's own) and the `decks` command in each agent's shell |
+| A Decks **server app** | Decks sets `DECKS_URL`, `DECKS_TOKEN` (the app's own, taken back when it stops) and `DECKS_SDK` (this file's path): `const { decks } = await import(process.env.DECKS_SDK)` |
+| The **person** at a terminal | `decks login` with a code from `decks pair code` keeps a token in `~/.decks/token`, one per harness address; `decks logout` takes it back |
+| Anything else | `connect({ url, token })` |
 
 An app's first call makes Decks ask the person whether that app may use the stage, and each call
-is noted in the conversation on screen. Who is calling is said, not proven, for now.
+is noted in the conversation on screen.
 
 ## What to know
 

@@ -64,22 +64,24 @@ export declare class DecksError extends Error {
 export interface ConnectOptions {
 	/** Decks' address, as in http://127.0.0.1:4329. Default: \`DECKS_URL\`, or a page's own. */
 	url?: string;
-	/** The agent the calls are for, by id or name. Default: \`DECKS_AGENT\`. */
-	agent?: string | (() => string | undefined);
-	/** The app the calls are from. Default: \`DECKS_APP\`, or the page's app. */
-	app?: string;
-	/** A board whose button is calling. Default: the board whose page this is. */
-	board?: string;
-	/** The person, in Decks' own page; \`stage\` and \`agent\` say whose stage, each a value or read per call. */
-	person?: boolean;
-	/** For the person: the canvas on screen. */
+	/**
+	 * Who is calling: a token from Decks, sent as \`Authorization: Bearer\`. Default: \`DECKS_TOKEN\`
+	 * (set in an agent's shell and an app server's environment), else the token \`decks login\` kept for
+	 * this address in \`~/.decks/token\`, else none.
+	 */
+	token?: string | (() => string | undefined);
+	/** For the person: the canvas they are acting on (\`X-Decks-Stage\`). A parameter, not who is calling. */
 	stage?: string | (() => string | undefined);
-	/** An opencode session, which Decks maps to its agent. Default: \`DECKS_SESSION\`. */
-	session?: string;
+	/** For the person: the agent they are talking to (\`X-Decks-Agent\`). A parameter, not who is calling. */
+	agent?: string | (() => string | undefined);
+	/** For the person's page: a board whose button it relays (\`X-Decks-Board\`). */
+	board?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */
 	notes?: (lines: string[]) => void;
 	/** A fetch to use instead of the global one. */
 	fetch?: typeof fetch;
+	/** More headers for every call. */
+	headers?: Record<string, string>;
 }
 
 export type AgentSpec = Exclude<Parameters<Verbs["send"]>[0], string>;

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer } from "node:http";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -25,9 +28,24 @@ async function fakeDecks() {
 		let body = "";
 		req.on("data", (chunk) => (body += chunk));
 		req.on("end", () => {
-			const verb = decodeURIComponent(req.url.replace(/^\/api\/v1\//, ""));
 			const sent = JSON.parse(body || "{}");
-			seen.push({ verb, args: sent.args, agent: req.headers["x-decks-agent"], app: req.headers["x-decks-app"] });
+			// The doors `decks login` and `decks logout` use.
+			if (req.url === "/api/login") {
+				res.setHeader("content-type", "application/json");
+				if (sent.code === "123456") res.end(JSON.stringify({ token: "dk_p_from-login", name: "Test" }));
+				else {
+					res.statusCode = 403;
+					res.end(JSON.stringify({ error: "That code is wrong or has expired." }));
+				}
+				return;
+			}
+			if (req.url === "/api/session") {
+				seen.push({ verb: `${req.method} session`, token: req.headers.authorization });
+				res.end("{}");
+				return;
+			}
+			const verb = decodeURIComponent(req.url.replace(/^\/api\/v1\//, ""));
+			seen.push({ verb, args: sent.args, token: req.headers.authorization, agent: req.headers["x-decks-agent"], app: req.headers["x-decks-app"], person: req.headers["x-decks-person"] });
 			const answer = answers[verb]?.(sent.args ?? []) ?? { ok: false, error: `There is no verb called ${verb}.`, notes: [] };
 			res.statusCode = answer.ok ? 200 : 422;
 			res.setHeader("content-type", "application/json");
@@ -41,7 +59,7 @@ async function fakeDecks() {
 
 test("the SDK has every verb in the table, groups nested", () => {
 	assert.equal(VERBS.length, 99, "71 calls and 28 old names");
-	const decks = connect({ url: "http://127.0.0.1:1", agent: "a1" });
+	const decks = connect({ url: "http://127.0.0.1:1", token: "dk_a_x" });
 	assert.equal(typeof decks.canvas.insert, "function");
 	assert.equal(typeof decks.agent.send, "function");
 	assert.equal(typeof decks.here, "function");
@@ -51,27 +69,70 @@ test("the SDK has every verb in the table, groups nested", () => {
 	assert.equal(decks.stage.boards, decks.boards, "the old decks.stage is the same verbs");
 });
 
-test("a verb posts its arguments for the agent, and answers with the value; notes go where asked", async () => {
+test("a verb posts its arguments with the caller's token, and answers with the value; notes go where asked", async () => {
 	const fake = await fakeDecks();
 	try {
 		const notes = [];
-		const decks = connect({ url: fake.url, agent: "Wren", notes: (lines) => notes.push(...lines) });
+		const decks = connect({ url: fake.url, token: "dk_a_wren", notes: (lines) => notes.push(...lines) });
 		assert.deepEqual(await decks.boards(), [{ path: "boards/a.html" }]);
 		assert.equal(await decks.newBoard({ title: "Q3 revenue" }), "boards/q3-revenue.html");
 		assert.deepEqual(notes, ["No at was given."]);
 		await decks.show("boards/a.html", undefined);
-		assert.deepEqual(fake.seen.at(-1), { verb: "show", args: ["boards/a.html"], agent: "Wren", app: undefined }, "a trailing undefined stays absent");
+		assert.deepEqual(fake.seen.at(-1), { verb: "show", args: ["boards/a.html"], token: "Bearer dk_a_wren", agent: undefined, app: undefined, person: undefined }, "a trailing undefined stays absent, and no header names the caller");
 		await assert.rejects(decks.fit("boards/x.html"), (error) => error instanceof DecksError && error.status === 422 && /not on your stage/.test(error.message));
 	} finally {
 		await fake.close();
 	}
 });
 
-test("an app's calls say so", async () => {
+test("the token comes from the options, else DECKS_TOKEN, else the one decks login kept for this address", async () => {
 	const fake = await fakeDecks();
+	const home = mkdtempSync(join(tmpdir(), "decks-sdk-home-"));
+	const before = { token: process.env.DECKS_TOKEN, home: process.env.DECKS_HOME };
 	try {
-		await connect({ url: fake.url, app: "polls" }).boards();
-		assert.equal(fake.seen.at(-1).app, "polls");
+		process.env.DECKS_HOME = home;
+		delete process.env.DECKS_TOKEN;
+		writeFileSync(join(home, "token"), JSON.stringify({ [fake.url]: "dk_p_saved", "http://elsewhere:1": "dk_p_other" }));
+		await connect({ url: fake.url }).boards();
+		assert.equal(fake.seen.at(-1).token, "Bearer dk_p_saved", "the kept one, for this address");
+		process.env.DECKS_TOKEN = "dk_a_env";
+		await connect({ url: fake.url }).boards();
+		assert.equal(fake.seen.at(-1).token, "Bearer dk_a_env");
+		await connect({ url: fake.url, token: "dk_x_given" }).boards();
+		assert.equal(fake.seen.at(-1).token, "Bearer dk_x_given");
+		delete process.env.DECKS_TOKEN;
+		await connect({ url: "http://127.0.0.1:1", fetch: async (_url, init) => {
+			fake.seen.push({ verb: "none", token: init.headers.authorization });
+			return new Response(JSON.stringify({ ok: true, value: 1, notes: [] }));
+		} }).boards();
+		assert.equal(fake.seen.at(-1).token, undefined, "no token kept for that address: none sent");
+		// The person's acting-on, sent as parameters.
+		await connect({ url: fake.url, token: "dk_p_x", agent: () => "a1", stage: "home" }).boards();
+		assert.equal(fake.seen.at(-1).agent, "a1");
+	} finally {
+		if (before.token === undefined) delete process.env.DECKS_TOKEN;
+		else process.env.DECKS_TOKEN = before.token;
+		if (before.home === undefined) delete process.env.DECKS_HOME;
+		else process.env.DECKS_HOME = before.home;
+		await fake.close();
+	}
+});
+
+test("decks login keeps the person's token for the harness, only this user can read it, and decks logout takes it back", async () => {
+	const fake = await fakeDecks();
+	const home = mkdtempSync(join(tmpdir(), "decks-login-"));
+	const env = { ...process.env, DECKS_URL: fake.url, DECKS_HOME: home, DECKS_TOKEN: "", DECKS_NODE: process.execPath };
+	try {
+		await assert.rejects(run(BIN, ["login", "000000"], { env }), (error) => error.code === 1 && /wrong or has expired/.test(error.stderr));
+		const done = await run(BIN, ["login", "123456"], { env });
+		assert.match(done.stderr, /Logged in to Test/);
+		assert.deepEqual(JSON.parse(readFileSync(join(home, "token"), "utf8")), { [fake.url]: "dk_p_from-login" });
+		assert.equal(statSync(join(home, "token")).mode & 0o777, 0o600);
+		await run(BIN, ["boards"], { env });
+		assert.equal(fake.seen.at(-1).token, "Bearer dk_p_from-login");
+		await run(BIN, ["logout"], { env });
+		assert.deepEqual(fake.seen.at(-1), { verb: "DELETE session", token: "Bearer dk_p_from-login" });
+		assert.deepEqual(JSON.parse(readFileSync(join(home, "token"), "utf8")), {});
 	} finally {
 		await fake.close();
 	}
@@ -112,7 +173,7 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 test("the decks command prints the value to stdout and notes to stderr, and fails with exit 1", async () => {
 	const fake = await fakeDecks();
 	try {
-		const env = { ...process.env, DECKS_URL: fake.url, DECKS_AGENT: "Wren", DECKS_NODE: process.execPath };
+		const env = { ...process.env, DECKS_URL: fake.url, DECKS_TOKEN: "dk_a_wren", DECKS_NODE: process.execPath };
 		const made = await run(BIN, ["new-board", "--title", "Q3 revenue"], { env });
 		assert.equal(made.stdout, "boards/q3-revenue.html\n", "a string as it is, ready for $(...)");
 		assert.equal(made.stderr, "No at was given.\n");
@@ -143,7 +204,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 			{ jsonrpc: "2.0", id: 2, method: "tools/list" },
 			{ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "decks_pen_edit", arguments: { edits: [{ op: "delete", id: "n2" }] } } },
 		];
-		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: fake.url, DECKS_AGENT: "Wren" } });
+		const child = execFile(process.execPath, [MCP], { env: { ...process.env, DECKS_URL: fake.url, DECKS_TOKEN: "dk_a_wren" } });
 		let output = "";
 		child.stdout.on("data", (chunk) => (output += chunk));
 		for (const line of lines) child.stdin.write(`${JSON.stringify(line)}\n`);
@@ -158,7 +219,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		assert.deepEqual(insert.inputSchema.required, ["item"]);
 		assert.equal(call.result.isError, false);
 		assert.deepEqual(JSON.parse(call.result.content[0].text), { rev: 2, results: [{ op: "delete", id: "n2" }] });
-		assert.deepEqual(fake.seen.at(-1), { verb: "pen.edit", args: [[{ op: "delete", id: "n2" }]], agent: "Wren", app: undefined });
+		assert.deepEqual(fake.seen.at(-1), { verb: "pen.edit", args: [[{ op: "delete", id: "n2" }]], token: "Bearer dk_a_wren", agent: undefined, app: undefined, person: undefined });
 	} finally {
 		await fake.close();
 	}

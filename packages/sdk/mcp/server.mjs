@@ -5,7 +5,7 @@
  * JSON-RPC 2.0 over stdio, no dependencies: the protocol is small enough to hold in one file.
  * Each call in the table is a tool named `decks_<noun>_<verb>` (`decks_canvas_insert`), whose input
  * is an object keyed by the call's parameter names; a call is one `POST /api/v1/<name>` through
- * the SDK, as the agent named by `DECKS_AGENT`. `DECKS_TOOLS` narrows the list to some groups
+ * the SDK, as whoever `DECKS_TOKEN` is (an agent's shell has its own; `decks login` keeps the person's). `DECKS_TOOLS` narrows the list to some groups
  * (`canvas,board,view`), since sixty tools is more than most agents want to read. The old names
  * are not listed, but a tool named for one (`decks_pen_edit`) still answers, for one release.
  */

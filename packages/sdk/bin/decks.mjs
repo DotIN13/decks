@@ -20,24 +20,84 @@
  *
  * The value goes to stdout: a string as it is, anything else as JSON. The notes a verb adds (what
  * `canvas fit` measured, where a board went) go to stderr, and a refusal goes to stderr with exit code 1.
- * Who is calling is `DECKS_AGENT`, and where Decks is is `DECKS_URL`; Decks sets both in every
- * agent's shell. With neither, it is the person at a terminal on this machine (`caller`).
+ * Who is calling is the token the command carries: `DECKS_TOKEN`, which Decks sets in every agent's
+ * shell and every app server's environment, or the person's, which `decks login` keeps in
+ * `~/.decks/token` for each harness. Where Decks is is `DECKS_URL`, else this machine at
+ * `DECKS_PORT` (4329).
  */
-import { readFileSync, realpathSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { homedir, hostname } from "node:os";
+import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { connect, DecksError } from "../src/index.js";
 
 const VERBS = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
 
-/**
- * Who this command calls as. In an agent's shell Decks sets DECKS_AGENT (or DECKS_SESSION, or
- * DECKS_APP); with none of them it is the person at a terminal on the harness, as for
- * `decks pair code`, and Decks is on this machine at DECKS_PORT unless DECKS_URL says otherwise.
- */
-function caller() {
+/** Where Decks is: `DECKS_URL`, else this machine at `DECKS_PORT`. */
+function harness() {
 	const env = process.env;
-	if (env.DECKS_AGENT || env.DECKS_SESSION || env.DECKS_APP) return { notes: () => {} };
-	return { notes: () => {}, person: true, url: env.DECKS_URL || `http://127.0.0.1:${env.DECKS_PORT || 4329}` };
+	return (env.DECKS_URL || `http://127.0.0.1:${env.DECKS_PORT || 4329}`).replace(/\/+$/, "");
+}
+
+/** The connection a command calls through: its token is the SDK's to find (`DECKS_TOKEN`, then `~/.decks/token`). */
+function caller() {
+	return { notes: () => {}, url: harness() };
+}
+
+/** `~/.decks/token`: a harness's address to the person token `decks login` got from it. */
+const tokenFile = () => join(process.env.DECKS_HOME || join(homedir(), ".decks"), "token");
+
+function readTokens() {
+	try {
+		const saved = JSON.parse(readFileSync(tokenFile(), "utf8"));
+		return saved && typeof saved === "object" ? saved : {};
+	} catch {
+		return {};
+	}
+}
+
+/** Keep the tokens where only this user reads them. */
+function writeTokens(tokens) {
+	const file = tokenFile();
+	mkdirSync(join(file, ".."), { recursive: true, mode: 0o700 });
+	writeFileSync(file, `${JSON.stringify(tokens, null, "\t")}\n`, { mode: 0o600 });
+	chmodSync(file, 0o600);
+}
+
+/**
+ * `decks login [code]`: the person at a terminal. The code is one `decks pair code` made on the
+ * harness's machine (an agent can run it, in its shell); asked for when it is not given.
+ */
+async function login(words) {
+	let code = words.find((word) => /\d/.test(word))?.replace(/\D/g, "") ?? "";
+	if (!code) {
+		if (!process.stdin.isTTY) throw new DecksError("decks login needs a code: decks login 123456. Make one with decks pair code on the harness's machine.");
+		const ask = createInterface({ input: process.stdin, output: process.stderr });
+		code = (await ask.question(`Code for ${harness()} (from decks pair code): `)).replace(/\D/g, "");
+		ask.close();
+	}
+	let response;
+	try {
+		response = await fetch(`${harness()}/api/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, label: `decks login on ${hostname()}` }) });
+	} catch (error) {
+		throw new DecksError(`Could not reach Decks at ${harness()}: ${error.message}`);
+	}
+	const answer = await response.json().catch(() => ({}));
+	if (!response.ok || typeof answer.token !== "string") throw new DecksError(answer.error || `Decks answered ${response.status}`);
+	writeTokens({ ...readTokens(), [harness()]: answer.token });
+	return `Logged in to ${answer.name ?? harness()}. The token is in ${tokenFile()}.`;
+}
+
+/** `decks logout`: the harness takes the token back, and it is gone from `~/.decks/token`. */
+async function logout() {
+	const tokens = readTokens();
+	const token = tokens[harness()];
+	if (!token) return `Not logged in to ${harness()}.`;
+	await fetch(`${harness()}/api/session`, { method: "DELETE", headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
+	delete tokens[harness()];
+	writeTokens(tokens);
+	return `Logged out of ${harness()}.`;
 }
 
 const out = (text) => process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
@@ -77,7 +137,8 @@ export function help(verb) {
 	}
 	lines.push(`Old names, for one release: ${VERBS.filter((verb) => verb.alias).map((verb) => verb.command.join(" ")).join(", ")}.`, "");
 	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
-	lines.push("decks help <command> says more about one. DECKS_URL and DECKS_AGENT say where Decks is and who is calling.");
+	lines.push("decks login [code] signs this terminal in as the person, with a code from decks pair code; decks logout signs it out.");
+	lines.push("decks help <command> says more about one. DECKS_URL says where Decks is; DECKS_TOKEN, or the token decks login kept, says who is calling.");
 	return lines.join("\n");
 }
 
@@ -194,6 +255,14 @@ async function main(argv) {
 		const found = verbOf(words.slice(1));
 		out(found ? help(found.verb) : help());
 		return found ? 0 : 1;
+	}
+	if (words[0] === "login") {
+		err(await login(words.slice(1)));
+		return 0;
+	}
+	if (words[0] === "logout") {
+		err(await logout());
+		return 0;
 	}
 	// Not a verb: every change as it is broadcast, one JSON line each, until stopped.
 	if (words[0] === "events") {
