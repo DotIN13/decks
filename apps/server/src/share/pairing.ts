@@ -46,22 +46,36 @@ function hashOf(token: string): string {
 export class Pairing {
 	private code: { value: string; expires: number; tries: number } | undefined;
 	private tokens: Stored[];
+	/** Asked for from a settings page (Studio's harness page), kept with the tokens. */
+	private chosen = false;
 
-	/** Whether every pairing needs a code, wherever it comes from (`codeRequired`). */
-	readonly required: boolean;
+	/** The code made a must by whoever deployed this (`DECKS_REQUIRE_PAIR_CODE`): not undone from a page. */
+	readonly forced: boolean;
 
 	constructor(
 		private readonly file: string,
 		options: { required?: boolean } = {},
 	) {
 		this.tokens = this.load();
-		this.required = options.required ?? false;
+		this.forced = options.required ?? false;
+	}
+
+	/** Whether every pairing needs a code, wherever it comes from: deployed so, or asked for. */
+	get required(): boolean {
+		return this.forced || this.chosen;
+	}
+
+	/** Ask for a code before every pairing, or stop asking (when it was not deployed so). */
+	setRequired(on: boolean): void {
+		this.chosen = on;
+		this.save();
 	}
 
 	private load(): Stored[] {
 		try {
 			if (!existsSync(this.file)) return [];
-			const parsed = JSON.parse(readFileSync(this.file, "utf8")) as { tokens?: Stored[] };
+			const parsed = JSON.parse(readFileSync(this.file, "utf8")) as { tokens?: Stored[]; requireCode?: boolean };
+			this.chosen = parsed.requireCode === true;
 			return Array.isArray(parsed.tokens) ? parsed.tokens.filter((one) => typeof one.hash === "string" && typeof one.id === "string") : [];
 		} catch {
 			return [];
@@ -70,7 +84,14 @@ export class Pairing {
 
 	private save(): void {
 		mkdirSync(dirname(this.file), { recursive: true });
-		writeFileSync(this.file, `${JSON.stringify({ tokens: this.tokens }, null, "\t")}\n`, { mode: 0o600 });
+		writeFileSync(this.file, `${JSON.stringify({ tokens: this.tokens, ...(this.chosen ? { requireCode: true } : {}) }, null, "\t")}\n`, { mode: 0o600 });
+	}
+
+	/** Which paired front end a token is, for "this browser" on a settings page. */
+	idOf(token: string | undefined): string | undefined {
+		if (!token) return undefined;
+		const hash = hashOf(token);
+		return this.tokens.find((one) => one.hash === hash)?.id;
 	}
 
 	/** A fresh code, replacing any other: only the newest one shown can be used. */

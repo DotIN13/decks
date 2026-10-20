@@ -97,8 +97,21 @@ export function lowMemory(): boolean | undefined {
  * has it too, since the render worker paints there: iOS 16 has WebGL 2 on the page and not in a
  * worker, and gets the notice rather than a stage with no drawing (decision D2).
  */
+/** The renderer this browser asked for in a settings page (Studio's), kept in `decks.backend`; else the best there is. */
+export const PREFERRED_BACKEND_KEY = "decks.backend";
+function preferred(): BackendName | undefined {
+	try {
+		const want = globalThis.localStorage?.getItem(PREFERRED_BACKEND_KEY);
+		return want === "webgl2" || want === "webgpu" ? want : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 export async function detect(): Promise<Detected> {
 	const memory = lowMemory();
+	// WebGL asked for: tried first, so a machine whose WebGPU misbehaves can be steered off it.
+	if (preferred() === "webgl2" && hasWebGl2(typeof document === "undefined" ? undefined : document.createElement("canvas")) && typeof OffscreenCanvas === "function" && hasWebGl2(new OffscreenCanvas(1, 1))) return { backend: BACKENDS.webgl2, lowMemory: memory };
 	if (await hasWebGpu()) return { backend: BACKENDS.webgpu, lowMemory: memory };
 	const page = hasWebGl2(typeof document === "undefined" ? undefined : document.createElement("canvas"));
 	const worker = typeof OffscreenCanvas === "function" && hasWebGl2(new OffscreenCanvas(1, 1));
