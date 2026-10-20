@@ -104,18 +104,20 @@ async function digestOf(text) {
 }
 
 async function fromServer(entry, rest, request) {
-	if (request.method !== "GET" && request.method !== "HEAD") {
-		const auth = request.headers.get("Authorization") ?? "";
-		const given = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-		if (!given || !keyDigest || (await digestOf(given)) !== keyDigest) return plain(401, "This page cannot give Decks commands. A board asks the page it is on, which asks the person.");
+	const auth = request.headers.get("Authorization") ?? "";
+	const given = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+	// A board's own token, which that server gave the board (`board/board-token.ts`): it goes on as itself.
+	const board = given.startsWith("dk_b_");
+	if (request.method !== "GET" && request.method !== "HEAD" && !board) {
+		if (!given || !keyDigest || (await digestOf(given)) !== keyDigest) return plain(401, "This page cannot give Decks commands. A board calls with its own token, which the page around it hands it.");
 	}
 	const headers = new Headers();
-	// And what the page is acting on: the canvas, the agent, a board it names by its frame. Never its token.
-	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Board", "X-Decks-Stage", "X-Decks-Agent"]) {
+	// And what the page is acting on: the canvas, the agent. Never its token.
+	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Stage", "X-Decks-Agent"]) {
 		const value = request.headers.get(name);
 		if (value) headers.set(name, value);
 	}
-	headers.set("Authorization", `Bearer ${entry.token}`);
+	headers.set("Authorization", `Bearer ${board ? given : entry.token}`);
 	const init = { method: request.method, headers, mode: "cors", credentials: "omit", redirect: "follow" };
 	if (request.method !== "GET" && request.method !== "HEAD") init.body = await request.arrayBuffer();
 	try {

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { Readable } from "node:stream";
 import type { Request, Response } from "express";
+import { bearerOf } from "../auth/guard.ts";
 
 /**
  * Another Decks server, passed through this one, for a page that has no service worker.
@@ -69,12 +70,15 @@ export class Relay {
 			return;
 		}
 		const rest = req.originalUrl.slice(`/c/${id}`.length) || "/";
-		const headers: Record<string, string> = { Authorization: `Bearer ${target.token}` };
 		/*
-		 * The page's own token stays here, and the connection's goes on. What the page says it is acting
-		 * on goes on too, as parameters: the canvas, the agent, a board it relays for (`verbs/router.ts`).
+		 * The page's own token stays here, and the connection's goes on; but a board's token, which that
+		 * server gave the board, goes on as itself (`auth/guard.ts`), so the board is that board there and
+		 * never this connection. What the page says it is acting on goes on too, as parameters: the
+		 * canvas, the agent (`verbs/router.ts`).
 		 */
-		for (const name of ["accept", "content-type", "range", "x-decks-board", "x-decks-stage", "x-decks-agent"]) {
+		const given = bearerOf(req.headers);
+		const headers: Record<string, string> = { Authorization: `Bearer ${given?.startsWith("dk_b_") ? given : target.token}` };
+		for (const name of ["accept", "content-type", "range", "x-decks-stage", "x-decks-agent"]) {
 			const value = req.headers[name];
 			if (typeof value === "string") headers[name] = value;
 		}

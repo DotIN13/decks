@@ -144,6 +144,37 @@ test("a board's token is made only for the person or a site, and calls as that b
 	}
 });
 
+test("a board's token calls verbs as that board and nothing else: no person's route, no other token, nothing passed on", async () => {
+	const { app, origin, post, bearer, cleanup } = await open();
+	try {
+		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/a.html" }).token);
+		app.evalTrust.allow("boards/a.html");
+		assert.equal((await post("/api/v1/boards", board)).status, 200, "its verbs");
+		assert.equal((await fetch(`${origin}/api/v1`, { headers: board })).status, 200, "the list of them");
+		assert.equal((await post("/api/session", board)).body.kind, "board");
+		// Tokens of any kind, tickets, uploads, the deck, settings, agents, another server: refused at the gate.
+		for (const [path, body] of [
+			["/api/tokens", { kind: "board", path: "boards/a.html" }],
+			["/api/tickets", { paths: ["/api/board/boards/a.html"] }],
+			["/api/upload?name=x.txt", {}],
+			["/api/relay", { id: "abcd", base: "http://127.0.0.1:1", token: "x" }],
+			["/c/abcd/api/v1/boards", { args: [] }],
+		] as const) {
+			const refused = await post(path, board, body);
+			assert.equal(refused.status, 403, `${path}: ${refused.text}`);
+			assert.match(refused.text, /board's token/);
+		}
+		for (const path of ["/api/deck", "/api/agents", "/api/settings", "/api/v1/events"]) assert.equal((await fetch(`${origin}${path}`, { headers: board })).status, 403, path);
+		// What a frame loads anyway is still read.
+		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: board })).status, 200);
+		// A verb that hands out a code is the person's too, refused by the verb.
+		const code = await post("/api/v1/pair.code", board);
+		assert.notEqual(code.status, 200);
+	} finally {
+		cleanup();
+	}
+});
+
 test("the opencode plugin trades its server's secret and a session for that session's agent token, and nothing less does", async () => {
 	const { app, post, bearer, cleanup } = await open();
 	try {

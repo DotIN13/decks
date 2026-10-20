@@ -122,6 +122,29 @@ export function refusal(reason: Refusal | "none"): string {
 	}
 }
 
+/**
+ * What a board's token may ask for: its verbs (`POST /api/v1/<verb>`, which act as that board,
+ * `verbs/router.ts`), the list of them, whether it still works (`/api/session`), and the pages
+ * anyone's frame may read. Nothing that is the person's (settings, uploads, agents, tickets, other
+ * tokens), and nothing passed on to another server (`/c/<id>/`): a board's page is handed its token
+ * by the page that framed it (`@decks/canvas/board-host.ts`), and that token is the board and no more.
+ */
+export function boardMay(method: string, path: string): boolean {
+	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return true;
+	if ((method === "GET" || method === "HEAD") && path === "/api/v1") return true;
+	if (path === "/api/session") return true;
+	if (path.startsWith("/c/")) return false;
+	return isPublic(method, path) || isPageRead(method, path);
+}
+
+/** What a board's token is told when it asks for anything else. */
+export const BOARD_ONLY = "A board's token calls verbs as that board, and nothing else: not the person's routes, and not another token.";
+
+/** A board's token another server gave out, on its way there through this one (`share/relay.ts`). */
+export function relayedBoardToken(path: string, token: string): boolean {
+	return path.startsWith("/c/") && token.startsWith("dk_b_");
+}
+
 /** What the gate needs of the harness. */
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
@@ -154,7 +177,7 @@ export function guard(gate: Gate) {
 			if (origin) {
 				res.setHeader("Vary", "Origin");
 				res.setHeader("Access-Control-Allow-Origin", origin);
-				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Board, X-Decks-Person, X-Decks-Stage");
+				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage");
 				res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 				if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
@@ -169,8 +192,21 @@ export function guard(gate: Gate) {
 		if (token) {
 			const seen = verifyOn(gate, token, req.headers);
 			if (seen.ok) {
+				if (seen.principal.kind === "board" && !boardMay(req.method, req.path)) {
+					res.status(403).type("text").send(BOARD_ONLY);
+					return;
+				}
 				req.principal = seen.principal;
 				req.tokenId = seen.id;
+				next();
+				return;
+			}
+			/*
+			 * A board on another server this page reaches through this one, calling that server with the
+			 * token it gave: passed on as itself, not as this server's connection (`share/relay.ts`), so it
+			 * is that board there and nobody here.
+			 */
+			if (relayedBoardToken(req.path, token)) {
 				next();
 				return;
 			}
