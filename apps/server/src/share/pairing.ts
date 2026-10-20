@@ -206,6 +206,48 @@ export function fromThisMachine(remote: string | undefined, headers: Record<stri
 	return !headers["x-forwarded-for"] && !headers.forwarded && !headers["x-real-ip"];
 }
 
+/**
+ * Whether a Studio may connect this harness without a code (`POST /api/studio/connect`): a page
+ * served by the same machine or tailnet name the request was addressed to (Studio beside the
+ * harness), one on loopback, or one whose origin the owner lists in `DECKS_STUDIO_ORIGINS`
+ * (comma-separated, `https://studio.example.com`). A call with no `Origin` is not a page, and is let
+ * through only from this machine itself. Any other site asks for a code: otherwise any page the
+ * person opened could link the harness to a Studio of its own and be sent the deck.
+ */
+export function studioWithoutCode(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
+	const origin = headers.origin;
+	if (typeof origin !== "string" || origin === "") return fromThisMachine(remote, headers);
+	let from: URL;
+	try {
+		from = new URL(origin);
+	} catch {
+		return false;
+	}
+	const name = from.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+	if (name === "localhost" || name === "::1" || /^127\./.test(name)) return true;
+	const forwarded = headers["x-forwarded-host"];
+	const host = (typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : undefined) ?? headers.host;
+	if (typeof host === "string" && host) {
+		try {
+			if (new URL(`http://${host}`).hostname.toLowerCase() === from.hostname.toLowerCase()) return true;
+		} catch {
+			/* not a host: compared with nothing */
+		}
+	}
+	const listed = String(env.DECKS_STUDIO_ORIGINS ?? "")
+		.split(",")
+		.map((one) => one.trim())
+		.filter(Boolean)
+		.map((one) => {
+			try {
+				return new URL(one).origin;
+			} catch {
+				return "";
+			}
+		});
+	return listed.includes(from.origin);
+}
+
 /** Loopback, the private ranges, link-local, and the 100.64/10 block Tailscale's addresses are in; IPv6 alike. */
 export function isPrivateAddress(address: string | undefined): boolean {
 	if (!address) return false;

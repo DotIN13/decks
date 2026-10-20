@@ -25,7 +25,7 @@ import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
-import { fromAnotherSite, fromPrivateNetwork, tokenOf } from "./share/pairing.ts";
+import { fromAnotherSite, fromPrivateNetwork, studioWithoutCode, tokenOf } from "./share/pairing.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "./share/hosts.ts";
 import { Relay } from "./share/relay.ts";
 import { saveStudioLink, studioOrigin } from "./studio/index.ts";
@@ -171,9 +171,10 @@ export function createHttpApp(app: App): Express {
 
 	/**
 	 * Decks Studio connecting this harness in one call: the Studio key to sync with, and a token
-	 * back for the page to call this harness with, so there is no separate `/api/pair`. Nothing is
-	 * checked by default, not even where the call comes from; a harness deployed where others can
-	 * reach it sets `DECKS_REQUIRE_PAIR_CODE=1`, and then a connect without a working code is refused.
+	 * back for the page to call this harness with, so there is no separate `/api/pair`. Without a code
+	 * only from a Studio the harness can place (`studioWithoutCode`): on this machine, on the same
+	 * name, or listed in `DECKS_STUDIO_ORIGINS`. A harness deployed where others can reach it sets
+	 * `DECKS_REQUIRE_PAIR_CODE=1`, and then a connect without a working code is refused from anywhere.
 	 */
 	api.post("/studio/connect", (req, res) => {
 		const body = (req.body ?? {}) as { url?: unknown; key?: unknown; code?: unknown; label?: unknown };
@@ -186,6 +187,10 @@ export function createHttpApp(app: App): Express {
 		}
 		if (app.pairing.required && !code) {
 			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
+			return;
+		}
+		if (!code && !studioWithoutCode(req.socket.remoteAddress, req.headers)) {
+			res.status(403).json({ needsCode: true, error: "Only a Studio on this machine, on the address you reached the harness at, or listed in DECKS_STUDIO_ORIGINS connects without a code. Run decks pair code in a shell on the harness's machine." });
 			return;
 		}
 		try {

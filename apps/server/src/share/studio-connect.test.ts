@@ -51,7 +51,19 @@ async function open(required: boolean) {
 	};
 }
 
-test("by default Studio connects with its key alone, and the token it gets back opens the harness's verbs", async () => {
+/** Run with `DECKS_STUDIO_ORIGINS` set, as the owner of a Studio on another site would. */
+async function listing<T>(origins: string, run: () => Promise<T>): Promise<T> {
+	const before = process.env.DECKS_STUDIO_ORIGINS;
+	process.env.DECKS_STUDIO_ORIGINS = origins;
+	try {
+		return await run();
+	} finally {
+		if (before === undefined) delete process.env.DECKS_STUDIO_ORIGINS;
+		else process.env.DECKS_STUDIO_ORIGINS = before;
+	}
+}
+
+test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and the token it gets back opens the harness's verbs", () => listing("https://other.test, https://studio.test/", async () => {
 	const { base, post, linked, deck, cleanup } = await open(false);
 	try {
 		assert.equal(((await (await fetch(`${base}/hello`, { headers: STUDIO })).json()) as { needsCode: boolean }).needsCode, false);
@@ -67,9 +79,32 @@ test("by default Studio connects with its key alone, and the token it gets back 
 	} finally {
 		cleanup();
 	}
+}));
+
+test("without a code, only a Studio beside the harness or a listed one connects; any other site is asked for one", async () => {
+	const { app, post, linked, cleanup } = await open(false);
+	try {
+		const elsewhere = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		assert.equal(elsewhere.status, 403, "an unlisted site");
+		assert.equal(elsewhere.body.needsCode, true);
+		assert.ok(!linked());
+		assert.equal(app.pairing.list().length, 0);
+
+		const json = { "content-type": "application/json" };
+		const local = await post("/studio/connect", { url: "http://localhost:4800", key: KEY }, { ...json, origin: "http://localhost:4800", "sec-fetch-site": "same-site" });
+		assert.equal(local.status, 200, "a Studio on this machine");
+		const tailnet = await post("/studio/connect", { url: "https://mac.tail1.ts.net:8444", key: KEY }, { ...json, origin: "https://mac.tail1.ts.net:8444", "x-forwarded-host": "mac.tail1.ts.net:8443", "sec-fetch-site": "same-site" });
+		assert.equal(tailnet.status, 200, "a Studio on the name the harness was reached at, another port");
+		const noOrigin = await post("/studio/connect", { url: "https://studio.test", key: KEY }, json);
+		assert.equal(noOrigin.status, 200, "no page at all, from this machine");
+		const proxied = await post("/studio/connect", { url: "https://studio.test", key: KEY }, { ...json, "x-forwarded-for": "100.101.102.103" });
+		assert.equal(proxied.status, 403, "no page, passed on by a proxy");
+	} finally {
+		cleanup();
+	}
 });
 
-test("a malformed key is refused before any token is given", async () => {
+test("a malformed key is refused before any token is given", () => listing("https://studio.test", async () => {
 	const { app, post, linked, cleanup } = await open(false);
 	try {
 		const bad = await post("/studio/connect", { url: "https://studio.test", key: "nope" });
@@ -79,7 +114,7 @@ test("a malformed key is refused before any token is given", async () => {
 	} finally {
 		cleanup();
 	}
-});
+}));
 
 test("with the code required, every connect and pairing without one is refused, even from this machine, and decks pair code makes one that works once", async () => {
 	const { app, base, post, linked, cleanup } = await open(true);
