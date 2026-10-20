@@ -655,7 +655,10 @@ export class StageEngine {
 		this.laidOut();
 		this.draw();
 	}
-	/** Arrows `setPreview` newly lifted (its answer): the worker leaves them out of its tiles too. */
+	/**
+	 * What `setPreview` newly lifted (its answer): the arrows it bent, and a shape's outline resized
+	 * with it. The worker leaves them out of its tiles too, and they are put down with the rest.
+	 */
 	private lift(answer: string): void {
 		const bent = JSON.parse(answer) as string[];
 		if (!bent.length) return;

@@ -408,8 +408,10 @@ impl Page {
 	/// what it names. Returns the items whose layout changed, for the stage's outlines.
 	///
 	/// An arrow with an end on what the gesture moves or reshapes bends with it: it is routed again
-	/// here at each step (`arrows.rs`, pen's router ported) and lifted too. Returns the arrows lifted
-	/// by this step, which the worker must leave out of its tiles as well.
+	/// here at each step (`arrows.rs`, pen's router ported) and lifted too. Returns every item this
+	/// step newly lifted, the bent arrows and any item the gesture names that the stage did not lift
+	/// itself (a shape's outline, resized with it), which the worker must leave out of its tiles as
+	/// well, and which the stage must put down at the drop; one kept back stays drawn here, over the tiles.
 	pub fn preview(&mut self, moving: Option<Vec<(String, Preview)>>) -> Result<Vec<String>, String> {
 		self.unpreview();
 		let Some(moving) = moving else {
@@ -417,6 +419,7 @@ impl Page {
 			return Ok(Vec::new());
 		};
 		let mut changes = Vec::new();
+		let mut fresh = Vec::new();
 		for (id, p) in &moving {
 			if p.dx != 0.0 || p.dy != 0.0 {
 				self.offsets.insert(id.clone(), (p.dx, p.dy));
@@ -424,7 +427,9 @@ impl Page {
 			for (key, value) in &p.set {
 				changes.push(Change::Set { id: id.clone(), key: key.clone(), value: value.clone() });
 			}
-			self.lifted.insert(id.clone());
+			if self.lifted.insert(id.clone()) {
+				fresh.push(id.clone());
+			}
 		}
 		// Fields that no longer apply (an item that went) are left out rather than failing the gesture.
 		changes.retain(|c| matches!(c, Change::Set { id, .. } if self.doc.handle(id).is_some()));
@@ -433,7 +438,8 @@ impl Page {
 			self.preview_undo = applied.undo.clone();
 			self.scene.update(&self.doc, Some(&applied), &self.text);
 		}
-		Ok(self.bend(&moving))
+		fresh.extend(self.bend(&moving));
+		Ok(fresh)
 	}
 
 	/// Route the arrows a gesture bends from where their ends are at this step, as preview fields
@@ -914,6 +920,26 @@ mod tests {
 	]}"##;
 
 	/// The whole loop: the page edits, the worker repaints what the edit touched, the page shows it.
+	/// A resize reshapes a shape's outline with it: the page lifts the outline too, and says so, so
+	/// the stage puts it down at the drop. Kept back, it was drawn over the tiles, and over its words.
+	#[test]
+	fn a_resize_says_it_lifted_the_outline() {
+		let stage = r##"{"version":"2.6","children":[
+			{"type":"frame","id":"f","x":0,"y":0,"width":200,"height":80,"layout":"vertical","children":[
+				{"type":"path","id":"o","layoutPosition":"absolute","x":0,"y":0,"width":200,"height":80,"geometry":"M0 0H200V80H0Z","fill":"#e8590c"},
+				{"type":"text","id":"t","content":"Words","width":"fill_container"}
+			]}
+		]}"##;
+		let mut page = Page::new(stage, false, "s").unwrap();
+		page.lift(&["f".into()]);
+		let wide = |id: &str| (id.to_owned(), Preview { dx: 0.0, dy: 0.0, set: vec![("width".into(), Some(json!(300)))] });
+		let lifted = page.preview(Some(vec![wide("f"), wide("o")])).unwrap();
+		assert_eq!(lifted, vec!["o".to_owned()], "the outline, which the stage did not lift");
+		assert!(page.preview(Some(vec![wide("f"), wide("o")])).unwrap().is_empty(), "lifted once");
+		page.landed(&["f".into(), "o".into()]);
+		assert!(page.lifted.is_empty());
+	}
+
 	#[test]
 	fn a_drag_bends_the_arrows_on_what_it_carries() {
 		let stage = r#"{"version":"2.6","children":[
@@ -926,6 +952,7 @@ mod tests {
 		let mut page = Page::new(stage, false, "s").unwrap();
 		let geometry = |page: &Page, id: &str| page.doc.get(id).unwrap().props.get("geometry").cloned();
 		let before = geometry(&page, "ab");
+		page.lift(&["a".into()]);
 		let lifted = page.preview(Some(vec![("a".into(), Preview { dx: 0.0, dy: 200.0, set: vec![] })])).unwrap();
 		assert_eq!(lifted, vec!["ab".to_owned()], "only the arrow joined to what moves is lifted");
 		// Routed as pen routes it, from where the moved box is now.

@@ -349,7 +349,7 @@ impl PageEngine {
 
 	/// A gesture in progress: `[[id, { dx, dy, w?, h?, radius?, set? }], …]`, or `null` when it ends.
 	#[wasm_bindgen(js_name = setPreview)]
-	/// Returns the arrows it bends that were not lifted before, as a JSON list, for the worker to lift.
+	/// Returns what it newly lifted (the arrows it bends, a resized shape's outline), as a JSON list, for the worker to lift.
 	pub fn set_preview(&mut self, moving: &str) -> Result<String, JsError> {
 		let bent = self.page.preview(previews(moving)).map_err(err)?;
 		Ok(serde_json::to_string(&bent).unwrap_or_else(|_| "[]".into()))
