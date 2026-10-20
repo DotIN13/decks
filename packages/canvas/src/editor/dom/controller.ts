@@ -108,8 +108,16 @@ export function createEditor(host: EditorHost) {
 		const result = step(read(), input, host.scene, untrack(context));
 		batch(() => commit(result.state));
 		if (result.preview !== undefined) host.engine.preview(result.preview ?? undefined);
+		/*
+		 * A drop's landing is said before its edit is sent: a host that applies the edit itself (a
+		 * mounted canvas, Studio) answers with the new drawing in the same call, and the engine glides
+		 * only what it was told would land. Sent first, the drawing came before the landing and nothing
+		 * glided. The rest go after, as before.
+		 */
+		const settling = result.effects.filter((effect) => effect.do === "settle");
+		for (const effect of settling) effects.run(effect);
 		if (result.ops.length) host.onPenEdit(result.ops);
-		for (const effect of result.effects) effects.run(effect);
+		for (const effect of result.effects) if (effect.do !== "settle") effects.run(effect);
 		// A resize let go of has no step left to wait for.
 		if (!read().resize) frames.length = 0;
 	};
