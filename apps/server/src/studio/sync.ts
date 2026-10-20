@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { diff, parse, serialize, type PenDocument } from "@decks/pen";
 import WebSocket from "ws";
@@ -147,7 +147,18 @@ export class HarnessSync {
 		for (const [name, s] of Object.entries(this.state.canvases)) {
 			const c = byId.get(s.id);
 			if (!c) {
-				this.log(`canvas ${name} is gone from Studio or no longer shared; the local copy stays`);
+				/*
+				 * Deleted in Studio, or no longer shared. Its folder is moved aside, not left in canvases/:
+				 * left there it would read as a new local canvas and go up again on the next pass. Restored
+				 * from Studio's trash, it comes down again as any Studio canvas does.
+				 */
+				const from = join(this.o.deck, "canvases", name);
+				if (existsSync(from)) {
+					const to = join(this.o.deck, ".decks", "studio-removed", `${name}-${Date.now()}`);
+					mkdirSync(dirname(to), { recursive: true });
+					renameSync(from, to);
+				}
+				this.log(`canvas ${name} is gone from Studio or no longer shared; its folder is moved to .decks/studio-removed`);
 				delete this.state.canvases[name];
 				continue;
 			}
