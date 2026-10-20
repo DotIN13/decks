@@ -7,6 +7,12 @@
  * properties panel, the tokens.
  */
 @import "tailwindcss";
+/*
+ * The package's own components use Tailwind utilities too (the conversation's cards are
+ * `flex flex-col`), and a host's build does not look inside a dependency for them: without this
+ * an agent's reply sat beside its tool rows a word wide.
+ */
+@source "../src";
 @import "./chrome.css";
 @import "./stream.css";
 @import "./canvas.css";
