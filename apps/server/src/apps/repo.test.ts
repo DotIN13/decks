@@ -70,7 +70,7 @@ test("the starter's .gitignore leaves out secrets, builds and installs", async (
 	await withScratch(async (dir) => {
 		const folder = join(dir, "shop");
 		writeStarter(folder, "static", "Shop");
-		for (const [path, text] of [[".env", "A=1"], [".env.local", "B=2"], ["node_modules/x/index.js", ""], ["dist/a.js", ""], ["debug.log", ""]]) {
+		for (const [path, text] of [[".env", "A=1"], [".env.local", "B=2"], ["node_modules/x/index.js", ""], ["dist/a.js", ""], ["debug.log", ""]] as const) {
 			mkdirSync(join(folder, path, ".."), { recursive: true });
 			writeFileSync(join(folder, path), text);
 		}
@@ -99,7 +99,7 @@ test("only https and git@host:path addresses may be cloned", () => {
 		"https://github.com/a b",
 		"https://github.com/a\nb",
 	])
-		assert.throws(() => checkCloneUrl(bad), undefined, JSON.stringify(bad));
+		assert.throws(() => checkCloneUrl(bad), Error, JSON.stringify(bad));
 });
 
 test("an app's name comes from the address's last part, as an app name is written", () => {
