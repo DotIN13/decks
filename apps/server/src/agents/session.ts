@@ -2167,6 +2167,11 @@ export class DeckAgent {
 		this.bridge.answer(...args);
 	}
 
+	/** The questions this agent is waiting on an answer to, for a front end that reads them over HTTP (Studio). */
+	dialogs(): ReturnType<ExtensionUiBridge["outstanding"]> {
+		return this.bridge.outstanding();
+	}
+
 	/** The model this conversation is on, live if a runtime is up, else as last recorded. */
 	currentModel(): AgentModel | undefined {
 		return this.backend?.model() ?? this.lastModel;

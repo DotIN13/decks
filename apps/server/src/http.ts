@@ -13,7 +13,7 @@ import { appRequest } from "./apps/route.ts";
 import { SDK_FILE } from "./apps/service.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
-import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ThinkingLevel } from "@decks/protocol";
+import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
@@ -204,6 +204,16 @@ export function createHttpApp(app: App): Express {
 	 * subscriptions it could spend and the one it does. `?limits=1` reads the accounts' 5-hour
 	 * figures again, as this app's picker does on opening; they arrive with the next read.
 	 */
+	/** The questions an agent is waiting on, for a front end that arrives after they were asked. */
+	api.get("/agents/:id/dialogs", (req, res) => {
+		const agent = app.agents.get(String(req.params.id));
+		if (!agent) {
+			res.status(404).json({ error: "No agent here has that id." });
+			return;
+		}
+		res.set("cache-control", "no-store").json({ dialogs: agent.dialogs() });
+	});
+
 	api.get(
 		"/agents/:id/settings",
 		asyncRoute(async (req, res) => {
@@ -221,6 +231,8 @@ export function createHttpApp(app: App): Express {
 				model: agent.model ?? null,
 				models: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.models ?? [],
 				// How much it asks before acting, and the modes its runtime offers (none for Pi).
+				// What `/` completes to: the session's own list once it has run, else its runtime's.
+				commands: agent.chat().commands ?? app.runtimes().find((runtime) => runtime.kind === agent.kind)?.commands ?? [],
 				mode: agent.mode ?? null,
 				// How full its context is and what the session has cost: the composer's dial.
 				usage: agent.usage ?? null,
@@ -326,6 +338,32 @@ export function createHttpApp(app: App): Express {
 			return;
 		}
 		const act = String(req.params.act);
+		/*
+		 * What a person types, as this app's own composer sends it (`agent.prompt` on the socket):
+		 * untouched, so a `/` command runs as one. Answered at once; what it does arrives as events.
+		 */
+		if (act === "prompt") {
+			const text = String(((req.body ?? {}) as { text?: unknown }).text ?? "");
+			if (!text.trim()) {
+				res.status(400).json({ error: "Say something to send." });
+				return;
+			}
+			void agent.prompt(text);
+			agent.sayRow();
+			res.json({ id: agent.id, sent: true });
+			return;
+		}
+		/** The answer to a question the agent asked (`/login`'s method and code, a choice, a confirm). */
+		if (act === "dialog") {
+			const answer = (req.body ?? {}) as ExtensionUiAnswer;
+			if (typeof answer?.id !== "string") {
+				res.status(400).json({ error: "An answer names the question it answers." });
+				return;
+			}
+			agent.answerDialog(answer);
+			res.json({ answered: answer.id });
+			return;
+		}
 		if (act === "rename") {
 			const name = String(((req.body ?? {}) as { name?: unknown }).name ?? "").trim().slice(0, 40);
 			if (!name) {
