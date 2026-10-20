@@ -147,8 +147,8 @@ export class Opencode2Manager {
 			OPENCODE_DISABLE_AUTOUPDATE: "1",
 			DECKS_STAGE_URL: spec.stageUrl,
 			DECKS_STAGE_TOKEN: secret,
-			// The `decks` command and where Decks is, for every session's shell; the plugin adds the
-			// session, which names the agent (`runtimes/decks-env.ts`).
+			// The `decks` command and where Decks is, for every session's shell; the plugin trades the
+			// session for its agent's token (`runtimes/decks-env.ts`).
 			...(spec.decksPort ? decksServerEnv(spec.decksPort, this.baseEnv.PATH) : {}),
 		};
 	}

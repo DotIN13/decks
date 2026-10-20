@@ -202,7 +202,7 @@ export class OpencodeManager {
 				DECKS_STAGE_URL: spec.stageUrl,
 				DECKS_STAGE_TOKEN: this.token,
 				// The `decks` command and where Decks is, for every session's shell; the plugin in
-				// `runtime/opencode/plugin/` adds the session, which names the agent (`runtimes/decks-env.ts`).
+				// `runtime/opencode/plugin/` trades the session for its agent's token (`runtimes/decks-env.ts`).
 				...(spec.decksPort ? decksServerEnv(spec.decksPort) : {}),
 			};
 			let child: OpencodeChild;

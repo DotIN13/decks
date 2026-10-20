@@ -134,7 +134,7 @@ export class AntigravityBackend implements AgentBackend {
 				// in env rather than in any per-agent config file.
 				DECKS_AGENT: this.context.stageAgent.id,
 				// The `decks` command and where Decks is, for the CLI's shell (`runtimes/decks-env.ts`).
-				...decksEnv(this.context.port, this.context.stageAgent.id),
+				...decksEnv(this.context.port, this.context.stageAgent.id, this.context.canvasToken),
 			},
 			stdio: ["pipe", "pipe", "pipe"],
 		});

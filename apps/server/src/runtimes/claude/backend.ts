@@ -292,7 +292,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * token from. `accounts.ts` has the measurement.
 			 */
 			// …and, whichever it is, the `decks` command and who this agent is, for its shell (`runtimes/decks-env.ts`).
-			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, (accountEnv ?? process.env).PATH) },
+			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, this.context.canvasToken, (accountEnv ?? process.env).PATH) },
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");
