@@ -95,7 +95,15 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			console.warn("[canvas] an edit was refused:", error instanceof Error ? error.message : error);
 			return false;
 		}
-		if (!commit(prev, next)) return false;
+		if (!commit(prev, next)) {
+			/*
+			 * Nothing changed (an item dropped back where it was), but the stage is waiting for the drawing
+			 * that answers its gesture, as a server sends one whatever the edit did: a fresh copy is that
+			 * answer, so what was let go glides back into place now rather than when the stage gives up.
+			 */
+			setDoc({ ...prev });
+			return false;
+		}
 		undoStack.push(prev);
 		if (undoStack.length > depth) undoStack.shift();
 		redoStack.length = 0;
