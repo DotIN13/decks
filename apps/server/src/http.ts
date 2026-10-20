@@ -623,6 +623,13 @@ export function createHttpApp(app: App): Express {
 			 */
 			if (isBoardPath(requested)) boardHeaders(res);
 			else assetHeaders(res, target);
+			/*
+			 * A board opened by another site carries its pairing token in its address (`?decks_token=`),
+			 * and the page would send that address on as the Referer of everything it loads: an app's
+			 * frame on this same origin, an image elsewhere. Such a page sends no Referer at all. A board
+			 * opened without one keeps the browser's default, which embeds such as YouTube's need.
+			 */
+			if (req.query.decks_token !== undefined) res.setHeader("Referrer-Policy", "no-referrer");
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 
 			/*

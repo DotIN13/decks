@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -76,6 +76,10 @@ test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and t
 		assert.equal(refused.status, 401, "without the token, another site is refused");
 		const allowed = await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${done.body.token}` });
 		assert.equal(allowed.status, 200);
+		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
+		const board = await fetch(`${base}/board/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
+		assert.equal(board.status, 200);
+		assert.equal(board.headers.get("referrer-policy"), "no-referrer", "its address, token and all, is not sent on as a Referer");
 	} finally {
 		cleanup();
 	}

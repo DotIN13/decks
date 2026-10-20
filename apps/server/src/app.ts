@@ -19,7 +19,7 @@ import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
-import { codeRequired, Pairing } from "./share/pairing.ts";
+import { codeRequired, Pairing, tokenDays } from "./share/pairing.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -302,7 +302,7 @@ export class App {
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false, "whole"));
 		};
-		this.pairing = new Pairing(join(deck.path, ".decks", "pairing.json"), { required: codeRequired() });
+		this.pairing = new Pairing(join(deck.path, ".decks", "pairing.json"), { required: codeRequired(), days: tokenDays() });
 		this.stage.pairCode = () => {
 			const made = this.pairing.newCode();
 			this.send(this.pairingMessage());

@@ -27,6 +27,12 @@ export function codeRequired(env: NodeJS.ProcessEnv = process.env): boolean {
 	return ["1", "true", "yes", "on"].includes(String(env.DECKS_REQUIRE_PAIR_CODE ?? "").trim().toLowerCase());
 }
 
+/** Days a token may go unused before it stops working (`DECKS_TOKEN_DAYS`, 30 unless set). */
+export function tokenDays(env: NodeJS.ProcessEnv = process.env): number {
+	const days = Number(env.DECKS_TOKEN_DAYS);
+	return Number.isFinite(days) && days > 0 ? days : 30;
+}
+
 const CODE_MS = 10 * 60_000;
 const CODE_TRIES = 5;
 
@@ -51,13 +57,21 @@ export class Pairing {
 
 	/** The code made a must by whoever deployed this (`DECKS_REQUIRE_PAIR_CODE`): not undone from a page. */
 	readonly forced: boolean;
+	/** How long a token may go unused, in milliseconds, before `check` refuses it and forgets it. */
+	private readonly idleMs: number;
 
 	constructor(
 		private readonly file: string,
-		options: { required?: boolean } = {},
+		options: { required?: boolean; days?: number } = {},
 	) {
-		this.tokens = this.load();
 		this.forced = options.required ?? false;
+		this.idleMs = (options.days ?? 30) * 86_400_000;
+		this.tokens = this.load();
+		// A token from before tokens expired has its idle time counted from now, not from when it was made.
+		const now = Date.now();
+		const unstamped = this.tokens.filter((one) => typeof one.last !== "number");
+		for (const one of unstamped) one.last = now;
+		if (unstamped.length) this.save();
 	}
 
 	/** Whether every pairing needs a code, wherever it comes from: deployed so, or asked for. */
@@ -115,7 +129,7 @@ export class Pairing {
 	grant(origin: string, label: string, now = Date.now()): string {
 		const token = randomBytes(32).toString("base64url");
 		const hash = hashOf(token);
-		this.tokens.push({ id: hash.slice(0, 10), hash, label: label.slice(0, 80) || "Another Decks", origin: origin.slice(0, 200), at: now });
+		this.tokens.push({ id: hash.slice(0, 10), hash, label: label.slice(0, 80) || "Another Decks", origin: origin.slice(0, 200), at: now, last: now });
 		this.save();
 		return token;
 	}
@@ -134,12 +148,20 @@ export class Pairing {
 		return this.grant(origin, label, now);
 	}
 
-	/** Whether a token is one this server gave out and has not revoked. */
+	/**
+	 * Whether a token is one this server gave out, has not revoked, and has seen used within its
+	 * idle days: a token left unused that long is forgotten, and its front end pairs again.
+	 */
 	check(token: string | undefined, now = Date.now()): boolean {
 		if (!token) return false;
 		const hash = hashOf(token);
 		const found = this.tokens.find((one) => one.hash === hash);
 		if (!found) return false;
+		if (now - (found.last ?? found.at) > this.idleMs) {
+			this.tokens = this.tokens.filter((one) => one !== found);
+			this.save();
+			return false;
+		}
 		// Recorded at most once a minute, so a busy front end does not rewrite the file per request.
 		if (!found.last || now - found.last > 60_000) {
 			found.last = now;

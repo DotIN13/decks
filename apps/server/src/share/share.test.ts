@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Board } from "@decks/protocol";
 import { readZip } from "../../../web/src/connections/zip.ts";
 import { buildBundle } from "./bundle.ts";
-import { fromAnotherSite, fromPrivateNetwork, isPrivateAddress, Pairing, tokenOf } from "./pairing.ts";
+import { fromAnotherSite, fromPrivateNetwork, isPrivateAddress, Pairing, tokenDays, tokenOf } from "./pairing.ts";
 import { zip } from "./zip.ts";
 
 test("a zip written here is read back by the browser's reader, stored and deflated alike", async () => {
@@ -110,4 +110,29 @@ test("a token can be granted without a code, and revoked like any other", () => 
 	const token = pairing.grant("http://localhost:4337", "Laptop");
 	assert.ok(pairing.check(token));
 	assert.equal(pairing.list()[0]?.label, "Laptop");
+});
+
+test("a token unused for its idle days stops working, a used one slides on, and an old one without a time starts from now", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-expiry-"));
+	const file = join(dir, "pairing.json");
+	const day = 86_400_000;
+	const t0 = Date.now();
+	const pairing = new Pairing(file, { days: 30 });
+	const kept = pairing.grant("https://a.test", "A", t0);
+	const left = pairing.grant("https://b.test", "B", t0);
+	assert.ok(pairing.check(kept, t0 + 20 * day), "used on day 20");
+	assert.ok(pairing.check(kept, t0 + 45 * day), "45 days in, 25 since it was last used");
+	assert.ok(!pairing.check(left, t0 + 31 * day), "31 days unused");
+	assert.ok(!pairing.check(left, t0), "and forgotten");
+	assert.equal(pairing.list().length, 1);
+
+	const old = join(dir, "old.json");
+	writeFileSync(old, JSON.stringify({ tokens: [{ id: "abc", hash: "f".repeat(64), label: "Old", origin: "", at: t0 - 400 * day }] }));
+	new Pairing(old);
+	const stamped = JSON.parse(readFileSync(old, "utf8")) as { tokens: Array<{ last?: number }> };
+	assert.ok((stamped.tokens[0]?.last ?? 0) >= t0, "given now, not its making a year ago");
+
+	assert.equal(tokenDays({}), 30);
+	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "7" }), 7);
+	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "nonsense" }), 30);
 });
