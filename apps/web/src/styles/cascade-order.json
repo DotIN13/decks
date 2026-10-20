@@ -1,8 +1,8 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "fdf3c42d1b716577b66b2872ca5604eebd0d83d8a03ce8aadd3e2d46d58801d6",
-	"rules": 1286,
+	"hash": "50ea73e0ae26859cadaee4815bcf41a126c966fe94560dd73a848b5a6f741c31",
+	"rules": 1287,
 	"sheets": 20,
 	"ties": 0,
 	"outsideLayer": 0,
@@ -25,7 +25,7 @@
 		"packages/canvas/styles/ink.css": 32,
 		"packages/canvas/styles/markdown.css": 28,
 		"packages/canvas/styles/properties.css": 90,
-		"packages/canvas/styles/stream.css": 95,
+		"packages/canvas/styles/stream.css": 96,
 		"packages/canvas/styles/tokens.css": 5
 	},
 	"order": [
@@ -464,9 +464,10 @@
 		["packages/canvas/styles/stream.css","@layer components ▸ .tool > .more{margin:4px 0 0;font-size:var(--type-note);color:var(--muted, #888)}"],
 		["packages/canvas/styles/stream.css","@layer components ▸ .stream-mine:has(> .stream-acts){flex-wrap:wrap}"],
 		["packages/canvas/styles/stream.css","@layer components ▸ .stream-acts{display:flex;flex-basis:100%;justify-content:flex-end;gap:2px;margin-top:-2px}"],
-		["packages/canvas/styles/stream.css","@layer components ▸ .stream-act{display:grid;width:24px;height:24px;padding:0;border:0;border-radius:var(--radius-item);background:none;color:var(--muted);cursor:pointer;place-items:center;opacity:0.55;transition:opacity 120ms ease, color 120ms ease, background 120ms ease}"],
-		["packages/canvas/styles/stream.css","@layer components ▸ .stream-mine:hover .stream-act,.stream-act:focus-visible{opacity:1}"],
+		["packages/canvas/styles/stream.css","@layer components ▸ .stream-act{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px 0 7px;border:0;border-radius:var(--radius-item);background:none;color:var(--muted);font:inherit;font-size:var(--type-note);cursor:pointer;transition:color 120ms ease, background 120ms ease}"],
+		["packages/canvas/styles/stream.css","@layer components ▸ .stream-act:focus-visible{outline:2px solid var(--color-accent);outline-offset:1px}"],
 		["packages/canvas/styles/stream.css","@layer components ▸ .stream-act:hover{background:var(--line);color:var(--fg)}"],
+		["packages/canvas/styles/stream.css","@layer components ▸ .stream-act:active{background:var(--border-strong, var(--line))}"],
 		["styles/dock.css","@layer components ▸ .composer-box{transition:border-color 120ms ease, box-shadow 120ms ease}"],
 		["styles/dock.css","@layer components ▸ .composer-box:has(.dockfield:focus){border-color:color-mix(in srgb, var(--color-accent) 40%, transparent);box-shadow:0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent), var(--shadow)}"],
 		["styles/dock.css","@layer components ▸ .dockfield{border:0;background:none;color:var(--fg);font:inherit;font-size:var(--type-body);line-height:1.45;outline:none;resize:none}"],

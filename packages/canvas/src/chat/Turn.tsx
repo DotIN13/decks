@@ -162,9 +162,11 @@ function Mine(props: {
 					<div class="stream-acts">
 						<button type="button" class="stream-act" title="Rewind to here: take back everything after it, and these words go back into the input bar" aria-label="Rewind to here" onClick={() => props.onRewind(entryId())}>
 							<Icon of={RotateCcw} size={13} />
+							<span>Rewind</span>
 						</button>
 						<button type="button" class="stream-act" title="Fork from here: a new conversation that remembers everything up to this message" aria-label="Fork from here" onClick={() => props.onFork(entryId())}>
 							<Icon of={GitBranch} size={13} />
+							<span>Fork</span>
 						</button>
 					</div>
 				)}

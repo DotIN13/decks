@@ -403,8 +403,10 @@ export function createHttpApp(app: App): Express {
 				res.status(400).json({ error: "Name the message, by its entry." });
 				return;
 			}
+			// A dormant agent has no session in memory to go back in: wake it first, as sending to it would.
+			const ready = agent.start().catch(() => undefined);
 			if (act === "rewind") {
-				agent.rewindTo(entryId).then(
+				ready.then(() => agent.rewindTo(entryId)).then(
 					(result) => {
 						app.agents.publish();
 						res.json(result.cancelled ? { cancelled: true } : { rewound: true, ...(result.editorText ? { editorText: result.editorText } : {}) });
@@ -413,7 +415,7 @@ export function createHttpApp(app: App): Express {
 				);
 				return;
 			}
-			agent.forkFrom(entryId).then(
+			ready.then(() => agent.forkFrom(entryId)).then(
 				(resumeRef) => {
 					if (!resumeRef) {
 						res.status(409).json({ error: "There is nothing before that message to fork from." });

@@ -1189,25 +1189,29 @@
 		margin-top: -2px;
 	}
 	.stream-act {
-		display: grid;
-		width: 24px;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		height: 24px;
-		padding: 0;
+		padding: 0 8px 0 7px;
 		border: 0;
 		border-radius: var(--radius-item);
 		background: none;
 		color: var(--muted);
+		font: inherit;
+		font-size: var(--type-note);
 		cursor: pointer;
-		place-items: center;
-		opacity: 0.55;
-		transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+		transition: color 120ms ease, background 120ms ease;
 	}
-	.stream-mine:hover .stream-act,
 	.stream-act:focus-visible {
-		opacity: 1;
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
 	}
 	.stream-act:hover {
 		background: var(--line);
 		color: var(--fg);
+	}
+	.stream-act:active {
+		background: var(--border-strong, var(--line));
 	}
 }
