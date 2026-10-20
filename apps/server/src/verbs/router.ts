@@ -21,9 +21,9 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * The person, in a Decks tab or a terminal, and a paired front end acting for them (Studio) call
  * through the person's tool; they may say what they are acting on, as parameters and not as who
  * they are: `X-Decks-Stage`, the canvas on screen, and `X-Decks-Agent`, the agent they are talking
- * to. Until boards carry tokens of their own, such a caller may also relay a board's button
- * (`X-Decks-Board`), and the call is then that board's, asked once of the person. An agent's token
- * calls as that agent, an app's as that app, a board's as that board.
+ * to. An agent's token calls as that agent, an app's as that app, and a board's as that board: a
+ * board's page is handed its own token by the page that framed it (`@decks/canvas/board-host.ts`),
+ * and that is the only way a call is a board's. Naming a board in a header makes nobody that board.
  */
 
 /** The answer to one call, as the SDK reads it. */
@@ -111,9 +111,6 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 	switch (principal?.kind) {
 		case "person":
 		case "site": {
-			// A board the Decks page or Studio framed, relaying its button's call (`board/stage-call.ts`).
-			const board = header("x-decks-board");
-			if (board) return boardCaller(app, decodeURIComponent(board), header("x-decks-stage"), allowedOnce);
 			// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
 			const stage = header("x-decks-stage");
 			const to = header("x-decks-agent");
@@ -137,8 +134,8 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 }
 
 /**
- * A board's button: its code runs in the board's own page, and each verb it calls comes here. Once
- * the person has let that board (asked once, by its path), it acts for the conversation on the
+ * A board's button: its code runs in the board's own page, with its board's token, and each verb it
+ * calls comes here. Once the person has let that board (asked once, by the token's path), it acts for the conversation on the
  * board's canvas under the board's name, as its code always did; it may not make agents.
  */
 async function boardCaller(app: App, path: string, stage: string | undefined, allowedOnce: Set<string>): Promise<Caller> {

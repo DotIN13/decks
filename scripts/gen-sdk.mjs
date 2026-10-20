@@ -74,8 +74,6 @@ export interface ConnectOptions {
 	stage?: string | (() => string | undefined);
 	/** For the person: the agent they are talking to (\`X-Decks-Agent\`). A parameter, not who is calling. */
 	agent?: string | (() => string | undefined);
-	/** For the person's page: a board whose button it relays (\`X-Decks-Board\`). */
-	board?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */
 	notes?: (lines: string[]) => void;
 	/** A fetch to use instead of the global one. */

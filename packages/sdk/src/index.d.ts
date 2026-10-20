@@ -402,8 +402,9 @@ export interface Verbs {
 	};
 	pair: {
 		/**
-		 * A pairing code for another Decks front end, such as Studio, to connect to this harness with: six
-		 * digits, ten minutes, once. Only on the harness's own machine; Settings never shows one.
+		 * A pairing code for another Decks front end, such as Studio, or a terminal elsewhere (decks login
+		 * <code>), to connect to this harness with: six digits, ten minutes, once. Only on the harness's
+		 * own machine, where a terminal logs in with decks login and no code; Settings never shows one.
 		 */
 		code(): Promise<{ code: string; expires: number }>;
 	};
@@ -449,8 +450,6 @@ export interface ConnectOptions {
 	stage?: string | (() => string | undefined);
 	/** For the person: the agent they are talking to (`X-Decks-Agent`). A parameter, not who is calling. */
 	agent?: string | (() => string | undefined);
-	/** For the person's page: a board whose button it relays (`X-Decks-Board`). */
-	board?: string;
 	/** Where the notes a verb adds go. Default: stderr in Node, nowhere in a page. */
 	notes?: (lines: string[]) => void;
 	/** A fetch to use instead of the global one. */

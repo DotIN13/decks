@@ -329,51 +329,66 @@
 	let stageClient;
 
 	/*
-	 * A board's page gives the harness no commands of its own: it has no token, and the harness refuses
-	 * a request without one. So each verb is asked of the page around this
-	 * one — the Decks app, or Studio — as `{ decks: "stage.call", id, verb, args }`, and that page
-	 * calls it, naming this board by the frame the message came from, never by what it says. The
-	 * harness asks the person once whether this board may use the stage. The answer comes back as
-	 * `{ decks: "stage.answer", id, status, answer }`.
+	 * This board's own token, from the page around it (`packages/canvas/src/board-host.ts`): the Decks
+	 * app, or Studio, asks the harness for a token that is this board and nothing else, and posts it to
+	 * this frame alone. It is asked for by `{ decks: "board.ready" }`, said once this script runs and
+	 * again on every load, and arrives as `{ decks: "board.token", token }` — taken only from the
+	 * window that framed this page, the first time, and after that only as a renewal from it. Calls
+	 * then go straight to the harness with the SDK, `Authorization: Bearer <token>`: the harness asks
+	 * the person once whether this board may use the stage, and lets the token call nothing else.
+	 *
+	 * The token lives in this closure, not on `window`, so a board's own scripts are not handed it; a
+	 * board's code runs with the board's rights in any case, which are what the token is.
 	 */
-	const waiting = new Map();
-	let nextCall = 0;
+	let boardToken;
+	/** Why there is no token, when the page around said so. */
+	let noToken;
+	const tokenWaiters = [];
 	window.addEventListener("message", (event) => {
-		if (event.source !== window.parent || event.data?.decks !== "stage.answer") return;
-		const done = waiting.get(event.data.id);
-		if (!done) return;
-		waiting.delete(event.data.id);
-		done(event.data);
+		if (window.parent === window || event.source !== window.parent) return;
+		const message = event.data;
+		if (!message || typeof message !== "object" || message.decks !== "board.token") return;
+		if (typeof message.token === "string" && message.token) {
+			if (boardToken && message.renew !== true) return;
+			boardToken = message.token;
+			noToken = undefined;
+		} else if (typeof message.error === "string") {
+			if (boardToken) return;
+			noToken = message.error;
+		} else return;
+		for (const done of tokenWaiters.splice(0)) done();
 	});
+	if (window.parent !== window) window.parent.postMessage({ decks: "board.ready" }, "*");
 
-	/** The SDK's `fetch`, passed up to the page around this one: answered as the harness answered it. */
-	function askParent(url, init) {
+	/** The token, once the page around has sent it: refused with why after a wait, or when it said there is none. */
+	function tokenNow() {
+		if (boardToken) return Promise.resolve(boardToken);
 		if (window.parent === window) return Promise.reject(new Error("This board is not on a canvas, so its buttons have no stage: open it in Decks."));
-		const verb = decodeURIComponent(new URL(url, location.href).pathname.split("/api/v1/")[1] ?? "");
-		let args = [];
-		try {
-			args = JSON.parse(init?.body ?? "{}").args ?? [];
-		} catch {
-			/* no arguments */
-		}
-		const id = `call-${++nextCall}-${Math.random().toString(36).slice(2)}`;
-		return new Promise((resolve) => {
-			waiting.set(id, (message) => {
-				const given = Number(message.status);
-				const status = given >= 200 && given <= 599 ? given : 502;
-				resolve(new Response(JSON.stringify(message.answer ?? { ok: false, error: "No answer.", notes: [] }), { status, headers: { "content-type": "application/json" } }));
+		if (noToken) return Promise.reject(new Error(noToken));
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error("The page around this board gave it no token, so its buttons have no stage here.")), 15_000);
+			tokenWaiters.push(() => {
+				clearTimeout(timer);
+				if (boardToken) resolve(boardToken);
+				else reject(new Error(noToken ?? "No token."));
 			});
-			window.parent.postMessage({ decks: "stage.call", id, verb, args }, "*");
 		});
 	}
 
-	/** The SDK, as this board: its calls go through the page around it (`askParent`). */
+	/**
+	 * The SDK, as this board: its own address's API, which is the harness that served it (in the Decks
+	 * app, in Studio, through another server's `/c/<id>/` prefix), with its own token.
+	 */
 	function boardStage() {
 		if (stageClient) return stageClient;
 		const at = location.pathname.indexOf(BOARD_ROUTE);
 		if (at < 0) return Promise.reject(new Error("This page is not a board Decks serves, so its buttons have no stage."));
 		const prefix = location.pathname.slice(0, at);
-		stageClient = import(`${location.origin}${prefix}/api/sdk/decks.mjs`).then((sdk) => sdk.connect({ url: `${location.origin}${prefix}`, fetch: askParent }));
+		stageClient = tokenNow().then(() => import(`${location.origin}${prefix}/api/sdk/decks.mjs`).then((sdk) => sdk.connect({ url: `${location.origin}${prefix}`, token: () => boardToken })));
+		// A refusal is not kept: the token may still come, or the page may be put on a canvas.
+		stageClient.catch(() => {
+			stageClient = undefined;
+		});
 		return stageClient;
 	}
 

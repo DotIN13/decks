@@ -17,7 +17,8 @@
  * Who is calling is the token each call carries (`Authorization: Bearer`), and nothing else: an
  * agent's (`DECKS_TOKEN`, which Decks sets in each agent's shell), an app server's (the same, set
  * when Decks starts it), the person's at a terminal (`decks login` keeps it in `~/.decks/token`), or
- * one passed as `{ token }`. A board's button calls through the page around it, which has its own.
+ * one passed as `{ token }`. A board's button calls with its board's own token, which the page around
+ * it hands it (`lib/board.js`).
  * The `decks` command (`bin/decks.mjs`) and the MCP server (`mcp/server.mjs`) are this file.
  *
  * The list of verbs below is generated from the table by `scripts/gen-sdk.mjs`; the rest is not.
@@ -180,7 +181,6 @@ function defaultNotes(lines) {
  * @param {string | (() => string | undefined)} [options.token]  Who is calling: a token from Decks. Default: `DECKS_TOKEN`, else the one `decks login` kept for this address in `~/.decks/token`, else none (a page whose `fetch` adds its own).
  * @param {string | (() => string | undefined)} [options.stage]  For the person: the canvas they are acting on (`X-Decks-Stage`). A parameter, not who is calling.
  * @param {string | (() => string | undefined)} [options.agent]  For the person: the agent they are talking to (`X-Decks-Agent`). A parameter, not who is calling.
- * @param {string} [options.board]  For the person's page: a board whose button it relays (`X-Decks-Board`).
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
  * @param {typeof fetch} [options.fetch]  A fetch to use instead of the global one.
  * @param {Record<string, string>} [options.headers]  More headers for every call.
@@ -191,7 +191,6 @@ export function connect(options = {}) {
 	// What the person is acting on, when the person is calling: parameters, read per call.
 	const agent = options.agent;
 	const stage = options.stage;
-	const board = options.board;
 	const given = options.token ?? env("DECKS_TOKEN");
 	/** The token, from what was given, else the one `decks login` kept; read once. */
 	let found;
@@ -222,7 +221,6 @@ export function connect(options = {}) {
 		if (on) headers["x-decks-stage"] = on;
 		const to = typeof agent === "function" ? agent() : agent;
 		if (to) headers["x-decks-agent"] = to;
-		if (board) headers["x-decks-board"] = encodeURIComponent(board);
 		let response;
 		try {
 			response = await doFetch(`${base}/api/v1/${verb}`, { method: "POST", headers, body: JSON.stringify({ args: given }) });

@@ -26,7 +26,7 @@ import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts"
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachLiveDoc } from "./live-doc.ts";
 import { attachBoardOpen } from "./board-links.ts";
-import { attachStageCall } from "./stage-call.ts";
+import { attachBoardToken } from "./board-token.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
@@ -297,7 +297,6 @@ export function BoardFrame(props: {
 	let detachLive: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
 	let detachDoc: (() => void) | undefined;
-	let detachStage: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	/** Whether the stage has been told this board's document is showing (`onLive`). */
@@ -893,9 +892,6 @@ export function BoardFrame(props: {
 		detachLinks = attachBoardOpen(frame, (path) => {
 			props.onOpenBoard?.(path, props.board.path);
 		});
-		// A button's code calling a verb: this page makes the call, naming the board by this frame (`stage-call.ts`).
-		detachStage?.();
-		detachStage = attachStageCall(frame, () => props.board.path);
 		reportExtent(frame, props.board.rev);
 	};
 
@@ -919,8 +915,7 @@ export function BoardFrame(props: {
 		detachLive?.();
 		detachLinks?.();
 		detachDoc?.();
-		detachStage?.();
-		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = detachStage = undefined;
+		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = undefined;
 		frames?.detach();
 		frames = undefined;
 		clearTimeout(measuring);
@@ -945,7 +940,15 @@ export function BoardFrame(props: {
 				// effect above is what owns this attribute, and letting JSX also
 				// write it would navigate twice on mount.
 				applySrc();
-				onCleanup(() => unwire(element));
+				/*
+				 * The board's own token, for its buttons (`board-token.ts`): from the frame's making, not its
+				 * load, since the page asks for it as its script runs, before the frame says it has loaded.
+				 */
+				const detachToken = attachBoardToken(element, () => props.board.path);
+				onCleanup(() => {
+					detachToken();
+					unwire(element);
+				});
 			}}
 			data-path={props.board.path}
 			title={props.board.title}
