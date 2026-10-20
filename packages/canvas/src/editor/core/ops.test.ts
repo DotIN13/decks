@@ -210,23 +210,3 @@ test("an arrow is a curved grey path between its ends", () => {
 		node: { type: "path", id: "ar2", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from: "a", to: [300, 40], route: "curved" } },
 	});
 });
-
-test("a joined arrow carried on its own is bent, not moved: the reroute would put a move straight back", () => {
-	const joined: FakeItem[] = [
-		...items,
-		{ id: "j", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, metadata: { type: ARROW, from: "a", to: { item: "b", side: "left" } } } },
-		{ id: "jb", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, metadata: { type: ARROW, from: "a", to: "b", route: "curved", bend: [5, -5] } } },
-		{ id: "je", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, metadata: { type: ARROW, from: "a", to: "b", route: "elbow" } } },
-	];
-	const s = fakeScene(joined, boards);
-	// Straight, joined at both ends: made a curve, pulled by the drag.
-	assert.deepEqual(moveOps(s, ["j"], 30, 60), [{ op: "update", id: "j", set: { metadata: { type: ARROW, from: "a", to: { item: "b", side: "left" }, route: "curved", bend: [30, 60] } } }]);
-	// Already bent: the pull adds to the bend it has.
-	assert.deepEqual(moveOps(s, ["jb"], 10, 10), [{ op: "update", id: "jb", set: { metadata: { type: ARROW, from: "a", to: "b", route: "curved", bend: [15, 5] } } }]);
-	// Carried with an item it joins: a plain move, which the reroute settles.
-	assert.deepEqual(moveOps(s, ["j", "a"], 30, 0)[0], { op: "update", id: "j", set: movedBy(s.node("j")!, 30, 0) });
-	// One end free: the free end moves, as before.
-	assert.deepEqual(moveOps(s, ["ar"], 5, 5), [{ op: "update", id: "ar", set: movedBy(s.node("ar")!, 5, 5) }]);
-	// An elbow's bend is a place along its run, not a pull: left as a move.
-	assert.deepEqual(moveOps(s, ["je"], 5, 5), [{ op: "update", id: "je", set: movedBy(s.node("je")!, 5, 5) }]);
-});

@@ -7,7 +7,7 @@
  * Ids come from a generator passed in (`idMaker` over the document's ids on the page, a counter in
  * the tests), so the same call writes the same ops.
  */
-import { ARROW, arrowBend, arrowEndItem, arrowStyle, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
+import { ARROW, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
 import type { BoardBox, MakingTool, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
@@ -41,25 +41,6 @@ export function movedBy(node: PenNode, dx: number, dy: number): Record<string, u
 }
 
 /**
- * An arrow joined at both ends, carried by `dx dy` while what it joins stays: its ends cannot move,
- * so the drag bends it, as its middle handle does (`bendAt`): a curve's middle pulled by `[dx, dy]`,
- * a straight arrow made a curve to be bent. It used to be moved, and the reroute after the edit put
- * it straight back, so nothing was saved and the drawn move was dropped a moment later.
- * Undefined when that is not the case: an end free, an elbow, or a joined item moving with it.
- */
-function bentBy(node: PenNode, dx: number, dy: number, moving: ReadonlySet<string>): Record<string, unknown> | undefined {
-	if (!isArrow(node) || !node.metadata) return undefined;
-	const meta = node.metadata as Record<string, unknown>;
-	const ends = [arrowEndItem(meta.from), arrowEndItem(meta.to)];
-	if (ends.some((end) => end === undefined || moving.has(end))) return undefined;
-	const route = arrowStyle(meta).route;
-	if (route === "elbow") return undefined;
-	const was = arrowBend(meta);
-	const [bx, by] = Array.isArray(was) ? was : [0, 0];
-	return { metadata: { ...meta, route: "curved", bend: [Math.round(bx + dx), Math.round(by + dy)] } };
-}
-
-/**
  * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
  * because a group's box starts where its children do, not at its own `x` and `y`.
  *
@@ -75,7 +56,6 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 	 * first, which is why this counts up.
 	 */
 	let put = slot;
-	const moving = new Set(ids);
 	return ids.flatMap((id): Op[] => {
 		const node = scene.node(id);
 		if (!node) return [];
@@ -103,7 +83,7 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 			}
 			if (index !== undefined) return [{ op: "move", id, parent: into, index }];
 		}
-		return [{ op: "update", id, set: bentBy(node, dx, dy, moving) ?? movedBy(node, dx, dy) }];
+		return [{ op: "update", id, set: movedBy(node, dx, dy) }];
 	});
 }
 
