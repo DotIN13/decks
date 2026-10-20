@@ -392,6 +392,48 @@ export function createHttpApp(app: App): Express {
 			res.json({ id: agent.id, sent: true });
 			return;
 		}
+		/*
+		 * The time machine, from a message's buttons in another front end (Studio), as this app's
+		 * own socket does it (`rewind.to`, `fork.from` in `wire/agents.ts`). A rewind may ask first,
+		 * on the agent's dialog; the words it took back come back for the composer.
+		 */
+		if (act === "rewind" || act === "fork") {
+			const entryId = String(((req.body ?? {}) as { entryId?: unknown }).entryId ?? "");
+			if (!entryId) {
+				res.status(400).json({ error: "Name the message, by its entry." });
+				return;
+			}
+			if (act === "rewind") {
+				agent.rewindTo(entryId).then(
+					(result) => {
+						app.agents.publish();
+						res.json(result.cancelled ? { cancelled: true } : { rewound: true, ...(result.editorText ? { editorText: result.editorText } : {}) });
+					},
+					(error: unknown) => res.status(400).json({ error: (error as Error).message }),
+				);
+				return;
+			}
+			agent.forkFrom(entryId).then(
+				(resumeRef) => {
+					if (!resumeRef) {
+						res.status(409).json({ error: "There is nothing before that message to fork from." });
+						return;
+					}
+					const at = agent.entryTime(entryId);
+					const child = app.agents.create({
+						name: `${agent.chat().name} (fork)`,
+						resumeRef,
+						kind: agent.kind,
+						...(at ? { forkedFrom: { agentId: agent.id, at } } : {}),
+						...(agent.model ? { model: agent.model } : {}),
+						...(agent.mode ? { mode: agent.mode } : {}),
+					});
+					res.json({ id: child.id, name: child.chat().name });
+				},
+				(error: unknown) => res.status(400).json({ error: (error as Error).message }),
+			);
+			return;
+		}
 		/** The answer to a question the agent asked (`/login`'s method and code, a choice, a confirm). */
 		if (act === "dialog") {
 			const answer = (req.body ?? {}) as ExtensionUiAnswer;

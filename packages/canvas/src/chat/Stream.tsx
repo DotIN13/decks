@@ -81,7 +81,7 @@ export function Stream(props: {
 	 */
 	shown?: boolean;
 	onClose?: () => void;
-	timeMachine?: boolean;
+	timeMachine?: boolean | "buttons";
 }) {
 	const shownNow = () => props.shown ?? historyShown();
 	const close = () => (props.onClose ? props.onClose() : closeHistory());

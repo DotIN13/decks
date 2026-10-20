@@ -1,3 +1,6 @@
+import { Icon } from "../ui/icons.tsx";
+import RotateCcw from "lucide-solid/icons/rotate-ccw";
+import GitBranch from "lucide-solid/icons/git-branch";
 import { clockTime } from "../lib/time.ts";
 import { createSignal, Index, Match, Show, Switch } from "solid-js";
 import { Markdown } from "./Markdown.tsx";
@@ -46,8 +49,8 @@ export function Turn(props: {
 	onRewind: (entryId: string) => void;
 	onFork: (entryId: string) => void;
 	onRestore: (entryId: string) => void;
-	/** False where the host cannot rewind or fork (Studio): no time machine on a message. */
-	timeMachine?: boolean;
+	/** False where the host cannot rewind or fork: no time machine. `"buttons"`: Rewind and Fork as icon buttons under the message (Studio). */
+	timeMachine?: boolean | "buttons";
 }) {
 	const when = () => clock(props.card.at);
 
@@ -120,8 +123,8 @@ function Mine(props: {
 	onRewind: (entryId: string) => void;
 	onFork: (entryId: string) => void;
 	onRestore: (entryId: string) => void;
-	/** False where the host cannot rewind or fork (Studio): no time machine on a message. */
-	timeMachine?: boolean;
+	/** False where the host cannot rewind or fork: no time machine. `"buttons"`: Rewind and Fork as icon buttons under the message (Studio). */
+	timeMachine?: boolean | "buttons";
 }) {
 	return (
 		<div class="stream-mine" data-card data-item={props.card.id}>
@@ -130,7 +133,7 @@ function Mine(props: {
 			 * session entry it became, and until that has happened there is nothing to address
 			 * a rewind to — a button that cannot say where it is going is worse than no button.
 			 */}
-			<Show when={props.timeMachine !== false && props.card.entryId}>
+			<Show when={props.timeMachine !== false && props.timeMachine !== "buttons" && props.card.entryId}>
 				{(entryId) => (
 					<TimeMachine
 						entryId={entryId()}
@@ -153,6 +156,19 @@ function Mine(props: {
 			<div class="stream-bubble" title={props.when}>
 				{props.card.text}
 			</div>
+			{/* Studio's way: the two acts as icon buttons under the bubble, once the message has an entry to address. */}
+			<Show when={props.timeMachine === "buttons" && props.card.entryId}>
+				{(entryId) => (
+					<div class="stream-acts">
+						<button type="button" class="stream-act" title="Rewind to here: take back everything after it, and these words go back into the input bar" aria-label="Rewind to here" onClick={() => props.onRewind(entryId())}>
+							<Icon of={RotateCcw} size={13} />
+						</button>
+						<button type="button" class="stream-act" title="Fork from here: a new conversation that remembers everything up to this message" aria-label="Fork from here" onClick={() => props.onFork(entryId())}>
+							<Icon of={GitBranch} size={13} />
+						</button>
+					</div>
+				)}
+			</Show>
 		</div>
 	);
 }
