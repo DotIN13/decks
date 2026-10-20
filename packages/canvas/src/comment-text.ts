@@ -24,8 +24,11 @@ export interface BoardComment {
 	items?: string[];
 	/** The selected words, spaces collapsed, cut at `QUOTE_LIMIT`. */
 	quote: string;
+	/** What was said; empty when the comment only points at the place, for the message to talk about. */
 	text: string;
 	at: number;
+	/** The board's title, for a comment on a whole board: what its pill in the composer says. */
+	title?: string;
 }
 
 export const QUOTE_LIMIT = 400;
@@ -50,15 +53,16 @@ export function commentBlock(comments: BoardComment[]): string {
 		? comments.length === 1 ? "A comment on items drawn on a canvas:" : `${comments.length} comments on items drawn on a canvas:`
 		: comments.length === 1 ? "A comment on a board. The quoted words are what I selected:" : `${comments.length} comments on boards. The quoted words are what I selected:`;
 	const items = comments.map((comment, index) => {
-		const said = comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n");
+		// A comment with no words points at the place and says nothing more.
+		const said = comment.text.trim() ? `\n${comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n")}` : "";
 		if (comment.items?.length) {
 			const named = comment.items.map((id) => `"${id}"`).join(", ");
-			return `${index + 1}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}\n${said}`;
+			return `${index + 1}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
 		}
 		const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
 		// No quote: a comment on the whole board, from its pill.
-		if (!comment.quote) return `${index + 1}. ${where}, the whole board\n${said}`;
-		return `${index + 1}. ${where}\n   > ${comment.quote}\n${said}`;
+		if (!comment.quote) return `${index + 1}. ${where}, the whole board${said}`;
+		return `${index + 1}. ${where}\n   > ${comment.quote}${said}`;
 	});
 	return `${head}\n\n${items.join("\n\n")}`;
 }
