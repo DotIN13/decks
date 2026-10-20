@@ -169,7 +169,8 @@ export function createHttpApp(app: App): Express {
 
 	/**
 	 * Tickets for another site's frames and tabs (`share/tickets.ts`): `{ paths }`, board request paths
-	 * (`/api/board/boards/a.html`, or `boards/a.html`) or app addresses (`/app/<name>/`), and back
+	 * (`/api/board/boards/a.html`, or `boards/a.html`), files (`/api/f/…`) or app addresses
+	 * (`/app/<name>/`), decoded, and back
 	 * `{ tickets, expires }`, a ticket for each path that can have one, keyed as asked. Only for a
 	 * token in the `Authorization` header, even from this server's own pages, which need no ticket:
 	 * a ticket is only ever for another site, and a token in an address is what tickets replace.

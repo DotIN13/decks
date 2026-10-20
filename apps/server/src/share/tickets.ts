@@ -6,8 +6,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * A frame or a new tab cannot send an `Authorization` header, so another site (Decks Studio) used to
  * put its pairing token in a board's address, and every script on that board could read the token
  * out of its own `location` and keep it. A ticket is what goes in the address instead: it admits one
- * GET of one path, the board page (`/api/board/<path>`) or an app (`/app/<name>/`, its whole
- * address), for five minutes, and nothing else. What the page then asks for is on its own origin and
+ * GET of one path, the board page (`/api/board/<path>`), one file (`/api/f/<path>`, an export opened
+ * in a tab) or an app (`/app/<name>/`, its whole address), for five minutes, and nothing else. What the page then asks for is on its own origin and
  * needs no ticket.
  *
  * A ticket is `<payload>.<mac>`, both base64url: the payload is `{ p: path, e: expires, k: token id }`
@@ -30,8 +30,8 @@ interface Payload {
 
 /**
  * The path a ticket is for, from what a front end asked one for: a board's request path
- * (`/api/board/boards/a.html`, or the deck path `boards/a.html` alone), or an app's, which is
- * widened to the app's whole address (`/app/<name>/`). Undefined for anything else: a ticket
+ * (`/api/board/boards/a.html`, or the deck path `boards/a.html` alone), a file's (`/api/f/…`), or an
+ * app's, which is widened to the app's whole address (`/app/<name>/`). Undefined for anything else: a ticket
  * admits a page, not the API.
  */
 export function ticketPath(given: string): string | undefined {
@@ -39,7 +39,7 @@ export function ticketPath(given: string): string | undefined {
 	const path = given.startsWith("/") ? given : `/api/board/${given}`;
 	const app = /^\/app\/([^/]+)(?:\/.*)?$/.exec(path);
 	if (app) return `/app/${app[1]}/`;
-	if (!/^\/api\/board\/[^/]/.test(path)) return undefined;
+	if (!/^\/api\/(?:board|f)\/[^/]/.test(path)) return undefined;
 	// No `..` or `.` segment: a ticket names the page it is for, and that page only.
 	if (path.split("/").some((segment) => segment === ".." || segment === ".")) return undefined;
 	return path;

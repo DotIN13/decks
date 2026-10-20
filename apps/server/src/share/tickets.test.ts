@@ -88,11 +88,12 @@ test("revoking the token a ticket was made with ends the ticket", () => {
 	}
 });
 
-test("tickets are only for board pages and apps, named by their request path or the board's deck path", () => {
+test("tickets are only for board pages, files and apps, named by their request path or the board's deck path", () => {
 	assert.equal(ticketPath("boards/a.html"), "/api/board/boards/a.html");
 	assert.equal(ticketPath("/api/board/boards/my board.html"), "/api/board/boards/my board.html");
 	assert.equal(ticketPath("/app/todo"), "/app/todo/");
 	assert.equal(ticketPath("/app/todo/api/items"), "/app/todo/");
+	assert.equal(ticketPath("/api/f/Users/me/decks/exports/a.png"), "/api/f/Users/me/decks/exports/a.png");
 	assert.equal(ticketPath("/api/v1/agent.list"), undefined);
 	assert.equal(ticketPath("/api/board/boards/../x.html"), undefined);
 	assert.equal(ticketPath("/api/board/boards/a.html?x=1"), undefined);
