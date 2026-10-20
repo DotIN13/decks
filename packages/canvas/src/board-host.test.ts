@@ -19,7 +19,7 @@ function page(base = "http://127.0.0.1:4830/") {
 	const say = (source: unknown, data: unknown) => {
 		for (const listener of [...listeners]) listener({ source, data } as MessageEvent);
 	};
-	return { frame, say, listening: () => listeners.size };
+	return { frame, say, view, listening: () => listeners.size };
 }
 
 /** Timers that run only when told. */
@@ -65,6 +65,17 @@ describe("board host", () => {
 		assert.deepEqual(minted[1], ["boards/b.html", undefined]);
 		assert.equal(b.posted[0]?.message.token, "dk_b_2");
 		assert.equal(a.posted.length, 1);
+	});
+
+	it("listens on the page's window when the frame is handed over before it is in the page (a template's document has none)", async () => {
+		const p = page();
+		const host = createBoardHost({ mint: async () => "dk_b_1", view: p.view as unknown as Window });
+		const a = p.frame("/api/board/boards/a.html");
+		(a.element as unknown as { ownerDocument: { defaultView: null; baseURI: string } }).ownerDocument = { defaultView: null, baseURI: "http://127.0.0.1:4830/" };
+		host.attach(a.element, { path: () => "boards/a.html" });
+		p.say(a.window, { decks: "board.ready" });
+		await settle();
+		assert.equal(a.posted[0]?.message.token, "dk_b_1");
 	});
 
 	it("ignores a ready from any window but the frame's, and messages that are not one", async () => {

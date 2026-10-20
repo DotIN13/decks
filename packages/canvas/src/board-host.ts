@@ -40,6 +40,8 @@ export interface BoardHostOptions {
 	 * twelve hours after its last use (`BOARD_IDLE_MS`), so six is well inside that. Default: six hours.
 	 */
 	renewMs?: number;
+	/** The window frames' messages arrive at. Default: the frame's document's, else this page's. */
+	view?: Pick<Window, "addEventListener" | "removeEventListener">;
 	/** Timers, for tests. */
 	setTimer?: (run: () => void, ms: number) => unknown;
 	clearTimer?: (timer: unknown) => void;
@@ -92,7 +94,11 @@ export function createBoardHost(options: BoardHostOptions): BoardHost {
 	const detachers = new Set<() => void>();
 
 	const attach = (frame: HTMLIFrameElement, spec: BoardFrameSpec): (() => void) => {
-		const view = frame.ownerDocument?.defaultView;
+		/*
+		 * The window the frame's messages arrive at: the host's own. Not read off the frame alone, which a
+		 * framework may hand over while it is still in a template's document, with no window yet.
+		 */
+		const view = options.view ?? frame.ownerDocument?.defaultView ?? (typeof window === "undefined" ? undefined : window);
 		if (!view) return () => {};
 		/** The token this frame was last given, for which board and canvas, so a reload is sent the same one. */
 		let held: { token: string; path: string; stage: string | undefined } | undefined;
