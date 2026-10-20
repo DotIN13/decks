@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { diff, parse, serialize, type PenDocument } from "@decks/pen";
 import WebSocket from "ws";
 
@@ -44,6 +44,71 @@ interface State {
 const SYNCED = ["boards", "assets"];
 const PICTURES = ".pictures";
 
+/*
+ * What Studio sends is not trusted to name places on this disk. A canvas's name becomes a folder
+ * under canvases/, and a file's path a file under the deck; either, unchecked, could be
+ * `../../.ssh/authorized_keys`. So a name from Studio is one plain segment, a path is under boards/
+ * or assets/ with no `..` in it, and neither is written through a symbolic link. Anything else is
+ * skipped and said in the log.
+ */
+const CANVAS_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
+/** Whether a canvas name from Studio may name a folder here. */
+export function safeCanvasName(name: unknown): name is string {
+	return typeof name === "string" && CANVAS_NAME.test(name) && name !== "." && name !== "..";
+}
+
+/**
+ * Whether a canvas folder's name is one plain segment of canvases/. Looser than `safeCanvasName`,
+ * because a folder made here by hand (with a space in it, say) is the person's and still syncs.
+ */
+export function safeCanvasFolder(name: unknown): name is string {
+	return typeof name === "string" && name.length > 0 && name.length <= 200 && name !== "." && name !== ".." && !/[/\\\0]/.test(name);
+}
+
+/** Whether a file path from Studio may be written in the deck: under boards/ or assets/, every segment a plain name. */
+export function safeSyncPath(path: unknown): path is string {
+	if (typeof path !== "string" || !path || path.includes("\\") || path.includes("\0")) return false;
+	const parts = path.split("/");
+	if (parts.length < 2 || !SYNCED.includes(parts[0]!)) return false;
+	return parts.every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+const SECRET_FILE = /^(?:\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx|keystore)|id_(?:rsa|ed25519|ecdsa).*|credentials\.json)$/i;
+
+/**
+ * Whether a deck file looks like a secret, or a dependency, and so never goes to Studio (or comes
+ * from it): an `.env`, a key or certificate, an SSH key, a `credentials.json`, anything in
+ * `node_modules`. An app's folder is not synced at all, but an agent can leave such a file in assets/.
+ */
+export function secretLooking(path: string): boolean {
+	const parts = path.split("/");
+	return parts.includes("node_modules") || SECRET_FILE.test(parts[parts.length - 1] ?? "");
+}
+
+/**
+ * Where a synced path lands in the deck, or a sentence saying why it may not: outside the deck, or
+ * through a symbolic link anywhere on the way (one an agent made would send the write elsewhere).
+ */
+export function landingFor(deck: string, path: string): { full: string } | { refused: string } {
+	if (!safeSyncPath(path)) return { refused: "not a plain path under boards/ or assets/" };
+	const full = resolve(deck, ...path.split("/"));
+	const inside = relative(resolve(deck), full);
+	if (!inside || inside.startsWith("..") || isAbsolute(inside)) return { refused: "outside the deck" };
+	let at = resolve(deck);
+	for (const part of inside.split(sep)) {
+		at = join(at, part);
+		let link = false;
+		try {
+			link = lstatSync(at).isSymbolicLink();
+		} catch {
+			break; // Not there yet: nothing further on can be a link either.
+		}
+		if (link) return { refused: `${relative(deck, at).split(sep).join("/")} is a symbolic link` };
+	}
+	return { full };
+}
+
 export class HarnessSync {
 	private state: State;
 	private readonly file: string;
@@ -83,7 +148,13 @@ export class HarnessSync {
 
 	private save() {
 		mkdirSync(dirname(this.file), { recursive: true });
-		writeFileSync(this.file, JSON.stringify(this.state));
+		// Only this account's to read: it lists every canvas and file, and an older one may be wider open.
+		writeFileSync(this.file, JSON.stringify(this.state), { mode: 0o600 });
+		try {
+			chmodSync(this.file, 0o600);
+		} catch {
+			/* a filesystem without modes */
+		}
 	}
 
 	/** One pass over everything; passes queue, so two never overlap. */
@@ -112,8 +183,12 @@ export class HarnessSync {
 		return existsSync(dir) ? readdirSync(dir).filter((n) => existsSync(join(dir, n, "canvas.pen"))) : [];
 	}
 
-	private folderFor(c: SyncCanvas): string {
-		return c.owner === this.user ? c.name : `shared-${c.owner.slice(0, 6)}-${c.name}`;
+	/** The folder a Studio canvas comes down to, or undefined when its name could name somewhere else. */
+	private folderFor(c: SyncCanvas): string | undefined {
+		if (!safeCanvasName(c.name)) return undefined;
+		if (c.owner === this.user) return c.name;
+		const owner = String(c.owner ?? "").slice(0, 6);
+		return /^[A-Za-z0-9_-]+$/.test(owner) ? `shared-${owner}-${c.name}` : undefined;
 	}
 
 	private async syncCanvases() {
@@ -138,6 +213,10 @@ export class HarnessSync {
 		for (const c of remote) {
 			if (known.has(c.id)) continue;
 			const name = this.folderFor(c);
+			if (!name) {
+				this.log(`skipped Studio canvas ${JSON.stringify(c.name)}: its name is not a plain folder name`);
+				continue;
+			}
 			const full = await this.call("GET", `/sync/v1/canvases/${c.id}`);
 			this.writePen(name, full.pen);
 			this.writeTitle(name, c.title);
@@ -146,6 +225,11 @@ export class HarnessSync {
 		}
 		for (const [name, s] of Object.entries(this.state.canvases)) {
 			const c = byId.get(s.id);
+			if (!safeCanvasFolder(name)) {
+				this.log(`forgot canvas ${JSON.stringify(name)}: its name is not a plain folder name`);
+				delete this.state.canvases[name];
+				continue;
+			}
 			if (!c) {
 				/*
 				 * Deleted in Studio, or no longer shared. Its folder is moved aside, not left in canvases/:
@@ -196,6 +280,7 @@ export class HarnessSync {
 
 	/** Written in place, never renamed over: the harness watches this file. */
 	private writePen(name: string, pen: PenDocument, current?: string) {
+		if (!safeCanvasFolder(name)) throw new Error(`not a canvas folder: ${JSON.stringify(name)}`);
 		const path = join(this.o.deck, "canvases", name, "canvas.pen");
 		const text = serialize(pen);
 		if (current !== undefined && current === text) return;
@@ -214,6 +299,7 @@ export class HarnessSync {
 	}
 
 	private writeTitle(name: string, title: string) {
+		if (!safeCanvasFolder(name)) throw new Error(`not a canvas folder: ${JSON.stringify(name)}`);
 		const meta = join(this.o.deck, "canvases", name, "canvas.json");
 		if (!existsSync(meta)) writeFileSync(meta, JSON.stringify({ title, boards: [] }, null, "\t"));
 	}
@@ -226,9 +312,10 @@ export class HarnessSync {
 			if (!existsSync(dir)) return;
 			for (const entry of readdirSync(dir, { withFileTypes: true })) {
 				const full = join(dir, entry.name);
-				if (entry.name.startsWith(".")) continue;
+				if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+				const path = relative(this.o.deck, full).split(sep).join("/");
 				if (entry.isDirectory()) walk(full);
-				else if (entry.isFile()) out.set(relative(this.o.deck, full).split(sep).join("/"), full);
+				else if (entry.isFile() && !secretLooking(path)) out.set(path, full);
 			}
 		};
 		for (const top of SYNCED) walk(join(this.o.deck, top));
@@ -307,8 +394,14 @@ export class HarnessSync {
 	}
 
 	private async download(path: string, f: SyncFile) {
-		const bytes = await this.call("GET", `/sync/v1/blobs/${f.hash}`);
-		const full = join(this.o.deck, ...path.split("/"));
+		const landing = landingFor(this.o.deck, path);
+		if ("refused" in landing || secretLooking(path)) {
+			if (!this.skipped.has(path)) this.log(`did not download ${JSON.stringify(path)}: ${"refused" in landing ? landing.refused : "it looks like a secret"}`);
+			this.skipped.add(path);
+			return;
+		}
+		const bytes = await this.call("GET", `/sync/v1/blobs/${encodeURIComponent(f.hash)}`);
+		const full = landing.full;
 		mkdirSync(dirname(full), { recursive: true });
 		writeFileSync(full, bytes);
 		this.state.files[path] = { version: f.version, hash: f.hash };
