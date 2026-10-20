@@ -21,6 +21,12 @@ export interface CanvasHost {
 	boardLink(href: string, base: string): string | undefined;
 	/** Where an icon's SVG is, before the CDN is asked (`pen/icons.ts`). Absent: the CDN. */
 	iconUrl?: IconSource;
+	/**
+	 * Where a picture the drawing names (an image fill, a card's picture) is read, given as the
+	 * drawing wrote it, relative to its own folder `base`. Absent: the address against `base`, which
+	 * is right wherever the canvas's folder is itself an address, as in the Decks app.
+	 */
+	pictureUrl?(url: string, base: string): string;
 }
 
 const fallback: CanvasHost = {
@@ -39,3 +45,9 @@ export function setCanvasHost(next: Partial<CanvasHost>): void {
 
 /** The host's answers, read at the moment they are needed. */
 export const canvasHost = (): CanvasHost => current;
+
+/** A picture the drawing names, as the address to fetch: the host's answer, or the address against `base`. */
+export function pictureAddress(url: string, base: string): string {
+	if (current.pictureUrl && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(url)) return current.pictureUrl(url, base);
+	return new URL(url, new URL(base || "/", typeof location === "undefined" ? "http://canvas.invalid/" : location.href)).href;
+}

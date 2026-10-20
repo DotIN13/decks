@@ -21,6 +21,7 @@ import Undo2 from "lucide-solid/icons/undo-2";
 import { pageFont } from "./look.ts";
 import type { Token, Tokens } from "marked";
 import { CALLOUTS, cardMarked, EMOJI_OF, FACE_ALIAS, FONT_GROUPS, sizedAlt, type Colour, type ColourToken, type CriticToken, type HighlightToken, type WikiToken } from "./card-syntax.ts";
+import { pictureAddress } from "../host.ts";
 
 /**
  * The editor over a card (`Stage.tsx`): its words as they read, typed into in place, and written back
@@ -93,7 +94,7 @@ export function CardEditor(props: CardEditorProps) {
 	let done = false;
 	const url = (src: string) => {
 		try {
-			return new URL(src, new URL(props.base || "/", location.origin)).href;
+			return pictureAddress(src, new URL(props.base || "/", location.origin).href);
 		} catch {
 			return src;
 		}

@@ -15,6 +15,7 @@ import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../pen/font-files.ts";
 import { iconUrl, parseIcon } from "../pen/icons.ts";
+import { pictureAddress } from "../host.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
 import { boundsOf } from "../pen/bounds.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
@@ -717,8 +718,7 @@ export class StageEngine {
 		for (const url of urls) {
 			if (url.startsWith("icon:")) this.fetchIcon(url.slice(5));
 			else if (!this.picturesAsked.has(url)) {
-				const base = this.base || location.href;
-				this.fetchPicture(url, new URL(url, base).href, false);
+				this.fetchPicture(url, pictureAddress(url, this.base || location.href), false);
 			}
 		}
 	}

@@ -152,6 +152,8 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		canWrite: () => !options.readOnly,
 		boardLink: options.boardLink ?? (() => undefined),
 		iconUrl: options.icons,
+		// A host that reads deck files by path reads the drawing's pictures the same way.
+		...(options.resolveUrl ? { pictureUrl: (url: string) => options.resolveUrl!(url) } : {}),
 	};
 	setCanvasHost(answers);
 

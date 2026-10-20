@@ -24,6 +24,7 @@ import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { cancelOps, cardInner as cardInnerOf, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
+import { pictureAddress } from "../../host.ts";
 
 export type TextHost = {
 	scene: SceneQuery;
@@ -312,7 +313,7 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 						image.onerror = () => finish(null);
 						setTimeout(() => finish(null), 1500);
 						try {
-							image.src = new URL(url, new URL(host.pen()?.base || "/", location.origin)).href;
+							image.src = pictureAddress(url, new URL(host.pen()?.base || "/", location.origin).href);
 						} catch {
 							finish(null);
 						}
