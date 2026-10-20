@@ -328,13 +328,52 @@
 	const BOARD_ROUTE = "/api/board/";
 	let stageClient;
 
-	/** The SDK, as this board: found from the board's own address, `<prefix>/api/board/<path>`. */
+	/*
+	 * A board's page gives the harness no commands of its own: the harness refuses a browser without
+	 * the person key, which only the Decks page holds. So each verb is asked of the page around this
+	 * one — the Decks app, or Studio — as `{ decks: "stage.call", id, verb, args }`, and that page
+	 * calls it, naming this board by the frame the message came from, never by what it says. The
+	 * harness asks the person once whether this board may use the stage. The answer comes back as
+	 * `{ decks: "stage.answer", id, status, answer }`.
+	 */
+	const waiting = new Map();
+	let nextCall = 0;
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent || event.data?.decks !== "stage.answer") return;
+		const done = waiting.get(event.data.id);
+		if (!done) return;
+		waiting.delete(event.data.id);
+		done(event.data);
+	});
+
+	/** The SDK's `fetch`, passed up to the page around this one: answered as the harness answered it. */
+	function askParent(url, init) {
+		if (window.parent === window) return Promise.reject(new Error("This board is not on a canvas, so its buttons have no stage: open it in Decks."));
+		const verb = decodeURIComponent(new URL(url, location.href).pathname.split("/api/v1/")[1] ?? "");
+		let args = [];
+		try {
+			args = JSON.parse(init?.body ?? "{}").args ?? [];
+		} catch {
+			/* no arguments */
+		}
+		const id = `call-${++nextCall}-${Math.random().toString(36).slice(2)}`;
+		return new Promise((resolve) => {
+			waiting.set(id, (message) => {
+				const given = Number(message.status);
+				const status = given >= 200 && given <= 599 ? given : 502;
+				resolve(new Response(JSON.stringify(message.answer ?? { ok: false, error: "No answer.", notes: [] }), { status, headers: { "content-type": "application/json" } }));
+			});
+			window.parent.postMessage({ decks: "stage.call", id, verb, args }, "*");
+		});
+	}
+
+	/** The SDK, as this board: its calls go through the page around it (`askParent`). */
 	function boardStage() {
 		if (stageClient) return stageClient;
 		const at = location.pathname.indexOf(BOARD_ROUTE);
 		if (at < 0) return Promise.reject(new Error("This page is not a board Decks serves, so its buttons have no stage."));
 		const prefix = location.pathname.slice(0, at);
-		stageClient = import(`${location.origin}${prefix}/api/sdk/decks.mjs`).then((sdk) => sdk.connect());
+		stageClient = import(`${location.origin}${prefix}/api/sdk/decks.mjs`).then((sdk) => sdk.connect({ url: `${location.origin}${prefix}`, fetch: askParent }));
 		return stageClient;
 	}
 
@@ -1495,7 +1534,7 @@
 	async function mountLiveApp(host) {
 		try {
 			const module = await needModule("live-app.js");
-			module.mountLiveApp(host, { api: API });
+			module.mountLiveApp(host, { api: API, stage: boardStage });
 		} catch (error) {
 			host.textContent = `Cannot show this app: ${error.message}`;
 			host.dataset.state = "broken";

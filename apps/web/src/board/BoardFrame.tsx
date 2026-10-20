@@ -26,6 +26,7 @@ import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts"
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachLiveDoc } from "./live-doc.ts";
 import { attachBoardOpen } from "./board-links.ts";
+import { attachStageCall } from "./stage-call.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
@@ -296,6 +297,7 @@ export function BoardFrame(props: {
 	let detachLive: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
 	let detachDoc: (() => void) | undefined;
+	let detachStage: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	/** Whether the stage has been told this board's document is showing (`onLive`). */
@@ -891,6 +893,9 @@ export function BoardFrame(props: {
 		detachLinks = attachBoardOpen(frame, (path) => {
 			props.onOpenBoard?.(path, props.board.path);
 		});
+		// A button's code calling a verb: this page makes the call, naming the board by this frame (`stage-call.ts`).
+		detachStage?.();
+		detachStage = attachStageCall(frame, () => props.board.path);
 		reportExtent(frame, props.board.rev);
 	};
 
@@ -914,7 +919,8 @@ export function BoardFrame(props: {
 		detachLive?.();
 		detachLinks?.();
 		detachDoc?.();
-		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = undefined;
+		detachStage?.();
+		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachDoc = detachStage = undefined;
 		frames?.detach();
 		frames = undefined;
 		clearTimeout(measuring);

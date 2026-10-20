@@ -36,6 +36,13 @@ export interface CanvasOptions {
 	boards?: {
 		page?(path: string): string | undefined;
 		picture?(path: string, scheme: "light" | "dark"): string | undefined;
+		/**
+		 * A verb a board's button called (`lib/board.js` posts it up, as `stage.call`): the host makes
+		 * the call for the board at `path` — the board whose frame the message came from, never one the
+		 * message names — and answers with the harness's status and answer, which go back down. A board's
+		 * page cannot give the harness commands itself. Absent: a board's buttons have no stage here.
+		 */
+		call?(path: string, verb: string, args: unknown[]): Promise<{ status: number; answer: unknown }>;
 	};
 	/**
 	 * The folder the drawing's own relative addresses are read against (image fills, files on the
@@ -256,7 +263,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
 								}}
 								onMove={moveBoard}
-								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} />}
+								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.call ? { call: options.boards.call } : {})} />}
 								shots={() => ({
 									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
 									ownPicture: true,

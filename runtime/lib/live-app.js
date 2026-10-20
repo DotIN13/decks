@@ -373,7 +373,11 @@ export function mountLiveApp(host, options) {
 		state.textContent = "Restarting";
 		dot.style.background = COLOURS.starting;
 		try {
-			await fetch(`${api}/apps/${encodeURIComponent(name)}/restart`, { method: "POST" });
+			// A command, so asked of the page around this board, as a button's verb is (`board.js`, `boardStage`).
+			const stage = await options.stage();
+			await stage.apps.restart(name);
+		} catch (error) {
+			console.warn(`[decks] could not restart ${name}:`, error);
 		} finally {
 			restart.disabled = false;
 			loaded = false;
@@ -407,7 +411,8 @@ export function mountLiveApp(host, options) {
 		}
 	}, 1000);
 	setInterval(() => {
-		if (seenNow() && !robot) void fetch(`${api}/apps/${encodeURIComponent(name)}/seen`, { method: "POST" }).catch(() => {});
+		// A read, not a post: a board's page gives no commands, and being looked at is not one.
+		if (seenNow() && !robot) void fetch(`${api}/apps/${encodeURIComponent(name)}/seen`, { cache: "no-store" }).catch(() => {});
 	}, 60_000);
 	void ask();
 }
