@@ -99,7 +99,7 @@ export function createHttpApp(app: App): Express {
 	});
 	// The deck's apps (`apps/route.ts`), for the same reason: a server app's request is the app's.
 	server.use((req, res, next) => {
-		if (!appRequest(req, res, app.apps)) next();
+		if (!appRequest(req, res, app.apps, (token) => app.pairing.check(token))) next();
 	});
 	server.use(express.json({ limit: "8mb" }));
 

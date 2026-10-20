@@ -1,7 +1,8 @@
+import assert from "node:assert/strict";
 import { createServer, get, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
-import { appRequest } from "./route.ts";
+import { appRequest, withoutToken } from "./route.ts";
 import type { Apps } from "./service.ts";
 
 function listen(server: Server): Promise<number> {
@@ -51,4 +52,52 @@ test("a request the browser drops closes the app's side too", async () => {
 		app.closeAllConnections();
 		app.close();
 	}
+});
+
+test("the app never sees Decks' pairing token or X-Decks headers, and keeps its own bearer token", async () => {
+	let seen: { url?: string; headers: Record<string, unknown> } = { headers: {} };
+	const app = createServer((req, res) => {
+		seen = { url: req.url, headers: req.headers };
+		res.end("ok");
+	});
+	const appPort = await listen(app);
+	const apps = { exists: () => true, manifest: () => ({ kind: "server" }), seen: () => {}, portFor: async () => appPort } as unknown as Apps;
+	const decks = createServer((req, res) => void appRequest(req, res as Parameters<typeof appRequest>[1], apps, (token) => token === "paired"));
+	const decksPort = await listen(decks);
+	const ask = async (path: string, headers: Record<string, string>) => {
+		const response = await fetch(`http://127.0.0.1:${decksPort}${path}`, { headers });
+		await response.text();
+		return response.status;
+	};
+	try {
+		assert.equal(await ask("/app/x/items?a=1&decks_token=paired&b=2", { authorization: "Bearer paired", "x-decks-agent": "a1", "x-decks-person": "1" }), 200);
+		assert.equal(seen.url, "/items?a=1&b=2");
+		assert.equal(seen.headers.authorization, undefined);
+		assert.equal(seen.headers["x-decks-agent"], undefined);
+		assert.equal(seen.headers["x-decks-person"], undefined);
+		assert.equal(await ask("/app/x/items", { authorization: "Bearer the-apps-own" }), 200);
+		assert.equal(seen.headers.authorization, "Bearer the-apps-own");
+
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "cross-site" }), 403, "another site");
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "same-site" }), 403, "a sibling site");
+		assert.equal(await ask("/app/x/", { origin: "http://evil.test" }), 403, "an Origin that is not this host");
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "cross-site", authorization: "Bearer paired" }), 200, "a paired site");
+		assert.equal(await ask("/app/x/?decks_token=paired", { "sec-fetch-site": "cross-site" }), 200, "a paired site, token in the address");
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "cross-site", authorization: "Bearer wrong" }), 403);
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "same-origin" }), 200);
+		assert.equal(await ask("/app/x/", { "sec-fetch-site": "none" }), 200);
+		assert.equal(await ask("/app/x/", { origin: `http://127.0.0.1:${decksPort}` }), 200);
+	} finally {
+		decks.closeAllConnections();
+		decks.close();
+		app.closeAllConnections();
+		app.close();
+	}
+});
+
+test("only decks_token leaves the query", () => {
+	assert.equal(withoutToken(""), "");
+	assert.equal(withoutToken("?a=1"), "?a=1");
+	assert.equal(withoutToken("?decks_token=x"), "");
+	assert.equal(withoutToken("?decks_token=x&q=a%20b"), "?q=a+b");
 });

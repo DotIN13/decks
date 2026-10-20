@@ -63,7 +63,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 		hub.handleUpgrade(request, socket, head);
 	}
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
-	else if (appUpgrade(request, socket, head, app.apps)) return;
+	else if (appUpgrade(request, socket, head, app.apps, (token) => app.pairing.check(token))) return;
 	else if (!forwardUpgrade(request, socket, head, app.forwards)) socket.destroy();
 });
 

@@ -2,6 +2,7 @@ import { request as httpRequest, type IncomingMessage, type ServerResponse } fro
 import { connect } from "node:net";
 import type { Duplex } from "node:stream";
 import type { Response } from "express";
+import { fromAnotherSite, tokenOf } from "../share/pairing.ts";
 import { APP_NAME, type Apps } from "./service.ts";
 
 /**
@@ -14,7 +15,15 @@ import { APP_NAME, type Apps } from "./service.ts";
  *
  * The path the server sees is the path inside the app, `/api/items`, unless its manifest says
  * `prefix` (a framework told its base path, which Decks also passes as `BASE_PATH`).
+ *
+ * An app is this server's own page, so another site is not let in (`fromAnotherSite`) unless it
+ * carries a pairing token, as for `/api/`: an app has no sign-in of its own, and without this any
+ * page the person opened could call it. What Decks itself uses to let a request in never reaches
+ * the app: the pairing token, in the `Authorization` header or as `decks_token`, and `X-Decks-*`.
  */
+
+/** Whether a token is one this server gave out (`Pairing.check`). */
+export type PairedCheck = (token: string | undefined) => boolean;
 
 const ROUTE = /^\/app\/([^/?]+)(\/[^?]*)?(\?.*)?$/;
 
@@ -27,10 +36,14 @@ function target(url: string): { name: string; inner: string; query: string; slas
 }
 
 /** Answer one request. Answers whether it was an `/app/` request at all. */
-export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps): boolean {
+export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps, paired?: PairedCheck): boolean {
 	const url = req.url ?? "/";
 	const at = target(url);
 	if (!at) return false;
+	if (refusedSite(req, paired)) {
+		plain(res, 403, "An app here answers only its own Decks' pages, or another site paired with this Decks.");
+		return true;
+	}
 	if (!apps.exists(at.name)) {
 		plain(res, 404, `There is no app called ${at.name}. An agent makes one with decks apps create ${at.name}.`);
 		return true;
@@ -74,8 +87,8 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 			plain(res, 503, `apps/${at.name} is ${state.status}${state.error ? `: ${state.error}` : ""}.\n\n${lines}`);
 			return;
 		}
-		const path = manifest.prefix ? url : `${at.inner}${at.query}`;
-		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: forwarded(req, at.name) }, (answer) => {
+		const path = manifest.prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`;
+		const upstream = httpRequest({ host: "127.0.0.1", port, method: req.method, path, headers: forwarded(req, at.name, paired) }, (answer) => {
 			const headers = { ...answer.headers };
 			// A redirect the app made to its own root goes back inside its address.
 			const location = headers.location;
@@ -98,10 +111,14 @@ export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<R
 }
 
 /** A websocket to a server app (a dev server's reloads, a chat). Answers whether it was an `/app/` upgrade at all. */
-export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, apps: Apps): boolean {
+export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, apps: Apps, paired?: PairedCheck): boolean {
 	const url = req.url ?? "/";
 	const at = target(url);
 	if (!at) return false;
+	if (refusedSite(req, paired)) {
+		socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+		return true;
+	}
 	if (!apps.exists(at.name) || apps.manifest(at.name).kind !== "server") {
 		socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
 		return true;
@@ -110,8 +127,8 @@ export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, a
 	void apps.portFor(at.name).then((port) => {
 		if (port === undefined) return void socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
 		const upstream = connect(port, "127.0.0.1", () => {
-			const lines = [`${req.method ?? "GET"} ${prefix ? url : `${at.inner}${at.query}`} HTTP/1.1`];
-			for (const [name, value] of Object.entries(forwarded(req, at.name))) {
+			const lines = [`${req.method ?? "GET"} ${prefix ? `${url.split("?")[0]}${withoutToken(at.query)}` : `${at.inner}${withoutToken(at.query)}`} HTTP/1.1`];
+			for (const [name, value] of Object.entries(forwarded(req, at.name, paired))) {
 				for (const one of Array.isArray(value) ? value : [value]) if (one !== undefined) lines.push(`${name}: ${one}`);
 			}
 			upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
@@ -131,8 +148,27 @@ export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, a
 	return true;
 }
 
-function forwarded(req: IncomingMessage, name: string): Record<string, string | string[] | undefined> {
-	const headers: Record<string, string | string[] | undefined> = { ...req.headers };
+/** Another site's request, without a paired token: `Sec-Fetch-Site` says so, or an `Origin` that is not this host. */
+function refusedSite(req: IncomingMessage, paired: PairedCheck | undefined): boolean {
+	if (!fromAnotherSite(req.headers)) return false;
+	return !(paired?.(tokenOf(req.headers, req.url)) ?? false);
+}
+
+/** A query string (`?a=1&decks_token=…`) without the pairing token, which is Decks', not the app's. */
+export function withoutToken(query: string): string {
+	if (!query.includes("decks_token")) return query;
+	const params = new URLSearchParams(query.slice(1));
+	params.delete("decks_token");
+	const rest = params.toString();
+	return rest ? `?${rest}` : "";
+}
+
+function forwarded(req: IncomingMessage, name: string, paired?: PairedCheck): Record<string, string | string[] | undefined> {
+	const headers: Record<string, string | string[] | undefined> = {};
+	for (const [key, value] of Object.entries(req.headers)) if (!key.startsWith("x-decks-")) headers[key] = value;
+	// A pairing token is Decks' to check, never the app's to see; an app's own bearer token goes on.
+	const auth = req.headers.authorization;
+	if (typeof auth === "string" && auth.startsWith("Bearer ") && paired?.(auth.slice(7).trim())) delete headers.authorization;
 	const host = req.headers["x-forwarded-host"] ?? req.headers.host;
 	if (host) headers["x-forwarded-host"] = host;
 	headers["x-forwarded-proto"] = req.headers["x-forwarded-proto"] ?? "http";
