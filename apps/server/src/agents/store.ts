@@ -300,6 +300,23 @@ export class AgentStore {
 		}
 	}
 
+	/**
+	 * Set a conversation aside when the agent is reset: its window and its archive are renamed with
+	 * the time, so nothing is lost and none of it is shown or scrolled back to again.
+	 */
+	retire(id: string, at = Date.now()): void {
+		const folder = this.folder(id);
+		for (const file of ["chat.json", "chat.log"]) {
+			const from = join(folder, file);
+			if (!existsSync(from)) continue;
+			try {
+				renameSync(from, join(folder, file.replace(".", `-reset-${at}.`)));
+			} catch {
+				/* left where it was: the next write replaces the window anyway */
+			}
+		}
+	}
+
 	/** Whether anything has been archived for this agent, without reading it. */
 	hasArchive(id: string): boolean {
 		try {

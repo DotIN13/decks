@@ -75,6 +75,11 @@ export class Translator {
 		}
 	}
 
+	/** Empty the window for a conversation started afresh. The counter stays, so no new id repeats an old one. */
+	clear(): void {
+		this.items.splice(0);
+	}
+
 	private id(prefix: string): string {
 		return `${this.agentId}:${prefix}${++this.counter}`;
 	}

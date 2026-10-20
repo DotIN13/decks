@@ -436,6 +436,17 @@ export function createHttpApp(app: App): Express {
 			);
 			return;
 		}
+		/** Start the agent afresh: a new conversation, the same agent (`session.reset`). */
+		if (act === "reset") {
+			agent.reset().then(
+				() => {
+					app.agents.publish();
+					res.json({ id: agent.id, reset: true });
+				},
+				(error: unknown) => res.status(400).json({ error: (error as Error).message }),
+			);
+			return;
+		}
 		/** The project an agent is filed under, from another front end's agent list (Studio); null takes it out of any. */
 		if (act === "workspace") {
 			const workspace = ((req.body ?? {}) as { workspace?: unknown }).workspace;

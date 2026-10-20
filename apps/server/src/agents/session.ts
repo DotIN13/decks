@@ -642,7 +642,8 @@ export class DeckAgent {
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
-	private stageHooks() {
+	/** `byPerson`: the hooks a person's acts go through (`personTool`), so a move they make is told to the agent. */
+	private stageHooks(byPerson = false) {
 		return {
 			id: this.id,
 			identity: () => this.identity,
@@ -675,9 +676,9 @@ export class DeckAgent {
 			stageName: () => this.stageName(true),
 			isolated: () => this.isolatedOn,
 
-			openStage: (name: string) => this.openStage(name),
-			newStage: (title: string) => this.newStage(title),
-			setHome: (name: string) => this.openStage(name),
+			openStage: (name: string) => this.openStage(name, byPerson ? "other" : "itself"),
+			newStage: (title: string) => this.newStage(title, { by: byPerson ? "other" : "itself" }),
+			setHome: (name: string) => this.openStage(name, byPerson ? "other" : "itself"),
 			deliver: (target: string, spec: { task: string; boards?: string[] }) => {
 				if (!this.host.deliver) throw new Error("This deck cannot deliver messages.");
 				return this.host.deliver(this.id, target, spec);
@@ -808,8 +809,14 @@ export class DeckAgent {
 		this.setInPlay(adopt);
 	}
 
-	/** Work on another stage: the browser is sent its drawing, and its boards are the ones this agent sees. */
-	openStage(name: string): void {
+	/**
+	 * Work on another stage: the browser is sent its drawing, and its boards are the ones this agent sees.
+	 *
+	 * `by`: who moved it. An agent that opened a canvas itself knows; one moved by someone else (a person
+	 * in Decks or Studio, or its canvas deleted) is told with its next message, so its next call that
+	 * names no canvas does not land somewhere it does not expect.
+	 */
+	openStage(name: string, by: "itself" | "other" = "other"): void {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". decks canvas list lists them; decks canvas create <title> makes one.`);
@@ -817,7 +824,12 @@ export class DeckAgent {
 		if (this.isolatedOn && !isIsolatedStage(pens, name)) throw new Error(`Isolated mode: "${name}" is not an isolated stage, and an isolated agent can open only those.`);
 		if (this.isolatedOn && !this.isolatedStages.includes(name)) this.isolatedStages.push(name);
 		if (name === this.stageFolder) return;
+		const from = this.stageFolder;
 		this.stageFolder = name;
+		if (by === "other") {
+			const title = pens.titleOf(name);
+			this.pending.push(`[You were moved ${from ? `from the canvas "${pens.names().includes(from) ? pens.titleOf(from) : from}" ` : ""}to the canvas "${title}" (decks … --canvas ${name}). It is your home canvas now: a call that names no canvas acts on it. Read it before you change it.]`);
+		}
 		this.save();
 		for (const path of [...this.playing].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.host.arranged?.();
@@ -870,13 +882,13 @@ export class DeckAgent {
 	}
 
 	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
-	newStage(title: string, options: { provisional?: boolean } = {}): string {
+	newStage(title: string, options: { provisional?: boolean; by?: "itself" | "other" } = {}): string {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		const name = pens.claim(title.trim() || UNTITLED, { provisional: options.provisional === true || !title.trim() });
 		// Made while isolated, it is isolated, and comes back as an ordinary stage with the rest.
 		if (this.isolatedOn) markIsolated(pens, name);
-		this.openStage(name);
+		this.openStage(name, options.by ?? "other");
 		return name;
 	}
 
@@ -1141,7 +1153,7 @@ export class DeckAgent {
 	personTool(): StageTool {
 		this.personal ??= createStageTool({
 			stage: this.stage,
-			agent: { ...this.stageHooks(), person: true, acted: undefined, worked: undefined, drew: undefined },
+			agent: { ...this.stageHooks(true), person: true, acted: undefined, worked: undefined, drew: undefined },
 			port: this.host.port,
 		});
 		return this.personal;
@@ -1627,6 +1639,30 @@ export class DeckAgent {
 		return result;
 	}
 
+	/**
+	 * Start afresh: a new conversation with the same agent. Its turn (if any) is stopped, its runtime
+	 * let go with the session it was on, and its log set aside on disk (`store.retire`); what makes it
+	 * this agent stays — name, face, colour, workspace, tags, home canvas, model and mode. The next
+	 * message starts a new session, as for an agent just made.
+	 */
+	async reset(): Promise<void> {
+		if (this.running) await this.abort().catch(() => undefined);
+		this.backend?.dispose();
+		this.backend = undefined;
+		this.starting = undefined;
+		this.stageBridge?.revoke(this.id);
+		this.resumeRef = undefined;
+		this.pending = [];
+		this.store.retire(this.id);
+		this.translator.clear();
+		this.transcriptLoaded = true;
+		this.storedLast = undefined;
+		this.lastUsage = undefined;
+		this.store.writeRecord(this.record());
+		this.emit(this.historyMessage());
+		this.sayRow();
+	}
+
 	async forkFrom(entryId: string): Promise<string | undefined> {
 		return this.backend?.forkFrom(entryId);
 	}
@@ -1748,7 +1784,7 @@ export class DeckAgent {
 				const isolated = pens.freshName(`${from}-isolated`);
 				copyStage(this.deck, pens, from, isolated, { isolated: true, origin: from });
 				this.isolatedStages = [];
-				this.openStage(isolated);
+				this.openStage(isolated, "itself");
 			}
 		}
 		if (!on) {
@@ -1769,7 +1805,7 @@ export class DeckAgent {
 				}
 				this.isolatedStages = [];
 				const current = this.stageFolder ? copies.get(this.stageFolder) : undefined;
-				if (current) this.openStage(current);
+				if (current) this.openStage(current, "itself");
 			}
 		}
 		const to = on ? this.openView().dir : this.deck.path;

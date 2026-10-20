@@ -507,8 +507,9 @@ export class Registry {
 		 * Its home canvas: the one named, or (for agent.create) a new one of its own. Left to itself
 		 * (the old send's { name, kind }), it joins its workspace's latest canvas on first use.
 		 */
-		if (spec.canvas) made.openStage(spec.canvas);
-		else if (spec.newCanvas && this.stage.pens) made.newStage("");
+		// Where it starts is where it was made, not a move: nothing to tell it.
+		if (spec.canvas) made.openStage(spec.canvas, "itself");
+		else if (spec.newCanvas && this.stage.pens) made.newStage("", { by: "itself" });
 		this.publish();
 		const model = made.model;
 		const mode = made.mode;

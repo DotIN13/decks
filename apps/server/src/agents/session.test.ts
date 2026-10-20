@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -656,6 +656,25 @@ test("scrolling back pages through the window before it reaches the archive", ()
 		);
 		assert.equal(first.more, false, "the start of a conversation with no archive");
 		assert.ok(page.items.every((item) => item.kind !== "tool" || !("args" in item)), "scrollback is trimmed too");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a reset starts the conversation afresh and sets the old one aside, keeping the agent", async () => {
+	const items = longChat(30);
+	const { agent, store, cleanup } = agentOn([], { restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "message 29", lastAt: 29 } });
+	try {
+		const name = agent.chat().name;
+		assert.ok((agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items.length > 0);
+		await agent.reset();
+		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		assert.equal(history.items.length, 0, "nothing is shown of the old conversation");
+		assert.equal(history.more, false, "and none of it is scrolled back to");
+		assert.deepEqual(store.readItems("R"), [], "the window on disk is empty");
+		const folder = join(store["deck"].path, ".decks", "agents", "R");
+		assert.ok(readdirSync(folder).some((file) => /^chat-reset-\d+\.json$/.test(file)), "the old conversation is kept on disk, set aside");
+		assert.equal(agent.chat().name, name, "it is still the same agent");
 	} finally {
 		cleanup();
 	}
