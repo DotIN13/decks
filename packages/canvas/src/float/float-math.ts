@@ -186,8 +186,8 @@ export function saveFloat(key: string, saved: Saved, storage?: Storage): void {
 	}
 }
 
-export { velocityFrom, type Sample, type Velocity } from "@decks/canvas/lib/velocity.ts";
-import type { Velocity } from "@decks/canvas/lib/velocity.ts";
+export { velocityFrom, type Sample, type Velocity } from "../lib/velocity.ts";
+import type { Velocity } from "../lib/velocity.ts";
 
 /**
  * Where a thrown float comes to rest on its own: the release point plus the velocity

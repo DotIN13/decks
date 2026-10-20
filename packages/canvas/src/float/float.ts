@@ -124,7 +124,7 @@ const SAMPLES = 8;
 export function makeFloat(
 	el: HTMLElement,
 	options: FloatOptions,
-): { restore: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; dispose: () => void } {
+): { restore: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; dispose: () => void } {
 	const { key, handle, ignore, home, bounds, size, apply, onChange, storage } = options;
 	const pin: Pin = options.pin ?? "top";
 	const disabled = (): boolean => options.disabled?.() === true;
@@ -457,6 +457,18 @@ export function makeFloat(
 		settle(at, false, true);
 	};
 
+	/**
+	 * Stand here, now, and remember it: for a host that moves the float itself, as a resize by its
+	 * left edge moves its left side. Kept inside the bounds; nothing glides, and a tucked float stays put.
+	 */
+	const placeAt = (p: Point): void => {
+		if (stowed || drag) return;
+		cancelSettle();
+		const at = clamp(p, size(), bounds());
+		place(at);
+		remember(toFraction(at, size(), bounds(), 6, pin));
+	};
+
 	const onResize = (): void => restore();
 
 	handle.addEventListener("pointerdown", onPointerDown);
@@ -489,6 +501,7 @@ export function makeFloat(
 		sendHome,
 		unstow,
 		stowed: () => stowed !== undefined,
+		placeAt,
 		dispose() {
 			handle.removeEventListener("pointerdown", onPointerDown);
 			handle.removeEventListener("pointermove", onPointerMove);
