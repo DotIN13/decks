@@ -70,6 +70,19 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 		const on = props.gestures.screenOf(at());
 		return { left: on.x, top: on.y, scale: on.scale };
 	};
+	/** Words selected in the page, as it said (`board.js`), in the page's pixels: a comment is offered on them. */
+	const [words, setWords] = createSignal<{ quote: string; component?: string; rect: { x: number; y: number; w: number; h: number } }>();
+	createEffect(() => {
+		if (!wired() || !props.onCommentWords) setWords(undefined);
+	});
+	/** Where the words are on the screen now, from where the frame is drawn: the camera may have moved since. */
+	const wordsOnScreen = (): DOMRect | undefined => {
+		const w = words();
+		if (!w || !frame) return undefined;
+		const r = frame.getBoundingClientRect();
+		const scale = r.width / Math.max(1, size().w);
+		return new DOMRect(r.left + w.rect.x * scale, r.top + w.rect.y * scale, w.rect.w * scale, w.rect.h * scale);
+	};
 	/** The page's fingers -> the ones the stage is told about. */
 	const fingers = new Map<number, number>();
 	let panFrom: { sx: number; sy: number } | undefined;
@@ -82,6 +95,13 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 			case "decks:embed-ready":
 				setGuest(true);
 				return;
+			case "decks:selection": {
+				const quote = typeof message.quote === "string" ? message.quote : "";
+				const rect = message.rect as { x?: unknown; y?: unknown; w?: unknown; h?: unknown } | undefined;
+				if (!quote || !rect || !props.onCommentWords) return setWords(undefined);
+				setWords({ quote, ...(typeof message.component === "string" ? { component: message.component } : {}), rect: { x: num(rect.x), y: num(rect.y), w: num(rect.w), h: num(rect.h) } });
+				return;
+			}
 			case "decks:wheel": {
 				const point = pointFromBoard(geometry(), num(message.x), num(message.y));
 				const zooming = message.zooming === true;
@@ -193,6 +213,24 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 			{/* The band along the edge of a board whose page takes the pointer: a press on the page is the page's, so this moves it. */}
 			<Show when={wired() && (hovered() || props.selected)}>
 				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={press} />}</For>
+			</Show>
+			{/* Over the selected words, at screen size whatever the zoom: a comment on them goes to the host. */}
+			<Show when={words()}>
+				{(w) => (
+					<button
+						type="button"
+						class="plain-board-comment"
+						style={{ left: `${w().rect.x + w().rect.w / 2}px`, top: `${w().rect.y}px`, transform: `translate(-50%, calc(-100% - 6px)) scale(${1 / zoom()})`, "transform-origin": "50% 100%" }}
+						onPointerDown={(e) => e.stopPropagation()}
+						onClick={() => {
+							const got = w();
+							props.onCommentWords?.({ quote: got.quote, ...(got.component ? { component: got.component } : {}), anchor: wordsOnScreen });
+							setWords(undefined);
+						}}
+					>
+						Comment
+					</button>
+				)}
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !wired() && press(event)}>
 				<Show when={live()}>

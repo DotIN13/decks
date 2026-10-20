@@ -68,6 +68,34 @@
 		return promise;
 	}
 	if (foreignParent) void needScript("embed-guest.js").catch(() => {});
+	/*
+	 * Words selected here, said to the page framing this one when it is another origin: it cannot read
+	 * this document's selection, and offers a comment on them (Decks Studio). Where they are is in this
+	 * page's pixels; an empty quote says the selection went.
+	 */
+	if (foreignParent) {
+		let said = "";
+		let soon = 0;
+		const report = () => {
+			const selection = document.getSelection();
+			const quote = selection && !selection.isCollapsed ? selection.toString().replace(/\s+/g, " ").trim().slice(0, 400) : "";
+			if (!quote) {
+				if (said) window.parent.postMessage({ t: "decks:selection", quote: "" }, "*");
+				said = "";
+				return;
+			}
+			const range = selection.getRangeAt(0);
+			const box = range.getBoundingClientRect();
+			const at = range.commonAncestorContainer;
+			const component = (at.nodeType === 1 ? at : at.parentElement)?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
+			said = quote;
+			window.parent.postMessage({ t: "decks:selection", quote, ...(component ? { component } : {}), rect: { x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height } }, "*");
+		};
+		document.addEventListener("selectionchange", () => {
+			clearTimeout(soon);
+			soon = setTimeout(report, 180);
+		});
+	}
 
 	function needStyle(file) {
 		const key = `style:${file}`;

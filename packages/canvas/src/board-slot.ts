@@ -124,6 +124,11 @@ export interface StageBoardProps {
 	onHide?: () => void;
 	/** Comment on the whole board, from its title bar. */
 	onComment?: () => void;
+	/**
+	 * Comment on words selected in the board's page: the words, the block they are in, and where
+	 * they are on screen. A host's page from another origin says what is selected (`board.js`).
+	 */
+	onCommentWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
 	/** The stage's layer that does not zoom, where the title bar lives (`Stage.tsx`); none on a touch screen. */
 	barLayer?: HTMLElement | undefined;
 	/** Put a bar on screen for a board at this place and width, and keep it there as the camera moves. */

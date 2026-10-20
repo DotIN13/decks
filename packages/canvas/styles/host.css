@@ -31,6 +31,21 @@
 		box-shadow: var(--shadow);
 	}
 
+	/* Over words selected in a `PlainBoard`'s page: comment on them. */
+	.plain-board-comment {
+		position: absolute;
+		z-index: 5;
+		padding: 5px 10px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--fg);
+		color: var(--bg);
+		font: 500 12px/1.2 var(--font-sans);
+		white-space: nowrap;
+		box-shadow: var(--shadow);
+		cursor: pointer;
+	}
+
 	/* A board drawn by `PlainBoard`: its title above it, to move it by. */
 	.plain-board-bar {
 		position: absolute;

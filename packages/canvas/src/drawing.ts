@@ -19,6 +19,8 @@ export interface Drawing {
 	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
 	moveBoard(path: string, x: number, y: number): void;
 	resizeBoard(path: string, size: { w: number; h: number }): void;
+	/** A board taken off the drawing (its file is the host's business): its item deleted. */
+	removeBoard(path: string): void;
 }
 
 export interface DrawingOptions {
@@ -124,6 +126,10 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		moveBoard(path, x, y) {
 			const id = boardId(path);
 			if (id) edit([{ op: "update", id, set: { x: Math.round(x), y: Math.round(y) } }]);
+		},
+		removeBoard(path) {
+			const id = boardId(path);
+			if (id) edit([{ op: "delete", id }]);
 		},
 		resizeBoard(path, size) {
 			const id = boardId(path);

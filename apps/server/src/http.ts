@@ -225,6 +225,20 @@ export function createHttpApp(app: App): Express {
 		}),
 	);
 
+	/**
+	 * Delete a board's file, for another front end's board pill (Studio): what this app's own page sends
+	 * on its socket (`board.delete`). A revision of it is kept first, as there.
+	 */
+	api.post("/boards/delete", (req, res) => {
+		const path = String(((req.body ?? {}) as { path?: unknown }).path ?? "");
+		let refused: string | undefined;
+		app.boards.deleteBoard(path, (message) => {
+			if (message.type === "notice") refused = message.text;
+		});
+		if (refused) res.status(/no board/i.test(refused) ? 404 : 409).json({ error: refused });
+		else res.json({ path, deleted: true });
+	});
+
 	api.post("/agents/:id/:act", (req, res) => {
 		const agent = app.agents.get(String(req.params.id));
 		if (!agent) {

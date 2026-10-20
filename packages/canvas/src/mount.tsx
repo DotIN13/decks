@@ -66,6 +66,11 @@ export interface CanvasOptions {
 	 * and drives them with `setTool`; the properties panel still shows for what is selected.
 	 */
 	toolbar?: boolean;
+	/**
+	 * A board's file to delete, from the board pill's Delete: the host deletes it (asking first, if it
+	 * likes) and says whether it did; the board then leaves the drawing. Absent: no Delete on the pill.
+	 */
+	onDeleteBoard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
 	onProperties?: () => void;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
@@ -162,7 +167,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	paintScheme();
 
 	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}) });
-	const { doc, edit, step, moveBoard, resizeBoard } = drawing;
+	const { doc, edit, step, moveBoard, resizeBoard, removeBoard } = drawing;
 
 	const setCamera = (next: Camera) => {
 		setCameraSignal(next);
@@ -171,7 +176,24 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 
 	const editable = !options.readOnly;
 	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
-	const editing = editable ? { onPenEdit: edit, onResize: resizeBoard } : {};
+	/*
+	 * The board pill's Hide takes the board off this drawing (its file stays), and Delete, when the host
+	 * can delete files, takes it off and asks the host to delete the file too.
+	 */
+	const editing = editable
+		? {
+				onPenEdit: edit,
+				onResize: resizeBoard,
+				onHide: removeBoard,
+				...(options.onDeleteBoard
+					? {
+							onDeleteBoard: (path: string) => {
+								void Promise.resolve(options.onDeleteBoard!(path)).then((deleted) => deleted !== false && removeBoard(path));
+							},
+						}
+					: {}),
+			}
+		: {};
 	const commenting = options.onComment ? { onComment: options.onComment } : {};
 
 	const tools = createRoot((done) => {

@@ -115,6 +115,8 @@ export interface StageComment {
 	path: string;
 	title: string;
 	quote: string;
+	/** The `data-id` of the block the selected words are in, for a comment on words in a board. */
+	component?: string;
 	items?: string[];
 	anchor: () => DOMRect | undefined;
 }
@@ -248,6 +250,8 @@ export function Stage(props: {
 	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
+	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
+	onDeleteBoard?: (path: string) => void;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
 	acts?: Record<string, AgentAct | undefined>;
@@ -2613,6 +2617,12 @@ export function Stage(props: {
 											}),
 									}
 								: {})}
+							{...(!alone && props.onComment
+								? {
+										onCommentWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) =>
+											props.onComment?.({ path: board.path, title: board.title, quote: words.quote, anchor: words.anchor, ...(words.component ? { component: words.component } : {}) }),
+									}
+								: {})}
 							{...(props.onPresent
 								? {
 										onPresent: () =>
@@ -2966,6 +2976,7 @@ export function Stage(props: {
 						{...(props.onFocusBoard ? { onFocus: () => props.onFocusBoard?.(board.path) } : {})}
 						{...(props.onPresent ? { onPresent: () => props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0) } : {})}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
+						{...(props.onDeleteBoard ? { onDelete: () => props.onDeleteBoard?.(board.path) } : {})}
 						{...(props.onComment
 							? {
 									onComment: () =>
