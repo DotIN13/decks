@@ -1,6 +1,7 @@
 import tailwind from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { readFileSync } from "node:fs";
+import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 
 /**
@@ -57,8 +58,37 @@ const named = (process.env.DECKS_WEB_ALLOWED ?? "")
 const LOOPBACK = WEB_HOST === "127.0.0.1" || WEB_HOST === "localhost" || WEB_HOST === "::1";
 const ALLOWED_HOSTS = named.length > 0 ? named : LOOPBACK ? undefined : [".ts.net"];
 
+/**
+ * The person key in the Decks page, as the server writes it (`server/src/share/person-key.ts`): only
+ * into a page a person opened in a tab, never into a frame or a script's fetch, never stored, and
+ * alone in its window group. Asked of the server from here, a program on its machine, for each such
+ * page, so a server started again since is a reload away.
+ */
+function personKey(): Plugin {
+	return {
+		name: "decks-person-key",
+		configureServer(server) {
+			server.middlewares.use(async (req, res, next) => {
+				const path = (req.url ?? "/").split("?")[0] ?? "/";
+				const page = path === "/" || path === "/index.html" || !/^\/(?:api|c|ws|app|node|rnode|@|src|node_modules)(?:\/|$)|\.[a-z0-9]+$/i.test(path);
+				if (req.method !== "GET" || !page || req.headers["sec-fetch-dest"] !== "document" || req.headers["sec-fetch-mode"] !== "navigate") return next();
+				try {
+					const { key } = (await (await fetch(`http://127.0.0.1:${API_PORT}/api/person-key`)).json()) as { key?: string };
+					const html = await server.transformIndexHtml(req.url ?? "/", readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8"));
+					res.setHeader("Content-Type", "text/html; charset=utf-8");
+					res.setHeader("Cache-Control", "no-store");
+					res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+					res.end(key ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="decks-person-key" content="${key}">`) : html);
+				} catch (error) {
+					next(error);
+				}
+			});
+		},
+	};
+}
+
 export default defineConfig({
-	plugins: [solid(), tailwind()],
+	plugins: [solid(), tailwind(), personKey()],
 	server: {
 		host: WEB_HOST,
 		port: WEB_PORT,

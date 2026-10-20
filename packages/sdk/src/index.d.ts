@@ -455,6 +455,8 @@ export interface ConnectOptions {
 	notes?: (lines: string[]) => void;
 	/** A fetch to use instead of the global one. */
 	fetch?: typeof fetch;
+	/** More headers for every call, such as the Decks page's own key (`X-Decks-Key`). */
+	headers?: Record<string, string>;
 }
 
 export type AgentSpec = Exclude<Parameters<Verbs["send"]>[0], string>;

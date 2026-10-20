@@ -2,6 +2,7 @@ import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { batch } from "solid-js";
 import { BundleBackend } from "../connections/bundle.ts";
 import { active, socketUrl } from "../connections/connection.ts";
+import { keyStale } from "../lib/person-key.ts";
 
 /**
  * The one connection to the server, and the frames that go down it.
@@ -130,6 +131,11 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 			// server that is three seconds from being back.
 			const delay = Math.min(2000, 150 * 2 ** attempt++);
 			timer = window.setTimeout(open, delay);
+			/*
+			 * A server that is back but will not take the socket was started again and has a new person
+			 * key (`lib/person-key.ts`), which only a reload of this page is given. Asked every few tries.
+			 */
+			if (attempt % 4 === 0 && here?.kind === "here") void keyStale().then((stale) => stale && location.reload());
 		};
 
 		socket.onerror = () => socket?.close();

@@ -172,6 +172,7 @@ function defaultNotes(lines) {
  * @param {string} [options.session]  An opencode session, which Decks maps to its agent. Default: `DECKS_SESSION`.
  * @param {(lines: string[]) => void} [options.notes]  Where the notes a verb adds go. Default: stderr in Node.
  * @param {typeof fetch} [options.fetch]  A fetch to use instead of the global one.
+ * @param {Record<string, string>} [options.headers]  More headers for every call, such as the Decks page's own key (`X-Decks-Key`).
  */
 export function connect(options = {}) {
 	const page = fromPage();
@@ -194,7 +195,7 @@ export function connect(options = {}) {
 		// Trailing undefineds are left off, so an optional argument stays absent rather than null.
 		const given = [...args];
 		while (given.length && given[given.length - 1] === undefined) given.pop();
-		const headers = { "content-type": "application/json" };
+		const headers = { ...options.headers, "content-type": "application/json" };
 		if (person) {
 			headers["x-decks-person"] = "1";
 			const on = typeof stage === "function" ? stage() : stage;

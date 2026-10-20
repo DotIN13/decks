@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { withKey } from "../lib/person-key.ts";
 
 /**
  * Which backend this tab is talking to, and every one it knows.
@@ -194,5 +195,6 @@ export function socketUrl(): string {
 		base.searchParams.set("decks_token", one.token);
 		return base.toString();
 	}
-	return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+	// This server's socket runs commands, so it carries the person key (`lib/person-key.ts`).
+	return withKey(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
 }

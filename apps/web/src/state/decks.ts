@@ -1,5 +1,6 @@
 import { connect, DecksError, type Decks } from "@decks/sdk";
 import { apiBase } from "../connections/connection.ts";
+import { keyHeaders } from "../lib/person-key.ts";
 import { notice } from "./notices.ts";
 import { send } from "./socket.ts";
 
@@ -21,12 +22,17 @@ export function setPersonStage(stage: () => string | undefined, agent: () => str
 	talkingTo = agent;
 }
 
+/** The canvas on screen, for a board's call this page passes on (`board/stage-call.ts`). */
+export function stageOnScreen(): string | undefined {
+	return onScreen();
+}
+
 let client: Decks | undefined;
 let clientBase: string | undefined;
 function decks(): Decks {
 	const base = `${location.origin}${apiBase().replace(/\/api$/, "")}`;
 	if (!client || clientBase !== base) {
-		client = connect({ url: base, person: true, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {} });
+		client = connect({ url: base, person: true, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: keyHeaders() });
 		clientBase = base;
 	}
 	return client;
@@ -36,7 +42,7 @@ function decks(): Decks {
 export async function act<T = unknown>(verb: string, args: unknown[], agent?: string): Promise<T | undefined> {
 	try {
 		// A click about one conversation (moving it to a stage) names it and no canvas: the agent wins.
-		const connection = agent ? connect({ url: decks().address, person: true, agent, notes: () => {} }) : decks();
+		const connection = agent ? connect({ url: decks().address, person: true, agent, notes: () => {}, headers: keyHeaders() }) : decks();
 		return (await connection.call(verb, args)).value as T;
 	} catch (error) {
 		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));

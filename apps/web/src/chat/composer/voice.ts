@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { api } from "../../connections/connection.ts";
+import { keyHeaders } from "../../lib/person-key.ts";
 
 /**
  * This browser's choices for the mic, from Settings: which recogniser, and what language the browser's
@@ -189,7 +190,7 @@ export async function startRecording(options: VoiceOptions = {}): Promise<Record
 				release();
 				const audio = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
 				if (audio.size === 0) return "";
-				const response = await fetch(api("/stt"), { method: "POST", headers: { "content-type": audio.type }, body: audio });
+				const response = await fetch(api("/stt"), { method: "POST", headers: { ...keyHeaders(), "content-type": audio.type }, body: audio });
 				const body = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
 				if (!response.ok) throw new Error(body.error ?? `The server could not transcribe it (${response.status}).`);
 				return body.text ?? "";

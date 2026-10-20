@@ -1,4 +1,6 @@
 /* @refresh reload */
+// First, before anything else runs: the person key is read and its tag taken out of the page.
+import "./lib/person-key.ts";
 import { App } from "./App.tsx";
 import { active, PUBLIC } from "./connections/connection.ts";
 import { Start } from "./connections/Start.tsx";

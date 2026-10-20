@@ -19,13 +19,22 @@
  */
 const TABLE_CACHE = "decks-connections";
 const TABLE_KEY = "/__decks/connections";
+const KEY_KEY = "/__decks/key";
 
 /** @type {Map<string, {id: string, kind: string, base?: string, token?: string}> | undefined} */
 let table;
 const manifests = new Map();
+/**
+ * The digest of the person key of the Decks page that told this worker its connections. A command
+ * passed to another server (anything but a read) must carry that key, as it must to this one
+ * (`server/src/share/person-key.ts`): a board on this address asks its page, and cannot send one.
+ */
+let keyDigest;
 
 async function loadTable() {
 	const cache = await caches.open(TABLE_CACHE);
+	const saved = await cache.match(KEY_KEY);
+	if (saved) keyDigest = await saved.text();
 	const response = await cache.match(TABLE_KEY);
 	const list = response ? await response.json() : [];
 	table = new Map(list.map((one) => [one.id, one]));
@@ -39,6 +48,7 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 self.addEventListener("message", (event) => {
 	if (event.data?.type !== "connections") return;
 	table = new Map(event.data.list.map((one) => [one.id, one]));
+	if (typeof event.data.key === "string") keyDigest = event.data.key;
 	manifests.clear();
 	event.ports?.[0]?.postMessage("ok");
 });
@@ -87,9 +97,19 @@ async function route(id, rest, request) {
 	return plain(404, "Unknown connection.");
 }
 
+async function digestOf(text) {
+	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function fromServer(entry, rest, request) {
+	if (request.method !== "GET" && request.method !== "HEAD") {
+		const given = request.headers.get("X-Decks-Key");
+		if (!given || !keyDigest || (await digestOf(given)) !== keyDigest) return plain(401, "This page cannot give Decks commands. A board asks the page it is on, which asks the person.");
+	}
 	const headers = new Headers();
-	for (const name of ["Accept", "Content-Type", "Range"]) {
+	// And who on the page is asking: the person, or a board the page names by its frame. Never the key.
+	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Board", "X-Decks-Stage", "X-Decks-Person", "X-Decks-Agent"]) {
 		const value = request.headers.get(name);
 		if (value) headers.set(name, value);
 	}
