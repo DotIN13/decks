@@ -12,7 +12,7 @@ import { appRequest } from "./apps/route.ts";
 import { SDK_FILE } from "./apps/service.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
-import { MAX_UPLOAD_BYTES } from "@decks/protocol";
+import { MAX_UPLOAD_BYTES, THINKING_LEVELS, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
@@ -197,6 +197,34 @@ export function createHttpApp(app: App): Express {
 	 * app's own page sends on its socket (`wire/agents.ts`). `rename` takes `{ name }`, refused when
 	 * another agent has it; `stop` ends the turn it is running; `remove` takes it off this deck.
 	 */
+	/**
+	 * What another front end's composer offers for one agent (Studio's model menu): the model it is on
+	 * with its thinking level, the models its runtime offers here, and, for a Claude agent, the
+	 * subscriptions it could spend and the one it does. `?limits=1` reads the accounts' 5-hour
+	 * figures again, as this app's picker does on opening; they arrive with the next read.
+	 */
+	api.get(
+		"/agents/:id/settings",
+		asyncRoute(async (req, res) => {
+			const agent = app.agents.get(String(req.params.id));
+			if (!agent) {
+				res.status(404).json({ error: "No agent here has that id." });
+				return;
+			}
+			if (req.query.limits) void app.refreshLimits();
+			let accounts: { accounts?: unknown[]; active?: string } = {};
+			if (agent.kind === "claude") await app.publishAccounts((frame) => frame.type === "claude.accounts" && (accounts = frame));
+			res.set("cache-control", "no-store").json({
+				id: agent.id,
+				kind: agent.kind,
+				model: agent.model ?? null,
+				models: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.models ?? [],
+				accounts: accounts.accounts ?? [],
+				account: agent.accountId() ?? accounts.active ?? null,
+			});
+		}),
+	);
+
 	api.post("/agents/:id/:act", (req, res) => {
 		const agent = app.agents.get(String(req.params.id));
 		if (!agent) {
@@ -232,7 +260,43 @@ export function createHttpApp(app: App): Express {
 			res.json({ id: agent.id, removed: true });
 			return;
 		}
-		res.status(404).json({ error: "An agent can be renamed, stopped or removed." });
+		const body = (req.body ?? {}) as { provider?: unknown; model?: unknown; thinking?: unknown; id?: unknown };
+		const level = THINKING_LEVELS.find((one) => one === body.thinking) as ThinkingLevel | undefined;
+		// The model, with the level the picker kept for it; the thinking level alone; the subscription it spends.
+		if (act === "model") {
+			if (typeof body.provider !== "string" || typeof body.model !== "string") {
+				res.status(400).json({ error: "Say which provider and model." });
+				return;
+			}
+			agent.setModel(body.provider, body.model, level).then(
+				() => res.json({ id: agent.id, model: agent.model ?? null }),
+				(error: unknown) => res.status(400).json({ error: (error as Error).message }),
+			);
+			return;
+		}
+		if (act === "thinking") {
+			if (!level) {
+				res.status(400).json({ error: `A thinking level is one of ${THINKING_LEVELS.join(", ")}.` });
+				return;
+			}
+			agent.setThinking(level).then(
+				() => res.json({ id: agent.id, model: agent.model ?? null }),
+				(error: unknown) => res.status(400).json({ error: `Could not change the thinking level: ${(error as Error).message}` }),
+			);
+			return;
+		}
+		if (act === "account") {
+			if (agent.kind !== "claude" || typeof body.id !== "string" || !agent.useAccount(body.id)) {
+				res.status(409).json({ error: "That account is not on the list, or this agent has no Claude account." });
+				return;
+			}
+			// The runtime starts, so the subscription is in force at once (`wire/accounts.ts`).
+			void agent.start();
+			void app.publishAccounts();
+			res.json({ id: agent.id, account: body.id });
+			return;
+		}
+		res.status(404).json({ error: "An agent can be renamed, stopped, removed, or given a model, a thinking level or an account." });
 	});
 
 	/**
@@ -713,7 +777,8 @@ export function createHttpApp(app: App): Express {
 		"/snapshot",
 		express.text({ type: () => true, limit: "24mb" }),
 		asyncRoute(async (req, res) => {
-			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// A paired front end (Studio) is another site by design, and its token is the proof.
+			if (!app.pairing.check(tokenOf(req.headers, req.originalUrl))) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
 			const path = normalizeBoardPath(typeof req.query.path === "string" ? req.query.path : "");
 			if (!app.deck.board(path)) {
 				res.status(404).type("text").send("No such board.");
@@ -742,7 +807,8 @@ export function createHttpApp(app: App): Express {
 		"/stt",
 		express.raw({ type: () => true, limit: "25mb" }),
 		asyncRoute(async (req, res) => {
-			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// A paired front end (Studio) is another site by design, and its token is the proof.
+			if (!app.pairing.check(tokenOf(req.headers, req.originalUrl))) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
 			if (!sttReady()) {
 				res.status(503).json({ error: "No speech recogniser on this server." });
 				return;
@@ -764,7 +830,8 @@ export function createHttpApp(app: App): Express {
 	api.post(
 		"/upload",
 		asyncRoute(async (req, res) => {
-			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// A paired front end (Studio) is another site by design, and its token is the proof.
+			if (!app.pairing.check(tokenOf(req.headers, req.originalUrl))) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
 			// Refused on the declared length before a byte is read; the stream enforces it again for a body that lied.
 			const declared = Number(req.headers["content-length"] ?? 0);
 			if (declared > MAX_UPLOAD_BYTES) throw new UploadRefused(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`, 413);
