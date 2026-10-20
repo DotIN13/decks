@@ -70,8 +70,11 @@ export class Relay {
 		}
 		const rest = req.originalUrl.slice(`/c/${id}`.length) || "/";
 		const headers: Record<string, string> = { Authorization: `Bearer ${target.token}` };
-		// And who on the page is asking: the person, or a board the page names by its frame (`share/person-key.ts`).
-		for (const name of ["accept", "content-type", "range", "x-decks-board", "x-decks-stage", "x-decks-person", "x-decks-agent"]) {
+		/*
+		 * The page's own token stays here, and the connection's goes on. What the page says it is acting
+		 * on goes on too, as parameters: the canvas, the agent, a board it relays for (`verbs/router.ts`).
+		 */
+		for (const name of ["accept", "content-type", "range", "x-decks-board", "x-decks-stage", "x-decks-agent"]) {
 			const value = req.headers[name];
 			if (typeof value === "string") headers[name] = value;
 		}

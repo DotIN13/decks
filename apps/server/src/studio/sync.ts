@@ -31,6 +31,8 @@ export interface SyncOptions {
 	 * shows it on the canvas's card. Absent: no canvas pictures, only boards'.
 	 */
 	harness?: string;
+	/** A person token for this harness, read per call: what its screenshot call carries (`auth/guard.ts`). */
+	harnessToken?: () => string;
 	/**
 	 * This harness's apps (`apps/service.ts`), told to Studio so it can list them beside the
 	 * canvases. Absent: nothing is told.
@@ -433,7 +435,7 @@ export class HarnessSync {
 			try {
 				const res = await fetch(new URL("/api/v1/canvas.screenshot", this.o.harness), {
 					method: "POST",
-					headers: { "Content-Type": "application/json", "X-Decks-Person": "studio-sync" },
+					headers: { "Content-Type": "application/json", ...(this.o.harnessToken ? { Authorization: `Bearer ${this.o.harnessToken()}` } : {}) },
 					body: JSON.stringify({ args: [{ canvas: name, format: "jpeg", scheme: "light" }] }),
 				});
 				const shot = (await res.json()) as { ok?: boolean; value?: { file?: string } };

@@ -1,5 +1,7 @@
-import { credentialsOf, fromBrowser } from "./share/person-key.ts";
-import { extraHosts, hostAllowed } from "./share/hosts.ts";
+import { socketPrincipal } from "./auth/guard.ts";
+import { actsAsPerson } from "./auth/principal.ts";
+import { TAB_IDLE_MS } from "./auth/tokens.ts";
+import { extraHosts, hostAllowed } from "./auth/hosts.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
 import { forwardUpgrade } from "./ports.ts";
@@ -35,7 +37,13 @@ app.attach(hub);
 
 // Decks Studio: syncs the deck in the background once this harness has a key (`studio/index.ts`).
 // Its app list goes to Studio too, so Studio can list the apps beside the canvases.
-const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list());
+// It asks this harness for canvas pictures as the person, with a token of its own that it renews when it runs out.
+let syncToken: string | undefined;
+const studioToken = () => {
+	if (!syncToken || !app.tokens.verify(syncToken).ok) syncToken = app.tokens.issue({ kind: "person" }, { label: "Studio sync", idle: TAB_IDLE_MS }).token;
+	return syncToken;
+};
+const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list(), studioToken);
 
 /*
  * One upgrade listener, two websockets.
@@ -47,7 +55,7 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
  */
 const hosts = extraHosts(process.env, config.host);
 httpServer.on("upgrade", (request, socket, head) => {
-	// A socket addressed to a name that is not this server's is a rebinding page, as for requests (`share/hosts.ts`).
+	// A socket addressed to a name that is not this server's is a rebinding page, as for requests (`auth/hosts.ts`).
 	if (!hostAllowed(request.headers.host, hosts)) {
 		socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
 		socket.destroy();
@@ -56,11 +64,10 @@ httpServer.on("upgrade", (request, socket, head) => {
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
 	if (path === "/ws") {
 		/*
-		 * The socket runs commands, so a browser gets it only with credentials, from this site as from
-		 * any other: the person key the Decks page holds, or a paired token (`share/person-key.ts`).
-		 * A program on this machine opens it as before.
+		 * The socket runs the person's commands, so it is opened only with the person's token or a
+		 * paired site's, in its address (`decks_token`): from this machine as from anywhere (`auth/guard.ts`).
 		 */
-		if (fromBrowser(request.headers) && !credentialsOf(request, app.personKey, app.pairing)) {
+		if (!socketPrincipal(app, request)) {
 			socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
 			socket.destroy();
 			return;
@@ -68,7 +75,13 @@ httpServer.on("upgrade", (request, socket, head) => {
 		hub.handleUpgrade(request, socket, head);
 	}
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
-	else if (appUpgrade(request, socket, head, app.apps, (token, origin) => app.pairing.verdict(token, origin) === "paired")) return;
+	else if (
+		appUpgrade(request, socket, head, app.apps, (token, origin) => {
+			const seen = app.tokens.verify(token, { origin });
+			return seen.ok && actsAsPerson(seen.principal);
+		})
+	)
+		return;
 	else if (!forwardUpgrade(request, socket, head, app.forwards)) socket.destroy();
 });
 

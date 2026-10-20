@@ -18,19 +18,18 @@ import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
-import { refuseCrossSite, storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
+import { storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
-import { fromAnotherSite, fromThisMachine, originOf, pairWithoutCode, studioWithoutCode, tokenOf } from "./share/pairing.ts";
-import { commandAllowed, fromBrowser, isTopNavigation, NO_COMMANDS, withPersonKey } from "./share/person-key.ts";
-import { decodedPath, MAX_TICKETS, TICKET_MS, ticketOf, ticketPath, Tickets } from "./share/tickets.ts";
-import { extraHosts, hostAllowed, hostRefusal } from "./share/hosts.ts";
+import { guard } from "./auth/guard.ts";
+import { extraHosts, hostAllowed, hostRefusal } from "./auth/hosts.ts";
+import { doorRoutes, isTopNavigation, tabToken, withSession } from "./auth/issue.ts";
+import { actsAsPerson } from "./auth/principal.ts";
 import { Relay } from "./share/relay.ts";
-import { saveStudioLink, studioOrigin } from "./studio/index.ts";
 
 /**
  * The HTTP surface: reading files, writing one kind of file, and the built UI.
@@ -46,9 +45,10 @@ import { saveStudioLink, studioOrigin } from "./studio/index.ts";
  * and nothing else makes that decision. The upload route adds its own guards, all
  * in `files/upload.ts`: a size cap refused before the body is buffered, a name
  * derived rather than trusted, a refusal to overwrite, and one `Sec-Fetch-Site`
- * check so it is not the easiest way in. What it does not add is authentication —
- * there is none anywhere (DEPLOYMENT §1), and `/ws` next door already runs tool
- * calls for whoever asks, which is what bounds how much this route could matter.
+ * check so it is not the easiest way in.
+ *
+ * Who may ask for any of it is decided once, before every route, by the gate (`auth/guard.ts`): a
+ * request carries a token, and the token's principal is who is calling.
  */
 
 function asyncRoute(handler: (req: Request, res: Response) => Promise<void>) {
@@ -76,12 +76,6 @@ function wildcard(req: Request): string {
 	return Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
 }
 
-/** What another site is told when its token was given to a page on a different site (`Pairing.verdict`). */
-const ELSEWHERE = "This pairing token was given to a page on another site, so it does not work from this one. Pair this page with the harness itself.";
-
-/** What a harness that requires a pairing code says to a connect without one. */
-const NEEDS_CODE = "This harness asks every other Decks for a pairing code. Run decks pair code in a shell on its machine.";
-
 export function createHttpApp(app: App): Express {
 	const server = express();
 	server.disable("x-powered-by");
@@ -102,185 +96,33 @@ export function createHttpApp(app: App): Express {
 	server.use((req, res, next) => {
 		if (!forwardRequest(req, res, app.forwards)) next();
 	});
-	// One page each for another site's frames and tabs (`share/tickets.ts`), in place of the token in their address.
-	const tickets = new Tickets((id) => app.pairing.live(id));
-	const ticketed = (ticket: string | undefined, path: string | undefined) => tickets.admits(ticket, path);
+	// One page each for another site's frames and tabs (`auth/tickets.ts`), in place of the token in their address.
+	const ticketed = (ticket: string | undefined, path: string | undefined) => app.tickets.admits(ticket, path);
+	// A token that is the person's or a paired site's, from the page it came with (`auth/tokens.ts`).
+	const paired = (token: string | undefined, origin?: string) => {
+		const seen = app.tokens.verify(token, { origin });
+		return seen.ok && actsAsPerson(seen.principal);
+	};
 	// The deck's apps (`apps/route.ts`), for the same reason: a server app's request is the app's.
 	server.use((req, res, next) => {
-		if (!appRequest(req, res, app.apps, (token, origin) => app.pairing.verdict(token, origin) === "paired", ticketed)) next();
+		if (!appRequest(req, res, app.apps, paired, ticketed)) next();
 	});
 
 	/*
-	 * Another Decks, served from another site, using this server (`share/pairing.ts`).
-	 *
-	 * This server's own front end is untouched: its requests are same-origin and go straight on.
-	 * A request from another site is let through only with a paired token, and then with the
-	 * headers that let that site read the answer: CORS, and Chrome's private-network permission,
-	 * which a public page needs to call an address on your own network. The preflight before a
-	 * request carries no token, so it is answered for anyone; the request after it is not.
-	 * `/api/web` is the Decks extension, which has its own pairing and is left as it was.
-	 *
-	 * A frame or a tab another site opens sends no `Origin` and cannot send a header either: it is let
-	 * through by a ticket for its one path (`decks_ticket`, `share/tickets.ts`), which that site had
-	 * for its token, and then sends no Referer, so the ticket does not travel on. A token sent by a
-	 * page on a site other than the one it was given to was copied, and is refused (`Pairing.verdict`).
+	 * The gate (`auth/guard.ts`): every request from here on carries a token, and who is calling is
+	 * that token's principal, on `req.principal`. Before any body is read: a request refused is not read.
 	 */
-	server.use((req, res, next) => {
-		if (!req.path.startsWith("/api/") || req.path.startsWith("/api/web/") || !fromAnotherSite(req.headers)) {
-			next();
-			return;
-		}
-		const origin = originOf(req.headers);
-		if (origin) {
-			res.setHeader("Vary", "Origin");
-			res.setHeader("Access-Control-Allow-Origin", origin);
-			res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Board, X-Decks-Person, X-Decks-Stage");
-			res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-			res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
-			if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
-			if (req.method === "OPTIONS") {
-				res.status(204).end();
-				return;
-			}
-		}
-		if (req.path === "/api/pair" || req.path === "/api/studio/connect" || req.path === "/api/hello") {
-			next();
-			return;
-		}
-		const ticket = ticketOf(req.originalUrl);
-		if (req.method === "GET" && ticket !== undefined && tickets.admits(ticket, decodedPath(req.originalUrl))) {
-			res.setHeader("Referrer-Policy", "no-referrer");
-			next();
-			return;
-		}
-		const verdict = app.pairing.verdict(tokenOf(req.headers, req.originalUrl), origin);
-		if (verdict === "paired") {
-			next();
-			return;
-		}
-		res.status(401).type("text").send(verdict === "elsewhere" ? ELSEWHERE : "This Decks has not been paired with that server. Make a pairing code with decks pair code on its machine.");
-	});
-
-	/*
-	 * Commands from a browser, from any site including this one (`share/person-key.ts`): only with the
-	 * person key, which only the Decks page a person opened holds, or a pairing token. A board's page is
-	 * on this server's own address, so being same-origin says nothing about who is asking; a board asks
-	 * the page around it, which names the board by its frame. Programs on this machine go on as before.
-	 */
-	server.use((req, res, next) => {
-		if (commandAllowed(req, app.personKey, app.pairing)) {
-			next();
-			return;
-		}
-		res.status(401).type("text").send(NO_COMMANDS);
-	});
-	// Bodies after both guards: a request refused is not read.
+	server.use(guard(app));
+	// Bodies after the gate.
 	server.use(express.json({ limit: "8mb" }));
 
 	const api = express.Router();
 	// Every verb in the table, for the SDK's three forms (`verbs/router.ts`).
 	api.use("/v1", verbRoutes(app));
+	// The doors, where tokens are handed out (`auth/issue.ts`).
+	api.use(doorRoutes(app));
 	const relay = new Relay(join(app.deck.path, ".decks", "relay.json"));
 	server.all("/c/:id/*rest", asyncRoute((req, res) => relay.pass(req, res)));
-
-	/**
-	 * Tickets for another site's frames and tabs (`share/tickets.ts`): `{ paths }`, board request paths
-	 * (`/api/board/boards/a.html`, or `boards/a.html`), files (`/api/f/…`) or app addresses
-	 * (`/app/<name>/`), decoded, and back
-	 * `{ tickets, expires }`, a ticket for each path that can have one, keyed as asked. Only for a
-	 * token in the `Authorization` header, even from this server's own pages, which need no ticket:
-	 * a ticket is only ever for another site, and a token in an address is what tickets replace.
-	 */
-	api.post("/tickets", (req, res) => {
-		const header = req.headers.authorization;
-		const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7).trim() : undefined;
-		const verdict = app.pairing.verdict(token, originOf(req.headers));
-		const id = verdict === "paired" ? app.pairing.idOf(token) : undefined;
-		if (!id) {
-			res.status(401).type("text").send(verdict === "elsewhere" ? ELSEWHERE : "Tickets are made only for a pairing token in the Authorization header.");
-			return;
-		}
-		const paths = (req.body as { paths?: unknown } | undefined)?.paths;
-		if (!Array.isArray(paths) || paths.length > MAX_TICKETS || !paths.every((one) => typeof one === "string")) {
-			res.status(400).json({ error: `Send paths, a list of at most ${MAX_TICKETS} board or app paths.` });
-			return;
-		}
-		const now = Date.now();
-		const made: Record<string, string> = {};
-		for (const given of paths as string[]) {
-			const path = ticketPath(given);
-			if (path) made[given] = tickets.make(path, id, now);
-		}
-		res.json({ tickets: made, expires: now + TICKET_MS });
-	});
-
-	/**
-	 * Trade a pairing code for a token: the one route another site may call without one. Answered
-	 * with the deck's name, which is what the other front end will call this server.
-	 */
-	api.post("/pair", (req, res) => {
-		const body = (req.body ?? {}) as { code?: unknown; label?: unknown };
-		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
-		const origin = String(req.headers.origin ?? "");
-		const label = typeof body.label === "string" ? body.label : "";
-		// No code from this machine or a private network, unless the owner made it a must; over the internet, only with one.
-		// A web page needs one too, unless it is on this machine, on the harness's own address or listed (`pairWithoutCode`).
-		if (!code && app.pairing.required) {
-			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
-			return;
-		}
-		if (!code && !pairWithoutCode(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine." });
-			return;
-		}
-		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
-		if (!token) {
-			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the server's machine." });
-			return;
-		}
-		app.send(app.pairingMessage());
-		res.json({ token, name: app.deck.name });
-	});
-
-	/**
-	 * Decks Studio connecting this harness in one call: the Studio key to sync with, and a token
-	 * back for the page to call this harness with, so there is no separate `/api/pair`. Without a code
-	 * only from a Studio the harness can place (`studioWithoutCode`): on this machine, on the same
-	 * name, or listed in `DECKS_STUDIO_ORIGINS`. A harness deployed where others can reach it sets
-	 * `DECKS_REQUIRE_PAIR_CODE=1`, and then a connect without a working code is refused from anywhere.
-	 */
-	api.post("/studio/connect", (req, res) => {
-		const body = (req.body ?? {}) as { url?: unknown; key?: unknown; code?: unknown; label?: unknown };
-		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
-		const origin = String(req.headers.origin ?? "");
-		const label = typeof body.label === "string" && body.label.trim() ? body.label : "Decks Studio";
-		if (typeof body.url !== "string" || typeof body.key !== "string") {
-			res.status(400).json({ error: "Send Studio's address as url and this harness's key as key." });
-			return;
-		}
-		if (app.pairing.required && !code) {
-			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
-			return;
-		}
-		if (!code && !studioWithoutCode(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "Only a Studio on this machine, on the address you reached the harness at, or listed in DECKS_STUDIO_ORIGINS connects without a code. Run decks pair code in a shell on the harness's machine." });
-			return;
-		}
-		try {
-			studioOrigin(body.url, body.key);
-		} catch (error) {
-			res.status(400).json({ error: (error as Error).message });
-			return;
-		}
-		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
-		if (!token) {
-			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine." });
-			return;
-		}
-		const linked = saveStudioLink(app.deck.path, body.url, body.key);
-		app.send(app.pairingMessage());
-		res.json({ token, name: app.deck.name, ...linked });
-	});
 
 	/**
 	 * A person's acts on an agent from another front end, such as Studio's agent rows: what this
@@ -373,7 +215,7 @@ export function createHttpApp(app: App): Express {
 			let accounts: { accounts?: unknown[]; active?: string } = {};
 			await app.publishAccounts((frame) => frame.type === "claude.accounts" && (accounts = frame));
 			const settings = app.settings.get();
-			const you = app.pairing.idOf(tokenOf(req.headers, req.originalUrl));
+			const you = req.tokenId;
 			res.set("cache-control", "no-store").json({
 				name: app.deck.name,
 				deck: app.deck.path,
@@ -385,9 +227,9 @@ export function createHttpApp(app: App): Express {
 				sttKey: sttReady(),
 				runtimes: app.runtimes().map((one) => ({ kind: one.kind, label: one.label, available: one.available, ...(one.reason ? { reason: one.reason } : {}), models: one.models?.length ?? 0 })),
 				accounts: accounts.accounts ?? [],
-				paired: app.pairing.list().map((one) => ({ ...one, ...(one.id === you ? { you: true } : {}) })),
-				requireCode: app.pairing.required,
-				requireCodeForced: app.pairing.forced,
+				paired: app.tokens.paired().map((one) => ({ ...one, ...(one.id === you ? { you: true } : {}) })),
+				requireCode: app.codes.required,
+				requireCodeForced: app.codes.forced,
 				extension: { status: app.web.status() },
 			});
 		}),
@@ -406,8 +248,8 @@ export function createHttpApp(app: App): Express {
 			if (outcome) refused.push(outcome.error);
 		}
 		if (typeof body.requireCode === "boolean") {
-			if (app.pairing.forced && !body.requireCode) refused.push("This harness was started with DECKS_REQUIRE_PAIR_CODE, so a code is always asked for.");
-			else app.pairing.setRequired(body.requireCode);
+			if (app.codes.forced && !body.requireCode) refused.push("This harness was started with DECKS_REQUIRE_PAIR_CODE, so a code is always asked for.");
+			else app.codes.setRequired(body.requireCode);
 		}
 		if (refused.length) res.status(400).json({ error: refused.join(" ") });
 		else res.json({ ok: true });
@@ -415,7 +257,8 @@ export function createHttpApp(app: App): Express {
 
 	/** Take a paired front end's token back; the one asking may take back its own, and is then unpaired. */
 	api.post("/harness/paired/:id/revoke", (req, res) => {
-		if (!app.pairing.revoke(String(req.params.id))) {
+		const id = String(req.params.id);
+		if (!app.tokens.paired().some((one) => one.id === id) || !app.tokens.revoke(id)) {
 			res.status(404).json({ error: "No front end with that id is paired here." });
 			return;
 		}
@@ -657,15 +500,6 @@ export function createHttpApp(app: App): Express {
 		res.json({ ok: true });
 	});
 
-	/**
-	 * Whether this is a Decks server, and which: what the switcher's reachability dot asks. Open to
-	 * any site, since it says nothing but the name; `paired` says whether the token sent still works.
-	 */
-	api.get("/hello", (req, res) => {
-		res.setHeader("Cache-Control", "no-store");
-		res.json({ decks: true, name: app.deck.name, paired: app.pairing.admits(req.headers, req.originalUrl), needsCode: app.pairing.required || !pairWithoutCode(req.socket.remoteAddress, req.headers) });
-	});
-
 	api.get("/deck", (_req, res) => {
 		res.json({ deck: app.deck.state(), warnings: app.deck.warnings });
 	});
@@ -696,14 +530,6 @@ export function createHttpApp(app: App): Express {
 			 */
 			if (isBoardPath(requested)) boardHeaders(res);
 			else assetHeaders(res, target);
-			/*
-			 * A board opened by another site the old way carries its pairing token in its address
-			 * (`?decks_token=`), and the page would send that address on as the Referer of everything it
-			 * loads: an app's frame on this same origin, an image elsewhere. Such a page sends no Referer
-			 * at all, as one let in by a ticket does (the cross-site guard above). A board opened without
-			 * either keeps the browser's default, which embeds such as YouTube's need.
-			 */
-			if (req.query.decks_token !== undefined) res.setHeader("Referrer-Policy", "no-referrer");
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);
 
 			/*
@@ -1129,8 +955,8 @@ export function createHttpApp(app: App): Express {
 		"/snapshot",
 		express.text({ type: () => true, limit: "24mb" }),
 		asyncRoute(async (req, res) => {
-			// A paired front end (Studio) is another site by design, and its token is the proof.
-			if (!app.pairing.admits(req.headers, req.originalUrl)) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// The person's, in a Decks tab or a terminal, or a paired front end's (Studio).
+			if (!actsAsPerson(req.principal)) throw new UploadRefused("Only the person, or a front end paired with this harness, sends this.", 403);
 			const path = normalizeBoardPath(typeof req.query.path === "string" ? req.query.path : "");
 			if (!app.deck.board(path)) {
 				res.status(404).type("text").send("No such board.");
@@ -1159,8 +985,8 @@ export function createHttpApp(app: App): Express {
 		"/stt",
 		express.raw({ type: () => true, limit: "25mb" }),
 		asyncRoute(async (req, res) => {
-			// A paired front end (Studio) is another site by design, and its token is the proof.
-			if (!app.pairing.admits(req.headers, req.originalUrl)) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// The person's, in a Decks tab or a terminal, or a paired front end's (Studio).
+			if (!actsAsPerson(req.principal)) throw new UploadRefused("Only the person, or a front end paired with this harness, sends this.", 403);
 			if (!sttReady()) {
 				res.status(503).json({ error: "No speech recogniser on this server." });
 				return;
@@ -1182,8 +1008,8 @@ export function createHttpApp(app: App): Express {
 	api.post(
 		"/upload",
 		asyncRoute(async (req, res) => {
-			// A paired front end (Studio) is another site by design, and its token is the proof.
-			if (!app.pairing.admits(req.headers, req.originalUrl)) refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// The person's, in a Decks tab or a terminal, or a paired front end's (Studio).
+			if (!actsAsPerson(req.principal)) throw new UploadRefused("Only the person, or a front end paired with this harness, sends this.", 403);
 			// Refused on the declared length before a byte is read; the stream enforces it again for a body that lied.
 			const declared = Number(req.headers["content-length"] ?? 0);
 			if (declared > MAX_UPLOAD_BYTES) throw new UploadRefused(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`, 413);
@@ -1313,7 +1139,7 @@ export function createHttpApp(app: App): Express {
 	});
 	/*
 	 * An app's board saying it is on screen, which keeps a server app awake. A read as well as a post:
-	 * a board's page gives no commands (`share/person-key.ts`), and a heartbeat is no more than the
+	 * a board's page has no token (`auth/guard.ts` lets this read in), and a heartbeat is no more than the
 	 * request from its frame that would wake the app anyway.
 	 */
 	const seen = (req: Request, res: Response) => {
@@ -1325,22 +1151,6 @@ export function createHttpApp(app: App): Express {
 	api.get("/apps/:name/seen", seen);
 	api.post("/apps/:name/seen", seen);
 
-	/**
-	 * The person key, for the development server (Vite), which serves the Decks page in place of this
-	 * server and writes the key into it as `shell` does. Only for a program on this machine: such a
-	 * program may act as the person anyway (`verbs/router.ts`), and a browser never gets it here.
-	 */
-	// Whether the key a page holds is still this harness's: the guard above answers 401 when it is not.
-	api.post("/person-key", (_req, res) => {
-		res.set("cache-control", "no-store").json({ ok: true });
-	});
-	api.get("/person-key", (req, res) => {
-		if (fromBrowser(req.headers) || !fromThisMachine(req.socket.remoteAddress, req.headers)) {
-			res.status(403).type("text").send("The person key is only in the Decks page a person opens.");
-			return;
-		}
-		res.set("cache-control", "no-store").json({ key: app.personKey.value });
-	});
 	/**
 	 * Stage code run by an app (`stage/caller-run.ts`): the same `stage` an agent has, acting for the
 	 * conversation in front of the person, under the app's own name.
@@ -1377,17 +1187,18 @@ export function createHttpApp(app: App): Express {
 	// proxies here, so a missing dist is normal rather than an error.
 	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 	/**
-	 * The Decks page itself, with the person key in it for a tab the person opened (`share/person-key.ts`):
-	 * a frame or a script's fetch of the same page gets it without. Never stored, so a later fetch
-	 * cannot be answered from a cache with the key in it; and alone in its browsing context group
-	 * (`Cross-Origin-Opener-Policy`), so a page that opened it in a new window cannot reach into it.
+	 * The Decks page itself, with a fresh person token in it for a tab the person opened
+	 * (`auth/issue.ts`): a frame or a script's fetch of the same page gets it without. Never stored, so
+	 * a later fetch cannot be answered from a cache with the token in it; and alone in its browsing
+	 * context group (`Cross-Origin-Opener-Policy`), so a page that opened it in a new window cannot
+	 * reach into it.
 	 */
 	const shell = async (req: Request, res: Response) => {
 		const html = await readFile(join(webDist, "index.html"), "utf8");
 		res.setHeader("Cache-Control", "no-store");
 		res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 		res.setHeader("Vary", "Sec-Fetch-Dest, Sec-Fetch-Mode");
-		res.type("html").send(isTopNavigation(req.headers) ? withPersonKey(html, app.personKey.value) : html);
+		res.type("html").send(isTopNavigation(req.headers) ? withSession(html, tabToken(app.tokens)) : html);
 	};
 	if (existsSync(webDist)) {
 		server.get(["/", "/index.html"], (req, res, next) => void shell(req, res).catch(next));

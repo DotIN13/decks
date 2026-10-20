@@ -19,7 +19,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
-import { hostAllowed } from "../share/hosts.ts";
+import { hostAllowed } from "../auth/hosts.ts";
 
 type Debuggee = { tabId?: number; extensionId?: string; targetId?: string };
 type DebuggerSession = Debuggee & { sessionId?: string };

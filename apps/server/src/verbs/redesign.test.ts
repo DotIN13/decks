@@ -29,8 +29,10 @@ async function open() {
 	await new Promise((done) => server.once("listening", done));
 	const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
 	const agent = app.agents.focused();
+	// Who is calling is a token (`auth/guard.ts`): the agent's own, as its shell has it.
+	const as = (id: string) => ({ authorization: `Bearer ${app.bridge.issue(id)}` });
 	type Answer = { ok: boolean; value?: any; error?: string; notes: string[] };
-	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = { "x-decks-agent": agent.id }): Promise<Answer> => {
+	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = as(agent.id)): Promise<Answer> => {
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
 		return (await response.json()) as Answer;
 	};
@@ -43,6 +45,7 @@ async function open() {
 		app,
 		deck,
 		agent,
+		as,
 		call,
 		must,
 		cleanup: () => {
@@ -132,7 +135,7 @@ test("a batch is all or nothing, and a later op can be beside what an earlier on
 });
 
 test("calls are stateless: a canvas named is acted on, and nobody moves to it", async () => {
-	const { agent, must, call, cleanup } = await open();
+	const { app, agent, must, call, cleanup } = await open();
 	try {
 		const home = (await must("here")).value.name;
 		const other = (await must("canvas.create", ["Launch plan"])).value;
@@ -151,7 +154,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		assert.equal((await must("here")).value.name, other.name);
 		assert.equal(agent.stageName(), other.name);
 		// The person's here is the canvas on screen they name.
-		const person = { "x-decks-person": "1", "x-decks-agent": agent.id, "x-decks-stage": home };
+		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id, "x-decks-stage": home };
 		assert.equal((await must("here", [], person)).value.name, home);
 	} finally {
 		cleanup();
@@ -189,12 +192,12 @@ test("an old name still answers as it did, and says its new call", async () => {
 });
 
 test("queue waits for the turn; send to an idle agent starts one; inbox lists the hand-offs", async () => {
-	const { app, agent, must, cleanup } = await open();
+	const { app, agent, as, must, cleanup } = await open();
 	try {
 		const other = app.agents.create({ name: "Rune" });
 		const queued = (await must("agent.queue", ["Rune", { task: "Read the plan", boards: ["boards/a.html"] }])).value;
 		assert.deepEqual(queued, { queued: true, position: 1 });
-		const theirs = (await must("agent.inbox", [], { "x-decks-agent": other.id })).value;
+		const theirs = (await must("agent.inbox", [], as(other.id))).value;
 		assert.equal(theirs.length, 1);
 		assert.equal(theirs[0].task, "Read the plan");
 		assert.equal(theirs[0].from, agent.name);

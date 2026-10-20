@@ -8,19 +8,26 @@ Everything below follows from a single fact, so it comes first.
 
 ---
 
-## 1. Decks has no authentication
+## 1. Every request carries a token
 
-There is no login and no token. `ws.ts` accepts every frame that arrives on `/ws`, and
-those frames drive a Pi session with live tool execution — `bash`, `write`, `edit`, and
-through `bash` the `decks` command; `/api/v1` answers every call in the verb table to anyone who asks. Decks ships no permission gate either, deliberately (§6.8): that is an
-extension's job, and if no extension is installed there is nothing in the way.
+Every request to the harness, and its socket, carries a token, and who is calling is that token
+alone (`apps/server/src/auth/`): not an `X-Decks-*` header, not coming from loopback, not being a
+page on the harness's own address. A request with none is answered `401`, apart from the doors
+that hand tokens out, the Decks page and its files, and (until boards and files move to their own
+address) the pages a frame or a picture loads.
 
-There is exactly one origin check in the codebase, and it is worth naming so it is not
-mistaken for a policy: `POST /api/upload` — the route that copies a file the user dropped
-on a board into the deck — refuses a request whose `Sec-Fetch-Site` says `cross-site`. It
-costs nothing and it keeps the newest way to write bytes from being the easiest one to
-reach by accident. It protects that route and nothing else, and it does not make the port
-safe: the socket beside it has no such check and does not need one to be dangerous.
+- **A Decks tab** is written a fresh person token when a person opens the page in a tab of its own;
+  it lasts twelve hours unused.
+- **A terminal**: `decks login` with a code from `decks pair code` keeps a person token in
+  `~/.decks/token`; it lasts `DECKS_TOKEN_DAYS` (30) unused.
+- **Agents and server apps** get their own token as `DECKS_TOKEN` when their process starts; it is
+  taken back when it stops.
+- **Another site** (Studio, a second Decks) pairs for a site token, bound to that site.
+
+Tokens are kept only as their hashes, in `<deck>/.decks/tokens.json` (mode 0600).
+
+The Decks tab's door is still "whoever can load the page": anyone who reaches the port can load it
+as a tab and is then the person. So the rest of this section stands.
 
 So a reachable Decks port is arbitrary code execution as the user running it, plus a
 spendable API key. The consequences for a deployment:
@@ -384,7 +391,7 @@ A stage picture should say how it was drawn. With `stage-shot` built, a box on a
 
 ```bash
 curl -s -X POST http://127.0.0.1:4329/api/v1/canvas.screenshot \
-  -H 'content-type: application/json' -H 'X-Decks-Person: 1' \
+  -H 'content-type: application/json' -H "Authorization: Bearer $(jq -r '."http://127.0.0.1:4329"' ~/.decks/token)" \
   -d '{"args":[{"of":{"x1":0,"y1":0,"x2":800,"y2":600}}]}' | grep -o '"how":"[^"]*"'
 ```
 

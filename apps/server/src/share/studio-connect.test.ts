@@ -79,8 +79,7 @@ test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and t
 		assert.equal(allowed.status, 200);
 		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
 		const board = await fetch(`${base}/board/boards/a.html?decks_token=${String(done.body.token)}`, { headers: { origin: STUDIO.origin, "sec-fetch-site": "cross-site" } });
-		assert.equal(board.status, 200);
-		assert.equal(board.headers.get("referrer-policy"), "no-referrer", "its address, token and all, is not sent on as a Referer");
+		assert.equal(board.status, 401, "a token in an address is no longer taken: a frame gets a ticket");
 	} finally {
 		cleanup();
 	}
@@ -93,7 +92,7 @@ test("without a code, only a Studio beside the harness or a listed one connects;
 		assert.equal(elsewhere.status, 403, "an unlisted site");
 		assert.equal(elsewhere.body.needsCode, true);
 		assert.ok(!linked());
-		assert.equal(app.pairing.list().length, 0);
+		assert.equal(app.tokens.paired().length, 0);
 
 		const json = { "content-type": "application/json" };
 		const local = await post("/studio/connect", { url: "http://localhost:4800", key: KEY }, { ...json, origin: "http://localhost:4800", "sec-fetch-site": "same-site" });
@@ -115,7 +114,7 @@ test("a malformed key is refused before any token is given", () => listing("http
 		const bad = await post("/studio/connect", { url: "https://studio.test", key: "nope" });
 		assert.equal(bad.status, 400);
 		assert.ok(!linked());
-		assert.equal(app.pairing.list().length, 0);
+		assert.equal(app.tokens.paired().length, 0);
 	} finally {
 		cleanup();
 	}
@@ -131,10 +130,11 @@ test("with the code required, every connect and pairing without one is refused, 
 		assert.ok(!linked());
 		assert.equal((await post("/pair", { label: "Other" })).status, 403, "the old pairing route asks for it too");
 
-		const agent = app.agents.focused();
-		const passedOn = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-agent": agent.id, "x-forwarded-for": "100.101.102.103" });
+		const agent = { "content-type": "application/json", authorization: `Bearer ${app.bridge.issue(app.agents.focused().id)}` };
+		const passedOn = await post("/v1/pair.code", { args: [] }, { ...agent, "x-forwarded-for": "100.101.102.103" });
 		assert.equal(passedOn.status, 403, "a call a proxy passed on, as tailscale serve does, is not from this machine");
-		const made = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-agent": agent.id });
+		assert.equal((await post("/v1/pair.code", { args: [] }, { "content-type": "application/json" })).status, 401, "from this machine, but with no token");
+		const made = await post("/v1/pair.code", { args: [] }, agent);
 		assert.equal(made.status, 200);
 		const code = (made.body.value as { code: string }).code;
 		assert.match(code, /^\d{6}$/);
@@ -158,8 +158,12 @@ test("a board's own button cannot make a pairing code", async () => {
 	try {
 		const tool = app.agents.focused().stageTool();
 		assert.ok(tool);
-		const board = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-board": encodeURIComponent("boards/x.html") });
+		writeFileSync(join(app.deck.path, "boards", "x.html"), "<p>x</p>");
+		app.evalTrust.allow("boards/x.html");
+		const token = app.tokens.issue({ kind: "board", path: "boards/x.html" }).token;
+		const board = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", authorization: `Bearer ${token}` });
 		assert.notEqual(board.status, 200);
+		assert.notEqual((await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-board": encodeURIComponent("boards/x.html") })).status, 200);
 	} finally {
 		cleanup();
 	}
@@ -243,7 +247,7 @@ test("Studio trades its token for tickets, and a board opened in a frame from St
 		assert.equal((await fetch(`${base}/board/boards/b.html?decks_ticket=${encodeURIComponent(tickets["/api/board/boards/b.html"]!)}`, { headers: frame })).status, 200);
 
 		// Revoking the token ends its tickets.
-		app.pairing.revoke(app.pairing.idOf(token)!);
+		app.tokens.revoke(app.tokens.idOf(token)!);
 		assert.equal((await fetch(`${base}/board/boards/a.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401);
 	} finally {
 		cleanup();

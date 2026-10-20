@@ -1,23 +1,23 @@
 import { randomBytes } from "node:crypto";
+import type { TokenStore } from "../auth/tokens.ts";
 
 /**
- * Who a call from another process speaks for (DESIGN §6.3).
+ * Each agent's token, and who a call from another process speaks for (DESIGN §6.3).
  *
- * opencode and antigravity are somebody else's program, so what they send back to Decks names
- * its agent by something Decks handed them: their Google Docs tools send a token, and opencode's
- * shell sends the session (`DECKS_SESSION`) so a `decks` command reaches its own agent
- * (`verbs/router.ts`).
+ * **Every agent has a token** (`auth/tokens.ts`, an `agent` principal), made when it first starts and
+ * taken back when it is disposed: its shell's `decks` command carries it (`DECKS_TOKEN`,
+ * `runtimes/decks-env.ts`), and so do its Google Docs tools. Stable across a restart of the agent's
+ * runtime, since a rewind reopens the session and the tool on the other side must not be left holding
+ * a token nobody answers.
  *
- * **Antigravity keeps a token per agent.** One agent, one process, so the token is minted when
- * the agent starts, handed into that agent's environment, and forgotten when it is disposed.
- *
- * **opencode has one shared process, so it gets a server token and a session id.** With
- * everything in one process there is no per-agent environment to put a token in; Decks, which
- * created each session, knows which agent it belongs to, and a single server token in the
- * process environment proves the caller is the process Decks spawned.
+ * **opencode has one shared process, so it also has a server secret and a session id.** With every
+ * agent in one process there is no per-agent environment to put a token in when it starts. Decks,
+ * which created each session, knows which agent it belongs to; the server's secret proves the caller
+ * is the process Decks spawned. Its plugin trades the two for the session's agent token before a shell
+ * command runs (`POST /api/tokens/session`, `auth/issue.ts`), and its Google Docs tools send them.
  */
 export class StageBridge {
-	private readonly byToken = new Map<string, { agentId: string }>();
+	/** Each agent's token, kept here only so a second start answers the same one. */
 	private readonly byAgent = new Map<string, string>();
 	/** One opencode session, resolved from the id its tool sends back. */
 	private readonly bySession = new Map<string, { agentId: string; server: string }>();
@@ -33,32 +33,22 @@ export class StageBridge {
 	 */
 	private readonly serverTokens = new Map<string, string>();
 
-	/**
-	 * Mint this agent's token, or return the one it already has.
-	 *
-	 * Stable across a restart of the agent's runtime — a rewind reopens the session and
-	 * would otherwise leave the tool holding a token nobody answers. This is the
-	 * per-agent scheme, which antigravity still uses; opencode's identity has moved to
-	 * the session registration below.
-	 */
+	/** The tokens live in the harness's store; without one (a test), in memory alone. */
+	constructor(private readonly tokens?: Pick<TokenStore, "issue" | "verify" | "revokeWhere">) {}
+
+	/** Mint this agent's token, or return the one it already has while it still works. */
 	issue(agentId: string): string {
 		const existing = this.byAgent.get(agentId);
-		if (existing) {
-			this.byToken.set(existing, { agentId });
-			return existing;
-		}
-		const token = randomBytes(24).toString("base64url");
+		if (existing && this.agentOf(existing) === agentId) return existing;
+		const token = this.tokens ? this.tokens.issue({ kind: "agent", id: agentId }).token : `dk_a_${randomBytes(32).toString("base64url")}`;
 		this.byAgent.set(agentId, token);
-		this.byToken.set(token, { agentId });
 		return token;
 	}
 
 	/** The agent is gone: its token stops working before its runtime has finished dying. */
 	revoke(agentId: string): void {
-		const token = this.byAgent.get(agentId);
-		if (!token) return;
 		this.byAgent.delete(agentId);
-		this.byToken.delete(token);
+		this.tokens?.revokeWhere((principal) => principal.kind === "agent" && principal.id === agentId);
 	}
 
 	/** Replace a shared server's token — called whenever that server is raised. */
@@ -69,7 +59,7 @@ export class StageBridge {
 	/**
 	 * Bind an opencode session to the agent that created it.
 	 *
-	 * Badged with the agent id for the same reason `byToken` carries it: a caller that
+	 * Badged with the agent id: a caller that
 	 * wants to know who a call speaks for can ask, and the answer is the agent's, not a
 	 * guess about it.
 	 */
@@ -98,13 +88,11 @@ export class StageBridge {
 		return this.agentOf(token);
 	}
 
-	/** The agent an opencode session was made for: what a `decks` command's `DECKS_SESSION` names. */
-	agentOfSession(sessionID: string | undefined): string | undefined {
-		return sessionID ? this.bySession.get(sessionID)?.agentId : undefined;
-	}
-
 	/** Which agent a token speaks for, for a caller that wants to say so. */
 	agentOf(token: string | undefined): string | undefined {
-		return token ? this.byToken.get(token)?.agentId : undefined;
+		if (!token) return undefined;
+		if (!this.tokens) return [...this.byAgent].find(([, held]) => held === token)?.[0];
+		const seen = this.tokens.verify(token);
+		return seen.ok && seen.principal.kind === "agent" ? seen.principal.id : undefined;
 	}
 }

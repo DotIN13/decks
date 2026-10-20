@@ -3,15 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Pairing } from "./pairing.ts";
+import { TokenStore } from "./tokens.ts";
 import { covers, TICKET_MS, ticketPath, Tickets } from "./tickets.ts";
 
-/** A pairing store in a fresh folder, a token in it, and tickets that ask it whether the token still works. */
+/** A token store in a fresh folder, a token in it, and tickets that ask it whether the token still works. */
 function setUp() {
 	const dir = mkdtempSync(join(tmpdir(), "decks-tickets-"));
-	const pairing = new Pairing(join(dir, "pairing.json"));
-	const token = pairing.grant("https://studio.test", "Decks Studio");
-	const id = pairing.idOf(token)!;
+	const pairing = new TokenStore(join(dir, "tokens.json"));
+	const { token, id } = pairing.issue({ kind: "site", origin: "https://studio.test", label: "Decks Studio" });
 	const tickets = new Tickets((one) => pairing.live(one));
 	return { pairing, token, id, tickets, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
@@ -102,14 +101,18 @@ test("tickets are only for board pages, files and apps, named by their request p
 
 test("a token is refused from a page on a site other than the one it was given to", () => {
 	const { pairing, token, cleanup } = setUp();
+	const verdict = (given: string, origin: string | undefined) => {
+		const seen = pairing.verify(given, { origin });
+		return seen.ok ? "paired" : seen.reason;
+	};
 	try {
-		assert.equal(pairing.verdict(token, "https://studio.test"), "paired");
-		assert.equal(pairing.verdict(token, undefined), "paired", "a program, which sends no Origin");
-		assert.equal(pairing.verdict(token, "https://evil.test"), "elsewhere");
-		assert.equal(pairing.verdict(token, "null"), "elsewhere", "a sandboxed page");
-		assert.equal(pairing.verdict("not-a-token", "https://studio.test"), "unpaired");
-		const anywhere = pairing.grant("", "A program");
-		assert.equal(pairing.verdict(anywhere, "https://evil.test"), "paired", "a token given with no site recorded keeps working as before");
+		assert.equal(verdict(token, "https://studio.test"), "paired");
+		assert.equal(verdict(token, undefined), "paired", "a program, which sends no Origin");
+		assert.equal(verdict(token, "https://evil.test"), "elsewhere");
+		assert.equal(verdict(token, "null"), "elsewhere", "a sandboxed page");
+		assert.equal(verdict("not-a-token", "https://studio.test"), "unknown");
+		const anywhere = pairing.issue({ kind: "site", label: "A program" }).token;
+		assert.equal(verdict(anywhere, "https://evil.test"), "paired", "a token given with no site recorded keeps working as before");
 	} finally {
 		cleanup();
 	}

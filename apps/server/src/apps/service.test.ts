@@ -148,21 +148,29 @@ test("names are checked, and a starter will not write over an app", () => {
 	}
 });
 
-test("a server app is told where Decks is, as itself, and where the SDK is", async () => {
+test("a server app is told where Decks is, its own token, and where the SDK is; the token ends with the process", async () => {
+	const { TokenStore } = await import("../auth/tokens.ts");
 	await withDeck(async ({ deck, apps, get }) => {
+		const tokens = new TokenStore(join(deck, ".decks", "tokens.json"));
 		apps.decksPort = 4999;
+		apps.tokens = tokens;
 		const folder = join(deck, "apps", "teller");
 		mkdirSync(folder, { recursive: true });
 		writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
 		writeFileSync(
 			join(folder, "server.js"),
-			`require("node:http").createServer((q, s) => s.end(JSON.stringify({ url: process.env.DECKS_URL, agent: process.env.DECKS_AGENT ?? null, app: process.env.DECKS_APP, sdk: process.env.DECKS_SDK }))).listen(process.env.PORT, "127.0.0.1");`,
+			`require("node:http").createServer((q, s) => s.end(JSON.stringify({ url: process.env.DECKS_URL, agent: process.env.DECKS_AGENT ?? null, app: process.env.DECKS_APP, token: process.env.DECKS_TOKEN, sdk: process.env.DECKS_SDK }))).listen(process.env.PORT, "127.0.0.1");`,
 		);
-		const seen = (await (await get("/app/teller/")).json()) as { url: string; agent: string | null; app: string; sdk: string };
+		const seen = (await (await get("/app/teller/")).json()) as { url: string; agent: string | null; app: string; token: string; sdk: string };
 		assert.equal(seen.url, "http://127.0.0.1:4999");
 		assert.equal(seen.app, "teller");
 		assert.equal(seen.agent, null, "an app never calls as the agent whose shell started Decks");
+		const verified = tokens.verify(seen.token);
+		assert.ok(verified.ok);
+		assert.deepEqual(verified.principal, { kind: "app", name: "teller" }, "its token is the app's");
 		assert.ok(existsSync(seen.sdk) && seen.sdk.endsWith("packages/sdk/src/index.js"), "and where the SDK is, to import");
+		apps.stop("teller");
+		assert.equal(tokens.verify(seen.token).ok, false, "stopped, its token is taken back");
 	});
 });
 

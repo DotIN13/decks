@@ -6,7 +6,6 @@ import { test } from "node:test";
 import type { Board } from "@decks/protocol";
 import { readZip } from "../../../web/src/connections/zip.ts";
 import { buildBundle } from "./bundle.ts";
-import { fromAnotherSite, fromPrivateNetwork, isPrivateAddress, pairWithoutCode, Pairing, tokenDays, tokenOf } from "./pairing.ts";
 import { zip } from "./zip.ts";
 
 test("a zip written here is read back by the browser's reader, stored and deflated alike", async () => {
@@ -56,94 +55,4 @@ test("a bundle carries the stage, its boards, what they name, lib, and pictures,
 	assert.ok(first.lastWrittenBy === undefined && first.namedAt === undefined && (first.seenAt ?? 0) > 0, "a board arrives read, with nobody's byline");
 	assert.equal(manifest.pen.base, "canvases/plan/");
 	assert.deepEqual(manifest.pictures, { "boards/a.html": { light: "pictures/light/boards/a.html.webp" } });
-});
-
-test("a pairing code works once, dies after five wrong tries, and its token can be revoked", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-pairing-"));
-	const file = join(dir, "pairing.json");
-	const pairing = new Pairing(file);
-	const { code } = pairing.newCode();
-	assert.equal(pairing.redeem(code === "000000" ? "111111" : "000000", "https://a.test", "A"), undefined);
-	const token = pairing.redeem(code, "https://a.test", "A");
-	assert.ok(token);
-	assert.equal(pairing.redeem(code, "https://a.test", "A"), undefined, "spent");
-	assert.ok(pairing.check(token));
-	assert.ok(new Pairing(file).check(token), "kept across a restart");
-	assert.ok(!pairing.check("made-up"));
-
-	const second = pairing.newCode().code;
-	const wrong = second === "999999" ? "888888" : "999999";
-	for (let i = 0; i < 5; i++) pairing.redeem(wrong, "x", "x");
-	assert.equal(pairing.redeem(second, "x", "x"), undefined, "five wrong tries kill the code");
-
-	const [row] = pairing.list();
-	assert.ok(row && pairing.revoke(row.id));
-	assert.ok(!pairing.check(token));
-});
-
-test("only a browser saying cross-site counts as another site, and the token comes from a header or the query", () => {
-	assert.equal(fromAnotherSite({ "sec-fetch-site": "same-origin" }), false);
-	assert.equal(fromAnotherSite({}), false);
-	assert.equal(fromAnotherSite({ "sec-fetch-site": "cross-site" }), true);
-	// Plain http: no fetch metadata, so the page's origin against the host it asked.
-	assert.equal(fromAnotherSite({ origin: "http://100.1.2.3:4337", host: "100.1.2.3:4346" }), true);
-	assert.equal(fromAnotherSite({ origin: "http://100.1.2.3:4337", host: "100.1.2.3:4337" }), false);
-	assert.equal(fromAnotherSite({ origin: "http://100.1.2.3:4337", host: "127.0.0.1:4336", "x-forwarded-host": "100.1.2.3:4337" }), false, "through a proxy that says what was asked");
-	assert.equal(tokenOf({ authorization: "Bearer abc" }, "/ws"), "abc");
-	assert.equal(tokenOf({}, "/ws?decks_token=xyz"), "xyz");
-	assert.equal(tokenOf({}, "/ws"), undefined);
-});
-
-test("no code is asked of this machine, a home network or the tailnet; one is of the internet, also through a proxy", () => {
-	for (const ip of ["127.0.0.1", "::1", "::ffff:192.168.1.20", "10.0.0.5", "172.20.1.1", "100.73.31.55", "fd7a:115c:a1e0::1"]) assert.ok(isPrivateAddress(ip), ip);
-	for (const ip of ["8.8.8.8", "172.32.0.1", "100.128.0.1", "2001:db8::1", "", undefined]) assert.ok(!isPrivateAddress(ip), String(ip));
-	assert.ok(fromPrivateNetwork("100.73.31.55", {}));
-	assert.ok(fromPrivateNetwork("127.0.0.1", {}), "this machine itself");
-	assert.ok(fromPrivateNetwork("127.0.0.1", { "x-forwarded-for": "100.73.31.55" }), "the tailnet, through tailscale serve");
-	assert.ok(!fromPrivateNetwork("127.0.0.1", { "x-forwarded-for": "203.0.113.9, 100.73.31.55" }), "the internet, through a funnel");
-	assert.ok(!fromPrivateNetwork("203.0.113.9", {}));
-	assert.ok(fromPrivateNetwork("10.0.0.2", { "x-forwarded-for": "8.8.8.8" }), "a forwarded header from a peer that is not this machine is not believed");
-});
-
-test("a token can be granted without a code, and revoked like any other", () => {
-	const pairing = new Pairing(join(mkdtempSync(join(tmpdir(), "decks-grant-")), "pairing.json"));
-	const token = pairing.grant("http://localhost:4337", "Laptop");
-	assert.ok(pairing.check(token));
-	assert.equal(pairing.list()[0]?.label, "Laptop");
-});
-
-test("a token unused for its idle days stops working, a used one slides on, and an old one without a time starts from now", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-expiry-"));
-	const file = join(dir, "pairing.json");
-	const day = 86_400_000;
-	const t0 = Date.now();
-	const pairing = new Pairing(file, { days: 30 });
-	const kept = pairing.grant("https://a.test", "A", t0);
-	const left = pairing.grant("https://b.test", "B", t0);
-	assert.ok(pairing.check(kept, t0 + 20 * day), "used on day 20");
-	assert.ok(pairing.check(kept, t0 + 45 * day), "45 days in, 25 since it was last used");
-	assert.ok(!pairing.check(left, t0 + 31 * day), "31 days unused");
-	assert.ok(!pairing.check(left, t0), "and forgotten");
-	assert.equal(pairing.list().length, 1);
-
-	const old = join(dir, "old.json");
-	writeFileSync(old, JSON.stringify({ tokens: [{ id: "abc", hash: "f".repeat(64), label: "Old", origin: "", at: t0 - 400 * day }] }));
-	new Pairing(old);
-	const stamped = JSON.parse(readFileSync(old, "utf8")) as { tokens: Array<{ last?: number }> };
-	assert.ok((stamped.tokens[0]?.last ?? 0) >= t0, "given now, not its making a year ago");
-
-	assert.equal(tokenDays({}), 30);
-	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "7" }), 7);
-	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "nonsense" }), 30);
-});
-
-test("pairing without a code: a web page must be on this machine, on the harness's own address or listed; no Origin keeps the private-network rule", () => {
-	assert.ok(!pairWithoutCode("127.0.0.1", { origin: "https://evil.test" }));
-	assert.ok(!pairWithoutCode("127.0.0.1", { origin: "null" }));
-	assert.ok(pairWithoutCode("127.0.0.1", { origin: "http://127.0.0.1:5173" }));
-	assert.ok(pairWithoutCode("100.73.31.55", { origin: "https://mac.tail1.ts.net", host: "mac.tail1.ts.net:8443" }));
-	assert.ok(pairWithoutCode("127.0.0.1", { origin: "https://studio.test" }, { DECKS_STUDIO_ORIGINS: "https://studio.test" }));
-	assert.ok(pairWithoutCode("192.168.1.20", {}), "the iOS app on the home network");
-	assert.ok(!pairWithoutCode("203.0.113.9", {}), "the internet still needs a code");
-	assert.ok(!pairWithoutCode("203.0.113.9", { origin: "http://localhost:4329" }));
 });

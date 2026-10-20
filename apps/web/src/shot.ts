@@ -27,7 +27,10 @@ const QUIET_MS = 500;
 const BOARD_MS = 10_000;
 
 async function main(): Promise<void> {
-	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}`) : await fetch(`/api/stage-pen/${encodeURIComponent(stage)}`);
+	// The harness's ticket for the one read this page makes (`server/src/auth/tickets.ts`).
+	const ticket = query.get("ticket");
+	const admitted = ticket ? `decks_ticket=${encodeURIComponent(ticket)}` : "";
+	const response = penPath ? await fetch(`/api/pen-file?path=${encodeURIComponent(penPath)}${admitted ? `&${admitted}` : ""}`) : await fetch(`/api/stage-pen/${encodeURIComponent(stage)}${admitted ? `?${admitted}` : ""}`);
 	if (!response.ok) throw new Error(penPath ? `no pen file "${penPath}" (${response.status}): ${await response.text()}` : `no stage "${stage}" (${response.status})`);
 	const { doc, base, boards } = (await response.json()) as { doc: PenDocument; base: string; boards: Array<{ path: string; x: number; y: number; w: number; h: number }> };
 

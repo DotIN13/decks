@@ -1,7 +1,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
- * Tickets: one page's admission, for another site that holds a pairing token (`pairing.ts`).
+ * Tickets: one page's admission, for another site that holds a site token (`tokens.ts`).
+ *
+ * A ticket is the `page` principal (`principal.ts`): the gate (`guard.ts`) lets a GET of its one path
+ * in on it and nothing else.
  *
  * A frame or a new tab cannot send an `Authorization` header, so another site (Decks Studio) used to
  * put its pairing token in a board's address, and every script on that board could read the token
@@ -12,12 +15,18 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  *
  * A ticket is `<payload>.<mac>`, both base64url: the payload is `{ p: path, e: expires, k: token id }`
  * and the mac its HMAC-SHA256 under a secret made when the server starts and never written down, so
- * a restart ends every ticket. `k` is the id of the token it was made with (`Pairing.idOf`): a ticket
+ * a restart ends every ticket. `k` is the id of the token it was made with (`TokenStore.issue`): a ticket
  * works only while that token does, so revoking the token ends its tickets too.
  */
 
 /** How long a ticket admits its page: enough to load it, too short to be worth stealing. */
 export const TICKET_MS = 5 * 60_000;
+
+/**
+ * The token id a ticket the harness makes for its own pages is made with (`stage/shots.ts`): its own
+ * Chromium drawing a canvas reads that canvas with one, and needs no token of anyone's.
+ */
+export const HARNESS_TICKET = "harness";
 
 /** The most paths one `POST /api/tickets` may ask for. */
 export const MAX_TICKETS = 200;
@@ -74,7 +83,7 @@ export function decodedPath(url: string | undefined): string | undefined {
 export class Tickets {
 	private readonly secret = randomBytes(32);
 
-	/** `live(id)`: whether the token with that id still works (`Pairing.live`). */
+	/** `live(id)`: whether the token with that id still works (`TokenStore.live`). */
 	constructor(private readonly live: (id: string) => boolean) {}
 
 	/** A ticket for one path (`ticketPath`), made with the token whose id is `id`. */

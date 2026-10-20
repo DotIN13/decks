@@ -58,6 +58,11 @@ export interface ShotHost {
 	pens: StagePens;
 	/** Where the web app is served, as the server can reach it: `shot.html` is part of it. */
 	webOrigin: () => string;
+	/**
+	 * A ticket for one of the harness's own reads (`auth/tickets.ts`): `shot.html` reads the stage it
+	 * draws with one, since the page carries no one's token.
+	 */
+	ticket?: (path: string) => string;
 	borrow: <T>(use: (browser: Browser) => Promise<T>) => Promise<T>;
 	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
 	native?: NativeShots;
@@ -149,7 +154,9 @@ export class StageShots {
 			notNative = outcome.why;
 		}
 
-		const query = new URLSearchParams({ ...(fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage }), x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme });
+		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage };
+		const read = drawn.pen !== undefined ? "/api/pen-file" : `/api/stage-pen/${drawn.stage}`;
+		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(this.host.ticket ? { ticket: this.host.ticket(read) } : {}) });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
 		const bytes = await this.host.borrow(async (browser) => {

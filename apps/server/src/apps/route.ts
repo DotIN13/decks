@@ -2,8 +2,8 @@ import { request as httpRequest, type IncomingMessage, type ServerResponse } fro
 import { connect } from "node:net";
 import type { Duplex } from "node:stream";
 import type { Response } from "express";
-import { fromAnotherSite, originOf, tokenOf } from "../share/pairing.ts";
-import { decodedPath, ticketOf } from "../share/tickets.ts";
+import { bearerOf, fromAnotherSite, originOf, queryTokenOf } from "../auth/guard.ts";
+import { decodedPath, ticketOf } from "../auth/tickets.ts";
 import { APP_NAME, type Apps } from "./service.ts";
 
 /**
@@ -27,7 +27,7 @@ import { APP_NAME, type Apps } from "./service.ts";
 
 /**
  * Whether a token is one this server gave out, and, given the page it came from (`Origin`), good
- * from that page (`Pairing.verdict`).
+ * from that page (`TokenStore.verify`).
  */
 export type PairedCheck = (token: string | undefined, origin?: string) => boolean;
 
@@ -163,10 +163,10 @@ export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, a
 /** Another site's request, without a paired token: `Sec-Fetch-Site` says so, or an `Origin` that is not this host. */
 function refusedSite(req: IncomingMessage, paired: PairedCheck | undefined): boolean {
 	if (!fromAnotherSite(req.headers)) return false;
-	return !(paired?.(tokenOf(req.headers, req.url), originOf(req.headers)) ?? false);
+	return !(paired?.(bearerOf(req.headers) ?? queryTokenOf(req.url), originOf(req.headers)) ?? false);
 }
 
-/** Another site's GET let in by a ticket for this app (`share/tickets.ts`). */
+/** Another site's GET let in by a ticket for this app (`auth/tickets.ts`). */
 function byTicket(req: IncomingMessage, ticketed: TicketCheck | undefined): boolean {
 	if (!ticketed || req.method !== "GET" || !fromAnotherSite(req.headers)) return false;
 	const ticket = ticketOf(req.url);

@@ -1,9 +1,9 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { randomBytes, timingSafeEqual } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createServer, connect } from "node:net";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { TokenStore } from "../auth/tokens.ts";
 
 /** The SDK a server app imports to call Decks' verbs (`packages/sdk`), told to it as `DECKS_SDK`. */
 export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/sdk/src/index.js");
@@ -101,6 +101,8 @@ interface Running {
 	child: ChildProcess;
 	port: number;
 	ready: Promise<boolean>;
+	/** The id of the token it was started with, taken back when it stops (`auth/tokens.ts`). */
+	token?: string;
 }
 
 /** An install, a build or a start in progress, which a second call joins rather than repeating. */
@@ -113,8 +115,12 @@ export class Apps {
 	private readonly jobs = new Map<string, Job>();
 	private readonly writes = new Map<string, number>();
 	private sweep: ReturnType<typeof setInterval> | undefined;
-	/** One secret per app, handed to its server's environment so it can run stage code (`stageToken`). */
-	private readonly tokens = new Map<string, string>();
+	/**
+	 * The harness's tokens (`auth/tokens.ts`), set by `app.ts`: a server app is given an `app` token as
+	 * `DECKS_TOKEN` when it starts, and it is taken back when the app stops or exits. Build and install
+	 * commands are given none.
+	 */
+	tokens: Pick<TokenStore, "issue" | "revoke"> | undefined;
 	/** Decks' own port, set by `app.ts`, so a server app is told where to call back for stage code. */
 	decksPort: number | undefined;
 
@@ -124,34 +130,8 @@ export class Apps {
 		process.once("exit", () => this.stopAll());
 	}
 
-	/**
-	 * The secret an app's server proves itself with when it runs stage code (`POST /api/apps/<name>/stage`).
-	 *
-	 * Minted on first use and kept for this process's life, so a server restarted by Decks gets the
-	 * same one; a restart of Decks mints new ones, and every app process is restarted with it anyway.
-	 * The secret says *which app* is calling, nothing more: whether that app may run code at all is
-	 * the person's decision, asked once (`http.ts`).
-	 */
-	stageToken(name: string): string {
-		let token = this.tokens.get(name);
-		if (!token) {
-			token = randomBytes(24).toString("base64url");
-			this.tokens.set(name, token);
-		}
-		return token;
-	}
-
-	/** Whether a request's bearer token is this app's. */
-	holdsToken(name: string, token: string | undefined): boolean {
-		const mine = this.tokens.get(name);
-		if (!mine || !token) return false;
-		const a = Buffer.from(mine), b = Buffer.from(token);
-		return a.length === b.length && timingSafeEqual(a, b);
-	}
-
 	setDeck(deckPath: string): void {
 		this.stopAll();
-		this.tokens.clear();
 		this.deckPath = deckPath;
 	}
 
@@ -379,6 +359,7 @@ export class Apps {
 			return false;
 		}
 		this.running.delete(name);
+		if (live.token) this.tokens?.revoke(live.token);
 		this.set(name, { status, port: undefined, warning: undefined });
 		this.kill(live.child);
 		this.write(name, status === "asleep" ? "— asleep: not seen for a while; the next request starts it again" : "— stopped");
@@ -501,7 +482,7 @@ export class Apps {
 		const env: NodeJS.ProcessEnv = { ...process.env };
 		for (const key of Object.keys(env)) if (secretEnv(key)) delete env[key];
 		// Who an app calls Decks as is its own, never inherited from whoever started Decks (an agent's shell sets these).
-		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_URL", "DECKS_AGENT", "DECKS_APP"]) delete env[key];
+		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_URL", "DECKS_AGENT", "DECKS_APP", "DECKS_TOKEN", "DECKS_SESSION"]) delete env[key];
 		Object.assign(env, extra);
 		if (env.NODE_ENV === "production") delete env.NODE_ENV;
 		delete env.DECKS_DATA_DIR;
@@ -529,6 +510,8 @@ export class Apps {
 		const port = await freePort();
 		this.set(name, { status: "starting", port, error: undefined, warning: undefined, seenAt: Date.now() });
 		this.write(name, `$ ${command}    (PORT=${port})`);
+		// Its own token, for the SDK's calls: who it is comes from this alone, and it ends with the process.
+		const minted = this.tokens?.issue({ kind: "app", name });
 		const child = spawn("bash", ["-lc", command], {
 			cwd: this.folder(name),
 			env: this.env({
@@ -538,8 +521,10 @@ export class Apps {
 				BASE_PATH: `/app/${name}`,
 				// Where Decks is, for the SDK's verbs (`/api/v1`), and the app they are called as.
 				...(this.decksPort ? { DECKS_URL: `http://127.0.0.1:${this.decksPort}` } : {}),
+				...(minted ? { DECKS_TOKEN: minted.token } : {}),
+				// Which app this is, for a log line; who is calling is the token's to say.
 				DECKS_APP: name,
-				// `const { decks } = await import(process.env.DECKS_SDK)` reads the two above; see packages/sdk.
+				// `const { decks } = await import(process.env.DECKS_SDK)` reads DECKS_URL and DECKS_TOKEN; see packages/sdk.
 				DECKS_SDK: SDK_FILE,
 			}),
 			stdio: ["ignore", "pipe", "pipe"],
@@ -554,13 +539,14 @@ export class Apps {
 		});
 		child.on("exit", (code, signal) => {
 			exited = true;
+			if (minted) this.tokens?.revoke(minted.id);
 			if (this.running.get(name)?.child !== child) return;
 			this.running.delete(name);
 			const error = `exited with ${signal ?? `code ${code}`}`;
 			this.write(name, `— ${error}`);
 			this.set(name, { status: "broken", error, port: undefined, warning: undefined, at: Date.now() });
 		});
-		this.running.set(name, { child, port, ready });
+		this.running.set(name, { child, port, ready, ...(minted ? { token: minted.id } : {}) });
 		const ok = await ready;
 		if (!ok) {
 			if (this.running.get(name)?.child === child) {

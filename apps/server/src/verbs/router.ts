@@ -1,10 +1,9 @@
 import { ALL_VERBS, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
-import type { DeckAgent } from "../agents/session.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
-import { fromThisMachine } from "../share/pairing.ts";
-import { credentialsOf } from "../share/person-key.ts";
+import { fromThisMachine } from "../auth/issue.ts";
+import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
@@ -18,14 +17,13 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * `GET /api/v1` lists the verbs, which is what `decks --help` prints, and `GET /api/v1/events`
  * streams every change as it is broadcast.
  *
- * Who is calling is said: `X-Decks-Agent` names an agent by id or name (the
- * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
- * opencode session, whose agent the bridge knows, `X-Decks-Person` the person in the browser (with
- * `X-Decks-Stage` and `X-Decks-Agent` saying whose stage), `X-Decks-Board` a board's button (with
- * `X-Decks-Stage`, the canvas it was pressed on), and `X-Decks-App`
- * names an app, which acts for the conversation on screen once the person has let it. The person and
- * a board are believed only of the Decks page holding the person key, a front end with a pairing
- * token, or a program on this machine; a board's own page asks the page around it, which names it.
+ * Who is calling is the request's token (`auth/guard.ts`), and nothing else: `req.principal`.
+ * The person, in a Decks tab or a terminal, and a paired front end acting for them (Studio) call
+ * through the person's tool; they may say what they are acting on, as parameters and not as who
+ * they are: `X-Decks-Stage`, the canvas on screen, and `X-Decks-Agent`, the agent they are talking
+ * to. Until boards carry tokens of their own, such a caller may also relay a board's button
+ * (`X-Decks-Board`), and the call is then that board's, asked once of the person. An agent's token
+ * calls as that agent, an app's as that app, a board's as that board.
  */
 
 /** The answer to one call, as the SDK reads it. */
@@ -71,7 +69,7 @@ export function verbRoutes(app: App): express.Router {
 			res.status(404).json({ ok: false, error: `There is no verb called ${name}. GET /api/v1 lists them.`, notes: [] });
 			return;
 		}
-		const body = (req.body ?? {}) as { args?: unknown; agent?: unknown; app?: unknown };
+		const body = (req.body ?? {}) as { args?: unknown };
 		const args = body.args === undefined ? [] : body.args;
 		if (!Array.isArray(args)) {
 			res.status(400).json({ ok: false, error: `Send the arguments as a list: { "args": [...] }. ${signature(verb)}`, notes: [] });
@@ -88,7 +86,7 @@ export function verbRoutes(app: App): express.Router {
 			res.status(403).json({ ok: false, error: "A pairing code is made only on the harness's own machine: run decks pair code in a shell there.", notes: [] });
 			return;
 		}
-		const caller = await callerOf(app, req, body, allowedOnce);
+		const caller = await callerOf(app, req, allowedOnce);
 		if ("error" in caller) {
 			res.status(caller.status).json({ ok: false, error: caller.error, notes: [] });
 			return;
@@ -103,53 +101,39 @@ export function verbRoutes(app: App): express.Router {
 
 type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string } } | { error: string; status: number };
 
-/** The stage tool a request acts through: an agent's own, or an app's on the conversation on screen. */
-async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: unknown }, allowedOnce: Set<string>): Promise<Caller> {
+/** The stage tool a request acts through: the token's principal's (`auth/principal.ts`). */
+export async function callerOf(app: App, req: Pick<Request, "headers"> & { principal?: Principal }, allowedOnce: Set<string>): Promise<Caller> {
 	const header = (key: string) => {
 		const value = req.headers[key];
 		return typeof value === "string" && value.trim() ? value.trim() : undefined;
 	};
-	const appName = header("x-decks-app") ?? (typeof body.app === "string" ? body.app : undefined);
-	if (appName) return appCaller(app, appName, allowedOnce);
-	/*
-	 * Saying "the person" or "this board" is believed only of a caller that could be either: the Decks
-	 * page with its person key, a front end with a pairing token (Studio, another Decks), or a program
-	 * on this machine (`share/person-key.ts`). A board asks its page, and the page names it.
-	 */
-	const trusted = credentialsOf(req, app.personKey, app.pairing) !== undefined;
-	if ((header("x-decks-person") || header("x-decks-board")) && !trusted) {
-		return { status: 401, error: "Only the Decks page, a paired front end or a program on the harness's machine may call as the person or name a board. A board asks the page it is on." };
+	const principal = req.principal;
+	switch (principal?.kind) {
+		case "person":
+		case "site": {
+			// A board the Decks page or Studio framed, relaying its button's call (`board/stage-call.ts`).
+			const board = header("x-decks-board");
+			if (board) return boardCaller(app, decodeURIComponent(board), header("x-decks-stage"), allowedOnce);
+			// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
+			const stage = header("x-decks-stage");
+			const to = header("x-decks-agent");
+			const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(stage ? { stage } : {}), ...(to ? { agent: to } : {}) });
+			return { tool: agent.personTool(), on: { ...(stage ? { stage } : {}) } };
+		}
+		case "agent": {
+			const agent = app.agents.get(principal.id);
+			if (!agent) return { status: 401, error: "The agent this token was made for is gone." };
+			return { tool: agent.stageTool() };
+		}
+		case "app":
+			return appCaller(app, principal.name, allowedOnce);
+		case "board":
+			return boardCaller(app, principal.path, principal.stage ?? header("x-decks-stage"), allowedOnce);
+		case "page":
+			return { status: 403, error: "A ticket opens one page; it calls no verbs." };
+		default:
+			return { status: 401, error: "Say who is calling with a token: Authorization: Bearer <token>. An agent's shell and an app's server have DECKS_TOKEN; a terminal gets one with decks login." };
 	}
-	// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
-	if (header("x-decks-person")) {
-		const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent")! } : {}) });
-		return { tool: agent.personTool(), on: { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}) } };
-	}
-	// A board's own button, whose code runs in the board's page (`runtime/lib/board.js`).
-	const board = header("x-decks-board");
-	if (board) return boardCaller(app, decodeURIComponent(board), header("x-decks-stage"), allowedOnce);
-
-	// An opencode session names its agent through the bridge that registered it (`runtime/opencode/plugin`).
-	const session = header("x-decks-session");
-	const named = header("x-decks-agent") ?? (typeof body.agent === "string" ? body.agent : undefined) ?? app.bridge.agentOfSession(session);
-	if (!named) {
-		return {
-			status: 400,
-			error: "Say who is calling: an agent with the X-Decks-Agent header (the decks command sends DECKS_AGENT), or an app with X-Decks-App.",
-		};
-	}
-	const agent = agentNamed(app, named);
-	if (!agent) return { status: 404, error: `There is no agent called ${named}. GET /api/v1/agents needs a caller too; DECKS_AGENT is set in each agent's shell.` };
-	return { tool: agent.stageTool() };
-}
-
-/** An agent by id, or by name when exactly one has it. */
-function agentNamed(app: App, named: string): DeckAgent | undefined {
-	const byId = app.agents.get(named);
-	if (byId) return byId;
-	const lower = named.toLowerCase();
-	const matches = app.agents.all().filter((one) => one.name.toLowerCase() === lower);
-	return matches.length === 1 ? matches[0] : undefined;
 }
 
 /**

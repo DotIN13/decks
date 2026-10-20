@@ -476,12 +476,12 @@ three things are made from it:
 - **The agent's reference** (`runtime/decks-commands.md`), injected into every agent's context.
 
 **The server runs nobody's code.** Agents chain verbs in their own shell, where each runtime puts
-`decks` on the PATH with `DECKS_URL` and the agent's identity (`runtimes/decks-env.ts`). Apps call
-the SDK from their own process or page. A board's button runs its `text/decks-eval` block in the
-board's own page with the SDK as `stage` (`runtime/lib/board.js`). Who is calling is a header the
-caller sets — `X-Decks-Agent`, `X-Decks-Session` (opencode, mapped by the bridge), `X-Decks-App`
-or `X-Decks-Board` — said, not proven: an app or a board is asked once whether it may use the
-stage at all, and each of its calls is noted in the conversation it acts for.
+`decks` on the PATH with `DECKS_URL` and the agent's own token, `DECKS_TOKEN` (`runtimes/decks-env.ts`).
+Apps call the SDK from their own process with theirs. A board's button runs its `text/decks-eval`
+block in the board's own page with the SDK as `stage` (`runtime/lib/board.js`), and the page around
+it makes the call. Who is calling is the token a request carries and nothing else (`auth/`): an app
+or a board is asked once whether it may use the stage at all, and each of its calls is noted in the
+conversation it acts for.
 
 `stage/tool.ts` builds its object as the SDK's generated `Verbs` type, so a verb the table
 declares and the server lacks, or a signature that disagrees, is a compile error; a test checks

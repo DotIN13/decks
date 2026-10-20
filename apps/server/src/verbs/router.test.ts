@@ -22,15 +22,28 @@ async function open() {
 	await new Promise((done) => server.once("listening", done));
 	const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
 	const agent = app.agents.focused();
-	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = { "x-decks-agent": agent.id }) => {
+	// The agent's own token, as its shell has it (`DECKS_TOKEN`): who is calling comes from this alone.
+	const token = app.bridge.issue(agent.id);
+	const bearer = (one: string) => ({ authorization: `Bearer ${one}` });
+	const call = async (verb: string, args: unknown[] = [], headers: Record<string, string> = bearer(token)) => {
 		const response = await fetch(`${base}/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
-		return { status: response.status, body: (await response.json()) as { ok: boolean; value?: unknown; error?: string; notes: string[] } };
+		// A refusal at the gate is a sentence, not the verbs' JSON.
+		const text = await response.text();
+		let body: { ok: boolean; value?: unknown; error?: string; notes: string[] };
+		try {
+			body = JSON.parse(text) as typeof body;
+		} catch {
+			body = { ok: false, error: text, notes: [] };
+		}
+		return { status: response.status, body };
 	};
 	return {
 		app,
 		deck,
 		base,
 		agent,
+		token,
+		bearer,
 		call,
 		cleanup: () => {
 			server.close();
@@ -41,9 +54,10 @@ async function open() {
 }
 
 test("GET /api/v1 lists every verb with its signature", async () => {
-	const { base, cleanup } = await open();
+	const { base, token, bearer, cleanup } = await open();
 	try {
-		const listed = (await (await fetch(base)).json()) as { verbs: Array<{ name: string; signature: string; effect: string; alias?: string }> };
+		assert.equal((await fetch(base)).status, 401, "even the list needs a token");
+		const listed = (await (await fetch(base, { headers: bearer(token) })).json()) as { verbs: Array<{ name: string; signature: string; effect: string; alias?: string }> };
 		const { ALL_VERBS } = await import("@decks/api");
 		assert.equal(listed.verbs.length, ALL_VERBS.length);
 		assert.deepEqual(listed.verbs.find((verb) => verb.name === "canvas.move"), {
@@ -60,8 +74,8 @@ test("GET /api/v1 lists every verb with its signature", async () => {
 	}
 });
 
-test("a verb is called for the agent the request names, by id or by name", async () => {
-	const { call, agent, cleanup } = await open();
+test("a verb is called for the agent whose token the request carries, whatever a header says", async () => {
+	const { app, call, agent, token, bearer, cleanup } = await open();
 	try {
 		const byId = await call("boards");
 		assert.equal(byId.status, 200);
@@ -73,8 +87,12 @@ test("a verb is called for the agent the request names, by id or by name", async
 		assert.equal((renamed.body.value as { name: string }).name, "Wren");
 		assert.equal(agent.name, "Wren");
 
-		const byName = await call("me", [], { "x-decks-agent": "wren" });
-		assert.equal((byName.body.value as { name: string }).name, "Wren");
+		// Another agent named in a header changes nothing: the token is who is calling.
+		const other = app.agents.create({ name: "Ada" });
+		const claimed = await call("me", [], { ...bearer(token), "x-decks-agent": other.id });
+		assert.equal((claimed.body.value as { name: string }).name, "Wren");
+		const theirs = await call("me", [], bearer(app.bridge.issue(other.id)));
+		assert.equal((theirs.body.value as { name: string }).name, "Ada");
 	} finally {
 		cleanup();
 	}
@@ -95,7 +113,7 @@ test("a change goes to the deck, and its notes come back beside the value", asyn
 });
 
 test("wrong calls are answered with a sentence and the verb's signature", async () => {
-	const { call, cleanup } = await open();
+	const { call, agent, bearer, cleanup } = await open();
 	try {
 		const missing = await call("move", ["boards/tall.html"]);
 		assert.equal(missing.status, 400);
@@ -105,11 +123,13 @@ test("wrong calls are answered with a sentence and the verb's signature", async 
 		assert.equal(unknown.status, 404);
 
 		const nobody = await call("boards", [], {});
-		assert.equal(nobody.status, 400);
-		assert.match(nobody.body.error!, /X-Decks-Agent/);
+		assert.equal(nobody.status, 401, "no token, though it comes from this machine");
 
-		const stranger = await call("boards", [], { "x-decks-agent": "nobody-here" });
-		assert.equal(stranger.status, 404);
+		const named = await call("boards", [], { "x-decks-agent": agent.id });
+		assert.equal(named.status, 401, "a header naming an agent is not a token");
+
+		const stranger = await call("boards", [], bearer("dk_a_nobody-here"));
+		assert.equal(stranger.status, 401);
 
 		const refused = await call("fit", ["boards/no-such.html"]);
 		assert.equal(refused.status, 422, "a verb that throws is an answer, not a crash");
@@ -125,9 +145,9 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 	const { execFile } = await import("node:child_process");
 	const { promisify } = await import("node:util");
 	const run = promisify(execFile);
-	const { base, agent, cleanup } = await open();
+	const { base, agent, token, cleanup } = await open();
 	try {
-		const env = { ...process.env, ...decksEnv(Number(new URL(base).port), agent.id) };
+		const env = { ...process.env, DECKS_TOKEN: "", ...decksEnv(Number(new URL(base).port), agent.id, token) };
 		const listed = await run("sh", ["-c", "decks boards | head -c 2000"], { env });
 		assert.ok(JSON.parse(listed.stdout).some((board: { path: string }) => board.path === "boards/tall.html"));
 		const made = await run("sh", ["-c", 'p=$(decks new-board --title "From the shell" --at.x1 0 --at.y1 900) && echo "$p"'], { env });
@@ -141,11 +161,11 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 
 test("the event stream carries what a verb changed, and only the types asked for", async () => {
 	const { connect } = await import("../../../../packages/sdk/src/index.js");
-	const { base, agent, call, cleanup } = await open();
+	const { base, token, call, cleanup } = await open();
 	try {
 		const url = base.replace(/\/api\/v1$/, "");
 		const heard: Array<{ type: string; path?: string }> = [];
-		const stream = connect({ url, agent: agent.id, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["board.changed"] });
+		const stream = connect({ url, token, notes: () => {} }).events((event: { type: string; path?: string }) => heard.push(event), { types: ["board.changed"] });
 		// The stream is open once its first comment arrives; a short wait is enough on loopback.
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		const moved = await call("move", ["boards/tall.html", { x: 320, y: 160 }]);
@@ -164,7 +184,8 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	try {
 		app.agents.focus(agent.id);
 		// On screen first, so there is a board to move (`canvas.insert`, as the person).
-		const person = { "content-type": "application/json", "x-decks-person": "1", "x-decks-agent": agent.id };
+		// The person's token, as a Decks tab has it; the agent they talk to is a parameter.
+		const person = { "content-type": "application/json", authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id };
 		const put = await fetch(`${base}/canvas.insert`, { method: "POST", headers: person, body: JSON.stringify({ args: [{ type: "board", board: "boards/tall.html" }, { at: { x1: 0, y1: 0 } }] }) });
 		assert.ok(((await put.json()) as { ok: boolean }).ok);
 		const response = await fetch(`${base}/canvas.move`, {
@@ -176,6 +197,41 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 		assert.ok(answer.ok);
 		assert.deepEqual([answer.value?.box.x1, answer.value?.box.y1], [40, 80]);
 		assert.deepEqual(answer.notes, [], "the person hears no agent's reminders");
+	} finally {
+		cleanup();
+	}
+});
+
+test("each principal calls as itself: an app as the app, a board as the board, a page not at all, a site as the person", async () => {
+	const { callerOf } = await import("./router.ts");
+	const { app, call, bearer, cleanup } = await open();
+	try {
+		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
+		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static" }));
+		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
+		// Let both in ahead, so no question waits on a person.
+		app.evalTrust.allow("apps/notes");
+		app.evalTrust.allow("boards/tall.html");
+
+		const asApp = await call("boards", [], bearer(app.tokens.issue({ kind: "app", name: "notes" }).token));
+		assert.equal(asApp.status, 200, asApp.body.error);
+		const gone = await call("boards", [], bearer(app.tokens.issue({ kind: "app", name: "nothing" }).token));
+		assert.equal(gone.status, 404);
+
+		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/tall.html" }).token);
+		assert.equal((await call("boards", [], board)).status, 200);
+		const made = await call("agent.create", [{ name: "From a board" }], board);
+		assert.equal(made.body.ok, false, "a board's code makes no agents");
+
+		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
+		assert.equal((await call("boards", [], site)).status, 200);
+		const relayed = await call("boards", [], { ...site, "x-decks-board": encodeURIComponent("boards/tall.html") });
+		assert.equal(relayed.status, 200, "a site relaying a board's button calls as that board");
+
+		const page = await callerOf(app, { headers: {}, principal: { kind: "page", path: "/api/board/boards/tall.html" } }, new Set());
+		assert.ok("error" in page && page.status === 403);
+		const none = await callerOf(app, { headers: { "x-decks-person": "1" } }, new Set());
+		assert.ok("error" in none && none.status === 401, "a header is nobody");
 	} finally {
 		cleanup();
 	}

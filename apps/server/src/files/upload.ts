@@ -82,26 +82,6 @@ export function assetName(requested: string): string {
 	return extension ? `${stem}.${extension.toLowerCase()}` : stem;
 }
 
-/**
- * Refuse an upload that some other page in the browser started.
- *
- * `Sec-Fetch-Site` is set by the browser and cannot be written by page script, so
- * this is the one CSRF check that costs nothing: the only legitimate caller is the
- * app's own `fetch`, which arrives as `same-origin`. An absent header is allowed —
- * `curl` and older Safari do not send it, and the threat here is a browser being
- * pointed at loopback, not a shell.
- *
- * It does not make the app safe, and it is worth being clear about why: `/ws` next
- * door accepts every frame from every origin and runs tool calls, and WebSockets
- * are not subject to CORS, so a hostile page already has more than this route
- * offers (DEPLOYMENT §1). What the check buys is that the *newest* way to write
- * bytes into the deck is not also the easiest one to reach by accident.
- */
-export function refuseCrossSite(fetchSite: string | undefined): void {
-	if (fetchSite === undefined || fetchSite === "same-origin" || fetchSite === "none") return;
-	throw new UploadRefused(`an upload from ${fetchSite} is not this app's own`, 403);
-}
-
 /** `photo.png`, 2 -> `photo-2.png`. The suffix goes on the name, not the type. */
 function suffixed(name: string, n: number): string {
 	const dot = name.lastIndexOf(".");

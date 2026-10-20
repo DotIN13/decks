@@ -19,8 +19,9 @@ import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
-import { codeRequired, Pairing, tokenDays } from "./share/pairing.ts";
-import { PersonKey } from "./share/person-key.ts";
+import { codeRequired, PairCodes } from "./auth/issue.ts";
+import { HARNESS_TICKET, Tickets } from "./auth/tickets.ts";
+import { TokenStore } from "./auth/tokens.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -104,10 +105,12 @@ export class App {
 	});
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
-	/** Other Decks front ends allowed to use this server (`share/pairing.ts`). */
-	readonly pairing: Pairing;
-	/** The secret only the person's own Decks page holds, made new each start (`share/person-key.ts`). */
-	readonly personKey = new PersonKey();
+	/** Every token this harness has given out, and who each one is (`auth/tokens.ts`). */
+	readonly tokens: TokenStore;
+	/** The code `decks pair code` makes, for pairing and `decks login` (`auth/issue.ts`). */
+	readonly codes: PairCodes;
+	/** One page's admission for another site's frame or tab (`auth/tickets.ts`). */
+	readonly tickets: Tickets;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */
@@ -115,7 +118,7 @@ export class App {
 		return this.config.port;
 	}
 	/** The canvas tool's other end, for the runtimes that are not in this process. */
-	readonly bridge = new StageBridge();
+	readonly bridge: StageBridge;
 	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: ThumbService;
@@ -139,6 +142,12 @@ export class App {
 		deck: Deck,
 	) {
 		this.deck = deck;
+		// Kept with the deck it was opened with: a deck opened later keeps the same callers.
+		this.tokens = new TokenStore(join(deck.path, ".decks", "tokens.json"));
+		this.codes = new PairCodes(this.tokens, { required: codeRequired() });
+		// A ticket made by the harness for its own pages (`HARNESS_TICKET`) works as long as the harness does.
+		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id));
+		this.bridge = new StageBridge(this.tokens);
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
 			send: (message) => {
@@ -220,6 +229,7 @@ export class App {
 		this.stage.forwards = this.forwards;
 		this.apps = new Apps(deck.path);
 		this.apps.decksPort = config.port;
+		this.apps.tokens = this.tokens;
 		this.stage.apps = this.apps;
 		this.pens.watch();
 		// Read through the deck each time, so a deck switch needs nothing but `closeAll`.
@@ -296,6 +306,7 @@ export class App {
 			deck: deck.path,
 			pens: this.pens,
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
+			ticket: (path) => this.tickets.make(path, HARNESS_TICKET),
 			borrow: (use) => this.thumbs.borrow(use),
 			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
 		});
@@ -305,9 +316,8 @@ export class App {
 			if (!board) throw new Error(`There is no board ${path}.`);
 			return readFileSync(await this.thumbs.get(board, scheme, () => false, "whole"));
 		};
-		this.pairing = new Pairing(join(deck.path, ".decks", "pairing.json"), { required: codeRequired(), days: tokenDays() });
 		this.stage.pairCode = () => {
-			const made = this.pairing.newCode();
+			const made = this.codes.newCode();
 			this.send(this.pairingMessage());
 			return made;
 		};
@@ -814,7 +824,7 @@ export class App {
 	/** The code on show and every front end holding a token, for Settings. */
 	pairingMessage(): ServerMessage {
 		// The code itself never goes to a browser: it is made and shown only by decks pair code.
-		return { type: "pairing", paired: this.pairing.list() };
+		return { type: "pairing", paired: this.tokens.paired() };
 	}
 
 	settingsMessage(): ServerMessage {

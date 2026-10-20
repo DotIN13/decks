@@ -44,7 +44,7 @@ export function studioOrigin(url: string, key: string): string {
 	return address.origin;
 }
 
-export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string, inventory?: SyncOptions["inventory"]): StudioLink {
+export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, harness?: string, inventory?: SyncOptions["inventory"], harnessToken?: SyncOptions["harnessToken"]): StudioLink {
 	const file = join(deck, ".decks", "studio.json");
 	let sync: HarnessSync | undefined;
 	let current = "";
@@ -69,7 +69,7 @@ export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, 
 		await sync?.stop();
 		sync = undefined;
 		if (!want) return;
-		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}) });
+		sync = new HarnessSync({ deck, studio: want.url, key: want.key, ...(harness ? { harness } : {}), ...(inventory ? { inventory } : {}), ...(harnessToken ? { harnessToken } : {}) });
 		sync.start().catch((error) => console.error(`[decks] studio: ${(error as Error).message}`));
 	};
 

@@ -55,15 +55,15 @@ test("the server token with a session id reaches that session's agent, and nothi
 	assert.equal(bridge.agentFor(undefined, "ses_1"), undefined);
 });
 
-test("a session's agent is known to the decks command, and forgotten when it goes", () => {
+test("a session is forgotten when it goes, and its server's token no longer speaks for it", () => {
 	const bridge = new StageBridge();
+	bridge.setServerToken("server-token");
 	bridge.registerSession("ses_1", "ada");
-	assert.equal(bridge.agentOfSession("ses_1"), "ada");
+	assert.equal(bridge.agentFor("server-token", "ses_1"), "ada");
 	bridge.unregisterSession("ses_1");
-	assert.equal(bridge.agentOfSession("ses_1"), undefined);
+	assert.equal(bridge.agentFor("server-token", "ses_1"), undefined);
 	// And unregistering nothing is a no-op, not a throw.
 	bridge.unregisterSession(undefined);
-	assert.equal(bridge.agentOfSession(undefined), undefined);
 });
 
 test("a new server's token retires the old one, and each kind of server keeps its own", () => {
@@ -79,4 +79,20 @@ test("a new server's token retires the old one, and each kind of server keeps it
 	assert.equal(bridge.agentFor("v2-token", "ses_v2"), "bo");
 	assert.equal(bridge.agentFor("new-server", "ses_v2"), undefined, "one server's token does not reach the other's sessions");
 	assert.equal(bridge.agentFor("new-server", "ses_1"), "ada", "the second server starting left the first one's alone");
+});
+
+test("with the harness's store, an agent's token is an agent principal there, and taking it back ends it there", async () => {
+	const { mkdtempSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { TokenStore } = await import("../auth/tokens.ts");
+	const tokens = new TokenStore(join(mkdtempSync(join(tmpdir(), "decks-bridge-")), "tokens.json"));
+	const bridge = new StageBridge(tokens);
+	const token = bridge.issue("ada");
+	assert.match(token, /^dk_a_/);
+	assert.deepEqual((tokens.verify(token) as { principal: unknown }).principal, { kind: "agent", id: "ada" });
+	assert.equal(bridge.issue("ada"), token, "the same one while it works");
+	bridge.revoke("ada");
+	assert.equal(tokens.verify(token).ok, false);
+	assert.notEqual(bridge.issue("ada"), token, "a new one after it was taken back");
 });
