@@ -304,7 +304,7 @@ export function OverlayLayer(
 										height: `${size()}px`,
 										"border-radius": joined() ? `${2 / props.zoom}px` : "50%",
 										transform: joined() ? "rotate(45deg)" : undefined,
-										"border-width": `${1.5 / props.zoom}px`,
+										"--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`,
 									}}
 									onPointerDown={(event) => props.onArrowEnd(event, which)}
 								/>
@@ -327,7 +327,7 @@ export function OverlayLayer(
 								width: `${size()}px`,
 								height: `${size()}px`,
 								"border-radius": "50%",
-								"border-width": `${1.5 / props.zoom}px`,
+								"--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`,
 								"box-shadow": o().arrow?.bent ? `inset 0 0 0 ${2.5 / props.zoom}px var(--color-accent)` : undefined,
 							}}
 							onPointerDown={(event) => props.onArrowBend(event)}
@@ -359,7 +359,7 @@ export function OverlayLayer(
 								<div
 									class="pen-handle"
 									data-handle={handle}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
+									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
 									onPointerDown={(event) => props.onHandle(event, handle)}
 								/>
 							);
@@ -378,7 +378,7 @@ export function OverlayLayer(
 							class="pen-handle"
 							data-handle="radius"
 							title="Drag to round the corners"
-							style={{ left: `${box().x + inset() - size() / 2}px`, top: `${box().y + inset() - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px` }}
+							style={{ left: `${box().x + inset() - size() / 2}px`, top: `${box().y + inset() - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px` }}
 							onPointerDown={(event) => props.onRadius(event)}
 						/>
 					);
@@ -395,7 +395,7 @@ export function OverlayLayer(
 									class="pen-handle"
 									data-handle={handle}
 									data-board={box().path}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
+									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
 									onPointerDown={(event) => props.onBoardHandle(event, handle)}
 								/>
 							);
