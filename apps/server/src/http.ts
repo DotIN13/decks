@@ -109,7 +109,6 @@ export function createHttpApp(app: App): Express {
 	server.use((req, res, next) => {
 		if (!appRequest(req, res, app.apps, (token, origin) => app.pairing.verdict(token, origin) === "paired", ticketed)) next();
 	});
-	server.use(express.json({ limit: "8mb" }));
 
 	/*
 	 * Another Decks, served from another site, using this server (`share/pairing.ts`).
@@ -175,6 +174,8 @@ export function createHttpApp(app: App): Express {
 		}
 		res.status(401).type("text").send(NO_COMMANDS);
 	});
+	// Bodies after both guards: a request refused is not read.
+	server.use(express.json({ limit: "8mb" }));
 
 	const api = express.Router();
 	// Every verb in the table, for the SDK's three forms (`verbs/router.ts`).

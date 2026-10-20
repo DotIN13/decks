@@ -52,13 +52,15 @@ async function open() {
 }
 
 test("a same-origin page gives no command without credentials, however it names itself", async () => {
-	const { app, page, post, cleanup } = await open();
+	const { app, origin, page, post, cleanup } = await open();
 	try {
 		assert.equal((await post("/api/v1/agent.list", { ...page, "x-decks-person": "1" })).status, 401, "X-Decks-Person alone");
 		assert.equal((await post("/api/v1/now", { ...page, "x-decks-board": "boards%2Fa.html" })).status, 401, "X-Decks-Board alone");
 		assert.equal((await post("/api/v1/now", { ...page, "x-decks-agent": app.agents.focused().id })).status, 401, "an agent's name");
 		assert.equal((await post("/api/relay", page, { id: "abcd", base: "http://x.test", token: "t" })).status, 401, "a route other than the verbs");
 		assert.equal((await post("/c/abcd/api/v1/now", page)).status, 401, "another server passed through this one");
+		const upload = await fetch(`${origin}/api/upload?name=x.txt`, { method: "POST", headers: page, body: "not json" });
+		assert.equal(upload.status, 401, "refused before its body is read");
 		// Without Sec-Fetch-Site, as on a plain http:// address: the Origin alone says it is a browser.
 		const { "sec-fetch-site": _site, ...plain } = page;
 		assert.equal((await post("/api/v1/agent.list", { ...plain, "x-decks-person": "1" })).status, 401, "Origin only");
