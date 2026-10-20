@@ -190,3 +190,24 @@ test("a request addressed to a name that is not this server's is refused before 
 		cleanup();
 	}
 });
+
+test("a page on another site cannot pair with a harness on this machine without a code; this machine's pages, listed ones and the iOS app still can", async () => {
+	const { post, base, cleanup } = await open(false);
+	try {
+		const evil = { origin: "https://evil.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
+		const refused = await post("/pair", { label: "x" }, evil);
+		assert.equal(refused.status, 403, "any site the person opens reaches 127.0.0.1, so it is asked for a code");
+		assert.equal(refused.body.needsCode, true);
+		assert.equal(refused.body.token, undefined);
+		assert.equal(((await (await fetch(`${base}/hello`, { headers: evil })).json()) as { needsCode: boolean }).needsCode, true, "hello tells that page a code is needed");
+		assert.equal((await post("/pair", {}, { origin: "null", "content-type": "application/json" })).status, 403, "a sandboxed page is not trusted either");
+
+		const local = await post("/pair", { label: "Decks at localhost:4329" }, { origin: "http://localhost:4329", "sec-fetch-site": "same-site", "content-type": "application/json" });
+		assert.equal(local.status, 200, "another Decks page on this machine");
+		assert.ok(local.body.token);
+		assert.equal((await post("/pair", { label: "iPad" }, { "content-type": "application/json" })).status, 200, "no Origin: not a web page");
+		assert.equal(await listing("https://evil.test", async () => (await post("/pair", {}, evil)).status), 200, "unless its owner listed it");
+	} finally {
+		cleanup();
+	}
+});

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { Board } from "@decks/protocol";
 import { readZip } from "../../../web/src/connections/zip.ts";
 import { buildBundle } from "./bundle.ts";
-import { fromAnotherSite, fromPrivateNetwork, isPrivateAddress, Pairing, tokenDays, tokenOf } from "./pairing.ts";
+import { fromAnotherSite, fromPrivateNetwork, isPrivateAddress, pairWithoutCode, Pairing, tokenDays, tokenOf } from "./pairing.ts";
 import { zip } from "./zip.ts";
 
 test("a zip written here is read back by the browser's reader, stored and deflated alike", async () => {
@@ -135,4 +135,15 @@ test("a token unused for its idle days stops working, a used one slides on, and 
 	assert.equal(tokenDays({}), 30);
 	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "7" }), 7);
 	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "nonsense" }), 30);
+});
+
+test("pairing without a code: a web page must be on this machine, on the harness's own address or listed; no Origin keeps the private-network rule", () => {
+	assert.ok(!pairWithoutCode("127.0.0.1", { origin: "https://evil.test" }));
+	assert.ok(!pairWithoutCode("127.0.0.1", { origin: "null" }));
+	assert.ok(pairWithoutCode("127.0.0.1", { origin: "http://127.0.0.1:5173" }));
+	assert.ok(pairWithoutCode("100.73.31.55", { origin: "https://mac.tail1.ts.net", host: "mac.tail1.ts.net:8443" }));
+	assert.ok(pairWithoutCode("127.0.0.1", { origin: "https://studio.test" }, { DECKS_STUDIO_ORIGINS: "https://studio.test" }));
+	assert.ok(pairWithoutCode("192.168.1.20", {}), "the iOS app on the home network");
+	assert.ok(!pairWithoutCode("203.0.113.9", {}), "the internet still needs a code");
+	assert.ok(!pairWithoutCode("203.0.113.9", { origin: "http://localhost:4329" }));
 });

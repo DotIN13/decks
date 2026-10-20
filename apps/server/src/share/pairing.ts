@@ -270,6 +270,21 @@ export function studioWithoutCode(remote: string | undefined, headers: Record<st
 	return listed.includes(from.origin);
 }
 
+/**
+ * Whether `POST /api/pair` may hand out a token without a code: only on this machine or a private
+ * network (`fromPrivateNetwork`), and then a web page only if it is one a Studio may be
+ * (`studioWithoutCode`): on loopback, on the address the harness was reached at, or listed in
+ * `DECKS_STUDIO_ORIGINS`. Reaching 127.0.0.1 proves nothing about a page, since any site the person
+ * opens is let reach it by their browser. A call with no `Origin` is not a page (the iOS app, a
+ * script) and keeps the old rule.
+ */
+export function pairWithoutCode(remote: string | undefined, headers: Record<string, string | string[] | undefined>, env: NodeJS.ProcessEnv = process.env): boolean {
+	if (!fromPrivateNetwork(remote, headers)) return false;
+	const origin = headers.origin;
+	if (typeof origin !== "string" || origin === "") return true;
+	return studioWithoutCode(remote, headers, env);
+}
+
 /** Loopback, the private ranges, link-local, and the 100.64/10 block Tailscale's addresses are in; IPv6 alike. */
 export function isPrivateAddress(address: string | undefined): boolean {
 	if (!address) return false;

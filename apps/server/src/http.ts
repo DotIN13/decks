@@ -25,7 +25,7 @@ import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
-import { fromAnotherSite, fromPrivateNetwork, studioWithoutCode, tokenOf } from "./share/pairing.ts";
+import { fromAnotherSite, pairWithoutCode, studioWithoutCode, tokenOf } from "./share/pairing.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "./share/hosts.ts";
 import { Relay } from "./share/relay.ts";
 import { saveStudioLink, studioOrigin } from "./studio/index.ts";
@@ -152,12 +152,13 @@ export function createHttpApp(app: App): Express {
 		const origin = String(req.headers.origin ?? "");
 		const label = typeof body.label === "string" ? body.label : "";
 		// No code from this machine or a private network, unless the owner made it a must; over the internet, only with one.
+		// A web page needs one too, unless it is on this machine, on the harness's own address or listed (`pairWithoutCode`).
 		if (!code && app.pairing.required) {
 			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
 			return;
 		}
-		if (!code && !fromPrivateNetwork(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "This server is reached over the internet, so it needs a pairing code. Run decks pair code in a shell on its machine." });
+		if (!code && !pairWithoutCode(req.socket.remoteAddress, req.headers)) {
+			res.status(403).json({ needsCode: true, error: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine." });
 			return;
 		}
 		const token = code ? app.pairing.redeem(code, origin, label) : app.pairing.grant(origin, label);
@@ -590,7 +591,7 @@ export function createHttpApp(app: App): Express {
 	 */
 	api.get("/hello", (req, res) => {
 		res.setHeader("Cache-Control", "no-store");
-		res.json({ decks: true, name: app.deck.name, paired: app.pairing.check(tokenOf(req.headers, req.originalUrl)), needsCode: app.pairing.required });
+		res.json({ decks: true, name: app.deck.name, paired: app.pairing.check(tokenOf(req.headers, req.originalUrl)), needsCode: app.pairing.required || !pairWithoutCode(req.socket.remoteAddress, req.headers) });
 	});
 
 	api.get("/deck", (_req, res) => {
