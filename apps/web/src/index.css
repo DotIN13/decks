@@ -30,7 +30,7 @@
 @import "./styles/panel.css";
 @import "./styles/forms.css";
 @import "./styles/inspector.css";
-@import "./styles/stream.css";
+@import "../../../packages/canvas/styles/stream.css";
 @import "./styles/dock.css";
 @import "./styles/usage.css";
 @import "../../../packages/canvas/styles/canvas.css";
@@ -39,7 +39,7 @@
 @import "../../../packages/canvas/styles/ink.css";
 @import "./styles/settings.css";
 @import "./styles/marks.css";
-@import "./styles/markdown.css";
+@import "../../../packages/canvas/styles/markdown.css";
 @import "./styles/composer.css";
 @import "./styles/connections.css";
 @import "../../../packages/canvas/styles/properties.css";

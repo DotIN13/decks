@@ -204,6 +204,35 @@ export function createHttpApp(app: App): Express {
 	 * subscriptions it could spend and the one it does. `?limits=1` reads the accounts' 5-hour
 	 * figures again, as this app's picker does on opening; they arrive with the next read.
 	 */
+	/*
+	 * An agent's conversation, for another front end's transcript (Studio): the window a browser is
+	 * given when it opens a chat (`chat.open`), a page before an item (`chat.earlier`), and one tool
+	 * call's whole result (`chat.tool`). What happens next arrives on the event stream as
+	 * `chat.item`, `chat.delta` and `chat.history`.
+	 */
+	api.get("/agents/:id/history", (req, res) => {
+		const agent = app.agents.get(String(req.params.id));
+		if (!agent) {
+			res.status(404).json({ error: "No agent here has that id." });
+			return;
+		}
+		const message = agent.historyMessage() as { items: unknown[]; more?: boolean };
+		res.set("cache-control", "no-store").json({ items: message.items, more: message.more ?? false });
+	});
+	api.get("/agents/:id/earlier", (req, res) => {
+		const agent = app.agents.get(String(req.params.id));
+		if (!agent) {
+			res.status(404).json({ error: "No agent here has that id." });
+			return;
+		}
+		const page = agent.earlier(String(req.query.before ?? ""), Math.min(Math.max(Number(req.query.limit) || 60, 1), 200));
+		res.set("cache-control", "no-store").json({ items: page.items, more: page.more });
+	});
+	api.get("/agents/:id/tool/:item", (req, res) => {
+		const agent = app.agents.get(String(req.params.id));
+		res.set("cache-control", "no-store").json({ result: agent?.toolResult(String(req.params.item)) ?? "" });
+	});
+
 	/** The questions an agent is waiting on, for a front end that arrives after they were asked. */
 	api.get("/agents/:id/dialogs", (req, res) => {
 		const agent = app.agents.get(String(req.params.id));
