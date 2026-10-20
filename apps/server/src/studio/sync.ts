@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { diff, parse, serialize, type PenDocument } from "@decks/pen";
 import WebSocket from "ws";
@@ -228,6 +228,34 @@ export class HarnessSync {
 		const remote = new Map<string, SyncFile>(((await this.call("GET", "/sync/v1/files")).files as SyncFile[]).map((f) => [f.path, f]));
 		const local = this.localFiles();
 		const eager = this.o.eagerBytes ?? 1024 * 1024;
+		/*
+		 * Deleted on one side, from a file both last agreed on (`state.files`): gone from the folder, it
+		 * is deleted in Studio (unless Studio's copy is newer, which then comes back); gone from Studio
+		 * and unchanged here, it is deleted here. Without this a deleted board came straight back.
+		 */
+		for (const [path, known] of Object.entries(this.state.files)) {
+			if (path.startsWith(`${PICTURES}/`)) continue;
+			const there = remote.get(path);
+			if (!local.has(path)) {
+				if (there && there.version !== known.version) continue;
+				if (there) {
+					const gone = await this.call("DELETE", `/sync/v1/files?path=${encodeURIComponent(path)}&base=${known.version}`).catch(() => undefined);
+					if (!gone) continue;
+					remote.delete(path);
+					this.log(`deleted ${path} in Studio`);
+				}
+				delete this.state.files[path];
+				continue;
+			}
+			if (!there) {
+				const full = local.get(path)!;
+				if (sha256(readFileSync(full)) !== known.hash) continue;
+				rmSync(full, { force: true });
+				local.delete(path);
+				delete this.state.files[path];
+				this.log(`deleted ${path}, as in Studio`);
+			}
+		}
 		for (const [path, full] of local) {
 			const bytes = readFileSync(full);
 			const hash = sha256(bytes);
