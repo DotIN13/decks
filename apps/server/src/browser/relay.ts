@@ -19,6 +19,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
+import { hostAllowed } from "../share/hosts.ts";
 
 type Debuggee = { tabId?: number; extensionId?: string; targetId?: string };
 type DebuggerSession = Debuggee & { sessionId?: string };
@@ -298,7 +299,7 @@ export class Relay {
 		});
 		this.wss = new WebSocketServer({ noServer: true });
 		this.http.on("upgrade", (request, socket, head) => {
-			if (request.url !== this.path) {
+			if (request.url !== this.path || !hostAllowed(request.headers.host)) {
 				socket.destroy();
 				return;
 			}

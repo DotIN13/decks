@@ -26,6 +26,7 @@ import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
 import { fromAnotherSite, fromPrivateNetwork, tokenOf } from "./share/pairing.ts";
+import { extraHosts, hostAllowed, hostRefusal } from "./share/hosts.ts";
 import { Relay } from "./share/relay.ts";
 import { saveStudioLink, studioOrigin } from "./studio/index.ts";
 
@@ -79,6 +80,16 @@ const NEEDS_CODE = "This harness asks every other Decks for a pairing code. Run 
 export function createHttpApp(app: App): Express {
 	const server = express();
 	server.disable("x-powered-by");
+	/*
+	 * Before anything else, the name the request was addressed to (`share/hosts.ts`): a page that
+	 * pointed its own name at this server (DNS rebinding) is refused here, ahead of the forwarded
+	 * ports and apps that would otherwise answer it as one of their own.
+	 */
+	const hosts = extraHosts(process.env, app.config.host);
+	server.use((req, res, next) => {
+		if (hostAllowed(req.headers.host, hosts)) return next();
+		res.status(403).type("text").send(hostRefusal(req.headers.host));
+	});
 	/*
 	 * Forwarded ports first (`ports.ts`), before any body is read: the request is somebody
 	 * else's server's, and a JSON parser here would eat the body it is waiting for.

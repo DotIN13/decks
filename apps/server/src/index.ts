@@ -1,4 +1,5 @@
 import { fromAnotherSite, tokenOf } from "./share/pairing.ts";
+import { extraHosts, hostAllowed } from "./share/hosts.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
 import { forwardUpgrade } from "./ports.ts";
@@ -43,7 +44,14 @@ const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${confi
  * forwarded port's own websockets (`ports.ts`). Anything else is not a websocket this
  * server has, and is dropped rather than left hanging.
  */
+const hosts = extraHosts(process.env, config.host);
 httpServer.on("upgrade", (request, socket, head) => {
+	// A socket addressed to a name that is not this server's is a rebinding page, as for requests (`share/hosts.ts`).
+	if (!hostAllowed(request.headers.host, hosts)) {
+		socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+		socket.destroy();
+		return;
+	}
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
 	if (path === "/ws") {
 		// A page on another site gets a socket only with a paired token (`share/pairing.ts`).
