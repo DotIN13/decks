@@ -43,6 +43,15 @@ await decks.canvas.insert({ type: "board", board: app.board }, { at: { x1: 0, y1
   installing or building: ask `decks.apps.status(name)` on your next call. `ok: false` comes with
   the error lines, and `decks.apps.logs(name)` has the rest.
 
+## Every app is its own git repo
+
+`create` makes `apps/<name>/` a git repository on `main` with the starter as its first commit;
+`decks apps repo <name>` does the same for a folder you wrote by hand, and says its branch, last
+commit and changed files. To share an app, push it:
+`git -C apps/<name> remote add origin <url> && git -C apps/<name> push -u origin main`. To take
+one in, `decks apps clone <url>` (https:// or git@host:path) adds it with its board; read its files
+before you run it. Keep secrets in `.env`, which the repo ignores.
+
 ## Rules that are easy to break
 
 - **Use relative addresses.** The app lives under `/app/<name>/`, so write `fetch("api/items")`
