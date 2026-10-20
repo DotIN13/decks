@@ -329,8 +329,8 @@
 	let stageClient;
 
 	/*
-	 * A board's page gives the harness no commands of its own: the harness refuses a browser without
-	 * the person key, which only the Decks page holds. So each verb is asked of the page around this
+	 * A board's page gives the harness no commands of its own: it has no token, and the harness refuses
+	 * a request without one. So each verb is asked of the page around this
 	 * one — the Decks app, or Studio — as `{ decks: "stage.call", id, verb, args }`, and that page
 	 * calls it, naming this board by the frame the message came from, never by what it says. The
 	 * harness asks the person once whether this board may use the stage. The answer comes back as

@@ -1,47 +1,74 @@
 /**
- * The person key: what makes this page the person to the harness (`server/src/share/person-key.ts`).
+ * This tab's person token: what makes this page the person to the harness (`server/src/auth/`).
  *
- * The harness writes it into this page only when a person opened it in a tab, and asks for it on
- * every command from a browser: each request that changes something, and the socket. A board is a
- * page on the same address, so it could otherwise send any command the person could; without the key
- * it can only ask this page, which names it by its frame (`board/stage-call.ts`).
+ * Every request to the harness carries a token, and who is calling is that token alone. The harness
+ * writes a fresh person token into this page only when a person opened it in a tab of its own
+ * (`server/src/auth/issue.ts`); a frame's copy of the page or a script's fetch of it gets none. It
+ * lasts twelve hours unused.
  *
  * Read once, before anything else on the page runs, and the tag taken out of the document straight
- * away, so a script that looks later finds nothing there.
+ * away, so a script that looks later finds nothing there. From then on this page sends it on every
+ * request of its own to the harness, `Authorization: Bearer`, and on its socket (`decks_token`). A
+ * board is a page on the same address but in its own frame, with its own `fetch`: it has no token,
+ * and asks this page, which names it by its frame (`board/stage-call.ts`).
  */
-const tag = typeof document === "undefined" ? null : document.querySelector<HTMLMetaElement>('meta[name="decks-person-key"]');
-const key = tag?.content || undefined;
+const tag = typeof document === "undefined" ? null : document.querySelector<HTMLMetaElement>('meta[name="decks-session"]');
+const token = tag?.content || undefined;
 tag?.remove();
 
-/** The header to send on a command, or nothing on a page the harness did not give a key (a frame, the public Decks). */
-export function keyHeaders(): Record<string, string> {
-	return key ? { "X-Decks-Key": key } : {};
+/** The token itself, for the SDK; nothing on a page the harness did not give one (a frame, the public Decks). */
+export function sessionToken(): string | undefined {
+	return token;
 }
 
-/** The socket's address with the key in it, since a socket cannot carry headers. */
-export function withKey(url: string): string {
-	if (!key) return url;
-	const keyed = new URL(url);
-	keyed.searchParams.set("decks_key", key);
-	return keyed.toString();
+/** The header to send on a request, or nothing on a page with no token. */
+export function authHeaders(): Record<string, string> {
+	return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** The socket's address with the token in it, since a socket cannot carry headers. */
+export function withToken(url: string): string {
+	if (!token) return url;
+	const given = new URL(url);
+	given.searchParams.set("decks_token", token);
+	return given.toString();
 }
 
 /**
- * Whether the harness no longer takes this page's key: it was started again since the page loaded,
- * and made a new one. Only a reload gets the new one, as only a tab the person opened is given it.
+ * Whether the harness no longer takes this page's token: it went unused too long, or was taken back.
+ * Only a reload gets a new one, as only a tab the person opened is given one.
  */
-export async function keyStale(): Promise<boolean> {
-	if (!key) return false;
+export async function sessionStale(): Promise<boolean> {
+	if (!token) return false;
 	try {
-		return (await fetch("/api/person-key", { method: "POST", headers: keyHeaders() })).status === 401;
+		return (await fetch("/api/session", { method: "POST", headers: authHeaders() })).status === 401;
 	} catch {
 		return false;
 	}
 }
 
-/** A digest of the key, for the service worker to check a command against without holding the key itself (`public/sw.js`). */
-export async function keyDigest(): Promise<string | undefined> {
-	if (!key || !crypto.subtle) return undefined;
-	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
+/** A digest of the token, for the service worker to check a request against without holding the token itself (`public/sw.js`). */
+export async function tokenDigest(): Promise<string | undefined> {
+	if (!token || !crypto.subtle) return undefined;
+	const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/**
+ * Every `fetch` this page makes to its own harness carries the token: the API (`/api/…`) and another
+ * server passed through this one (`/c/…`), unless the request already says who it is. A picture or a
+ * frame cannot carry a header; the harness lets those in by what they are until boards and files
+ * move to their own address (`server/src/auth/guard.ts`).
+ */
+function carryToken(): void {
+	if (!token || typeof window === "undefined" || typeof window.fetch !== "function") return;
+	const plain = window.fetch.bind(window);
+	window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+		const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+		if (url.origin !== location.origin || !/^\/(?:api|c)\//.test(url.pathname)) return plain(input, init);
+		const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+		if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+		return plain(input, { ...init, headers });
+	};
+}
+carryToken();

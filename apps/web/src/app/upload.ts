@@ -1,5 +1,5 @@
 import { api } from "../connections/connection.ts";
-import { keyHeaders } from "../lib/person-key.ts";
+import { authHeaders } from "../lib/session.ts";
 import { CONFIRM_UPLOAD_BYTES, MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
 import { ask } from "../state/confirm.ts";
 
@@ -58,8 +58,8 @@ function send(file: File, onProgress?: (fraction: number) => void): Promise<Uplo
 		// The bytes are the body, so the type says only that. What the file *is* is
 		// decided from its name when it is served, never from what the client claimed.
 		request.setRequestHeader("Content-Type", "application/octet-stream");
-		// The person's own page, sending a command (`lib/person-key.ts`).
-		for (const [name, value] of Object.entries(keyHeaders())) request.setRequestHeader(name, value);
+		// The person's own page, sending a command (`lib/session.ts`).
+		for (const [name, value] of Object.entries(authHeaders())) request.setRequestHeader(name, value);
 		request.upload.addEventListener("progress", (event) => {
 			if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total);
 		});

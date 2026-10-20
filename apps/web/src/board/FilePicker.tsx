@@ -1,5 +1,5 @@
 import { api } from "../connections/connection.ts";
-import { keyHeaders } from "../lib/person-key.ts";
+import { authHeaders } from "../lib/session.ts";
 import type { LucideIcon } from "lucide-solid";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import ChevronRight from "lucide-solid/icons/chevron-right";
@@ -134,7 +134,7 @@ export function FilePicker(props: {
 	const [said, setSaid] = createSignal("");
 	const signIn = () => window.open(`${api("/google/signin")}?origin=${encodeURIComponent(location.origin)}`, "_blank", "noopener");
 	const finish = async () => {
-		const answer = (await (await fetch(api("/google/code"), { method: "POST", headers: { ...keyHeaders(), "content-type": "application/json" }, body: JSON.stringify({ url: returned().trim() }) })).json()) as { ok: boolean; email?: string; message?: string };
+		const answer = (await (await fetch(api("/google/code"), { method: "POST", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ url: returned().trim() }) })).json()) as { ok: boolean; email?: string; message?: string };
 		setSaid(answer.ok ? `Signed in as ${answer.email}.` : (answer.message ?? "That did not work."));
 		if (answer.ok) void recheck();
 	};

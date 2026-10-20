@@ -1,12 +1,13 @@
 import { connect, DecksError, type Decks } from "@decks/sdk";
 import { apiBase } from "../connections/connection.ts";
-import { keyHeaders } from "../lib/person-key.ts";
+import { authHeaders } from "../lib/session.ts";
 import { notice } from "./notices.ts";
 import { send } from "./socket.ts";
 
 /**
  * The person's clicks on the canvas, as verbs: the same `POST /api/v1/<verb>` an agent's `decks`
- * command and an app's SDK call (`packages/sdk`), sent as the person (`X-Decks-Person`).
+ * command and an app's SDK call (`packages/sdk`), sent with this tab's person token (`lib/session.ts`),
+ * which is what makes them the person's. The canvas and the agent they act on go as parameters.
  *
  * Whose stage a click acts on is read when it is sent: the canvas on screen and the conversation
  * the person is in, which App names once (`setPersonStage`). Through the relay to another server
@@ -32,7 +33,7 @@ let clientBase: string | undefined;
 function decks(): Decks {
 	const base = `${location.origin}${apiBase().replace(/\/api$/, "")}`;
 	if (!client || clientBase !== base) {
-		client = connect({ url: base, person: true, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: keyHeaders() });
+		client = connect({ url: base, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: authHeaders() });
 		clientBase = base;
 	}
 	return client;
@@ -42,7 +43,7 @@ function decks(): Decks {
 export async function act<T = unknown>(verb: string, args: unknown[], agent?: string): Promise<T | undefined> {
 	try {
 		// A click about one conversation (moving it to a stage) names it and no canvas: the agent wins.
-		const connection = agent ? connect({ url: decks().address, person: true, agent, notes: () => {}, headers: keyHeaders() }) : decks();
+		const connection = agent ? connect({ url: decks().address, agent, notes: () => {}, headers: authHeaders() }) : decks();
 		return (await connection.call(verb, args)).value as T;
 	} catch (error) {
 		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));

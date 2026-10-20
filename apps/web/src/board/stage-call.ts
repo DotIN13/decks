@@ -1,13 +1,13 @@
 import { api } from "../connections/connection.ts";
-import { keyHeaders } from "../lib/person-key.ts";
+import { authHeaders } from "../lib/session.ts";
 import { stageOnScreen } from "../state/decks.ts";
 
 /**
  * A board's button calling a verb, passed on by this page (`lib/board.js`, `boardStage`).
  *
- * A board's page cannot give the harness commands itself: it has no person key, and the harness
- * refuses a browser without one (`server/src/share/person-key.ts`). So its code posts each call up
- * here as `{ decks: "stage.call", id, verb, args }`, and this page makes it, with its key and the
+ * A board's page cannot give the harness commands itself: it has no token, and the harness refuses
+ * a request without one (`server/src/auth/guard.ts`). So its code posts each call up here as
+ * `{ decks: "stage.call", id, verb, args }`, and this page makes it, with its token and the
  * board named by **the frame the message came from** — never by anything in the message, which the
  * board wrote. The harness then asks the person once whether that board may use the stage, as it
  * always did for a board's button. The answer goes back down as `{ decks: "stage.answer", id,
@@ -39,7 +39,7 @@ async function call(path: string, verb: string, args: unknown[]): Promise<{ stat
 	try {
 		const response = await fetch(api(`/v1/${verb}`), {
 			method: "POST",
-			headers: { ...keyHeaders(), "Content-Type": "application/json", "X-Decks-Board": encodeURIComponent(path), ...(stage ? { "X-Decks-Stage": stage } : {}) },
+			headers: { ...authHeaders(), "Content-Type": "application/json", "X-Decks-Board": encodeURIComponent(path), ...(stage ? { "X-Decks-Stage": stage } : {}) },
 			body: JSON.stringify({ args }),
 		});
 		const answer = await response.json().catch(() => ({ ok: false, error: `Decks answered ${response.status} without a result`, notes: [] }));

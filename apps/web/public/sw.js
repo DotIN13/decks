@@ -25,9 +25,10 @@ const KEY_KEY = "/__decks/key";
 let table;
 const manifests = new Map();
 /**
- * The digest of the person key of the Decks page that told this worker its connections. A command
- * passed to another server (anything but a read) must carry that key, as it must to this one
- * (`server/src/share/person-key.ts`): a board on this address asks its page, and cannot send one.
+ * The digest of the person token of the Decks page that told this worker its connections. A command
+ * passed to another server (anything but a read) must carry that token, as it must to this one
+ * (`server/src/auth/guard.ts`): a board on this address asks its page, and cannot send one. The token
+ * stays here; the connection's own goes on.
  */
 let keyDigest;
 
@@ -104,12 +105,13 @@ async function digestOf(text) {
 
 async function fromServer(entry, rest, request) {
 	if (request.method !== "GET" && request.method !== "HEAD") {
-		const given = request.headers.get("X-Decks-Key");
+		const auth = request.headers.get("Authorization") ?? "";
+		const given = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
 		if (!given || !keyDigest || (await digestOf(given)) !== keyDigest) return plain(401, "This page cannot give Decks commands. A board asks the page it is on, which asks the person.");
 	}
 	const headers = new Headers();
-	// And who on the page is asking: the person, or a board the page names by its frame. Never the key.
-	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Board", "X-Decks-Stage", "X-Decks-Person", "X-Decks-Agent"]) {
+	// And what the page is acting on: the canvas, the agent, a board it names by its frame. Never its token.
+	for (const name of ["Accept", "Content-Type", "Range", "X-Decks-Board", "X-Decks-Stage", "X-Decks-Agent"]) {
 		const value = request.headers.get(name);
 		if (value) headers.set(name, value);
 	}

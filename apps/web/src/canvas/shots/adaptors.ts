@@ -1,5 +1,5 @@
 import { api } from "../../connections/connection.ts";
-import { keyHeaders } from "../../lib/person-key.ts";
+import { authHeaders } from "../../lib/session.ts";
 import type { Board } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { thumbUrl } from "../../lib/api.ts";
@@ -111,7 +111,7 @@ export async function takeSnapshot(frame: HTMLIFrameElement, board: Board): Prom
 	const html = snapshotOf(doc);
 	const scheme = document.documentElement.dataset.colorScheme === "dark" ? "dark" : "light";
 	const query = new URLSearchParams({ path: board.path, w: String(board.w), h: String(heightOf(doc, board)), scheme });
-	const answer = await fetch(api(`/snapshot?${query}`), { method: "POST", headers: { ...keyHeaders(), "Content-Type": "text/html" }, body: html });
+	const answer = await fetch(api(`/snapshot?${query}`), { method: "POST", headers: { ...authHeaders(), "Content-Type": "text/html" }, body: html });
 	return answer.ok ? await answer.blob() : undefined;
 }
 

@@ -59,26 +59,27 @@ const LOOPBACK = WEB_HOST === "127.0.0.1" || WEB_HOST === "localhost" || WEB_HOS
 const ALLOWED_HOSTS = named.length > 0 ? named : LOOPBACK ? undefined : [".ts.net"];
 
 /**
- * The person key in the Decks page, as the server writes it (`server/src/share/person-key.ts`): only
- * into a page a person opened in a tab, never into a frame or a script's fetch, never stored, and
- * alone in its window group. Asked of the server from here, a program on its machine, for each such
- * page, so a server started again since is a reload away.
+ * The tab's person token in the Decks page, as the server writes it (`server/src/auth/issue.ts`):
+ * only into a page a person opened in a tab, never into a frame or a script's fetch, never stored,
+ * and alone in its window group. The development server serves the page in place of the harness, so
+ * for each such page it loads the harness's own page as that tab would, and passes its token on.
  */
-function personKey(): Plugin {
+function tabSession(): Plugin {
 	return {
-		name: "decks-person-key",
+		name: "decks-tab-session",
 		configureServer(server) {
 			server.middlewares.use(async (req, res, next) => {
 				const path = (req.url ?? "/").split("?")[0] ?? "/";
 				const page = path === "/" || path === "/index.html" || !/^\/(?:api|c|ws|app|node|rnode|@|src|node_modules)(?:\/|$)|\.[a-z0-9]+$/i.test(path);
 				if (req.method !== "GET" || !page || req.headers["sec-fetch-dest"] !== "document" || req.headers["sec-fetch-mode"] !== "navigate") return next();
 				try {
-					const { key } = (await (await fetch(`http://127.0.0.1:${API_PORT}/api/person-key`)).json()) as { key?: string };
+					const served = await (await fetch(`http://127.0.0.1:${API_PORT}/`, { headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" } })).text();
+					const token = /<meta name="decks-session" content="([^"]+)">/.exec(served)?.[1];
 					const html = await server.transformIndexHtml(req.url ?? "/", readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8"));
 					res.setHeader("Content-Type", "text/html; charset=utf-8");
 					res.setHeader("Cache-Control", "no-store");
 					res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-					res.end(key ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="decks-person-key" content="${key}">`) : html);
+					res.end(token ? html.replace(/<head([^>]*)>/i, `<head$1><meta name="decks-session" content="${token}">`) : html);
 				} catch (error) {
 					next(error);
 				}
@@ -88,7 +89,7 @@ function personKey(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [solid(), tailwind(), personKey()],
+	plugins: [solid(), tailwind(), tabSession()],
 	server: {
 		host: WEB_HOST,
 		port: WEB_PORT,

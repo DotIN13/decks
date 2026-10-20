@@ -1,5 +1,5 @@
 import { active, connections, elsewhere, PUBLIC, type Connection } from "./connection.ts";
-import { keyDigest, keyHeaders } from "../lib/person-key.ts";
+import { tokenDigest, authHeaders } from "../lib/session.ts";
 
 /**
  * The service worker that serves every backend but this one (`public/sw.js`), and what it knows.
@@ -11,7 +11,7 @@ import { keyDigest, keyHeaders } from "../lib/person-key.ts";
  */
 const TABLE_CACHE = "decks-connections";
 const TABLE_KEY = "/__decks/connections";
-/** Where the digest of this page's person key is kept for a restarted worker (`lib/person-key.ts`). */
+/** Where the digest of this page's person token is kept for a restarted worker (`lib/session.ts`). */
 const KEY_KEY = "/__decks/key";
 
 export function available(): boolean {
@@ -29,8 +29,8 @@ function table(): unknown[] {
 export async function tellWorker(): Promise<void> {
 	if (!available()) return;
 	const list = table();
-	// Only a digest: the worker checks a command's key against it, and a page that reads the cache learns nothing.
-	const key = await keyDigest();
+	// Only a digest: the worker checks a command's token against it, and a page that reads the cache learns nothing.
+	const key = await tokenDigest();
 	const cache = await caches.open(TABLE_CACHE);
 	await cache.put(TABLE_KEY, new Response(JSON.stringify(list), { headers: { "Content-Type": "application/json" } }));
 	if (key) await cache.put(KEY_KEY, new Response(key, { headers: { "Content-Type": "text/plain" } }));
@@ -75,7 +75,7 @@ export async function reach(one: Connection): Promise<void> {
 	// No worker and nothing to relay through: `ensureWorker` says why, in a sentence.
 	else if (one.kind === "bundle" || PUBLIC) await ensureWorker();
 	else {
-		const response = await fetch("/api/relay", { method: "POST", headers: { ...keyHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ id: one.id, base: one.base, token: one.token }) });
+		const response = await fetch("/api/relay", { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ id: one.id, base: one.base, token: one.token }) });
 		if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? `This server would not relay that one (${response.status}).`);
 	}
 	ready.add(one.id);
