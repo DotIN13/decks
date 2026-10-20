@@ -250,6 +250,8 @@ export function Stage(props: {
 	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
+	/** The host's own menu for what a pill is on: a board by its path, or drawn items by their ids. */
+	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteBoard?: (path: string) => void;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
@@ -2977,6 +2979,7 @@ export function Stage(props: {
 						{...(props.onPresent ? { onPresent: () => props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0) } : {})}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 						{...(props.onDeleteBoard ? { onDelete: () => props.onDeleteBoard?.(board.path) } : {})}
+						{...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ path: board.path }, anchor) } : {})}
 						{...(props.onComment
 							? {
 									onComment: () =>
@@ -3021,6 +3024,7 @@ export function Stage(props: {
 									onDuplicate: () => penDuplicate(),
 									onProperties: () => (props.onProperties ? props.onProperties() : setPenSheet(true)),
 									onDelete: () => penDeleteSelected(),
+									...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: items().ids }, anchor) } : {}),
 								}
 							: {})}
 					/>

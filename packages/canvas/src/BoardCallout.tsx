@@ -13,6 +13,7 @@ import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import Maximize from "lucide-solid/icons/maximize-2";
 import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
+import Ellipsis from "lucide-solid/icons/ellipsis";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
@@ -46,6 +47,8 @@ export function BoardCallout(props: {
 	onDuplicate?: () => void;
 	onProperties?: () => void;
 	onDelete?: () => void;
+	/** The host's own menu for what the pill is on, opened under this button (its box on screen). */
+	onMore?: (anchor: DOMRect) => void;
 	/** Out of sight while something moves. */
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
@@ -141,6 +144,11 @@ export function BoardCallout(props: {
 			<Show when={props.onProperties}>
 				<button type="button" role="menuitem" class="icon-button" aria-label="Properties" title="Properties" onClick={() => props.onProperties?.()}>
 					<Icon of={SlidersHorizontal} size={16} />
+				</button>
+			</Show>
+			<Show when={props.onMore}>
+				<button type="button" role="menuitem" class="icon-button" aria-label="More" title="More" onClick={(e) => props.onMore?.(e.currentTarget.getBoundingClientRect())}>
+					<Icon of={Ellipsis} size={16} />
 				</button>
 			</Show>
 			<Show when={props.onDelete}>

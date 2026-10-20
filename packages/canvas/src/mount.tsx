@@ -71,6 +71,8 @@ export interface CanvasOptions {
 	 * likes) and says whether it did; the board then leaves the drawing. Absent: no Delete on the pill.
 	 */
 	onDeleteBoard?: (path: string) => boolean | void | Promise<boolean | void>;
+	/** The host's own menu on the pill (its ⋯): for a board by its path, or for drawn items by their ids. Absent: no ⋯. */
+	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
 	onProperties?: () => void;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
@@ -194,7 +196,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 					: {}),
 			}
 		: {};
-	const commenting = options.onComment ? { onComment: options.onComment } : {};
+	const commenting = { ...(options.onComment ? { onComment: options.onComment } : {}), ...(options.onPillMore ? { onPillMore: options.onPillMore } : {}) };
 
 	const tools = createRoot((done) => {
 		createEffect(on(penTool, (tool) => options.onTool?.(tool), { defer: true }));
