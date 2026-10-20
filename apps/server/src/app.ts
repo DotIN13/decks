@@ -20,6 +20,7 @@ import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { codeRequired, Pairing, tokenDays } from "./share/pairing.ts";
+import { PersonKey } from "./share/person-key.ts";
 import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -105,6 +106,8 @@ export class App {
 	readonly settings: SettingsStore;
 	/** Other Decks front ends allowed to use this server (`share/pairing.ts`). */
 	readonly pairing: Pairing;
+	/** The secret only the person's own Decks page holds, made new each start (`share/person-key.ts`). */
+	readonly personKey = new PersonKey();
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `decks.board.url()` answers like an agent's. */

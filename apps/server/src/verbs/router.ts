@@ -4,6 +4,7 @@ import type { App } from "../app.ts";
 import type { DeckAgent } from "../agents/session.ts";
 import { callerTool, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../share/pairing.ts";
+import { credentialsOf } from "../share/person-key.ts";
 import { personAgent } from "./person.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
@@ -17,13 +18,14 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * `GET /api/v1` lists the verbs, which is what `decks --help` prints, and `GET /api/v1/events`
  * streams every change as it is broadcast.
  *
- * Who is calling is said, not proven, for now: `X-Decks-Agent` names an agent by id or name (the
+ * Who is calling is said: `X-Decks-Agent` names an agent by id or name (the
  * `decks` command sends `DECKS_AGENT`, which Decks puts in each agent's shell), `X-Decks-Session` an
  * opencode session, whose agent the bridge knows, `X-Decks-Person` the person in the browser (with
  * `X-Decks-Stage` and `X-Decks-Agent` saying whose stage), `X-Decks-Board` a board's button (with
  * `X-Decks-Stage`, the canvas it was pressed on), and `X-Decks-App`
- * names an app, which acts for the conversation on screen once the person has let it. Requests
- * from another site still need the pairing token (`http.ts`), as every `/api` route does.
+ * names an app, which acts for the conversation on screen once the person has let it. The person and
+ * a board are believed only of the Decks page holding the person key, a front end with a pairing
+ * token, or a program on this machine; a board's own page asks the page around it, which names it.
  */
 
 /** The answer to one call, as the SDK reads it. */
@@ -109,6 +111,15 @@ async function callerOf(app: App, req: Request, body: { agent?: unknown; app?: u
 	};
 	const appName = header("x-decks-app") ?? (typeof body.app === "string" ? body.app : undefined);
 	if (appName) return appCaller(app, appName, allowedOnce);
+	/*
+	 * Saying "the person" or "this board" is believed only of a caller that could be either: the Decks
+	 * page with its person key, a front end with a pairing token (Studio, another Decks), or a program
+	 * on this machine (`share/person-key.ts`). A board asks its page, and the page names it.
+	 */
+	const trusted = credentialsOf(req, app.personKey, app.pairing) !== undefined;
+	if ((header("x-decks-person") || header("x-decks-board")) && !trusted) {
+		return { status: 401, error: "Only the Decks page, a paired front end or a program on the harness's machine may call as the person or name a board. A board asks the page it is on." };
+	}
 	// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
 	if (header("x-decks-person")) {
 		const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(header("x-decks-stage") ? { stage: header("x-decks-stage")! } : {}), ...(header("x-decks-agent") ? { agent: header("x-decks-agent")! } : {}) });

@@ -25,7 +25,8 @@ import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
-import { fromAnotherSite, originOf, pairWithoutCode, studioWithoutCode, tokenOf } from "./share/pairing.ts";
+import { fromAnotherSite, fromThisMachine, originOf, pairWithoutCode, studioWithoutCode, tokenOf } from "./share/pairing.ts";
+import { commandAllowed, fromBrowser, isTopNavigation, NO_COMMANDS, withPersonKey } from "./share/person-key.ts";
 import { decodedPath, MAX_TICKETS, TICKET_MS, ticketOf, ticketPath, Tickets } from "./share/tickets.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "./share/hosts.ts";
 import { Relay } from "./share/relay.ts";
@@ -134,7 +135,7 @@ export function createHttpApp(app: App): Express {
 		if (origin) {
 			res.setHeader("Vary", "Origin");
 			res.setHeader("Access-Control-Allow-Origin", origin);
-			res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage");
+			res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Board, X-Decks-Person, X-Decks-Stage");
 			res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 			res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 			if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
@@ -159,6 +160,20 @@ export function createHttpApp(app: App): Express {
 			return;
 		}
 		res.status(401).type("text").send(verdict === "elsewhere" ? ELSEWHERE : "This Decks has not been paired with that server. Make a pairing code with decks pair code on its machine.");
+	});
+
+	/*
+	 * Commands from a browser, from any site including this one (`share/person-key.ts`): only with the
+	 * person key, which only the Decks page a person opened holds, or a pairing token. A board's page is
+	 * on this server's own address, so being same-origin says nothing about who is asking; a board asks
+	 * the page around it, which names the board by its frame. Programs on this machine go on as before.
+	 */
+	server.use((req, res, next) => {
+		if (commandAllowed(req, app.personKey, app.pairing)) {
+			next();
+			return;
+		}
+		res.status(401).type("text").send(NO_COMMANDS);
 	});
 
 	const api = express.Router();
@@ -1295,11 +1310,35 @@ export function createHttpApp(app: App): Express {
 		const name = appOf(req, res);
 		if (name) res.set("cache-control", "no-store").json({ lines: app.apps.log(name, Number(req.query.tail) || 200) });
 	});
-	api.post("/apps/:name/seen", (req, res) => {
+	/*
+	 * An app's board saying it is on screen, which keeps a server app awake. A read as well as a post:
+	 * a board's page gives no commands (`share/person-key.ts`), and a heartbeat is no more than the
+	 * request from its frame that would wake the app anyway.
+	 */
+	const seen = (req: Request, res: Response) => {
 		const name = appOf(req, res);
 		if (!name) return;
 		app.apps.seen(name);
-		res.json({ ok: true });
+		res.set("cache-control", "no-store").json({ ok: true });
+	};
+	api.get("/apps/:name/seen", seen);
+	api.post("/apps/:name/seen", seen);
+
+	/**
+	 * The person key, for the development server (Vite), which serves the Decks page in place of this
+	 * server and writes the key into it as `shell` does. Only for a program on this machine: such a
+	 * program may act as the person anyway (`verbs/router.ts`), and a browser never gets it here.
+	 */
+	// Whether the key a page holds is still this harness's: the guard above answers 401 when it is not.
+	api.post("/person-key", (_req, res) => {
+		res.set("cache-control", "no-store").json({ ok: true });
+	});
+	api.get("/person-key", (req, res) => {
+		if (fromBrowser(req.headers) || !fromThisMachine(req.socket.remoteAddress, req.headers)) {
+			res.status(403).type("text").send("The person key is only in the Decks page a person opens.");
+			return;
+		}
+		res.set("cache-control", "no-store").json({ key: app.personKey.value });
 	});
 	/**
 	 * Stage code run by an app (`stage/caller-run.ts`): the same `stage` an agent has, acting for the
@@ -1336,7 +1375,21 @@ export function createHttpApp(app: App): Express {
 	// The built UI, when there is one. In development Vite serves it instead and
 	// proxies here, so a missing dist is normal rather than an error.
 	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
+	/**
+	 * The Decks page itself, with the person key in it for a tab the person opened (`share/person-key.ts`):
+	 * a frame or a script's fetch of the same page gets it without. Never stored, so a later fetch
+	 * cannot be answered from a cache with the key in it; and alone in its browsing context group
+	 * (`Cross-Origin-Opener-Policy`), so a page that opened it in a new window cannot reach into it.
+	 */
+	const shell = async (req: Request, res: Response) => {
+		const html = await readFile(join(webDist, "index.html"), "utf8");
+		res.setHeader("Cache-Control", "no-store");
+		res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+		res.setHeader("Vary", "Sec-Fetch-Dest, Sec-Fetch-Mode");
+		res.type("html").send(isTopNavigation(req.headers) ? withPersonKey(html, app.personKey.value) : html);
+	};
 	if (existsSync(webDist)) {
+		server.get(["/", "/index.html"], (req, res, next) => void shell(req, res).catch(next));
 		// Compressed and cached by name first (`static.ts`); anything it passes on is sent plain,
 		// with the same cache rule.
 		server.use(compressedStatic(webDist));
@@ -1345,10 +1398,7 @@ export function createHttpApp(app: App): Express {
 				setHeaders: (res, file) => res.setHeader("Cache-Control", cacheControlFor(file.slice(webDist.length).split(sep).join("/"))),
 			}),
 		);
-		server.get("*any", (_req, res) => {
-			res.setHeader("Cache-Control", "no-cache");
-			res.sendFile(join(webDist, "index.html"));
-		});
+		server.get("*any", (req, res, next) => void shell(req, res).catch(next));
 	}
 
 	// One error handler, because a refusal should read the same wherever it came

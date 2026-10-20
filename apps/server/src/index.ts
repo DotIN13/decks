@@ -1,4 +1,4 @@
-import { fromAnotherSite } from "./share/pairing.ts";
+import { credentialsOf, fromBrowser } from "./share/person-key.ts";
 import { extraHosts, hostAllowed } from "./share/hosts.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
@@ -55,8 +55,12 @@ httpServer.on("upgrade", (request, socket, head) => {
 	}
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
 	if (path === "/ws") {
-		// A page on another site gets a socket only with a paired token (`share/pairing.ts`).
-		if (fromAnotherSite(request.headers) && !app.pairing.admits(request.headers, request.url)) {
+		/*
+		 * The socket runs commands, so a browser gets it only with credentials, from this site as from
+		 * any other: the person key the Decks page holds, or a paired token (`share/person-key.ts`).
+		 * A program on this machine opens it as before.
+		 */
+		if (fromBrowser(request.headers) && !credentialsOf(request, app.personKey, app.pairing)) {
 			socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
 			socket.destroy();
 			return;

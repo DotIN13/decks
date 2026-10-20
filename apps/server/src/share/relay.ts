@@ -70,7 +70,8 @@ export class Relay {
 		}
 		const rest = req.originalUrl.slice(`/c/${id}`.length) || "/";
 		const headers: Record<string, string> = { Authorization: `Bearer ${target.token}` };
-		for (const name of ["accept", "content-type", "range"]) {
+		// And who on the page is asking: the person, or a board the page names by its frame (`share/person-key.ts`).
+		for (const name of ["accept", "content-type", "range", "x-decks-board", "x-decks-stage", "x-decks-person", "x-decks-agent"]) {
 			const value = req.headers[name];
 			if (typeof value === "string") headers[name] = value;
 		}
