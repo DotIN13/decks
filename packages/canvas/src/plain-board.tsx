@@ -10,6 +10,18 @@ const EDGE_IN_PX = COARSE ? 6 : 4;
 /** Fingers reported from a board's page get ids of their own, clear of the stage's (as `board.js` gives an embed's). */
 let nextFinger = 800001;
 
+/** A page's address without its ticket (`decks_ticket`), to tell a new ticket from a new page. */
+function withoutTicket(address: string): string {
+	if (!address.includes("decks_ticket=")) return address;
+	try {
+		const url = new URL(address, location.href);
+		url.searchParams.delete("decks_ticket");
+		return url.toString();
+	} catch {
+		return address;
+	}
+}
+
 /**
  * A board as a host with no board editor draws it: its page in a frame while the stage lets it
  * have one, and nothing otherwise, since the stage's sheet draws every board without a page as
@@ -49,6 +61,18 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 	};
 	const zoom = () => props.camera.zoom;
 	const live = () => props.mounted && props.page !== undefined;
+	/*
+	 * The address the frame keeps while it is up. A host that admits each page by a short-lived ticket
+	 * in its address (`decks_ticket`, Studio's) hands a new address every few minutes for the same
+	 * page; a loaded page needs no fresh ticket, and giving the frame the new address would reload it.
+	 * So an address that differs only in its ticket keeps the one the frame was first given, until the
+	 * frame goes and is made again, which then takes the address of the moment.
+	 */
+	const src = createMemo<string | undefined>((given) => {
+		if (!live()) return undefined;
+		const next = props.page;
+		return given !== undefined && next !== undefined && withoutTicket(given) === withoutTicket(next) ? given : next;
+	});
 	/*
 	 * Below the live zoom a board is a tile to pan across and to pick up by its body, selected or not.
 	 * `BoardFrame` makes the selected one live at any zoom, and there the drag that selects a tile
@@ -239,7 +263,7 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined 
 							frame = element;
 						}}
 						class="plain-board-page"
-						src={props.page}
+						src={src()}
 						onLoad={() => say(live())}
 						data-wired={wired() ? "" : undefined}
 						title={props.board.title}
