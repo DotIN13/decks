@@ -329,7 +329,17 @@ export interface Verbs {
 		 * A new app folder from a starter ("static" default, "node", "solid", "react", "next"), with its
 		 * board.
 		 */
-		create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }>;
+		create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; repo?: { branch: string; head: string }; next: string }>;
+		/**
+		 * Its git repository, made now with everything committed if the folder is not one yet: branch, last
+		 * commit, changed files, origin.
+		 */
+		repo(name: string): Promise<{ branch: string; head: string; dirty?: number; remote?: string }>;
+		/**
+		 * Take in an app from an https:// or git@host:path address, with its board. Nothing is installed or
+		 * run.
+		 */
+		clone(url: string, options?: { name?: string; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; board: string; url: string; repo: { branch: string; head: string; remote?: string }; next: string }>;
 		/** The board for an app whose folder you wrote yourself. */
 		board(name: string): Promise<string>;
 		/** Build it, waiting up to 15 s; `pending` means ask its status later. */

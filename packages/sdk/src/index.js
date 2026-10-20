@@ -77,6 +77,8 @@ export const VERBS = [
 	["apps.list",[]],
 	["apps.status",["name"]],
 	["apps.create",["name","options?"]],
+	["apps.repo",["name"]],
+	["apps.clone",["url","options?"]],
 	["apps.board",["name"]],
 	["apps.build",["name"]],
 	["apps.run",["name"]],

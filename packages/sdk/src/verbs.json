@@ -2542,7 +2542,7 @@
   "effect": "change",
   "summary": "A new app folder from a starter (\"static\" default, \"node\", \"solid\", \"react\", \"next\"), with its board.",
   "signature": "apps.create(name: string, options?: { starter?: \"static\" | \"node\" | \"solid\" | \"react\" | \"next\"; title?: string })",
-  "returns": "{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }",
+  "returns": "{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; repo?: { branch: string; head: string }; next: string }",
   "params": [
    {
     "name": "name",
@@ -2566,6 +2566,67 @@
         "react",
         "next"
        ]
+      },
+      "title": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.repo",
+  "command": [
+   "apps",
+   "repo"
+  ],
+  "group": "apps",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Its git repository, made now with everything committed if the folder is not one yet: branch, last commit, changed files, origin.",
+  "signature": "apps.repo(name: string)",
+  "returns": "{ branch: string; head: string; dirty?: number; remote?: string }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
+  "name": "apps.clone",
+  "command": [
+   "apps",
+   "clone"
+  ],
+  "group": "apps",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Take in an app from an https:// or git@host:path address, with its board. Nothing is installed or run.",
+  "signature": "apps.clone(url: string, options?: { name?: string; title?: string })",
+  "returns": "{ name: string; kind: AppKind; folder: string; board: string; url: string; repo: { branch: string; head: string; remote?: string }; next: string }",
+  "params": [
+   {
+    "name": "url",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ name?: string; title?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string"
       },
       "title": {
        "type": "string"

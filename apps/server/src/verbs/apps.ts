@@ -1,6 +1,17 @@
+import { existsSync, rmSync } from "node:fs";
+import { cloneRepo, initRepo, isRepo, nameFromUrl, repoState, type RepoState } from "../apps/repo.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
+import type { AppKind } from "../apps/service.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
+
+/** What to do with a new app before its board is worth showing, by its kind. */
+function nextSteps(name: string, kind: AppKind, board: string, first = "Edit the files"): string {
+	const insert = `decks apps check ${name} and decks canvas insert '{"type":"board","board":"${board}"}'`;
+	if (kind === "static") return `${first}, then ${insert}.`;
+	if (kind === "build") return `${first}, decks apps build ${name}, then ${insert}.`;
+	return `${first}, decks apps run ${name}, then ${insert}.`;
+}
 
 /** Apps: folders in the deck's apps/ that Decks serves, builds or runs. */
 export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
@@ -49,6 +60,15 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					if (!STARTERS.includes(starter)) throw new Error(`Unknown starter ${JSON.stringify(options?.starter)}; one of ${STARTERS.join(", ")}.`);
 					const title = options?.title?.trim() || text;
 					const files = writeStarter(folder, starter, title);
+					// Its own repository from the start, so it can be pushed and shared; an app without one still works.
+					let repo: { branch: string; head: string } | undefined;
+					let unkept = "";
+					try {
+						const made = await initRepo(folder, `Start ${title} from the ${starter} starter`);
+						repo = { branch: made.branch, head: made.head };
+					} catch (error) {
+						unkept = ` Its git repository was not made (${(error as Error).message}); decks apps repo ${text} tries again.`;
+					}
 					const board = service.appBoard(text, title);
 					return {
 						name: text,
@@ -57,7 +77,55 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 						files,
 						board,
 						url: `/app/${text}/`,
-						next: STARTER_KIND[starter] === "static" ? `Edit the files, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.` : STARTER_KIND[starter] === "build" ? `Edit the files, decks apps build ${text}, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.` : `Edit the files, decks apps run ${text}, then decks apps check ${text} and decks canvas insert '{"type":"board","board":"${board}"}'.`,
+						...(repo ? { repo } : {}),
+						next: nextSteps(text, STARTER_KIND[starter], board) + unkept,
+					};
+				},
+				/**
+				 * The app's git repository: made now, with everything in it committed, if the folder is not
+				 * one yet. Reading one that exists is anyone's; making one is an agent's or the person's.
+				 */
+				repo: async (name: string): Promise<RepoState> => {
+					const text = known(name);
+					const folder = service_().folder(text);
+					if (!isRepo(folder)) {
+						if (agent.board) throw new Error(`A board's own code cannot put an app in git; ask an agent.`);
+						if (isolated()) notWhileIsolated("apps (put in git)");
+						await initRepo(folder, `Keep ${text} in git`);
+					}
+					return repoState(folder);
+				},
+				/** An app taken in from a git address, with its board. Nothing is installed or run. */
+				clone: async (url: string, options?: { name?: string; title?: string }) => {
+					agentOnly("clone");
+					const apps = service_();
+					const address = String(url ?? "").trim();
+					const text = options?.name?.trim() || nameFromUrl(address);
+					if (!text) throw new Error(`No app name can be made from ${JSON.stringify(address)}; give one with --name.`);
+					const folder = apps.folder(text);
+					if (existsSync(folder)) throw new Error(`apps/${text} already exists; pick another name with --name.`);
+					const cloned = await cloneRepo(address, folder);
+					if (!apps.exists(text)) {
+						rmSync(folder, { recursive: true, force: true });
+						throw new Error(`${address} has no app.json at its top, so it is not a Decks app; nothing was kept.`);
+					}
+					let manifest;
+					try {
+						manifest = apps.manifest(text);
+					} catch (error) {
+						rmSync(folder, { recursive: true, force: true });
+						throw error;
+					}
+					const title = options?.title?.trim() || manifest.title || text;
+					const board = service.appBoard(text, title);
+					return {
+						name: text,
+						kind: manifest.kind,
+						folder: `apps/${text}`,
+						board,
+						url: `/app/${text}/`,
+						repo: { branch: cloned.branch, head: cloned.head, ...(cloned.remote ? { remote: cloned.remote } : {}) },
+						next: nextSteps(text, manifest.kind, board, "Read its files first, since it is someone else's code"),
 					};
 				},
 				/** The board for an app whose folder was written by hand. */

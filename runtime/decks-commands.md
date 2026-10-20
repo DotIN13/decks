@@ -79,7 +79,9 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 
 - `decks apps list` · `decks.apps.list(): AppState[]`. Every app in the deck's apps/ folder, with its state.
 - `decks apps status` · `decks.apps.status(name: string): AppState`. One app's state.
-- `decks apps create` · `decks.apps.create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): { name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; next: string }`. A new app folder from a starter ("static" default, "node", "solid", "react", "next"), with its board.
+- `decks apps create` · `decks.apps.create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): { name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; repo?: { branch: string; head: string }; next: string }`. A new app folder from a starter ("static" default, "node", "solid", "react", "next"), with its board.
+- `decks apps repo` · `decks.apps.repo(name: string): { branch: string; head: string; dirty?: number; remote?: string }`. Its git repository, made now with everything committed if the folder is not one yet: branch, last commit, changed files, origin.
+- `decks apps clone` · `decks.apps.clone(url: string, options?: { name?: string; title?: string }): { name: string; kind: AppKind; folder: string; board: string; url: string; repo: { branch: string; head: string; remote?: string }; next: string }`. Take in an app from an https:// or git@host:path address, with its board. Nothing is installed or run.
 - `decks apps board` · `decks.apps.board(name: string): string`. The board for an app whose folder you wrote yourself.
 - `decks apps build` · `decks.apps.build(name: string): AppOutcome`. Build it, waiting up to 15 s; `pending` means ask its status later.
 - `decks apps run` · `decks.apps.run(name: string): AppOutcome`. Start it, waiting up to 15 s.
