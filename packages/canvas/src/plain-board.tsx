@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
@@ -40,10 +41,7 @@ function withoutTicket(address: string): string {
  * Until the page says it does that (`decks:embed-ready`) it does not take the pointer, so a pinch
  * over it never zooms the browser's page instead of the canvas.
  */
-/** A verb's name: words and dots, so it cannot climb out of `/api/v1/` in an address. */
-const VERB = /^[a-z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)*$/;
-
-export function PlainBoard(props: StageBoardProps & { page?: string | undefined; call?: (path: string, verb: string, args: unknown[]) => Promise<{ status: number; answer: unknown }> }) {
+export function PlainBoard(props: StageBoardProps & { page?: string | undefined; boardHost?: BoardHost | undefined }) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
 		return props.origin ?? { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
@@ -118,33 +116,6 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 		const message = event.data as Record<string, unknown> | null;
 		if (!message || typeof message !== "object") return;
 		const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
-		/*
-		 * A button's code calling a verb (`board.js`): made by the host for this board, the one whose frame
-		 * sent it, and answered down to the same page at the origin it was loaded from.
-		 */
-		if (message.decks === "stage.call") {
-			const { id, verb, args } = message;
-			if (typeof id !== "string" || typeof verb !== "string" || !VERB.test(verb) || !Array.isArray(args)) return;
-			const to = frame.contentWindow;
-			/*
-			 * A page from the host's own address is served sandboxed, in an origin of its own that no name
-			 * can be given for (Studio's own copy of a board), so it is answered at any; any other at its own.
-			 */
-			const origin = (() => {
-				try {
-					const from = new URL(src() ?? "", location.href).origin;
-					return from === location.origin ? "*" : from;
-				} catch {
-					return undefined;
-				}
-			})();
-			if (!to || !origin) return;
-			const answered = props.call ? props.call(props.board.path, verb, args) : Promise.resolve({ status: 501, answer: { ok: false, error: "This canvas does not pass a board's calls on to Decks.", notes: [] } });
-			void answered
-				.catch((error: unknown) => ({ status: 502, answer: { ok: false, error: (error as Error)?.message ?? String(error), notes: [] } }))
-				.then(({ status, answer }) => to.postMessage({ decks: "stage.answer", id, status, answer }, origin));
-			return;
-		}
 		switch (message.t) {
 			case "decks:embed-ready":
 				setGuest(true);
@@ -291,6 +262,9 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 					<iframe
 						ref={(element) => {
 							frame = element;
+							// Its board's own token, for the board's buttons, handed to this frame alone (`board-host.ts`).
+							const detach = props.boardHost?.attach(element, { path: () => props.board.path, page: src });
+							if (detach) onCleanup(detach);
 						}}
 						class="plain-board-page"
 						src={src()}

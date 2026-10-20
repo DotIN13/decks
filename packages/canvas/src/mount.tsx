@@ -5,6 +5,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { render } from "solid-js/web";
 import { fitInto } from "./camera/camera.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
+import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsOf, createDrawing } from "./drawing.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
@@ -37,12 +38,12 @@ export interface CanvasOptions {
 		page?(path: string): string | undefined;
 		picture?(path: string, scheme: "light" | "dark"): string | undefined;
 		/**
-		 * A verb a board's button called (`lib/board.js` posts it up, as `stage.call`): the host makes
-		 * the call for the board at `path` — the board whose frame the message came from, never one the
-		 * message names — and answers with the harness's status and answer, which go back down. A board's
-		 * page cannot give the harness commands itself. Absent: a board's buttons have no stage here.
+		 * A board's own token, for its buttons (`board-host.ts`): the host asks the harness the board's
+		 * page came from (`POST /api/tokens { kind: "board", path }`), and the canvas hands it to that
+		 * board's frame alone. Undefined, or absent, when a board can have none here: its buttons then
+		 * say they have no stage.
 		 */
-		call?(path: string, verb: string, args: unknown[]): Promise<{ status: number; answer: unknown }>;
+		mintBoardToken?: MintBoardToken;
 	};
 	/**
 	 * The folder the drawing's own relative addresses are read against (image fills, files on the
@@ -218,6 +219,9 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		return done;
 	});
 
+	// Each board's frame is handed its own token, by the host's way of asking for one.
+	const boardHost = options.boards?.mintBoardToken ? createBoardHost({ mint: options.boards.mintBoardToken }) : undefined;
+
 	const dispose = render(() => {
 		const pen = createMemo(() => ({ doc: doc(), base }));
 		/*
@@ -263,7 +267,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
 								}}
 								onMove={moveBoard}
-								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.call ? { call: options.boards.call } : {})} />}
+								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} />}
 								shots={() => ({
 									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
 									ownPicture: true,
@@ -317,6 +321,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		dispose() {
 			tools();
 			dispose();
+			boardHost?.dispose();
 			setDrawing(false);
 			setPenTool("select");
 			delete host.dataset.colorScheme;
