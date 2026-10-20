@@ -219,6 +219,9 @@ export function createHttpApp(app: App): Express {
 				kind: agent.kind,
 				model: agent.model ?? null,
 				models: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.models ?? [],
+				// How much it asks before acting, and the modes its runtime offers (none for Pi).
+				mode: agent.mode ?? null,
+				modes: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.capabilities.modes ?? [],
 				accounts: accounts.accounts ?? [],
 				account: agent.accountId() ?? accounts.active ?? null,
 			});
@@ -274,7 +277,7 @@ export function createHttpApp(app: App): Express {
 			res.json({ id: agent.id, removed: true });
 			return;
 		}
-		const body = (req.body ?? {}) as { provider?: unknown; model?: unknown; thinking?: unknown; id?: unknown };
+		const body = (req.body ?? {}) as { provider?: unknown; model?: unknown; thinking?: unknown; id?: unknown; mode?: unknown };
 		const level = THINKING_LEVELS.find((one) => one === body.thinking) as ThinkingLevel | undefined;
 		// The model, with the level the picker kept for it; the thinking level alone; the subscription it spends.
 		if (act === "model") {
@@ -299,6 +302,22 @@ export function createHttpApp(app: App): Express {
 			);
 			return;
 		}
+		if (act === "mode") {
+			const modes = app.runtimes().find((runtime) => runtime.kind === agent.kind)?.capabilities.modes ?? [];
+			const mode = modes.find((one) => one === body.mode);
+			if (!mode) {
+				res.status(400).json({ error: modes.length ? `A mode here is one of ${modes.join(", ")}.` : "This agent's runtime has no modes." });
+				return;
+			}
+			agent.setMode(mode).then(
+				() => {
+					app.agents.publish();
+					res.json({ id: agent.id, mode: agent.mode ?? mode });
+				},
+				(error: unknown) => res.status(400).json({ error: `Could not change mode: ${(error as Error).message}` }),
+			);
+			return;
+		}
 		if (act === "account") {
 			if (agent.kind !== "claude" || typeof body.id !== "string" || !agent.useAccount(body.id)) {
 				res.status(409).json({ error: "That account is not on the list, or this agent has no Claude account." });
@@ -310,7 +329,7 @@ export function createHttpApp(app: App): Express {
 			res.json({ id: agent.id, account: body.id });
 			return;
 		}
-		res.status(404).json({ error: "An agent can be renamed, stopped, removed, or given a model, a thinking level or an account." });
+		res.status(404).json({ error: "An agent can be renamed, stopped, removed, or given a model, a thinking level, a mode or an account." });
 	});
 
 	/**
