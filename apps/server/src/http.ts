@@ -221,6 +221,8 @@ export function createHttpApp(app: App): Express {
 				models: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.models ?? [],
 				// How much it asks before acting, and the modes its runtime offers (none for Pi).
 				mode: agent.mode ?? null,
+				// How full its context is and what the session has cost: the composer's dial.
+				usage: agent.usage ?? null,
 				modes: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.capabilities.modes ?? [],
 				accounts: accounts.accounts ?? [],
 				account: agent.accountId() ?? accounts.active ?? null,
