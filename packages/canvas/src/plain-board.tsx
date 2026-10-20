@@ -126,9 +126,14 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 			const { id, verb, args } = message;
 			if (typeof id !== "string" || typeof verb !== "string" || !VERB.test(verb) || !Array.isArray(args)) return;
 			const to = frame.contentWindow;
+			/*
+			 * A page from the host's own address is served sandboxed, in an origin of its own that no name
+			 * can be given for (Studio's own copy of a board), so it is answered at any; any other at its own.
+			 */
 			const origin = (() => {
 				try {
-					return new URL(src() ?? "", location.href).origin;
+					const from = new URL(src() ?? "", location.href).origin;
+					return from === location.origin ? "*" : from;
 				} catch {
 					return undefined;
 				}
