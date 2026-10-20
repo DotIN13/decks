@@ -133,6 +133,11 @@ export function Stage(props: {
 	/** How boards are drawn (`lib/renderer.ts`): documents, a canvas each, or one canvas. */
 	renderer: RendererChoice;
 	/**
+	 * While the camera moves, show every board as its picture: pages are hidden and the sheet paints
+	 * their pictures, so a pan or zoom moves pictures only. Back to pages when it rests (Studio's choice).
+	 */
+	picturesWhileMoving?: boolean;
+	/**
 	 * Whether the app has opened — the deck and the chat you are looking at are drawn — so the
 	 * boards may start. Until it is true no board has a document (`admitted` below).
 	 */
@@ -388,6 +393,8 @@ export function Stage(props: {
 	 * behalf, and a check has no other way to wait for it to arrive without sleeping.
 	 */
 	const [gliding, setGliding] = createSignal(false);
+	/** Boards as pictures for the length of a camera move (`picturesWhileMoving`). */
+	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 
 	/*
@@ -891,6 +898,7 @@ export function Stage(props: {
 	createEffect(() => {
 		const live = liveBoards();
 		const look = scheme();
+		picturesNow();
 		// A board drawn into a canvas of its own keeps its own picture: the sheet leaves it alone.
 		const own = props.renderer === "canvas-per-board";
 		/*
@@ -921,7 +929,7 @@ export function Stage(props: {
 						h: sized?.h ?? board.h,
 						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
 						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
-						live: (own && props.shots().ownPicture) || live.has(board.path),
+						live: (own && props.shots().ownPicture) || (live.has(board.path) && !picturesNow()),
 						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						picture: props.shots().picture(board, look),
@@ -2790,6 +2798,8 @@ export function Stage(props: {
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
 			data-scaling={scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET}
 			data-gliding={gliding()}
+			/* Boards drawn as pictures while the camera moves: their pages are hidden (`canvas.css`). */
+			data-pictures={picturesNow() ? "true" : undefined}
 			/* The camera rests at or above this device's live zoom: boards have pages and take the pointer. */
 			data-live={liveZoom() ? "true" : undefined}
 			data-moving={moving() || panning() || gliding() ? "true" : undefined}
