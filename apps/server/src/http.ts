@@ -377,6 +377,16 @@ export function createHttpApp(app: App): Express {
 				res.status(400).json({ error: "Say something to send." });
 				return;
 			}
+			// Said from a canvas (Studio's composer): the agent works on that one, as an agent talked
+			// to from this app's own canvas does, rather than being told which in the words.
+			const canvas = ((req.body ?? {}) as { canvas?: unknown }).canvas;
+			if (typeof canvas === "string" && canvas && agent.stageName() !== canvas) {
+				try {
+					agent.openStage(canvas);
+				} catch {
+					// A canvas this harness has not synced yet: the words still go.
+				}
+			}
 			void agent.prompt(text);
 			agent.sayRow();
 			res.json({ id: agent.id, sent: true });
