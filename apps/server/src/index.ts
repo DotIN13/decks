@@ -2,6 +2,7 @@ import { socketPrincipal } from "./auth/guard.ts";
 import { actsAsPerson } from "./auth/principal.ts";
 import { TAB_IDLE_MS } from "./auth/tokens.ts";
 import { extraHosts, hostAllowed } from "./auth/hosts.ts";
+import { writeCliToken, type CliToken } from "./auth/cli-token.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
 import { forwardUpgrade } from "./ports.ts";
@@ -90,12 +91,23 @@ httpServer.on("error", (error) => {
 	process.exit(1);
 });
 
+// `decks login` with no code, on this machine (`auth/cli-token.ts`): a token for this start, taken back at stop.
+let cliToken: CliToken | undefined;
 httpServer.listen(config.port, config.host, () => {
 	console.log(`[decks] ${app.deck.name} — http://${config.host}:${config.port}`);
 	console.log(`[decks] data: ${config.dataDir}`);
+	const local = config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host.includes(":") ? `[${config.host}]` : config.host;
+	try {
+		cliToken = writeCliToken(app.tokens, config.dataDir, `http://${local}:${config.port}`);
+		app.cliTokenId = cliToken.id;
+	} catch (error) {
+		console.warn(`[decks] could not write the token for decks login: ${(error as Error).message}`);
+	}
 });
 
 const shutdown = () => {
+	cliToken?.stop();
+	app.cliTokenId = undefined;
 	void studio.stop();
 	app.dispose();
 	hub.close();

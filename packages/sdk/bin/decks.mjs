@@ -66,27 +66,80 @@ function writeTokens(tokens) {
 }
 
 /**
- * `decks login [code]`: the person at a terminal. The code is one `decks pair code` made on the
- * harness's machine (an agent can run it, in its shell); asked for when it is not given.
+ * The token a harness on this machine wrote for its own user at start (`<data dir>/.decks/cli-token`,
+ * `server/src/auth/cli-token.ts`): the data folder is `DECKS_DATA_DIR`, else `~/.decks`, as the
+ * harness's own default. Undefined when there is none to read.
  */
-async function login(words) {
-	let code = words.find((word) => /\d/.test(word))?.replace(/\D/g, "") ?? "";
-	if (!code) {
-		if (!process.stdin.isTTY) throw new DecksError("decks login needs a code: decks login 123456. Make one with decks pair code on the harness's machine.");
-		const ask = createInterface({ input: process.stdin, output: process.stderr });
-		code = (await ask.question(`Code for ${harness()} (from decks pair code): `)).replace(/\D/g, "");
-		ask.close();
+function cliToken() {
+	const dataDir = process.env.DECKS_DATA_DIR || join(homedir(), ".decks");
+	const file = join(dataDir.replace(/^~(?=\/|$)/, homedir()), ".decks", "cli-token");
+	try {
+		const saved = JSON.parse(readFileSync(file, "utf8"));
+		return typeof saved?.token === "string" ? { file, token: saved.token, url: typeof saved.url === "string" ? saved.url : undefined } : { file };
+	} catch {
+		return { file };
 	}
+}
+
+/**
+ * Whether the harness this command calls is the one that wrote the file: the same address, or this
+ * machine at the same port. The token is never sent anywhere else, so a `DECKS_URL` that points at
+ * another server does not carry this machine's token there.
+ */
+function sameHarness(written) {
+	if (!written) return false;
+	try {
+		const [a, b] = [new URL(written), new URL(harness())];
+		if (a.origin === b.origin) return true;
+		const loopback = (url) => /^(?:127\.\d+\.\d+\.\d+|localhost|\[::1\])$/.test(url.hostname);
+		return loopback(a) && loopback(b) && a.port === b.port && a.protocol === b.protocol;
+	} catch {
+		return false;
+	}
+}
+
+/** Trade a code, or the harness's own token for this user, for a terminal's person token. */
+async function trade(body, bearer) {
 	let response;
 	try {
-		response = await fetch(`${harness()}/api/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, label: `decks login on ${hostname()}` }) });
+		response = await fetch(`${harness()}/api/login`, { method: "POST", headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) }, body: JSON.stringify({ ...body, label: `decks login on ${hostname()}` }) });
 	} catch (error) {
 		throw new DecksError(`Could not reach Decks at ${harness()}: ${error.message}`);
 	}
 	const answer = await response.json().catch(() => ({}));
-	if (!response.ok || typeof answer.token !== "string") throw new DecksError(answer.error || `Decks answered ${response.status}`);
-	writeTokens({ ...readTokens(), [harness()]: answer.token });
-	return `Logged in to ${answer.name ?? harness()}. The token is in ${tokenFile()}.`;
+	return { ok: response.ok && typeof answer.token === "string", status: response.status, answer };
+}
+
+/**
+ * `decks login [code]`: the person at a terminal. With a code, one `decks pair code` made on the
+ * harness's machine (an agent can run it, in its shell). With none, on the harness's own machine as
+ * the user it runs as: the token it wrote for that user (`cliToken`) is the proof, and is traded for
+ * the terminal's own. Asked for a code only when neither works and there is someone to ask.
+ */
+async function login(words) {
+	let code = words.find((word) => /\d/.test(word))?.replace(/\D/g, "") ?? "";
+	if (!code) {
+		const local = cliToken();
+		if (local.token && !sameHarness(local.url)) {
+			if (!process.stdin.isTTY) throw new DecksError(`The token in ${local.file} is for ${local.url ?? "another harness"}, not ${harness()}: set DECKS_DATA_DIR to this harness's data folder (or DECKS_URL/DECKS_PORT to that harness), or log in with a code, decks login 123456, made with decks pair code on its machine.`);
+		} else if (local.token) {
+			const traded = await trade({}, local.token);
+			if (traded.ok) {
+				writeTokens({ ...readTokens(), [harness()]: traded.answer.token });
+				return `Logged in to ${traded.answer.name ?? harness()} with the token it keeps for you in ${local.file}. The terminal's token is in ${tokenFile()}.`;
+			}
+			if (!process.stdin.isTTY) throw new DecksError(`${harness()} did not take the token in ${local.file}${local.url && local.url !== harness() ? ` (it is for ${local.url})` : ""}: set DECKS_DATA_DIR to this harness's data folder, or log in with a code, decks login 123456, made with decks pair code on its machine.`);
+		} else if (!process.stdin.isTTY) {
+			throw new DecksError(`No code, and no token in ${local.file} to log in with: run decks login on the harness's own machine as its user (DECKS_DATA_DIR names its data folder), or give a code, decks login 123456, made with decks pair code there.`);
+		}
+		const ask = createInterface({ input: process.stdin, output: process.stderr });
+		code = (await ask.question(`Code for ${harness()} (from decks pair code): `)).replace(/\D/g, "");
+		ask.close();
+	}
+	const traded = await trade({ code });
+	if (!traded.ok) throw new DecksError(traded.answer.error || `Decks answered ${traded.status}`);
+	writeTokens({ ...readTokens(), [harness()]: traded.answer.token });
+	return `Logged in to ${traded.answer.name ?? harness()}. The token is in ${tokenFile()}.`;
 }
 
 /** `decks logout`: the harness takes the token back, and it is gone from `~/.decks/token`. */
@@ -137,7 +190,7 @@ export function help(verb) {
 	}
 	lines.push(`Old names, for one release: ${VERBS.filter((verb) => verb.alias).map((verb) => verb.command.join(" ")).join(", ")}.`, "");
 	lines.push("decks events [type…] prints every change as it happens, one JSON line each.");
-	lines.push("decks login [code] signs this terminal in as the person, with a code from decks pair code; decks logout signs it out.");
+	lines.push("decks login [code] signs this terminal in as the person: with no code on the harness's own machine, else with a code from decks pair code; decks logout signs it out.");
 	lines.push("decks help <command> says more about one. DECKS_URL says where Decks is; DECKS_TOKEN, or the token decks login kept, says who is calling.");
 	return lines.join("\n");
 }

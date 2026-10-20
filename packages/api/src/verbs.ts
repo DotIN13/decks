@@ -443,7 +443,7 @@ export const VERBS: readonly Verb[] = [
 		name: "pair.code",
 		group: "misc",
 		...outsideChange,
-		summary: "A pairing code for another Decks front end, such as Studio, to connect to this harness with: six digits, ten minutes, once. Only on the harness's own machine; Settings never shows one.",
+		summary: "A pairing code for another Decks front end, such as Studio, or a terminal elsewhere (decks login <code>), to connect to this harness with: six digits, ten minutes, once. Only on the harness's own machine, where a terminal logs in with decks login and no code; Settings never shows one.",
 		params: [],
 		result: obj({ code: str(), expires: num() }),
 	},

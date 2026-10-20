@@ -107,6 +107,8 @@ export class App {
 	readonly settings: SettingsStore;
 	/** Every token this harness has given out, and who each one is (`auth/tokens.ts`). */
 	readonly tokens: TokenStore;
+	/** The id of the token written for `decks login` on this machine (`auth/cli-token.ts`), once the server listens. */
+	cliTokenId: string | undefined;
 	/** The code `decks pair code` makes, for pairing and `decks login` (`auth/issue.ts`). */
 	readonly codes: PairCodes;
 	/** One page's admission for another site's frame or tab (`auth/tickets.ts`). */

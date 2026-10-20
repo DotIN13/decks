@@ -2,6 +2,7 @@ import { randomInt, timingSafeEqual } from "node:crypto";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
 import { saveStudioLink, studioOrigin } from "../studio/index.ts";
+import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
 import { MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
 import { TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
@@ -309,15 +310,25 @@ export function doorRoutes(app: App): express.Router {
 
 	/**
 	 * `decks login`: a code from `decks pair code` for a person token, which the command keeps in
-	 * `~/.decks/token`. Always a code, from anywhere: a terminal is the person only by proving it.
+	 * `~/.decks/token`. A terminal is the person only by proving it: with a code, from anywhere; or, on
+	 * this machine, with the token the harness wrote at start where only its own user can read it
+	 * (`cli-token.ts`), sent as the bearer. That one token, and no other person's: a Decks tab's, which
+	 * lasts twelve hours, is not traded here for one that lasts for weeks.
 	 */
 	api.post("/login", (req, res) => {
 		const code = String(((req.body ?? {}) as { code?: unknown }).code ?? "").replace(/\D/g, "");
-		if (!code || !app.codes.redeem(code)) {
+		const fromFile = !code && req.tokenId !== undefined && req.tokenId === app.cliTokenId;
+		if (!fromFile && !code) {
+			res.status(403).json({ error: "Log in with a code from decks pair code, or run decks login with no code on the harness's own machine, as the user it runs as: it reads the token the harness keeps in its data folder (.decks/cli-token)." });
+			return;
+		}
+		if (!fromFile && !app.codes.redeem(code)) {
 			res.status(403).json({ error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine: any agent there can run it in its shell." });
 			return;
 		}
-		const label = String(((req.body ?? {}) as { label?: unknown }).label ?? "decks login").slice(0, 80) || "decks login";
+		const asked = String(((req.body ?? {}) as { label?: unknown }).label ?? "decks login").slice(0, 80) || "decks login";
+		// Never the file's own label, which the next start takes back (`cli-token.ts`).
+		const label = asked === CLI_TOKEN_LABEL ? "decks login" : asked;
 		const { token } = app.tokens.issue({ kind: "person" }, { label });
 		res.json({ token, name: app.deck.name });
 	});

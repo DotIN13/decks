@@ -18,8 +18,18 @@ address) the pages a frame or a picture loads.
 
 - **A Decks tab** is written a fresh person token when a person opens the page in a tab of its own;
   it lasts twelve hours unused.
-- **A terminal**: `decks login` with a code from `decks pair code` keeps a person token in
-  `~/.decks/token`; it lasts `DECKS_TOKEN_DAYS` (30) unused.
+- **A terminal**: `decks login` keeps a person token in `~/.decks/token`; it lasts
+  `DECKS_TOKEN_DAYS` (30) unused. On the harness's own machine, as the user it runs as, no code is
+  needed: at every start the harness writes a person token to `<data dir>/.decks/cli-token`
+  (`DECKS_DATA_DIR`, else `~/.decks`; mode 0600, a new one each start, taken back at stop), and
+  `decks login` reads it and trades it for the terminal's own. Being able to read that file is the
+  proof; nothing is opened on the network for it. Set `DECKS_DATA_DIR` (and `DECKS_PORT` or
+  `DECKS_URL`) when the harness is not the default one. Anywhere else, `decks login <code>` with a
+  code from `decks pair code` run on the harness's machine.
+- **A board's buttons**: the page that frames a board (the Decks tab, Studio) asks for a token that
+  is that board alone (`POST /api/tokens { kind: "board", path }`) and hands it to that frame only.
+  It calls verbs as that board, after the person allows the board once, and nothing else: not the
+  person's routes, not another token.
 - **Agents and server apps** get their own token as `DECKS_TOKEN` when their process starts; it is
   taken back when it stops.
 - **Another site** (Studio, a second Decks) pairs for a site token, bound to that site.
