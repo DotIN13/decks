@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createServer, connect } from "node:net";
@@ -74,6 +74,11 @@ export interface AppState {
 	 * loads the app again when it changes, so an agent's edit shows without anyone pressing Reload.
 	 */
 	version?: number;
+	/**
+	 * Something the person should know about a running server app: that it listens on more than
+	 * this Mac's loopback, where anyone on the network can reach it without Decks in the way.
+	 */
+	warning?: string;
 }
 
 /** What a build or a start answers with: how it went, and the lines worth reading. */
@@ -374,7 +379,7 @@ export class Apps {
 			return false;
 		}
 		this.running.delete(name);
-		this.set(name, { status, port: undefined });
+		this.set(name, { status, port: undefined, warning: undefined });
 		this.kill(live.child);
 		this.write(name, status === "asleep" ? "— asleep: not seen for a while; the next request starts it again" : "— stopped");
 		return true;
@@ -487,9 +492,14 @@ export class Apps {
 		return this.outcome(name, false, Date.now() - t0);
 	}
 
-	/** The environment an app's commands run in: this server's, minus `NODE_ENV=production`, which makes npm leave out a build's tools. */
+	/**
+	 * The environment an app's commands run in: this server's, minus `NODE_ENV=production`, which
+	 * makes npm leave out a build's tools, and minus its secrets (`secretEnv`): an app is code an
+	 * agent wrote, often from a starter, and has no business with the person's API keys.
+	 */
 	private env(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
 		const env: NodeJS.ProcessEnv = { ...process.env };
+		for (const key of Object.keys(env)) if (secretEnv(key)) delete env[key];
 		// Who an app calls Decks as is its own, never inherited from whoever started Decks (an agent's shell sets these).
 		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_URL", "DECKS_AGENT", "DECKS_APP"]) delete env[key];
 		Object.assign(env, extra);
@@ -517,7 +527,7 @@ export class Apps {
 		const command = manifest.start ?? (existsSync(join(this.folder(name), "package.json")) ? "npm start" : undefined);
 		if (!command) return this.failed(name, `apps/${name}/app.json has no "start" command`, t0);
 		const port = await freePort();
-		this.set(name, { status: "starting", port, error: undefined, seenAt: Date.now() });
+		this.set(name, { status: "starting", port, error: undefined, warning: undefined, seenAt: Date.now() });
 		this.write(name, `$ ${command}    (PORT=${port})`);
 		const child = spawn("bash", ["-lc", command], {
 			cwd: this.folder(name),
@@ -548,7 +558,7 @@ export class Apps {
 			this.running.delete(name);
 			const error = `exited with ${signal ?? `code ${code}`}`;
 			this.write(name, `— ${error}`);
-			this.set(name, { status: "broken", error, port: undefined, at: Date.now() });
+			this.set(name, { status: "broken", error, port: undefined, warning: undefined, at: Date.now() });
 		});
 		this.running.set(name, { child, port, ready });
 		const ok = await ready;
@@ -562,6 +572,15 @@ export class Apps {
 		}
 		this.set(name, { status: "running", at: Date.now(), seenAt: Date.now() });
 		this.write(name, `— running on ${port}, in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+		// The child was started detached, so its pid is its process group: npm and the server under it too.
+		if (child.pid !== undefined) {
+			void openListeners(child.pid).then((open) => {
+				if (!open.length || this.running.get(name)?.child !== child) return;
+				const warning = `Unguarded: listens on ${open.join(", ")}, not only this Mac`;
+				this.set(name, { warning });
+				this.write(name, `— ${warning}. Listen on 127.0.0.1 ($HOST) so it is reached only through Decks.`);
+			});
+		}
 		return this.outcome(name, true, Date.now() - t0);
 	}
 
@@ -596,6 +615,43 @@ export class Apps {
 			if (now - seenAt > minutes * 60_000) this.stop(name, "asleep");
 		}
 	}
+}
+
+/*
+ * Environment variables an app is not given. Decks' own (`DECKS_*`) are set again explicitly where
+ * an app needs them; the Studio key is not one of them.
+ */
+const SECRET_ENV = /^(?:ANTHROPIC_|CLAUDE_|OPENAI_|GEMINI_|AWS_)|^(?:GOOGLE_API_KEY|GH_TOKEN|GITHUB_TOKEN|DECKS_STUDIO_KEY)$|_(?:TOKEN|SECRET|API_KEY|PASSWORD)$/i;
+
+/** Whether an environment variable's name says it holds a secret, which an app's commands do not inherit. */
+export function secretEnv(name: string): boolean {
+	return SECRET_ENV.test(name);
+}
+
+/**
+ * The addresses in `lsof -nP -iTCP -sTCP:LISTEN` output that are not loopback: `*:3000`,
+ * `0.0.0.0:3000`, `192.168.1.5:3000`, `[::]:3000`. One per address, in the order listed.
+ */
+export function outsideListeners(lsof: string): string[] {
+	const out: string[] = [];
+	for (const line of lsof.split("\n")) {
+		const match = /\s(\S+):(\d+|\*)\s+\(LISTEN\)\s*$/.exec(line);
+		if (!match) continue;
+		const host = match[1]!.replace(/^\[|\]$/g, "");
+		if (host === "127.0.0.1" || host === "::1" || host === "localhost" || /^127\./.test(host)) continue;
+		const address = `${match[1]}:${match[2]}`;
+		if (!out.includes(address)) out.push(address);
+	}
+	return out;
+}
+
+/** What a process group listens on beyond loopback, by `lsof`; nothing when lsof is missing or fails. */
+function openListeners(group: number): Promise<string[]> {
+	return new Promise((resolveOpen) => {
+		execFile("lsof", ["-nP", "-a", "-g", String(group), "-iTCP", "-sTCP:LISTEN"], { timeout: 5000 }, (error, stdout) => {
+			resolveOpen(error ? [] : outsideListeners(String(stdout)));
+		});
+	});
 }
 
 /** A port nobody is listening on, from the system. */

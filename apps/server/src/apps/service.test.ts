@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import express from "express";
 import { appRequest } from "./route.ts";
-import { Apps } from "./service.ts";
+import { Apps, outsideListeners, secretEnv } from "./service.ts";
 import { writeStarter } from "./starters.ts";
 
 const listen = (server: Server) => new Promise<number>((resolve) => server.listen(0, "127.0.0.1", () => resolve((server.address() as AddressInfo).port)));
@@ -163,5 +163,60 @@ test("a server app is told where Decks is, as itself, and where the SDK is", asy
 		assert.equal(seen.app, "teller");
 		assert.equal(seen.agent, null, "an app never calls as the agent whose shell started Decks");
 		assert.ok(existsSync(seen.sdk) && seen.sdk.endsWith("packages/sdk/src/index.js"), "and where the SDK is, to import");
+	});
+});
+
+test("an app's commands are not handed the person's secrets", async () => {
+	const saved = { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, DECKS_STUDIO_KEY: process.env.DECKS_STUDIO_KEY, MY_SERVICE_TOKEN: process.env.MY_SERVICE_TOKEN };
+	Object.assign(process.env, { ANTHROPIC_API_KEY: "sk-a", DECKS_STUDIO_KEY: "dsk_x", MY_SERVICE_TOKEN: "t" });
+	try {
+		await withDeck(async ({ deck, get }) => {
+			const folder = join(deck, "apps", "peek");
+			mkdirSync(folder, { recursive: true });
+			writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
+			writeFileSync(join(folder, "server.js"), `require("node:http").createServer((q, s) => s.end(JSON.stringify(Object.keys(process.env)))).listen(process.env.PORT, "127.0.0.1");`);
+			const names = (await (await get("/app/peek/")).json()) as string[];
+			for (const name of ["ANTHROPIC_API_KEY", "DECKS_STUDIO_KEY", "MY_SERVICE_TOKEN"]) assert.ok(!names.includes(name), name);
+			assert.ok(names.includes("PATH") && names.includes("DECKS_APP"));
+		});
+	} finally {
+		for (const [key, value] of Object.entries(saved)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
+	for (const name of ["OPENAI_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "AWS_SECRET_ACCESS_KEY", "GH_TOKEN", "GITHUB_TOKEN", "GOOGLE_API_KEY", "GEMINI_API_KEY", "DB_PASSWORD", "STRIPE_SECRET", "X_API_KEY"]) assert.ok(secretEnv(name), name);
+	for (const name of ["PATH", "HOME", "DECKS_REQUIRE_PAIR_CODE", "NODE_ENV", "TOKEN_LIST"]) assert.ok(!secretEnv(name), name);
+});
+
+test("lsof's listeners beyond loopback are named, and loopback ones are not", () => {
+	const lines = [
+		"COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME",
+		"node 1 me 20u IPv4 0x1 0t0 TCP 127.0.0.1:5100 (LISTEN)",
+		"node 1 me 21u IPv6 0x2 0t0 TCP [::1]:5100 (LISTEN)",
+		"node 1 me 22u IPv4 0x3 0t0 TCP *:5101 (LISTEN)",
+		"node 1 me 23u IPv6 0x4 0t0 TCP *:5101 (LISTEN)",
+		"node 1 me 24u IPv4 0x5 0t0 TCP 192.168.1.4:5102 (LISTEN)",
+		"node 1 me 25u IPv6 0x6 0t0 TCP [::]:5103 (LISTEN)",
+	].join("\n");
+	assert.deepEqual(outsideListeners(lines), ["*:5101", "192.168.1.4:5102", "[::]:5103"]);
+	assert.deepEqual(outsideListeners(""), []);
+});
+
+test("a server app that listens beyond this Mac is marked unguarded", async () => {
+	await withDeck(async ({ deck, apps, get }) => {
+		for (const [name, host] of [["open", "0.0.0.0"], ["shut", "127.0.0.1"]] as const) {
+			const folder = join(deck, "apps", name);
+			mkdirSync(folder, { recursive: true });
+			writeFileSync(join(folder, "app.json"), JSON.stringify({ kind: "server", start: "node server.js" }));
+			writeFileSync(join(folder, "server.js"), `require("node:http").createServer((q, s) => s.end("ok")).listen(process.env.PORT, ${JSON.stringify(host)});`);
+			assert.equal((await get(`/app/${name}/`)).status, 200);
+		}
+		const end = Date.now() + 5000;
+		while (!apps.state("open").warning && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
+		assert.match(apps.state("open").warning ?? "", /^Unguarded: listens on \S+:\d+, not only this Mac$/);
+		assert.equal(apps.state("shut").warning, undefined);
+		apps.stop("open");
+		assert.equal(apps.state("open").warning, undefined);
 	});
 });

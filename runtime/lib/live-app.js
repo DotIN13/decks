@@ -20,6 +20,8 @@ const STYLE = `
 .app-state { font-weight: 600; }
 .app-name { color: var(--b-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-kind { font-size: 14px; color: var(--b-muted); border: 1px solid var(--b-border); border-radius: 6px; padding: 2px 6px; }
+.app-warn { color: var(--b-warn); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.app-warn[hidden] { display: none; }
 .app-grow { flex: 1; }
 .app-bar button, .app-bar a { font: 500 14px/1 var(--b-font); color: var(--b-fg); background: var(--b-bg); border: 1px solid var(--b-border); border-radius: 6px; padding: 5px 9px; cursor: pointer; text-decoration: none; }
 .app-bar button[aria-pressed="true"] { background: var(--b-bg-deep); }
@@ -65,6 +67,9 @@ export function mountLiveApp(host, options) {
 	const state = el("span", "app-state", "…");
 	const label = el("span", "app-name", `apps/${name}`);
 	const kind = el("span", "app-kind", "");
+	// What the server says the person should know, such as an app listening beyond this Mac (`warning`).
+	const warn = el("span", "app-warn", "");
+	warn.hidden = true;
 	const reload = el("button", "", "Reload");
 	reload.title = "Load the app again";
 	const restart = el("button", "", "Restart");
@@ -77,7 +82,7 @@ export function mountLiveApp(host, options) {
 	open.title = "Open the app in a tab of its own";
 	const logs = el("button", "", "Log");
 	logs.setAttribute("aria-pressed", "false");
-	bar.append(dot, state, label, kind, el("span", "app-grow"), reload, restart, open, logs);
+	bar.append(dot, state, label, kind, warn, el("span", "app-grow"), reload, restart, open, logs);
 
 	const body = el("div", "app-body");
 	const frame = document.createElement("iframe");
@@ -313,6 +318,9 @@ export function mountLiveApp(host, options) {
 		label.title = `apps/${name}, at ${appUrl}`;
 		kind.textContent = app.kind === "server" ? "server app" : app.kind === "build" ? "built app" : "static app";
 		restart.hidden = app.kind !== "server";
+		warn.hidden = !app.warning;
+		warn.textContent = app.warning ?? "";
+		warn.title = app.warning ?? "";
 		const busy = BUSY.has(app.status);
 		const neverBuilt = app.kind === "build" && app.status === "stopped";
 		let show = "";
