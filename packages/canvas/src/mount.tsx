@@ -12,6 +12,7 @@ import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
 import { Stage, type StageComment } from "./Stage.tsx";
+import type { RendererChoice } from "./lib/renderer.ts";
 import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
 
@@ -75,6 +76,8 @@ export interface CanvasOptions {
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
 	onProperties?: () => void;
+	/** How boards are drawn: each a live page (`dom`, the default), or each into its own canvas where the browser can (`canvas-per-board`). */
+	renderer?: RendererChoice;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
@@ -228,7 +231,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 						<div class="surface-layer" data-layer="stage">
 							<Stage
 								mode={mode()}
-								renderer="dom"
+								renderer={options.renderer ?? "dom"}
 								boardsMayStart={true}
 								boardPill={true}
 								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
