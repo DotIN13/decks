@@ -210,3 +210,17 @@ test("an arrow is a curved grey path between its ends", () => {
 		node: { type: "path", id: "ar2", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from: "a", to: [300, 40], route: "curved" } },
 	});
 });
+
+test("an arrow joined at both ends, carried on its own, gets no op: it cannot move, and goes back at once", () => {
+	const joined: FakeItem[] = [
+		...items,
+		{ id: "j", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, metadata: { type: ARROW, from: "a", to: { item: "b", side: "left" } } } },
+	];
+	const s = fakeScene(joined, boards);
+	assert.deepEqual(moveOps(s, ["j"], 30, 60), []);
+	assert.deepEqual(moveOps(s, ["j"], 30, 60, null), []);
+	// Carried with an item it joins: a plain move, which the reroute settles.
+	assert.deepEqual(moveOps(s, ["j", "a"], 30, 0)[0], { op: "update", id: "j", set: movedBy(s.node("j")!, 30, 0) });
+	// One end free: the free end moves, as before.
+	assert.deepEqual(moveOps(s, ["ar"], 5, 5), [{ op: "update", id: "ar", set: movedBy(s.node("ar")!, 5, 5) }]);
+});

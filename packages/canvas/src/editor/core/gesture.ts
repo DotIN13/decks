@@ -379,8 +379,12 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drag: ZERO };
 		if (copied.made.length) next = selectMade(next, copied.made);
 	} else ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
+	if (ids.length && ops.length === 0) {
+		// Nothing it carried can move (an arrow joined at both ends, `moveOps`): it goes back now, not after the wait for a drawing that will not change.
+		preview = null;
+		next = { ...next, drag: ZERO };
+	} else if (ids.length) next = settle(next, p.time, ctx, effects, p.mods.alt ? undefined : landingBoxes(scene, ids, offset, into));
 	// A copy lands where it was let go and moves nothing else: only a move glides.
-	if (ids.length) next = settle(next, p.time, ctx, effects, p.mods.alt ? undefined : landingBoxes(scene, ids, offset, into));
 	effects.push({ do: "move-boards", moves: boardMoves(scene.boards(), boards, offset.dx, offset.dy) });
 	next = { ...next, boardDrag: undefined };
 	return { state: next, ops, effects, ...(preview === null ? { preview } : {}) };

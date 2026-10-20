@@ -7,7 +7,7 @@
  * Ids come from a generator passed in (`idMaker` over the document's ids on the page, a counter in
  * the tests), so the same call writes the same ops.
  */
-import { ARROW, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
+import { ARROW, arrowEndItem, isArrow, isCard, isMarkdownText, makeShape, MARKDOWN, moveArrowEnds, newId, shapeKind, SHAPES, type Box, type Op, type PenNode } from "@decks/pen";
 import type { BoardBox, MakingTool, Pt, Rect } from "./model.ts";
 import type { SceneQuery } from "./scene.ts";
 
@@ -41,6 +41,18 @@ export function movedBy(node: PenNode, dx: number, dy: number): Record<string, u
 }
 
 /**
+ * An arrow joined at both ends, carried while what it joins stays: it cannot move, since it is drawn
+ * from its ends again after every edit. It gets no op, so the drag lets it go back at once
+ * (`releaseCarry`) rather than when the canvas stops waiting for a change that never comes.
+ */
+function pinned(node: PenNode, moving: ReadonlySet<string>): boolean {
+	if (!isArrow(node) || !node.metadata) return false;
+	const meta = node.metadata as Record<string, unknown>;
+	const ends = [arrowEndItem(meta.from), arrowEndItem(meta.to)];
+	return ends.every((end) => end !== undefined && !moving.has(end));
+}
+
+/**
  * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
  * because a group's box starts where its children do, not at its own `x` and `y`.
  *
@@ -56,9 +68,12 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 	 * first, which is why this counts up.
 	 */
 	let put = slot;
+	const moving = new Set(ids);
 	return ids.flatMap((id): Op[] => {
 		const node = scene.node(id);
 		if (!node) return [];
+		// Not into another frame: an arrow that cannot move gets nothing.
+		if ((into === undefined || into === (scene.item(id)?.parent ?? null)) && pinned(node, moving)) return [];
 		/*
 		 * Into a frame, or out of one onto the stage: a `move` with the parent and the box the
 		 * item ends up at **in stage coordinates**, which the server turns into the frame's own
