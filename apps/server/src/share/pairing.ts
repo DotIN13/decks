@@ -155,7 +155,40 @@ export class Pairing {
 	check(token: string | undefined, now = Date.now()): boolean {
 		if (!token) return false;
 		const hash = hashOf(token);
+		return this.used(this.tokens.find((one) => one.hash === hash), now);
+	}
+
+	/**
+	 * A token and the page it came from (`Origin`), together. A token is given to one page, and its
+	 * site is recorded then: the same token sent by a page on another site was copied out of that
+	 * page, so it is refused (`elsewhere`), however good it is. A token given with no site recorded
+	 * (to a program, or before sites were recorded), and a request with no `Origin` (a program, the
+	 * iOS app), are answered as `check` answers them.
+	 */
+	verdict(token: string | undefined, origin: string | undefined, now = Date.now()): "paired" | "unpaired" | "elsewhere" {
+		if (!token) return "unpaired";
+		const hash = hashOf(token);
 		const found = this.tokens.find((one) => one.hash === hash);
+		if (!found) return "unpaired";
+		if (origin && found.origin && found.origin !== origin) return "elsewhere";
+		return this.used(found, now) ? "paired" : "unpaired";
+	}
+
+	/** Whether a request carries a token that is good, and good from the page it came from (`verdict`). */
+	admits(headers: Record<string, string | string[] | undefined>, url: string | undefined, now = Date.now()): boolean {
+		return this.verdict(tokenOf(headers, url), originOf(headers), now) === "paired";
+	}
+
+	/**
+	 * Whether the token with this id (`idOf`) still works: what a ticket made from it asks
+	 * (`tickets.ts`), so revoking a token, or its going unused too long, ends its tickets too.
+	 */
+	live(id: string, now = Date.now()): boolean {
+		return this.used(this.tokens.find((one) => one.id === id), now);
+	}
+
+	/** A stored token being used now: forgotten if it went unused too long, else stamped as seen. */
+	private used(found: Stored | undefined, now: number): boolean {
 		if (!found) return false;
 		if (now - (found.last ?? found.at) > this.idleMs) {
 			this.tokens = this.tokens.filter((one) => one !== found);
@@ -216,6 +249,12 @@ export function tokenOf(headers: Record<string, string | string[] | undefined>, 
 	} catch {
 		return undefined;
 	}
+}
+
+/** The page a request says it came from (`Origin`), or undefined when it says none. */
+export function originOf(headers: Record<string, string | string[] | undefined>): string | undefined {
+	const origin = headers.origin;
+	return typeof origin === "string" && origin !== "" ? origin : undefined;
 }
 
 /**

@@ -211,3 +211,61 @@ test("a page on another site cannot pair with a harness on this machine without 
 		cleanup();
 	}
 });
+
+test("Studio trades its token for tickets, and a board opened in a frame from Studio loads by its ticket alone and only that board", () => listing("https://studio.test", async () => {
+	const { app, base, post, deck, cleanup } = await open(false);
+	try {
+		const done = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		assert.equal(done.status, 200);
+		const token = String(done.body.token);
+		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
+		writeFileSync(join(deck, "boards", "b.html"), "<p>b</p>");
+		const paths = ["boards/a.html", "/api/board/boards/b.html", "/api/v1/agent.list"];
+
+		assert.equal((await post("/tickets", { paths })).status, 401, "another site without a token");
+		assert.equal((await post("/tickets", { paths }, { "content-type": "application/json" })).status, 401, "even this server's own page needs a token in the header");
+		const made = await post("/tickets", { paths }, { ...STUDIO, authorization: `Bearer ${token}` });
+		assert.equal(made.status, 200);
+		const tickets = made.body.tickets as Record<string, string>;
+		assert.deepEqual(Object.keys(tickets).sort(), ["/api/board/boards/b.html", "boards/a.html"], "no ticket for the API");
+		assert.ok(Number(made.body.expires) > Date.now());
+		assert.equal((await post("/tickets", { paths: Array.from({ length: 201 }, () => "boards/a.html") }, { ...STUDIO, authorization: `Bearer ${token}` })).status, 400);
+
+		// A frame's navigation: another site, and no Origin.
+		const frame = { "sec-fetch-site": "cross-site", "sec-fetch-dest": "iframe" };
+		const a = await fetch(`${base}/board/boards/a.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame });
+		assert.equal(a.status, 200);
+		assert.equal(await a.text(), "<p>a</p>");
+		assert.equal(a.headers.get("referrer-policy"), "no-referrer", "the ticket in its address is not sent on");
+		assert.equal((await fetch(`${base}/board/boards/a.html`, { headers: frame })).status, 401, "no ticket");
+		assert.equal((await fetch(`${base}/board/boards/b.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401, "a's ticket, for b");
+		assert.equal((await fetch(`${base}/v1/events?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401, "a's ticket, for the API");
+		assert.equal((await fetch(`${base}/board/boards/b.html?decks_ticket=${encodeURIComponent(tickets["/api/board/boards/b.html"]!)}`, { headers: frame })).status, 200);
+
+		// Revoking the token ends its tickets.
+		app.pairing.revoke(app.pairing.idOf(token)!);
+		assert.equal((await fetch(`${base}/board/boards/a.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401);
+	} finally {
+		cleanup();
+	}
+}));
+
+test("a token works only from the site it was given to, or from a caller that sends no Origin", () => listing("https://studio.test", async () => {
+	const { post, base, cleanup } = await open(false);
+	try {
+		const done = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		const token = String(done.body.token);
+		const evil = { origin: "https://evil.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
+		const stolen = await post("/v1/now", { args: [] }, { ...evil, authorization: `Bearer ${token}` });
+		assert.equal(stolen.status, 401);
+		assert.match(String(stolen.body.text), /another site/);
+		assert.equal((await post("/tickets", { paths: ["boards/a.html"] }, { ...evil, authorization: `Bearer ${token}` })).status, 401, "no tickets for it either");
+		assert.equal((await fetch(`${base}/v1/events?decks_token=${encodeURIComponent(token)}`, { headers: evil })).status, 401, "nor in the address");
+		assert.equal((await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${token}` })).status, 200, "from Studio's own page");
+		assert.equal((await post("/v1/now", { args: [] }, { "content-type": "application/json", "x-decks-person": "studio", authorization: `Bearer ${token}` })).status, 200, "a program, with no Origin");
+		const hello = (await (await fetch(`${base}/hello`, { headers: { ...evil, authorization: `Bearer ${token}` } })).json()) as { paired: boolean };
+		assert.equal(hello.paired, false, "hello does not call the copied token paired");
+	} finally {
+		cleanup();
+	}
+}));

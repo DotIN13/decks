@@ -1,4 +1,4 @@
-import { fromAnotherSite, tokenOf } from "./share/pairing.ts";
+import { fromAnotherSite } from "./share/pairing.ts";
 import { extraHosts, hostAllowed } from "./share/hosts.ts";
 import { createServer } from "node:http";
 import { appUpgrade } from "./apps/route.ts";
@@ -56,7 +56,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
 	if (path === "/ws") {
 		// A page on another site gets a socket only with a paired token (`share/pairing.ts`).
-		if (fromAnotherSite(request.headers) && !app.pairing.check(tokenOf(request.headers, request.url))) {
+		if (fromAnotherSite(request.headers) && !app.pairing.admits(request.headers, request.url)) {
 			socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
 			socket.destroy();
 			return;
@@ -64,7 +64,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 		hub.handleUpgrade(request, socket, head);
 	}
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
-	else if (appUpgrade(request, socket, head, app.apps, (token) => app.pairing.check(token))) return;
+	else if (appUpgrade(request, socket, head, app.apps, (token, origin) => app.pairing.verdict(token, origin) === "paired")) return;
 	else if (!forwardUpgrade(request, socket, head, app.forwards)) socket.destroy();
 });
 

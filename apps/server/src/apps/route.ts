@@ -2,7 +2,8 @@ import { request as httpRequest, type IncomingMessage, type ServerResponse } fro
 import { connect } from "node:net";
 import type { Duplex } from "node:stream";
 import type { Response } from "express";
-import { fromAnotherSite, tokenOf } from "../share/pairing.ts";
+import { fromAnotherSite, originOf, tokenOf } from "../share/pairing.ts";
+import { decodedPath, ticketOf } from "../share/tickets.ts";
 import { APP_NAME, type Apps } from "./service.ts";
 
 /**
@@ -17,13 +18,21 @@ import { APP_NAME, type Apps } from "./service.ts";
  * `prefix` (a framework told its base path, which Decks also passes as `BASE_PATH`).
  *
  * An app is this server's own page, so another site is not let in (`fromAnotherSite`) unless it
- * carries a pairing token, as for `/api/`: an app has no sign-in of its own, and without this any
- * page the person opened could call it. What Decks itself uses to let a request in never reaches
- * the app: the pairing token, in the `Authorization` header or as `decks_token`, and `X-Decks-*`.
+ * carries a pairing token, as for `/api/`, or a GET carries a ticket for the app (`decks_ticket`,
+ * `share/tickets.ts`), which is how another site opens one in a frame or a tab: an app has no
+ * sign-in of its own, and without this any page the person opened could call it. What Decks itself
+ * uses to let a request in never reaches the app: the pairing token, in the `Authorization` header
+ * or as `decks_token`, a ticket, and `X-Decks-*`.
  */
 
-/** Whether a token is one this server gave out (`Pairing.check`). */
-export type PairedCheck = (token: string | undefined) => boolean;
+/**
+ * Whether a token is one this server gave out, and, given the page it came from (`Origin`), good
+ * from that page (`Pairing.verdict`).
+ */
+export type PairedCheck = (token: string | undefined, origin?: string) => boolean;
+
+/** Whether a ticket admits a GET of this decoded path (`Tickets.admits`). */
+export type TicketCheck = (ticket: string | undefined, path: string | undefined) => boolean;
 
 const ROUTE = /^\/app\/([^/?]+)(\/[^?]*)?(\?.*)?$/;
 
@@ -36,11 +45,14 @@ function target(url: string): { name: string; inner: string; query: string; slas
 }
 
 /** Answer one request. Answers whether it was an `/app/` request at all. */
-export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps, paired?: PairedCheck): boolean {
+export function appRequest(req: IncomingMessage, res: ServerResponse & Partial<Response>, apps: Apps, paired?: PairedCheck, ticketed?: TicketCheck): boolean {
 	const url = req.url ?? "/";
 	const at = target(url);
 	if (!at) return false;
-	if (refusedSite(req, paired)) {
+	if (byTicket(req, ticketed)) {
+		// The page's address holds its ticket, which is not sent on as the Referer of what it loads.
+		res.setHeader("Referrer-Policy", "no-referrer");
+	} else if (refusedSite(req, paired)) {
 		plain(res, 403, "An app here answers only its own Decks' pages, or another site paired with this Decks.");
 		return true;
 	}
@@ -151,14 +163,22 @@ export function appUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, a
 /** Another site's request, without a paired token: `Sec-Fetch-Site` says so, or an `Origin` that is not this host. */
 function refusedSite(req: IncomingMessage, paired: PairedCheck | undefined): boolean {
 	if (!fromAnotherSite(req.headers)) return false;
-	return !(paired?.(tokenOf(req.headers, req.url)) ?? false);
+	return !(paired?.(tokenOf(req.headers, req.url), originOf(req.headers)) ?? false);
 }
 
-/** A query string (`?a=1&decks_token=…`) without the pairing token, which is Decks', not the app's. */
+/** Another site's GET let in by a ticket for this app (`share/tickets.ts`). */
+function byTicket(req: IncomingMessage, ticketed: TicketCheck | undefined): boolean {
+	if (!ticketed || req.method !== "GET" || !fromAnotherSite(req.headers)) return false;
+	const ticket = ticketOf(req.url);
+	return ticket !== undefined && ticketed(ticket, decodedPath(req.url));
+}
+
+/** A query string (`?a=1&decks_token=…`) without the pairing token or a ticket, which are Decks', not the app's. */
 export function withoutToken(query: string): string {
-	if (!query.includes("decks_token")) return query;
+	if (!query.includes("decks_token") && !query.includes("decks_ticket")) return query;
 	const params = new URLSearchParams(query.slice(1));
 	params.delete("decks_token");
+	params.delete("decks_ticket");
 	const rest = params.toString();
 	return rest ? `?${rest}` : "";
 }
