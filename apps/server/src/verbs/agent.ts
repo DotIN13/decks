@@ -21,6 +21,7 @@ export function agentVerbs(ctx: VerbContext): Pick<Stage, "agent" | "here"> {
 		...(other.stage ? { canvas: other.stage } : {}),
 		state: other.state,
 		queued: other.queued ?? 0,
+		...(other.avatar ? { avatar: other.avatar } : {}),
 	});
 	const find = (name: unknown) => {
 		const asked = typeof name === "string" ? name.trim() : "";

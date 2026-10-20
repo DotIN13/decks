@@ -124,7 +124,7 @@ export interface StageAgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string }>;
+	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string; avatar?: string }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Queue work for an agent that already exists, and return without waiting. */
