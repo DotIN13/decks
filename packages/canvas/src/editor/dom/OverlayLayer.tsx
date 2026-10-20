@@ -194,7 +194,7 @@ export function OverlayLayer(
 						{(side) => {
 							const [x, y] = sidePoint(hint.box, side);
 							const size = () => (hint.side === side ? 12 : 8) / props.zoom;
-							return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={{ left: `${x - size() / 2}px`, top: `${y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px` }} />;
+							return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={{ left: `${x - size() / 2}px`, top: `${y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px` }} />;
 						}}
 					</For>
 				)}
@@ -214,7 +214,7 @@ export function OverlayLayer(
 									class="pen-anchor"
 									data-side={side}
 									title="Drag to draw an arrow from this side"
-									style={{ left: `${at().x - size() / 2}px`, top: `${at().y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "border-width": `${1.5 / props.zoom}px` }}
+									style={{ left: `${at().x - size() / 2}px`, top: `${at().y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px` }}
 									onPointerDown={(event) => props.onAnchor(event, box(), side)}
 								/>
 							);
