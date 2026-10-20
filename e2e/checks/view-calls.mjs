@@ -10,7 +10,7 @@
  *   canvas says the screen shows another one.
  * - None of them changed the canvas file.
  */
-import { API, open, resetStage, say, settle } from "../harness.mjs";
+import { API, asPerson, open, resetStage, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await resetStage(page);
@@ -20,9 +20,10 @@ const call = async (verb, args = [], headers = {}) => {
 	const response = await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args }) });
 	return response.json();
 };
-const person = { "x-decks-person": "1" };
+// The person's token; the agent on screen is a parameter of the person's calls, not who is calling.
+const person = await asPerson();
 const me = (await call("agent.me", [], person)).value;
-const agent = { "x-decks-agent": me.id };
+const agent = { ...person, "x-decks-agent": me.id };
 const home = (await call("here", [], agent)).value;
 const read = await call("canvas.read", [], agent);
 const board = read.value.items.find((item) => item.type === "board")?.board;

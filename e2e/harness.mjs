@@ -51,10 +51,46 @@ export function failed() {
 	return failures;
 }
 
+/**
+ * A person token for the checks' own calls, as a Decks tab gets one: the harness writes it into its
+ * page loaded as a tab of its own (`server/src/auth/issue.ts`). Every request to the harness carries a
+ * token, from this machine too. Made once per harness address.
+ */
+const tokens = new Map();
+export function personToken(api) {
+	api = typeof api === "string" ? api : API;
+	if (!tokens.has(api)) {
+		tokens.set(
+			api,
+			import("node:http").then(
+				({ get }) =>
+					new Promise((resolve, reject) => {
+						get(`${api}/`, { headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" } }, (response) => {
+							let html = "";
+							response.setEncoding("utf8");
+							response.on("data", (chunk) => (html += chunk));
+							response.on("end", () => {
+								const token = /<meta name="decks-session" content="([^"]+)">/.exec(html)?.[1];
+								if (token) resolve(token);
+								else reject(new Error(`${api}/ gave no person token: is it a Decks harness with a built web app?`));
+							});
+						}).on("error", reject);
+					}),
+			),
+		);
+	}
+	return tokens.get(api);
+}
+
+/** The headers that make a check's request the person's. */
+export async function asPerson(api) {
+	return { authorization: `Bearer ${await personToken(api)}` };
+}
+
 /** The deck the server actually has open, straight from the API. */
 export async function deckState(api) {
 	api = typeof api === "string" ? api : API;
-	const response = await fetch(`${api}/api/deck`);
+	const response = await fetch(`${api}/api/deck`, { headers: await asPerson(api) });
 	if (!response.ok) throw new Error(`GET /api/deck -> ${response.status}`);
 	return (await response.json()).deck;
 }
@@ -438,7 +474,7 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 /** Talk to the server the way the client does. */
 export async function socket(api) {
 	api = typeof api === "string" ? api : API;
-	const ws = new WebSocket(`${api.replace("http", "ws")}/ws`);
+	const ws = new WebSocket(`${api.replace("http", "ws")}/ws?decks_token=${encodeURIComponent(await personToken(api))}`);
 	const received = [];
 	await new Promise((resolve, reject) => {
 		ws.onopen = resolve;
