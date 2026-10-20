@@ -76,11 +76,13 @@ export function startStudio(deck: string, env: NodeJS.ProcessEnv = process.env, 
 	void apply();
 	if (!env.DECKS_STUDIO_KEY) {
 		try {
+			// A new deck has no .decks folder yet; made now, so a link saved later is seen at once.
+			mkdirSync(join(deck, ".decks"), { recursive: true });
 			watcher = watch(join(deck, ".decks"), (_event, name) => {
-				if (name === "studio.json") void apply();
+				if (!name || name === "studio.json") void apply();
 			});
 		} catch {
-			// No .decks folder yet: the key can still come by environment on the next start.
+			// No folder to watch: the key can still come by environment on the next start.
 		}
 	}
 
