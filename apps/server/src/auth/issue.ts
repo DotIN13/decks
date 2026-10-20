@@ -314,7 +314,7 @@ export function doorRoutes(app: App): express.Router {
 	api.post("/login", (req, res) => {
 		const code = String(((req.body ?? {}) as { code?: unknown }).code ?? "").replace(/\D/g, "");
 		if (!code || !app.codes.redeem(code)) {
-			res.status(403).json({ error: "That code is wrong or has expired. Make a new one with decks pair code: an agent can run it, or Settings can." });
+			res.status(403).json({ error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine: any agent there can run it in its shell." });
 			return;
 		}
 		const label = String(((req.body ?? {}) as { label?: unknown }).label ?? "decks login").slice(0, 80) || "decks login";

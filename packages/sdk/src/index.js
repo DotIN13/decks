@@ -229,7 +229,14 @@ export function connect(options = {}) {
 		} catch (error) {
 			throw new DecksError(`Could not reach Decks at ${base}: ${error.message}`);
 		}
-		const answer = await response.json().catch(() => ({ ok: false, error: `Decks answered ${response.status} without a result` }));
+		// A refusal at the gate (no token, or one taken back) is a sentence, not the verbs' JSON.
+		const text = await response.text().catch(() => "");
+		let answer;
+		try {
+			answer = JSON.parse(text);
+		} catch {
+			answer = { ok: false, error: text.trim() ? `Decks answered ${response.status}: ${text.trim().slice(0, 400)}` : `Decks answered ${response.status} without a result` };
+		}
 		const notes = Array.isArray(answer.notes) ? answer.notes : [];
 		if (!response.ok || answer.ok === false) throw new DecksError(answer.error || `Decks answered ${response.status}`, { status: response.status, notes });
 		return { value: answer.value, notes, images: answer.images };

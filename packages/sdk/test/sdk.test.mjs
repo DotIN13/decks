@@ -80,6 +80,8 @@ test("a verb posts its arguments with the caller's token, and answers with the v
 		await decks.show("boards/a.html", undefined);
 		assert.deepEqual(fake.seen.at(-1), { verb: "show", args: ["boards/a.html"], token: "Bearer dk_a_wren", agent: undefined, app: undefined, person: undefined }, "a trailing undefined stays absent, and no header names the caller");
 		await assert.rejects(decks.fit("boards/x.html"), (error) => error instanceof DecksError && error.status === 422 && /not on your stage/.test(error.message));
+		const refused = connect({ url: fake.url, fetch: async () => new Response("Every request to this harness carries a token.", { status: 401 }) });
+		await assert.rejects(refused.boards(), (error) => error.status === 401 && /carries a token/.test(error.message), "the gate's sentence comes through");
 	} finally {
 		await fake.close();
 	}
