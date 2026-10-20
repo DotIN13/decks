@@ -436,6 +436,19 @@ export function createHttpApp(app: App): Express {
 			);
 			return;
 		}
+		/** The project an agent is filed under, from another front end's agent list (Studio); null takes it out of any. */
+		if (act === "workspace") {
+			const workspace = ((req.body ?? {}) as { workspace?: unknown }).workspace;
+			if (workspace === null || workspace === "") agent.clearWorkspace();
+			else if (typeof workspace === "string") agent.setWorkspace(workspace.trim());
+			else {
+				res.status(400).json({ error: "A workspace is a name, or null for none." });
+				return;
+			}
+			app.agents.publish();
+			res.json({ id: agent.id, workspace: agent.workspace ?? null });
+			return;
+		}
 		/** The answer to a question the agent asked (`/login`'s method and code, a choice, a confirm). */
 		if (act === "dialog") {
 			const answer = (req.body ?? {}) as ExtensionUiAnswer;
