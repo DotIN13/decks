@@ -43,6 +43,20 @@ export function OverlayLayer(
 	},
 ) {
 	const o = () => props.overlay();
+	/**
+	 * A handle drawn at its screen size, `px` square, centred on a point in the world and scaled by the
+	 * zoom from there, as the block grip is. Sized and placed in world units instead, a 10px handle was
+	 * 6.67 units across at 150%, and the browser snapped its edges unevenly: an oval, a line 1px here
+	 * and 2px there. This way every handle is the same whole-pixel shape at every zoom.
+	 */
+	const knob = (x: number, y: number, px: number, after = "") => ({
+		left: `${x}px`,
+		top: `${y}px`,
+		width: `${px}px`,
+		height: `${px}px`,
+		"transform-origin": "0 0",
+		transform: `scale(${1 / props.zoom}) translate(-50%, -50%)${after}`,
+	});
 	/** More than one thing selected: each is outlined thin, and one box round them all is the strong line. */
 	const many = () => !!o().selectionFrame?.many;
 	return (
@@ -193,8 +207,7 @@ export function OverlayLayer(
 					<For each={ARROW_SIDES}>
 						{(side) => {
 							const [x, y] = sidePoint(hint.box, side);
-							const size = () => (hint.side === side ? 12 : 8) / props.zoom;
-							return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={{ left: `${x - size() / 2}px`, top: `${y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px` }} />;
+							return <div class="pen-side" data-on={hint.side === side ? "true" : undefined} style={knob(x, y, hint.side === side ? 12 : 8)} />;
 						}}
 					</For>
 				)}
@@ -207,14 +220,13 @@ export function OverlayLayer(
 				{(box) => (
 					<For each={ARROW_SIDES}>
 						{(side) => {
-							const size = () => ANCHOR_PX / props.zoom;
 							const at = () => anchorAt(box(), side, ANCHOR_OUT / props.zoom);
 							return (
 								<div
 									class="pen-anchor"
 									data-side={side}
 									title="Drag to draw an arrow from this side"
-									style={{ left: `${at().x - size() / 2}px`, top: `${at().y - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px` }}
+									style={knob(at().x, at().y, ANCHOR_PX)}
 									onPointerDown={(event) => props.onAnchor(event, box(), side)}
 								/>
 							);
@@ -288,7 +300,7 @@ export function OverlayLayer(
 					<For each={["from", "to"] as const}>
 						{(which) => {
 							// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
-							const size = () => (COARSE ? 18 : 11) / props.zoom;
+							const px = COARSE ? 18 : 11;
 							// A joined end is a diamond, which slides along the side it joins; a free end is a dot.
 							const joined = () => !!(which === "from" ? ends().fromJoin : ends().toJoin);
 							return (
@@ -297,15 +309,7 @@ export function OverlayLayer(
 									data-end={which}
 									data-joined={joined() ? "true" : undefined}
 									title={joined() ? "Slide along the side, or drag off to join something else; double-click for the middle" : "Drag onto something to join it"}
-									style={{
-										left: `${ends()[which].x - size() / 2}px`,
-										top: `${ends()[which].y - size() / 2}px`,
-										width: `${size()}px`,
-										height: `${size()}px`,
-										"border-radius": joined() ? `${2 / props.zoom}px` : "50%",
-										transform: joined() ? "rotate(45deg)" : undefined,
-										"--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`,
-									}}
+									style={{ ...knob(ends()[which].x, ends()[which].y, px, joined() ? " rotate(45deg)" : ""), "border-radius": joined() ? "2px" : "50%" }}
 									onPointerDown={(event) => props.onArrowEnd(event, which)}
 								/>
 							);
@@ -315,21 +319,13 @@ export function OverlayLayer(
 			</Show>
 			<Show when={o().arrow?.middle}>
 				{(middle) => {
-					const size = () => (COARSE ? 18 : 12) / props.zoom;
+					const px = COARSE ? 18 : 12;
 					return (
 						<div
 							class="pen-handle"
 							data-bend={o().arrow?.route}
 							title="Drag to bend the arrow; double-click for its automatic route"
-							style={{
-								left: `${middle().x - size() / 2}px`,
-								top: `${middle().y - size() / 2}px`,
-								width: `${size()}px`,
-								height: `${size()}px`,
-								"border-radius": "50%",
-								"--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`,
-								"box-shadow": o().arrow?.bent ? `inset 0 0 0 ${2.5 / props.zoom}px var(--color-accent)` : undefined,
-							}}
+							style={{ ...knob(middle().x, middle().y, px), "border-radius": "50%", "box-shadow": o().arrow?.bent ? "inset 0 0 0 2.5px var(--color-accent)" : undefined }}
 							onPointerDown={(event) => props.onArrowBend(event)}
 						/>
 					);
@@ -359,7 +355,7 @@ export function OverlayLayer(
 								<div
 									class="pen-handle"
 									data-handle={handle}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
+									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
 									onPointerDown={(event) => props.onHandle(event, handle)}
 								/>
 							);
@@ -378,7 +374,7 @@ export function OverlayLayer(
 							class="pen-handle"
 							data-handle="radius"
 							title="Drag to round the corners"
-							style={{ left: `${box().x + inset() - size() / 2}px`, top: `${box().y + inset() - size() / 2}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px` }}
+							style={knob(box().x + inset(), box().y + inset(), HANDLE_PX)}
 							onPointerDown={(event) => props.onRadius(event)}
 						/>
 					);
@@ -395,7 +391,7 @@ export function OverlayLayer(
 									class="pen-handle"
 									data-handle={handle}
 									data-board={box().path}
-									style={{ left: `${at().x}px`, top: `${at().y}px`, width: `${size()}px`, height: `${size()}px`, "--bw": `${1.5 / props.zoom}px`, "--br": `${2 / props.zoom}px`, "--hit": `${hitReach(size(), props.zoom) + 1.5 / props.zoom}px` }}
+									style={{ ...knob(at().x + size() / 2, at().y + size() / 2, HANDLE_PX), "--hit": `${(hitReach(size(), props.zoom) + 1.5 / props.zoom) * props.zoom}px` }}
 									onPointerDown={(event) => props.onBoardHandle(event, handle)}
 								/>
 							);
