@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { request } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -159,6 +160,32 @@ test("a board's own button cannot make a pairing code", async () => {
 		assert.ok(tool);
 		const board = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-board": encodeURIComponent("boards/x.html") });
 		assert.notEqual(board.status, 200);
+	} finally {
+		cleanup();
+	}
+});
+
+test("a request addressed to a name that is not this server's is refused before anything answers it", async () => {
+	const { base, cleanup } = await open(false);
+	const port = Number(new URL(base).port);
+	const ask = (host: string, path: string) =>
+		new Promise<{ status: number; text: string }>((done, fail) => {
+			const req = request({ host: "127.0.0.1", port, path, headers: { host } }, (res) => {
+				let text = "";
+				res.on("data", (chunk) => (text += chunk));
+				res.on("end", () => done({ status: res.statusCode ?? 0, text }));
+			});
+			req.on("error", fail);
+			req.end();
+		});
+	try {
+		for (const path of ["/api/hello", "/app/x/", "/"]) {
+			const refused = await ask(`rebound.evil.test:${port}`, path);
+			assert.equal(refused.status, 403, path);
+			assert.match(refused.text, /DECKS_HOSTS/);
+		}
+		assert.equal((await ask(`localhost:${port}`, "/api/hello")).status, 200);
+		assert.equal((await ask(`mac.tail1.ts.net`, "/api/hello")).status, 200);
 	} finally {
 		cleanup();
 	}
