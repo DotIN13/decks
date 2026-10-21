@@ -588,7 +588,7 @@ export class HarnessSync {
 			const r = await this.call("POST", `/sync/v1/canvases/${s.id}/edits`, { base: s.rev, edits, client: this.me });
 			if (r.dropped) this.log(`${name}: ${r.dropped} of your edits touched items someone else removed`);
 			if (r.pen) next = { doc: r.pen, rev: r.rev }; // A Studio from before edits were answered with changes.
-			else if (r.base === s.rev) next = { doc: applyEdits(base.doc, r.changes ?? []), rev: r.rev };
+			else if (r.base === s.rev) next = { doc: loosely(base.doc, r.changes ?? []), rev: r.rev };
 			else {
 				this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, r.rev));
 				next = await this.changesSince(s, base.doc);
@@ -602,10 +602,15 @@ export class HarnessSync {
 			if (local.same || !edits.length) this.penSeen.set(name, { size: local.size, mtimeMs: local.mtimeMs });
 			return;
 		}
+		/*
+		 * The file first, then the agreed drawing, then (at the end of the pass) the revision: stopped
+		 * between any two, the next pass finds the edits already made, which change nothing again.
+		 */
+		const text = serialize(next.doc);
+		this.writePen(name, text, local);
+		this.keepBase(s.id, next.doc, text);
 		s.rev = next.rev;
 		this.latest.set(s.id, Math.max(this.latest.get(s.id) ?? 0, s.rev));
-		this.keepBase(s.id, next.doc);
-		this.writePen(name, this.base.get(s.id)!.text, local);
 	}
 
 	/**
@@ -622,7 +627,7 @@ export class HarnessSync {
 			for (const m of waiting) {
 				if (m.rev <= rev) continue;
 				if (m.base !== rev) break;
-				doc = applyEdits(doc, m.changes);
+				doc = loosely(doc, m.changes);
 				rev = m.rev;
 			}
 		} catch {
@@ -634,7 +639,7 @@ export class HarnessSync {
 			try {
 				const got = await this.call("GET", `/sync/v1/canvases/${s.id}/changes?since=${rev}`);
 				if (!got.tooOld && Array.isArray(got.changes)) {
-					for (const edits of got.changes as PenEdit[][]) doc = applyEdits(doc, edits);
+					for (const edits of got.changes as PenEdit[][]) doc = loosely(doc, edits);
 					return { doc, rev: got.rev };
 				}
 			} catch (error) {
@@ -1132,13 +1137,26 @@ export class HarnessSync {
 /** Board pictures the harness keeps, watched so a new one goes up with its canvas. */
 const THUMBS = ".decks/thumbs";
 
-/** Edits applied one by one, those that no longer fit left out: what was changed here while Studio was asked. */
+/**
+ * Edits applied as far as they fit: an insert of an item already there, or an edit to one gone, is
+ * left out. Applying a revision twice (the harness stopped between writing the file and its state)
+ * so changes nothing.
+ */
 function loosely(doc: PenDocument, edits: readonly PenEdit[]): PenDocument {
+	const ids = new Set<string>();
+	const visit = (list: readonly { id: string; children?: unknown }[]) => {
+		for (const n of list) {
+			ids.add(n.id);
+			if (Array.isArray(n.children)) visit(n.children as never);
+		}
+	};
+	if (edits.some((e) => e.op === "insert")) visit(doc.children ?? []);
+	const fits = edits.filter((e) => e.op !== "insert" || !ids.has(e.id));
 	try {
-		return applyEdits(doc, edits);
+		return applyEdits(doc, fits);
 	} catch {
 		let out = doc;
-		for (const edit of edits) {
+		for (const edit of fits) {
 			try {
 				out = applyEdits(out, [edit]);
 			} catch {
