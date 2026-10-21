@@ -1,5 +1,6 @@
 import { migrateStages } from "./2026-10-16-stages-to-canvases.ts";
 import { describe, migrated, migrateStandalone } from "./2026-10-20-standalone-canvases.ts";
+import { migrated as isolationMigrated, migrateIsolation } from "./2026-10-21-isolation-removed.ts";
 
 /**
  * Every change to how a deck is kept on disk, oldest first, and when each one runs.
@@ -19,6 +20,7 @@ import { describe, migrated, migrateStandalone } from "./2026-10-20-standalone-c
  * | 2026-10-16-board-lists-into-canvas-files.ts| on read | `agents/session.ts` (adoptStage) |
  * | 2026-10-16-stages-to-canvases.ts           | at open | `runAtOpen`, below              |
  * | 2026-10-20-standalone-canvases.ts          | at open | `runAtOpen`, below; once, after a backup, and recorded in `.decks/migrations.json` |
+ * | 2026-10-21-isolation-removed.ts            | at open | `runAtOpen`, below; once, after a backup of what it changes, and recorded there too |
  *
  * `DECKS_MIGRATE_DRY_RUN=1` on a harness's start (or `npm run migrate -- --dry-run <deck>`) prints
  * what the migrations still to run would move, and stops before anything is written.
@@ -41,7 +43,8 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 	if (dryRun) {
 		const lines: string[] = [];
 		if (!migrated(deck)) migrateStandalone(deck, { dryRun: true, log: (line) => lines.push(line) });
-		else lines.push(`${deck} is migrated already: nothing to do.`);
+		if (!isolationMigrated(deck)) migrateIsolation(deck, { dryRun: true, log: (line) => lines.push(line) });
+		if (migrated(deck) && isolationMigrated(deck)) lines.push(`${deck} is migrated already: nothing to do.`);
 		throw new DryRun(lines);
 	}
 	const moved = migrateStages(deck);
@@ -49,6 +52,10 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 	if (!migrated(deck)) {
 		const { plan, ran, backup } = migrateStandalone(deck, { ...(options.dataDir ? { dataDir: options.dataDir } : {}), log: (line) => said.push(line) });
 		if (ran && plan.canvases) said.push(describe(plan).at(-1)!, ...(backup ? [`the deck as it was is in ${backup}`] : []));
+	}
+	if (!isolationMigrated(deck)) {
+		const { plan, ran, backup } = migrateIsolation(deck, { log: (line) => said.push(line) });
+		if (ran && (plan.marks.length || plan.agents.length)) said.push(`isolated mode is gone: ${plan.agents.length} agent(s) and the canvases they used are ordinary now`, ...(backup ? [`what changed is backed up in ${backup}`] : []));
 	}
 	return said;
 }
