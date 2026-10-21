@@ -35,6 +35,8 @@ export interface DraftFieldProps {
 	label?: string;
 	disabled?: boolean;
 	ref?: (api: DraftFieldApi) => void;
+	/** Files pasted in (a screenshot, a file copied in the Finder): the composer attaches them. Absent: a paste is words only. */
+	onPasteFiles?: (files: File[]) => void;
 }
 
 export interface DraftFieldApi {
@@ -441,6 +443,8 @@ export function DraftField(props: DraftFieldProps) {
 		const onPaste = (event: ClipboardEvent) => {
 			if (!event.clipboardData) return;
 			event.preventDefault();
+			const files = [...event.clipboardData.files];
+			if (files.length && props.onPasteFiles) return props.onPasteFiles(files);
 			insertAtSelection(
 				parseDraft(event.clipboardData.getData(DRAFT_MIME)) ?? textDraft(event.clipboardData.getData("text/plain")),
 			);
