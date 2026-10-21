@@ -227,6 +227,13 @@ export interface Verbs {
 		 * your home, view.goto shows it.
 		 */
 		create(title: string): Promise<Canvas>;
+		/**
+		 * Make your own copy of a canvas a friend shared with you (`canvas`, shared/<owner>/<canvas>): its
+		 * drawing, boards, frames and files copied into a new canvases/<name>/ of yours, titled "Copy of …"
+		 * (or `title`). The copy is yours and syncs as your own; it never changes theirs. How a canvas
+		 * shared with you to view is changed.
+		 */
+		copyShared(options?: { canvas?: string; title?: string }): Promise<Canvas>;
 	};
 	board: {
 		/** Every board file in the deck, placed or not. */
@@ -498,8 +505,12 @@ export interface Decks extends Verbs {
 	connectStudio(options: { studio: string; key: string; code?: string; label?: string }): Promise<{ token: string; name: string; [key: string]: unknown }>;
 	/** A board's own token for its frame, on canvas `stage`: its calls act as that board. */
 	boardToken(path: string, stage?: string): Promise<string>;
-	/** Put a file into the deck's `assets/`, for an agent to read: its deck path. */
-	upload(file: Blob, options?: { name?: string }): Promise<string>;
+	/**
+	 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's own
+	 * `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck path. In
+	 * the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.
+	 */
+	upload(file: Blob, options?: { name?: string; canvas?: string }): Promise<string>;
 	/** Five-minute tickets for pages a frame or tab opens, by decoded request path (`/api/board/boards/a.html`, `/api/f/…`, `/app/<name>/`). Held by this connection too. */
 	tickets(paths: string[]): Promise<{ tickets: Record<string, string>; expires: number }>;
 	/** The ticket held for a page, while it has a little time left. */

@@ -1853,6 +1853,38 @@
   ]
  },
  {
+  "name": "canvas.copyShared",
+  "command": [
+   "canvas",
+   "copy-shared"
+  ],
+  "group": "canvas",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Make your own copy of a canvas a friend shared with you (`canvas`, shared/<owner>/<canvas>): its drawing, boards, frames and files copied into a new canvases/<name>/ of yours, titled \"Copy of …\" (or `title`). The copy is yours and syncs as your own; it never changes theirs. How a canvas shared with you to view is changed.",
+  "signature": "canvas.copyShared(options?: { canvas?: string; title?: string })",
+  "returns": "Canvas",
+  "params": [
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string; title?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
   "name": "frame.create",
   "command": [
    "frame",

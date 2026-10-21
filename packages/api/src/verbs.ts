@@ -242,6 +242,15 @@ export const VERBS: readonly Verb[] = [
 		result: Canvas,
 	},
 	{
+		name: "canvas.copyShared",
+		group: "canvas",
+		...deckChange,
+		summary:
+			'Make your own copy of a canvas a friend shared with you (`canvas`, shared/<owner>/<canvas>): its drawing, boards, frames and files copied into a new canvases/<name>/ of yours, titled "Copy of …" (or `title`). The copy is yours and syncs as your own; it never changes theirs. How a canvas shared with you to view is changed.',
+		params: [onCanvas({ title: opt(str()) })],
+		result: Canvas,
+	},
+	{
 		name: "frame.create",
 		group: "board",
 		...deckChange,

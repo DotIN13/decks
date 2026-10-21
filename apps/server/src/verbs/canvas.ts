@@ -1,3 +1,4 @@
+import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, walk, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
@@ -403,6 +404,15 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const pens = needPens();
 				const { isIsolatedStage } = await import("../stage/isolated-stages.ts");
 				return pens.names().filter((name) => !isolated() || isIsolatedStage(pens, name)).map(canvasRow);
+			},
+			/** Your own copy of a friend's canvas (`stage/copy-shared.ts`): a new canvas of yours, which syncs as yours. */
+			copyShared: async (options?: { canvas?: string; title?: string }) => {
+				const pens = needPens();
+				const from = canvasOf(options?.canvas);
+				const name = copySharedCanvas(service.deckPath(), pens, from, options?.title);
+				service.stagesChanged();
+				notes.push(`${name} is your own copy of ${pens.titleOf(from)}: change it as you like, it syncs as your canvas and never changes theirs. decks view goto ${name} shows it.`);
+				return canvasRow(name);
 			},
 			create: async (title: string) => {
 				if (typeof title !== "string" || !title.trim()) throw new Error('canvas create takes a title, as in decks canvas create "Launch plan".');
