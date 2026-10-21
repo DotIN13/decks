@@ -3,6 +3,7 @@ import { For, Show, createEffect, createMemo, createSignal, on, onCleanup } from
 import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
+import { measureFrame } from "./extent.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
@@ -120,6 +121,31 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	const wired = () => live() && guest() && !inert();
 
 	let frame: HTMLIFrameElement | undefined;
+	/*
+	 * A page from this page's own origin says how big it is and how it reads (`extent.ts`), for a
+	 * host whose agents fit boards to their content; tried for a while, as a page can lay out late.
+	 * A page from another origin cannot be read from here, and says nothing.
+	 */
+	let measuring: ReturnType<typeof setTimeout> | undefined;
+	const measure = () => {
+		clearTimeout(measuring);
+		if (!props.onExtent) return;
+		const at = frame;
+		let left = 150;
+		const attempt = () => {
+			if (!at || at !== frame || !at.isConnected) return;
+			let extent: ReturnType<typeof measureFrame>;
+			try {
+				extent = measureFrame(at);
+			} catch {
+				return;
+			}
+			if (extent) return props.onExtent?.({ rev: props.board.rev, ...extent });
+			if (left-- > 0) measuring = setTimeout(attempt, 100);
+		};
+		measuring = setTimeout(attempt, 0);
+	};
+	onCleanup(() => clearTimeout(measuring));
 	// The file changed: the same address again loads what it says now. Its gestures wait for its next hello.
 	createEffect(on(() => props.reload, () => {
 		if (!frame?.src) return;
@@ -313,7 +339,10 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						class="plain-board-page"
 						src={props.sandboxed ? withStorage(src(), props.sandboxed.key()) : src()}
 						sandbox={props.sandboxed ? SHARED_SANDBOX : undefined}
-						onLoad={() => say(live())}
+						onLoad={() => {
+							say(live());
+							measure();
+						}}
 						data-wired={wired() ? "" : undefined}
 						title={props.board.title}
 						data-path={props.board.path}

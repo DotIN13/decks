@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyEdits, type PenDocument, type PenEdit } from "@decks/pen";
+import { applyEdits, serialize, type PenDocument, type PenEdit } from "@decks/pen";
 import { boardsOf, createDrawing } from "./drawing.ts";
 
 const sample = (): PenDocument => ({
@@ -83,4 +83,22 @@ test("boards are the drawing's decks.board items, and moving one moves its item"
 	drawing.resizeBoard("boards/plan.html", { w: 640, h: 380 });
 	const board = drawing.doc().children[1]!;
 	assert.deepEqual([board.x, board.y, board.width, board.height], [420, -8, 640, 380]);
+});
+
+test("a drawing the host owns sends every edit and step to the host, and shows only what the host sends back", () => {
+	const sent: unknown[][] = [];
+	const steps: string[] = [];
+	const heard: unknown[] = [];
+	const d = createDrawing(serialize({ version: "2.14", children: [{ id: "n1", type: "note", content: "one", x: 0, y: 0 }] } as never), {
+		host: { send: (ops) => sent.push(ops), step: (dir) => steps.push(dir) },
+		onEdits: (edits) => heard.push(edits),
+	});
+	assert.equal(d.edit([{ op: "update", id: "n1", set: { content: "two" } }]), true);
+	assert.deepEqual(sent, [[{ op: "update", id: "n1", set: { content: "two" } }]]);
+	assert.equal((d.doc().children[0] as { content: string }).content, "one", "nothing changes until the host answers");
+	d.step("undo");
+	assert.deepEqual(steps, ["undo"]);
+	d.set({ version: "2.14", children: [{ id: "n1", type: "note", content: "two", x: 0, y: 0 }] } as never);
+	assert.equal((d.doc().children[0] as { content: string }).content, "two");
+	assert.equal(heard.length, 0, "a host-owned drawing reports nothing as the person's own edits");
 });

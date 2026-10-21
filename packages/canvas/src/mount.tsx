@@ -1,6 +1,6 @@
 import { baseTheme, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
-import { createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
+import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { render } from "solid-js/web";
 import { fitInto, frames } from "./camera/camera.ts";
@@ -59,6 +59,33 @@ export interface CanvasOptions {
 		 * `@decks/canvas/tools` lay a batch out). Absent: a drop on a board does nothing.
 		 */
 		onFiles?(path: string, files: File[], at: { x: number; y: number }, how: "drop" | "paste"): void;
+		/**
+		 * The host's own records of the boards (their revision, format and title), as its server keeps
+		 * them, in place of the ones read off the drawing. Read reactively.
+		 */
+		list?(): Board[];
+		/** A board's page measured itself (same-origin pages only): its size and how it reads, for the host's agents. */
+		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }): void;
+		/** A double-click on empty canvas: make a board there (or a deck of slides). Absent: nothing happens. */
+		onCreate?(at: { x: number; y: number }, format?: "board" | "slides"): void;
+		/** The canvas menu's Open document, at a point. */
+		onOpenDocument?(at: { x: number; y: number }): void;
+		/** A link on a board to another board: open it, and say whether this host has it. */
+		onOpenLink?(path: string, from: string): boolean;
+		/** Boards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
+		news?(): Record<string, string>;
+		/** The person looked at a board with a dot. */
+		onRead?(path: string): void;
+		/** Whether the boards' pages may start loading yet (the host may hold them until the canvas has opened). Read reactively. */
+		mayStart?(): boolean;
+		/** Every board on screen has started. */
+		onStarted?(): void;
+		/** The host is moving to another canvas: the boards hold still until it has. Read reactively. */
+		switching?(): boolean;
+		/** Pictures of boards the host takes itself (in the browser), in place of `picture`. */
+		shots?(): import("./Stage.tsx").StageShots;
+		/** A board's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
+		onHide?(path: string): void;
 		/** Words on a board with a comment waiting on them, kept marked in its page. Read reactively. */
 		marks?(path: string): Array<{ id: string; quote: string; component?: string }>;
 	};
@@ -95,6 +122,18 @@ export interface CanvasOptions {
 	};
 	/** The camera moved (a pan, a zoom, a fit). */
 	onCamera?: (camera: Camera) => void;
+	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
+	onViewport?: (viewport: { width: number; height: number }) => void;
+	/** Boards or items dragged onto the host's composer, to talk about them. */
+	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
+	/** A swipe in from the screen's left or right edge (touch): the host's side panels. */
+	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
+	/**
+	 * A drawing the host owns (its server): edits go to `send` as pen operations and show when the
+	 * host's answer arrives through `setDocument`; undo and redo are `step`'s. Absent: the drawing is
+	 * this page's, and `onEdits` hears every change.
+	 */
+	document?: { send(ops: unknown[]): void; step(direction: "undo" | "redo"): void };
 	/** The board selected on the canvas, or none. */
 	onSelect?: (path: string | undefined) => void;
 	/** Comment on a board or on drawn items (the comment buttons; absent: none). */
@@ -128,7 +167,9 @@ export interface CanvasOptions {
 /** A mounted canvas. */
 export interface CanvasHandle {
 	/** A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no `onEdits`. */
-	setDocument(text: string | PenDocument): void;
+	setDocument(text: string | PenDocument, base?: string): void;
+	/** Move the camera there, gliding unless `ms` is 0: an agent showing the person something. */
+	glide(camera: Camera, ms?: number): void;
 	/** The drawing as it is now. */
 	document(): PenDocument;
 	/** The drawing as `.pen` text. */
@@ -234,7 +275,12 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	};
 	paintScheme();
 
-	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}) });
+	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
+	/** What the drawing's own addresses are read against; a host that moves between canvases says so with `setDocument`. */
+	const [penBase, setPenBase] = createSignal(base);
+	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
+	const [glideAsk, setGlideAsk] = createSignal<{ token: number; ms: number }>();
+	let glides = 0;
 	const { doc, edit, step, moveBoard, resizeBoard, removeBoard } = drawing;
 
 	const setCamera = (next: Camera) => {
@@ -291,7 +337,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		? {
 				onPenEdit: edit,
 				onResize: resizeBoard,
-				onHide: removeBoard,
+				onHide: (path: string) => (options.boards?.onHide ? options.boards.onHide(path) : removeBoard(path)),
 				...(options.onDeleteBoard
 					? {
 							onDeleteBoard: (path: string) => {
@@ -313,7 +359,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	const boardHost = options.boards?.mintBoardToken ? createBoardHost({ mint: options.boards.mintBoardToken }) : undefined;
 
 	const dispose = render(() => {
-		const pen = createMemo(() => ({ doc: doc(), base }));
+		const pen = createMemo(() => ({ doc: doc(), base: penBase() }));
 		/*
 		 * In the canvas's own root, as every computation here is. Made beside the drawing, it belonged to
 		 * whatever was running when the host called `mountCanvas` (Studio mounts from an effect), and
@@ -326,7 +372,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		 * on every edit rebuilt every slot and reloaded every board's page after any drag.
 		 */
 		const [boards, setBoards] = createStore<Board[]>([]);
-		createComputed(() => setBoards(reconcile(boardsOf(doc()), { key: "path" })));
+		createComputed(() => setBoards(reconcile(options.boards?.list ? options.boards.list() : boardsOf(doc()), { key: "path" })));
 		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 		const inking = createMemo(() => inkOn() && mode() === "browse");
 		return (
@@ -338,7 +384,19 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 								mode={mode()}
 								renderer={options.renderer ?? "dom"}
 								picturesWhileMoving={options.picturesWhileMoving !== false}
-								boardsMayStart={true}
+								boardsMayStart={options.boards?.mayStart ? options.boards.mayStart() : true}
+								switching={options.boards?.switching?.() ?? false}
+								{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}
+								{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
+								{...(options.boards?.onCreate && editable ? { onCreateBoard: options.boards.onCreate } : {})}
+								{...(options.boards?.onOpenDocument && editable ? { onOpenDocument: options.boards.onOpenDocument } : {})}
+								{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
+								news={options.boards?.news?.() ?? {}}
+								{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
+								{...(options.onViewport ? { onViewport: options.onViewport } : {})}
+								{...(options.onRefer ? { onRefer: options.onRefer } : {})}
+								{...(options.onEdgeSwipe ? { onEdgeSwipe: options.onEdgeSwipe } : {})}
+								glide={glideAsk()}
 								boardPill={true}
 								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
 								opening={{ camera: opening }}
@@ -358,10 +416,13 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 								}}
 								onMove={moveBoard}
 								frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
-								shots={() => ({
-									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
-									ownPicture: true,
-								})}
+								shots={
+									options.boards?.shots ??
+									(() => ({
+										picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
+										ownPicture: true,
+									}))
+								}
 								{...commenting}
 							/>
 						</div>
@@ -378,7 +439,16 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	}, host);
 
 	return {
-		setDocument: (next) => drawing.set(next),
+		setDocument: (next, at) => {
+			if (at !== undefined) setPenBase(at);
+			drawing.set(next);
+		},
+		// The destination and the journey written together, so the stage never sees one without the other.
+		glide: (to, ms = 420) =>
+			batch(() => {
+				setGlideAsk(ms > 0 ? { token: ++glides, ms } : undefined);
+				setCamera(to);
+			}),
 		document: () => untrack(doc),
 		text: () => serialize(untrack(doc)),
 		setDark(on) {

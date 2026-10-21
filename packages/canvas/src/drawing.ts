@@ -30,6 +30,13 @@ export interface DrawingOptions {
 	readOnly?: boolean;
 	/** How many edits undo reaches back. */
 	depth?: number;
+	/**
+	 * A drawing the host owns, as the Decks app's server owns its canvases: each edit is handed to
+	 * `send` as pen operations and nothing changes here until the host's answer arrives (`set`); undo
+	 * and redo are the host's too (`step`). Without it the drawing is this page's: edits apply here at
+	 * once, are reported to `onEdits`, and undo is kept here (Studio, a sharing site).
+	 */
+	host?: { send(ops: unknown[]): void; step(direction: "undo" | "redo"): void };
 }
 
 export const isBoard = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.board";
@@ -87,6 +94,10 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 
 	const edit = (ops: unknown[]) => {
 		if (options.readOnly || ops.length === 0) return false;
+		if (options.host) {
+			options.host.send(ops);
+			return true;
+		}
 		const prev = untrack(doc);
 		let next: PenDocument;
 		try {
@@ -111,6 +122,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	};
 
 	const step = (direction: "undo" | "redo") => {
+		if (options.host) return options.host.step(direction);
 		const from = direction === "undo" ? undoStack : redoStack;
 		const to = direction === "undo" ? redoStack : undoStack;
 		const target = from.pop();
