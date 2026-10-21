@@ -12,13 +12,15 @@
 		"./float": "./src/public/float.ts",
 		"./tools": "./src/public/tools.ts",
 		"./styles.css": "./styles/standalone.css",
+		"./canvas.css": "./dist/canvas.css",
 		"./styles/*": "./styles/*",
 		"./internal/*": "./src/*"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"src/**/*.test.ts\"",
-		"demo": "vite --config demo/vite.config.ts"
+		"demo": "vite --config demo/vite.config.ts",
+		"build:css": "node scripts/build-css.mjs"
 	},
 	"dependencies": {
 		"@decks/board-kit": "*",
@@ -40,5 +42,11 @@
 		"typescript": "^5.9.3",
 		"vite": "^7.1.9",
 		"vite-plugin-solid": "^2.11.10"
-	}
+	},
+	"files": [
+		"src",
+		"styles",
+		"dist",
+		"scripts"
+	]
 }

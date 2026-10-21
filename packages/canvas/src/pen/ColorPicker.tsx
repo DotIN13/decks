@@ -1,6 +1,7 @@
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { portalLayer } from "../ui/portal.ts";
 import { Icon } from "../ui/icons.tsx";
 
 /**
@@ -136,7 +137,7 @@ export function ColorPicker(props: {
 	};
 
 	return (
-		<Portal>
+		<Portal mount={portalLayer()}>
 			<div ref={card} class="panel-float color-picker" role="dialog" aria-label={`${props.label}: pick a colour`} style={{ left: `${place().left}px`, top: `${place().top}px` }}>
 				<div
 					class="color-sv"

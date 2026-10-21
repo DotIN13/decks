@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
+import { portalLayer } from "./portal.ts";
 
 /**
  * One popover, for all five of them.
@@ -251,7 +252,7 @@ export function Popover(props: {
 				 * listens on the document and asks `card.contains`, so nothing here depends on
 				 * where the node sits.
 				 */}
-				<Portal>
+				<Portal mount={portalLayer()}>
 				<div
 					ref={card}
 					class={`popover ${props.class ?? ""}`}

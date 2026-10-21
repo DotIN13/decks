@@ -17,6 +17,7 @@ import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { portalLayer } from "../ui/portal.ts";
 import { insertPanel, penTool, setInsertPanel, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { Icon } from "../ui/icons.tsx";
 import { Properties } from "./Properties.tsx";
@@ -191,7 +192,7 @@ export function PenBar(props: {
 
 		<Show when={making()}>
 			{(at) => (
-				<Portal>
+				<Portal mount={portalLayer()}>
 					<div ref={newMenu} class="popover" role="menu" aria-label="A new board" style={{ left: `${at().left}px`, top: `${at().top}px`, width: "220px" }}>
 						<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => make(() => props.onNewBoard?.("board"))}>
 							<span class="row-icon">
