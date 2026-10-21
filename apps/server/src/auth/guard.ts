@@ -127,7 +127,7 @@ export function refusal(reason: Refusal | "none"): string {
  * `verbs/router.ts`), the list of them, whether it still works (`/api/session`), and the pages
  * anyone's frame may read. Nothing that is the person's (settings, uploads, agents, tickets, other
  * tokens), and nothing passed on to another server (`/c/<id>/`): a board's page is handed its token
- * by the page that framed it (`@decks/canvas/board-host.ts`), and that token is the board and no more.
+ * by the page that framed it (`@decks/canvas/internal/board-host.ts`), and that token is the board and no more.
  */
 export function boardMay(method: string, path: string): boolean {
 	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return true;

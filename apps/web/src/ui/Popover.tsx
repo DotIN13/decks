@@ -1,2 +1,2 @@
 /** Moved to `@decks/canvas`; this keeps the old path. */
-export * from "@decks/canvas/ui/Popover.tsx";
+export * from "@decks/canvas/internal/ui/Popover.tsx";

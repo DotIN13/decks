@@ -1,6 +1,6 @@
 import { api } from "../connections/connection.ts";
-import { AgentCursor } from "@decks/canvas/AgentCursor.tsx";
-import { touchedCanvas } from "@decks/canvas/camera/touched.ts";
+import { AgentCursor } from "@decks/canvas/internal/AgentCursor.tsx";
+import { touchedCanvas } from "@decks/canvas/internal/camera/touched.ts";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch, on, untrack } from "solid-js";
@@ -14,11 +14,11 @@ import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import Maximize from "lucide-solid/icons/maximize-2";
 import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
-import { INTERACT_ZOOM } from "@decks/canvas/camera/camera.ts";
+import { INTERACT_ZOOM } from "@decks/canvas/internal/camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
-import type { BoardView } from "@decks/canvas/editor/index.ts";
+import type { BoardView } from "@decks/canvas/internal/editor/index.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
-import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "@decks/canvas/acts.ts";
+import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "@decks/canvas/internal/acts.ts";
 import { isRead, READ_MS, READ_ZOOM } from "./glow.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
@@ -32,7 +32,7 @@ import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
-import { canvasPixelRatio, clickableWhereDrawn, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "@decks/canvas/picture.ts";
+import { canvasPixelRatio, clickableWhereDrawn, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "@decks/canvas/internal/picture.ts";
 
 /**
  * One board on the stage: a title above it, and the document itself in a frame.

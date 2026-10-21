@@ -1,10 +1,10 @@
-import { createBoardHost } from "@decks/canvas/board-host.ts";
+import { createBoardHost } from "@decks/canvas/internal/board-host.ts";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
 import { stageOnScreen } from "../state/decks.ts";
 
 /**
- * Each board frame's own token, for its buttons (`@decks/canvas/board-host.ts`, `lib/board.js`).
+ * Each board frame's own token, for its buttons (`@decks/canvas/internal/board-host.ts`, `lib/board.js`).
  *
  * This page asks the harness its boards come from for a token that is one board and nothing else
  * (`POST /api/tokens { kind: "board", path, stage }`, with this tab's person token), and the host

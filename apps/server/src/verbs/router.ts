@@ -22,7 +22,7 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * through the person's tool; they may say what they are acting on, as parameters and not as who
  * they are: `X-Decks-Stage`, the canvas on screen, and `X-Decks-Agent`, the agent they are talking
  * to. An agent's token calls as that agent, an app's as that app, and a board's as that board: a
- * board's page is handed its own token by the page that framed it (`@decks/canvas/board-host.ts`),
+ * board's page is handed its own token by the page that framed it (`@decks/canvas/internal/board-host.ts`),
  * and that is the only way a call is a board's. Naming a board in a header makes nobody that board.
  */
 

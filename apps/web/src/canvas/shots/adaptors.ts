@@ -3,7 +3,7 @@ import { authHeaders } from "../../lib/session.ts";
 import type { Board } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { thumbUrl } from "../../lib/api.ts";
-import { canvasPixelRatio, drawScale, elementContext, hasElementGeometry } from "@decks/canvas/picture.ts";
+import { canvasPixelRatio, drawScale, elementContext, hasElementGeometry } from "@decks/canvas/internal/picture.ts";
 import { snapshotOf } from "./snapshot.ts";
 
 /**

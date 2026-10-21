@@ -1,7 +1,7 @@
 /*
  * localStorage for a board whose page has a blank origin, kept by the page around it.
  *
- * A board on a canvas a friend shared runs sandboxed (`@decks/canvas/board-storage.ts`), without
+ * A board on a canvas a friend shared runs sandboxed (`@decks/canvas/internal/board-storage.ts`), without
  * `allow-same-origin`, so the browser gives its page no storage of its own: `localStorage` throws. A
  * board that keeps a score, a checklist or a setting still needs somewhere to keep it, so this file
  * puts a `localStorage` in its place that is the same to the board's own scripts — `getItem`,

@@ -1,2 +1,2 @@
 /** Moved to `@decks/canvas`, which the conversation shares; this keeps the old path. */
-export * from "@decks/canvas/state/edge.ts";
+export * from "@decks/canvas/internal/state/edge.ts";

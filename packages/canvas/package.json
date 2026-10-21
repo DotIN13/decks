@@ -6,9 +6,14 @@
 	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and one mount function for any host",
 	"exports": {
 		".": "./src/index.ts",
+		"./chat": "./src/public/chat.ts",
+		"./composer": "./src/public/composer.ts",
+		"./comments": "./src/public/comments.ts",
+		"./float": "./src/public/float.ts",
+		"./tools": "./src/public/tools.ts",
 		"./styles.css": "./styles/standalone.css",
 		"./styles/*": "./styles/*",
-		"./*": "./src/*"
+		"./internal/*": "./src/*"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",

@@ -1,12 +1,12 @@
 import { api } from "../connections/connection.ts";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
-import { type DeckHandle, slideKey } from "@decks/canvas/lib/slide-keys.ts";
+import { type DeckHandle, slideKey } from "@decks/canvas/internal/lib/slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 import { attachBoardOpen } from "../board/board-links.ts";
 import { isSharedBoard, SHARED_SANDBOX, sharedBoardSrc } from "../board/shared-board.ts";
-import { lendFrame } from "@decks/canvas/borrow.ts";
-import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS, springEasing } from "@decks/canvas/lib/spring.ts";
+import { lendFrame } from "@decks/canvas/internal/borrow.ts";
+import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS, springEasing } from "@decks/canvas/internal/lib/spring.ts";
 import { reducedMotion } from "../state/camera.ts";
 
 /**

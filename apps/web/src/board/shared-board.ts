@@ -1,4 +1,4 @@
-import { attachBoardStorage, boardStorageKey, isSharedBoard, sharedFolderOf, SHARED_SANDBOX, storageHash, storageKeeper } from "@decks/canvas/board-storage.ts";
+import { attachBoardStorage, boardStorageKey, isSharedBoard, sharedFolderOf, SHARED_SANDBOX, storageHash, storageKeeper } from "@decks/canvas/internal/board-storage.ts";
 import { createSignal } from "solid-js";
 import { api } from "../connections/connection.ts";
 import { authHeaders } from "../lib/session.ts";
@@ -12,7 +12,7 @@ import { authHeaders } from "../lib/session.ts";
  * at an address carrying a ticket for its canvas's folder, `/api/t/<ticket>/board/<path>`, and what
  * it loads by relative address carries the ticket too. The ticket reads that folder and nothing else
  * (`server/src/auth/tickets.ts`). Its `localStorage` is kept here, per canvas and board, by the shim
- * the harness puts in its page (`lib/storage-shim.js`, `@decks/canvas/board-storage.ts`).
+ * the harness puts in its page (`lib/storage-shim.js`, `@decks/canvas/internal/board-storage.ts`).
  */
 export { isSharedBoard, SHARED_SANDBOX };
 

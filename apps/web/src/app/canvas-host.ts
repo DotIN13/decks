@@ -1,4 +1,4 @@
-import { setCanvasHost } from "@decks/canvas/host.ts";
+import { setCanvasHost } from "@decks/canvas/internal/host.ts";
 import { deckBoardLink } from "../board/board-links.ts";
 import { can } from "../connections/backend.ts";
 import { deckFileUrl } from "../lib/api.ts";

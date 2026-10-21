@@ -1,2 +1,2 @@
 /** Moved to `@decks/canvas` so Studio draws the conversation the same way; this keeps the old path. */
-export * from "@decks/canvas/chat/working-sign.ts";
+export * from "@decks/canvas/internal/chat/working-sign.ts";

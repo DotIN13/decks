@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { deckMode, slideKey } from "@decks/canvas/lib/slide-keys.ts";
+import { deckMode, slideKey } from "@decks/canvas/internal/lib/slide-keys.ts";
 
 const press = (key: string, extra: Partial<KeyboardEvent> = {}) =>
 	({ key, code: key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...extra }) as KeyboardEvent;
