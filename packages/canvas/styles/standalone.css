@@ -13,8 +13,10 @@
  * an agent's reply sat beside its tool rows a word wide.
  */
 @source "../src";
+/* The agent parts (`@decks/agent-ui`) are still styled from here until they ship a sheet of their own. */
+@source "../../agent-ui/src";
 @import "./chrome.css";
-@import "./stream.css";
+@import "../../agent-ui/styles/stream.css";
 @import "./canvas.css";
 @import "./ink.css";
 @import "./markdown.css";

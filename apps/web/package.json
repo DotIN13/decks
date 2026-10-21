@@ -1,37 +1,39 @@
 {
-  "name": "@decks/web",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "build:public": "tsc -p tsconfig.json --noEmit && VITE_DECKS_PUBLIC=1 vite build --outDir dist-public",
-    "stage:backends": "node --import tsx scripts/stage-backends.ts"
-  },
-  "dependencies": {
-    "@decks/board-kit": "*",
+	"name": "@decks/web",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -p tsconfig.json --noEmit && vite build",
+		"preview": "vite preview",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test \"src/**/*.test.ts\"",
+		"build:public": "tsc -p tsconfig.json --noEmit && VITE_DECKS_PUBLIC=1 vite build --outDir dist-public",
+		"stage:backends": "node --import tsx scripts/stage-backends.ts"
+	},
+	"dependencies": {
+		"@decks/agent-ui": "*",
+		"@decks/board-kit": "*",
 		"@decks/canvas": "*",
-    "@decks/pen": "*",
-    "@decks/protocol": "*",
-    "@decks/sdk": "*",
-    "@decks/stage": "*",
-    "highlight.js": "^11.12.0",
-    "lucide-solid": "^1.37.0",
-    "marked": "^15.0.12",
-    "mathjax-full": "^3.2.2",
-    "solid-js": "^1.9.14"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.11",
-    "@webgpu/types": "^0.1.74",
-    "tailwindcss": "^4.1.11",
-    "tsx": "^4.20.7",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.9",
-    "vite-plugin-solid": "^2.11.10"
-  }
+		"@decks/pen": "*",
+		"@decks/protocol": "*",
+		"@decks/sdk": "*",
+		"@decks/stage": "*",
+		"@decks/ui": "*",
+		"highlight.js": "^11.12.0",
+		"lucide-solid": "^1.37.0",
+		"marked": "^15.0.12",
+		"mathjax-full": "^3.2.2",
+		"solid-js": "^1.9.14"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.1.11",
+		"@webgpu/types": "^0.1.74",
+		"tailwindcss": "^4.1.11",
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3",
+		"vite": "^7.1.9",
+		"vite-plugin-solid": "^2.11.10"
+	}
 }

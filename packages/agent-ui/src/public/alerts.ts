@@ -1,7 +1,7 @@
 /**
  * What an editor may interrupt you with when an agent finishes, asks or fails: a sound, a system
  * banner while you are elsewhere, and a count on the tab. The rules (`policy`), the cues (`sound`,
- * served by `decksSounds()` from `@decks/canvas/vite`), the banners (`notify`) and the live half
+ * served by `decksSounds()` from `@decks/agent-ui/vite`), the banners (`notify`) and the live half
  * (`createAlerts`), shared by the Decks app and Studio.
  */
 export { createAlerts, type AlertBanner } from "../alerts/alerts.ts";

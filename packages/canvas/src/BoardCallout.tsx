@@ -3,7 +3,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { toScreen, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { canvasHost } from "./host.ts";
-import { Icon } from "./ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";

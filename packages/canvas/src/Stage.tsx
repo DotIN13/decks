@@ -7,7 +7,7 @@ import MessageSquare from "lucide-solid/icons/message-square";
 import Scan from "lucide-solid/icons/scan";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import Pencil from "lucide-solid/icons/pencil";
-import { Icon } from "./ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { cursorFor, type AgentAct } from "./acts.ts";
 import { AgentCursor, type CursorAt } from "./AgentCursor.tsx";
@@ -23,7 +23,7 @@ import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./lib/sli
 import { cssEscape } from "./lib/css-escape.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
-import { velocityFrom, type Sample } from "./lib/velocity.ts";
+import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";

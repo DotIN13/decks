@@ -6,7 +6,7 @@
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
 import { canvasHost } from "../../host.ts";
-import { shortLabel } from "../../lib/labels.ts";
+import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
 

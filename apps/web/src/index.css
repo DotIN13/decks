@@ -30,7 +30,7 @@
 @import "./styles/panel.css";
 @import "./styles/forms.css";
 @import "./styles/inspector.css";
-@import "../../../packages/canvas/styles/stream.css";
+@import "../../../packages/agent-ui/styles/stream.css";
 @import "./styles/dock.css";
 @import "./styles/usage.css";
 @import "../../../packages/canvas/styles/canvas.css";

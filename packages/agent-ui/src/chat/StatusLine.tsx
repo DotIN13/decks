@@ -1,7 +1,7 @@
 import type { AgentKind, AgentState } from "@decks/protocol";
 import { Show } from "solid-js";
-import { historyShown, toggleHistory } from "../state/edge.ts";
-import { AgentMark } from "../agents/agent-marks.tsx";
+import { historyShown, toggleHistory } from "../edge.ts";
+import { AgentMark } from "@decks/ui";
 import { isWorking, signPlacement, workingWords } from "./working-sign.ts";
 
 /**

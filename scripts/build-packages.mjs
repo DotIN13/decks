@@ -30,10 +30,21 @@ const PUBLIC = [
 	{ dir: "sync-client" },
 	{ dir: "board-host", copy: ["lib"] },
 	// The canvas: its own build (JSX for Solid, one file per module, and the scoped stylesheet).
-	{ dir: "canvas", js: false, build: ["scripts/build-css.mjs", "scripts/build-lib.mjs"], copy: ["dist", "sounds", "vite-plugin.mjs", "vite-plugin.d.mts"], exports: (key, target) => (typeof target !== "string" ? target : key === "./internal/*" || key.startsWith("./styles") ? undefined : key === "./canvas.css" ? target : { types: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".d.ts"), default: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".js") }) },
+	{ dir: "ui", js: false, solid: true, copy: ["dist"], exports: solidExports },
+	{ dir: "agent-ui", js: false, solid: true, copy: ["dist", "sounds", "styles", "vite-plugin.mjs", "vite-plugin.d.mts"], exports: solidExports },
+	{ dir: "canvas", js: false, solid: true, build: ["scripts/build-css.mjs"], copy: ["dist"], exports: (key, target) => (typeof target !== "string" ? target : key === "./internal/*" || key.startsWith("./styles") ? undefined : key === "./canvas.css" ? target : { types: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".d.ts"), default: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".js") }) },
 	{ dir: "stage", js: false, copy: ["pkg", "pkg-gl", "README.md"] },
 	{ dir: "sdk", js: false, copy: ["src", "bin", "mcp", "README.md"] },
 ];
+
+/** A Solid package's exports, pointed at what `build-solid-lib.mjs` wrote; `internal/` and raw styles stay unpublished. */
+function solidExports(key, target) {
+	if (typeof target !== "string") return target;
+	if (key === "./internal/*" || key.startsWith("./styles")) return key.startsWith("./styles/") && target.startsWith("./styles/") ? target : undefined;
+	if (!/^\.\/src\/.*\.tsx?$/.test(target)) return target;
+	const at = target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, "");
+	return { types: `${at}.d.ts`, default: `${at}.js` };
+}
 
 const want = process.argv.slice(2);
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
@@ -47,6 +58,7 @@ for (const p of PUBLIC.filter((p) => !want.length || want.includes(p.dir))) {
 	mkdirSync(dest, { recursive: true });
 
 	for (const script of p.build ?? []) execFileSync(process.execPath, [join(src, script)], { stdio: "inherit", cwd: src });
+	if (p.solid) execFileSync(process.execPath, [join(root, "scripts", "build-solid-lib.mjs"), src], { stdio: "inherit", cwd: root });
 	if (p.js !== false) {
 		const config = join(dest, "tsconfig.build.json");
 		writeFileSync(config, JSON.stringify({

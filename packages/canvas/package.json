@@ -6,17 +6,9 @@
 	"description": "The Decks canvas editor as a package: the stage, its camera, the drawing's editor and tools, and one mount function for any host",
 	"exports": {
 		".": "./src/index.ts",
-		"./chat": "./src/public/chat.ts",
-		"./composer": "./src/public/composer.ts",
 		"./comments": "./src/public/comments.ts",
-		"./float": "./src/public/float.ts",
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",
-		"./alerts": "./src/public/alerts.ts",
-		"./vite": {
-			"types": "./vite-plugin.d.mts",
-			"default": "./vite-plugin.mjs"
-		},
 		"./styles.css": "./styles/standalone.css",
 		"./canvas.css": "./dist/canvas.css",
 		"./styles/*": "./styles/*",
@@ -27,13 +19,14 @@
 		"test": "node --import tsx --test \"src/**/*.test.ts\"",
 		"demo": "vite --config demo/vite.config.ts",
 		"build:css": "node scripts/build-css.mjs",
-		"build:lib": "node scripts/build-lib.mjs"
+		"build:lib": "node ../../scripts/build-solid-lib.mjs ."
 	},
 	"dependencies": {
 		"@decks/board-kit": "*",
 		"@decks/pen": "*",
 		"@decks/protocol": "*",
 		"@decks/stage": "*",
+		"@decks/ui": "*",
 		"highlight.js": "^11.12.0",
 		"lucide-solid": "^1.37.0",
 		"marked": "^15.0.12",
@@ -53,10 +46,7 @@
 	"files": [
 		"dist",
 		"scripts",
-		"sounds",
 		"src",
-		"styles",
-		"vite-plugin.d.mts",
-		"vite-plugin.mjs"
+		"styles"
 	]
 }

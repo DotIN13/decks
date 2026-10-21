@@ -66,8 +66,8 @@ export function draftLabel(node: DraftMention): string {
 	return node.label;
 }
 
-export { LABEL_LIMIT, shortLabel } from "../lib/labels.ts";
-import { shortLabel } from "../lib/labels.ts";
+export { LABEL_LIMIT, shortLabel } from "@decks/ui";
+import { shortLabel } from "@decks/ui";
 
 /** The start of a quotation, in quotes, short enough to sit in a sentence. */
 export function commentLabel(quote: string): string {

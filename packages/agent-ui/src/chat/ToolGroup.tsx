@@ -1,6 +1,6 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, Index, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import type { ToolSlot } from "./tool-groups.ts";
 import { ToolChip } from "./ToolChip.tsx";
 

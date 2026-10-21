@@ -16,7 +16,7 @@ import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid
 import { stagePoint } from "../../camera/coords.ts";
 import { canvasHost } from "../../host.ts";
 import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
-import { Icon } from "../../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import { newCard } from "../../pen/card-frame.ts";
 import { Insert } from "../../pen/Insert.tsx";
 import { TOOLS } from "../../pen/PenBar.tsx";

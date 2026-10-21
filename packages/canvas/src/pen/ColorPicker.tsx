@@ -1,8 +1,8 @@
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { portalLayer } from "../ui/portal.ts";
-import { Icon } from "../ui/icons.tsx";
+import { portalLayer } from "@decks/ui";
+import { Icon } from "@decks/ui";
 
 /**
  * A colour picker for the properties panel: a square of shade and brightness, a strip of hues, the

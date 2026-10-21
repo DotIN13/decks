@@ -1,7 +1,7 @@
-import { Icon } from "../ui/icons.tsx";
+import { Icon } from "@decks/ui";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import GitBranch from "lucide-solid/icons/git-branch";
-import { clockTime } from "../lib/time.ts";
+import { clockTime } from "@decks/ui";
 import { createSignal, Index, Match, Show, Switch } from "solid-js";
 import { Markdown } from "./MarkdownView.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";

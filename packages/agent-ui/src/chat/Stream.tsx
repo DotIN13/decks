@@ -1,10 +1,10 @@
-import { dayKey, formatDate, yearOf } from "../lib/time.ts";
+import { dayKey, formatDate, yearOf } from "@decks/ui";
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "../ui/icons.tsx";
-import { closeHistory, historyShown } from "../state/edge.ts";
+import { Icon } from "@decks/ui";
+import { closeHistory, historyShown } from "../edge.ts";
 import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
 import { WorkingSign } from "./StatusLine.tsx";
 import { turnCards, type TurnCard } from "./turn-cards.ts";

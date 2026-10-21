@@ -61,7 +61,7 @@ export function isSound(id: unknown): id is string {
 
 /**
  * Where the cues are served: `/sounds/` on the page's own origin by default, which is where
- * `@decks/canvas/vite`'s `decksSounds()` puts them (this package's `sounds/`, in dev and in a build).
+ * `@decks/agent-ui/vite`'s `decksSounds()` puts them (this package's `sounds/`, in dev and in a build).
  */
 let soundBase = "/sounds/";
 export function setSoundBase(base: string): void {

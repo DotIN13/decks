@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 // The alerts' cues at /sounds/, from @decks/canvas (they were public/sounds).
-import { decksSounds } from "@decks/canvas/vite";
+import { decksSounds } from "@decks/agent-ui/vite";
 
 /**
  * The dev server proxies to the API rather than talking to it cross-origin.

@@ -1,2 +1,2 @@
 /** Moved to `@decks/canvas`; this keeps the old path. */
-export * from "@decks/canvas/internal/agents/agent-marks.tsx";
+export * from "@decks/ui/agent-marks";
