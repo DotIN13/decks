@@ -52,6 +52,21 @@ await decks.view.goto("deploy");              // bring the person's screen there
 Two agents with one home canvas share its boards and its drawing. Make a new canvas for a new
 piece of work; make an old one your home to continue it.
 
+**A friend's canvas.** A canvas shared with you through Decks Studio is named `shared/<owner>/<canvas>`
+(`canvas.list` gives `shared: { owner, role }`) and lives in `shared/canvases/<owner>/<canvas>/`, the
+same shape as yours. What the share lets you do is its `role`:
+
+- `edit`: change it as your own, and everything goes into **its** folder, which syncs back to its
+  owner and everyone else it is shared with: a board you make (`board.create({ canvas })`) goes in its
+  `boards/`, a picture or file in its `files/` (the person's drops do this; from a script,
+  `decks.upload(file, { canvas })`, or write the file into its `files/` yourself), named in its
+  drawing as `files/<name>`. Never put what it uses in this deck's `assets/`: the owner would not get it.
+- `view`: it follows its owner's copy, and every call that would change it refuses. To change it,
+  make your own copy: `decks.canvas.copyShared({ canvas: "shared/ada/plan" })` copies its drawing,
+  boards, frames and files into a new `canvases/copy-of-…/` of yours (its owner's deck files go in the
+  copy's `files/`, links re-pointed), titled "Copy of …". The copy syncs as your canvas and never
+  changes theirs; an app's board in it stays a picture, since the app runs on its owner's harness.
+
 ## The calls
 
 ```ts
