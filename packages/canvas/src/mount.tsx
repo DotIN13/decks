@@ -3,7 +3,9 @@ import type { Board, Camera } from "@decks/protocol";
 import { createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { render } from "solid-js/web";
-import { fitInto } from "./camera/camera.ts";
+import { fitInto, frames } from "./camera/camera.ts";
+import { viewToPark } from "./camera/agent-view.ts";
+import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsOf, createDrawing } from "./drawing.ts";
@@ -75,8 +77,22 @@ export interface CanvasOptions {
 	mode?: "edit" | "browse";
 	/** Nothing can be changed: no tools, no edits. */
 	readOnly?: boolean;
-	/** Where the camera starts. Default: fit what is on the drawing. */
+	/** Where the camera starts. Default: the view kept for `views.scope`, else a fit of what is on the drawing. */
 	camera?: Camera;
+	/**
+	 * Keep where the person was looking, on this device, per scope: the host says what a view
+	 * belongs to and the editor parks and restores it. The Decks app's scope is an agent on a canvas
+	 * (`agent@canvas`), so each conversation has its own view; Studio's is the canvas. When the scope
+	 * changes, the view is parked under the old one and the new one's comes back, if it still shows
+	 * something on the drawing; a scope seen for the first time leaves the camera where it is.
+	 */
+	views?: {
+		scope: () => string | undefined;
+		/** Where views are kept: `localStorage` unless said (a test passes its own). */
+		storage?: ViewStorage;
+		/** What the store is called, so two hosts on one origin keep theirs apart. Default "canvas". */
+		key?: string;
+	};
 	/** The camera moved (a pan, a zoom, a fit). */
 	onCamera?: (camera: Camera) => void;
 	/** The board selected on the canvas, or none. */
@@ -138,6 +154,8 @@ export interface CanvasHandle {
 	setCamera(camera: Camera): void;
 	/** A board's file changed where its page comes from (a drop, an agent's edit): its page loads again. */
 	reloadBoard(path: string): void;
+	/** The canvas opened on the view kept for its scope (`views`), rather than on a fit. */
+	readonly restored: boolean;
 	dispose(): void;
 }
 
@@ -182,7 +200,21 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	};
 	setCanvasHost(answers);
 
-	const opening = options.camera ?? fitAll(parse(options.text), { width: host.clientWidth, height: host.clientHeight }, options.dark ? "dark" : "light");
+	// ---- views, per scope (`options.views`) ----
+	const views = options.views ? createAgentViews(options.views.key ?? "canvas", options.views.storage) : undefined;
+	const boxesOf = (d: PenDocument, scheme: "light" | "dark") => {
+		const placed = placements(d, { theme: baseTheme(d, scheme) });
+		return (d.children ?? []).map((node) => placed.get(node.id)?.box).filter((box): box is Frame => box !== undefined && box.w > 0 && box.h > 0);
+	};
+	/** The view kept for a scope, if it still shows something on this drawing. */
+	const kept = (scope: string | undefined, d: PenDocument, scheme: "light" | "dark") => {
+		const v = scope && views ? views.of(scope, undefined) : undefined;
+		return v && frames(v.camera, { width: host.clientWidth, height: host.clientHeight }, boxesOf(d, scheme)) ? v : undefined;
+	};
+	const firstScope = options.views ? untrack(options.views.scope) : undefined;
+	const firstView = kept(firstScope, parse(options.text), options.dark ? "dark" : "light");
+
+	const opening = firstView?.camera ?? options.camera ?? fitAll(parse(options.text), { width: host.clientWidth, height: host.clientHeight }, options.dark ? "dark" : "light");
 	const [camera, setCameraSignal] = createSignal<Camera>(opening);
 	/** How many times each board's page has been told to load again (`reloadBoard`). */
 	const [reloads, setReloads] = createSignal<Record<string, number>>({});
@@ -209,6 +241,45 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		setCameraSignal(next);
 		options.onCamera?.(next);
 	};
+
+	/*
+	 * Park the view under its scope as the camera moves (a little after it stops), when the scope
+	 * changes, when the page goes and when the canvas is unmounted; bring the new scope's back.
+	 */
+	const park = (scope: string | undefined) => {
+		if (scope && views) views.keep(scope, undefined, viewToPark(untrack(camera), untrack(penSelection)[0]));
+	};
+	let parkTimer: ReturnType<typeof setTimeout> | undefined;
+	const disposeViews = options.views
+		? createRoot((done) => {
+				const scope = options.views!.scope;
+				createEffect(
+					on(scope, (next, prev) => {
+						if (prev) park(prev);
+						const v = kept(next, untrack(doc), untrack(look));
+						if (!v) return;
+						setCamera(v.camera);
+						if (v.selected) setPenSelection([v.selected]);
+					}, { defer: true }),
+				);
+				createEffect(
+					on(camera, () => {
+						clearTimeout(parkTimer);
+						const at = untrack(scope);
+						parkTimer = setTimeout(() => park(at), 400);
+					}, { defer: true }),
+				);
+				const onHide = () => park(untrack(scope));
+				addEventListener("pagehide", onHide);
+				return () => {
+					clearTimeout(parkTimer);
+					park(untrack(scope));
+					removeEventListener("pagehide", onHide);
+					done();
+				};
+			})
+		: undefined;
+	if (firstView?.selected) setPenSelection([firstView.selected]);
 
 	const editable = !options.readOnly;
 	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
@@ -337,8 +408,10 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		redo: () => step("redo"),
 		camera: () => untrack(camera),
 		setCamera,
+		restored: firstView !== undefined,
 		reloadBoard: (path) => setReloads((all) => ({ ...all, [path]: (all[path] ?? 0) + 1 })),
 		dispose() {
+			disposeViews?.();
 			tools();
 			dispose();
 			boardHost?.dispose();
