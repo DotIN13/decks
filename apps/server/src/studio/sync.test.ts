@@ -14,9 +14,9 @@ test("a canvas name from Studio is one plain folder name", () => {
 	for (const name of [".", "..", "", "a/b", "a\\b", "a\0b"]) assert.ok(!safeCanvasFolder(name), name);
 });
 
-test("a file path from Studio stays under boards/ or assets/", () => {
-	for (const path of ["boards/a.html", "assets/img/x.png", "boards/apps/x.html"]) assert.ok(safeSyncPath(path), path);
-	for (const path of ["boards", "boards/", "lib/x.css", ".decks/studio.json", "canvases/x/canvas.pen", "boards/../x", "boards/./x", "boards//x", "assets/a\\..\\..\\x", "assets/a\0", "/boards/x", "../boards/x"]) assert.ok(!safeSyncPath(path), path);
+test("a file path from Studio stays in a canvas's bundle: its boards, frames and files, the deck files it mirrors, and pictures", () => {
+	for (const path of ["boards/a.html", "assets/img/x.png", "boards/apps/x.html", "frames/card.pen", "files/a.png", "docs/notes.md", ".pictures/boards/a.html.light.webp"]) assert.ok(safeSyncPath(path), path);
+	for (const path of ["boards", "boards/", "lib/x.css", ".decks/studio.json", "canvas.pen", "canvases/x/canvas.pen", "boards/../x", "boards/./x", "boards//x", "boards/.git/x", "files/.env", "assets/a\\..\\..\\x", "assets/a\0", "/boards/x", "../boards/x"]) assert.ok(!safeSyncPath(path), path);
 });
 
 test("secrets and dependencies never sync", () => {
@@ -31,6 +31,8 @@ test("a download lands inside the deck and never through a symbolic link", () =>
 		mkdirSync(join(deck, "boards"));
 		mkdirSync(join(deck, "assets"));
 		assert.deepEqual(landingFor(deck, "boards/new/a.html"), { full: join(deck, "boards", "new", "a.html") });
+		assert.ok("refused" in landingFor(deck, ".decks/studio.json"), "never into a hidden folder");
+		assert.deepEqual(landingFor(deck, "shared/canvases/ada/plan/boards/a.html"), { full: join(deck, "shared", "canvases", "ada", "plan", "boards", "a.html") });
 		symlinkSync(away, join(deck, "assets", "out"));
 		const refused = landingFor(deck, "assets/out/x.png");
 		assert.ok("refused" in refused && /symbolic link/.test(refused.refused));
