@@ -2,7 +2,7 @@
  * The board vocabulary, as data, in one place.
  *
  * A board is HTML, and what may appear on one is a closed set: seven classes
- * `runtime/lib/board.css` styles, five kinds of component the app can put on a board, and
+ * `board-host/lib/board.css` styles, five kinds of component the app can put on a board, and
  * three tones a callout may carry. That set used to be written down in eight files across
  * three workspaces — two unions here, the splice's placeholders there, the palette's key,
  * its label, its icon and its default size, the cheat sheet, the stylesheet, the authoring

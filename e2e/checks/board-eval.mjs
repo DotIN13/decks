@@ -3,7 +3,7 @@
  *
  * The board carries a script typed `text/decks-eval`, which a browser reads as text and never
  * runs on its own, and a component naming it with `data-eval`. Pressing that component runs the
- * block in the board's own page with the SDK as `stage` (`runtime/lib/board.js`); each verb it
+ * block in the board's own page with the SDK as `stage` (`board-host/lib/board.js`); each verb it
  * calls goes to `/api/v1` as this board, and the server asks once whether this board may use the
  * stage at all. This check is the whole path in a real browser:
  *

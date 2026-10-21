@@ -320,7 +320,7 @@ async function shapeOf(file: File): Promise<{ width: number; height: number }> {
 /**
  * The extensions the board runtime renders as escaped preformatted text.
  *
- * Duplicated from `runtime/lib/board.js` on purpose: that file is standalone by
+ * Duplicated from `board-host/lib/board.js` on purpose: that file is standalone by
  * design — it renders a board with no app around it — so it cannot import from
  * here, and this side only uses the list to pick a box. A miss costs a slightly
  * wrong shape, not a broken embed.

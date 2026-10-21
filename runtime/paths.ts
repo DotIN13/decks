@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { libDir as boardLib } from "@decks/board-host";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -63,7 +65,9 @@ export function examplesDir(): string {
  * rather than a route this server serves.
  */
 export function runtimeLib(): string {
-	return resolve(HERE, "lib");
+	// A variant runtime (`DECKS_RUNTIME_DIR`) may carry its own primitives; otherwise they are @decks/board-host's.
+	if (HERE !== SELF && existsSync(resolve(HERE, "lib"))) return resolve(HERE, "lib");
+	return boardLib();
 }
 
 /** The `decks` command reference, generated from the verb table and given to every agent in its context. */
@@ -110,7 +114,6 @@ export function antigravityServer(): string {
  * clone missing one says so rather than starting an agent that cannot read a board.
  */
 export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean }> = [
-	{ path: "lib", what: "the board primitives, copied into every deck", dir: true },
 	{ path: "skills", what: "what an agent is taught with", dir: true },
 	{ path: "examples", what: "the worked boards agents borrow from, copied into every deck", dir: true },
 	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },

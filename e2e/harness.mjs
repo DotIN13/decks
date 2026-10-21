@@ -242,7 +242,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 /**
  * Wait until every board on the canvas has finished mounting.
  *
- * `__boardReady` is set by `runtime/lib/board.js` once the document has rendered its
+ * `__boardReady` is set by `board-host/lib/board.js` once the document has rendered its
  * components, which is the same signal the app itself waits for.
  */
 /**

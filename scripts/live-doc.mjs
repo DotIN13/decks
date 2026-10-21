@@ -15,9 +15,9 @@ await build({
 	format: "esm",
 	platform: "browser",
 	target: ["es2022"],
-	outfile: join(root, "runtime", "lib", "live-doc.js"),
+	outfile: join(root, "packages", "board-host", "lib", "live-doc.js"),
 	minify: true,
 	legalComments: "none",
 	logLevel: "error",
 });
-console.log("[live-doc] runtime/lib/live-doc.js");
+console.log("[live-doc] packages/board-host/lib/live-doc.js");

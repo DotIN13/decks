@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 // @ts-expect-error -- the vendored runtime is plain JS, deliberately untyped: it is shipped
 // into every deck as-is and a `.d.ts` beside it would be a second thing to keep true.
-import { isHtmlDeck, logicalSize, sheetColumns, splitDeck, splitNote } from "../../../../runtime/lib/slides.js";
+import { isHtmlDeck, logicalSize, sheetColumns, splitDeck, splitNote } from "@decks/board-host/lib/slides.js";
 
 /**
- * The deck parser, tested here because `runtime/lib` ships as plain JS with no build step.
+ * The deck parser, tested here because `@decks/board-host/lib` ships as plain JS with no build step.
  *
  * These are the functions with real edge cases in them — the fence that is also a
  * separator, the trailing `---` that is a habit rather than a slide — and they are the ones

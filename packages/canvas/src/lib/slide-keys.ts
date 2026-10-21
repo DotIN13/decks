@@ -83,7 +83,7 @@ export function deckMode(zoom: number, interactZoom: number): "stage" | "sheet" 
 
 
 /**
- * What `runtime/lib/slides.js` puts on a deck frame's `window` as `__deck`.
+ * What `board-host/lib/slides.js` puts on a deck frame's `window` as `__deck`.
  *
  * Declared here rather than imported, because the runtime is plain JS shipped into every
  * deck and deliberately untyped — a `.d.ts` beside it would be a second thing to keep true
