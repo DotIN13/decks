@@ -10,7 +10,7 @@ import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
-import { copyBoardInto, copyFrameInto } from "../boards/copy-in.ts";
+import { copyBoardInto, copyFileInto, copyFrameInto } from "../boards/copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
 /**
@@ -162,6 +162,22 @@ export class StagePens {
 		}
 	}
 
+	/**
+	 * A drawing written from outside (Studio's sync, pen.dev, an agent's own tools) that reaches out of
+	 * its canvas's folder for a picture is written again through `toDisk`, which copies the picture into
+	 * the canvas's `files/` (`canvas-refs.ts`). Only this deck's own canvases, and only when it would change.
+	 */
+	private settle(name: string): void {
+		if (isSharedCanvas(name)) return;
+		const entry = this.cache.get(name);
+		if (!entry || entry.error) return;
+		try {
+			if (serialize(toDisk(name, entry.doc, this.adopt)) !== entry.text) this.write(name, entry.doc);
+		} catch {
+			/* a board it names cannot be copied in: left as it is, and drawn as missing */
+		}
+	}
+
 	/** Refused, with a sentence, for a friend's canvas shared with you to view: its drawing follows theirs. */
 	mayWrite(name: string): void {
 		const shared = this.sharing(name);
@@ -175,6 +191,7 @@ export class StagePens {
 	adopt: Adopt = {
 		board: (canvas, path) => this.copyIn(canvas, path),
 		frame: (canvas, ref) => copyFrameInto(this.deckPath, ref, canvas),
+		file: (canvas, deckPath) => copyFileInto(this.deckPath, deckPath, canvas),
 	};
 
 	/** Told of each copy a canvas makes, so the deck reads it at once (`app.ts`). */
@@ -1011,6 +1028,7 @@ export class StagePens {
 					const before = this.cache.get(name);
 					const after = this.get(name);
 					if (after !== before || after.rev !== before?.rev) this.changed(name, after);
+					this.settle(name);
 				}, 80),
 			);
 		};

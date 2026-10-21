@@ -295,3 +295,34 @@ test("a .pen file outside the deck is read and edited by its absolute path", () 
 		rmSync(elsewhere, { recursive: true, force: true });
 	}
 });
+
+test("a canvas stands alone: a board placed from the library is copied in, and a picture filled from the deck's assets/ too", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		mkdirSync(join(dir, "boards"), { recursive: true });
+		mkdirSync(join(dir, "assets"), { recursive: true });
+		writeFileSync(join(dir, "boards", "plan.html"), '<link rel="stylesheet" href="../lib/board.css"><img src="../assets/a.png">');
+		writeFileSync(join(dir, "assets", "a.png"), "png");
+		const name = pens.claim("s");
+		pens.edit(name, [
+			{ op: "insert", node: { type: "browser", id: "b", url: "../../boards/plan.html", width: 600, height: 400, metadata: { type: "decks.board", path: "boards/plan.html" } }, box: { x1: 0, y1: 0 } },
+			{ op: "insert", node: { type: "rectangle", id: "pic", width: 100, height: 100, fill: { type: "image", url: "../../assets/a.png", mode: "fill" } }, box: { x1: 700, y1: 0 } },
+		]);
+		const saved = JSON.parse(readFileSync(join(dir, "canvases", "s", "canvas.pen"), "utf8"));
+		assert.deepEqual(saved.children[0].metadata, { type: "decks.board", path: "boards/plan.html" }, "named from the canvas's own folder");
+		assert.equal(readFileSync(join(dir, "canvases", "s", "boards", "plan.html"), "utf8"), '<link rel="stylesheet" href="../lib/board.css"><img src="../assets/a.png">', "lib/ and assets/ are served beside a canvas's boards, so the copy needs no rewrite");
+		assert.equal(saved.children[1].fill.url, "files/a.png");
+		assert.equal(readFileSync(join(dir, "canvases", "s", "files", "a.png"), "utf8"), "png");
+		assert.equal(pens.copyOf("s", "boards/plan.html"), "canvases/s/boards/plan.html");
+		assert.equal(pens.ownPath("s", "boards/plan.html"), "canvases/s/boards/plan.html", "asked for again, the same copy");
+		// A reference the rules refuse, written by hand, is not drawn as a board and is written back as it was.
+		writeFileSync(join(dir, "canvases", "s", "canvas.pen"), JSON.stringify({ version: "2.14", children: [{ type: "browser", id: "x", url: "../other/boards/a.html", width: 10, height: 10, metadata: { type: "decks.board", path: "../other/boards/a.html" } }] }));
+		assert.deepEqual(pens.boards("s"), []);
+		pens.edit("s", [{ op: "insert", node: { type: "note", id: "n" } }]);
+		assert.equal(JSON.parse(readFileSync(join(dir, "canvases", "s", "canvas.pen"), "utf8")).children[0].metadata.path, "../other/boards/a.html");
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

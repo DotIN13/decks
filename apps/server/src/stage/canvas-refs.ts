@@ -1,5 +1,6 @@
 import { PenError, walk, type PenDocument, type PenNode } from "@decks/pen";
-import { referenceFor, resolveReference, urlFor } from "../deck/layout.ts";
+import { posix } from "node:path";
+import { canvasFolder, referenceFor, resolveReference, urlFor } from "../deck/layout.ts";
 
 /**
  * A canvas's drawing as it is on disk, and as the harness holds it.
@@ -51,6 +52,11 @@ export interface Adopt {
 	board(canvas: string, path: string): string;
 	/** Copy a saved frame (`frames/<name>`) the drawing uses into the canvas, if it is not there yet. */
 	frame?(canvas: string, ref: string): void;
+	/**
+	 * Copy a deck file a drawn item fills with (a picture dropped into the deck's `assets/`) into the
+	 * canvas's `files/`, and answer its path in the canvas's folder; undefined leaves it as it is.
+	 */
+	file?(canvas: string, deckPath: string): string | undefined;
 }
 
 /**
@@ -80,7 +86,33 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 		node.url = urlFor(name, reference.path);
 	}
 	if (adopt?.frame) for (const ref of frameRefsOf(out)) adopt.frame(name, ref);
+	if (adopt?.file) adoptFills(name, out, adopt.file);
 	return out;
+}
+
+/**
+ * Every fill's address that reaches out of the canvas's folder into the deck (`../../assets/a.png`)
+ * pointed at the canvas's own copy in `files/`, made now: so the drawing reads the same in any folder
+ * it is copied to, a friend's included.
+ */
+function adoptFills(name: string, doc: PenDocument, file: NonNullable<Adopt["file"]>): void {
+	const folder = canvasFolder(name);
+	const visit = (value: unknown): void => {
+		if (Array.isArray(value)) value.forEach(visit);
+		else if (value && typeof value === "object") {
+			const record = value as Record<string, unknown>;
+			for (const [key, inner] of Object.entries(record)) {
+				if (key === "children" || key === "metadata") continue;
+				if (key === "url" && typeof inner === "string" && !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(inner)) {
+					const target = posix.normalize(posix.join(folder, inner));
+					if (target.startsWith("..") || target.startsWith(`${folder}/`)) continue;
+					const own = file(name, target);
+					if (own) record[key] = own;
+				} else if (inner && typeof inner === "object") visit(inner);
+			}
+		}
+	};
+	for (const node of walk(doc.children)) if (node.type !== "browser") visit(node);
 }
 
 /** The saved frames a drawing places by ref, `frames/<name>`, overrides and all. */

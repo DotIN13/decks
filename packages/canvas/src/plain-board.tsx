@@ -14,6 +14,8 @@ let nextFinger = 800001;
 
 /** A page's address without its ticket (`decks_ticket`), to tell a new ticket from a new page. */
 function withoutTicket(address: string): string {
+	// A friend's board's folder ticket rides in the path (`/api/t/<ticket>/board/…`): the same page under a new ticket.
+	address = address.replace(/\/api\/t\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\/board\//, "/api/t/-/board/");
 	if (!address.includes("decks_ticket=")) return address;
 	try {
 		const url = new URL(address, location.href);

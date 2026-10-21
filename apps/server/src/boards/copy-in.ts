@@ -104,3 +104,15 @@ export function copyFrameInto(deck: string, ref: string, canvas: string): void {
 	if (existsSync(join(deck, target)) || !existsSync(join(deck, `${ref}.pen`))) return;
 	clone(deck, `${ref}.pen`, target);
 }
+
+/**
+ * Copy a deck file a canvas's drawing fills with into its `files/` (`assets/a.png` → `files/a.png`,
+ * `exports/x.png` → `files/exports/x.png`), once; answers its path in the canvas's folder, or
+ * undefined for a path that is no plain deck file (hidden, missing, another canvas's).
+ */
+export function copyFileInto(deck: string, deckPath: string, canvas: string): string | undefined {
+	if (isHidden(deckPath) || canvasOfPath(deckPath) || /^(?:shared|lib)\//.test(deckPath) || !isFile(join(deck, deckPath))) return undefined;
+	const inside = deckPath.startsWith("assets/") ? `files/${deckPath.slice("assets/".length)}` : `files/${deckPath}`;
+	clone(deck, deckPath, `${canvasFolder(canvas)}/${inside}`);
+	return inside;
+}
