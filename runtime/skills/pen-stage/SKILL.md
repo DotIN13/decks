@@ -8,11 +8,15 @@ description: A canvas is a native pen.dev .pen file — its boards, and notes, t
 Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
-- **Boards**: the HTML pages you write. In the file each one is a pen `browser` item pointing at
-  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`; every canvas call reads
-  and writes it as **`{ type: "board", board: "boards/…" }`**, and takes a board's path wherever
-  it takes an item's id. Make the file with `decks.board.create`, then place it with
-  `decks.canvas.insert({ type: "board", board: path }, { beside })`; `canvas.move`, `canvas.update`
+- **Boards**: the HTML pages you write, kept in the canvas's own folder, `canvases/<name>/boards/`.
+  In the file each one is a pen `browser` item pointing at its file, tagged
+  `metadata: { type: "decks.board", path: "boards/…" }` — the path is the canvas's own folder's, so the
+  folder stands alone and can be shared whole. Every canvas call reads and writes it as
+  **`{ type: "board", board: "canvases/<name>/boards/…" }`**, its path in the deck, and takes a
+  board's path wherever it takes an item's id. Make the file with `decks.board.create` (it goes in
+  your canvas's `boards/`, or `{ canvas }`'s), then place it with
+  `decks.canvas.insert({ type: "board", board: path }, { beside })`. A board from another canvas or the
+  library (`boards/`, read only) placed on your canvas is **copied in**, and the answer names the copy; `canvas.move`, `canvas.update`
   (`{ size: { w, h } }`) and `canvas.delete` (the file stays) do the rest, or put it inside a frame.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
   boards — a note beside one, an arrow from one to the next, an outline round a group. Put an
@@ -222,15 +226,16 @@ overrides inside a copy; an override with a `type` replaces that child whole. A 
 reusable item marked `slot: ["<item id>", …]` is a place for content: a copy fills it with
 `descendants: { "<slot id>": { children: [ … ] } }`, refs included.
 
-**Saved frames.** A frame worth using again goes in the deck's `frames/` folder, as a board goes in
-`boards/`, in folders if you like. Two ways in:
+**Saved frames.** A frame worth using again goes in your canvas's own `frames/` folder
+(`canvases/<name>/frames/`), as its boards go in its `boards/`, in folders if you like; a frame from the
+deck's old `frames/` placed on a canvas is copied in. Two ways in:
 
 - `decks.frame.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
   `frames/ui/agent-card.pen` with that frame as its one reusable item;
 - `decks.canvas.save("<item id>", "frames/ui/agent-card")` saves something already on your stage there, and
   puts a ref to it where the item was.
 
-Any stage places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
+Your canvas places it with `{ type: "ref", ref: "frames/ui/agent-card" }` and its own `descendants`,
 with nothing to declare. To change the frame itself, give the canvas item calls `{ frame }` in place of
 `{ canvas }`: `decks.canvas.read({ frame: "frames/ui/agent-card" })`, then `insert`, `update`, `replace`,
 `delete`, `move`, `copy`, `variables` or `batch` with the same items, as in
