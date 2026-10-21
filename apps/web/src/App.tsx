@@ -71,7 +71,7 @@ import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, isPhone, keepVisible, middleOf} from "@decks/canvas/internal/camera/camera.ts";
-import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
+import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable, toggleHistory} from "./state/edge.ts";
 import { canvasBox, insets, watchInsets } from "@decks/canvas/internal/camera/insets.ts";

@@ -7,7 +7,7 @@ import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
-import { viewToPark } from "../camera/agent-view.ts";
+import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../camera/agent-views.ts";
 import { runStageCall } from "@decks/canvas/internal/stage-ops.ts";
 import { DONE_LINGER_MS } from "@decks/canvas/internal/acts.ts";

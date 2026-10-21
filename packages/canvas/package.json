@@ -11,6 +11,7 @@
 		"./comments": "./src/public/comments.ts",
 		"./float": "./src/public/float.ts",
 		"./tools": "./src/public/tools.ts",
+		"./camera": "./src/public/camera.ts",
 		"./styles.css": "./styles/standalone.css",
 		"./canvas.css": "./dist/canvas.css",
 		"./styles/*": "./styles/*",
