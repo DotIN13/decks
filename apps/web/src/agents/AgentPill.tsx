@@ -598,6 +598,12 @@ export function AgentPill(props: {
 	stage?: string;
 	onStages?: () => void;
 	stagesOpen?: boolean;
+	/**
+	 * The canvas on screen is a friend's, shared with you to view: who shared it. The pill says so
+	 * beside the canvas's name, with the way to change it, which is your own copy (`onCopy`).
+	 */
+	viewOnly?: string;
+	onCopy?: () => void;
 }) {
 	const active = () => props.chats.find((chat) => chat.id === props.focused);
 	const name = () => {
@@ -721,6 +727,18 @@ export function AgentPill(props: {
 							<Show when={props.stage}>{(name) => <span class="pill-agent-name max-[768px]:hidden">{name()}</span>}</Show>
 							<Icon of={ChevronDown} size={12} />
 						</button>
+						<Show when={props.viewOnly}>
+							{(owner) => (
+								<button
+									type="button"
+									class="chip-button pill-agent pill-view-only"
+									title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`}
+									onClick={() => props.onCopy?.()}
+								>
+									<span class="pill-agent-name">View only · Make a copy</span>
+								</button>
+							)}
+						</Show>
 					</>
 				)}
 			</Show>

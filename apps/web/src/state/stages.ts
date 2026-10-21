@@ -23,6 +23,12 @@ export function stageOf(agentId: string | undefined): StageRow | undefined {
 	return stages().find((one) => one.agents.some((agent) => agent.id === agentId));
 }
 
+/** The canvas of this name when it is a friend's, shared with you to view: read here, changed only in a copy. */
+export function viewOnly(name: string | undefined): StageRow | undefined {
+	const row = name ? stages().find((one) => one.name === name) : undefined;
+	return row?.shared?.role === "view" ? row : undefined;
+}
+
 /**
  * The stages a query matches, and whether each did.
  *

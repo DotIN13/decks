@@ -13,9 +13,9 @@ import { ask } from "../state/confirm.ts";
  * is used on. A drop that copies 8MB with nothing moving on screen reads as broken,
  * which makes the progress the feature rather than a nicety.
  */
-export async function uploadAsset(file: File, onProgress?: (fraction: number) => void): Promise<UploadedAsset> {
+export async function uploadAsset(file: File, onProgress?: (fraction: number) => void, canvas?: string): Promise<UploadedAsset> {
 	if (!(await mayUpload(file))) throw new Error("not uploaded");
-	return send(file, onProgress);
+	return send(file, onProgress, canvas);
 }
 
 /** Files already asked about and agreed to (`mayUpload`), so a caller that asks first is not asked twice. */
@@ -31,7 +31,7 @@ export async function mayUpload(file: File): Promise<boolean> {
 	const mb = Math.round(file.size / 1024 / 1024);
 	const go = await ask({
 		title: `Upload ${file.name}?`,
-		body: `It is ${mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`}. It is copied into the deck's assets folder, which takes a while and keeps that much disk.`,
+		body: `It is ${mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`}. It is copied into the deck, which takes a while and keeps that much disk.`,
 		yes: "Upload",
 		no: "Cancel",
 	});
@@ -39,7 +39,11 @@ export async function mayUpload(file: File): Promise<boolean> {
 	return go;
 }
 
-function send(file: File, onProgress?: (fraction: number) => void): Promise<UploadedAsset> {
+/**
+ * `canvas`: the canvas the file was dropped on, whose own `files/` it goes into (`/api/upload`), so a
+ * friend's canvas you may edit takes it in its own folder and it reaches them. Left out, `assets/`.
+ */
+function send(file: File, onProgress?: (fraction: number) => void, canvas?: string): Promise<UploadedAsset> {
 	return new Promise((resolve, reject) => {
 		// Refused here as well as on the server: the point of a client-side check is
 		// not the limit, it is not spending a minute uploading something that will be
@@ -54,7 +58,7 @@ function send(file: File, onProgress?: (fraction: number) => void): Promise<Uplo
 		}
 
 		const request = new XMLHttpRequest();
-		request.open("POST", api(`/upload?name=${encodeURIComponent(file.name)}`));
+		request.open("POST", api(`/upload?name=${encodeURIComponent(file.name)}${canvas ? `&canvas=${encodeURIComponent(canvas)}` : ""}`));
 		// The bytes are the body, so the type says only that. What the file *is* is
 		// decided from its name when it is served, never from what the client claimed.
 		request.setRequestHeader("Content-Type", "application/octet-stream");

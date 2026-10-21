@@ -525,6 +525,13 @@
 		padding-left: 7px;
 	}
 
+	/* A friend's canvas shared with you to view: said beside its name, in the accent, and pressing it makes your own copy. */
+	.pill-agent.pill-view-only {
+		padding: 0 9px;
+		color: var(--accent, currentColor);
+		white-space: nowrap;
+	}
+
 	/* The mark itself, centred in its own box. */
 	.pill-stage-glyph {
 		display: grid;

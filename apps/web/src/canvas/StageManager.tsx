@@ -1,6 +1,7 @@
 import { api } from "../connections/connection.ts";
 import Lock from "lucide-solid/icons/lock";
 import Pencil from "lucide-solid/icons/pencil";
+import Copy from "lucide-solid/icons/copy";
 import Trash from "lucide-solid/icons/trash-2";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
@@ -67,6 +68,8 @@ export function StageManager(props: {
 	onRename: (name: string, to: string) => void;
 	/** Delete a stage, with its drawing and any boards kept in its own folder. */
 	onDelete: (name: string) => void;
+	/** Make your own copy of a friend's canvas (`canvas.copyShared`), and go to it. */
+	onCopy?: (name: string) => void;
 }) {
 	const [query, setQuery] = createSignal("");
 	let field: HTMLInputElement | undefined;
@@ -266,6 +269,7 @@ export function StageManager(props: {
 									onOpen={open}
 									onRename={props.onRename}
 									onDelete={props.onDelete}
+									{...(props.onCopy ? { onCopy: props.onCopy } : {})}
 								/>
 							)}
 						</For>
@@ -311,6 +315,7 @@ function StageCard(props: {
 	onOpen: (name: string) => void;
 	onRename: (name: string, to: string) => void;
 	onDelete: (name: string) => void;
+	onCopy?: (name: string) => void;
 }) {
 	const [editing, setEditing] = createSignal(false);
 	const [confirming, setConfirming] = createSignal(false);
@@ -391,9 +396,17 @@ function StageCard(props: {
 					when={confirming()}
 					fallback={
 						<>
-							<button type="button" class="stage-icon" title="Rename" aria-label={`Rename ${stage().title}`} onClick={startEditing}>
-								<Icon of={Pencil} size={13} />
-							</button>
+							{/* A friend's canvas: your own copy of it, which you can change (to view, the only way to). */}
+							<Show when={stage().shared && props.onCopy}>
+								<button type="button" class="stage-icon" title="Make a copy" aria-label={`Make a copy of ${stage().title}`} onClick={() => props.onCopy?.(stage().name)}>
+									<Icon of={Copy} size={13} />
+								</button>
+							</Show>
+							<Show when={stage().shared?.role !== "view"}>
+								<button type="button" class="stage-icon" title="Rename" aria-label={`Rename ${stage().title}`} onClick={startEditing}>
+									<Icon of={Pencil} size={13} />
+								</button>
+							</Show>
 							<button type="button" class="stage-icon" title="Delete" aria-label={`Delete ${stage().title}`} onClick={() => setConfirming(true)}>
 								<Icon of={Trash} size={13} />
 							</button>

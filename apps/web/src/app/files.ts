@@ -17,7 +17,8 @@ import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
 import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
-import { editDrawing } from "../state/decks.ts";
+import { editDrawing, stageOnScreen } from "../state/decks.ts";
+import { viewOnly } from "../state/stages.ts";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -65,8 +66,41 @@ const isWords = (file: File) => file.size <= CARD_BYTES && (WORDS.has(extensionO
 /** Whether a file can be an item on the stage itself rather than something on a board. */
 export const onStage = (file: File) => isRaster(file) || isWords(file) || isPlayable(file);
 
-/** A deck-relative asset path as the stage file writes it: from `canvases/<name>/`, two folders up. */
-const fromStage = (asset: string) => `../../${asset}`;
+/** A canvas's folder, deck-relative, by its name: `canvases/<name>`, or `shared/canvases/<owner>/<canvas>` for a friend's (`deck/layout.ts`). */
+const folderOf = (name: string) => {
+	const friend = /^shared\/([^/]+)\/([^/]+)$/.exec(name);
+	return friend ? `shared/canvases/${friend[1]}/${friend[2]}` : `canvases/${name}`;
+};
+/** The canvas a deck path is in, by name, or undefined for a path in none (the library, `assets/`). */
+const canvasOfDeckPath = (path: string): string | undefined => {
+	const own = /^canvases\/([^/]+)\//.exec(path);
+	if (own) return own[1];
+	const friend = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path);
+	return friend ? `shared/${friend[1]}/${friend[2]}` : undefined;
+};
+/**
+ * A deck path as the canvas on screen's drawing writes it: a file in the canvas's own folder by its
+ * path there (`files/a.png`), anything else climbing out of the folder to the deck (`../../assets/a.png`),
+ * which the server copies into the canvas's `files/` as it writes the drawing.
+ */
+const fromStage = (asset: string) => {
+	const name = stageOnScreen();
+	if (!name) return `../../${asset}`;
+	const folder = folderOf(name);
+	if (asset.startsWith(`${folder}/`)) return asset.slice(folder.length + 1);
+	return `${"../".repeat(folder.split("/").length)}${asset}`;
+};
+
+/**
+ * Why nothing may be dropped on the canvas on screen, or on the canvas a board is in: a friend's,
+ * shared with you to view. Said as a notice, with the way to change it, before anything is sent.
+ */
+const refusedOn = (canvas: string | undefined): boolean => {
+	const row = viewOnly(canvas);
+	if (!row) return false;
+	notice("warn", `${row.title} is shared with you to view, by ${row.shared?.owner ?? "its owner"}: it follows their copy, and only they can change it. To change it, make your own copy: View only · Make a copy, beside the canvas's name.`);
+	return true;
+};
 
 /** A byte count as a sentence a person reads while waiting. */
 function sizeLabel(bytes: number): string {
@@ -122,6 +156,9 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	const dropOnBoard = async (path: string, files: File[], at: { x: number; y: number }) => {
 		const board = state.boards.find((candidate) => candidate.path === path);
 		if (!board) return;
+		// Into the files/ of the canvas the board is in; a library board's go to the deck's assets/.
+		const canvas = canvasOfDeckPath(path);
+		if (refusedOn(canvas)) return;
 		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
 		// The insert variant specifically, so the summary below can read back `embed`.
 		const inserts: Extract<BoardPatch, { op: "insert" }>[] = [];
@@ -139,8 +176,10 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		for (const [index, file] of files.entries()) {
 			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
 			try {
-				const asset = await uploadAsset(file, (fraction) =>
-					report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+				const asset = await uploadAsset(
+					file,
+					(fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+					canvas,
 				);
 				if (asset.reused) reused += 1;
 				/*
@@ -195,10 +234,14 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 * first, and the path comes back for the component that asked.
 	 */
 	const addFile = async (board: string | undefined, file: File): Promise<string | undefined> => {
+		const canvas = board ? canvasOfDeckPath(board) : undefined;
+		if (refusedOn(canvas)) return undefined;
 		const report = working(`Adding ${file.name}…`);
 		try {
-			const asset = await uploadAsset(file, (fraction) =>
-				report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+			const asset = await uploadAsset(
+				file,
+				(fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+				canvas,
 			);
 			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
 			// Relative to the board that asked, because a deck is self-contained and an
@@ -233,7 +276,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 */
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }) => {
 		const stage = document.querySelector(".stage");
-		if (!stage) return;
+		if (!stage || refusedOn(stageOnScreen())) return;
 		// Asked first, before anything is made for them: a big file said no to leaves no board behind.
 		const files: File[] = [];
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
@@ -259,7 +302,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const failures: string[] = [];
 		for (const file of files) {
 			try {
-				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`))).path);
+				paths.push((await uploadAsset(file, (fraction) => report.update(`${file.name}: ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen())).path);
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
@@ -344,7 +387,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 					continue;
 				}
 				const natural = isRaster(file) ? await naturalSize(file) : undefined;
-				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
+				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
 				if (isRaster(file)) {
 					const w = Math.round(Math.min(into.inner, natural?.width ?? into.inner));
 					const h = Math.round(natural ? (w * natural.height) / Math.max(1, natural.width) : w * 0.5625);
@@ -381,7 +424,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
-				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
+				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
 				/*
 				 * A film or a sound: pen's own rectangle, filled with the still the server wrote and
 				 * marked as media (`@decks/pen`, `MEDIA`). pen.dev opens it as the rectangle it is,
@@ -454,7 +497,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 * you are writing is not an embed.
 	 */
 	const paste = (files: File[]) => {
-		if (files.length === 0) return;
+		if (files.length === 0 || refusedOn(stageOnScreen())) return;
 		const path = selected();
 		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
 		if (!board) {

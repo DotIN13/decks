@@ -66,7 +66,7 @@ import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./agents/AgentPill.tsx";
 import { StageManager } from "./canvas/StageManager.tsx";
-import { stageOf, stages } from "./state/stages.ts";
+import { stageOf, stages, viewOnly } from "./state/stages.ts";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
@@ -275,9 +275,11 @@ export function App() {
 		// A comment on the whole board, from its pill, is not a selection and stays in any mode.
 		if ((mode() !== "browse" || drawing()) && untrack(commenting)?.range) setCommenting(undefined);
 	});
-	/* A backend that cannot write is read: no edit mode and no pen, whichever key asked for them. */
+	/** The canvas on screen, when it is a friend's shared with you to view (`state/stages.ts`). */
+	const viewOnlyStage = () => viewOnly(stageOf(state.focused)?.name);
+	/* A backend that cannot write is read, and so is a friend's canvas shared with you to view: no edit mode and no pen, whichever key asked for them. */
 	createEffect(() => {
-		if (can("write")) return;
+		if (can("write") && !viewOnlyStage()) return;
 		if (mode() !== "browse") setMode("browse");
 		if (drawing()) setDrawing(false);
 	});
@@ -1217,6 +1219,22 @@ export function App() {
 
 	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
 	const [stagesOpen, setStagesOpen] = createSignal(false);
+	/**
+	 * Your own copy of a friend's canvas (`canvas.copyShared`), and this conversation moved onto it:
+	 * how a canvas shared with you to view is changed. It syncs as your canvas, never back to theirs.
+	 */
+	const copyShared = (name: string) => {
+		const agentId = state.focused;
+		void act<{ name: string; title: string }>("canvas.copyShared", [{ canvas: name }]).then((made) => {
+			if (!made) return;
+			setStagesOpen(false);
+			notice("info", `${made.title} is your own copy: change it as you like. It never changes theirs.`);
+			if (agentId) {
+				switchingFor(true);
+				void act("agent.update", [{ canvas: made.name }], agentId);
+			}
+		});
+	};
 
 	/**
 	 * Land on a stage that has just been opened: the middle of its work.
@@ -1671,6 +1689,7 @@ export function App() {
 					onToggleBoards={() => showBoards(!boardsOpen())}
 					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.title } : {})}
 					{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
+					{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
 				/>
 
 				{/*
@@ -1684,6 +1703,7 @@ export function App() {
 					isolated={state.chats.find((chat) => chat.id === state.focused)?.isolated === true}
 					onRename={(name, to) => send({ type: "stage.rename", name, to })}
 					onDelete={(name) => send({ type: "stage.delete", name })}
+					onCopy={copyShared}
 					here={stageOf(state.focused)?.name}
 					open={stagesOpen()}
 					onClose={() => void setStagesOpen(false)}
