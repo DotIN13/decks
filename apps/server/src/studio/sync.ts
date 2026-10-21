@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, watch, type FSWatcher } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync as readFileRaw, renameSync, rmSync, statSync, writeFileSync as writeFileRaw, watch, type FSWatcher } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { diff, parse, serialize, type PenDocument } from "@decks/pen";
 import WebSocket from "ws";
@@ -69,6 +69,22 @@ interface State {
 	/** The hash of the app list last told to Studio. */
 	inventory?: string;
 }
+
+/**
+ * What sync costs, counted for the bench (`DECKS_STUDIO_STATS`: a file each pass appends one JSON
+ * line to): bytes read from disk, bytes hashed and how many files, bytes written, bytes Studio sent,
+ * how many canvases a pass looked at, and the time spent taking canvas pictures (at most one a minute each).
+ */
+const cost = { read: 0, hashed: 0, files: 0, written: 0, received: 0, canvases: 0, pictureMs: 0 };
+const readFileSync = ((...args: Parameters<typeof readFileRaw>) => {
+	const out = readFileRaw(...args);
+	cost.read += out.length;
+	return out;
+}) as typeof readFileRaw;
+const writeFileSync = ((file: Parameters<typeof writeFileRaw>[0], data: string | Uint8Array, options?: Parameters<typeof writeFileRaw>[2]) => {
+	cost.written += typeof data === "string" ? Buffer.byteLength(data) : data.length;
+	writeFileRaw(file, data, options);
+}) as typeof writeFileRaw;
 
 const PICTURES = ".pictures";
 /** The parts of a canvas's bundle, by its path in the canvas's folder (Studio's `canvasPath`). */
@@ -187,9 +203,13 @@ export class HarnessSync {
 		const res = await fetch(new URL(path, this.o.studio), { method, headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": raw ? "application/octet-stream" : "application/json" }, body: raw ? (raw as unknown as BodyInit) : body === undefined ? undefined : JSON.stringify(body) });
 		if (path.startsWith("/sync/v1/blobs/")) {
 			if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
-			return new Uint8Array(await res.arrayBuffer());
+			const bytes = new Uint8Array(await res.arrayBuffer());
+			cost.received += bytes.length;
+			return bytes;
 		}
-		const json = await res.json();
+		const text = await res.text();
+		cost.received += Buffer.byteLength(text);
+		const json = JSON.parse(text);
 		if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${json.error ?? ""}`);
 		return json;
 	}
@@ -212,6 +232,17 @@ export class HarnessSync {
 	}
 
 	private async pass() {
+		const started = performance.now();
+		const was = { ...cost };
+		await this.passInner();
+		const file = process.env.DECKS_STUDIO_STATS;
+		if (file) {
+			const spent = Object.fromEntries(Object.entries(cost).map(([k, v]) => [k, Math.round(v - was[k as keyof typeof cost])]));
+			appendFileSync(file, `${JSON.stringify({ at: Date.now(), ms: Math.round((performance.now() - started) * 10) / 10, ...spent })}\n`);
+		}
+	}
+
+	private async passInner() {
 		if (!this.me) {
 			const hello = await this.call("GET", "/sync/v1/hello");
 			this.me = hello.harness.id;
@@ -341,6 +372,7 @@ export class HarnessSync {
 	private async syncCanvas(name: string, remote: SyncCanvas) {
 		const s = this.state.canvases[name];
 		if (!s) return;
+		cost.canvases++;
 		const path = join(this.folder(name), "canvas.pen");
 		if (!existsSync(path)) return;
 		const text = readFileSync(path, "utf8");
@@ -559,6 +591,15 @@ export class HarnessSync {
 	 * Studio has no picture of yet is taken first.
 	 */
 	private async syncCanvasPictures() {
+		const started = performance.now();
+		try {
+			await this.takeCanvasPictures();
+		} finally {
+			cost.pictureMs += performance.now() - started;
+		}
+	}
+
+	private async takeCanvasPictures() {
 		if (!this.o.harness) return;
 		for (const name of [...this.pictureDue]) {
 			const s = this.state.canvases[name];
@@ -681,5 +722,7 @@ export class HarnessSync {
 }
 
 function sha256(bytes: Uint8Array): string {
+	cost.hashed += bytes.length;
+	cost.files++;
 	return createHash("sha256").update(bytes).digest("hex");
 }
