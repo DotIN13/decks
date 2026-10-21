@@ -1,5 +1,5 @@
 import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "./board-storage.ts";
-import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
@@ -52,7 +52,18 @@ function withStorage(address: string | undefined, key: string): string | undefin
 	return address === undefined ? undefined : `${address.split("#")[0]}${storageHash(sandboxKeeper.read(key))}`;
 }
 
-export function PlainBoard(props: StageBoardProps & { page?: string | undefined; boardHost?: BoardHost | undefined; sandboxed?: { key: () => string } | undefined }) {
+/** What a host adds to a plain board: where its page is, its token, its sandbox, and what it does with files dropped on it. */
+export interface PlainBoardExtras {
+	page?: string | undefined;
+	boardHost?: BoardHost | undefined;
+	sandboxed?: { key: () => string } | undefined;
+	/** Files dropped or pasted onto the board's page, where they landed in board pixels. */
+	onFiles?: ((files: File[], at: { x: number; y: number }, how: "drop" | "paste") => void) | undefined;
+	/** Raised by the host when the board's file changed where its page comes from: the page loads again. */
+	reload?: number | undefined;
+}
+
+export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
 		return props.origin ?? { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
@@ -101,6 +112,12 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 	const wired = () => live() && guest() && !inert();
 
 	let frame: HTMLIFrameElement | undefined;
+	// The file changed: the same address again loads what it says now. Its gestures wait for its next hello.
+	createEffect(on(() => props.reload, () => {
+		if (!frame?.src) return;
+		setGuest(false);
+		frame.src = frame.src;
+	}, { defer: true }));
 	/** Where the page is on the stage, from the camera: the frame sits at the board's corner, drawn at the zoom. */
 	const geometry = (): FrameAt => {
 		const on = props.gestures.screenOf(at());
@@ -131,6 +148,13 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 			case "decks:embed-ready":
 				setGuest(true);
 				return;
+			// Files dropped or pasted onto the page (`embed-guest.js`), with where, in board pixels.
+			case "decks:files": {
+				const files = Array.isArray(message.files) ? message.files.filter((f): f is File => f instanceof File) : [];
+				const at = message.at as { x?: unknown; y?: unknown } | undefined;
+				if (files.length && props.onFiles) props.onFiles(files, { x: num(at?.x), y: num(at?.y) }, message.how === "paste" ? "paste" : "drop");
+				return;
+			}
 			case "decks:selection": {
 				const quote = typeof message.quote === "string" ? message.quote : "";
 				const rect = message.rect as { x?: unknown; y?: unknown; w?: unknown; h?: unknown } | undefined;

@@ -85,21 +85,4 @@ function send(file: File, onProgress?: (fraction: number) => void, canvas?: stri
 	});
 }
 
-/**
- * A deck-relative asset path -> what a board should write in `data-embed`.
- *
- * A board is a document, so its `data-embed` means what it would mean in an
- * `<img src>` on that page (DESIGN §4) — `assets/x.png` beside `boards/plan.html`
- * has to be written `../assets/x.png`. Computed from the two paths rather than
- * hardcoded as `../`, because a board is only *conventionally* in `boards/`: the
- * deck is a directory a person edits, and one day a board will sit somewhere else.
- */
-export function embedPath(boardPath: string, assetPath: string): string {
-	const from = boardPath.split("/").slice(0, -1).filter(Boolean);
-	const to = assetPath.split("/").filter(Boolean);
-	let shared = 0;
-	while (shared < from.length && shared < to.length && from[shared] === to[shared]) shared += 1;
-	const up = Array.from({ length: from.length - shared }, () => "..");
-	const down = to.slice(shared);
-	return [...up, ...down].join("/") || assetPath;
-}
+export { embedPath } from "@decks/canvas/tools";
