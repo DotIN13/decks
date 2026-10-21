@@ -40,14 +40,16 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		// Both have the board up, so both have a place for it — as two agents on one project do.
 		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/plan.html"], { place: true });
-		const before = app.stage.boards(mover.id).find((board) => board.path === "boards/plan.html")!;
+		// Each canvas places its own copy of a library board (`deck/layout.ts`).
+		const plan = app.pens.copyOf(mover.stageName()!, "boards/plan.html");
+		const before = app.stage.boards(mover.id).find((board) => board.path === plan)!;
 
 		// The person is reading the other conversation while this one works.
 		app.agents.look(elsewhere.id);
 		const moved = app.stage.move(mover.id, "boards/plan.html", { x: before.x - 1140, y: before.y + 60 });
 		assert.equal(moved?.x, before.x - 1140, "the move answers with what was asked for");
 
-		const read = app.stage.boards(mover.id).find((board) => board.path === "boards/plan.html")!;
+		const read = app.stage.boards(mover.id).find((board) => board.path === plan)!;
 		assert.equal(read.x, before.x - 1140, "and the read agrees: this is the caller's canvas");
 		assert.equal(read.y, before.y + 60);
 		cleanup();
@@ -64,14 +66,15 @@ test("the other conversation's canvas is untouched, which is what made the stale
 		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
 		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/risks.html"], { place: true });
-		const before = app.stage.boards(mover.id).find((board) => board.path === "boards/risks.html")!;
+		const own = (agent: typeof mover) => app.pens.copyOf(agent.stageName()!, "boards/risks.html");
+		const before = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
 
 		app.agents.look(elsewhere.id);
 		app.stage.move(mover.id, "boards/risks.html", { x: before.x - 2000, y: before.y });
 
-		const theirs = app.stage.boards(elsewhere.id).find((board) => board.path === "boards/risks.html")!;
+		const theirs = app.stage.boards(elsewhere.id).find((board) => board.path === own(elsewhere))!;
 		assert.equal(theirs.x, before.x, "a move on one canvas is not a move on another");
-		const ours = app.stage.boards(mover.id).find((board) => board.path === "boards/risks.html")!;
+		const ours = app.stage.boards(mover.id).find((board) => board.path === own(mover))!;
 		assert.equal(ours.x, before.x - 2000);
 		cleanup();
 	} catch (error) {
