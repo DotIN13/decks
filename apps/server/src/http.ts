@@ -210,6 +210,8 @@ export function createHttpApp(app: App): Express {
 				modes: app.runtimes().find((runtime) => runtime.kind === agent.kind)?.capabilities.modes ?? [],
 				accounts: accounts.accounts ?? [],
 				account: agent.accountId() ?? accounts.active ?? null,
+				// The person's own messages waiting for the turn to end (Ctrl+Enter), and whether Stop holds them.
+				queued: agent.queuedMine(),
 			});
 		}),
 	);
@@ -426,6 +428,26 @@ export function createHttpApp(app: App): Express {
 			}
 			agent.rename(name);
 			res.json({ id: agent.id, name });
+			return;
+		}
+		/*
+		 * The person's own queue, as this app's composer works it over the socket (`agent.queue`):
+		 * `add` a message for when the turn ends, `remove` one, `send` one now (it steers the turn),
+		 * `release` what Stop held. The new queue comes back, and as `agent.queued` on the events.
+		 */
+		if (act === "queue") {
+			const body = (req.body ?? {}) as { action?: unknown; text?: unknown; item?: unknown };
+			const { action, text, item } = body;
+			if (action === "add" && typeof text === "string" && text.trim()) agent.queueMine(text);
+			else if (action === "remove" && typeof item === "string") agent.unqueueMine(item);
+			else if (action === "send" && typeof item === "string") agent.sendMineNow(item);
+			else if (action === "release") agent.releaseMine();
+			else {
+				res.status(400).json({ error: "Say what to do with the queue: add (with text), remove or send (with item), or release." });
+				return;
+			}
+			agent.sayRow();
+			res.json({ id: agent.id, ...agent.queuedMine() });
 			return;
 		}
 		if (act === "stop") {

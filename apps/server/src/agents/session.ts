@@ -1463,6 +1463,11 @@ export class DeckAgent {
 	// --- what you queued yourself (Ctrl+Enter) ------------------------------------------
 
 	/** Queue a message for when this turn ends; with no turn running, it is simply sent. */
+	/** The person's own messages waiting for this turn to end, and whether Stop is holding them. */
+	queuedMine(): { items: Array<{ id: string; text: string }>; held: boolean } {
+		return { items: this.mine.map((one) => ({ ...one })), held: this.mineHeld };
+	}
+
 	queueMine(text: string): void {
 		const said = text.trim();
 		if (!said) return;
