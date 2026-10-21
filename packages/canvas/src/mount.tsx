@@ -93,7 +93,7 @@ export interface CanvasOptions {
 	onProperties?: () => void;
 	/** How boards are drawn: each a live page (`dom`, the default), or each into its own canvas where the browser can (`canvas-per-board`). */
 	renderer?: RendererChoice;
-	/** Boards as pictures while the camera moves (`Stage`'s `picturesWhileMoving`). */
+	/** Boards as pictures while the camera moves (`Stage`'s `picturesWhileMoving`): on unless set false, since a pan then moves flat pictures instead of repainting pages. */
 	picturesWhileMoving?: boolean;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
@@ -254,7 +254,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 							<Stage
 								mode={mode()}
 								renderer={options.renderer ?? "dom"}
-								picturesWhileMoving={options.picturesWhileMoving === true}
+								picturesWhileMoving={options.picturesWhileMoving !== false}
 								boardsMayStart={true}
 								boardPill={true}
 								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
