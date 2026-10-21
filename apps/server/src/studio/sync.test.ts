@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -103,5 +103,41 @@ test("the app list goes to Studio once on connecting, then only when it changes,
 		old.close();
 		rmSync(deck, { recursive: true, force: true });
 		rmSync(oldDeck, { recursive: true, force: true });
+	}
+});
+
+test("a sync state from before keeps working: each canvas's drawing moves to .decks/sync/<id>.pen and the state keeps revisions only", async () => {
+	const deck = mkdtempSync(join(tmpdir(), "decks-sync-state-"));
+	const pen = `${JSON.stringify({ version: "2.14", children: [{ id: "n", type: "note", x: 1, y: 2 }] }, null, 2)}\n`;
+	const asked: string[] = [];
+	const server = createServer((req, res) => {
+		asked.push(`${req.method} ${req.url}`);
+		const reply = (value: unknown) => (res.writeHead(200, { "content-type": "application/json" }), res.end(JSON.stringify(value)));
+		if (req.url === "/sync/v1/hello") return reply({ harness: { id: "h1", name: "mac" }, user: { id: "u1", email: "a@b.test" } });
+		if (req.url === "/sync/v1/canvases") return reply({ canvases: [{ id: "c1", name: "plan", title: "Plan", rev: 3, role: "owner", owner: "u1" }] });
+		if (req.url === "/sync/v1/canvases/c1/files") return reply({ files: [] });
+		res.writeHead(404).end("{}");
+	});
+	await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+	const studio = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+	try {
+		mkdirSync(join(deck, "canvases", "plan"), { recursive: true });
+		writeFileSync(join(deck, "canvases", "plan", "canvas.pen"), pen);
+		mkdirSync(join(deck, ".decks"), { recursive: true });
+		writeFileSync(join(deck, ".decks", "studio-sync.json"), JSON.stringify({ studio, user: "u1", canvases: { plan: { id: "c1", rev: 3, pen, files: {} } } }));
+		const sync = new HarnessSync({ deck, studio, key: "dsk_x", log: () => {} });
+		await sync.sync();
+		const state = JSON.parse(readFileSync(join(deck, ".decks", "studio-sync.json"), "utf8"));
+		assert.deepEqual(state.canvases.plan, { id: "c1", rev: 3, files: {} });
+		assert.equal(readFileSync(join(deck, ".decks", "sync", "c1.pen"), "utf8"), pen);
+		assert.equal(statSync(join(deck, ".decks", "sync", "c1.pen")).mode & 0o777, 0o600);
+		assert.ok(!asked.some((a) => a.startsWith("POST") || a.includes("/c1?") || a.endsWith("/c1")), `nothing to push or fetch: ${asked.join(", ")}`);
+		// A second pass reads nothing of the drawing: unchanged since the first looked.
+		asked.length = 0;
+		await sync.sync();
+		assert.deepEqual(asked, ["GET /sync/v1/canvases", "GET /sync/v1/canvases", "GET /sync/v1/canvases/c1/files"]);
+	} finally {
+		server.close();
+		rmSync(deck, { recursive: true, force: true });
 	}
 });
