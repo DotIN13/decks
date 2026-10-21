@@ -210,3 +210,11 @@ export function isBoardPagePath(path: string): boolean {
 	const at = canvasOfPath(clean);
 	return !!at && at.rest.startsWith("boards/");
 }
+
+/**
+ * What a canvas shared with you to view says to anything that would change it: whose it is, that it
+ * follows their copy, and how to have one you can change.
+ */
+export function viewOnlySentence(title: string, owner: string, name: string): string {
+	return `${title} is shared with you to view, by ${owner}: it follows their copy, and only they can change it. To change it, make your own copy: Make a copy in the canvas menu, or decks canvas copy-shared --canvas ${name}.`;
+}

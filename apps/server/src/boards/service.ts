@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { canvasOfPath, isSharedCanvas } from "../deck/layout.ts";
+import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { relink } from "../deck/stage-boards.ts";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
@@ -293,17 +293,25 @@ export class BoardService {
 		if (/^boards\//.test(path) && !/^boards\/(?:apps|mirrors|documents|files)\//.test(path) && path !== "boards/your-chrome.html") {
 			return `${path} is in the library, on no canvas, and is read only: place it on a canvas (decks canvas insert copies it in) and change the copy.`;
 		}
+		return this.viewOnly(path);
+	}
+
+	/** Why a board on a friend's canvas shared with you to view may not be changed or deleted, or undefined. */
+	viewOnly(path: string): string | undefined {
 		const at = canvasOfPath(path);
-		if (at && isSharedCanvas(at.name)) {
-			let role: unknown;
-			try {
-				role = (JSON.parse(readFileSync(join(this.deck.path, at.folder, "canvas.json"), "utf8")) as { shared?: { role?: unknown } }).shared?.role;
-			} catch {
-				/* no record: read only */
-			}
-			if (role !== "edit") return `${path} is on a canvas shared with you to view: it follows its owner's copy, and only they can change it.`;
+		if (!at || !isSharedCanvas(at.name)) return undefined;
+		let shared: { role?: unknown; ownerName?: unknown } | undefined;
+		let title: unknown;
+		try {
+			const meta = JSON.parse(readFileSync(join(this.deck.path, at.folder, "canvas.json"), "utf8")) as { title?: unknown; shared?: { role?: unknown; ownerName?: unknown } };
+			shared = meta.shared;
+			title = meta.title;
+		} catch {
+			/* no record: read only */
 		}
-		return undefined;
+		if (shared?.role === "edit") return undefined;
+		const owner = typeof shared?.ownerName === "string" && shared.ownerName ? shared.ownerName : (sharedParts(at.name)?.owner ?? "its owner");
+		return viewOnlySentence(typeof title === "string" && title ? title : at.name, owner, at.name);
 	}
 
 	writeBoard(path: string, html: string): Board {
@@ -525,6 +533,11 @@ export class BoardService {
 	deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
 		if (!this.deck.board(path)) {
 			reply({ type: "notice", level: "warn", text: `There is no board at ${path} to delete.` });
+			return;
+		}
+		const refused = this.viewOnly(path);
+		if (refused) {
+			reply({ type: "notice", level: "warn", text: refused });
 			return;
 		}
 		this.recordRevision(path);

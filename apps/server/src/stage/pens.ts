@@ -9,7 +9,7 @@ import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
-import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
+import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { copyBoardInto, copyFileInto, copyFrameInto } from "../boards/copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
@@ -181,7 +181,7 @@ export class StagePens {
 	/** Refused, with a sentence, for a friend's canvas shared with you to view: its drawing follows theirs. */
 	mayWrite(name: string): void {
 		const shared = this.sharing(name);
-		if (shared && shared.role !== "edit") throw new PenError(`${this.titleOf(name)} is shared with you to view, by ${shared.ownerName ?? shared.owner}: it follows their copy, and only they can change it.`);
+		if (shared && shared.role !== "edit") throw new PenError(viewOnlySentence(this.titleOf(name), shared.ownerName ?? shared.owner, name));
 	}
 
 	/**
@@ -315,6 +315,7 @@ export class StagePens {
 	 */
 	setTitle(name: string, title: string, options: { provisional?: boolean } = {}): string {
 		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
+		this.mayWrite(name);
 		const clean = title.replace(/\s+/g, " ").trim().slice(0, 80);
 		if (!clean) throw new Error("A canvas's name cannot be empty.");
 		const file = join(this.folderOf(name), CANVAS_META);
@@ -472,7 +473,7 @@ export class StagePens {
 	 */
 	follow(name: string, boards: (path: string) => Frame | undefined): void {
 		const current = this.get(name);
-		if (current.error || !existsSync(this.fileOf(name))) return;
+		if (current.error || !existsSync(this.fileOf(name)) || this.sharing(name)?.role === "view") return;
 		const doc = structuredClone(current.doc);
 		const placed = placements(this.withImported(name, doc), { theme: baseTheme(doc, "light"), measure });
 		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path), rustRouter)) this.write(name, doc);
@@ -574,6 +575,7 @@ export class StagePens {
 	 * everywhere it is used.
 	 */
 	saveFrame(stage: string, id: string, path: string, replace = true): { frame: string; ref: string; replaced: boolean; overwrote: boolean } {
+		if (replace) this.mayWrite(stage);
 		const entry = this.get(stage);
 		if (entry.error) throw new PenError(`${entry.error}. Fix the file before saving from it.`);
 		// A frame is saved in the canvas's own frames/, so the canvas still stands alone (`deck/layout.ts`).
@@ -651,6 +653,9 @@ export class StagePens {
 	}
 
 	private writePen(file: string, doc: PenDocument): void {
+		// A frame in a friend's canvas shared with you to view is theirs, as its drawing is.
+		const at = canvasOfPath(relative(this.deckPath, file).split(sep).join("/"));
+		if (at && isSharedCanvas(at.name)) this.mayWrite(at.name);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, serialize(doc));
 		this.importCache.delete(file);
@@ -997,6 +1002,7 @@ export class StagePens {
 	}
 
 	private write(name: string, doc: PenDocument): PenEntry {
+		this.mayWrite(name);
 		const file = this.fileOf(name);
 		mkdirSync(this.folderOf(name), { recursive: true });
 		if (!this.watcher) this.watch();
@@ -1103,3 +1109,4 @@ function withBox(result: OpResult, placed: Map<string, Placed>): OpResult & { bo
 	const at = result.op === "delete" ? undefined : placed.get(result.id);
 	return at ? { ...result, box: { x1: at.box.x, y1: at.box.y, x2: at.box.x + at.box.w, y2: at.box.y + at.box.h } } : result;
 }
+
