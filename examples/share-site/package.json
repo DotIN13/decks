@@ -1,0 +1,28 @@
+{
+  "name": "@decks/example-share-site",
+  "private": true,
+  "type": "module",
+  "description": "A canvas-sharing site in a few hundred lines, from the public @decks packages: people edit one canvas together in their browsers, and Decks harnesses sync it",
+  "scripts": {
+    "start": "node --import tsx src/server.ts",
+    "page": "vite",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@decks/board-host": "*",
+    "@decks/canvas": "*",
+    "@decks/hub": "*",
+    "@decks/pen": "*",
+    "@decks/sync-protocol": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@decks/sync-client": "*",
+    "@webgpu/types": "^0.1.74",
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "vite-plugin-solid": "^2.11.10"
+  }
+}

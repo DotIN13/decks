@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>A shared canvas</title>
+	<style>
+		html, body { margin: 0; height: 100%; font: 14px system-ui, sans-serif }
+		header { position: fixed; z-index: 10; left: 12px; bottom: 12px; padding: 6px 10px; border-radius: 8px; background: #fff; box-shadow: 0 1px 6px #0002 }
+		#canvas { position: fixed; inset: 0 }
+	</style>
+</head>
+<body>
+	<div id="canvas"></div>
+	<header id="who">Open with #key=ada-key</header>
+	<script type="module" src="/src/page.ts"></script>
+</body>
+</html>

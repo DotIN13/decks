@@ -9,12 +9,17 @@ export interface SyncHandlerOptions {
 	/** Where changes are announced; leave it out and nobody hears of them until they ask. */
 	live?: Live;
 	/**
-	 * Which harness is asking, from its request: Studio looks its key up from `Authorization: Bearer`.
-	 * Nothing means 401. Only harnesses (`who.harness` set) reach these routes.
+	 * Who is asking, from the request: Studio looks a harness's key up from `Authorization: Bearer`.
+	 * Nothing means 401. Unless `harnessesOnly` is false, only harnesses (`who.harness` set) get in.
 	 */
 	who: (req: Request) => Who | undefined | Promise<Who | undefined>;
 	/** The largest body taken, in bytes: 50 MB unless said. */
 	maxBytes?: number;
+	/**
+	 * Whether only harnesses may use these routes (the default). A site whose own pages read and edit
+	 * canvases through the same routes sets it false; `who` then answers for a page's person too.
+	 */
+	harnessesOnly?: boolean;
 }
 
 /** A request that does not fit: answered with its status and sentence. */
@@ -147,7 +152,7 @@ export function syncHandler(o: SyncHandlerOptions): (req: Request) => Promise<Re
 		const found = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
 		if (!found) return undefined;
 		const who = await o.who(req);
-		if (!who?.harness) return json(401, { error: "Send a harness's key: Authorization: Bearer <key>." });
+		if (!who || (o.harnessesOnly !== false && !who.harness)) return json(401, { error: "Send a harness's key: Authorization: Bearer <key>." });
 		const m = url.pathname.match(found.pattern)!;
 		const params: Record<string, string> = {};
 		found.keys.forEach((k, i) => (params[k] = decodeURIComponent(m[i + 1]!)));

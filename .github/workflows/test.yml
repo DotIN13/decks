@@ -79,6 +79,10 @@ jobs:
       # binary on the machine — see the flag that makes that true in `opencode/manager.ts`.
       - run: npm test
 
+      # The public packages as an outsider gets them: built, packed, installed into an empty
+      # folder, and run as a sharing site under plain Node (`scripts/test-packages.mjs`).
+      - run: npm run test:packages
+
       # Its own server, on its own ports, over its own copy of `example/` — so this needs
       # nothing running first, and it cannot touch a deck somebody is working in.
       - run: npm run test:e2e

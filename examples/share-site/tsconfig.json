@@ -1,0 +1,5 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": { "noEmit": true, "lib": ["ES2023", "DOM", "DOM.Iterable"], "types": ["node", "vite/client", "@webgpu/types"], "module": "esnext", "moduleResolution": "bundler", "jsx": "preserve", "jsxImportSource": "solid-js" },
+	"include": ["src", "test"]
+}
