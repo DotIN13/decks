@@ -7,11 +7,11 @@ import { canvasFolder, plainSegment, servedAs, SHARED_CANVASES, sharedName, shar
 import { slug } from "../agents/slug.ts";
 import { HashCache, RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
 
-/** What Studio's sync API lists (decks-studio's packages/sync). */
-interface SyncCanvas { id: string; name: string; title: string; rev: number; role: "owner" | "edit" | "view"; owner: string; ownerName?: string }
-interface SyncFile { path: string; version: number; hash: string; size: number; at: number }
-/** What Studio's live socket says; `changes` (one revision's edits after `base`) when Studio sends them inline. */
-type LiveEvent = { type: string; by?: string; id?: string; rev?: number; base?: number; changes?: PenEdit[]; canvas?: string };
+import { LiveEvent, OWN_PARTS, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
+
+// The sync's own rules, now in @decks/sync-protocol, are still read from here by older callers.
+export { safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking };
+const MIRRORED: readonly string[] = MIRRORED_PARTS;
 
 /**
  * Keeps this harness's canvases and Decks Studio in step, once Studio has given it an API key.
@@ -97,12 +97,8 @@ const writeFileSync = ((file: Parameters<typeof writeFileRaw>[0], data: string |
 	writeFileRaw(file, data, options);
 }) as typeof writeFileRaw;
 
-const PICTURES = ".pictures";
 /** The backstop: a pass over every canvas this often, besides the targeted ones. */
 export const FULL_PASS_MS = 5 * 60_000;
-/** The parts of a canvas's bundle, by its path in the canvas's folder (Studio's `canvasPath`). */
-const OWN_PARTS = ["boards", "frames", "files"];
-const MIRRORED = ["assets", "docs"];
 /** Files bigger than this are not synced, and are listed in `skipped`. */
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -114,44 +110,6 @@ const MAX_BYTES = 50 * 1024 * 1024;
  * with no `..` and no hidden part, and nothing is written through a symbolic link. Anything else is
  * skipped and said in the log.
  */
-const CANVAS_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
-
-/** Whether a canvas name from Studio may name a folder here. */
-export function safeCanvasName(name: unknown): name is string {
-	return typeof name === "string" && CANVAS_NAME.test(name) && name !== "." && name !== "..";
-}
-
-/**
- * Whether a canvas folder's name is one plain segment of canvases/. Looser than `safeCanvasName`,
- * because a folder made here by hand (with a space in it, say) is the person's and still syncs.
- */
-export function safeCanvasFolder(name: unknown): name is string {
-	return typeof name === "string" && name.length > 0 && name.length <= 200 && name !== "." && name !== ".." && !/[/\\\0]/.test(name);
-}
-
-/**
- * Whether a file path from Studio may be written for a canvas: in one of its bundle's parts, every
- * segment a plain name (`.pictures` the one hidden part, and only first).
- */
-export function safeSyncPath(path: unknown): path is string {
-	if (typeof path !== "string" || !path || path.length > 1000 || path.includes("\\") || path.includes("\0")) return false;
-	const parts = path.split("/");
-	if (parts.length < 2 || ![...OWN_PARTS, ...MIRRORED, PICTURES].includes(parts[0]!)) return false;
-	return parts.every((part, i) => part !== "" && part !== "." && part !== ".." && (i === 0 || !part.startsWith(".")));
-}
-
-const SECRET_FILE = /^(?:\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx|keystore)|id_(?:rsa|ed25519|ecdsa).*|credentials\.json)$/i;
-
-/**
- * Whether a deck file looks like a secret, or a dependency, and so never goes to Studio (or comes
- * from it): an `.env`, a key or certificate, an SSH key, a `credentials.json`, anything in
- * `node_modules`. An app's folder is not synced at all, but an agent can leave such a file in assets/.
- */
-export function secretLooking(path: string): boolean {
-	const parts = path.split("/");
-	return parts.includes("node_modules") || SECRET_FILE.test(parts[parts.length - 1] ?? "");
-}
-
 /**
  * Where a deck-relative path lands, or a sentence saying why it may not: outside the deck, in a
  * hidden folder, or through a symbolic link anywhere on the way (one an agent made would send the
@@ -1001,14 +959,14 @@ export class HarnessSync {
 			this.fullDue = true;
 			return this.soon(50);
 		}
-		if (e.by && e.by === this.me) return;
+		if ("by" in e && e.by && e.by === this.me) return;
 		switch (e.type) {
 			case "canvas": {
 				if (!e.id) return;
 				if (typeof e.rev === "number") this.latest.set(e.id, Math.max(this.latest.get(e.id) ?? 0, e.rev));
 				if (Array.isArray(e.changes) && typeof e.base === "number" && typeof e.rev === "number") {
 					const list = this.inbox.get(e.id) ?? [];
-					list.push({ base: e.base, rev: e.rev, changes: e.changes });
+					list.push({ base: e.base, rev: e.rev, changes: e.changes as unknown as PenEdit[] });
 					// A canvas nobody here looks at for a while keeps at most its last 500 messages; the rest come by `changes?since=`.
 					this.inbox.set(e.id, list.slice(-500));
 				}
@@ -1083,7 +1041,10 @@ export class HarnessSync {
 			this.ws.on("message", (m) => {
 				let e: LiveEvent;
 				try {
-					e = JSON.parse(String(m)) as LiveEvent;
+					// A message this harness does not know (from a newer Studio) is nothing to sync.
+					const got = LiveEvent.safeParse(JSON.parse(String(m)));
+					if (!got.success) return;
+					e = got.data;
 				} catch {
 					return;
 				}

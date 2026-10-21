@@ -1,0 +1,9 @@
+{
+  "name": "@decks/sync-protocol",
+  "version": "0.1.0",
+  "description": "What a Decks harness and a canvas-sharing service say to each other: every /sync/v1 route and live message as a zod schema, and the rules for canvas names and paths",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "zod": "^4.4.3" }
+}
