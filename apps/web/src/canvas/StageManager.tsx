@@ -1,5 +1,4 @@
 import { api } from "../connections/connection.ts";
-import Lock from "lucide-solid/icons/lock";
 import Pencil from "lucide-solid/icons/pencil";
 import Copy from "lucide-solid/icons/copy";
 import Trash from "lucide-solid/icons/trash-2";
@@ -62,8 +61,6 @@ export function StageManager(props: {
 	/** Make a stage from a name, and open it. */
 	onNew: (title: string) => void;
 	scheme: "light" | "dark";
-	/** The agent is isolated: only isolated stages are offered, since those are all it may open. */
-	isolated?: boolean;
 	/** Rename a stage; the server makes the name folder-safe and refuses one that is taken. */
 	onRename: (name: string, to: string) => void;
 	/** Delete a stage, with its drawing and any boards kept in its own folder. */
@@ -136,8 +133,7 @@ export function StageManager(props: {
 		onCleanup(() => document.removeEventListener("keydown", escape));
 	});
 
-	/* Isolated, the isolated stages are the whole list: the server refuses the rest anyway. */
-	const offered = createMemo(() => (props.isolated ? props.stages.filter((stage) => stage.isolated) : props.stages));
+	const offered = () => props.stages;
 	const rows = createMemo(() => searchStages(offered(), query()));
 	const found = createMemo(() => rows().filter((one) => one.hit).length);
 	const searching = () => query().trim() !== "";
@@ -235,7 +231,7 @@ export function StageManager(props: {
 								ref={field}
 								type="text"
 								spellcheck={false}
-								placeholder={`Search ${offered().length} ${props.isolated ? "isolated " : ""}canvas${offered().length === 1 ? "" : "es"}`}
+								placeholder={`Search ${offered().length} canvas${offered().length === 1 ? "" : "es"}`}
 								title="Matches a canvas's name, the words on its boards and notes, and who is on it"
 								value={query()}
 								onInput={(event) => setQuery(event.currentTarget.value)}
@@ -382,13 +378,6 @@ function StageCard(props: {
 				</Show>
 				<Show when={here()}>
 					<span class="stage-current">Current</span>
-				</Show>
-				{/* Copied back from an isolated stage when isolation ended: on the picture's corner, at a glance. */}
-				<Show when={stage().fromIsolation}>
-					<span class="stage-badge" title="Copied back from an isolated canvas when isolation ended">
-						<Icon of={Lock} size={11} />
-						Isolated
-					</span>
 				</Show>
 			</button>
 			<span class="stage-acts" data-confirming={confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>

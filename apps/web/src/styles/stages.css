@@ -342,25 +342,6 @@
 		font-weight: 500;
 	}
 
-	/* A canvas copied back from an isolated one: a pill on the picture's lower corner, clear of the controls. */
-	.stage-badge {
-		position: absolute;
-		bottom: 8px;
-		left: 8px;
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		padding: 2px 8px 2px 6px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--raise);
-		box-shadow: var(--shadow);
-		color: var(--muted);
-		font-size: var(--type-note);
-		font-weight: 500;
-		white-space: nowrap;
-	}
-
 	/* Rename and delete, on the picture's corner, out of sight until the card is approached. */
 	.stage-acts {
 		position: absolute;
