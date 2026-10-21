@@ -873,7 +873,7 @@ export class StagePens {
 	}
 
 	setDeck(deckPath: string): void {
-		runAtOpen(deckPath);
+		runAtOpen(deckPath, { dataDir: dirname(deckPath) });
 		this.deckPath = deckPath;
 		this.cache.clear();
 		this.importCache.clear();

@@ -12,6 +12,7 @@ import { createHttpApp } from "./http.ts";
 import { installDir } from "@decks/runtime";
 import { Hub } from "./ws.ts";
 import { startStudio } from "./studio/index.ts";
+import { DryRun } from "./migrations/index.ts";
 
 const config = loadConfig();
 
@@ -24,6 +25,12 @@ let app: App;
 try {
 	app = App.open(config);
 } catch (error) {
+	// A dry run of the migrations (`DECKS_MIGRATE_DRY_RUN=1`): every move printed, nothing changed, and no harness.
+	if (error instanceof DryRun) {
+		for (const line of error.lines) console.log(line);
+		console.log("[decks] dry run: nothing was changed; start again without DECKS_MIGRATE_DRY_RUN to migrate.");
+		process.exit(0);
+	}
 	console.error(`[decks] cannot open ${config.dataDir}: ${(error as Error).message}`);
 	process.exit(1);
 }

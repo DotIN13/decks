@@ -586,7 +586,7 @@ export class App {
 	 */
 	static open(config: Config): App {
 		// A deck kept in an older shape is moved to this one before anything reads it (`migrations/`).
-		for (const line of runAtOpen(config.deck)) console.log(`[decks] ${line}`);
+		for (const line of runAtOpen(config.deck, { dataDir: config.dataDir })) console.log(`[decks] ${line}`);
 		const existing = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"));
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
