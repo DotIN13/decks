@@ -14,7 +14,8 @@ import { SDK_FILE } from "./apps/service.ts";
 import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
-import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
+import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
+import { canvasOfPath, isBoardPagePath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
@@ -66,8 +67,18 @@ function asyncRoute(handler: (req: Request, res: Response) => Promise<void>) {
  * needs — a wrong answer that reads as "editing stopped working".
  */
 function isBoardPath(requested: string): boolean {
-	// The deck's `boards/`, or a stage's own board folder (`deck/stage-boards.ts`): both are boards.
-	return /^(?:boards|stages\/[^/\0]+\/boards)\/[^\0]*\.x?html?$/i.test(requested.split("\\").join("/").replace(/^\/+/, ""));
+	// The library's `boards/`, or a canvas's own (`deck/layout.ts`): both are boards.
+	return isBoardPagePath(requested);
+}
+
+/**
+ * A friend's board, or anything else from a canvas shared with you, is someone else's page on your
+ * machine: sent with a sandbox of its own, so it has a blank origin wherever it is opened, a frame or
+ * a tab, and can reach nothing of the harness's (`deck/layout.ts`).
+ */
+function sharedHeaders(res: Response): void {
+	res.setHeader("Content-Security-Policy", `sandbox ${SHARED_SANDBOX}`);
+	res.setHeader("Referrer-Policy", "no-referrer");
 }
 
 /** The wildcard segment of `/api/board/*path`, as one forward-slashed string. */
@@ -514,12 +525,18 @@ export function createHttpApp(app: App): Express {
 	api.get(
 		"/board/*path",
 		asyncRoute(async (req, res) => {
-			let requested = wildcard(req);
+			const asked = wildcard(req);
+			// A canvas's `lib/`, and the deck's `assets/`, `docs/` and `apps/` beside its boards (`deck/layout.ts`).
+			const served = servedAs(asked);
+			if ("refused" in served) throw new PathRefused(asked, served.refused);
+			let requested = served.path;
 			// The runtime at a versioned address (`deck/lib-version.ts`): the file is the one in `lib/`.
 			const versioned = requested.startsWith("lib/") ? splitLibVersion(requested.slice(4)) : undefined;
 			if (versioned) requested = `lib/${versioned.file}`;
-			const target = resolveInDeck(app.deck.path, requested);
+			const target = resolveServed(app.deck.path, requested);
 			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
+			// A friend's canvas: every page and file of it sandboxed, whatever frame it is in.
+			if (isSharedCanvas(canvasOfPath(asked)?.name ?? "")) sharedHeaders(res);
 			/*
 			 * This route serves the whole deck, not only its boards — a board's own
 			 * `../assets/photo.png` and `../lib/board.css` resolve to sibling URLs and
@@ -589,7 +606,7 @@ export function createHttpApp(app: App): Express {
 			 * Still the asset's headers, so still sandboxed; the script is ours and reads nothing back.
 			 */
 			if (req.query.guest !== undefined && !isBoardPath(requested) && /\.html?$/i.test(requested)) {
-				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(requested.split("/").length - 1)}lib/embed-guest.js`));
+				res.type("html").send(withGuest(await readFile(target, "utf8"), `${"../".repeat(asked.split("/").length - 1)}lib/embed-guest.js`));
 				return;
 			}
 			await sendFile(res, target);
@@ -818,7 +835,7 @@ export function createHttpApp(app: App): Express {
 		"/lib/*path",
 		asyncRoute(async (req, res) => {
 			const versioned = splitLibVersion(wildcard(req));
-			const target = resolveInDeck(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
+			const target = resolveServed(app.deck.path, join("lib", versioned?.file ?? wildcard(req)));
 			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(wildcard(req), "not a file");
 			boardHeaders(res);
 			if (versioned?.version === libVersion(app.deck.path)) res.setHeader("Cache-Control", LIB_FOREVER);

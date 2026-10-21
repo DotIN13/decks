@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Root } from "@decks/protocol";
 import { expandUser } from "../config.ts";
+import { isHidden } from "./layout.ts";
 
 /**
  * Which paths may be served — and the one that may be written — decided here and
@@ -70,6 +71,18 @@ export function resolveInDeck(deckRoot: string, requested: string): string {
 	const real = realPathOf(resolve(deckRoot, cleaned));
 	const realRoot = realPathOf(deckRoot);
 	if (!containedIn(realRoot, real)) throw new PathRefused(requested, "it resolves outside the deck");
+	return real;
+}
+
+/**
+ * A deck-relative request a route serves: inside the deck, and in no hidden folder, by the path
+ * asked for or where it really is (`refuseHidden`).
+ */
+export function resolveServed(deckRoot: string, requested: string): string {
+	const real = resolveInDeck(deckRoot, requested);
+	const realRoot = realPathOf(deckRoot);
+	refuseHidden(realRoot, real, requested);
+	refuseHidden(realRoot, join(realRoot, requested.split("\\").join("/").replace(/^\/+/, "")), requested);
 	return real;
 }
 
@@ -147,14 +160,41 @@ export function resolveFileRequest(
 	const candidate = isAbsolute(cleaned) ? cleaned : resolve(base, cleaned);
 	const real = realPathOf(candidate);
 
-	if (containedIn(resolved.deck, real)) return real;
+	if (containedIn(resolved.deck, real)) return visible(resolved.deck, candidate, real, request.path);
 	for (const root of resolved.roots) {
-		if (root.exists && containedIn(root.path, real)) return real;
+		if (root.exists && containedIn(root.path, real)) return visible(root.path, candidate, real, request.path);
 	}
 	// A path written down before the deck or a root moved: the same file where it is now.
 	const moved = isAbsolute(cleaned) && !existsSync(candidate) ? movedTo(resolved, cleaned) : undefined;
-	if (moved) return moved;
+	if (moved) {
+		const place = [resolved.deck, ...resolved.roots.map((root) => root.path)].find((one) => containedIn(one, moved));
+		return place ? visible(place, moved, moved, request.path) : moved;
+	}
 	throw new PathRefused(request.path, "it is outside the deck and every declared root");
+}
+
+/**
+ * The one hidden file the file routes hand out: a picture of a canvas the harness took
+ * (`stage/shots.ts`), which a page opens in a tab by its address.
+ */
+const SHOTS = /^\.decks\/shots\/[^/]+$/;
+
+/**
+ * Whether a path below the deck or a root may be read: nothing in a hidden folder (`.decks/`,
+ * `.git`, `.env`, `.ssh`), by the path asked for or by where it really is, but for the harness's
+ * own pictures of canvases. The deck's records and keys live in `.decks/`, and a board that could
+ * read them could act as the person.
+ */
+export function refuseHidden(place: string, below: string, requested: string): void {
+	const rel = relative(place, below).split(sep).join("/");
+	if (isHidden(rel) && !SHOTS.test(rel)) throw new PathRefused(requested, "it is in a hidden folder");
+}
+
+/** `real` once neither it nor the path that led to it is in a hidden folder of `place`. */
+function visible(place: string, candidate: string, real: string, requested: string): string {
+	refuseHidden(place, real, requested);
+	if (containedIn(place, candidate)) refuseHidden(place, candidate, requested);
+	return real;
 }
 
 /**
