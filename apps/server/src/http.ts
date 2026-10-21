@@ -15,7 +15,7 @@ import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
-import { canvasOfPath, isBoardPagePath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
+import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
@@ -956,7 +956,8 @@ export function createHttpApp(app: App): Express {
 	});
 
 	/**
-	 * A file the user dropped onto a board, copied into the deck's `assets/` (§3).
+	 * A file the user dropped onto a board, copied into the deck's `assets/` (§3), or with
+	 * `canvas`, into that canvas's own `files/`.
 	 *
 	 * One file per request, its bytes as the body and its name in the query. Not
 	 * `multipart/form-data`: a raw body needs no parser and therefore no parser
@@ -1035,7 +1036,24 @@ export function createHttpApp(app: App): Express {
 			const declared = Number(req.headers["content-length"] ?? 0);
 			if (declared > MAX_UPLOAD_BYTES) throw new UploadRefused(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`, 413);
 			const name = typeof req.query.name === "string" ? req.query.name : "";
-			res.json(await storeAssetStream(app.deck.path, name, req));
+			/*
+			 * Dropped on a canvas, it goes into that canvas's own files/ (`deck/layout.ts`), so the canvas
+			 * stands alone, and a friend's canvas you may edit takes it in its folder, which syncs back to
+			 * them. A canvas shared with you to view takes nothing: its owner's copy is the one there is.
+			 */
+			const canvas = typeof req.query.canvas === "string" && req.query.canvas ? req.query.canvas : undefined;
+			let into: { folder: string; ref: string } | undefined;
+			if (canvas) {
+				const pens = app.stage.pens;
+				if (!pens || !canvasNameOk(canvas) || !pens.has(canvas)) throw new UploadRefused(`There is no canvas ${canvas} to put the file in.`, 404);
+				try {
+					pens.mayWrite(canvas);
+				} catch (error) {
+					throw new UploadRefused((error as Error).message, 403);
+				}
+				into = { folder: `${canvasFolder(canvas)}/files`, ref: "files" };
+			}
+			res.json(await storeAssetStream(app.deck.path, name, req, into));
 		}),
 	);
 

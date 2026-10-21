@@ -152,17 +152,22 @@ function digestOfFile(path: string): Promise<string> {
 /**
  * `storeAsset` for a request body, streamed to disk.
  *
+ * Into the deck's `assets/`, or, for a file dropped on a canvas, into that canvas's own `files/`
+ * (`into`: its deck path, and its path in the canvas's folder), so the canvas still stands alone
+ * and a friend's canvas you may edit takes the file in its own folder, which syncs back to them.
+ *
  * The bytes go into a hidden part file in `assets/` as they arrive, hashed on the way, and the cap
  * is enforced on the stream, so a 2GB video costs 2GB of disk and a few kilobytes of memory. Then
  * the same naming as `storeAsset`: an identical file already under the name is reused, a different
  * one moves this to the next name, and nothing is overwritten — the part file is *linked* to its
  * name, which fails if the name was taken in between, and then removed.
  */
-export async function storeAssetStream(deckRoot: string, requested: string, body: Readable): Promise<UploadedAsset> {
+export async function storeAssetStream(deckRoot: string, requested: string, body: Readable, into: { folder: string; ref: string } = { folder: "assets", ref: "" }): Promise<UploadedAsset> {
 	const name = assetName(requested);
-	mkdirSync(join(deckRoot, "assets"), { recursive: true });
+	const folder = into.folder;
+	mkdirSync(join(deckRoot, ...folder.split("/")), { recursive: true });
 	// Our own name, never the requester's, and opened `wx`: nothing there is followed or overwritten.
-	const part = join(deckRoot, "assets", `.upload-${randomUUID()}.part`);
+	const part = join(deckRoot, ...folder.split("/"), `.upload-${randomUUID()}.part`);
 	const hash = createHash("sha256");
 	let bytes = 0;
 	try {
@@ -188,10 +193,12 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
 		const digest = hash.digest("hex");
 		for (let n = 1; n <= 99; n++) {
 			const candidate = n === 1 ? name : suffixed(name, n);
-			const target = resolveAssetWrite(deckRoot, candidate);
-			const relative = `assets/${candidate}`;
+			const target = resolveAssetWrite(deckRoot, candidate, folder);
+			const relative = `${folder}/${candidate}`;
+			// In a canvas's files/, also its path in the canvas's folder: what its drawing names it by.
+			const ref = into.ref ? { ref: `${into.ref}/${candidate}` } : {};
 			if (existsSync(target)) {
-				if (statSync(target).size === bytes && (await digestOfFile(target)) === digest) return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: true });
+				if (statSync(target).size === bytes && (await digestOfFile(target)) === digest) return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: true, ...ref });
 				continue;
 			}
 			try {
@@ -200,7 +207,7 @@ export async function storeAssetStream(deckRoot: string, requested: string, body
 				if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
 				throw error;
 			}
-			return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: false });
+			return await withMedia(deckRoot, { path: relative, name: candidate, bytes, reused: false, ...ref });
 		}
 		throw new UploadRefused(`there are already too many files called ${name}`, 409);
 	} finally {

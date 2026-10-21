@@ -25,6 +25,11 @@ export interface UploadedAsset {
 	/** True when an identical file was already there and this one was not written. */
 	reused: boolean;
 	/**
+	 * For a file dropped on a canvas (`/api/upload?canvas=`), its path in the canvas's own folder
+	 * (`files/photo.png`): what the canvas's drawing names it by, wherever the folder is.
+	 */
+	ref?: string;
+	/**
 	 * For a film or a sound, what the server read out of it with ffmpeg (`files/media.ts`): the
 	 * still it wrote, the running time, and the picture's own size. Absent for everything else,
 	 * and for a deployment with no ffmpeg — what is placed then has no poster, not no item.

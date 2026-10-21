@@ -65,6 +65,7 @@ export const VERBS = [
 	["board.url",["board"]],
 	["canvas.list",[]],
 	["canvas.create",["title"]],
+	["canvas.copyShared",["options?"]],
 	["frame.create",["path","item?"]],
 	["file.url",["file"]],
 	["agent.me",[]],
@@ -378,10 +379,15 @@ export function connect(options = {}) {
 			if (typeof said?.token !== "string") throw new DecksError("Decks gave no token for that board.");
 			return said.token;
 		},
-		/** Put a file into the deck's `assets/`, for an agent to read: its deck path back. */
+		/**
+		 * Put a file into the deck's `assets/`, for an agent to read, or with `canvas` into that canvas's
+		 * own `files/` (a friend's canvas you may edit included, which syncs it back to them): its deck
+		 * path back. In the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.
+		 */
 		async upload(file, given = {}) {
 			const name = given.name ?? file.name ?? "pasted";
-			const said = await request(`/api/upload?name=${encodeURIComponent(name || "pasted")}`, { body: file });
+			const canvas = given.canvas ? `&canvas=${encodeURIComponent(given.canvas)}` : "";
+			const said = await request(`/api/upload?name=${encodeURIComponent(name || "pasted")}${canvas}`, { body: file });
 			if (typeof said?.path !== "string") throw new DecksError(`Could not upload ${name}.`);
 			return said.path;
 		},
