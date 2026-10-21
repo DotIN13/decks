@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { HashCache, sha256 } from "./hash-cache.ts";
+import { HashCache, sha256 } from "../src/hash-cache.ts";
 
 test("a file is hashed again only when its size or time changes, or when asked to check afresh, and the cache outlives the process", () => {
 	const dir = mkdtempSync(join(tmpdir(), "decks-hash-cache-"));

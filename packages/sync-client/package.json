@@ -1,0 +1,24 @@
+{
+  "name": "@decks/sync-client",
+  "version": "0.1.0",
+  "description": "Keeps a Decks deck folder's canvases in step with a canvas-sharing service (Decks Studio, or any @decks/hub server): watches the folder, pushes and pulls drawings as changes, files by hash",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@decks/hub": "*",
+    "@decks/pen": "*",
+    "@decks/sync-protocol": "*",
+    "ws": "^8.18.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3"
+  }
+}

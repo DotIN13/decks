@@ -1,0 +1,28 @@
+{
+  "name": "@decks/hub",
+  "version": "0.1.0",
+  "description": "The server side of sharing Decks canvases: the canvas folder layout, merging edits made at the same time, live updates, and the /sync/v1 routes harnesses sync through, over a storage interface you implement",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./layout": "./src/layout.ts",
+    "./node": "./src/node.ts"
+  },
+  "dependencies": {
+    "@decks/pen": "*",
+    "@decks/sync-protocol": "*",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3",
+    "@decks/sync-client": "*",
+    "@types/ws": "^8.5.12",
+    "ws": "^8.18.0"
+  }
+}

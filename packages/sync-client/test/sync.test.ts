@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { HarnessSync, landingFor, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking } from "./sync.ts";
+import { HarnessSync, landingFor, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking } from "../src/sync.ts";
 
 test("a canvas name from Studio is one plain folder name", () => {
 	for (const name of ["plan", "Plan-2", "a.b_c", "x".repeat(100)]) assert.ok(safeCanvasName(name), name);

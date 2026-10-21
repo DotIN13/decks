@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import { HarnessSync, type SyncOptions } from "./sync.ts";
+import { HarnessSync, type SyncOptions } from "@decks/sync-client";
 
 /**
  * Decks Studio, from the harness's side: when this harness has a Studio key, its deck syncs with

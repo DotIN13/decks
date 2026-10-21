@@ -3,13 +3,12 @@ import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readdirSyn
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { applyEdits, diff, parse, serialize, type PenDocument, type PenEdit } from "@decks/pen";
 import WebSocket from "ws";
-import { canvasFolder, plainSegment, servedAs, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
-import { slug } from "../agents/slug.ts";
+import { canvasFolder, ownerFolderBase, plainSegment, servedAs, SHARED_CANVASES, sharedName, sharedParts } from "@decks/hub/layout";
 import { HashCache, RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
 
 import { LiveEvent, OWN_PARTS, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
 
-// The sync's own rules, now in @decks/sync-protocol, are still read from here by older callers.
+// The rules a harness checks what a service sends against, from @decks/sync-protocol.
 export { safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking };
 const MIRRORED: readonly string[] = MIRRORED_PARTS;
 
@@ -222,7 +221,7 @@ export class HarnessSync {
 	}
 
 	private async call(method: string, path: string, body?: unknown, raw?: Uint8Array): Promise<any> {
-		const res = await fetch(new URL(path, this.o.studio), { method, headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": raw ? "application/octet-stream" : "application/json" }, body: raw ? (raw as unknown as BodyInit) : body === undefined ? undefined : JSON.stringify(body) });
+		const res = await fetch(new URL(path, this.o.studio), { method, headers: { Authorization: `Bearer ${this.o.key}`, "Content-Type": raw ? "application/octet-stream" : "application/json" }, body: raw ? (raw as unknown as ArrayBuffer) : body === undefined ? undefined : JSON.stringify(body) });
 		if (path.startsWith("/sync/v1/blobs/")) {
 			if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
 			const bytes = new Uint8Array(await res.arrayBuffer());
@@ -363,7 +362,7 @@ export class HarnessSync {
 		if (owners[c.owner]) return owners[c.owner];
 		const id = String(c.owner ?? "");
 		if (!/^[A-Za-z0-9_-]+$/.test(id)) return undefined;
-		const base = slug(c.ownerName ?? "", 40).replace(/[^A-Za-z0-9._-]/g, "").replace(/^[._-]+/, "") || "friend";
+		const base = ownerFolderBase(c.ownerName ?? "");
 		const taken = new Set(Object.values(owners));
 		const name = taken.has(base) ? `${base}-${id.slice(0, 6)}` : base;
 		owners[c.owner] = name;
