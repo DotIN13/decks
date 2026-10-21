@@ -12,6 +12,11 @@
 		"./float": "./src/public/float.ts",
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",
+		"./alerts": "./src/public/alerts.ts",
+		"./vite": {
+			"types": "./vite-plugin.d.mts",
+			"default": "./vite-plugin.mjs"
+		},
 		"./styles.css": "./styles/standalone.css",
 		"./canvas.css": "./dist/canvas.css",
 		"./styles/*": "./styles/*",
@@ -46,9 +51,12 @@
 		"vite-plugin-solid": "^2.11.10"
 	},
 	"files": [
+		"dist",
+		"scripts",
+		"sounds",
 		"src",
 		"styles",
-		"dist",
-		"scripts"
+		"vite-plugin.d.mts",
+		"vite-plugin.mjs"
 	]
 }

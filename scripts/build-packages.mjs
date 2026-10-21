@@ -30,7 +30,7 @@ const PUBLIC = [
 	{ dir: "sync-client" },
 	{ dir: "board-host", copy: ["lib"] },
 	// The canvas: its own build (JSX for Solid, one file per module, and the scoped stylesheet).
-	{ dir: "canvas", js: false, build: ["scripts/build-css.mjs", "scripts/build-lib.mjs"], copy: ["dist"], exports: (key, target) => (key === "./internal/*" || key.startsWith("./styles") ? undefined : key === "./canvas.css" ? target : { types: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".d.ts"), default: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".js") }) },
+	{ dir: "canvas", js: false, build: ["scripts/build-css.mjs", "scripts/build-lib.mjs"], copy: ["dist", "sounds", "vite-plugin.mjs", "vite-plugin.d.mts"], exports: (key, target) => (typeof target !== "string" ? target : key === "./internal/*" || key.startsWith("./styles") ? undefined : key === "./canvas.css" ? target : { types: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".d.ts"), default: target.replace(/^\.\/src\//, "./dist/lib/").replace(/\.tsx?$/, ".js") }) },
 	{ dir: "stage", js: false, copy: ["pkg", "pkg-gl", "README.md"] },
 	{ dir: "sdk", js: false, copy: ["src", "bin", "mcp", "README.md"] },
 ];

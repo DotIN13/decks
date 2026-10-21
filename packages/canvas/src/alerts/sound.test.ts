@@ -12,7 +12,7 @@ import { isSound, SILENT, SOUND_FAMILIES, SOUND_IDS, soundLabel, soundName, soun
  * browser is in after this build, since the ids changed under it.
  */
 
-const sounds = join(dirname(fileURLToPath(import.meta.url)), "../../public/sounds");
+const sounds = join(dirname(fileURLToPath(import.meta.url)), "../../sounds");
 const onDisk = readdirSync(sounds)
 	.filter((name) => name.endsWith(".mp3"))
 	.map((name) => name.replace(/\.mp3$/, ""))

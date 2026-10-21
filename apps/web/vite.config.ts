@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
+// The alerts' cues at /sounds/, from @decks/canvas (they were public/sounds).
+import { decksSounds } from "@decks/canvas/vite";
 
 /**
  * The dev server proxies to the API rather than talking to it cross-origin.
@@ -89,7 +91,7 @@ function tabSession(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [solid(), tailwind(), tabSession()],
+	plugins: [solid(), tailwind(), tabSession(), decksSounds()],
 	server: {
 		host: WEB_HOST,
 		port: WEB_PORT,
