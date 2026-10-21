@@ -222,6 +222,8 @@ export class HarnessSync {
 		await this.syncCanvases();
 		await this.syncInventory();
 		this.save();
+		// A change to a friend's canvas that came down in this pass is seen at once, not on the next 30 s round.
+		this.watchFolders();
 	}
 
 	// ---- where things are ----
@@ -644,11 +646,22 @@ export class HarnessSync {
 			this.ws.on("error", () => {});
 		};
 		connect();
+		this.started = true;
+		this.watchFolders();
+		this.timer = setInterval(() => this.sync(), 30_000);
+	}
+
+	/** Which of the deck's synced folders are watched: one that comes later (a friend's first share, the first canvas) is watched from then on. */
+	private watched = new Set<string>();
+	private started = false;
+	private watchFolders() {
+		if (!this.started || this.stopped) return;
 		for (const top of ["canvases", SHARED_CANVASES, ...MIRRORED]) {
 			const dir = join(this.o.deck, top);
-			if (existsSync(dir)) this.watchers.push(watch(dir, { recursive: true }, () => this.soon(300)));
+			if (this.watched.has(top) || !existsSync(dir)) continue;
+			this.watched.add(top);
+			this.watchers.push(watch(dir, { recursive: true }, () => this.soon(300)));
 		}
-		this.timer = setInterval(() => this.sync(), 30_000);
 	}
 
 	private pending?: NodeJS.Timeout;
