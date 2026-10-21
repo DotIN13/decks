@@ -348,7 +348,7 @@ export class BoardService {
 		const format = options.format ?? "board";
 		const extension = extensionFor(format);
 		const base = slugFor(options.title);
-		// `boards/`, or a stage's own board folder for an isolated agent (`deck/stage-boards.ts`).
+		// `boards/`, or a canvas's own board folder (`deck/stage-boards.ts`).
 		const folder = options.folder ?? "boards";
 		let path = `${folder}/${base}${extension}`;
 		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {

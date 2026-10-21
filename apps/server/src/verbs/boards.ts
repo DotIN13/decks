@@ -6,7 +6,7 @@ import type { VerbContext } from "./context.ts";
 
 /** Board files: list them, make one, size one on the canvas and in its file, and say which ones are yours. */
 export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard" | "resize" | "fit" | "report"> {
-	const { service, agent, notes, asList, viewport, isolated, here, cornerOf, reportPlace } = ctx;
+	const { service, agent, notes, asList, viewport, here, cornerOf, reportPlace } = ctx;
 	return {
 		/** Every board in the deck, placed as this agent's stage has them, with its box's two corners. */
 		boards: async () => here().map(withBox),
@@ -55,8 +55,8 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 			 */
 			const view = viewport();
 			const width = boardWidth(options.w, view?.width, format);
-			// A new board is made in the canvas it lands on, the caller's own (`deck/layout.ts`); isolated, its stage's.
-			const stageName = isolated() ? agent.stageName?.() : (agent.stageName?.() ?? undefined);
+			// A new board is made in the canvas it lands on, the caller's own (`deck/layout.ts`).
+			const stageName = agent.stageName?.();
 			const path = service.newBoard({
 				title,
 				format,

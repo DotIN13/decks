@@ -1,18 +1,16 @@
-import { isIsolatedStage } from "../stage/isolated-stages.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
 /** Stages (canvases): list them, move to one, name one, make one. */
 export function stagesVerbs(ctx: VerbContext): Pick<Stage, "stages" | "open" | "title" | "newStage"> {
-	const { service, agent, needPens, needStage, isolated, here } = ctx;
+	const { service, agent, needPens, needStage, here } = ctx;
 	return {
 		/** Every stage in the deck, who has it open, and how much is on it. */
 		stages: async () => {
 			const pens = needPens();
 			const mine = agent.stageName?.();
 			const everyone = agent.agents();
-			// Isolated, the isolated stages are all there are (`stage/isolated-stages.ts`).
-			return pens.names().filter((name) => !isolated() || isIsolatedStage(pens, name)).map((name) => ({
+			return pens.names().map((name) => ({
 				name,
 				title: pens.titleOf(name),
 				open: everyone.filter((other) => (other.id === agent.id ? mine : other.stage) === name).map((other) => other.name),

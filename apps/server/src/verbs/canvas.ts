@@ -2,7 +2,6 @@ import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, walk, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
-import { markIsolated } from "../stage/isolated-stages.ts";
 import { BOARD_ITEM, boardOf } from "../stage/pens.ts";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
@@ -71,7 +70,7 @@ export function placeBy(box: { x: number; y: number; w: number; h: number }, how
 }
 
 export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
-	const { service, agent, notes, needPens, canvasOf, canvasRow, isolated } = ctx;
+	const { service, agent, notes, needPens, canvasOf, canvasRow } = ctx;
 	const measure = serverText.measure;
 
 	/** A canvas, or a frame file when the caller says `frame`; both at once is a mistake worth saying. */
@@ -400,11 +399,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return canvasRow(folder);
 			},
 			file: async (options?: { canvas?: string }) => canvasFile(canvasOf(options?.canvas)),
-			list: async () => {
-				const pens = needPens();
-				const { isIsolatedStage } = await import("../stage/isolated-stages.ts");
-				return pens.names().filter((name) => !isolated() || isIsolatedStage(pens, name)).map(canvasRow);
-			},
+			list: async () => needPens().names().map(canvasRow),
 			/** Your own copy of a friend's canvas (`stage/copy-shared.ts`): a new canvas of yours, which syncs as yours. */
 			copyShared: async (options?: { canvas?: string; title?: string }) => {
 				const pens = needPens();
@@ -418,7 +413,6 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				if (typeof title !== "string" || !title.trim()) throw new Error('canvas create takes a title, as in decks canvas create "Launch plan".');
 				const pens = needPens();
 				const name = pens.claim(title.trim());
-				if (isolated()) markIsolated(pens, name);
 				service.stagesChanged();
 				notes.push(`${name} is made and empty. Nobody is on it yet: decks agent update --canvas ${name} makes it your home, decks view goto ${name} shows it.`);
 				return canvasRow(name);

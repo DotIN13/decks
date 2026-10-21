@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { slug } from "../agents/slug.ts";
 import type { DeckAgent } from "../agents/session.ts";
@@ -40,24 +40,13 @@ export function renameStage(context: Context, from: string, title: string): stri
 	return moveCanvas(context, from, to);
 }
 
-/** Move a canvas to a new folder; its kept boards, the isolated copies of it and its agents follow. */
+/** Move a canvas to a new folder; its kept boards and its agents follow. */
 function moveCanvas(context: Context, from: string, to: string): string {
 	const before = `${stageBoardsDir(from)}/`;
 	const after = `${stageBoardsDir(to)}/`;
 	const repoint = (path: string) => (path.startsWith(before) ? after + path.slice(before.length) : path);
 	context.pens.rename(from, to, repoint);
 	context.deck.reload();
-	// An isolated stage names the stage it was copied from; that name moved.
-	for (const name of context.pens.names()) {
-		const mark = join(context.pens.folderOf(name), "isolated.json");
-		if (!existsSync(mark)) continue;
-		try {
-			const parsed = JSON.parse(readFileSync(mark, "utf8")) as { from?: string };
-			if (parsed.from === from) writeFileSync(mark, `${JSON.stringify({ ...parsed, from: to })}\n`);
-		} catch {
-			// An unreadable mark stays as it was.
-		}
-	}
 	for (const agent of context.agents) agent.stageRenamed(from, to, repoint);
 	return to;
 }

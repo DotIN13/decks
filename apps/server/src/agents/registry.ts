@@ -296,8 +296,6 @@ export class Registry {
 					...(record.userTags ? { userTags: record.userTags } : {}),
 					...(record.workspace ? { workspace: record.workspace } : {}),
 					...(record.stage ? { stage: record.stage } : {}),
-					...(record.isolated ? { isolated: true as const } : {}),
-					...(record.isolatedStages ? { isolatedStages: record.isolatedStages } : {}),
 				},
 			});
 		}

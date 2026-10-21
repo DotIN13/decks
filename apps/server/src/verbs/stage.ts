@@ -7,7 +7,7 @@ import type { VerbContext } from "./context.ts";
 
 /** Your stage and your view of it: what is up and where, the camera, cursors, and pictures of it. */
 export function stageVerbs(ctx: VerbContext): Pick<Stage, "show" | "hide" | "move" | "camera" | "reload" | "cursor" | "viewport" | "screenshot"> {
-	const { service, agent, images, asList, viewport, needStage, itemBox, isolated, here, cornerOf, reportPlace, notWhileIsolated } = ctx;
+	const { service, agent, images, asList, viewport, needStage, itemBox, here, cornerOf, reportPlace } = ctx;
 	return {
 		/**
 		 * Put these boards on this agent's stage, beside what is already there — or look at a
@@ -35,7 +35,6 @@ export function stageVerbs(ctx: VerbContext): Pick<Stage, "show" | "hide" | "mov
 					continue;
 				}
 				const box = itemBox(one);
-				if (!box && isolated()) notWhileIsolated(`showing ${one}, which is not on this stage,`);
 				if (!box) throw new Error(`No such board or drawn item: ${one}`);
 				items.push({ id: one, box });
 			}

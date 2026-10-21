@@ -5,10 +5,8 @@ import { canvasFolder } from "./layout.ts";
 /**
  * Boards a canvas keeps for itself: `canvases/<name>/boards/`.
  *
- * A board normally lives in the deck's `boards/`. When an agent is isolated
- * (`agents/isolation.ts`) its stage's boards are copied into the stage's own folder and the stage
- * points at the copies, so the agent's work never touches the originals and stays with the stage
- * afterwards. The deck lists these like any other board.
+ * A canvas keeps the boards it places in its own folder, so it stands alone (`deck/layout.ts`);
+ * the deck's `boards/` is a library read and copied from. The deck lists these like any other board.
  */
 
 /** The deck-relative folder a stage keeps its own boards in. */

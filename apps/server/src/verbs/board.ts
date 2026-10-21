@@ -10,7 +10,7 @@ import type { VerbContext } from "./context.ts";
  * not place it, which is the canvas's job (`canvas.insert`).
  */
 export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "file"> {
-	const { service, agent, notes, viewport, isolated, needPens, notWhileIsolated } = ctx;
+	const { service, agent, notes, viewport, needPens } = ctx;
 
 	/** Who wrote a board, as a name: an agent's, or "person" for the person's own edit. */
 	const writer = (who: string | undefined): string | undefined => {
@@ -18,12 +18,10 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 		if (who === "you") return "person";
 		return agent.agents().find((one) => one.id === who)?.name ?? who;
 	};
-	/** Isolated, only the boards on the agent's own stage exist. */
-	const visible = (path: string): boolean => !isolated() || agent.inPlay().includes(path);
 	const needBoard = (path: unknown) => {
 		if (typeof path !== "string" || !path.trim()) throw new Error('A board is named by its path, as in "boards/plan.html": decks board list lists them.');
 		const board = service.fileBoard(path);
-		if (!board || !visible(path)) throw new Error(`There is no board ${path}. decks board list lists them.`);
+		if (!board) throw new Error(`There is no board ${path}. decks board list lists them.`);
 		return board;
 	};
 	const asBoard = (board: { path: string; title: string; lastWrittenBy?: string }) => {
@@ -33,7 +31,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 
 	return {
 		board: {
-			list: async () => service.allBoards().filter((board) => visible(board.path)).map(asBoard),
+			list: async () => service.allBoards().map(asBoard),
 			create: async (options: { title: string; format?: string; w?: number; h?: number; canvas?: string }) => {
 				const title = options?.title?.trim();
 				if (!title) throw new Error("A board needs a title: the finding it states, as a sentence.");
@@ -43,11 +41,11 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 				const width = boardWidth(options.w, view?.width, format);
 				/*
 				 * A board is made in a canvas's own boards/, the one named or the caller's own, so the canvas
-				 * stands alone (`deck/layout.ts`). Isolated, it is the agent's own stage's (`deck/stage-boards.ts`).
+				 * stands alone (`deck/layout.ts`).
 				 */
 				let stageName: string | undefined;
 				try {
-					stageName = isolated() ? agent.stageName?.() : ctx.canvasOf(options?.canvas);
+					stageName = ctx.canvasOf(options?.canvas);
 				} catch (error) {
 					throw new Error(`A board is made in a canvas: name it with { canvas }, as in decks board create '{"title":"…","canvas":"launch-plan"}'. ${(error as Error).message}`);
 				}
@@ -108,13 +106,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 			},
 		},
 		file: {
-			url: async (file: string) => {
-				if (isolated()) {
-					const path = agent.boardPathOf(file) ?? file;
-					if (!agent.inPlay().includes(path)) notWhileIsolated(`the address of ${file}, which is not on this stage,`);
-				}
-				return service.resolve(file);
-			},
+			url: async (file: string) => service.resolve(file),
 		},
 	};
 }

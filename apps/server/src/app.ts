@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { sttReady } from "./stt.ts";
 import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
-import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
@@ -1054,8 +1053,6 @@ export class App {
 				boards,
 				rev,
 				words,
-				...(isIsolatedStage(pens, name) ? { isolated: true as const } : {}),
-				...(fromIsolation(pens, name) ? { fromIsolation: true as const } : {}),
 				...(pens.formerly(name).length ? { formerly: pens.formerly(name) } : {}),
 				agents: everyone
 					.filter((agent) => agent.stageName() === name)

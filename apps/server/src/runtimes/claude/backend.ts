@@ -1408,8 +1408,8 @@ export class ClaudeBackend implements AgentBackend {
 	 * Make a conversation resumable from this folder.
 	 *
 	 * Claude Code files a session under `projects/<the folder, every other character a dash>/`, so a
-	 * session resumed from another folder — isolation turned on or off, even while the agent was
-	 * dormant — is looked for where it is not, and fails with "No conversation found". When the
+	 * session resumed from another folder (a deck that moved, a conversation begun elsewhere) is
+	 * looked for where it is not, and fails with "No conversation found". When the
 	 * file is not under this folder, it is found under any other and copied here; the original
 	 * stays, so the old folder can still open it.
 	 */

@@ -1,5 +1,4 @@
 import { cleanWorkspace } from "../agents/workspaces.ts";
-import { isIsolatedStage } from "../stage/isolated-stages.ts";
 import type { StageService, WebTarget } from "../stage/service.ts";
 import type { StageAgentHooks } from "../stage/tool.ts";
 
@@ -23,11 +22,9 @@ export interface VerbContext {
 	itemBox(id: string): { x: number; y: number; w: number; h: number } | undefined;
 	needWeb(): NonNullable<StageService["web"]>;
 	needTarget(value: unknown, sentence: string): WebTarget;
-	isolated(): boolean;
 	here(): ReturnType<StageService["boards"]>;
 	cornerOf(at: unknown): { x: number; y: number } | undefined;
 	reportPlace(path: string, named: { x: number; y: number } | undefined, before?: { x: number; y: number }): void;
-	notWhileIsolated(what: string): never;
 	askedWorkspace(raw: unknown): string;
 	/**
 	 * The canvas a call means when it names none (`decks.here()`): the one the call says it was made
@@ -109,17 +106,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */
-	const isolated = () => agent.isolated?.() === true;
-	/*
-	 * Isolated mode (`agents/isolation.ts`): the stage is all there is. Every read goes through
-	 * `here`, so filtering it is what keeps the rest of the deck out of every verb at once.
-	 */
-	const here = () => {
-		const all = service.boards(agent.id);
-		if (!isolated()) return all;
-		const mine = new Set(agent.inPlay());
-		return all.filter((board) => mine.has(board.path));
-	};
+	const here = () => service.boards(agent.id);
 	/**
 	 * Where a board goes, as an agent writes it: its top-left corner, `{ x1, y1 }` (`{ x, y }` is
 	 * taken too, the shape `move` uses). Nothing when it was not given; a sentence when it is not
@@ -171,9 +158,6 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 			notes.push(`${path} is at ${corner}, as asked, and sits on ${what}. Move it with decks canvas move if that was not meant.`);
 		}
 	};
-	const notWhileIsolated = (what: string): never => {
-		throw new Error(`Isolated mode: ${what} is not available while this agent can see only its own stage.`);
-	};
 	/** A workspace a caller named, cleaned as the store cleans it, or a sentence. */
 	const askedWorkspace = (raw: unknown): string => {
 		const clean = typeof raw === "string" ? cleanWorkspace(raw) : null;
@@ -198,7 +182,6 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		const names = pens.names();
 		const name = names.includes(raw) ? raw : names.find((one) => pens.titleOf(one).toLowerCase() === raw.toLowerCase());
 		if (!name) throw new Error(`No canvas is called "${asked}". decks canvas list names them, by name and title.`);
-		if (isolated() && name !== agent.stageName?.() && !isIsolatedStage(pens, name)) notWhileIsolated(`the canvas "${name}"`);
 		return name;
 	};
 	const canvasRow = (name: string) => {
@@ -224,7 +207,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 			boards,
 		};
 	};
-	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, isolated, here, cornerOf, reportPlace, notWhileIsolated, askedWorkspace, hereCanvas, canvasOf, canvasRow, callOn };
+	return { service, agent, port, notes, images, asList, viewport, needPens, needStage, itemBox, needWeb, needTarget, here, cornerOf, reportPlace, askedWorkspace, hereCanvas, canvasOf, canvasRow, callOn };
 }
 
 /** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */

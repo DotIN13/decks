@@ -15,7 +15,7 @@ function nextSteps(name: string, kind: AppKind, board: string, first = "Edit the
 
 /** Apps: folders in the deck's apps/ that Decks serves, builds or runs. */
 export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
-	const { service, agent, isolated, notWhileIsolated } = ctx;
+	const { service, agent } = ctx;
 	return {
 		/**
 		 * Apps in the deck's `apps/` (`apps/service.ts`): an app is a folder the agent writes with its
@@ -23,8 +23,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 		 * seconds: an install can take minutes, and a stage run is abandoned after twenty, so a
 		 * `pending` answer means ask `status` again on the next call.
 		 *
-		 * Agents' verbs: a board's own code may read the list and an app's state, nothing more, and an
-		 * isolated agent may not use them, since an app's server reaches outside its stage.
+		 * Agents' verbs: a board's own code may read the list and an app's state, nothing more.
 		 */
 		apps: (() => {
 			const service_ = () => {
@@ -33,7 +32,6 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				return apps;
 			};
 			const agentOnly = (what: string) => {
-				if (isolated()) notWhileIsolated(`apps (${what})`);
 				if (agent.board) throw new Error(`A board's own code cannot ${what} an app; ask an agent.`);
 			};
 			const known = (name: unknown) => {
@@ -90,7 +88,6 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					const folder = service_().folder(text);
 					if (!isRepo(folder)) {
 						if (agent.board) throw new Error(`A board's own code cannot put an app in git; ask an agent.`);
-						if (isolated()) notWhileIsolated("apps (put in git)");
 						await initRepo(folder, `Keep ${text} in git`);
 					}
 					return repoState(folder);

@@ -122,8 +122,7 @@ export class AntigravityBackend implements AgentBackend {
 			...(conversation ? ["--conversation", conversation] : []),
 		];
 		const child = spawn(executable, args, {
-			// The deck, or the isolated copy of the stage (`agents/isolation.ts`), which is then
-			// also the CLI's workspace.
+			// The deck, which is also the CLI's workspace.
 			cwd: this.context.cwd,
 			env: {
 				...process.env,

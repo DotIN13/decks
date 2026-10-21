@@ -1,8 +1,8 @@
 import { skillsDir, opencode2PluginDir } from "@decks/runtime";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import { DEFAULT_THINKING } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint, IsolationContext } from "../../agents/backend.ts";
-import { deckContext, isolationNote } from "../../agents/context.ts";
+import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import { deckContext } from "../../agents/context.ts";
 import { sentAs } from "../../agents/sent-as.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 // The level vocabulary is Decks' own and the same for both opencodes, so it is read from there
@@ -25,11 +25,9 @@ import { opencode2Manager, type Opencode2ServerHandle } from "./manager.ts";
  * - **The deck's briefing is a session instruction**, not a file named in the server's config:
  *   OpenCode 2 still accepts `instructions` in its config schema and does not read it. A session
  *   instruction (`session.instructions.entry.put`) is OpenCode 2's own way to give a session
- *   standing text, and it is per session, which isolated mode needs anyway.
+ *   standing text, and it is per session.
  * - **The model and level are the session's**, set with `switchModel`, not riders on each
  *   prompt; so a change is sent only when it is one.
- * - **Isolated mode moves the session** (`session.move`) into the copy of the stage, since a
- *   prompt can no longer name its own directory, and moves it back when isolation ends.
  * - **A turn's end is `session.execution.*`**, which `events.ts` reads.
  * - **Permissions are `{ action, resource, effect }` rules on the session**, and `bash` is
  *   called `shell`. The session's rules come after the agent's and the last match wins, so the
@@ -66,9 +64,8 @@ function rulesOf(mode: AgentMode): Array<{ action: string; resource: string; eff
 
 const DEFAULT_MODE: AgentMode = "acceptEdits";
 
-/** The keys of this agent's two session instructions. */
+/** The key of this agent's session instruction. */
 const BRIEFING = "decks";
-const ISOLATION = "decks-isolation";
 
 export class Opencode2Backend implements AgentBackend {
 	readonly capabilities = OPENCODE2_CAPABILITIES;
@@ -96,8 +93,6 @@ export class Opencode2Backend implements AgentBackend {
 	private commandList: SlashCommand[] = OPENCODE2_COMMANDS;
 	private storedName: string | undefined;
 	private lastUsage: AgentUsage | null = null;
-	/** Isolated mode, while it is on (`agents/isolation.ts`). */
-	private isolation: IsolationContext | undefined;
 
 	private constructor(private readonly context: AgentBackendContext) {}
 
@@ -144,7 +139,6 @@ export class Opencode2Backend implements AgentBackend {
 		// A `decks` command and the Google Docs tools name this session; the bridge resolves that to this agent.
 		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, "opencode2");
 		await this.putInstruction(BRIEFING, this.briefing());
-		if (this.context.isolation) await this.setIsolation(this.context.isolation);
 
 		this.stream = new Opencode2Stream(translator, this.sessionId, {
 			ended: () => {
@@ -264,8 +258,7 @@ export class Opencode2Backend implements AgentBackend {
 		await this.applyModel();
 		/*
 		 * Mid-turn input steers, as it does on pi: the person is correcting what they watch. Input
-		 * to an idle chat is queued instead, because a steer jumps the queue, and the queue may hold
-		 * a move into or out of isolated mode that this prompt has to come after.
+		 * to an idle chat is queued instead, because a steer jumps the queue.
 		 */
 		const delivery = this.streamingNow ? "steer" : "queue";
 		this.streamingNow = true;
@@ -452,7 +445,7 @@ export class Opencode2Backend implements AgentBackend {
 		return this.lastUsage;
 	}
 
-	// --- identity, isolation and the session tree ----------------------------------------
+	// --- identity and the session tree ----------------------------------------
 
 	name(): string | undefined {
 		return this.storedName;
@@ -465,24 +458,6 @@ export class Opencode2Backend implements AgentBackend {
 
 	sessionRef(): string | undefined {
 		return this.sessionId;
-	}
-
-	/**
-	 * Isolation on or off, in place: the session moves into the copy of the stage (or back to the
-	 * deck), and the isolation note is a second session instruction beside the briefing.
-	 */
-	async setIsolation(isolation: IsolationContext | undefined): Promise<void> {
-		const was = this.isolation;
-		this.isolation = isolation;
-		if (!this.sessionId) return;
-		const to = isolation?.dir ?? this.directory;
-		if ((was?.dir ?? this.directory) !== to) {
-			await this.client.session
-				.move({ sessionID: this.sessionId, directory: to, delivery: "queue" } as never)
-				.catch((error: Error) => this.context.notice("warn", `OpenCode 2 would not move the chat: ${error.message}`));
-		}
-		if (isolation) await this.putInstruction(ISOLATION, isolationNote(isolation, this.context.stageAgent.inPlay()));
-		else await this.client.session.instructions.entry.remove({ sessionID: this.sessionId, key: ISOLATION } as never).catch(() => undefined);
 	}
 
 	/**

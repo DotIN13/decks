@@ -66,10 +66,6 @@ export interface StageRow {
 	 * whether you may change it. Its boards run sandboxed, with no token.
 	 */
 	shared?: { owner: string; role: "edit" | "view" };
-	/** An isolated stage: the only kind an isolated agent may open (`stage/isolated-stages.ts`). */
-	isolated?: true;
-	/** Copied back from an isolated stage when isolation ended: badged in the manager. */
-	fromIsolation?: true;
 	/**
 	 * The folders it had before, since this server started: the first name chosen for a canvas names
 	 * its folder (`stage/stage-admin.ts`), and a browser on it keeps its view rather than landing anew.
@@ -249,8 +245,6 @@ export type ClientMessage =
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
-	/** Isolated mode on or off: the agent restarts in its stage's folder, on the same conversation. */
-	| { type: "agent.setIsolated"; id: string; on: boolean }
 	/**
 	 * Read this agent's full usage report — the panel, not the ring.
 	 *
@@ -366,7 +360,7 @@ export type ServerMessage =
 	 * one means absent. That is what keeps it from becoming a second, disagreeing account of a
 	 * row — the failure this protocol has already had once.
 	 */
-	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode; isolated?: true }
+	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode }
 	/** An agent is off the list; anything the browser kept for it can go. */
 	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }

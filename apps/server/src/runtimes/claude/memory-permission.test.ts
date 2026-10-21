@@ -19,7 +19,7 @@ test("a file in a project's memory folder counts, by the linked spelling and the
 		symlinkSync(real, link);
 		assert.ok(inMemoryFolder(link, join(link, "projects", "-home-decks-data-decks", "memory", "note.md")));
 		assert.ok(inMemoryFolder(link, join(real, "projects", "-home-decks-data-decks", "memory", "MEMORY.md")));
-		assert.ok(inMemoryFolder(link, join(link, "projects", "-tmp-decks-isolation-x", "memory", "new.md")), "a memory folder not made yet");
+		assert.ok(inMemoryFolder(link, join(link, "projects", "-tmp-elsewhere-x", "memory", "new.md")), "a memory folder not made yet");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

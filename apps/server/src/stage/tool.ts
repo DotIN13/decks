@@ -2,7 +2,6 @@ import { canvasFile } from "./canvas-files.ts";
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { identityReminder } from "../agents/identity-reminder.ts";
 import { canvasNameReminder } from "./canvas-name.ts";
-import { isIsolatedStage } from "./isolated-stages.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
@@ -160,8 +159,6 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
-	/** Isolated mode (`agents/isolation.ts`): this agent may see only its own stage's boards. */
-	isolated?(): boolean;
 	/** Set when the caller is a board's own code (`stage/board-actor.ts`), not an agent. */
 	board?: string;
 	/**

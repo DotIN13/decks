@@ -7,15 +7,9 @@ import type { VerbContext } from "./context.ts";
 
 /** Addresses and time: a board's URL, a file's, forwarded ports, the clock, and the link to Decks Studio. */
 export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "ports" | "now" | "studio" | "pair"> {
-	const { service, agent, port, isolated, notWhileIsolated } = ctx;
+	const { service, agent, port } = ctx;
 	return {
-		resolve: async (file: string) => {
-			if (isolated()) {
-				const path = agent.boardPathOf(file) ?? file;
-				if (!agent.inPlay().includes(path)) notWhileIsolated(`resolving ${file}, which is not on this stage,`);
-			}
-			return service.resolve(file);
-		},
+		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
 		/**
 		 * The ports forwarded through Decks, so a board can frame a server this machine runs
@@ -23,11 +17,9 @@ export function miscVerbs(ctx: VerbContext): Pick<Stage, "resolve" | "url" | "po
 		 * to stop. Each comes back with its two addresses, as Open OnDemand names them: `node` keeps
 		 * the path (for a server given that base path), `rnode` takes it off (for one at the root).
 		 *
-		 * An agent's verb, not a board's: a board's own code may read the list but not change it, and
-		 * an isolated agent may do neither, since a forwarded port reaches outside its stage.
+		 * An agent's verb, not a board's: a board's own code may read the list but not change it.
 		 */
 		ports: async (change?: { open?: number; close?: number; label?: string }) => {
-			if (isolated()) notWhileIsolated("port forwarding");
 			const forwards = service.forwards;
 			if (!forwards) throw new Error("This server forwards no ports.");
 			if (change && (change.open !== undefined || change.close !== undefined)) {
