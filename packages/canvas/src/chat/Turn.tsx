@@ -3,7 +3,7 @@ import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { clockTime } from "../lib/time.ts";
 import { createSignal, Index, Match, Show, Switch } from "solid-js";
-import { Markdown } from "./Markdown.tsx";
+import { Markdown } from "./MarkdownView.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";
 import { ToolGroup } from "./ToolGroup.tsx";
 import type { AgentPart, TurnCard } from "./turn-cards.ts";

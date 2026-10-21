@@ -20,7 +20,8 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --import tsx --test \"src/**/*.test.ts\"",
 		"demo": "vite --config demo/vite.config.ts",
-		"build:css": "node scripts/build-css.mjs"
+		"build:css": "node scripts/build-css.mjs",
+		"build:lib": "node scripts/build-lib.mjs"
 	},
 	"dependencies": {
 		"@decks/board-kit": "*",
