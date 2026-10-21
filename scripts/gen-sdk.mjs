@@ -59,6 +59,8 @@ export declare class DecksError extends Error {
 	status?: number;
 	/** The notes the verb added before it failed. */
 	notes: string[];
+	/** Set when a pairing door refused for want of a (working) pairing code. */
+	needsCode?: true;
 }
 
 export interface ConnectOptions {
@@ -95,10 +97,57 @@ export interface Decks extends Verbs {
 	/** Hand work to the agent with this name, making it from the spec first when there is none. */
 	sendTo(agent: AgentSpec, work: Work | string): Promise<{ queued: true; position: number; name: string; made: boolean; agent?: string }>;
 	/**
-	 * Every change as Decks broadcasts it (\`GET /api/v1/events\`), as in \`{ type: "board.changed", path, board }\`.
-	 * \`types\` keeps only some. \`done\` settles when the stream ends; \`close\` stops it.
+	 * Any other door the harness has, with the token: \`path\` from its root, as in \`/api/harness\`. A Blob
+	 * or bytes go as they are, with their type; any other body as JSON. Answers with the JSON sent back,
+	 * or the body \`as\` a Blob, text, or the Response itself. A refusal throws a DecksError.
 	 */
-	events(onEvent: (event: { type: string; [key: string]: unknown }) => void, options?: { types?: string[] }): { close(): void; done: Promise<void> };
+	request<T = any>(path: string, options?: RequestOptions & { as?: "json" }): Promise<T>;
+	request(path: string, options: RequestOptions & { as: "blob" }): Promise<Blob>;
+	request(path: string, options: RequestOptions & { as: "text" }): Promise<string>;
+	request(path: string, options: RequestOptions & { as: "response" }): Promise<Response>;
+	/** Whether a Decks answers here, and what it says of itself; open to anyone. */
+	hello(): Promise<Hello>;
+	/** Pair a page on another site (\`POST /api/pair\`): a site token bound to the page's origin. \`needsCode\` on the error wants a code. */
+	pairSite(options?: { code?: string; label?: string }): Promise<{ token: string; name: string }>;
+	/** Decks Studio connecting this harness (\`POST /api/studio/connect\`): Studio's address and its key, and a site token back. */
+	connectStudio(options: { studio: string; key: string; code?: string; label?: string }): Promise<{ token: string; name: string; [key: string]: unknown }>;
+	/** A board's own token for its frame, on canvas \`stage\`: its calls act as that board. */
+	boardToken(path: string, stage?: string): Promise<string>;
+	/** Put a file into the deck's \`assets/\`, for an agent to read: its deck path. */
+	upload(file: Blob, options?: { name?: string }): Promise<string>;
+	/** Five-minute tickets for pages a frame or tab opens, by decoded request path (\`/api/board/boards/a.html\`, \`/api/f/…\`, \`/app/<name>/\`). Held by this connection too. */
+	tickets(paths: string[]): Promise<{ tickets: Record<string, string>; expires: number }>;
+	/** The ticket held for a page, while it has a little time left. */
+	ticketFor(path: string): string | undefined;
+	/** A page's address on the harness, with \`ticket\` (default: the one held) in it. */
+	pageUrl(path: string, ticket?: string): string;
+	/** A page's address with a fresh ticket, for a tab about to open it. */
+	ticketedUrl(path: string): Promise<string>;
+	/** Keep tickets for pages that stay shown: asked at once when wanted, again every four minutes and when the page comes back into view. */
+	keepTickets(onChange?: (tickets: Record<string, string>) => void, options?: { every?: number }): { want(paths: string[]): void; stop(): void };
+	/**
+	 * Every change as Decks broadcasts it (\`GET /api/v1/events\`), as in \`{ type: "board.changed", path, board }\`.
+	 * \`types\` keeps only some. With \`reconnect\` it is opened again after it ends or fails, until a
+	 * refusal, which calls \`refused\`. \`done\` settles when the stream ends for good; \`close\` stops it.
+	 */
+	events(onEvent: (event: { type: string; [key: string]: any }) => void, options?: { types?: string[]; reconnect?: boolean; refused?: () => void }): { close(): void; done: Promise<void> };
+}
+
+export interface RequestOptions {
+	method?: string;
+	body?: unknown;
+	headers?: Record<string, string>;
+	signal?: AbortSignal;
+}
+
+/** What \`GET /api/hello\` says. */
+export interface Hello {
+	decks: boolean;
+	name?: string;
+	/** Whether the token sent still works. */
+	paired?: boolean;
+	/** Whether pairing from here will want a code. */
+	needsCode?: boolean;
 }
 
 /** A connection to Decks; with nothing passed, the one the environment or the page names. */

@@ -21,6 +21,12 @@
  * it hands it (`lib/board.js`).
  * The `decks` command (`bin/decks.mjs`) and the MCP server (`mcp/server.mjs`) are this file.
  *
+ * A page on another site (Decks Studio) talks to a harness with this file alone: `connectStudio` or
+ * `pairSite` for its site token, the verbs, `request` for the harness's other doors, `events` for its
+ * changes, `boardToken` for each board frame it shows, and `tickets`/`pageUrl` for the frames and tabs
+ * it opens on the harness's own address. The token only ever goes in a header; a frame or a tab carries
+ * a ticket instead.
+ *
  * The list of verbs below is generated from the table by `scripts/gen-sdk.mjs`; the rest is not.
  */
 
@@ -31,6 +37,8 @@ export class DecksError extends Error {
 		this.name = "DecksError";
 		this.status = details.status;
 		this.notes = details.notes ?? [];
+		// A pairing door's refusal for want of a (working) pairing code.
+		if (details.needsCode) this.needsCode = true;
 	}
 }
 
@@ -157,7 +165,9 @@ function fromPage() {
 async function savedToken(base) {
 	if (typeof process === "undefined" || !process.versions?.node) return undefined;
 	try {
-		const [{ readFileSync }, { homedir }, { join }] = await Promise.all([import("node:fs"), import("node:os"), import("node:path")]);
+		// Named at run time, so a bundler making this file into a page leaves Node's modules alone.
+		const node = ["node:fs", "node:os", "node:path"];
+		const [{ readFileSync }, { homedir }, { join }] = await Promise.all(node.map((name) => import(/* @vite-ignore */ name)));
 		const saved = JSON.parse(readFileSync(join(process.env.DECKS_HOME || join(homedir(), ".decks"), "token"), "utf8"));
 		const token = saved?.[base.replace(/\/+$/, "")];
 		return typeof token === "string" && token ? token : undefined;
@@ -240,6 +250,73 @@ export function connect(options = {}) {
 		return { value: answer.value, notes, images: answer.images };
 	}
 
+	/**
+	 * Any other door the harness has, with the token: `path` from its root, as in `/api/harness`. A
+	 * body that is a Blob (a File, a recording) or bytes goes as it is, with its own type; anything
+	 * else as JSON. Answers with the JSON sent back, or `as: "blob"`, `"text"` or `"response"`.
+	 */
+	async function request(path, opts = {}) {
+		const { body, as = "json", signal } = opts;
+		const method = opts.method ?? (body === undefined ? "GET" : "POST");
+		const headers = { ...(await authHeaders()), ...opts.headers };
+		let sent;
+		if (body !== undefined) {
+			const raw = (typeof Blob !== "undefined" && body instanceof Blob) || body instanceof ArrayBuffer || ArrayBuffer.isView(body);
+			sent = raw ? body : JSON.stringify(body);
+			headers["content-type"] ??= raw ? body.type || "application/octet-stream" : "application/json";
+		}
+		let response;
+		try {
+			response = await doFetch(`${base}${path.startsWith("/") ? "" : "/"}${path}`, { method, headers, ...(sent === undefined ? {} : { body: sent }), ...(signal ? { signal } : {}) });
+		} catch (error) {
+			if (error?.name === "AbortError") throw error;
+			throw new DecksError(`Could not reach Decks at ${base}: ${error.message}`);
+		}
+		if (as === "response") return response;
+		if (!response.ok) {
+			const text = await response.text().catch(() => "");
+			let said = {};
+			try {
+				said = JSON.parse(text) ?? {};
+			} catch {}
+			const error = typeof said.error === "string" ? said.error : text.trim() ? `Decks answered ${response.status}: ${text.trim().slice(0, 400)}` : `Decks answered ${response.status}`;
+			throw new DecksError(error, { status: response.status, needsCode: said.needsCode === true });
+		}
+		if (as === "blob") return response.blob();
+		if (as === "text") return response.text();
+		const text = await response.text();
+		return text ? JSON.parse(text) : undefined;
+	}
+
+	/**
+	 * Tickets for pages this connection opens in a frame or a tab, which cannot send the token in a
+	 * header: by request path, decoded (`/api/board/boards/a.html`, `/api/f/…`, `/app/<name>/`).
+	 */
+	const held = new Map();
+	/** The most paths one ask may name (the harness's `MAX_TICKETS`). */
+	const PER_ASK = 200;
+	async function tickets(paths) {
+		const made = {};
+		let expires = Date.now();
+		for (let at = 0; at < paths.length; at += PER_ASK) {
+			const got = await request("/api/tickets", { body: { paths: paths.slice(at, at + PER_ASK) } });
+			for (const [path, ticket] of Object.entries(got.tickets ?? {})) {
+				made[path] = ticket;
+				held.set(path, { ticket, expires: got.expires });
+			}
+			expires = got.expires;
+		}
+		return { tickets: made, expires };
+	}
+	/** The ticket held for a page, while it has a little time left. */
+	const ticketFor = (path) => {
+		const one = held.get(path);
+		return one && one.expires - Date.now() > 10_000 ? one.ticket : undefined;
+	};
+	/** A page's address on the harness, with its ticket when there is one. `path` is decoded. */
+	const pageUrl = (path, ticket = ticketFor(path)) =>
+		`${base}${path.split("/").map(encodeURIComponent).join("/")}${ticket ? `?decks_ticket=${encodeURIComponent(ticket)}` : ""}`;
+
 	/** The verbs as functions, `pen.edit` under `pen`. */
 	const tree = {};
 	for (const [name] of VERBS) {
@@ -270,15 +347,103 @@ export function connect(options = {}) {
 		run() {
 			throw new DecksError("decks.run(code) is gone: the server runs no code now. Call the verbs themselves, as in await decks.canvas.read().");
 		},
+		request,
+		/**
+		 * Whether a Decks answers here, its name, whether it will want a pairing code, and whether this
+		 * connection's token still works (`paired`). Open to anyone: no token needed.
+		 */
+		hello() {
+			return request("/api/hello");
+		},
+		/**
+		 * Pair a page on another site with this harness (`POST /api/pair`): a site token back, bound to the
+		 * page's origin, and the harness's name. A thrown DecksError with `needsCode` wants a code from `decks pair code`.
+		 */
+		pairSite(given = {}) {
+			return request("/api/pair", { body: { label: given.label ?? "Another Decks", ...(given.code ? { code: given.code } : {}) } });
+		},
+		/**
+		 * Decks Studio connecting this harness in one call (`POST /api/studio/connect`): Studio's address
+		 * and the key to sync with, and a site token back. `needsCode` as for `pairSite`.
+		 */
+		connectStudio(given) {
+			return request("/api/studio/connect", { body: { url: given.studio, key: given.key, label: given.label ?? "Decks Studio", ...(given.code ? { code: given.code } : {}) } });
+		},
+		/**
+		 * A board's own token, for its buttons: the page around a board's frame hands it to that frame
+		 * alone, and the board calls as itself; the person is asked once whether it may use the stage.
+		 */
+		async boardToken(path, stage) {
+			const said = await request("/api/tokens", { body: { kind: "board", path, ...(stage ? { stage } : {}) } });
+			if (typeof said?.token !== "string") throw new DecksError("Decks gave no token for that board.");
+			return said.token;
+		},
+		/** Put a file into the deck's `assets/`, for an agent to read: its deck path back. */
+		async upload(file, given = {}) {
+			const name = given.name ?? file.name ?? "pasted";
+			const said = await request(`/api/upload?name=${encodeURIComponent(name || "pasted")}`, { body: file });
+			if (typeof said?.path !== "string") throw new DecksError(`Could not upload ${name}.`);
+			return said.path;
+		},
+		tickets,
+		ticketFor,
+		pageUrl,
+		/** A page's address with a fresh ticket, for a tab about to open it. Throws if the harness will not open it. */
+		async ticketedUrl(path) {
+			const ticket = (await tickets([path])).tickets[path];
+			if (!ticket) throw new DecksError("Decks would not open that page.");
+			return pageUrl(path, ticket);
+		},
+		/**
+		 * Keep tickets for pages that stay shown: `want(paths)` asks for any not held at once, and every
+		 * path wanted is asked for again every four minutes (a ticket lasts five), and when a page in a
+		 * browser comes back into view. `onChange` hears each batch that came. `stop()` ends it.
+		 */
+		keepTickets(onChange, given = {}) {
+			let wanted = [];
+			const asking = new Set();
+			const ask = async (paths) => {
+				const fresh = paths.filter((one) => !asking.has(one));
+				if (!fresh.length) return;
+				for (const one of fresh) asking.add(one);
+				try {
+					const got = await tickets(fresh);
+					if (Object.keys(got.tickets).length) onChange?.(got.tickets);
+				} catch {
+					// Out of reach, or a harness from before tickets: asked again at the next round.
+				} finally {
+					for (const one of fresh) asking.delete(one);
+				}
+			};
+			const again = () => wanted.length && void ask(wanted);
+			const timer = setInterval(again, given.every ?? 4 * 60_000);
+			// A tab back from the background, or a laptop from sleep, may hold tickets that ran out meanwhile.
+			const back = () => typeof document !== "undefined" && document.visibilityState === "visible" && again();
+			if (typeof document !== "undefined") document.addEventListener("visibilitychange", back);
+			return {
+				want(paths) {
+					wanted = [...new Set(paths)];
+					const missing = wanted.filter((one) => !ticketFor(one));
+					if (missing.length) void ask(missing);
+				},
+				stop() {
+					clearInterval(timer);
+					if (typeof document !== "undefined") document.removeEventListener("visibilitychange", back);
+				},
+			};
+		},
 		/**
 		 * Every change as Decks broadcasts it (`GET /api/v1/events`): `onEvent` hears each frame, as
-		 * in `{ type: "board.changed", path, board }`. `types` keeps only some. Answers with a way to stop.
+		 * in `{ type: "board.changed", path, board }`. `types` keeps only some. Read with fetch, so the
+		 * token goes in its header, never the address. With `reconnect` a stream that ends or fails is
+		 * opened again, a little later each time up to 15 s, until a refusal (401, 403), which calls
+		 * `refused`. Answers with a way to stop.
 		 */
-		events(onEvent, options = {}) {
+		events(onEvent, given = {}) {
 			const controller = new AbortController();
-			const types = options.types?.length ? `?types=${encodeURIComponent(options.types.join(","))}` : "";
-			const done = (async () => {
-				const response = await doFetch(`${base}/api/v1/events${types}`, { headers: await authHeaders(), signal: controller.signal });
+			const types = given.types?.length ? `?types=${encodeURIComponent(given.types.join(","))}` : "";
+			const once = async () => {
+				const response = await request(`/api/v1/events${types}`, { as: "response", headers: { accept: "text/event-stream" }, signal: controller.signal });
 				if (!response.ok || !response.body) throw new DecksError(`Decks answered ${response.status} for its events`, { status: response.status });
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
@@ -286,14 +451,37 @@ export function connect(options = {}) {
 				for (;;) {
 					const { value, done: ended } = await reader.read();
 					if (ended) return;
-					buffer += decoder.decode(value, { stream: true });
+					buffer += decoder.decode(value, { stream: true }).replace(/\r\n?/g, "\n");
 					let gap;
 					while ((gap = buffer.indexOf("\n\n")) >= 0) {
 						const block = buffer.slice(0, gap);
 						buffer = buffer.slice(gap + 2);
-						const data = block.split("\n").filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("\n");
+						// `event:` names the frame, which its JSON names too; `:` lines keep the stream open.
+						const data = block
+							.split("\n")
+							.filter((line) => line.startsWith("data:"))
+							.map((line) => line.slice(5).replace(/^ /, ""))
+							.join("\n");
 						if (data) onEvent(JSON.parse(data));
 					}
+				}
+			};
+			const done = (async () => {
+				if (!given.reconnect) return once();
+				let wait = 1000;
+				while (!controller.signal.aborted) {
+					try {
+						await once();
+						wait = 1000;
+					} catch (error) {
+						if (controller.signal.aborted) return;
+						if (error?.status === 401 || error?.status === 403) {
+							given.refused?.();
+							return;
+						}
+					}
+					await new Promise((resolve) => setTimeout(resolve, wait));
+					wait = Math.min(wait * 2, 15_000);
 				}
 			})().catch((error) => {
 				if (error?.name !== "AbortError") throw error;

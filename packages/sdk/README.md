@@ -70,3 +70,25 @@ is noted in the conversation on screen.
 - `DECKS_TOOLS=canvas,board,view` narrows the MCP server to some groups.
 - `decks.events(onEvent, { types })` and `decks events [type…]` follow every change as Decks
   broadcasts it (`GET /api/v1/events`, Server-Sent Events), the same frames a browser hears.
+  `{ reconnect: true, refused }` opens it again after it ends, until the harness refuses the token.
+
+## From a page on another site
+
+A front end such as Decks Studio needs nothing but this file to talk to a harness:
+
+```js
+import { connect } from "@decks/sdk";
+const harness = connect({ url: "http://127.0.0.1:4329" });
+const { token } = await harness.connectStudio({ studio: location.origin, key }); // or pairSite({ code })
+const decks = connect({ url: "http://127.0.0.1:4329", token });
+await decks.hello();                                     // its name, and whether the token works
+const t = await decks.boardToken("boards/a.html", "plan"); // a board frame's own token
+await decks.tickets(["/api/board/boards/a.html"]);        // five-minute tickets for frames and tabs
+frame.src = decks.pageUrl("/api/board/boards/a.html");    // the harness's address, with its ticket
+const path = await decks.upload(file);                    // into assets/
+const settings = await decks.request("/api/harness");     // any other door, with the token
+```
+
+The token goes in the `Authorization` header of every request and never in an address; a frame or a
+tab carries a ticket instead. `keepTickets(onChange).want(paths)` keeps tickets fresh for pages that
+stay shown.

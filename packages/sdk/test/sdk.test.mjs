@@ -226,3 +226,73 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		await fake.close();
 	}
 });
+
+/** A fetch that records each request and answers from `answer(url, init)`, for the doors that are not verbs. */
+function fakeFetch(answer) {
+	const seen = [];
+	const fetch = async (url, init = {}) => {
+		seen.push({ url, method: init.method ?? "GET", headers: init.headers ?? {}, body: init.body });
+		return answer(url, init);
+	};
+	return { fetch, seen };
+}
+const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
+
+test("a page's doors: hello, tickets are asked in batches and held, a board's token, an upload as it is", async () => {
+	const { fetch, seen } = fakeFetch((url, init) => {
+		const path = new URL(url).pathname;
+		if (path === "/api/hello") return json({ decks: true, name: "Lab", paired: true });
+		if (path === "/api/tickets") {
+			const { paths } = JSON.parse(init.body);
+			return json({ tickets: Object.fromEntries(paths.map((one) => [one, `t-${one.length}`])), expires: Date.now() + 300_000 });
+		}
+		if (path === "/api/tokens") return json({ token: `dk_b_${JSON.parse(init.body).path}` });
+		if (path === "/api/upload") return json({ path: `assets/${new URL(url).searchParams.get("name")}` });
+		if (path === "/api/pair") return json({ needsCode: true, error: "This harness asks for a code." }, 403);
+		return json({ error: "no" }, 404);
+	});
+	const decks = connect({ url: "http://127.0.0.1:4830", token: "dk_s_site", fetch });
+	assert.equal((await decks.hello()).name, "Lab");
+	const paths = Array.from({ length: 250 }, (_, i) => `/api/board/boards/b${i}.html`);
+	const got = await decks.tickets(paths);
+	assert.equal(Object.keys(got.tickets).length, 250);
+	assert.equal(seen.filter((one) => one.url.endsWith("/api/tickets")).length, 2, "at most 200 paths an ask");
+	assert.equal(decks.ticketFor(paths[0]), got.tickets[paths[0]]);
+	assert.equal(decks.pageUrl("/api/board/boards/a b.html", "T"), "http://127.0.0.1:4830/api/board/boards/a%20b.html?decks_ticket=T");
+	assert.match(await decks.ticketedUrl("/api/f/assets/x.png"), /^http:\/\/127\.0\.0\.1:4830\/api\/f\/assets\/x\.png\?decks_ticket=/);
+	assert.equal(await decks.boardToken("boards/a.html", "plan"), "dk_b_boards/a.html");
+	assert.deepEqual(JSON.parse(seen.at(-1).body), { kind: "board", path: "boards/a.html", stage: "plan" });
+	const picture = new File([new Uint8Array([1, 2, 3])], "cat.png", { type: "image/png" });
+	assert.equal(await decks.upload(picture), "assets/cat.png");
+	assert.equal(seen.at(-1).body, picture, "the file itself, not JSON");
+	assert.equal(seen.at(-1).headers["content-type"], "image/png");
+	for (const one of seen) assert.equal(one.headers.authorization, "Bearer dk_s_site", "the token in the header");
+	for (const one of seen) assert.doesNotMatch(one.url, /dk_s_site/, "never in the address");
+	await assert.rejects(decks.pairSite({ label: "Studio" }), (error) => error instanceof DecksError && error.needsCode === true && error.status === 403);
+});
+
+test("events read with fetch and the token, opened again when the stream ends, until the harness refuses the token", async () => {
+	let opened = 0;
+	const { fetch, seen } = fakeFetch(() => {
+		opened++;
+		if (opened > 2) return new Response("no", { status: 401 });
+		const body = new ReadableStream({
+			start(controller) {
+				const bytes = new TextEncoder();
+				controller.enqueue(bytes.encode(": decks events\r\n\r\nevent: agent.state\r\ndata: {\"type\":\"agent.state\",\"id\":\"a1\"}\r\n\r\n"));
+				controller.close();
+			},
+		});
+		return new Response(body, { headers: { "content-type": "text/event-stream" } });
+	});
+	const decks = connect({ url: "http://127.0.0.1:4830", token: "dk_s_site", fetch });
+	const heard = [];
+	let refused = false;
+	const stream = decks.events((event) => heard.push(event), { types: ["agent.state"], reconnect: true, refused: () => (refused = true) });
+	await stream.done;
+	assert.equal(refused, true);
+	assert.deepEqual(heard, [{ type: "agent.state", id: "a1" }, { type: "agent.state", id: "a1" }]);
+	assert.equal(seen.length, 3);
+	assert.equal(seen[0].headers.authorization, "Bearer dk_s_site");
+	assert.match(seen[0].url, /\/api\/v1\/events\?types=agent\.state$/);
+});
