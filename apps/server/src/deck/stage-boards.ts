@@ -29,9 +29,10 @@ export function boardFolders(deck: string): string[] {
 	const folders = ["boards"];
 	if (existsSync(join(deck, "frames"))) folders.push("frames");
 	const stages = join(deck, "canvases");
-	if (!existsSync(stages)) return folders;
-	for (const entry of readdirSync(stages, { withFileTypes: true })) {
-		if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "boards"))) folders.push(stageBoardsDir(entry.name));
+	if (existsSync(stages)) {
+		for (const entry of readdirSync(stages, { withFileTypes: true })) {
+			if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "boards"))) folders.push(stageBoardsDir(entry.name));
+		}
 	}
 	// The canvases friends shared, each with its own boards (`deck/layout.ts`).
 	const shared = join(deck, "shared", "canvases");

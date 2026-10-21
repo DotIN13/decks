@@ -1253,6 +1253,11 @@ export function createHttpApp(app: App): Express {
 			return;
 		}
 		const message = error instanceof Error ? error.message : String(error);
+		// A file half sent when the page went away (a frame closed, a picture no longer wanted): nothing to answer.
+		if (res.headersSent || /EPIPE|ECONNRESET|aborted/i.test(message)) {
+			res.end();
+			return;
+		}
 		const code = /ENOENT/.test(message) ? 404 : 500;
 		if (code === 500) console.error("[decks]", error);
 		res.status(code).type("text/plain").send(message);

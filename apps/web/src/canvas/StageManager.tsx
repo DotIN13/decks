@@ -337,7 +337,9 @@ function StageCard(props: {
 
 	const here = () => stage().name === props.here;
 	const boards = () => stage().boards;
-	const meta = () => [boards() === 0 ? "Empty" : `${boards()} board${boards() === 1 ? "" : "s"}`, since(stage().changedAt)].filter(Boolean).join(" · ");
+	// A friend's canvas says whose it is, and whether you may change it (`shared/canvases/<owner>/<canvas>`).
+	const sharedBy = () => (stage().shared ? `Shared by ${stage().shared!.owner}${stage().shared!.role === "view" ? ", to view" : ""}` : undefined);
+	const meta = () => [sharedBy(), boards() === 0 ? "Empty" : `${boards()} board${boards() === 1 ? "" : "s"}`, since(stage().changedAt)].filter(Boolean).join(" · ");
 	const [broken, setBroken] = createSignal(false);
 
 	return (
