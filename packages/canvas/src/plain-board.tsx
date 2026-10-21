@@ -61,6 +61,8 @@ export interface PlainBoardExtras {
 	onFiles?: ((files: File[], at: { x: number; y: number }, how: "drop" | "paste") => void) | undefined;
 	/** Raised by the host when the board's file changed where its page comes from: the page loads again. */
 	reload?: number | undefined;
+	/** Words on this board with a comment waiting on them: kept marked in its page (`board.js`). */
+	marks?: Array<{ id: string; quote: string; component?: string }> | undefined;
 }
 
 export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
@@ -108,6 +110,12 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	const [guest, setGuest] = createSignal(false);
 	createEffect(() => {
 		if (!live()) setGuest(false);
+	});
+	// The marked words, to the page whenever they change and whenever it has (re)loaded.
+	createEffect(() => {
+		const marks = props.marks ?? [];
+		if (!guest()) return;
+		frame?.contentWindow?.postMessage({ t: "decks:marks", marks: marks.map((m) => ({ id: m.id, quote: m.quote, ...(m.component ? { component: m.component } : {}) })) }, "*");
 	});
 	const wired = () => live() && guest() && !inert();
 

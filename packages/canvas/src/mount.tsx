@@ -57,6 +57,8 @@ export interface CanvasOptions {
 		 * `@decks/canvas/tools` lay a batch out). Absent: a drop on a board does nothing.
 		 */
 		onFiles?(path: string, files: File[], at: { x: number; y: number }, how: "drop" | "paste"): void;
+		/** Words on a board with a comment waiting on them, kept marked in its page. Read reactively. */
+		marks?(path: string): Array<{ id: string; quote: string; component?: string }>;
 	};
 	/**
 	 * The folder the drawing's own relative addresses are read against (image fills, files on the
@@ -284,7 +286,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
 								}}
 								onMove={moveBoard}
-								frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
+								frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
 								shots={() => ({
 									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
 									ownPicture: true,

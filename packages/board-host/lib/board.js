@@ -89,11 +89,73 @@
 			const at = range.commonAncestorContainer;
 			const component = (at.nodeType === 1 ? at : at.parentElement)?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
 			said = quote;
+			lastRange = range.cloneRange();
+			lastQuote = quote;
 			window.parent.postMessage({ t: "decks:selection", quote, ...(component ? { component } : {}), rect: { x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height } }, "*");
 		};
 		document.addEventListener("selectionchange", () => {
 			clearTimeout(soon);
 			soon = setTimeout(report, 180);
+		});
+
+		/*
+		 * Words with a comment waiting on them stay marked, as the Decks app marks them
+		 * (`markup/comment-select.ts`): the page framing this one says which (`decks:marks`, the
+		 * whole list each time), and each is found again by its words, in its block when it names
+		 * one, so marks come back after a reload. Painted with the CSS Highlight API, so the
+		 * document itself is not changed.
+		 */
+		let lastRange;
+		let lastQuote = "";
+		const marks = new Map();
+		const HIGHLIGHT = "decks-comment";
+		const find = (quote, component) => {
+			const root = (component && document.querySelector(`[data-id="${CSS.escape(component)}"]`)) || document.body;
+			if (!root) return undefined;
+			// The page's words with each run of space as one, and where each character came from.
+			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (node) => (node.parentElement?.closest("script, style, [data-decks-ui]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+			let flat = "";
+			const from = [];
+			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+				const text = node.data;
+				for (let i = 0; i < text.length; i++) {
+					const space = /\s/.test(text[i]);
+					if (space && (flat === "" || flat.endsWith(" "))) continue;
+					flat += space ? " " : text[i];
+					from.push([node, i]);
+				}
+			}
+			const at = flat.indexOf(quote);
+			if (at === -1) return undefined;
+			const start = from[at];
+			const end = from[at + quote.length - 1];
+			const range = document.createRange();
+			range.setStart(start[0], start[1]);
+			range.setEnd(end[0], end[1] + 1);
+			return range;
+		};
+		const paint = () => {
+			const registry = window.CSS?.highlights;
+			if (!registry || typeof Highlight !== "function") return;
+			if (!marks.size) return void registry.delete(HIGHLIGHT);
+			if (!document.querySelector("style[data-decks-comment]")) {
+				const style = document.createElement("style");
+				style.setAttribute("data-decks-comment", "");
+				style.textContent = `::highlight(${HIGHLIGHT}) { background-color: rgba(242, 178, 0, 0.35); }`;
+				document.head.append(style);
+			}
+			registry.set(HIGHLIGHT, new Highlight(...marks.values()));
+		};
+		window.addEventListener("message", (event) => {
+			if (event.source !== window.parent || event.data?.t !== "decks:marks" || !Array.isArray(event.data.marks)) return;
+			const wanted = new Map(event.data.marks.filter((m) => m && typeof m.id === "string" && typeof m.quote === "string" && m.quote).map((m) => [m.id, m]));
+			for (const id of [...marks.keys()]) if (!wanted.has(id)) marks.delete(id);
+			for (const [id, mark] of wanted) {
+				if (marks.has(id)) continue;
+				const range = lastRange && lastQuote === mark.quote ? lastRange.cloneRange() : find(mark.quote, mark.component);
+				if (range) marks.set(id, range);
+			}
+			paint();
 		});
 	}
 
