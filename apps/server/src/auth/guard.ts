@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { NextFunction, Request, Response } from "express";
 import type { Principal } from "./principal.ts";
 import type { Refusal, TokenStore, Verified } from "./tokens.ts";
-import { decodedPath, ticketOf, type Tickets } from "./tickets.ts";
+import { decodedPath, splitPathTicket, ticketOf, type Tickets } from "./tickets.ts";
 
 /**
  * The one gate: every request to the harness, and every socket, is let in on its token, and who is
@@ -216,6 +216,23 @@ export function guard(gate: Gate) {
 				return;
 			}
 			res.status(401).type("text").send(seen.reason === "kind" ? "This token is for the harness's own pages and programs, not for a page on another site. Pair that site with the harness." : refusal(seen.reason));
+			return;
+		}
+		/*
+		 * A friend's board, sandboxed, loading what it is made of on the folder ticket in its address
+		 * (`tickets.ts`): the ticket taken out, and the request goes on as the route's own path.
+		 */
+		const carried = splitPathTicket(req.url);
+		if (carried && (req.method === "GET" || req.method === "HEAD")) {
+			const path = decodedPath(carried.rest);
+			if (path !== undefined && gate.tickets.admits(carried.ticket, path)) {
+				req.url = carried.rest;
+				req.principal = { kind: "page", path } satisfies Principal;
+				res.setHeader("Referrer-Policy", "no-referrer");
+				next();
+				return;
+			}
+			res.status(401).type("text").send("This page's ticket has run out, or is not for this file. Reload the canvas.");
 			return;
 		}
 		// One page another site opened in a frame or a tab, by its ticket; it sends no Referer on.

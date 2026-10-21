@@ -936,9 +936,11 @@ export class DeckAgent {
 			this.publishContext();
 			return;
 		}
-		const leaving = this.onCanvas().filter((one) => !wanted.includes(one.path)).map((one) => one.path);
+		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
+		const own = wanted.map((path) => pens.ownPath(name, path));
+		const leaving = this.onCanvas().filter((one) => !own.includes(one.path)).map((one) => one.path);
 		if (leaving.length) Object.assign(this.places, takeOff(pens, this.deck, name, leaving));
-		for (const path of putOn(pens, this.deck, name, wanted, { ...(options.at ? { at: options.at } : {}), remembered: this.places })) delete this.places[path];
+		for (const path of putOn(pens, this.deck, name, own, { ...(options.at ? { at: options.at } : {}), remembered: this.places })) delete this.places[path];
 		this.save();
 		this.host.arranged?.();
 		this.publishContext();

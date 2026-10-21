@@ -226,6 +226,8 @@ export class App {
 		 * the agents whose stage it is, since two chats never share a folder but the browser draws per chat.
 		 */
 		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
+		// A canvas's copy of a board from elsewhere is a board of the deck the moment it is made.
+		this.pens.copied = (path) => this.boards?.appeared(path);
 		this.stage.pens = this.pens;
 		this.forwards = new Forwards(deck.path, config.port);
 		this.stage.forwards = this.forwards;

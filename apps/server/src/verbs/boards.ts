@@ -174,10 +174,12 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
  * writes them, and to that canvas; every other canvas keeps the size it has for the board. What
  * the browser read goes into the call's notes, and is returned as one sentence too.
  */
-export async function fitOn(ctx: VerbContext, path: string, named: string | undefined, margin?: number | null): Promise<{ board: { path: string; w: number; h: number }; content: { w: number; h: number; page?: number }; canvas: string; said: string }> {
+export async function fitOn(ctx: VerbContext, asked: string, named: string | undefined, margin?: number | null): Promise<{ board: { path: string; w: number; h: number }; content: { w: number; h: number; page?: number }; canvas: string; said: string }> {
 	const { service, agent, notes } = ctx;
 	const pens = service.pens;
 	const on = named ?? agent.stageName?.();
+	// A board from elsewhere is the canvas's own copy of it (`StagePens.copyOf`): that is what is fitted.
+	const path = on && pens ? pens.copyOf(on, asked) : asked;
 	const held = on && pens ? pens.boards(on).find((one) => one.path === path) : undefined;
 	if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your canvas"}, so there is no width to fit it at. Put it there first (decks canvas insert '{"type":"board","board":"${path}"}'), or name a canvas that holds it with --canvas.`);
 	const own = !named || named === agent.stageName?.();

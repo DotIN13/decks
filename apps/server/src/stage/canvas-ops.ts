@@ -52,7 +52,8 @@ export function putOn(
 ): string[] {
 	const on = boardsOn(pens, deck, name);
 	const present = new Set(on.map((one) => one.path));
-	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && deck.board(path));
+	// A copy a canvas has just made of a board (`StagePens.ownPath`) is read now, before the watcher finds it.
+	const joining = paths.filter((path, index) => paths.indexOf(path) === index && !present.has(path) && (deck.board(path) ?? deck.refresh(path)));
 	if (joining.length === 0) return [];
 	const known: Record<string, { x: number; y: number }> = { ...(options.remembered ?? {}) };
 	const sizes: Record<string, { w: number; h: number }> = {};

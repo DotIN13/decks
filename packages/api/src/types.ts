@@ -25,8 +25,8 @@ export const Placement = named(
 
 export const Canvas = named(
 	"Canvas",
-	obj({ name: str(), title: str(), open: arr(str()), boards: num() }),
-	"A canvas (a stage file) and who has it open. `name` is its folder and never changes; `title` is what the person calls it.",
+	obj({ name: str(), title: str(), open: arr(str()), boards: num(), shared: opt(obj({ owner: str(), role: lit("edit", "view"), studio: opt(str()) })), studio: opt(str()) }),
+	"A canvas and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas> for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the Studio canvas it syncs with.",
 );
 
 export const Fit = named("Fit", obj({ board: str(), canvas: str(), w: num(), h: num(), notes: str() }), "What the browser measured while fitting a board.");

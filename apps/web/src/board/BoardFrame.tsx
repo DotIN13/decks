@@ -27,6 +27,7 @@ import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } f
 import { attachLiveDoc } from "./live-doc.ts";
 import { attachBoardOpen } from "./board-links.ts";
 import { attachBoardToken } from "./board-token.ts";
+import { attachSharedStorage, isSharedBoard, SHARED_SANDBOX, sharedBoardSrc } from "./shared-board.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
 import { paintFrame } from "../lib/theme.ts";
 import { holdFrames, type FrameHold } from "./hold-frames.ts";
@@ -553,6 +554,8 @@ export function BoardFrame(props: {
 		if (props.previewSha) return api(`/revision/${props.previewSha}`);
 		// 0 means unpinned: show whatever the board now is.
 		const rev = props.showRev && props.showRev > 0 ? props.showRev : props.board.rev;
+		// A friend's board: on its canvas's folder ticket, sandboxed (`shared-board.ts`); blank until the ticket is here.
+		if (isSharedBoard(props.board.path)) return sharedBoardSrc(props.board.path, rev) ?? "about:blank";
 		const url = boardUrl({ path: props.board.path, rev });
 		return props.nonce ? `${url}&r=${props.nonce}` : url;
 	};
@@ -944,7 +947,8 @@ export function BoardFrame(props: {
 				 * The board's own token, for its buttons (`board-token.ts`): from the frame's making, not its
 				 * load, since the page asks for it as its script runs, before the frame says it has loaded.
 				 */
-				const detachToken = attachBoardToken(element, () => props.board.path);
+				// A friend's board has no token: its storage is kept here instead (`shared-board.ts`).
+				const detachToken = isSharedBoard(props.board.path) ? attachSharedStorage(element, () => props.board.path) : attachBoardToken(element, () => props.board.path);
 				onCleanup(() => {
 					detachToken();
 					unwire(element);
@@ -956,9 +960,16 @@ export function BoardFrame(props: {
 			width={sizing()?.w ?? props.board.w}
 			height={sizing()?.h ?? props.board.h}
 			referrerpolicy="no-referrer"
+			sandbox={isSharedBoard(props.board.path) ? SHARED_SANDBOX : undefined}
 			// A drawable child of a canvas (`canvas-per-board`); ignored by a plain box.
 			attr:drawable=""
 			onLoad={(event) => {
+				// A friend's board is a page of another origin: nothing of it is read or wired, it is shown.
+				if (isSharedBoard(props.board.path)) {
+					const frame = event.currentTarget;
+					if (frame.getAttribute("src") !== "about:blank") requestAnimationFrame(() => frame === frameEl && !sleepy() && setLiveNow(true));
+					return;
+				}
 				wire(event.currentTarget);
 				whenReady(event.currentTarget);
 				// Nothing to draw here: a document that has just loaded has no snapshot

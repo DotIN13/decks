@@ -76,7 +76,11 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 		assert.ok(here.name, "an agent always has a canvas here");
 		const put = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value;
 		assert.equal(put.type, "board");
-		assert.equal(put.board, "boards/a.html");
+		// A board from the library is copied into the canvas, and is the canvas's copy from then on (`deck/layout.ts`).
+		const a = `canvases/${here.name}/boards/a.html`;
+		const b = `canvases/${here.name}/boards/b.html`;
+		assert.equal(put.board, a);
+		assert.ok(app.deck.board("boards/a.html"), "the library keeps its own");
 		assert.deepEqual(put.box, { x1: 0, y1: 0, x2: 900, y2: 400 });
 		const file = JSON.parse(readFileSync(join(deck, "canvases", here.name, "canvas.pen"), "utf8"));
 		const node = file.children.find((one: { id: string }) => one.id === put.id);
@@ -102,13 +106,14 @@ test("a board goes on a canvas as an item, is written as pen's browser item, and
 
 		const read = (await must("canvas.read")).value;
 		assert.equal(read.canvas, here.name);
-		assert.deepEqual(read.items.filter((one: { type: string }) => one.type === "board").map((one: { board: string }) => one.board).sort(), ["boards/a.html", "boards/b.html"]);
+		assert.deepEqual(read.items.filter((one: { type: string }) => one.type === "board").map((one: { board: string }) => one.board).sort(), [a, b]);
 
-		const gone = (await must("canvas.delete", ["boards/b.html"])).value;
-		assert.equal(gone.deleted, "boards/b.html");
-		assert.ok(app.deck.board("boards/b.html"), "a board's file stays in the deck");
-		assert.deepEqual((await must("board.canvases", ["boards/a.html"])).value.map((one: { canvas: string }) => one.canvas), [here.name]);
-		assert.deepEqual((await must("board.canvases", ["boards/b.html"])).value, []);
+		const gone = (await must("canvas.delete", [b])).value;
+		assert.equal(gone.deleted, b);
+		assert.ok(app.deck.board(b), "a board's file stays in the deck");
+		assert.deepEqual((await must("board.canvases", [a])).value.map((one: { canvas: string }) => one.canvas), [here.name], "a canvas's board is on that canvas, and only there");
+		assert.deepEqual((await must("board.canvases", ["boards/a.html"])).value.map((one: { board: string }) => one.board), [a], "the library's board says where it was copied");
+		assert.deepEqual((await must("board.canvases", [b])).value, []);
 	} finally {
 		cleanup();
 	}
@@ -143,7 +148,7 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 		assert.notEqual(other.name, home);
 		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { canvas: "Launch plan", at: { x1: 0, y1: 0 } }]);
 		assert.equal((await must("here")).value.name, home, "making and writing a canvas does not move you to it");
-		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { board?: string }) => one.board), ["boards/a.html"]);
+		assert.deepEqual((await must("canvas.read", [{ canvas: other.name }])).value.items.map((one: { board?: string }) => one.board), [`canvases/${other.name}/boards/a.html`]);
 		assert.deepEqual((await must("canvas.read")).value.items, [], "your own canvas is untouched");
 		const unknown = await call("canvas.read", [{ canvas: "no such canvas" }]);
 		assert.match(unknown.error!, /No canvas is called "no such canvas"/);
@@ -165,7 +170,10 @@ test("board.create writes the file and places nothing", async () => {
 	const { must, cleanup } = await open();
 	try {
 		const made = (await must("board.create", [{ title: "Churn halved" }])).value;
-		assert.match(made.path, /^boards\/.+\.html$/);
+		const home = (await must("here")).value.name;
+		assert.equal(made.path, `canvases/${home}/boards/churn-halved.html`, "a board is made in the caller's canvas's own folder");
+		const named = (await must("canvas.create", ["Elsewhere"])).value.name;
+		assert.match((await must("board.create", [{ title: "Over there", canvas: named }])).value.path, new RegExp(`^canvases/${named}/boards/over-there\\.html$`), "or in the canvas it names");
 		assert.equal(made.title, "Churn halved");
 		assert.deepEqual((await must("board.canvases", [made.path])).value, []);
 		assert.ok((await must("board.list")).value.some((one: { path: string }) => one.path === made.path));
@@ -242,20 +250,19 @@ test("the old names map onto the new calls: open moves the home canvas, report c
 	}
 });
 
-test("the item calls take a frame file instead of a canvas, and its change shows on every canvas placing it", async () => {
+test("the item calls take a frame file instead of a canvas, and its change shows on the canvas placing it", async () => {
 	const { deck, must, call, cleanup } = await open();
 	try {
 		const made = (await must("frame.create", ["frames/card", { type: "frame", width: 200, height: "fit_content", layout: "vertical", children: [] }])).value;
-		assert.equal(made.ref, "frames/card");
-		// Placed on two canvases by its ref.
 		const home = (await must("here")).value.name;
-		const other = (await must("canvas.create", ["Second"])).value.name;
-		for (const canvas of [home, other]) await must("canvas.insert", [{ type: "ref", id: "c", ref: "frames/card" }, { canvas, at: { x1: 0, y1: 0 } }]);
-		const revs = async () => Promise.all([home, other].map(async (canvas) => (await must("canvas.read", [{ canvas }])).value.rev as number));
-		const before = await revs();
+		// Made in the caller's canvas's own frames/, and placed there by its ref.
+		assert.deepEqual([made.file, made.ref], [`canvases/${home}/frames/card.pen`, "frames/card"]);
+		await must("canvas.insert", [{ type: "ref", id: "c", ref: "frames/card" }, { canvas: home, at: { x1: 0, y1: 0 } }]);
+		const rev = async () => (await must("canvas.read", [{ canvas: home }])).value.rev as number;
+		const before = await rev();
 
 		const read = (await must("canvas.read", [{ frame: "frames/card" }])).value;
-		assert.equal(read.frame, "frames/card");
+		assert.equal(read.frame, `canvases/${home}/frames/card.pen`, "frames/card is the caller's canvas's own");
 		assert.deepEqual(read.items.map((one: { id: string }) => one.id), [made.id]);
 		// The same item shapes and answers as on a canvas.
 		const note = (await must("canvas.insert", [{ type: "text", id: "t1", content: "Hello" }, { frame: "frames/card", parent: made.id }])).value;
@@ -265,13 +272,12 @@ test("the item calls take a frame file instead of a canvas, and its change shows
 		const batch = (await must("canvas.batch", [[{ op: "insert", item: { type: "text", id: "t2", content: "Two" }, parent: made.id }, { op: "delete", id: "t1" }], { frame: "frames/card" }])).value;
 		assert.deepEqual(batch.map((one: { id: string; type: string }) => [one.id, one.type]), [["t2", "text"], ["t1", "deleted"]]);
 		await must("canvas.variables", [{ ink: { type: "color", value: "#123456" } }, { frame: "frames/card" }]);
-		const file = JSON.parse(readFileSync(join(deck, "frames", "card.pen"), "utf8"));
+		const file = JSON.parse(readFileSync(join(deck, "canvases", home, "frames", "card.pen"), "utf8"));
 		assert.deepEqual(file.children[0].children.map((one: { id: string }) => one.id), ["t2"], "the frame's own file is what changed");
 		assert.equal(file.variables.ink.value, "#123456");
-		const after = await revs();
-		assert.ok(after[0]! > before[0]! && after[1]! > before[1]!, `every canvas placing the frame is sent it again: ${before} -> ${after}`);
-		// Nothing on either canvas was written: the canvases still hold only the ref.
-		for (const canvas of [home, other]) assert.deepEqual((await must("canvas.read", [{ canvas }])).value.items.map((one: { type: string }) => one.type), ["ref"]);
+		assert.ok((await rev()) > before, "the canvas placing the frame is sent it again");
+		// Nothing on the canvas was written: it still holds only the ref.
+		assert.deepEqual((await must("canvas.read", [{ canvas: home }])).value.items.map((one: { type: string }) => one.type), ["ref"]);
 
 		const both = await call("canvas.read", [{ canvas: home, frame: "frames/card" }]);
 		assert.ok(!both.ok && /canvas or a frame, not both/.test(both.error ?? ""), both.error);

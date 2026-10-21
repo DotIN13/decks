@@ -30,7 +30,8 @@ test("an isolated copy holds its own copies of the boards, in place, and leaves 
 	try {
 		const paths = copyStage(deck, pens, "deploy", "deploy-isolated", { isolated: true, origin: "deploy" });
 		assert.deepEqual(paths, ["canvases/deploy-isolated/boards/plan.html"]);
-		assert.match(readFileSync(join(deckPath, paths[0]!), "utf8"), /href="\.\.\/\.\.\/\.\.\/lib\/board\.css"/);
+		// lib/ is served beside every canvas's boards (`deck/layout.ts`), so the link needs no change.
+		assert.match(readFileSync(join(deckPath, paths[0]!), "utf8"), /href="\.\.\/lib\/board\.css"/);
 		assert.deepEqual(pens.boards("deploy-isolated").map((one) => [one.path, one.x, one.y]), [["canvases/deploy-isolated/boards/plan.html", 40, 60]]);
 		assert.ok(isIsolatedStage(pens, "deploy-isolated") && !isIsolatedStage(pens, "deploy"));
 		assert.equal(originOf(pens, "deploy-isolated"), "deploy");

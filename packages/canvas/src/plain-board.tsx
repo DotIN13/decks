@@ -1,3 +1,4 @@
+import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "./board-storage.ts";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
@@ -41,7 +42,15 @@ function withoutTicket(address: string): string {
  * Until the page says it does that (`decks:embed-ready`) it does not take the pointer, so a pinch
  * over it never zooms the browser's page instead of the canvas.
  */
-export function PlainBoard(props: StageBoardProps & { page?: string | undefined; boardHost?: BoardHost | undefined }) {
+/** Where sandboxed boards' storage is kept: this page's own `localStorage` (`board-storage.ts`). */
+const sandboxKeeper = storageKeeper(typeof localStorage === "undefined" ? undefined : localStorage, "decks.board-storage:");
+
+/** A sandboxed board's address with its storage after the `#`, so it reads it as it starts. */
+function withStorage(address: string | undefined, key: string): string | undefined {
+	return address === undefined ? undefined : `${address.split("#")[0]}${storageHash(sandboxKeeper.read(key))}`;
+}
+
+export function PlainBoard(props: StageBoardProps & { page?: string | undefined; boardHost?: BoardHost | undefined; sandboxed?: { key: () => string } | undefined }) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
 		return props.origin ?? { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
@@ -262,12 +271,14 @@ export function PlainBoard(props: StageBoardProps & { page?: string | undefined;
 					<iframe
 						ref={(element) => {
 							frame = element;
-							// Its board's own token, for the board's buttons, handed to this frame alone (`board-host.ts`).
-							const detach = props.boardHost?.attach(element, { path: () => props.board.path, page: src });
+							// Its board's own token, for the board's buttons, handed to this frame alone (`board-host.ts`);
+							// a friend's board, sandboxed, has none, and its storage is kept here (`board-storage.ts`).
+							const detach = props.sandboxed ? attachBoardStorage(element, props.sandboxed.key, sandboxKeeper) : props.boardHost?.attach(element, { path: () => props.board.path, page: src });
 							if (detach) onCleanup(detach);
 						}}
 						class="plain-board-page"
-						src={src()}
+						src={props.sandboxed ? withStorage(src(), props.sandboxed.key()) : src()}
+						sandbox={props.sandboxed ? SHARED_SANDBOX : undefined}
 						onLoad={() => say(live())}
 						data-wired={wired() ? "" : undefined}
 						title={props.board.title}

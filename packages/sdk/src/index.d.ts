@@ -24,10 +24,12 @@ export type Fit = { board: string; canvas: string; w: number; h: number; notes: 
 /** A saved image of a canvas, or of part of it. */
 export type Screenshot = { file: string; width: number; height: number; box: Box; how?: string; note?: string };
 /**
- * A canvas (a stage file) and who has it open. `name` is its folder and never changes; `title` is
- * what the person calls it.
+ * A canvas and who has it open. `name` is its folder (canvases/<name>/, or shared/<owner>/<canvas>
+ * for one a friend shared, in shared/canvases/) and never changes; `title` is what the person calls
+ * it. `shared` says who shared a friend's canvas and whether you may edit it; `studio` is the
+ * Studio canvas it syncs with.
  */
-export type Canvas = { name: string; title: string; open: string[]; boards: number };
+export type Canvas = { name: string; title: string; open: string[]; boards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
 /** A board file in the deck. `title` is the finding it states. */
 export type Board = { path: string; title: string; lastWrittenBy?: string };
 /**
@@ -230,23 +232,30 @@ export interface Verbs {
 		/** Every board file in the deck, placed or not. */
 		list(): Promise<Board[]>;
 		/**
-		 * Write a blank board and return it; placing it is the canvas's job (decks.canvas.insert({ type:
-		 * "board", board: path }, { beside })). The title is the finding, as a sentence. `format` "board"
-		 * (default) is one HTML page you design; "slides" is a reveal deck of <section>s.
+		 * Write a blank board in a canvas's own boards/ (`canvas`, or your own canvas) and return it;
+		 * placing it is the canvas's job (decks.canvas.insert({ type: "board", board: path }, { beside })).
+		 * The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design;
+		 * "slides" is a reveal deck of <section>s. A canvas is a folder that stands alone
+		 * (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.
 		 */
-		create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<Board>;
+		create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number; canvas?: string }): Promise<Board>;
 		/** A board's path and title (the finding it states), and who last wrote it. */
 		get(board: string): Promise<Board>;
-		/** The canvases this board is on, with its place and size on each. */
+		/**
+		 * The canvas this board is on, with its place and size there: a board in a canvas's folder is on
+		 * that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied
+		 * it, each with its copy's path.
+		 */
 		canvases(board: string): Promise<Placement[]>;
 		/** The board's address, for a browser such as Playwright. */
 		url(board: string): Promise<string>;
 	};
 	frame: {
 		/**
-		 * A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item.
-		 * Placed on any canvas with { type: "ref", ref }; read and edited with the canvas item calls given
-		 * { frame: ref }.
+		 * A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in
+		 * your canvas's own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with
+		 * the canvas item calls given { frame: ref }. A frame from the deck's own frames/ placed on a
+		 * canvas is copied into it.
 		 */
 		create(path: string, item?: PenItem): Promise<{ file: string; ref?: string; id: string }>;
 	};

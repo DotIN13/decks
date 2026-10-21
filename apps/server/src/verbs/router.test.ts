@@ -104,7 +104,7 @@ test("a change goes to the deck, and its notes come back beside the value", asyn
 		const made = await call("newBoard", [{ title: "The finding", at: { x1: 0, y1: 0 } }]);
 		assert.ok(made.body.ok, made.body.error);
 		const path = made.body.value as string;
-		assert.match(path, /^boards\/the-finding/);
+		assert.match(path, /^canvases\/[^/]+\/boards\/the-finding/, "made in the caller's canvas");
 		assert.ok(existsSync(join(deck, path)), "the board's file was written");
 		assert.ok(made.body.notes.length > 0, "newBoard tells the caller about the viewport, as a run does");
 	} finally {
@@ -151,7 +151,7 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 		const listed = await run("sh", ["-c", "decks boards | head -c 2000"], { env });
 		assert.ok(JSON.parse(listed.stdout).some((board: { path: string }) => board.path === "boards/tall.html"));
 		const made = await run("sh", ["-c", 'p=$(decks new-board --title "From the shell" --at.x1 0 --at.y1 900) && echo "$p"'], { env });
-		assert.match(made.stdout.trim(), /^boards\/from-the-shell/);
+		assert.match(made.stdout.trim(), /^canvases\/[^/]+\/boards\/from-the-shell/);
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
 		await assert.rejects(run("sh", ["-c", "decks move boards/tall.html"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /move needs at/.test(error.stderr));
 	} finally {

@@ -166,6 +166,17 @@ export class BoardService {
 	 * stage. Sending it raw is a board at the origin, on every write, for everyone; the failure looks
 	 * like "the drag did not stick" on one surface only, which is what makes it worth one function.
 	 */
+	/**
+	 * A board file that appeared without this service writing it (a canvas's copy of a board from
+	 * elsewhere, `StagePens.ownPath`): read now and told to every browser, as a new board is.
+	 */
+	appeared(path: string): void {
+		const board = this.deck.refresh(path);
+		if (!board) return;
+		this.revisions.record(path, readFileSync(this.deck.fileOf(path), "utf8"));
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
+	}
+
 	private placed(board: Board): Board {
 		return this.hooks.state().boards.find((one) => one.path === board.path) ?? board;
 	}

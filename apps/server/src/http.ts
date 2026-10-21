@@ -596,7 +596,11 @@ export function createHttpApp(app: App): Express {
 			// A board's page, with its runtime at the versioned address; the file itself is untouched,
 			// and `?raw=1` (its text, for the editor) is the file as it is.
 			if (req.query.raw === undefined && isBoardPath(requested) && /\.html?$/i.test(requested)) {
-				res.type("html").send(versionLibRefs(await readFile(target, "utf8"), libVersion(app.deck.path)));
+				let page = versionLibRefs(await readFile(target, "utf8"), libVersion(app.deck.path));
+				// A friend's board has no storage of its own: the shim keeps it in the page around (`lib/storage-shim.js`).
+				const shared = canvasOfPath(asked);
+				if (shared && isSharedCanvas(shared.name)) page = withScript(page, `${"../".repeat(shared.rest.split("/").length - 1)}lib/storage-shim.js`);
+				res.type("html").send(page);
 				return;
 			}
 			/*
@@ -1285,6 +1289,11 @@ function aspectOf(deck: { path: string }, boardPath: string): string | undefined
  */
 function withGuest(page: string, src: string): string {
 	if (page.includes("decks:embed-ready")) return page;
+	return withScript(page, src);
+}
+
+/** A page with a script put first in its head, before any of its own. */
+function withScript(page: string, src: string): string {
 	const tag = `<script src="${src}"></script>`;
 	const head = /<head[^>]*>/i.exec(page);
 	return head ? `${page.slice(0, head.index + head[0].length)}${tag}${page.slice(head.index + head[0].length)}` : `${tag}${page}`;

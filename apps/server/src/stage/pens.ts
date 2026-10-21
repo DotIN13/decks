@@ -9,7 +9,7 @@ import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
-import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
+import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
 import { copyBoardInto, copyFrameInto } from "../boards/copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
@@ -173,9 +173,59 @@ export class StagePens {
 	 * (`boards/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
 	 */
 	adopt: Adopt = {
-		board: (canvas, path) => copyBoardInto(this.deckPath, path, canvas),
+		board: (canvas, path) => this.copyIn(canvas, path),
 		frame: (canvas, ref) => copyFrameInto(this.deckPath, ref, canvas),
 	};
+
+	/** Told of each copy a canvas makes, so the deck reads it at once (`app.ts`). */
+	copied?: (path: string) => void;
+
+	/** Copy a board into a canvas, and write down where the copy came from (`canvas.json`'s `copiedFrom`). */
+	private copyIn(canvas: string, path: string): string {
+		const copy = copyBoardInto(this.deckPath, path, canvas);
+		const file = join(this.folderOf(canvas), CANVAS_META);
+		let meta: Record<string, unknown> = {};
+		try {
+			meta = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+		} catch {
+			/* a canvas with no record yet */
+		}
+		const copied = meta.copiedFrom && typeof meta.copiedFrom === "object" ? (meta.copiedFrom as Record<string, string>) : {};
+		writeFileSync(file, `${JSON.stringify({ ...meta, copiedFrom: { ...copied, [copy.slice(canvasFolder(canvas).length + 1)]: path } }, null, "\t")}\n`);
+		this.copied?.(copy);
+		return copy;
+	}
+
+	/**
+	 * The canvas's own board for a deck path: the path itself when the board is the canvas's, else the
+	 * copy the canvas already made of it (`copiedFrom`), else the path as it was. Copies nothing.
+	 */
+	copyOf(name: string, path: string): string {
+		if ("path" in referenceFor(name, path)) return path;
+		let copied: unknown;
+		try {
+			copied = (JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { copiedFrom?: unknown }).copiedFrom;
+		} catch {
+			return path;
+		}
+		if (!copied || typeof copied !== "object") return path;
+		for (const [reference, origin] of Object.entries(copied as Record<string, unknown>)) {
+			const own = `${canvasFolder(name)}/${reference}`;
+			if (origin === path && existsSync(join(this.deckPath, own))) return own;
+		}
+		return path;
+	}
+
+	/**
+	 * The board a canvas places for a deck path, copied in now when the canvas has no copy of it yet
+	 * (`boards/copy-in.ts`): what an agent's list of boards on its canvas is turned into, so the same
+	 * library board asked for twice is one copy, not two. A path with no file is left as it is.
+	 */
+	ownPath(name: string, path: string): string {
+		const known = this.copyOf(name, path);
+		if (known !== path || "path" in referenceFor(name, path) || !existsSync(join(this.deckPath, path))) return known;
+		return this.copyIn(name, path);
+	}
 
 	/** Whether a canvas is a friend's, shared with this deck: read here, written back only when they let you edit it. */
 	isShared(name: string): boolean {
@@ -745,7 +795,8 @@ export class StagePens {
 	 * Make the stage's boards these: add the ones missing, move and resize the ones that differ, and
 	 * take away the rest. Writes only when something changed, and returns whether it did.
 	 */
-	syncBoards(name: string, wanted: readonly BoardSpot[]): boolean {
+	syncBoards(name: string, given: readonly BoardSpot[]): boolean {
+		const wanted = given.map((spot) => ({ ...spot, path: this.ownPath(name, spot.path) }));
 		const entry = this.get(name);
 		if (entry.error) return false;
 		const placed = this.placedOf(name);
@@ -803,7 +854,8 @@ export class StagePens {
 	}
 
 	/** Put boards on a stage, each at its corner and size; one already there keeps its place and size. */
-	placeBoards(name: string, spots: readonly BoardSpot[]): void {
+	placeBoards(name: string, given: readonly BoardSpot[]): void {
+		const spots = given.map((spot) => ({ ...spot, path: this.ownPath(name, spot.path) }));
 		const entry = this.get(name);
 		if (entry.error) return;
 		const present = this.boardItems(name);
@@ -826,7 +878,7 @@ export class StagePens {
 
 	/** Move one board on a stage, its corner to `x y`. False when the stage does not hold it. */
 	moveBoard(name: string, path: string, x: number, y: number): boolean {
-		const node = this.boardItems(name).get(path);
+		const node = this.boardItems(name).get(this.copyOf(name, path));
 		if (!node) return false;
 		const box = this.placedOf(name).get(node.id)?.box;
 		if (box && Math.round(box.x) === Math.round(x) && Math.round(box.y) === Math.round(y)) return true;
@@ -836,7 +888,7 @@ export class StagePens {
 
 	/** Size one board on a stage. False when the stage does not hold it. */
 	sizeBoard(name: string, path: string, size: { w?: number; h?: number }): boolean {
-		const node = this.boardItems(name).get(path);
+		const node = this.boardItems(name).get(this.copyOf(name, path));
 		if (!node) return false;
 		const set: Record<string, unknown> = {};
 		if (size.w !== undefined && node.width !== Math.round(size.w)) set.width = Math.round(size.w);
@@ -850,7 +902,7 @@ export class StagePens {
 		const present = this.boardItems(name);
 		const ops: Op[] = [];
 		for (const path of paths) {
-			const node = present.get(path);
+			const node = present.get(this.copyOf(name, path));
 			if (node) ops.push({ op: "delete", id: node.id });
 		}
 		if (ops.length) this.edit(name, ops);

@@ -10,7 +10,7 @@ type PenEdit = { op: "insert"; node: PenItem; parent?: string | null; index?: nu
 type PenItem = { type: string; id?: string; children?: unknown[]; [key: string]: unknown };
 type Fit = { board: string; canvas: string; w: number; h: number; notes: string };
 type Screenshot = { file: string; width: number; height: number; box: Box; how?: string; note?: string };
-type Canvas = { name: string; title: string; open: string[]; boards: number };
+type Canvas = { name: string; title: string; open: string[]; boards: number; shared?: { owner: string; role: "edit" | "view"; studio?: string }; studio?: string };
 type Board = { path: string; title: string; lastWrittenBy?: string };
 type Placement = { board: string; canvas: string; box: Box; clipped?: boolean };
 type Agent = { id?: string; name: string; avatar?: string; color?: string; kind?: string; workspace?: string; tags: string[]; canvas?: string; state?: string; queued?: number; model?: string; thinking?: string; mode?: string; avatarChanged?: string };
@@ -43,13 +43,13 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 **Board and deck: files in the deck folder, on any number of canvases**
 
 - `decks board list` · `decks.board.list(): Board[]`. Every board file in the deck, placed or not.
-- `decks board create` · `decks.board.create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Board`. Write a blank board and return it; placing it is the canvas's job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design; "slides" is a reveal deck of <section>s.
+- `decks board create` · `decks.board.create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number; canvas?: string }): Board`. Write a blank board in a canvas's own boards/ (`canvas`, or your own canvas) and return it; placing it is the canvas's job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design; "slides" is a reveal deck of <section>s. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.
 - `decks board get` · `decks.board.get(board: string): Board`. A board's path and title (the finding it states), and who last wrote it.
-- `decks board canvases` · `decks.board.canvases(board: string): Placement[]`. The canvases this board is on, with its place and size on each.
+- `decks board canvases` · `decks.board.canvases(board: string): Placement[]`. The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.
 - `decks board url` · `decks.board.url(board: string): string`. The board's address, for a browser such as Playwright.
 - `decks canvas list` · `decks.canvas.list(): Canvas[]`. Every canvas in the deck, and which agents have it open.
 - `decks canvas create` · `decks.canvas.create(title: string): Canvas`. A new, empty canvas, named from a title. Nobody moves to it: agent.update({ canvas }) makes it your home, view.goto shows it.
-- `decks frame create` · `decks.frame.create(path: string, item?: PenItem): { file: string; ref?: string; id: string }`. A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item. Placed on any canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }.
+- `decks frame create` · `decks.frame.create(path: string, item?: PenItem): { file: string; ref?: string; id: string }`. A new reusable .pen file at `path` ("frames/ui/button"), with `item` as its one reusable item, in your canvas's own frames/. Placed on that canvas with { type: "ref", ref }; read and edited with the canvas item calls given { frame: ref }. A frame from the deck's own frames/ placed on a canvas is copied into it.
 - `decks file url` · `decks.file.url(file: string): string`. A file on disk, as the address a board embeds.
 
 **Agent: you, or another agent**

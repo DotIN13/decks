@@ -105,10 +105,16 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		return { doc: entry.doc, layout: (doc) => lay(doc, pens.withImported(target.canvas, doc)) };
 	};
 
+	/** The canvas the ops being turned into pen's are for, if a canvas: a board named from elsewhere is its copy there. */
+	let onCanvas: string | undefined;
+	/** A board's path as this canvas holds it: its own copy of a board from elsewhere (`StagePens.copyOf`). */
+	const ownOn = (path: string): string => (onCanvas ? needPens().copyOf(onCanvas, path) : path);
+
 	/** An item's id, or a board's path on this document turned into its item's id. */
 	const idIn = (doc: PenDocument, ref: unknown, what = "id"): string => {
 		if (typeof ref !== "string" || !ref.trim()) throw new Error(`${what} names an item: its id from decks canvas read, or a board's path.`);
-		for (const node of walk(doc.children)) if (boardOf(node) === ref) return node.id;
+		const own = ownOn(ref);
+		for (const node of walk(doc.children)) if (boardOf(node) === ref || boardOf(node) === own) return node.id;
 		return ref;
 	};
 
@@ -155,6 +161,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	const translate = (target: Target, ops: readonly CanvasOpIn[]): { penOps: Op[]; sized: Array<{ path: string; w?: number; h?: number }>; deleted: Set<string>; placedFor: string[] } => {
 		const surface = surfaceOf(target);
 		const frame = target.frame;
+		onCanvas = target.canvas;
 		let doc = surface.doc;
 		const theme = baseTheme(doc, "light");
 		const penOps: Op[] = [];
@@ -184,7 +191,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						const node = fromItem(op.item, ids(doc), frame);
 						const path = boardOf(node as unknown as PenNode);
 						if (path) {
-							const there = [...walk(doc.children)].find((one) => boardOf(one) === path);
+							const there = [...walk(doc.children)].find((one) => boardOf(one) === path || boardOf(one) === ownOn(path));
 							if (there) throw new Error(`${path} is already on this canvas, as ${there.id}: move it with decks canvas move.`);
 						}
 						let box = placeOf(doc, placed, op);

@@ -44,6 +44,13 @@ export interface CanvasOptions {
 		 * say they have no stage.
 		 */
 		mintBoardToken?: MintBoardToken;
+		/**
+		 * Whether a board is a friend's, on a canvas shared with the person (`board-storage.ts`): its frame
+		 * is sandboxed with no token, and its `localStorage` is kept by this page under `storageKey`.
+		 */
+		sandboxed?(path: string): boolean;
+		/** Where a sandboxed board's storage is kept in this page's own storage: one key per harness, canvas and board. */
+		storageKey?(path: string): string;
 	};
 	/**
 	 * The folder the drawing's own relative addresses are read against (image fills, files on the
@@ -267,7 +274,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
 								}}
 								onMove={moveBoard}
-								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} />}
+								frame={(slot) => <PlainBoard {...slot} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
 								shots={() => ({
 									picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
 									ownPicture: true,

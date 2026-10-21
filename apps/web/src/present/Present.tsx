@@ -4,6 +4,7 @@ import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "@decks/canvas/lib/slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 import { attachBoardOpen } from "../board/board-links.ts";
+import { isSharedBoard, SHARED_SANDBOX, sharedBoardSrc } from "../board/shared-board.ts";
 import { lendFrame } from "@decks/canvas/borrow.ts";
 import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS, springEasing } from "@decks/canvas/lib/spring.ts";
 import { reducedMotion } from "../state/camera.ts";
@@ -379,7 +380,8 @@ export function Present(props: {
 				 * flow document wants the opposite — the window *is* its rectangle, and the
 				 * flag's `overflow: hidden` would take away the scrolling it is there to do.
 				 */
-				src={api(`/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`)}
+				src={isSharedBoard(props.board.path) ? (sharedBoardSrc(props.board.path, props.board.rev) ?? "about:blank") : api(`/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`)}
+				sandbox={isSharedBoard(props.board.path) ? SHARED_SANDBOX : undefined}
 				/* A designed board is laid out at the size it was written at and scaled to the screen
 				    (`fit`). A board wrapped in a shell is given the window by CSS. */
 				style={frameStyle()}

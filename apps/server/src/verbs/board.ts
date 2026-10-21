@@ -1,3 +1,4 @@
+import { canvasFolder, canvasOfPath } from "../deck/layout.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
@@ -66,17 +67,25 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 				const pens = needPens();
 				const out: Array<{ board: string; canvas: string; box: { x1: number; y1: number; x2: number; y2: number }; clipped?: boolean }> = [];
 				const file = service.fileBoard(path);
-				for (const name of pens.names()) {
+				/*
+				 * A board in a canvas's folder is on that canvas and no other (`deck/layout.ts`), so this answers
+				 * one canvas at most. A board in the library is on none; the canvases that copied it are said,
+				 * each with its copy's path.
+				 */
+				const home = canvasOfPath(path);
+				for (const name of home ? [home.name] : pens.names()) {
+					const own = home ? path : pens.copyOf(name, path);
+					if (!home && own === path) continue;
 					let held;
 					try {
-						held = pens.boards(name).find((one) => one.path === path);
+						held = pens.boards(name).find((one) => one.path === own);
 					} catch {
 						continue;
 					}
 					if (!held) continue;
-					const content = file?.content;
+					const content = (home ? file : service.fileBoard(own))?.content;
 					const clipped = content ? content.w > held.w || content.h > held.h : undefined;
-					out.push({ board: path, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
+					out.push({ board: own, canvas: name, box: { x1: held.x, y1: held.y, x2: held.x + held.w, y2: held.y + held.h }, ...(clipped ? { clipped } : {}) });
 				}
 				return out;
 			},
@@ -86,7 +95,17 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 			},
 		},
 		frame: {
-			create: async (path: string, item?: Record<string, unknown>) => needPens().createFile(path, item as never),
+			// A frame is made in the caller's canvas's own frames/, so the canvas stands alone (`deck/layout.ts`).
+			create: async (path: string, item?: Record<string, unknown>) => {
+				let home: string | undefined;
+				try {
+					home = ctx.canvasOf(undefined);
+				} catch {
+					/* no canvas: the deck's own frames/, a library to place from */
+				}
+				const asked = typeof path === "string" ? path.trim().replace(/^\.?\/+/, "") : path;
+				return needPens().createFile(home && typeof asked === "string" && /^frames\//.test(asked) ? `${canvasFolder(home)}/${asked}` : path, item as never);
+			},
 		},
 		file: {
 			url: async (file: string) => {

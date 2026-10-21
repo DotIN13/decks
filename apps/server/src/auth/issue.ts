@@ -4,7 +4,7 @@ import type { App } from "../app.ts";
 import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
-import { MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
+import { FOLDER_TICKET_MS, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
 import { TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
 import { bearerOf, originOf } from "./guard.ts";
 
@@ -364,6 +364,11 @@ export function doorRoutes(app: App): express.Router {
 			res.status(404).json({ error: `There is no board at ${body.path}.` });
 			return;
 		}
+		// A friend's board runs sandboxed with no token: it is someone else's code on this machine (`deck/layout.ts`).
+		if (/^shared\//.test(body.path)) {
+			res.status(403).json({ error: "A board on a canvas shared with you runs without a token: it is its owner's page, and acts on nothing here." });
+			return;
+		}
 		const stage = typeof body.stage === "string" && body.stage ? body.stage : undefined;
 		const { token } = app.tokens.issue({ kind: "board", path: body.path, ...(stage ? { stage } : {}) });
 		res.set("cache-control", "no-store").json({ token });
@@ -407,7 +412,7 @@ export function doorRoutes(app: App): express.Router {
 			const path = ticketPath(given);
 			if (path) made[given] = app.tickets.make(path, id, now);
 		}
-		res.json({ tickets: made, expires: now + TICKET_MS });
+		res.json({ tickets: made, expires: now + TICKET_MS, ...(Object.values(made).length && Object.keys(made).some((one) => ticketPath(one)?.endsWith("/") && ticketPath(one)?.startsWith("/api/board/shared/")) ? { folderExpires: now + FOLDER_TICKET_MS } : {}) });
 	});
 
 	return api;

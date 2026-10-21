@@ -23,6 +23,22 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 export const TICKET_MS = 5 * 60_000;
 
 /**
+ * How long a shared canvas's folder ticket lasts: a friend's board runs sandboxed, with no token,
+ * and loads what it is made of (and what it fetches later) on the ticket in its address, so it is
+ * good for a working day. It reads only that canvas's folder, which the board could read anyway.
+ */
+export const FOLDER_TICKET_MS = 12 * 3_600_000;
+
+/**
+ * A friend's canvas's folder, as a ticket admits it: `/api/board/shared/canvases/<owner>/<canvas>/`.
+ * Every page and file under it, and nothing else: no hidden part, no step out (`deck/layout.ts`).
+ */
+const SHARED_FOLDER = /^\/api\/board\/shared\/canvases\/[^/.][^/]*\/[^/.][^/]*\/$/;
+
+/** Whether a ticket's path is a shared canvas's whole folder rather than one page. */
+export const isFolderTicket = (path: string): boolean => SHARED_FOLDER.test(path);
+
+/**
  * The token id a ticket the harness makes for its own pages is made with (`stage/shots.ts`): its own
  * Chromium drawing a canvas reads that canvas with one, and needs no token of anyone's.
  */
@@ -48,6 +64,12 @@ export function ticketPath(given: string): string | undefined {
 	const path = given.startsWith("/") ? given : `/api/board/${given}`;
 	const app = /^\/app\/([^/]+)(?:\/.*)?$/.exec(path);
 	if (app) return `/app/${app[1]}/`;
+	// A friend's canvas's boards: a ticket for the folder, so a sandboxed page loads its files on it.
+	const shared = /^\/api\/board\/shared\/canvases\/([^/]+)\/([^/]+)\/(?:.*)$/.exec(path);
+	if (shared && !shared[1]!.startsWith(".") && !shared[2]!.startsWith(".") && path.endsWith("/")) {
+		const folder = `/api/board/shared/canvases/${shared[1]}/${shared[2]}/`;
+		return SHARED_FOLDER.test(folder) ? folder : undefined;
+	}
 	if (!/^\/api\/(?:board|f)\/[^/]/.test(path)) return undefined;
 	// No `..` or `.` segment: a ticket names the page it is for, and that page only.
 	if (path.split("/").some((segment) => segment === ".." || segment === ".")) return undefined;
@@ -56,6 +78,11 @@ export function ticketPath(given: string): string | undefined {
 
 /** Whether a ticket's path admits a request for `requested` (decoded): the same page, or inside the same app. */
 export function covers(path: string, requested: string): boolean {
+	if (isFolderTicket(path)) {
+		// Inside the folder, every part plain: never `..`, `.`, or a hidden folder.
+		if (!requested.startsWith(path)) return false;
+		return requested.slice(path.length).split("/").every((part) => part !== "" && !part.startsWith("."));
+	}
 	if (!path.startsWith("/app/")) return requested === path;
 	// The bare `/app/<name>` is redirected to `/app/<name>/`, ticket and all.
 	return requested.startsWith(path) || requested === path.slice(0, -1);
@@ -68,6 +95,16 @@ export function ticketOf(url: string | undefined): string | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * A ticket carried in the path rather than the query, `/api/t/<ticket>/board/<path>`: what a shared
+ * canvas's sandboxed board is framed at, so every relative address it loads (`../lib/board.css`,
+ * `../files/a.png`) carries the ticket too. Answers the ticket and the path as the route sees it.
+ */
+export function splitPathTicket(url: string | undefined): { ticket: string; rest: string } | undefined {
+	const match = /^\/api\/t\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)(\/[^?]*)(\?.*)?$/.exec(url ?? "");
+	return match ? { ticket: match[1]!, rest: `/api${match[2]}${match[3] ?? ""}` } : undefined;
 }
 
 /** A request's path as the route will see it: percent-decoded, without its query. */
@@ -88,7 +125,7 @@ export class Tickets {
 
 	/** A ticket for one path (`ticketPath`), made with the token whose id is `id`. */
 	make(path: string, id: string, now = Date.now()): string {
-		const payload = Buffer.from(JSON.stringify({ p: path, e: now + TICKET_MS, k: id } satisfies Payload)).toString("base64url");
+		const payload = Buffer.from(JSON.stringify({ p: path, e: now + (isFolderTicket(path) ? FOLDER_TICKET_MS : TICKET_MS), k: id } satisfies Payload)).toString("base64url");
 		return `${payload}.${this.mac(payload).toString("base64url")}`;
 	}
 
