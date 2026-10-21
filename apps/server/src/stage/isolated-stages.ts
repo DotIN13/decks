@@ -21,18 +21,18 @@ const BACK = "from-isolation.json";
 
 /** True when this stage was copied back from an isolated one, when isolation ended. */
 export function fromIsolation(pens: StagePens, name: string): boolean {
-	return existsSync(join(pens.dir, name, BACK));
+	return existsSync(join(pens.folderOf(name), BACK));
 }
 
 /** True when this stage is an isolated one. */
 export function isIsolatedStage(pens: StagePens, name: string): boolean {
-	return existsSync(join(pens.dir, name, MARK));
+	return existsSync(join(pens.folderOf(name), MARK));
 }
 
 /** The stage an isolated stage was copied from, when it was copied from one. */
 export function originOf(pens: StagePens, name: string): string | undefined {
 	try {
-		const mark = JSON.parse(readFileSync(join(pens.dir, name, MARK), "utf8")) as { from?: unknown };
+		const mark = JSON.parse(readFileSync(join(pens.folderOf(name), MARK), "utf8")) as { from?: unknown };
 		return typeof mark.from === "string" && mark.from ? mark.from : undefined;
 	} catch {
 		return undefined;
@@ -41,8 +41,8 @@ export function originOf(pens: StagePens, name: string): string | undefined {
 
 /** Make a stage an isolated one, saying where it came from. */
 export function markIsolated(pens: StagePens, name: string, from?: string): void {
-	mkdirSync(join(pens.dir, name), { recursive: true });
-	writeFileSync(join(pens.dir, name, MARK), `${JSON.stringify(from ? { from } : {})}\n`);
+	mkdirSync(pens.folderOf(name), { recursive: true });
+	writeFileSync(join(pens.folderOf(name), MARK), `${JSON.stringify(from ? { from } : {})}\n`);
 }
 
 /** The first free `<base>-1`, `<base>-2`, …: the name a copied-back stage takes. */
@@ -77,9 +77,9 @@ export function copyStage(deck: Deck, pens: StagePens, from: string, to: string,
 	// The copied drawing still names the old boards; this swaps them for the copies, in place.
 	if (spots.length > 0 || existsSync(pens.fileOf(to))) pens.syncBoards(to, spots);
 	if (options.isolated) markIsolated(pens, to, options.origin);
-	else rmSync(join(pens.dir, to, MARK), { force: true });
+	else rmSync(join(pens.folderOf(to), MARK), { force: true });
 	// Copied back when isolation ended: said, so the manager can badge it (and a copy of a copy is not).
-	if (options.back) writeFileSync(join(pens.dir, to, BACK), `${JSON.stringify({ from })}\n`);
-	else rmSync(join(pens.dir, to, BACK), { force: true });
+	if (options.back) writeFileSync(join(pens.folderOf(to), BACK), `${JSON.stringify({ from })}\n`);
+	else rmSync(join(pens.folderOf(to), BACK), { force: true });
 	return spots.map((spot) => spot.path);
 }

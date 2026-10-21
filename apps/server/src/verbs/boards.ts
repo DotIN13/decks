@@ -55,8 +55,8 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 			 */
 			const view = viewport();
 			const width = boardWidth(options.w, view?.width, format);
-			// Isolated, a new board is the stage's own from the start (`deck/stage-boards.ts`).
-			const stageName = isolated() ? agent.stageName?.() : undefined;
+			// A new board is made in the canvas it lands on, the caller's own (`deck/layout.ts`); isolated, its stage's.
+			const stageName = isolated() ? agent.stageName?.() : (agent.stageName?.() ?? undefined);
 			const path = service.newBoard({
 				title,
 				format,

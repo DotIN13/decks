@@ -1039,13 +1039,15 @@ export class App {
 			const { boards, rev, words } = pens.summary(name);
 			let changedAt: number | undefined;
 			try {
-				changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : join(pens.dir, name)).mtimeMs);
+				changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : pens.folderOf(name)).mtimeMs);
 			} catch {
 				/* gone between the listing and the look */
 			}
+			const shared = pens.sharing(name);
 			return {
 				name,
 				title: pens.titleOf(name),
+				...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role } } : {}),
 				...(changedAt ? { changedAt } : {}),
 				boards,
 				rev,

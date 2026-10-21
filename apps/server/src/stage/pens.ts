@@ -9,6 +9,9 @@ import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
+import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, SHARED_CANVASES, sharedName, sharedParts } from "../deck/layout.ts";
+import { copyBoardInto, copyFrameInto } from "../boards/copy-in.ts";
+import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
 /**
  * A deck board on a stage: pen's own `browser` item, a live web page, pointed at the board's file
@@ -88,6 +91,8 @@ export class StagePens {
 		return this.former.get(name) ?? [];
 	}
 	private watcher: FSWatcher | undefined;
+	/** The friends' canvases, `shared/canvases/`, watched as this deck's own are. */
+	private sharedWatcher: FSWatcher | undefined;
 	private framesWatchers = new Map<string, FSWatcher>();
 	private pending = new Map<string, NodeJS.Timeout>();
 	private readonly history = new Map<string, { undo: Array<{ before: string; after: string }>; redo: Array<{ before: string; after: string }> }>();
@@ -108,21 +113,90 @@ export class StagePens {
 	}
 
 	fileOf(name: string): string {
-		return join(this.dir, name, FILE);
+		return join(this.folderOf(name), FILE);
 	}
 
-	/** Every stage folder, drawn on or only claimed. */
+	/**
+	 * A canvas's folder: `canvases/<name>`, or `shared/canvases/<owner>/<canvas>` for a friend's
+	 * (`deck/layout.ts`). Refused for a name that could name anywhere else.
+	 */
+	folderOf(name: string): string {
+		return join(this.deckPath, canvasFolder(name));
+	}
+
 	/** Whether a stage of this name exists, without listing them all. */
 	has(name: string): boolean {
-		return !!name && !name.includes("/") && existsSync(join(this.dir, name));
+		return canvasNameOk(name) && existsSync(this.folderOf(name));
 	}
 
+	/** Every canvas folder, drawn on or only claimed: this deck's own, then those friends shared, as `shared/<owner>/<canvas>`. */
 	names(): string[] {
-		if (!existsSync(this.dir)) return [];
-		return readdirSync(this.dir, { withFileTypes: true })
-			.filter((entry) => entry.isDirectory())
-			.map((entry) => entry.name)
-			.sort();
+		// A friend's canvas that came down since the watcher started: watched from now on.
+		if (!this.sharedWatcher && this.watcher && existsSync(join(this.deckPath, SHARED_CANVASES))) this.watch();
+		const own = existsSync(this.dir)
+			? readdirSync(this.dir, { withFileTypes: true })
+					.filter((entry) => entry.isDirectory() && plainSegment(entry.name))
+					.map((entry) => entry.name)
+					.sort()
+			: [];
+		const shared: string[] = [];
+		const from = join(this.deckPath, SHARED_CANVASES);
+		if (existsSync(from)) {
+			for (const owner of readdirSync(from, { withFileTypes: true })) {
+				if (!owner.isDirectory() || !plainSegment(owner.name)) continue;
+				for (const canvas of readdirSync(join(from, owner.name), { withFileTypes: true })) {
+					if (canvas.isDirectory() && plainSegment(canvas.name)) shared.push(sharedName(owner.name, canvas.name));
+				}
+			}
+		}
+		return [...own, ...shared.sort()];
+	}
+
+	/** The Studio canvas a canvas of this deck is synced with, when it is (`studio/sync.ts` writes it in `canvas.json`). */
+	studioId(name: string): string | undefined {
+		try {
+			const meta = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { studio?: unknown };
+			return typeof meta.studio === "string" ? meta.studio : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	/** Refused, with a sentence, for a friend's canvas shared with you to view: its drawing follows theirs. */
+	mayWrite(name: string): void {
+		const shared = this.sharing(name);
+		if (shared && shared.role !== "edit") throw new PenError(`${this.titleOf(name)} is shared with you to view, by ${shared.ownerName ?? shared.owner}: it follows their copy, and only they can change it.`);
+	}
+
+	/**
+	 * How a canvas takes in a board or a frame from elsewhere: copied into its own folder
+	 * (`boards/copy-in.ts`). Replaced by the app, which also tells the deck about the copy.
+	 */
+	adopt: Adopt = {
+		board: (canvas, path) => copyBoardInto(this.deckPath, path, canvas),
+		frame: (canvas, ref) => copyFrameInto(this.deckPath, ref, canvas),
+	};
+
+	/** Whether a canvas is a friend's, shared with this deck: read here, written back only when they let you edit it. */
+	isShared(name: string): boolean {
+		return isSharedCanvas(name);
+	}
+
+	/**
+	 * Who shared a friend's canvas, and as what (`canvas.json`, written by the sync when it came down,
+	 * `studio/sync.ts`); undefined for one of this deck's own.
+	 */
+	sharing(name: string): { owner: string; ownerName?: string; role: "edit" | "view"; studio?: string } | undefined {
+		const parts = sharedParts(name);
+		if (!parts) return undefined;
+		let meta: { shared?: { ownerName?: unknown; role?: unknown; studio?: unknown } } = {};
+		try {
+			meta = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as typeof meta;
+		} catch {
+			/* no record: read only */
+		}
+		const role = meta.shared?.role === "edit" ? "edit" : "view";
+		return { owner: parts.owner, ...(typeof meta.shared?.ownerName === "string" ? { ownerName: meta.shared.ownerName } : {}), role, ...(typeof meta.shared?.studio === "string" ? { studio: meta.shared.studio } : {}) };
 	}
 
 	/**
@@ -133,7 +207,7 @@ export class StagePens {
 	 */
 	claim(title: string, options: { provisional?: boolean } = {}): string {
 		const name = this.freshName(title);
-		mkdirSync(join(this.dir, name), { recursive: true });
+		mkdirSync(this.folderOf(name), { recursive: true });
 		if (title.trim()) this.setTitle(name, title, { provisional: options.provisional === true });
 		if (!this.watcher) this.watch();
 		return name;
@@ -158,7 +232,7 @@ export class StagePens {
 	 */
 	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
 		try {
-			const parsed = JSON.parse(readFileSync(join(this.dir, name, CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
+			const parsed = JSON.parse(readFileSync(join(this.folderOf(name), CANVAS_META), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
 			const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : undefined;
 			const boards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
 			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(boards ? { boards } : {}) };
@@ -176,7 +250,7 @@ export class StagePens {
 		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
 		const clean = title.replace(/\s+/g, " ").trim().slice(0, 80);
 		if (!clean) throw new Error("A canvas's name cannot be empty.");
-		const file = join(this.dir, name, CANVAS_META);
+		const file = join(this.folderOf(name), CANVAS_META);
 		let kept: Record<string, unknown> = {};
 		try {
 			kept = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -202,7 +276,7 @@ export class StagePens {
 	rename(from: string, to: string, repoint: (path: string) => string): void {
 		if (!this.names().includes(from)) throw new Error(`No canvas "${from}".`);
 		if (this.names().includes(to)) throw new Error(`A canvas called "${to}" already exists.`);
-		renameSync(join(this.dir, from), join(this.dir, to));
+		renameSync(this.folderOf(from), this.folderOf(to));
 		this.former.set(to, [...(this.former.get(from) ?? []), from]);
 		this.former.delete(from);
 		this.cache.delete(from);
@@ -222,7 +296,7 @@ export class StagePens {
 	/** Delete a stage: its folder, its drawing and any boards kept in it. */
 	remove(name: string): void {
 		if (!this.names().includes(name)) throw new Error(`No canvas "${name}".`);
-		rmSync(join(this.dir, name), { recursive: true, force: true });
+		rmSync(this.folderOf(name), { recursive: true, force: true });
 		this.cache.delete(name);
 		this.history.delete(name);
 	}
@@ -248,7 +322,7 @@ export class StagePens {
 			return cached;
 		}
 		try {
-			const doc = parse(text);
+			const doc = toMemory(name, parse(text));
 			const entry = { doc, rev: (cached?.rev ?? 0) + 1, mtime, text };
 			this.cache.set(name, entry);
 			return entry;
@@ -267,6 +341,7 @@ export class StagePens {
 	 * (`@decks/pen`'s `reroute`). `boards` finds a board by path, for an arrow that ends on one.
 	 */
 	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
+		this.mayWrite(name);
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
 		const theme = baseTheme(current.doc, "light");
@@ -307,7 +382,7 @@ export class StagePens {
 			throw new PenError("The drawing has changed since, by an agent or in the file, so there is nothing safe to take back.");
 		}
 		from.pop();
-		const entry = this.write(name, parse(direction === "undo" ? last.before : last.after));
+		const entry = this.write(name, toMemory(name, parse(direction === "undo" ? last.before : last.after)));
 		to.push(last);
 		return entry;
 	}
@@ -346,14 +421,14 @@ export class StagePens {
 	 * into it are drawn as missing. Never saved.
 	 */
 	withImported(name: string, doc: PenDocument): PenDocument {
-		return this.withImportedAt(join(this.dir, name), doc);
+		return this.withImportedAt(this.folderOf(name), doc);
 	}
 
 	/** The same, for a `.pen` file in `here` (a frame's folder, or a stage's). */
 	private withImportedAt(here: string, doc: PenDocument): PenDocument {
 		const imports = doc.imports && typeof doc.imports === "object" ? doc.imports : {};
 		const out: Record<string, PenDocument> = {};
-		this.addFrames(doc, out);
+		this.addFrames(doc, out, this.framesBaseOf(here));
 		for (const [short, rel] of Object.entries(imports)) {
 			if (typeof rel !== "string" || !rel) continue;
 			const file = resolvePath(here, rel);
@@ -389,7 +464,17 @@ export class StagePens {
 	 * it, its overrides included, and the frames those use in turn: as `IMPORTED["frames/<name>"]`, read
 	 * from the deck's `frames/` folder with nothing to declare, as a board is placed by its path.
 	 */
-	private addFrames(doc: PenDocument, out: Record<string, PenDocument>, depth = 0): void {
+	/**
+	 * Where `frames/<name>` is read from for a file in `here`: its canvas's folder, when it is in one
+	 * (`deck/layout.ts`), and the deck, for a frame kept in the deck's own `frames/`.
+	 */
+	private framesBaseOf(here: string): string {
+		const inside = relative(this.deckPath, here).split(sep).join("/");
+		const at = inside && !inside.startsWith("..") ? canvasOfPath(`${inside}/x`) : undefined;
+		return at ? join(this.deckPath, at.folder) : this.deckPath;
+	}
+
+	private addFrames(doc: PenDocument, out: Record<string, PenDocument>, base: string, depth = 0): void {
 		if (depth > 8) return;
 		const names = new Set<string>();
 		const scan = (value: unknown): void => {
@@ -408,10 +493,10 @@ export class StagePens {
 		if (names.size) this.watchFrames();
 		for (const key of names) {
 			if (out[key]) continue;
-			const saved = this.readPen(join(this.deckPath, `${key}.pen`));
+			const saved = this.readPen(join(base, `${key}.pen`));
 			if (!saved) continue;
 			out[key] = saved;
-			this.addFrames(saved, out, depth + 1);
+			this.addFrames(saved, out, base, depth + 1);
 		}
 	}
 
@@ -424,7 +509,8 @@ export class StagePens {
 	saveFrame(stage: string, id: string, path: string, replace = true): { frame: string; ref: string; replaced: boolean; overwrote: boolean } {
 		const entry = this.get(stage);
 		if (entry.error) throw new PenError(`${entry.error}. Fix the file before saving from it.`);
-		const target = this.penFile(path);
+		// A frame is saved in the canvas's own frames/, so the canvas still stands alone (`deck/layout.ts`).
+		const target = this.penFile(/^\.?\/?frames\//.test(path.trim()) ? `${canvasFolder(stage)}/${path.trim().replace(/^\.?\/+/, "")}` : path);
 		if (!target.ref) throw new PenError(`A frame is saved in frames/ or boards/: give a path there, such as "frames/agent-card" or "frames/ui/agent-card".`);
 		const found = indexOf(entry.doc).get(id);
 		if (!found) throw new PenError(`No item "${id}" on stage ${stage}: decks canvas read lists the items.`);
@@ -441,7 +527,7 @@ export class StagePens {
 			const ref: PenNode = { type: "ref", id, ref: target.ref, ...(x !== undefined ? { x } : {}), ...(y !== undefined ? { y } : {}) };
 			this.edit(stage, [{ op: "replace", id, node: ref } as Op]);
 		}
-		this.resendFrame(target.ref);
+		this.resendFrame(target.ref, target.canvas);
 		return { frame: target.shown, ref: target.ref, replaced: replace, overwrote };
 	}
 
@@ -450,7 +536,7 @@ export class StagePens {
 	 * `"canvases/research-notes/canvas.pen"`), or an absolute path anywhere. `.pen` may be left off. Its deck-relative path to show, the stage it is when it is a
 	 * stage's own file, and the ref that places it when it is a frame.
 	 */
-	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string } {
+	penFile(path: string): { file: string; shown: string; stage?: string; ref?: string; canvas?: string } {
 		const asked = typeof path === "string" ? path.trim() : "";
 		if (!asked) throw new PenError("A .pen file needs a path relative to the deck, such as \"frames/agent-card\" or \"canvases/research-notes/canvas.pen\", or an absolute one.");
 		// A path written before canvases moved out of stages/ still finds its canvas (`migrations/2026-10-16-stages-to-canvases.ts`).
@@ -462,12 +548,24 @@ export class StagePens {
 		const inside = relative(this.deckPath, file);
 		const outside = !inside || inside.startsWith("..") || isAbsolute(inside);
 		const shown = outside ? file : inside.split(sep).join("/");
-		const stageMatch = /^canvases\/([^/]+)\/canvas\.pen$/.exec(shown);
-		if (stageMatch) return { file, shown, stage: stageMatch[1]! };
-		// A file in frames/ or boards/ is placed by its path; the path is its ref, so it keeps to what a ref can say.
-		const ref = !outside && /^(?:frames|boards)\//.test(shown) ? shown.replace(/\.pen$/, "") : undefined;
+		const at = outside ? undefined : canvasOfPath(shown);
+		if (at && at.rest === FILE) return { file, shown, stage: at.name };
+		// A file in frames/ or boards/, the deck's or a canvas's own, is placed by its path there; the path is its ref, so it keeps to what a ref can say.
+		const placed = at ? at.rest : shown;
+		const ref = !outside && /^(?:frames|boards)\//.test(placed) ? placed.replace(/\.pen$/, "") : undefined;
 		if (ref && !/^(?:frames|boards)\/[A-Za-z0-9][\w.-]*(?:\/[A-Za-z0-9][\w.-]*)*$/.test(ref)) throw new PenError(`${asked}: a path placed by ref is letters, digits, dots and dashes, in folders if you like, such as "frames/ui/agent-card".`);
-		return { file, shown, ...(ref ? { ref } : {}) };
+		return { file, shown, ...(ref ? { ref } : {}), ...(at && ref ? { canvas: at.name } : {}) };
+	}
+
+	/**
+	 * A frame named as a canvas names it (`frames/agent-card`), as the deck path of the file: the one in
+	 * that canvas's own `frames/` when it has it, else the deck's own `frames/`, the library.
+	 */
+	frameOn(path: string, canvas?: string): string {
+		const asked = path.trim().replace(/^\.?\/+/, "");
+		if (!canvas || !/^frames\//.test(asked) || !canvasNameOk(canvas)) return asked;
+		const own = `${canvasFolder(canvas)}/${asked}`;
+		return existsSync(join(this.deckPath, /\.pen$/.test(own) ? own : `${own}.pen`)) ? own : asked;
 	}
 
 	/** A pen file's document, read fresh, with a sentence when it is missing or does not parse. */
@@ -499,7 +597,7 @@ export class StagePens {
 	 */
 	fileFrame(path: string): { doc: PenDocument; base: string; box?: { x1: number; y1: number; x2: number; y2: number }; stage?: string } {
 		const target = this.penFile(path);
-		if (target.stage) return { doc: this.withImported(target.stage, this.get(target.stage).doc), base: `${fileUrl(join(this.dir, target.stage))}/`, stage: target.stage };
+		if (target.stage) return { doc: this.withImported(target.stage, this.get(target.stage).doc), base: `${fileUrl(this.folderOf(target.stage))}/`, stage: target.stage };
 		const doc = this.withImportedAt(dirname(target.file), this.loadPen(target.file, target.shown));
 		const placed = placements(doc, { theme: baseTheme(doc, "light"), measure });
 		const boxes = doc.children.map((node) => placed.get(node.id)?.box).filter((box): box is NonNullable<typeof box> => !!box);
@@ -540,7 +638,7 @@ export class StagePens {
 		const current = this.loadPen(target.file, target.shown);
 		const { doc, results } = apply(current, ops, { theme: theme(current), measure });
 		this.writePen(target.file, doc);
-		if (target.ref) this.resendFrame(target.ref);
+		if (target.ref) this.resendFrame(target.ref, target.canvas);
 		const placed = placements(this.withImportedAt(dirname(target.file), doc), { theme: theme(doc), measure });
 		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), results: results.map((result) => withBox(result, placed)) };
 	}
@@ -563,9 +661,11 @@ export class StagePens {
 	}
 
 	/** Every stage that uses a saved frame, sent again with a new revision, so each copy shows the change. */
-	private resendFrame(key: string): void {
+	private resendFrame(key: string, canvas?: string): void {
 		for (const [stage, entry] of this.cache) {
 			if (!entry.text.includes(`"${key}`)) continue;
+			// A canvas's own frame is that canvas's; the deck's is any canvas's that has no copy of its own.
+			if (canvas ? stage !== canvas : existsSync(join(this.folderOf(stage), `${key}.pen`))) continue;
 			// A new revision, so the canvas takes it as news and lays the stage out again.
 			const next = { ...entry, rev: entry.rev + 1, placed: undefined };
 			this.cache.set(stage, next);
@@ -659,7 +759,7 @@ export class StagePens {
 		for (const spot of wanted) {
 			const node = present.get(spot.path);
 			if (!node) {
-				const base = slug(spot.path.replace(/^boards\//, "").replace(/\.[^.]+$/, ""), 40) || "board";
+				const base = slug(basename(spot.path).replace(/\.[^.]+$/, ""), 40) || "board";
 				let id = base;
 				for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 				taken.add(id);
@@ -715,7 +815,7 @@ export class StagePens {
 				if (node.name !== spot.title) ops.push({ op: "update", id: node.id, set: { name: spot.title } });
 				continue;
 			}
-			const base = slug(spot.path.replace(/^boards\//, "").replace(/\.[^.]+$/, ""), 40) || "board";
+			const base = slug(basename(spot.path).replace(/\.[^.]+$/, ""), 40) || "board";
 			let id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 			taken.add(id);
@@ -786,14 +886,14 @@ export class StagePens {
 	/** The `stage.pen` frame for one agent looking at this stage. */
 	/** A stage's drawing as the page is given it (imports in place) and the folder its fills are read against, without counting as sent. */
 	drawingOf(name: string): { doc: PenDocument; base: string } {
-		return { doc: this.withImported(name, this.get(name).doc), base: `${fileUrl(join(this.dir, name))}/` };
+		return { doc: this.withImported(name, this.get(name).doc), base: `${fileUrl(this.folderOf(name))}/` };
 	}
 
 	frame(agentId: string, name: string): ServerMessage {
 		const entry = this.get(name);
 		const doc = this.withImported(name, entry.doc);
 		this.sent.set(name, { rev: entry.rev, doc });
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(join(this.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}) };
 	}
 
 	/** The version of each stage last sent to browsers, whole or as edits: what the next edits are from. */
@@ -812,13 +912,13 @@ export class StagePens {
 		const doc = this.withImported(name, entry.doc);
 		const edits = diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });
-		const base = `${fileUrl(join(this.dir, name))}/`;
+		const base = `${fileUrl(this.folderOf(name))}/`;
 		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base }));
 	}
 
 	/** Replace the document whole, from text that must parse. */
 	replace(name: string, text: string): PenEntry {
-		return this.write(name, parse(text));
+		return this.write(name, toMemory(name, parse(text)));
 	}
 
 	/** What an agent reads: the file's items, each with its box on the stage. */
@@ -829,10 +929,12 @@ export class StagePens {
 
 	private write(name: string, doc: PenDocument): PenEntry {
 		const file = this.fileOf(name);
-		mkdirSync(join(this.dir, name), { recursive: true });
+		mkdirSync(this.folderOf(name), { recursive: true });
 		if (!this.watcher) this.watch();
-		const text = serialize(doc);
+		// Named from the canvas's own folder on disk, a board from elsewhere copied in first (`canvas-refs.ts`).
+		const text = serialize(toDisk(name, doc, this.adopt));
 		writeFileSync(file, text);
+		doc = toMemory(name, parse(text));
 		const previous = this.cache.get(name);
 		const entry = { doc, rev: (previous?.rev ?? 0) + 1, mtime: statSync(file).mtimeMs, text };
 		this.cache.set(name, entry);
@@ -847,25 +949,53 @@ export class StagePens {
 	watch(): void {
 		this.close();
 		this.watchFrames();
+		// A drawing changed on disk: an agent's write, pen.dev's save, a friend's edit the sync brought down.
+		const drawing = (name: string) => {
+			clearTimeout(this.pending.get(name));
+			this.pending.set(
+				name,
+				setTimeout(() => {
+					this.pending.delete(name);
+					const before = this.cache.get(name);
+					const after = this.get(name);
+					if (after !== before || after.rev !== before?.rev) this.changed(name, after);
+				}, 80),
+			);
+		};
+		// One of a canvas's own frames changed: that canvas is sent again.
+		const frame = (name: string, rest: string[]) => {
+			const key = `frames/${rest.join("/").replace(/\.pen$/, "")}`;
+			this.importCache.delete(join(this.folderOf(name), `${key}.pen`));
+			clearTimeout(this.pending.get(`${name}:${key}`));
+			this.pending.set(
+				`${name}:${key}`,
+				setTimeout(() => {
+					this.pending.delete(`${name}:${key}`);
+					this.resendFrame(key, name);
+				}, 80),
+			);
+		};
+		const seen = (name: string, rest: string[]) => {
+			if (rest.length === 1 && rest[0] === FILE) drawing(name);
+			else if (rest[0] === "frames" && rest.length > 1 && rest.at(-1)!.endsWith(".pen")) frame(name, rest.slice(1));
+		};
 		// No folder yet is no stage yet: `claim` and `write` start watching when they make one.
-		if (!existsSync(this.dir)) return;
 		try {
-			this.watcher = watch(this.dir, { recursive: true }, (_event, file) => {
-				if (!file) return;
-				const parts = String(file).split(/[\\/]/);
-				if (parts.length !== 2 || parts[1] !== FILE) return;
-				const name = parts[0]!;
-				clearTimeout(this.pending.get(name));
-				this.pending.set(
-					name,
-					setTimeout(() => {
-						this.pending.delete(name);
-						const before = this.cache.get(name);
-						const after = this.get(name);
-						if (after !== before || after.rev !== before?.rev) this.changed(name, after);
-					}, 80),
-				);
-			});
+			if (existsSync(this.dir)) {
+				this.watcher = watch(this.dir, { recursive: true }, (_event, file) => {
+					if (!file) return;
+					const parts = String(file).split(/[\\/]/);
+					if (parts.length >= 2 && plainSegment(parts[0])) seen(parts[0]!, parts.slice(1));
+				});
+			}
+			const shared = join(this.deckPath, SHARED_CANVASES);
+			if (existsSync(shared)) {
+				this.sharedWatcher = watch(shared, { recursive: true }, (_event, file) => {
+					if (!file) return;
+					const parts = String(file).split(/[\\/]/);
+					if (parts.length >= 3 && plainSegment(parts[0]) && plainSegment(parts[1])) seen(sharedName(parts[0]!, parts[1]!), parts.slice(2));
+				});
+			}
 		} catch {
 			// A platform without recursive watching still works: edits through the tool are announced
 			// by `write`, and a hand edit is read the next time anything asks.
@@ -883,6 +1013,8 @@ export class StagePens {
 	close(): void {
 		this.watcher?.close();
 		this.watcher = undefined;
+		this.sharedWatcher?.close();
+		this.sharedWatcher = undefined;
 		for (const watcher of this.framesWatchers.values()) watcher.close();
 		this.framesWatchers.clear();
 		for (const timer of this.pending.values()) clearTimeout(timer);

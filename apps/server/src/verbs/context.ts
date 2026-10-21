@@ -194,7 +194,7 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 			return name;
 		}
 		if (typeof asked !== "string") throw new Error('canvas is a canvas\'s name or title, as in { canvas: "launch-plan" }.');
-		const raw = asked.trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "");
+		const raw = asked.trim().replace(/^canvases\//, "").replace(/^shared\/canvases\//, "shared/").replace(/\/canvas(\.pen)?$/, "");
 		const names = pens.names();
 		const name = names.includes(raw) ? raw : names.find((one) => pens.titleOf(one).toLowerCase() === raw.toLowerCase());
 		if (!name) throw new Error(`No canvas is called "${asked}". decks canvas list names them, by name and title.`);
@@ -210,9 +210,13 @@ export function verbContext(deps: { stage: StageService; agent: StageAgentHooks;
 		} catch {
 			/* a canvas whose file does not parse holds no boards we can count */
 		}
+		const shared = pens.sharing(name);
 		return {
 			name,
 			title: pens.titleOf(name),
+			// A friend's canvas: who shared it, and whether you may change it (`deck/layout.ts`).
+			...(shared ? { shared: { owner: shared.ownerName ?? shared.owner, role: shared.role, ...(shared.studio ? { studio: shared.studio } : {}) } } : {}),
+			...(!shared && pens.studioId(name) ? { studio: pens.studioId(name) } : {}),
 			open: agent
 				.agents()
 				.filter((other) => (other.id === agent.id && !agent.board ? mine : other.stage) === name)

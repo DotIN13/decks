@@ -460,7 +460,7 @@ export class Registry {
 		for (const name of canvases) {
 			let at = 0;
 			try {
-				at = statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : join(pens.dir, name)).mtimeMs;
+				at = statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : pens.folderOf(name)).mtimeMs;
 			} catch {
 				continue;
 			}

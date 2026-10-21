@@ -49,7 +49,7 @@ function moveCanvas(context: Context, from: string, to: string): string {
 	context.deck.reload();
 	// An isolated stage names the stage it was copied from; that name moved.
 	for (const name of context.pens.names()) {
-		const mark = join(context.pens.dir, name, "isolated.json");
+		const mark = join(context.pens.folderOf(name), "isolated.json");
 		if (!existsSync(mark)) continue;
 		try {
 			const parsed = JSON.parse(readFileSync(mark, "utf8")) as { from?: string };

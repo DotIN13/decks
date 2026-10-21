@@ -33,20 +33,30 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 	return {
 		board: {
 			list: async () => service.allBoards().filter((board) => visible(board.path)).map(asBoard),
-			create: async (options: { title: string; format?: string; w?: number; h?: number }) => {
+			create: async (options: { title: string; format?: string; w?: number; h?: number; canvas?: string }) => {
 				const title = options?.title?.trim();
 				if (!title) throw new Error("A board needs a title: the finding it states, as a sentence.");
 				const format = asBoardFormat(options.format ?? "board");
 				if (!format) throw new Error(`Unknown format ${options.format}; use one of ${BOARD_FORMATS.join(", ")}`);
 				const view = viewport();
 				const width = boardWidth(options.w, view?.width, format);
-				// Isolated, a new board is the stage's own from the start (`deck/stage-boards.ts`).
-				const stageName = isolated() ? agent.stageName?.() : undefined;
-				const path = service.newBoard({ title, format, size: { w: width, ...(options.h ? { h: options.h } : {}) }, ...(stageName ? { folder: stageBoardsDir(stageName) } : {}) });
+				/*
+				 * A board is made in a canvas's own boards/, the one named or the caller's own, so the canvas
+				 * stands alone (`deck/layout.ts`). Isolated, it is the agent's own stage's (`deck/stage-boards.ts`).
+				 */
+				let stageName: string | undefined;
+				try {
+					stageName = isolated() ? agent.stageName?.() : ctx.canvasOf(options?.canvas);
+				} catch (error) {
+					throw new Error(`A board is made in a canvas: name it with { canvas }, as in decks board create '{"title":"…","canvas":"launch-plan"}'. ${(error as Error).message}`);
+				}
+				if (!stageName) throw new Error('A board is made in a canvas: name it with { canvas }. decks canvas list names them.');
+				needPens().mayWrite(stageName);
+				const path = service.newBoard({ title, format, size: { w: width, ...(options.h ? { h: options.h } : {}) }, folder: stageBoardsDir(stageName) });
 				agent.worked?.(path);
 				if (view) notes.push(`viewport ${view.width}×${view.height} px`);
 				notes.push(
-					`board width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. It is on no canvas yet: decks canvas insert '{"type":"board","board":"${path}"}' --beside <id> puts it on yours, then decks canvas fit ${path}.`,
+					`board width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. It is kept in the canvas ${stageName}'s own folder and not placed yet: decks canvas insert '{"type":"board","board":"${path}"}' --canvas ${stageName} --beside <id> puts it there, then decks canvas fit ${path}.`,
 				);
 				return asBoard(service.fileBoard(path) ?? { path, title });
 			},

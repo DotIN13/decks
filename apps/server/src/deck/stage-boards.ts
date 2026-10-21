@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { canvasFolder } from "./layout.ts";
 
 /**
  * Boards a canvas keeps for itself: `canvases/<name>/boards/`.
@@ -12,12 +13,12 @@ import { join } from "node:path";
 
 /** The deck-relative folder a stage keeps its own boards in. */
 export function stageBoardsDir(stage: string): string {
-	return `canvases/${stage}/boards`;
+	return `${canvasFolder(stage)}/boards`;
 }
 
 /** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `canvases/<name>/boards/…`. */
 export function inBoardFolder(path: string): boolean {
-	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/boards\/.+/.test(path);
+	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/boards\/.+/.test(path) || /^shared\/canvases\/[^/]+\/[^/]+\/boards\/.+/.test(path);
 }
 
 /**
@@ -31,6 +32,15 @@ export function boardFolders(deck: string): string[] {
 	if (!existsSync(stages)) return folders;
 	for (const entry of readdirSync(stages, { withFileTypes: true })) {
 		if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "boards"))) folders.push(stageBoardsDir(entry.name));
+	}
+	// The canvases friends shared, each with its own boards (`deck/layout.ts`).
+	const shared = join(deck, "shared", "canvases");
+	if (!existsSync(shared)) return folders;
+	for (const owner of readdirSync(shared, { withFileTypes: true })) {
+		if (!owner.isDirectory() || owner.name.startsWith(".")) continue;
+		for (const canvas of readdirSync(join(shared, owner.name), { withFileTypes: true })) {
+			if (canvas.isDirectory() && !canvas.name.startsWith(".") && existsSync(join(shared, owner.name, canvas.name, "boards"))) folders.push(`shared/canvases/${owner.name}/${canvas.name}/boards`);
+		}
 	}
 	return folders;
 }

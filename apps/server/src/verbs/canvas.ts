@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, walk, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { markIsolated } from "../stage/isolated-stages.ts";
@@ -78,7 +79,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (frame === undefined || frame === null) return { canvas: canvasOf(options?.canvas) };
 		if (options?.canvas !== undefined && options.canvas !== null) throw new Error("Say a canvas or a frame, not both: { frame } edits the frame file itself, and that shows on every canvas placing it.");
 		if (typeof frame !== "string" || !frame.trim()) throw new Error('frame names a frame file, as in { frame: "frames/agent-card" }.');
-		return { frame: needPens().framePen(frame).ref };
+		// `frames/<name>`: the agent's own canvas's copy when it has one (`StagePens.frameOn`), else the deck's.
+		let home: string | undefined;
+		try {
+			home = canvasOf(undefined);
+		} catch {
+			/* no canvas of its own: the deck's frames/ */
+		}
+		return { frame: needPens().framePen(needPens().frameOn(frame, home)).shown };
 	};
 
 	/**
@@ -118,7 +126,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (!file) throw new Error(`There is no board ${board} in the deck. decks board create makes one; decks board list lists them.`);
 		let id = typeof own.id === "string" && own.id ? own.id : undefined;
 		if (!id) {
-			const base = slug(board.replace(/^boards\//, "").replace(/\.[^.]+$/, ""), 40) || "board";
+			const base = slug(basename(board).replace(/\.[^.]+$/, ""), 40) || "board";
 			id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 		}

@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { canvasOfPath, isSharedCanvas } from "../deck/layout.ts";
 import { relink } from "../deck/stage-boards.ts";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
@@ -272,7 +273,31 @@ export class BoardService {
 		return this.writeBoard(path, withBoardSize(path, html, size));
 	}
 
+	/**
+	 * Why a board may not be changed, or undefined when it may: a board in the library (`boards/`, on
+	 * no canvas) is read and copied from, and a friend's canvas shared with you to view follows theirs
+	 * (`deck/layout.ts`). The app boards and the boards the harness makes for itself stay writable.
+	 */
+	readOnly(path: string): string | undefined {
+		if (/^boards\//.test(path) && !/^boards\/(?:apps|mirrors|documents|files)\//.test(path) && path !== "boards/your-chrome.html") {
+			return `${path} is in the library, on no canvas, and is read only: place it on a canvas (decks canvas insert copies it in) and change the copy.`;
+		}
+		const at = canvasOfPath(path);
+		if (at && isSharedCanvas(at.name)) {
+			let role: unknown;
+			try {
+				role = (JSON.parse(readFileSync(join(this.deck.path, at.folder, "canvas.json"), "utf8")) as { shared?: { role?: unknown } }).shared?.role;
+			} catch {
+				/* no record: read only */
+			}
+			if (role !== "edit") return `${path} is on a canvas shared with you to view: it follows its owner's copy, and only they can change it.`;
+		}
+		return undefined;
+	}
+
 	writeBoard(path: string, html: string): Board {
+		const refused = this.readOnly(path);
+		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
 		const before = existsSync(file) ? readFileSync(file, "utf8") : undefined;
 		writeFileSync(file, html);
@@ -542,6 +567,11 @@ export class BoardService {
 		const board = this.deck.board(path);
 		if (!board) {
 			reply({ type: "board.patched", path, rev: 0, refused: `No such board: ${path}` });
+			return;
+		}
+		const readOnly = this.readOnly(path);
+		if (readOnly) {
+			reply({ type: "board.patched", path, rev: board.rev, refused: readOnly });
 			return;
 		}
 		if (board.rev !== rev) {

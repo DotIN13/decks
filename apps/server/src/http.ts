@@ -735,7 +735,7 @@ export function createHttpApp(app: App): Express {
 				deckPath: app.deck.path,
 				deckName: app.deck.name,
 				board: (path) => app.deck.board(path),
-				stage: { dir: join(pens.dir, name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.boards(name) },
+				stage: { dir: pens.folderOf(name), title: pens.titleOf(name), rev: frame.rev, doc: frame.doc, boards: pens.boards(name) },
 				picture: async (board, scheme) => {
 					const near = app.thumbs.nearest(board, scheme, "whole");
 					if (near) return near.file;

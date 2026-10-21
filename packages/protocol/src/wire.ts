@@ -61,6 +61,11 @@ export interface StageRow {
 	agents: Array<{ id: string; name: string; color: string }>;
 	/** The words its boards and notes carry, for the manager's search field. */
 	words: string;
+	/**
+	 * A friend's canvas, shared with you (`shared/canvases/<owner>/<canvas>/`): who shared it, and
+	 * whether you may change it. Its boards run sandboxed, with no token.
+	 */
+	shared?: { owner: string; role: "edit" | "view" };
 	/** An isolated stage: the only kind an isolated agent may open (`stage/isolated-stages.ts`). */
 	isolated?: true;
 	/** Copied back from an isolated stage when isolation ended: badged in the manager. */

@@ -29,7 +29,7 @@ import type { AppCheck } from "../apps/check.ts";
 
 export interface StageHost {
 	/** Write a new blank board and return its deck-relative path. */
-	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number } }): string;
+	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number }; folder?: string }): string;
 	/** The board that shows an app, `boards/apps/<name>.html`; the one it has if it has one. */
 	newAppBoard(name: string, title: string): string;
 	/** A live board: a stub that draws one agent's conversation. See `App.newMirror`. */
@@ -275,7 +275,7 @@ export class StageService {
 	}
 
 	/** A new blank board — the shell, so the agent writes only the content. */
-	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number } }): string {
+	newBoard(options: { title: string; format?: string; size?: { w?: number; h?: number }; folder?: string }): string {
 		return this.host.newBoard(options);
 	}
 
