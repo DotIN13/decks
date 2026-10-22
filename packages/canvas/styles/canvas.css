@@ -2216,3 +2216,40 @@
 .stage[data-pictures="true"] .board-node iframe {
 	visibility: hidden;
 }
+
+/* The editor's own board (`PlainBoard`), in both the Decks app and any host of the canvas: it was in
+   `host.css` alone, so the Decks app laid the title inside the box, pushing the page down from its picture. */
+@layer components {
+	/* Over words selected in a `PlainBoard`'s page: comment on them. */
+	.plain-board-comment {
+		position: absolute;
+		z-index: 5;
+		padding: 5px 10px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--fg);
+		color: var(--bg);
+		font: 500 12px/1.2 var(--font-sans);
+		white-space: nowrap;
+		box-shadow: var(--shadow);
+		cursor: pointer;
+	}
+
+	/* A board drawn by `PlainBoard`: its title above it, to move it by, outside the board's box so the
+	   page and the sheet's picture of it both start at the box's top. `--zoom` is the camera's, set on
+	   the board, so the title reads at 12px on screen at any zoom. */
+	.plain-board-bar {
+		position: absolute;
+		left: 0;
+		bottom: 100%;
+		max-width: 100%;
+		padding: 0 2px calc(4px / var(--zoom, 1));
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: calc(12px / var(--zoom, 1));
+		color: var(--muted);
+		cursor: grab;
+		user-select: none;
+	}
+}

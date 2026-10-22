@@ -319,6 +319,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 				transform: shift(),
 				width: `${size().w}px`,
 				height: `${size().h}px`,
+				"--zoom": String(zoom()),
 			}}
 		>
 			<div class="shade" aria-hidden="true" />
