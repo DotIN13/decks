@@ -2237,7 +2237,7 @@
 
 	/* A board drawn by `PlainBoard`: its title above it, to move it by, outside the board's box so the
 	   page and the sheet's picture of it both start at the box's top. `--zoom` is the camera's, set on
-	   the board, so the title reads at 12px on screen at any zoom. */
+	   the title itself (the Decks app registers it as not inherited), so it reads at 12px on screen at any zoom. */
 	.plain-board-bar {
 		position: absolute;
 		left: 0;
