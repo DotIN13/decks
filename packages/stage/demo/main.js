@@ -1,6 +1,6 @@
 // The page: owns the document through the Rust page engine, sends the render worker numbered
 // batches and the camera, and in one animation frame moves the boards' pages and lays the tiles.
-import init, { PageEngine, openStage } from "./pkg/stage_web.js";
+import init, { PageEngine, openStage, scaleFor } from "./pkg/stage_web.js";
 
 const params = new URLSearchParams(location.search);
 const name = params.get("stage") ?? "herobrine";
@@ -100,7 +100,7 @@ function frame(now) {
 		boardsKey = `${awake}`;
 		engine.setBoards(JSON.stringify(JSON.parse(engine.boards()).map((b) => ({ path: b.id, x: b.x, y: b.y, w: b.w, h: b.h, live: awake }))));
 	}
-	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height, moving);
+	stats.tiles = engine.frame(camera.x, camera.y, camera.zoom, dpr, width, height, scaleFor(camera.zoom * dpr, moving));
 	loadPictures(JSON.parse(engine.wantedPictures()));
 	const ms = performance.now() - t0;
 	stats.pageMs.push(ms);
