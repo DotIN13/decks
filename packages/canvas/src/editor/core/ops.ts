@@ -41,16 +41,17 @@ export function movedBy(node: PenNode, dx: number, dy: number): Record<string, u
 }
 
 /**
- * An arrow joined at both ends, carried while what it joins stays: it cannot move, since it is drawn
- * from its ends again after every edit. It gets no op, so the drag lets it go back at once
- * (`releaseCarry`) rather than when the canvas stops waiting for a change that never comes.
+ * An arrow joined at either end, carried while what that end joins stays: it does not move. Dragging
+ * its line would only stretch it round the join, and an arrow's shape is changed by its handles
+ * alone. It gets no op, so the drag lets it go back at once (`releaseCarry`) rather than when the
+ * canvas stops waiting for a change that never comes. A free arrow moves whole.
  */
 function pinned(node: PenNode, moving: ReadonlySet<string>, scene: SceneQuery): boolean {
 	if (!isArrow(node) || !node.metadata) return false;
 	const meta = node.metadata as Record<string, unknown>;
 	const ends = [arrowEndItem(meta.from), arrowEndItem(meta.to)];
 	// An end that names an item no longer there joins nothing: it does not hold the arrow still.
-	return ends.every((end) => end !== undefined && !moving.has(end) && joinsSomething(scene, end));
+	return ends.some((end) => end !== undefined && !moving.has(end) && joinsSomething(scene, end));
 }
 
 /** Whether an arrow's end names something still on the stage: an item, or a board by its path. */

@@ -105,9 +105,12 @@ export const pointEnd = (point: Pt): [number, number] => [Math.round(point.x * 1
  * has a middle segment to slide, and always on a line or a curve.
  */
 export function arrowHandles(scene: SceneQuery, id: string, drag: { dx: number; dy: number } = { dx: 0, dy: 0 }): ArrowHandles | undefined {
-	const node = scene.item(id)?.node;
+	const placed = scene.item(id);
+	const node = placed?.node;
 	if (!node || !isArrow(node)) return undefined;
-	const points = arrowLine(scene, node.metadata);
+	// On the line as it is drawn, so a handle sits on the arrow the person sees; the route its metadata
+	// would take now only for an arrow not drawn yet (the two part when what it joins moved since).
+	const points = drawnLine(node, placed.box) ?? arrowLine(scene, node.metadata);
 	if (!points) return undefined;
 	const [fx, fy] = points[0]!;
 	const [tx, ty] = points[points.length - 1]!;
@@ -132,6 +135,25 @@ export function arrowHandles(scene: SceneQuery, id: string, drag: { dx: number; 
 		...(bendable ? { middle: { x: mx + drag.dx, y: my + drag.dy } } : {}),
 		bent: arrowBend(node.metadata) !== undefined,
 	};
+}
+
+/**
+ * An arrow's line as it is drawn, on the stage: the points of its geometry's first subpath (a curve's
+ * start, two controls and end; a line's corners), through its box and `viewBox`. Undefined when it has
+ * no geometry or the subpath is neither.
+ */
+export function drawnLine(node: PenNode, box: Rect): Array<[number, number]> | undefined {
+	if (typeof node.geometry !== "string") return undefined;
+	const line = node.geometry.trim().split(/(?=M)/i)[0] ?? "";
+	if (!/^M/i.test(line) || /[^MLC\d\s.,eE+-]/i.test(line)) return undefined;
+	const n = (line.match(/-?\d*\.?\d+(?:e[+-]?\d+)?/gi) ?? []).map(Number);
+	if (n.length < 4 || n.length % 2) return undefined;
+	const vb = Array.isArray(node.viewBox) && node.viewBox.length === 4 ? (node.viewBox as number[]) : [0, 0, box.w, box.h];
+	const sx = vb[2] ? box.w / vb[2]! : 1;
+	const sy = vb[3] ? box.h / vb[3]! : 1;
+	const points: Array<[number, number]> = [];
+	for (let i = 0; i < n.length; i += 2) points.push([box.x + (n[i]! - vb[0]!) * sx, box.y + (n[i + 1]! - vb[1]!) * sy]);
+	return points;
 }
 
 /** The route an arrow would take with this metadata, as a dashed draft: what a handle's drag shows. */

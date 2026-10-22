@@ -40,8 +40,8 @@ test("a nudge shifts each item's own x and y: 1 px, and 10 with Shift", () => {
 	assert.deepEqual(moveOps(scene, ["gone"], 1, 0), []);
 });
 
-test("an arrow moved carries its point ends, and its joined end stays joined", () => {
-	assert.deepEqual(moveOps(scene, ["ar"], 10, 5), [{ op: "update", id: "ar", set: { x: 10, y: 5, metadata: { type: ARROW, from: [10, 5], to: "a" } } }]);
+test("an arrow moved with what it joins carries its point ends, and its joined end stays joined", () => {
+	assert.deepEqual(moveOps(scene, ["ar", "a"], 10, 5)[0], { op: "update", id: "ar", set: { x: 10, y: 5, metadata: { type: ARROW, from: [10, 5], to: "a" } } });
 	assert.deepEqual(movedBy({ id: "r", type: "rectangle", x: 1.2 } as PenNode, 0.4, 0), { x: 2, y: 0 });
 });
 
@@ -219,10 +219,14 @@ test("an arrow joined at both ends, carried on its own, gets no op: it cannot mo
 	const s = fakeScene(joined, boards);
 	assert.deepEqual(moveOps(s, ["j"], 30, 60), []);
 	assert.deepEqual(moveOps(s, ["j"], 30, 60, null), []);
-	// Carried with an item it joins: a plain move, which the reroute settles.
-	assert.deepEqual(moveOps(s, ["j", "a"], 30, 0)[0], { op: "update", id: "j", set: movedBy(s.node("j")!, 30, 0) });
-	// One end free: the free end moves, as before.
-	assert.deepEqual(moveOps(s, ["ar"], 5, 5), [{ op: "update", id: "ar", set: movedBy(s.node("ar")!, 5, 5) }]);
+	// Carried with one item it joins while the other stays: no op of its own; it is drawn from its ends after the move.
+	assert.deepEqual(moveOps(s, ["j", "a"], 30, 0), [{ op: "update", id: "a", set: movedBy(s.node("a")!, 30, 0) }]);
+	// Carried with both: it moves with them.
+	assert.deepEqual(moveOps(s, ["j", "a", "b"], 30, 0)[0], { op: "update", id: "j", set: movedBy(s.node("j")!, 30, 0) });
+	// One end joined: it stays too, since dragging its line would only stretch it; its handles change its shape.
+	assert.deepEqual(moveOps(s, ["ar"], 5, 5), []);
+	// Carried with what it joins, it moves.
+	assert.deepEqual(moveOps(s, ["ar", "a"], 5, 5)[0], { op: "update", id: "ar", set: movedBy(s.node("ar")!, 5, 5) });
 });
 
 test("an arrow whose joined items were deleted moves as a free one, from where it is drawn", () => {
