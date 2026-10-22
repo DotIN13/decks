@@ -15,7 +15,7 @@ export type StageEditorHost = Omit<EditorHost, "effects"> & {
 	/** The page's side of the effects, but for the camera having been dragged, which the pointer keeps. */
 	effects: Omit<EditorHost["effects"], "panned">;
 	/** The pointer's host, but for what the typing and the adding answer themselves. */
-	pointer: Omit<PointerHost, "scene" | "typing" | "make" | "madeAt" | "menuOpen" | "openMenu" | "open"> & { open: Pick<PointerHost["open"], "liveFile"> };
+	pointer: Omit<PointerHost, "scene" | "typing" | "make" | "madeAt" | "noteAt" | "open"> & { open: Pick<PointerHost["open"], "liveFile"> };
 	keys: Omit<KeysHost, "scene" | "nextIds" | "edit">;
 	text: Omit<TextHost, "scene" | "engine" | "edit" | "nextIds">;
 	insert: Omit<InsertHost, "scene" | "zoom" | "edit" | "follow">;
@@ -33,8 +33,7 @@ export function createStageEditor(host: StageEditorHost) {
 		typing: editor.typing,
 		make: (event, tool, at) => insert.create(event, tool, at),
 		madeAt: insert.madeAt,
-		menuOpen: insert.menuOpen,
-		openMenu: insert.openMenu,
+		noteAt: insert.noteAt,
 		open: {
 			liveFile: host.pointer.open.liveFile,
 			file: text.openFileOf,

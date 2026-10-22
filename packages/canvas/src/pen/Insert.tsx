@@ -1,7 +1,6 @@
 import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
 import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { isPhone } from "../camera/camera.ts";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../state/pen-tools.ts";
 import { Icon } from "@decks/ui";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "./icon-index.ts";
@@ -14,7 +13,7 @@ import { iconUrl } from "./icons.ts";
  *
  * Opened from the tool column it sits beside the column, and a pick arms the shape or icon tool:
  * the next click on the canvas makes one, at its own size, and a drag makes one the size dragged.
- * Opened from the canvas menu it sits where the menu was, and a pick is put there at once. Either
+ * Opened for a point (`InsertPanel.at`) it sits there, and a pick is put there at once. Either
  * way the shape or icon picked stays the tool's until another is picked.
  *
  * Shapes are drawn here from the same outlines the canvas draws (`@decks/pen`, `SHAPES`). Icons
@@ -76,8 +75,7 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 	};
 
 	/*
-	 * Where it sits: beside the tool column, or where the canvas menu was opened, kept on screen. On a
-	 * phone it is a sheet along the bottom, as the properties panel is.
+	 * Where it sits: beside the tool column, or at the point it was opened for, kept on screen.
 	 */
 	const [place, setPlace] = createSignal<{ left: number; top: number }>({ left: 64, top: 80 });
 	const position = () => {
@@ -118,10 +116,9 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 		<div
 			ref={panel}
 			class="panel-float float insert-panel"
-			data-sheet={isPhone() ? "true" : undefined}
 			role="dialog"
 			aria-label={props.open.tab === "shapes" ? "Shapes" : "Icons"}
-			style={isPhone() ? undefined : { left: `${place().left}px`, top: `${place().top}px` }}
+			style={{ left: `${place().left}px`, top: `${place().top}px` }}
 		>
 			<label class="field insert-search">
 				<Icon of={Search} size={13} class="flex-none text-faint" />

@@ -13,7 +13,6 @@
  */
 import { mediaOf, type MediaItem, type PenNode } from "@decks/pen";
 import { batch, onCleanup, untrack } from "solid-js";
-import { setPenSheet } from "../../state/pen-tools.ts";
 import { decideHover, decidePress, DRAG_SLOP_PX, isBareSecondTap, isSecondTap, MADE_MS, PANNED_MS, TAP_MS, TAP_SLOP_PX, type BareTap, type LastTap, type PressTarget } from "../core/dispatch.ts";
 import type { ArrowHandles } from "../core/arrows.ts";
 import type { BoardBox, Offset, PenTool, Pt, Rect } from "../core/model.ts";
@@ -84,8 +83,6 @@ export type PointerHost = {
 	linkAt: (at: Pt) => string | undefined;
 	/** The app's selected board. */
 	onSelect: (path: string | undefined) => void;
-	/** Whether the app makes boards here (`Stage`'s `onCreateBoard`). */
-	canCreate: () => boolean;
 	/** The stage's finger pool: how many fingers are down, a finger the camera must not pan with, a finger handed to it. */
 	fingers: () => number;
 	claim: (pointer: number) => void;
@@ -96,9 +93,8 @@ export type PointerHost = {
 	make: (event: PointerEvent, tool: Exclude<PenTool, "select">, at: Pt) => void;
 	/** When a tool last made an item. */
 	madeAt: () => number;
-	/** The canvas menu, and opening it at a screen point. */
-	menuOpen: () => boolean;
-	openMenu: (event: Client) => void;
+	/** A note at a screen point, open for typing: what the Note tool and a click there make (`InsertMenu`'s `noteAt`). */
+	noteAt: (event: Client) => void;
 	toggleMedia: (id: string, media: MediaItem) => void;
 	open: Openers;
 	/** The handles the overlay draws, as drawn, for the presses on them. */
@@ -130,7 +126,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 *
 	 * Chromium fires `dblclick` after two presses whatever happened between them, and a quick
 	 * pan is two presses with a lot happening between them — so without this, dragging the
-	 * canvas about would leave a new board behind at the end of it.
+	 * canvas about would leave a new note behind at the end of it.
 	 */
 	let pannedAt = 0;
 	let lastBareTap: BareTap | undefined;
@@ -161,7 +157,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 *
 	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
 	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
-	 * its double-click would reach the canvas and make a board.
+	 * its double-click would reach the canvas and make a note.
 	 *
 	 * The camera can move while the press is held (a wheel, a glide), and then the last step runs
 	 * again: a `move` that reads the pointer in world space (`worldAt`) follows the cursor.
@@ -459,11 +455,11 @@ export function createPointer(editor: Editor, host: PointerHost) {
 				editor.select([]);
 				editor.pickBoards([]);
 			});
-			// A second tap close by, soon after: the canvas menu, as a double-click is with a mouse.
+			// A second tap close by, soon after: a note there, as a double-click is with a mouse.
 			const now = performance.now();
 			const twice = isBareSecondTap(lastBareTap, { x: e.clientX, y: e.clientY }, now);
 			lastBareTap = twice ? undefined : { x: e.clientX, y: e.clientY, at: now };
-			if (twice) host.openMenu(e);
+			if (twice && host.editable() && !host.drawing()) host.noteAt(e);
 		};
 		window.addEventListener("pointermove", move);
 		window.addEventListener("pointerup", up);
@@ -545,11 +541,8 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			const href = host.mode() === "browse" ? host.linkAt(at) : undefined;
 			if (href) return editor.openLink(href);
 			lastTap = { id: hit.id, at: performance.now() };
-			// A second tap on the one thing selected asks for its properties: on a phone, the sheet.
-			if (selected.length === 1 && selected[0] === hit.id) {
-				setPenSheet(true);
-				return;
-			}
+			// A second tap on the one thing selected keeps it selected.
+			if (selected.length === 1 && selected[0] === hit.id) return;
 			host.onSelect(undefined);
 			editor.pickBoards([]);
 			editor.select([hit.id]);
@@ -563,16 +556,16 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	};
 
 	/**
-	 * A double-click on empty canvas: the canvas menu, there (`canvasMenu`).
+	 * A double-click on empty canvas: a note there, open for typing — what the Note tool and a
+	 * click there make (`InsertMenu`'s `noteAt`). A double-click on an item reaches into it instead.
 	 *
-	 * "Empty" is anything that is not inside a `.board-node`. The stage's own background is the
-	 * common case, but a board's title bar is in *this* document too — a keystroke that lands in
-	 * a board never reaches here at all, because that is another document and its events do not
-	 * bubble out of a frame. So the test is the node, not the element.
+	 * "Empty" is the stage's own element with no board's picture under the point: not a board, its
+	 * title bar, something drawn, or anything laid over the drawing (the editor a note's words are
+	 * typed in is one, and a double-click there picks a word).
 	 */
 	const onDblClick = (event: MouseEvent) => {
 		if (host.editable() && !host.drawing() && onCanvas(event.target)) {
-			// The second press of a quick double-click on a tool's first item is not a request for a board.
+			// The second press of a quick double-click on a tool's first item is not a request for a note.
 			if (performance.now() - host.madeAt() < MADE_MS) return;
 			// A double-click reaches into what is one thing (a shape, a file, a card): words open for rewriting, anything else is selected on its own.
 			const hit = pickAtHere(worldAt(event), { deep: true });
@@ -604,17 +597,14 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			}
 		}
 		// Nothing can be added where nothing can be written: a canvas opened from a file.
-		if (!host.canCreate() && !host.editable()) return;
-		/*
-		 * Only on the bare stage itself. Not on a board, its title bar, something drawn, or anything
-		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
-		 * to pick a word in it opened the menu.
-		 */
+		if (!host.editable() || host.drawing()) return;
 		if (event.target !== host.element() || pictureUnder(event)) return;
+		// On an item that took none of the above (one already selected, say): it is not empty canvas.
+		if (pickAtHere(worldAt(event), { deep: true })) return;
 		if (performance.now() - pannedAt < PANNED_MS) return;
-		// A finger's two taps already opened it (`onPointerDown`); a touch screen's own dblclick is the same gesture.
-		if (host.menuOpen()) return;
-		host.openMenu(event);
+		// A finger's two taps already made it (`tapToDeselect`); a touch screen's own dblclick is the same gesture.
+		if (performance.now() - host.madeAt() < MADE_MS) return;
+		host.noteAt(event);
 	};
 
 	/**

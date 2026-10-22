@@ -159,7 +159,7 @@ export function ModelPicker(props: {
 						{/* The level only when there is one to show. "off" is a real answer and
 						    stays; a model with no scale at all has nothing to say here. */}
 						<Show when={levels().length > 0 ? props.model?.thinking : undefined}>
-							{(level) => <span class="chip-sub max-[470px]:hidden">{level()}</span>}
+							{(level) => <span class="chip-sub">{level()}</span>}
 						</Show>
 						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>

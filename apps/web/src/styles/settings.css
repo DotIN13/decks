@@ -129,15 +129,6 @@
 	white-space: nowrap;
 }
 
-	/* The same rules, under the same query. */
-	@media (max-width: 420px) {
-	.set-row:has(> .set-vol) {
-		flex-wrap: wrap;
-	}
-	.set-row > .set-vol {
-		width: 100%;
-	}
-}
 	/*
  * A standing fact about this browser, inside the group it constrains.
  *

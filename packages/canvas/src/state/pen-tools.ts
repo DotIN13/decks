@@ -45,13 +45,8 @@ export function feedSelection(source: SelectionSource): () => void {
 }
 /** The selection a stage starts with: the one up now, else what the last one left, unless something cleared it since. */
 export const keptSelection = (): readonly string[] => untrack(penSelection);
-/** Whether a card is open for typing, or on a phone any words (`Stage.tsx`): the properties panel stands aside. */
+/** Whether a card is open for typing (`Stage.tsx`): the properties panel stands aside. */
 const [penTyping, setPenTyping] = createSignal(false);
-/**
- * Whether a phone's properties sheet has been asked for: by a second tap on the item already selected.
- * The first tap only selects, so a finger can carry what it picked without the sheet over the canvas.
- */
-const [penSheet, setPenSheet] = createSignal(false);
 
 /**
  * What the `shape` and `icon` tools make: the shape picked in the insert panel (`canvas/pen/Insert.tsx`,
@@ -90,4 +85,4 @@ const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
  */
 const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
 
-export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penSheet, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenSheet, setPenTool, setPenTyping };
+export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping };

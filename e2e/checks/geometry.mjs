@@ -1,12 +1,10 @@
 /**
- * Board geometry, from the two gestures that change it: the resize handle, and the double-click
- * that makes a board.
+ * Board geometry, from the gesture that changes it: the resize handle — and the double-click on
+ * empty canvas, which makes a note and never a board.
  *
- * Both are the same subject — where a board's *size* comes from. A resize is written twice: to this
- * stage's file, where the board is drawn at what the drag let go at, and to the board's own file,
- * the size another stage takes it at next, as an agent's fit writes it. A double-click is a
- * creation: a name the server mints, a place the browser picked, and a board whose centre ends up
- * where the pointer was.
+ * A resize is written twice: to this stage's file, where the board is drawn at what the drag let go
+ * at, and to the board's own file, the size another stage takes it at next, as an agent's fit
+ * writes it. A double-click on empty canvas is the Note tool's click: a note there, open for typing.
  */
 import { boardPath, flyToBoard, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
 
@@ -313,7 +311,7 @@ const countAfterBar = await page.evaluate(() => document.querySelectorAll(".boar
  */
 say("a double-click on a board's own bar makes nothing", countAfterBar === countNow && countNow >= 1, `${countNow} → ${countAfterBar}`);
 
-// --- empty canvas: a double-click makes a board, where you clicked ---------------------
+// --- empty canvas: a double-click makes a note, where you clicked ----------------------
 
 /*
  * The canvas is emptied first, and that is the fix for how this step first failed.
@@ -344,52 +342,29 @@ const spot = await page.evaluate(() => {
 });
 say("there is empty canvas to double-click on", spot !== null, JSON.stringify(spot));
 
+const pens = await socket();
 await page.mouse.dblclick(spot.x, spot.y);
-// A double-click opens the canvas menu there; its first row is a board.
-const menuOpen = await page.waitForSelector('.canvas-menu [data-new-board="board"]', { timeout: 3000 }).catch(() => null);
-say("a double-click on empty canvas opens the menu of things to add, a board first", !!menuOpen);
-await page.locator('.canvas-menu [data-new-board="board"]').click();
-await settle(page, 1800);
-const created = await page.evaluate(([at]) => {
-	const nodes = [...document.querySelectorAll(".board-node")];
-	const fresh = nodes[0];
-	if (!fresh) return null;
-	const box = fresh.getBoundingClientRect();
-	return {
-		count: nodes.length,
-		path: fresh.dataset.path,
-		selected: fresh.dataset.selected,
-		centre: { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) },
-		size: { w: Math.round(Number.parseFloat(fresh.style.width)), h: Math.round(Number.parseFloat(fresh.style.height)) },
-		at,
-	};
-}, [spot]);
-say("…and Board makes one", created !== null && created.count === 1, JSON.stringify(created));
-say(
-	"…centred on the point that was pressed, not hung off its corner",
-	created !== null && Math.abs(created.centre.x - created.at.x) <= 4 && Math.abs(created.centre.y - created.at.y) <= 4,
-	`centre ${JSON.stringify(created?.centre)} vs the press ${JSON.stringify(created?.at)}`,
-);
-say("…selected, so it can be typed into or resized straight away", created?.selected === "true", String(created?.selected));
-say("…the blank template's own size", created !== null && created.size.w === 880 && created.size.h === 400, JSON.stringify(created?.size));
-
-const madeFile = created ? await boardPath(created.path.split("/").pop()) : undefined;
-const made = madeFile ? read(madeFile) : "";
-say(
-	"…and a file on disk, with a heading and a board tag in it",
-	/<title>Untitled<\/title>/.test(made) && /name="board"/.test(made) && /class="board"/.test(made),
-	`${made.split("\n").length} lines written`,
-);
+// The same note the Note tool makes with a click there: its corner at the point, open for typing.
+const typing = await page.waitForSelector(".pen-text", { timeout: 3000 }).catch(() => null);
+const focused = await page.evaluate(() => !!document.activeElement?.classList.contains("pen-text"));
+say("a double-click on empty canvas starts a note, open for typing", !!typing && focused, `editor ${!!typing}, focused ${focused}`);
+const box = await page.evaluate(() => {
+	const r = document.querySelector(".pen-text")?.getBoundingClientRect();
+	return r ? { x: Math.round(r.x), y: Math.round(r.y) } : null;
+});
+say("…at the point that was pressed", box !== null && Math.abs(box.x - spot.x) <= 30 && Math.abs(box.y - spot.y) <= 30, `${JSON.stringify(box)} vs the press ${JSON.stringify(spot)}`);
+await page.keyboard.type("hello");
+await page.mouse.click(spot.x + 300, spot.y + 120);
+await settle(page, 1500);
+const notes = (pens.last("stage.pen")?.doc?.children ?? []).filter((node) => node.type === "note");
+say("…and the note is saved with what was typed", JSON.stringify(notes).includes("hello"), `${notes.length} note(s)`);
+const boardsAfter = await page.evaluate(() => document.querySelectorAll(".board-node").length);
+say("…and no board was made", boardsAfter === 0, `${boardsAfter} board(s)`);
+pens.close();
 
 // --- the fixture is put back, so the checks after this one see the deck they expect -----
 
 write(component, wasComponent);
 write(flow, wasFlow);
-if (created) {
-	const link = await socket();
-	link.send({ type: "board.delete", path: created.path });
-	await new Promise((resolve) => setTimeout(resolve, 600));
-	link.close();
-}
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

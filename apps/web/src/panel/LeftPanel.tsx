@@ -62,18 +62,6 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * It must stay *mounted* while folded, though, because `⌘\` is registered here. Wrapping the
  * call site in a `<Show>` would take the shortcut away in exactly the state it is needed.
  *
- * ### Beside the canvas, or over it
- *
- * Under 1100px the panel is a **sheet** over the canvas rather than a panel beside it, and a
- * sheet must not carry `data-inset` — subtracting one fitted a 1600px board into the strip
- * beside it at 3.7%. That is why the breakpoint is a signal read from `matchMedia` rather
- * than a `@media` block: it changes which *attribute* is rendered, not only how the thing
- * looks, and CSS cannot tell the camera anything.
- *
- * The sheet starts under the pill instead of at the top of the window, so the button that
- * opened it is still there to close it. A sheet that covers its own dismiss control is a
- * trap, and on a 390px phone it would cover it by 250px.
- *
  * ### Presentational
  *
  * No socket, no app state: boards in, `onPick` out. The panel is a picture of what it is
@@ -92,9 +80,6 @@ export type PanelTab = "agents" | "boards";
 /** The strip's order: who is working, then what is on the stage. The panel still opens on Boards. */
 const PANEL_TABS: PanelTab[] = ["agents", "boards"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Boards" };
-
-/** Below this the panel cannot stand beside the canvas, so it goes over it. */
-const SHEET = 1100;
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
@@ -221,30 +206,9 @@ export function LeftPanel(props: {
 		const ask = props.ask;
 		if (ask) setTab(ask.tab);
 	});
-	const sheet = createSheet();
 
 	/*
-	 * A sheet over the canvas closes with a tap on the canvas beside it, as a phone's drawer does.
-	 * The tap only closes: taken in the capture phase before the stage sees it, so it does not
-	 * also select a board or start a pan under a panel that is going away.
-	 */
-	createEffect(() => {
-		if (!props.open || !sheet()) return;
-		const away = (event: PointerEvent) => {
-			const target = event.target as Element | null;
-			// The focus view's header is in the stage and is not canvas: its own button opens and closes this.
-			if (!target?.closest?.(".stage") || target.closest('aside[aria-label="Boards"], .focus-bar')) return;
-			event.stopPropagation();
-			event.preventDefault();
-			props.onOpenChange(false);
-		};
-		window.addEventListener("pointerdown", away, true);
-		onCleanup(() => window.removeEventListener("pointerdown", away, true));
-	});
-
-	/*
-	 * The width is the person's to set, by the handle on the panel's right edge. Only beside
-	 * the canvas: a sheet covers the screen on a phone and keeps the width it always had.
+	 * The width is the person's to set, by the handle on the panel's right edge.
 	 * Nothing else is told, because everything beside the panel reads `--inset-left`, which
 	 * is measured from this box (`camera/insets.ts`).
 	 */
@@ -543,65 +507,45 @@ export function LeftPanel(props: {
 		<>
 			<aside
 				/*
-				 * `data-inset` on the panel and *not* on the sheet — the one attribute in this
-				 * component that changes what the camera believes. See `camera/insets.ts`.
+				 * `data-inset` only while it is open: the attribute is the only thing telling the
+				 * camera whether there is a panel to subtract — and a closed panel still has a
+				 * box, because it is slid out rather than removed. See `camera/insets.ts`.
 				 */
-				/*
-				 * `data-inset` only while it is open *and* beside the canvas.
-				 *
-				 * The element is in the document either way now, so the attribute is the only
-				 * thing telling the camera whether there is a panel to subtract — and a closed
-				 * panel still has a box, because it is slid out rather than removed. A sheet
-				 * never declares one: subtracting one fitted a 1600px board into the strip
-				 * beside it at 3.7%.
-				 */
-				data-inset={props.open && !sheet() ? "left" : undefined}
+				data-inset={props.open ? "left" : undefined}
 				data-open={props.open ? "true" : "false"}
 				aria-hidden={!props.open}
-				data-sheet={sheet() ? "true" : undefined}
 				aria-label="Boards"
 				/*
-				 * A stationary column, not a card. Beside the canvas it runs the full height of
-				 * the window at the left edge, with the deck mark on top, and never moves while
-				 * the middle slides. A sheet keeps the geometry it had: it covers the canvas on a
-				 * phone and starts under the pill, 8px clear of it.
+				 * A stationary column, not a card: it runs the full height of the window at the
+				 * left edge, with the deck mark on top, and never moves while the middle slides.
 				 */
-				style={sheet() ? undefined : { width: `${width()}px` }}
+				style={{ width: `${width()}px` }}
 				data-resizing={resizing() ? "true" : undefined}
-				class={`float panel-shell fixed flex w-[264px] max-w-[86vw] flex-col p-2 ${
-					sheet()
-						? /* Over the composer (10) on a phone, under the toolbars (20): the two used to
-						     share 10, and the bar, later in the document, drew across the sheet's foot. */
-							"z-[12] top-[calc(max(12px,env(safe-area-inset-top))_+_60px)] bottom-0 left-0"
-						: "z-10 top-0 bottom-0 left-0 rounded-none border-y-0 border-l-0"
-				}`}
+				class="float panel-shell fixed z-10 top-0 bottom-0 left-0 flex w-[264px] max-w-[86vw] flex-col rounded-none border-y-0 border-l-0 p-2"
 			>
-				<Show when={!sheet()}>
-					{/* The right edge, as something to take hold of. A separator in the ARIA
-					    sense: focusable, arrow keys move it, Home puts the default back, and so
-					    does a double-click. */}
-					<div
-						class="panel-resize"
-						role="separator"
-						aria-orientation="vertical"
-						aria-label="Sidebar width"
-						aria-valuemin={PANEL_MIN}
-						aria-valuemax={PANEL_MAX}
-						aria-valuenow={width()}
-						tabindex={props.open ? 0 : -1}
-						title="Drag to resize. Double-click to reset."
-						onPointerDown={onHandleDown}
-						onKeyDown={onHandleKey}
-						onDblClick={() => {
-							resizeTo(PANEL_WIDTH);
-							savePanelWidth(width());
-						}}
-					/>
-				</Show>
+				{/* The right edge, as something to take hold of. A separator in the ARIA
+				    sense: focusable, arrow keys move it, Home puts the default back, and so
+				    does a double-click. */}
+				<div
+					class="panel-resize"
+					role="separator"
+					aria-orientation="vertical"
+					aria-label="Sidebar width"
+					aria-valuemin={PANEL_MIN}
+					aria-valuemax={PANEL_MAX}
+					aria-valuenow={width()}
+					tabindex={props.open ? 0 : -1}
+					title="Drag to resize. Double-click to reset."
+					onPointerDown={onHandleDown}
+					onKeyDown={onHandleKey}
+					onDblClick={() => {
+						resizeTo(PANEL_WIDTH);
+						savePanelWidth(width());
+					}}
+				/>
 				{/*
 					The deck's mark, where a title bar would have put it, and now the switcher too: it names
-					the backend this tab is on and opens the others (`connections/Switcher.tsx`). On a phone
-					as well, since it is the only way to another server there.
+					the backend this tab is on and opens the others (`connections/Switcher.tsx`).
 				*/}
 				<div class="panel-mark">
 					<Switcher />
@@ -993,27 +937,6 @@ function readLines(): 1 | 2 {
 	} catch {
 		return 2;
 	}
-}
-
-/**
- * Whether the panel has to go over the canvas rather than beside it.
- *
- * A signal and not a media query, because what changes across this line is `data-inset` —
- * see the note at the top. `matchMedia` in a `try` for the same reason `lib/media.ts` does
- * it: a test environment without one should get the desktop answer, not an exception.
- */
-function createSheet(): () => boolean {
-	let query: MediaQueryList | undefined;
-	try {
-		query = window.matchMedia(`(max-width: ${SHEET}px)`);
-	} catch {
-		return () => false;
-	}
-	const [sheet, setSheet] = createSignal(query.matches);
-	const sync = (event: MediaQueryListEvent) => setSheet(event.matches);
-	query.addEventListener("change", sync);
-	onCleanup(() => query?.removeEventListener("change", sync));
-	return sheet;
 }
 
 /** Is a text field taking keys right now? Then this component's chord is not for it. */

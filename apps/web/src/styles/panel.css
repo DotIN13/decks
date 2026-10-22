@@ -34,13 +34,7 @@
  */
 @layer components {
 	/*
-	 * The shell. 264px, pinned to the left edge, from under the top-left pill to the bottom
-	 * margin — the geometry is in the component, and only the two forms it takes are here.
-	 *
-	 * Under 1100px it is a **sheet**: hard against the edge, square on that side, and — the
-	 * part that matters — carrying no `data-inset`. A sheet covers the canvas rather than
-	 * standing beside it, and subtracting one from the camera's box fitted a 1600px board
-	 * into the leftover strip at 3.7%.
+	 * The shell. 264px, pinned to the left edge, full height — the geometry is in the component.
 	 */
 	.panel-shell {
 		box-sizing: border-box;
@@ -102,12 +96,6 @@
 		transition: none !important;
 		cursor: col-resize !important;
 		user-select: none !important;
-	}
-
-	.panel-shell[data-sheet="true"] {
-		border-bottom: 0;
-		border-left: 0;
-		border-radius: 0 var(--radius-panel, 12px) 0 0;
 	}
 
 	/*
@@ -281,11 +269,6 @@
 		translate: calc(-100% - 16px) 0;
 		opacity: 0;
 		pointer-events: none;
-	}
-
-	/* A sheet slides from the screen's own edge, where a panel slides from its gutter. */
-	.panel-shell[data-open="false"][data-sheet="true"] {
-		translate: -100% 0;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -1305,32 +1288,4 @@
 	font-size: var(--type-ui);
 }
 
-	/* The same rules, under the same query. */
-	@media (max-width: 760px) {
-	/*
-	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
-	 * reasoning does not survive the screen getting smaller.
-	 *
-	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
-	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
-	 * that opened it* — you tap a component, a panel appears over the place your finger
-	 * just was, and your next tap lands on a class switch you never meant to touch. That
-	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
-	 * revision each time. At the bottom the sheet is where the hand already is and the
-	 * component it describes stays visible above it.
-	 *
-	 * It takes the zoom controls' place while it is up rather than stacking above them.
-	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
-	 * missing for a moment; two floating panels in one corner is neither of them usable.
-	 */
-	.inspector {
-		top: auto;
-		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
-		right: max(8px, env(safe-area-inset-right));
-		left: max(8px, env(safe-area-inset-left));
-		width: auto;
-		max-height: 42vh;
-		overflow-y: auto;
-	}
-}
 }

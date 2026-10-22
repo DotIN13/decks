@@ -9,10 +9,8 @@
  * children space out, and everything responsive — is a utility in the markup.
  *
  * Inside `@layer components`, like every stylesheet in this app, so a utility on the same
- * element still wins. **The corollary is load-bearing here:** a `@media` block in this file
- * loses to a utility, so the full-width-sheet behaviour under 1100px is a `max-[1100px]:`
- * variant in `Stream.tsx` and not a media query down here. The two media blocks that *are*
- * here — coarse pointers and reduced motion — set properties no utility touches.
+ * element still wins: a `@media` block in this file loses to a utility. The media blocks that
+ * are here — coarse pointers and reduced motion — set properties no utility touches.
  */
 @layer components {
 	/*
@@ -75,12 +73,9 @@
 		/* Opacity and an 8px slide, on the cards rather than on a panel — there is no panel
 		   to slide. The column has no paint of its own, so moving it *is* moving them. */
 		translate: 0 8px;
-		/* `transform` is in here for the swipe: `swipe-close` drags with it and clears it on
-		   release, and without a transition the column snapped back rather than settling. */
 		transition:
 			opacity 160ms ease,
-			translate 160ms ease,
-			transform 160ms ease;
+			translate 160ms ease;
 	}
 
 	/*
@@ -108,8 +103,7 @@
 	 * It was a hover-revealed button at the top of the stack, on the argument that a column
 	 * of cards has no title bar to hang one on. The corner's conversation button is the
 	 * answer to that — it opens this and it closes it — and a surface with two dismiss
-	 * controls has one too many. Escape and a right-swipe are the other ways out, and
-	 * neither needs a rule in here.
+	 * controls has one too many. Escape is the other way out, and needs no rule in here.
 	 */
 
 	.stream-roll {

@@ -17,12 +17,11 @@ import { state } from "../state/deck.ts";
  * are variants here rather than media queries in `styles/`, because a utility outranks
  * anything in the components layer — a `@media` block there would lose to the class beside it
  * and silently do nothing. `pointer-coarse` drops the column below a title bar that grows to
- * 52px with a 44px palette in it, where 58px used to be clear; the narrow rule lets it span
- * the screen instead of centring inside it.
+ * 52px with a 44px palette in it, where 58px used to be clear.
  */
 export function NoticeStrip() {
 	return (
-		<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 pointer-coarse:top-[74px] max-[760px]:right-3 max-[760px]:left-3 max-[760px]:max-w-none max-[760px]:translate-x-0">
+		<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 pointer-coarse:top-[74px]">
 			<For each={state.notices}>
 				{(item) => (
 					<div

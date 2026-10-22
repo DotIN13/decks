@@ -28,15 +28,14 @@
  * in the components layer loses to a utility on the same element.** Every rule below that is
  * inside one sets a property no utility touches — the two control-size custom properties,
  * and the send button's own square. Anything responsive about a utility-styled element is a
- * variant in the markup instead, which is why the hint row's ranks read as
- * `max-[620px]:hidden` over there rather than as a media query here.
+ * variant in the markup instead.
  *
  * ### One thing this file cannot fix, and where it has to be fixed
  *
  * All three popovers in the bar are `position: fixed` cards placed in viewport coordinates
  * by `ui/Popover.tsx`. `.dock` in `index.css` centres itself with
  * `left: 50%; transform: translateX(-50%)`, and **any transform other than `none` makes an
- * element the containing block for its fixed descendants** — so above 1100px, where that
+ * element the containing block for its fixed descendants** — so where that
  * transform is live, the cards resolve their `left`/`top` against the dock instead of the
  * window and land the dock's own offset away from their triggers. Nothing inside the dock
  * can undo an ancestor's transform, which is why this is a note rather than a rule.
@@ -662,8 +661,7 @@
 	 * 0. The bar you type into is not something a transcript may cover.
 	 *
 	 * `--z-chrome` (10) and not 11: the boards panel is on the same layer and comes later in
-	 * the document, so on a phone — where it is a full-height sheet — it still covers this,
-	 * which is the arrangement the sheet was drawn for.
+	 * the document.
 	 */
 	z-index: var(--z-chrome);
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
@@ -697,8 +695,7 @@
 	 *
 	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
 	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
-	 * invisible one. Under 1100px the media query at the end of this file goes full-width
-	 * instead, which is where the floor stops mattering.
+	 * invisible one.
 	 */
 	width: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
 	flex-direction: column;
@@ -712,13 +709,4 @@
 	pointer-events: auto;
 }
 
-	/* The same rules, under the same query. */
-	@media (max-width: 1100px) {
-	.dock {
-		left: max(12px, env(safe-area-inset-left));
-		right: max(12px, env(safe-area-inset-right));
-		width: auto;
-		transform: none;
-	}
-}
 }

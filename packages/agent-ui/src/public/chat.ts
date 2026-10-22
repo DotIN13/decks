@@ -12,7 +12,6 @@ export * from "../chat/MarkdownView.tsx";
 export * from "../chat/markdown.ts";
 export * from "../chat/history-page.ts";
 export * from "../chat/float-rows.ts";
-export * from "../chat/swipe-close.ts";
 export * from "../chat/tool-groups.ts";
 export * from "../chat/tool-results.ts";
 export * from "../chat/turn-cards.ts";

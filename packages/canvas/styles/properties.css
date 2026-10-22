@@ -580,29 +580,4 @@
 		background: var(--color-accent);
 		opacity: 1;
 	}
-
-	/* On a phone both are sheets along the bottom, over the zoom controls, as the board inspector is. */
-	@media (max-width: 760px) {
-		.props-panel {
-			top: auto;
-			right: max(8px, env(safe-area-inset-right));
-			bottom: calc(var(--dock, 88px) + 20px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
-			left: max(8px, env(safe-area-inset-left));
-			width: auto;
-			max-height: 46vh;
-		}
-		.insert-panel[data-sheet="true"] {
-			right: max(8px, env(safe-area-inset-right));
-			bottom: calc(var(--dock, 88px) + 20px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
-			left: max(8px, env(safe-area-inset-left));
-			width: auto;
-			max-height: 52vh;
-		}
-		.insert-grid {
-			grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
-		}
-		.insert-grid.icons {
-			grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-		}
-	}
 }

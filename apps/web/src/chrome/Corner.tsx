@@ -4,7 +4,6 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
-import FilePlus from "lucide-solid/icons/file-plus";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
@@ -64,8 +63,6 @@ export function Corner(props: {
 	onZoom: (zoom: number) => void;
 	/** Frame what is on the canvas — the `0` key's job, and the button beside the readout. */
 	onFit: () => void;
-	/** A new, empty board, straight onto the canvas. */
-	onNewBoard: () => void;
 	/**
 	 * Take every board off the canvas.
 	 *
@@ -142,7 +139,7 @@ export function Corner(props: {
 			 * route between the two. `--control-md` rather than `--control`, because a labelled
 			 * chip is read far more often than it is pressed.
 			 */}
-			<span class="flex items-center max-[1100px]:hidden">
+			<span class="flex items-center">
 				<Popover
 					placement="bottom-start"
 					label="Zoom"
@@ -202,33 +199,27 @@ export function Corner(props: {
 			 * Fit, as a button rather than a row in the zoom menu.
 			 *
 			 * It was the menu's first row, which put the one camera control people reach for
-			 * *by name* two clicks and a read behind a percentage — and hid it entirely under
-			 * 1100px, where the readout folds away and a trackpad is least likely. It is the
-			 * `0` key's twin, and the keyless devices are exactly the ones that need it drawn.
+			 * *by name* two clicks and a read behind a percentage. It is the `0` key's twin,
+			 * and the keyless devices are exactly the ones that need it drawn.
 			 *
 			 * Beside the readout and inside the camera group, because "how close am I" and
-			 * "frame what is up" are the same question asked twice; it folds into `⋯` at 640px
-			 * with the other two, where a fourth 44px target would push the pill into the
-			 * agent cluster.
+			 * "frame what is up" are the same question asked twice.
 			 */}
-			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+			<span class="pill-sep" aria-hidden="true" />
 
 			{/*
-			 * What the canvas holds: one board more, or none at all.
+			 * What the canvas holds: none at all.
 			 *
-			 * Beside the camera rather than in the overflow, because these two are about the
-			 * *canvas* and the overflow is about the app — the cheat sheet, the settings, the
-			 * theme. Adding a board and clearing the stage are the two things you do to a
-			 * canvas that are not looking at it.
+			 * Beside the camera rather than in the overflow, because this is about the *canvas*
+			 * and the overflow is about the app — the cheat sheet, the settings, the theme.
 			 *
 			 * Clearing is disabled with nothing up rather than hidden. A control that comes
 			 * and goes with the state it acts on is a control you have to hunt for at exactly
 			 * the moment you want it, and the count in the title is what says why it is off.
 			 */}
-			{/* The new-board button is the first in the tools column now (`canvas/pen/PenBar.tsx`); on a phone it is rows in ⋯ below. */}
 			<button
 				type="button"
-				class="icon-button max-[640px]:hidden"
+				class="icon-button"
 				data-writes
 				disabled={props.onCanvas === 0}
 				title={
@@ -242,11 +233,10 @@ export function Corner(props: {
 				<Icon of={Eraser} size={15} />
 			</button>
 
-			{/* Fit, after Clear: the three canvas verbs read left to right as add, take away,
-			    frame what is left. It used to sit beside the zoom readout. */}
+			{/* Fit, after Clear: take away, then frame what is left. It used to sit beside the zoom readout. */}
 			<button
 				type="button"
-				class="icon-button max-[640px]:hidden"
+				class="icon-button"
 				title="Fit the boards on the canvas (0)"
 				aria-label="Fit the boards on the canvas"
 				onClick={() => props.onFit()}
@@ -254,7 +244,7 @@ export function Corner(props: {
 				<Icon of={Maximize} size={15} />
 			</button>
 
-			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
+			<span class="pill-sep" aria-hidden="true" />
 
 			{/*
 			 * The conversation, and its three states.
@@ -267,7 +257,7 @@ export function Corner(props: {
 			 */}
 			<button
 				type="button"
-				class="icon-button max-[1100px]:hidden pointer-coarse:hidden"
+				class="icon-button"
 				data-writes
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
@@ -288,7 +278,7 @@ export function Corner(props: {
 				/* At the toolbar's right edge, as the toolbar ends there: a card from the button's left ran past it. */
 				placement="bottom-end"
 				label="More"
-				/* As wide as its longest row: three short words on a desktop, the folded toolbar on a phone. */
+				/* As wide as its longest row. */
 				class="w-max min-w-[168px] max-w-[248px]"
 				trigger={(api) => (
 					<button
@@ -351,60 +341,6 @@ export function Corner(props: {
 					</button>
 					<span class="rule hidden pointer-coarse:block" />
 				</Show>
-
-				{/* The conversation, as a row, on the narrowest phones: at 320px the corner has
-				    room for one button, and the menu is the one that has to stay. */}
-				<button type="button" role="menuitem" data-row data-flat="true" class="hidden max-[360px]:flex" onClick={() => toggleHistory()}>
-					<span class="row-icon">
-						<Icon of={MessageSquare} size={15} />
-					</span>
-					<span class="row-label flex-1">{historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}</span>
-				</button>
-				<span class="rule hidden max-[360px]:block" />
-
-				{/*
-					The same three, as rows, on a screen too narrow for them.
-
-					Four 44px buttons and a chip do not fit a 393px line beside a 184px pill —
-					adding them to the corner is what pushed the two clusters back into overlap,
-					which is the one thing a floating chrome cannot do. So on a phone they fold
-					in here, where the app's own controls already are, and the menu is the only
-					thing that grows.
-				*/}
-				<button
-					type="button"
-					data-row
-					data-flat="true"
-					class="hidden max-[640px]:flex"
-					onClick={() => props.onFit()}
-				>
-					<span class="row-icon">
-						<Icon of={Maximize} size={15} />
-					</span>
-					<span class="row-label">Fit the boards</span>
-				</button>
-				{/* The new-board button as a row, because on a phone this menu *is* the toolbar. */}
-				<button type="button" data-row data-flat="true" class="hidden max-[640px]:flex" onClick={() => props.onNewBoard()}>
-					<span class="row-icon">
-						<Icon of={FilePlus} size={15} />
-					</span>
-					<span class="row-label">Board</span>
-					<span class="row-note">.html</span>
-				</button>
-				<button
-					type="button"
-					data-row
-					data-flat="true"
-					class="hidden max-[640px]:flex"
-					disabled={props.onCanvas === 0}
-					onClick={() => props.onClearStage()}
-				>
-					<span class="row-icon">
-						<Icon of={Eraser} size={15} />
-					</span>
-					<span class="row-label">Clear the canvas</span>
-				</button>
-				<span class="rule hidden max-[640px]:block" />
 
 				<For each={props.overflow}>
 					{(item) => (

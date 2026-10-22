@@ -10,7 +10,6 @@ import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import { zoomKey } from "./zoom-keys.ts";
-import { createEdgeSwipe } from "./edge-swipe.ts";
 import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
 import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
@@ -21,7 +20,7 @@ import type { SceneBoard } from "./stage/types.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenSheet, setPenTool, type PenTool } from "./state/pen-tools.ts";
+import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, indexOf, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { firstLine } from "./pen/look.ts";
@@ -195,16 +194,6 @@ export function Stage(props: {
 	onMove: (path: string, x: number, y: number) => void;
 	/** The board dragged to a new size, in board units. The file is what changes. */
 	onResize?: (path: string, size: { w: number; h: number }) => void;
-	/**
-	 * A double-click that landed on empty canvas, in stage pixels.
-	 *
-	 * The gesture that makes a board. Absent means the app does not want one, and nothing is
-	 * asked of the server.
-	 */
-	/** A board where the canvas menu was opened, in stage pixels. */
-	onCreateBoard?: (at: { x: number; y: number }) => void;
-	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
-	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
 	/** The host's own menu for what a pill is on: a board by its path, or drawn items by their ids. */
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
@@ -239,14 +228,6 @@ export function Stage(props: {
 	 * its name on the stage.
 	 */
 	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
-	/**
-	 * Swipe in from an edge to open a panel, where there is no cursor to reach with.
-	 *
-	 * Here rather than in `App` because a board is an iframe: the only place a finger over
-	 * a board and a finger over bare canvas look the same is the pool below
-	 * (`edge-swipe.ts`).
-	 */
-	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
 }) {
 	/* The host's board, read once: a component, not a value that changes. */
 	const Frame = untrack(() => props.frame);
@@ -625,7 +606,6 @@ export function Stage(props: {
 			rendered: () => renderedPaths(),
 			linkAt: (at) => penLayer.linkAt(at),
 			onSelect: (path) => props.onSelect(path),
-			canCreate: () => !!props.onCreateBoard,
 			fingers: () => touches.count(),
 			claim: (pointer) => claimed.add(pointer),
 			beginTouch: (event) => beginTouch(event),
@@ -656,14 +636,11 @@ export function Stage(props: {
 			editable: () => !!props.onPenEdit,
 			freshId: () => freshId(),
 		},
-		// What a tool and the canvas menu add (`editor/dom/InsertMenu.tsx`).
+		// What a tool and a double-click on bare canvas add (`editor/dom/InsertMenu.tsx`).
 		insert: {
 			worldAt: (event) => worldAt(event),
-			camera: () => props.camera,
 			freshId: () => freshId(),
 			idsBut: (id) => freshIds(id),
-			createBoard: (at) => props.onCreateBoard?.(at),
-			openDocument: (at) => props.onOpenDocument?.(at),
 		},
 	});
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
@@ -865,8 +842,6 @@ export function Stage(props: {
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: props.camera.zoom }));
 
-	// A new selection starts with a phone's sheet put away; a second tap on it brings the sheet (`touchOnDrawing`).
-	createEffect(on(editor.items, () => setPenSheet(false)));
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
 	 * (`state/pen-tools.ts`, `penLive`). The same preview a drag of an item uses, so the sheet draws
@@ -1418,18 +1393,12 @@ export function Stage(props: {
 	 */
 	const touches = createTouches();
 	const claimed = new Set<number>();
-	const edges = createEdgeSwipe({
-		width: () => view().width,
-		enabled: () => props.onEdgeSwipe?.enabled() ?? false,
-		openLeft: () => props.onEdgeSwipe?.left(),
-		openRight: () => props.onEdgeSwipe?.right(),
-	});
 	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
 	const carried = new Set<number>();
 	/*
 	 * The pan so far, as a path the camera has been dragged along, for the speed at release.
-	 * A gesture that was ever more than a one-finger pan of the camera (a pinch, the edge
-	 * drawer, a finger a board claimed) does not coast.
+	 * A gesture that was ever more than a one-finger pan of the camera (a pinch, a finger a
+	 * board claimed) does not coast.
 	 */
 	let trail: Sample[] = [];
 	let trailAt = { x: 0, y: 0 };
@@ -1460,16 +1429,12 @@ export function Stage(props: {
 				trailAt = { x: 0, y: 0 };
 				noCoast = false;
 			}
-			// After `touches.down`, so the count includes this finger: one is a drawer, two
-			// are a pinch.
-			edges.down(finger, touches.count());
 			setPanning(true);
 			return { kind: "idle" };
 		}
 		if (phase === "up") {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
-			edges.up(finger.id);
 			if (touches.count() === 0) {
 				setPanning(false);
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
@@ -1479,26 +1444,15 @@ export function Stage(props: {
 			return { kind: "idle" };
 		}
 
-		/*
-		 * The drawer gets first refusal, and holds the finger while it is undecided.
-		 *
-		 * A pan that begins in the outermost 28px does not move the camera until the
-		 * gesture has said which of the two it is — 44px of lurch before a panel appears
-		 * is worse than 44px of a pan that starts late, and the panel is the rarer of the
-		 * two so it is the one that has to be unmistakable.
-		 */
-		const drawer = edges.move(finger);
-
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
 			noCoast = true;
 			claimed.clear();
-			edges.cancel();
 			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
 			return step;
 		}
 		if (step.kind === "pan") {
-			if (drawer || claimed.has(finger.id)) noCoast = true;
+			if (claimed.has(finger.id)) noCoast = true;
 			else {
 				pushCamera(pan(localCamera, step.dx, step.dy));
 				trailAt = { x: trailAt.x + step.dx, y: trailAt.y + step.dy };
@@ -1580,7 +1534,6 @@ export function Stage(props: {
 		releaseCarried();
 		for (const id of touches.ids()) touches.up(id);
 		claimed.clear();
-		edges.cancel();
 		setPanning(false);
 	};
 	const onHidden = () => {
@@ -2327,7 +2280,7 @@ export function Stage(props: {
 				</OverlayLayer>
 				<TextEditor text={editor.textEditing} zoom={props.camera.zoom} />
 			</div>
-			<InsertMenu menu={editor.insert} board={!!props.onCreateBoard} document={!!props.onOpenDocument} editable={!!props.onPenEdit} />
+			<InsertMenu menu={editor.insert} />
 			{/*
 				Boards have no title bars: the selected board's name and actions are a pill over it
 				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
@@ -2388,7 +2341,7 @@ export function Stage(props: {
 											}
 										: {}),
 									onDuplicate: () => penDuplicate(),
-									onProperties: () => (props.onProperties ? props.onProperties() : setPenSheet(true)),
+									...(props.onProperties ? { onProperties: props.onProperties } : {}),
 									onDelete: () => penDeleteSelected(),
 									...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: items().ids }, anchor) } : {}),
 								}

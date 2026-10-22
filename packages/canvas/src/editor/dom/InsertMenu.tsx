@@ -1,28 +1,23 @@
 /**
  * Adding to the stage: an item made by a tool (a press, or a drag corner to corner, followed to its
- * lift: `create`), one made at a point (`makeAt`), an arrow drawn from an item's anchor
- * (`fromAnchor`), and the canvas menu a double-click or a double tap on bare canvas opens, with
- * the insert panel a shape or an icon is picked in (`InsertMenu`, the `.popover`).
+ * lift: `create`), one made at a point (`makeAt`), the note a double-click or a double tap on bare
+ * canvas makes (`noteAt`), an arrow drawn from an item's anchor (`fromAnchor`), and the insert
+ * panel a shape or an icon is picked in (`InsertMenu`).
  *
  * What each pick does and what an arrow being drawn lights up are decided in `core/insert.ts`; the
  * ops are `core/ops.ts`'s. The dashed outline of what was drawn is kept until the sheet draws the
  * item it made (`presented`), or a moment and a half.
  */
 import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
-import FilePlus from "lucide-solid/icons/file-plus";
-import Paperclip from "lucide-solid/icons/paperclip";
-import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
-import { stagePoint } from "../../camera/coords.ts";
+import { Show } from "solid-js";
 import { canvasHost } from "../../host.ts";
 import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
-import { Icon } from "@decks/ui";
 import { newCard } from "../../pen/card-frame.ts";
 import { Insert } from "../../pen/Insert.tsx";
-import { TOOLS } from "../../pen/PenBar.tsx";
 import type { Box } from "../../pen/snap.ts";
 import { joinAt as joinAtIn, newArrowEnds, type Join } from "../core/arrows.ts";
 import { frameAt as frameAtIn } from "../core/drop.ts";
-import { drawHints, insertPick, menuPick, menuPlace, menuShift, opensWords } from "../core/insert.ts";
+import { drawHints, insertPick, opensWords } from "../core/insert.ts";
 import type { PenTool, Pt } from "../core/model.ts";
 import { arrowInsertOp, drawnOp, makeAtOp, type MakeOptions, type NextId } from "../core/ops.ts";
 import type { Outline } from "../core/overlay.ts";
@@ -39,8 +34,6 @@ export type InsertHost = {
 	zoom: () => number;
 	/** Where a screen point is on the stage, from the camera now. */
 	worldAt: (event: Client) => Pt;
-	/** The camera: the menu belongs to a place on the canvas, and goes when it moves. */
-	camera: () => unknown;
 	edit: (ops: Op[]) => void;
 	/** An id no item has. */
 	freshId: () => string;
@@ -48,15 +41,11 @@ export type InsertHost = {
 	idsBut: (also: string) => NextId;
 	/** Follow a press to its lift (`dom/pointer.ts`, `follow`). */
 	follow: (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => void;
-	/** A board where the menu was opened, in stage pixels (`Stage`'s `onCreateBoard`). */
-	createBoard: (at: Pt) => void;
-	/** A file from the picker, placed by what it is, centred at a point (`Stage`'s `onOpenDocument`). */
-	openDocument: (at: Pt) => void;
 };
 
 export function createInsertMenu(editor: Editor, text: TextEditing, host: InsertHost) {
 	const worldAt = host.worldAt;
-	/** When a tool last made an item, so the second press of a double-click does not make a board. */
+	/** When a tool last made an item, so the second press of a double-click does not make a note as well. */
 	let penMadeAt = 0;
 
 	/** What a tool makes, besides the tool (`editor/core/ops.ts`): the shape and icon picked, and ids for what it holds, never `id`. */
@@ -161,40 +150,16 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 	};
 
 	/**
-	 * The canvas menu: everything that can be added, at the place a double-click or a double-tap on
-	 * bare canvas landed, on every device. A board first, then the drawing's tools.
-	 * One gesture means one thing everywhere: it used to make a board straight away with a mouse and
-	 * open the tools with a finger. A pick makes the thing there; the arrow, which needs a drag, is
-	 * put in hand.
+	 * A note at a screen point, open for typing: a double-click or a double tap on bare canvas. The
+	 * same note the Note tool makes with a click there (`penMakeAt`), its corner at the point. Not
+	 * on a canvas that can only be read (one opened from a file).
 	 */
-	const [canvasMenu, setCanvasMenu] = createSignal<{ client: Pt; world: Pt; stage: Pt } | undefined>();
-	const openCanvasMenu = (event: Client) => {
-		// A canvas that can only be read (one opened from a file) has nothing to add.
+	const noteAt = (event: Client) => {
 		if (!canvasHost().canWrite()) return;
-		setCanvasMenu({ client: { x: event.clientX, y: event.clientY }, world: worldAt(event), stage: stagePoint(event as PointerEvent) });
-	};
-	const boardFromMenu = () => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (menu) host.createBoard(menu.stage);
-	};
-	const documentFromMenu = () => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (menu) host.openDocument(menu.stage);
+		penMakeAt("note", worldAt(event));
 	};
 
-	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
-		const menu = canvasMenu();
-		setCanvasMenu(undefined);
-		if (!menu) return;
-		const pick = menuPick(tool);
-		if (pick.do === "arm") setPenTool(pick.tool);
-		// A shape or an icon is chosen first, in the insert panel, and put where the menu was opened.
-		else if (pick.do === "panel") setInsertPanel({ tab: pick.tab, at: menu.world, client: menu.client });
-		else penMakeAt(pick.tool, menu.world);
-	};
-	/** A pick in the insert panel: put where the canvas menu was opened, or else armed for the next press. */
+	/** A pick in the insert panel: put where it was opened for, or else armed for the next press. */
 	const insertPicked = (tool: "shape" | "icon") => {
 		const open = insertPanel();
 		setInsertPanel(undefined);
@@ -204,39 +169,13 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 		else if (pick.do === "make") penMakeAt(tool, pick.at, true);
 		else setPenTool(tool);
 	};
-	createEffect(() => {
-		if (!canvasMenu()) return;
-		const away = (event: PointerEvent) => {
-			if (!(event.target as Element | null)?.closest?.(".canvas-menu")) setCanvasMenu(undefined);
-		};
-		const key = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setCanvasMenu(undefined);
-		};
-		window.addEventListener("pointerdown", away, true);
-		window.addEventListener("keydown", key);
-		onCleanup(() => {
-			window.removeEventListener("pointerdown", away, true);
-			window.removeEventListener("keydown", key);
-		});
-	});
-	// The camera moving takes it away: it belongs to a place on the canvas, which has just moved.
-	createEffect(() => {
-		void host.camera();
-		untrack(() => canvasMenu() && setCanvasMenu(undefined));
-	});
-
 	return {
 		create: penCreate,
 		makeAt: penMakeAt,
 		fromAnchor,
 		/** When a tool last made an item. */
 		madeAt: () => penMadeAt,
-		menu: canvasMenu,
-		menuOpen: () => !!canvasMenu(),
-		openMenu: openCanvasMenu,
-		boardFromMenu,
-		documentFromMenu,
-		pickFromMenu,
+		noteAt,
 		insertPicked,
 		/** The sheet put a frame on screen: the dashed outline goes once the item it stood in for is drawn. */
 		presented: () => {
@@ -249,69 +188,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 }
 export type InsertMenuApi = ReturnType<typeof createInsertMenu>;
 
-/**
- * The canvas menu, at the point it was opened (`core/insert.ts`, `menuPlace`): a board and a file
- * where boards can be made, then the drawing's tools where it can be edited; and
- * the insert panel a shape or an icon is picked in.
- */
-export function InsertMenu(props: { menu: InsertMenuApi; board: boolean; document: boolean; editable: boolean }) {
-	return (
-		<>
-			<Show when={props.menu.menu()} keyed>
-				{(menu) => {
-					const place = menuPlace(menu.client, { w: window.innerWidth, h: window.innerHeight });
-					return (
-						<div
-							class="popover canvas-menu"
-							role="menu"
-							aria-label="Add to the canvas"
-							style={{
-								// Its left edge at the point, as a dropdown's is at its button's, and kept on the screen.
-								left: `${place.left}px`,
-								top: `${place.top}px`,
-								width: `${place.width}px`,
-								// Above the point in the lower half of the screen, under it in the upper half.
-								transform: menuShift(place.above),
-							}}
-						>
-							<Show when={props.board}>
-								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={props.menu.boardFromMenu}>
-									<span class="row-icon">
-										<Icon of={FilePlus} size={15} />
-									</span>
-									<span class="row-label">Board</span>
-									<span class="row-note">.html</span>
-								</button>
-								<Show when={props.document}>
-									<button type="button" role="menuitem" data-row data-flat="true" data-new-board="document" onClick={props.menu.documentFromMenu}>
-										<span class="row-icon">
-											<Icon of={Paperclip} size={15} />
-										</span>
-										{/* Bold like Board beside it, which is bold because it carries a note. */}
-										<span class="row-label row-name">Open File…</span>
-									</button>
-								</Show>
-								<Show when={props.editable}>
-									<div class="rule" aria-hidden="true" />
-								</Show>
-							</Show>
-							<Show when={props.editable}>
-								<For each={TOOLS}>
-									{(entry) => (
-										<button type="button" role="menuitem" data-row data-flat="true" data-tool={entry.tool} onClick={() => props.menu.pickFromMenu(entry.tool as Exclude<PenTool, "select">)}>
-											<span class="row-icon">
-												<Icon of={entry.icon} size={15} />
-											</span>
-											<span class="row-label">{entry.label.split(":")[0]}</span>
-										</button>
-									)}
-								</For>
-							</Show>
-						</div>
-					);
-				}}
-			</Show>
-			<Show when={insertPanel()}>{(open) => <Insert open={open()} onPick={props.menu.insertPicked} onClose={() => setInsertPanel(undefined)} />}</Show>
-		</>
-	);
+/** The insert panel a shape or an icon is picked in, while it is open. */
+export function InsertMenu(props: { menu: InsertMenuApi }) {
+	return <Show when={insertPanel()}>{(open) => <Insert open={open()} onPick={props.menu.insertPicked} onClose={() => setInsertPanel(undefined)} />}</Show>;
 }

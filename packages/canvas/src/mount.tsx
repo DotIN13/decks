@@ -60,10 +60,6 @@ export interface CanvasOptions {
 		list?(): Board[];
 		/** A board's page measured itself (same-origin pages only): its size and how it reads, for the host's agents. */
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void;
-		/** A double-click on empty canvas: make a board there. Absent: nothing happens. */
-		onCreate?(at: { x: number; y: number }): void;
-		/** The canvas menu's Open document, at a point. */
-		onOpenDocument?(at: { x: number; y: number }): void;
 		/** A link on a board to another board: open it, and say whether this host has it. */
 		onOpenLink?(path: string, from: string): boolean;
 		/** Boards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
@@ -124,8 +120,6 @@ export interface CanvasOptions {
 	onViewport?: (viewport: { width: number; height: number }) => void;
 	/** Boards or items dragged onto the host's composer, to talk about them. */
 	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
-	/** A swipe in from the screen's left or right edge (touch): the host's side panels. */
-	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
 	/**
 	 * A drawing the host owns (its server): edits go to `send` as pen operations and show when the
 	 * host's answer arrives through `setDocument`; undo and redo are `step`'s. Absent: the drawing is
@@ -423,14 +417,11 @@ export function createEditor(
 			switching={options.boards?.switching?.() ?? false}
 			{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}
 			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
-			{...(options.boards?.onCreate && editable ? { onCreateBoard: options.boards.onCreate } : {})}
-			{...(options.boards?.onOpenDocument && editable ? { onOpenDocument: options.boards.onOpenDocument } : {})}
 			{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
 			news={options.boards?.news?.() ?? {}}
 			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
 			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
 			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
-			{...(options.onEdgeSwipe ? { onEdgeSwipe: options.onEdgeSwipe } : {})}
 			glide={glideAsk()}
 			boardPill={true}
 			{...(options.onProperties ? { onProperties: options.onProperties } : {})}

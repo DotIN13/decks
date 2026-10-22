@@ -10,7 +10,7 @@
  *
  * Inside `@layer components`, like every other rule in this app, so that a utility on the
  * same element still wins. And **no `@media` block for anything a utility also sets**: a
- * layer keeps its precedence inside a media query, so `max-[1100px]:hidden` in the markup
+ * layer keeps its precedence inside a media query, so a `hidden` utility in the markup
  * beats a `@media` rule in here every time. The one media block below sets `animation`,
  * which no utility here touches.
  */

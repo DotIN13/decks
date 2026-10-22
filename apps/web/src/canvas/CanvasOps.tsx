@@ -190,10 +190,8 @@ export function CanvasOps(props: { onClose: () => void }) {
 								<h3 class="mt-0 mb-[5px] text-ui font-semibold text-fg">{group.title}</h3>
 								<For each={group.rows}>
 									{(row) => (
-										// 13em of keys and a sentence beside it is two lines of neither on a
-										// phone, so the grid collapses to one column there.
 										<div
-											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-ui leading-[1.5] max-[560px]:grid-cols-[minmax(0,1fr)] max-[560px]:gap-0 max-[560px]:py-1"
+											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-ui leading-[1.5]"
 										>
 											<span class="flex flex-wrap items-center gap-1">
 												<For each={tokens(row.keys)}>

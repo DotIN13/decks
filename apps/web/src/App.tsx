@@ -3,8 +3,6 @@ import { queuedFor } from "./state/queued.ts";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
-import Redo2 from "lucide-solid/icons/redo-2";
-import Undo2 from "lucide-solid/icons/undo-2";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
@@ -64,12 +62,11 @@ import { stageOf, stages, viewOnly } from "./state/stages.ts";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
-import {boxOf, fitInto, isPhone, keepVisible, middleOf} from "@decks/canvas/camera";
+import {boxOf, fitInto, keepVisible, middleOf} from "@decks/canvas/camera";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
-import {closeHistory, historyShown, openHistory, setInspectable, toggleHistory} from "./state/edge.ts";
+import {historyShown, setInspectable} from "./state/edge.ts";
 import { canvasBox, insets, watchInsets } from "@decks/canvas/camera";
-import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
@@ -302,10 +299,6 @@ export function App() {
 		const { left, right } = insets();
 		return { x: left, y: 0, w: (rect?.width ?? window.innerWidth) - left - right, h: rect?.height ?? window.innerHeight };
 	};
-	const floatsOff = () => window.innerWidth < 1100;
-	/* Under a finger the conversation stands on the composer and is not dragged (`shell.css`). */
-	const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : undefined;
-	const conversationFixed = () => floatsOff() || coarse?.matches === true;
 	/*
 	 * What a float must not land on: the other floats, as they stand now, in `workBox`'s frame.
 	 * Measured from the page rather than kept as state, so a float that has not been dragged,
@@ -333,7 +326,7 @@ export function App() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, off: () => boolean = floatsOff) => {
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }) => {
 		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
 		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
 		const float = makeFloat(el, {
@@ -348,7 +341,6 @@ export function App() {
 			home,
 			bounds: workBox,
 			size: () => ({ w: el.offsetWidth, h: el.offsetHeight }),
-			disabled: off,
 			pin,
 			read: () => ({ x: el.offsetLeft, y: el.offsetTop }),
 			apply: (p, atHome, stowed) => {
@@ -422,7 +414,7 @@ export function App() {
 			const box = workBox();
 			// The panel's own CSS: `right: 12px`, `top: 64px` (the gutter is 0 once it is a panel).
 			return { x: box.x + box.w - stream.offsetWidth - 12, y: 64 };
-		}, "top", undefined, conversationFixed);
+		}, "top");
 		createEffect(() => {
 			insets();
 			float.restore();
@@ -432,17 +424,11 @@ export function App() {
 	/*
 	 * The drawing tools: the third float, taken by the grip at the column's head, on every
 	 * screen. Like the composer, a hard throw at either edge tucks it behind that edge with
-	 * its tab showing, and the tab can be dragged or pulled back out. Where room is short (a
-	 * phone, a narrow window) it starts tucked behind the left edge, as the pull tab it
-	 * replaces kept it. A phone on its side is the one exception: there the tools are a row
-	 * under the right-hand cluster (`canvas.css`), and the row stays where it is.
+	 * its tab showing, and the tab can be dragged or pulled back out.
 	 *
-	 * Home is the CSS's own place, which on a phone is centred on the room between the top
-	 * clusters and the composer rather than on the window, so it is **measured** whenever the
-	 * column is standing there rather than worked out again here, with the window's middle
-	 * only until it first has been.
+	 * Home is the CSS's own place, so it is **measured** whenever the column is standing there
+	 * rather than worked out again here, with the window's middle only until it first has been.
 	 */
-	const lying = typeof matchMedia === "function" ? matchMedia("(max-height: 560px) and (orientation: landscape)") : undefined;
 	const mountToolsFloat = (tools: HTMLElement, grip: HTMLElement): { unstow: () => void } => {
 		let seen: { x: number; y: number } | undefined;
 		const home = () => {
@@ -462,8 +448,7 @@ export function App() {
 			"button, input, label",
 			home,
 			"top",
-			{ tab: () => cssPx("--stowtab-w", 20), ...(conversationFixed() ? { initially: "left" as const } : {}) },
-			() => lying?.matches === true,
+			{ tab: () => cssPx("--stowtab-w", 20) },
 		);
 		createEffect(() => {
 			insets();
@@ -732,41 +717,8 @@ export function App() {
 	 */
 
 
-	/**
-	 * On a narrow screen the panel and the conversation take turns.
-	 *
-	 * 264px of panel and 320px of cards on a 390px phone is two surfaces and no canvas.
-	 * Above `NARROW` nothing is closed: a laptop has room for a panel beside the
-	 * conversation, and taking one away would be the app tidying up after a choice the user
-	 * had just made.
-	 *
-	 * Two surfaces where there were three, because the agents are a dropdown now rather than
-	 * a panel — so the rule that used to need a `keep` argument is two `if`s.
-	 */
-	const narrow = () => window.innerWidth < NARROW;
-
-	/*
-	 * On a narrow screen the two surfaces take turns, whichever way they were opened.
-	 *
-	 * 264px of sheet and 320px of conversation on a 393px screen is two surfaces and no
-	 * canvas. The swipes used to be the only place this was enforced, because they were the
-	 * only openers `App` could see — the history button lives in `Corner` and calls
-	 * `state/edge.ts` directly. So the rule went where the *state* is instead of where the
-	 * buttons are: an effect watching whether the conversation is up.
-	 *
-	 * One direction only, deliberately. Closing the panel cannot reopen the conversation, so
-	 * there is no cycle to guard against — and the other direction is handled by the one
-	 * setter the panel has, below.
-	 */
-	createEffect(() => {
-		if (historyShown() && narrow()) setBoardsOpen(false);
-	});
-
-	/** Open the panel, and on a phone put the conversation away to make room. */
-	const showBoards = (open: boolean) => {
-		setBoardsOpen(open);
-		if (open && narrow()) closeHistory();
-	};
+	/** Open the panel. */
+	const showBoards = (open: boolean) => setBoardsOpen(open);
 	/** The Agents tab of the panel, asked for by the agent list's overflow row. */
 	const [panelAsk, setPanelAsk] = createSignal<{ tab: PanelTab; at: number } | undefined>();
 	const openAgentsPanel = () => {
@@ -775,24 +727,6 @@ export function App() {
 	};
 
 
-	/**
-	 * Pull in from an edge and the surface on that side arrives (`canvas/edge-swipe.ts`).
-	 *
-	 * A swipe *opens*; it does not toggle. A gesture aimed at the edge a drawer comes from
-	 * means "bring it", and answering an open drawer by putting it away would make one
-	 * motion mean two opposite things depending on state nobody is looking at. The buttons
-	 * in the two clusters stay the way back, and on a phone the sheet has its own swipe out
-	 * (`chat/swipe-close.ts`).
-	 *
-	 * Off where a cursor can hover: the buttons are right there, and a laptop with a
-	 * touchscreen would have two rules for one edge.
-	 */
-	const edgeSwipe = {
-		enabled: () => !canHover(),
-		left: () => showBoards(true),
-		// The effect above closes the panel; a swipe only has to say what it wants.
-		right: () => openHistory(),
-	};
 
 	/**
 	 * Switch to an agent: its stage, its conversation, and the view this device left it in.
@@ -866,22 +800,6 @@ export function App() {
 	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
 	/** Fly to a board once the server has placed it and put it on the canvas. */
 	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
-	/* A new board from the tools column or the phone's ⋯ menu. Asked for by name, so the camera can
-	   arrive on it: the server places a new board in the middle of this stage's view and clear of
-	   what is there, which is near but not always on screen when the middle is taken. */
-	const newBoard = () => {
-		if (!state.focused) {
-			notice("info", "Make an agent first: a board is made on an agent's canvas.");
-			return;
-		}
-		void files
-			.askForBoard((request) => send({ type: "board.create", request }))
-			.then((path) => {
-				if (!path) return;
-				setSelected(path);
-				frameWhenPlaced(path);
-			});
-	};
 	const playAndFrame = (path: string) => {
 		send({ type: "board.play", path });
 		frameWhenPlaced(path);
@@ -1179,16 +1097,6 @@ export function App() {
 									noteFlow(path, extent.h);
 									send({ type: "board.extent", path, ...extent });
 								},
-								onCreate: (at) =>
-									void files.boardAt(at).then((path) => {
-										if (!path) return;
-										setSelected(path);
-									}),
-								onOpenDocument: (at) =>
-									void files.fileAt(at).then((path) => {
-										if (!path) return;
-										setSelected(path);
-									}),
 								onOpenLink: openLinkedBoard,
 								news: newsGlow,
 								onRead: (path) => send({ type: "board.seen", path }),
@@ -1214,7 +1122,6 @@ export function App() {
 									insert: true,
 									...(state.focused ? { agentId: state.focused } : {}),
 								}),
-							onEdgeSwipe: edgeSwipe,
 						});
 						setEditorHandle(editor.handle);
 						onCleanup(() => {
@@ -1308,7 +1215,6 @@ export function App() {
 					 * it is what "where am I" means.
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
-					onNewBoard={newBoard}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and
@@ -1326,13 +1232,6 @@ export function App() {
 					usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 					onContext={() => openUsage(state.focused)}
 					overflow={[
-						// On a phone the drawing's tool column is gone (`PenBar`), and its undo and redo live here.
-						...(isPhone() && stagePen()
-							? [
-									{ label: "Undo", icon: Undo2, onPick: () => penStep("undo") },
-									{ label: "Redo", icon: Redo2, onPick: () => penStep("redo") },
-								]
-							: []),
 						{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
 						{
 							label: "Settings",
@@ -1390,7 +1289,6 @@ export function App() {
 							onStep={penStep}
 							onFloat={mountToolsFloat}
 							onArm={() => {}}
-							onNewBoard={newBoard}
 							onOpenFile={() => {
 								const stage = document.querySelector(".stage");
 								if (!stage) return;
@@ -1746,8 +1644,6 @@ export function App() {
 						}}
 						onDraftTaken={() => setDraft(undefined)}
 						onDropFiles={(files) => void intoComposer(files)}
-						onHistory={toggleHistory}
-						historyOn={historyShown()}
 					/>
 				</div>
 

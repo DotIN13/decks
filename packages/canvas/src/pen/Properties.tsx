@@ -40,15 +40,14 @@ import Type from "lucide-solid/icons/type";
 import X from "lucide-solid/icons/x";
 import { obsidianNote } from "./card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
-import { isPhone } from "../camera/camera.ts";
-import { penBoxes, penSelection, penSheet, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../state/pen-tools.ts";
+import { penBoxes, penSelection, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../state/pen-tools.ts";
 import { Icon } from "@decks/ui";
 import { ColorPicker } from "./ColorPicker.tsx";
 import { ICON_LIBRARIES } from "./icon-index.ts";
 
 /**
  * The properties panel: everything about what is selected in the drawing, in the board inspector's
- * corner (top right, a sheet along the bottom on a phone).
+ * corner (top right).
  *
  * It shows only what the selection has: a shape its kind, fill, line and words; an arrow its route,
  * heads, sides and words; an icon its library, name and weight; words their font. Position, size,
@@ -451,14 +450,10 @@ export function Properties(props: {
 		</details>
 	);
 
-	/*
-	 * On a phone the sheet covers most of the screen, so it opens only when asked for, with a second tap
-	 * on what is selected (`penSheet`): the first tap selects, and leaves the canvas to the finger that
-	 * carries it. It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`).
-	 */
+	/* It stands aside while a card is typed into, whose toolbar is its panel then (`penTyping`). */
 	return (
-		<Show when={selected().length > 0 && !penTyping() && !(isPhone() && !penSheet())}>
-			<aside class="panel-float props-panel" data-sheet={isPhone() ? "true" : undefined} aria-label="Properties" data-props>
+		<Show when={selected().length > 0 && !penTyping()}>
+			<aside class="panel-float props-panel" aria-label="Properties" data-props>
 				<header class="props-head">
 					<span class="props-kind" aria-hidden="true">
 						<Icon of={single() ? KIND_ICON[kindOf(single()!)] : Layers} size={14} />

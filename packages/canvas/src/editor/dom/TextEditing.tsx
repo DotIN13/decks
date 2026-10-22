@@ -12,7 +12,6 @@
  */
 import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDocument, type PenNode } from "@decks/pen";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
-import { isPhone } from "../../camera/camera.ts";
 import { setPenTyping } from "../../state/pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../pen/card-frame.ts";
 import { CardEditor } from "../../pen/CardEditor.tsx";
@@ -104,8 +103,8 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 		window.open(new URL(file.metadata.path, new URL(host.pen()?.base || "/", location.origin)).href, "_blank", "noopener");
 		return true;
 	};
-	// While a card is typed into its toolbar is the panel, so the properties stand aside; on a phone, for any words.
-	createEffect(() => setPenTyping(!!open() && (!!open()!.card || isPhone())));
+	// While a card is typed into its toolbar is the panel, so the properties stand aside.
+	createEffect(() => setPenTyping(!!open() && !!open()!.card));
 	onCleanup(() => setPenTyping(false));
 	const openCard = (card: PenNode, at: Rect, fresh?: boolean, where?: { insertAt?: number; caretAt?: Pt }) => {
 		const placed = host.scene.item(card.id);

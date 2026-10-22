@@ -82,8 +82,8 @@
 	}
 
 	/* The sidebar beside the canvas: one hairline on its right, no lift. It is the ground's
-	   neighbour, not something floating on it. A sheet (narrow screens) keeps the card look. */
-	.panel-shell:not([data-sheet="true"]) {
+	   neighbour, not something floating on it. */
+	.panel-shell {
 		border-right-color: var(--line);
 		box-shadow: none;
 	}
@@ -318,10 +318,6 @@
 	.stream[data-shown="true"] .stream-head {
 		display: flex;
 	}
-	/* The composer's grip, at the head of the history, on a phone only: pull it down to put the history away. */
-	.stream-grip {
-		display: none;
-	}
 	.stream-head-name {
 		font-weight: 600;
 	}
@@ -360,76 +356,6 @@
 	.pen-tools[data-landing="true"] {
 		transition: none;
 	}
-	/*
-	 * Under a finger, or on a narrow screen, the conversation is not a float: it stands on the
-	 * composer, as wide as the composer, and stays there.
-	 *
-	 * It used to keep the desktop's place, hung 64px from the top at a fixed 420px, which on a
-	 * phone left it against the toolbar with half a screen of canvas between it and the bar
-	 * you were typing into, 12px off centre because only its right edge had a margin. The
-	 * bottom is the composer's own: its 12px, its measured height (`--dock`), the keyboard and
-	 * the safe area, and 8px of air. It is full height: from there up to 72px under the top,
-	 * which is the toolbar's row, so the history is never a half-screen window.
-	 *
-	 * `!important` on the size only: `resize: both` writes an inline width and height on a
-	 * laptop, and a window then narrowed would keep them. After the floating rules on
-	 * purpose, being the same specificity.
-	 */
-	@media (max-width: 1100px), (pointer: coarse) {
-		.stream[data-shown="true"] {
-			--stream-foot: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
-			top: auto;
-			bottom: var(--stream-foot);
-			height: calc(100% - var(--stream-foot) - 72px) !important;
-			min-height: 0;
-			resize: none;
-		}
-		.stream-head {
-			position: relative;
-			cursor: default;
-			touch-action: none;
-		}
-	}
-	/* The grip is the composer's own (`.dock-grip`), and the title and × stay centred in the header under it. */
-	@media (pointer: coarse) {
-		/* 8px of the header is the grip's (4px down, 4px tall), so the title and × centre in the 40px under it. */
-		.stream[data-shown="true"] .stream-head {
-			box-sizing: border-box;
-			height: 48px;
-			padding-top: 8px;
-		}
-		.stream-grip {
-			position: absolute;
-			top: 4px;
-			left: 50%;
-			display: block;
-			width: 28px;
-			height: 4px;
-			margin-left: -14px;
-			border-radius: 2px;
-			background: var(--line-strong);
-			opacity: 0.8;
-		}
-	}
-	/* Narrow: the composer's own margins. The width is a utility in the markup (`Stream.tsx`). */
-	@media (max-width: 1100px) {
-		.stream[data-shown="true"] {
-			left: max(12px, env(safe-area-inset-left));
-			right: max(12px, env(safe-area-inset-right));
-			width: auto !important;
-		}
-	}
-	/* A wide tablet: the composer's column and the composer's width (`.dock` in `index.css`),
-	   by arithmetic rather than a transform, which would make this the containing block of the
-	   time machine's fixed menu (see `stream.css`). */
-	@media (min-width: 1101px) and (pointer: coarse) {
-		.stream[data-shown="true"] {
-			--stream-w: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
-			left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2 - var(--stream-w) / 2);
-			right: auto;
-			width: var(--stream-w) !important;
-		}
-	}
 	@media (prefers-reduced-motion: reduce) {
 		.dock[data-snapping="true"],
 		.stream[data-snapping="true"],
@@ -438,59 +364,6 @@
 		}
 	}
 
-	/*
-	 * Mobile: the history unrolls like paper coming out of a typewriter — it grows upward
-	 * from the composer rather than fading in from above. The clip reveals the stream from
-	 * the bottom (nearest the composer) to the top over ~300 ms, then settles with a small
-	 * spring overshoot on the translate. Works only on coarse-pointer (phone/tablet); a
-	 * trackpad laptop with a narrow window keeps the standard desktop fade.
-	 */
-	@media (max-width: 1100px), (pointer: coarse) {
-		.stream {
-			/* Start clipped from the top: the paper has not emerged yet. Hiding with clip-path
-			   rather than opacity lets the scroll container stay live for the opening frame,
-			   so the newest card is already scrolled into view when the paper arrives. */
-			clip-path: inset(100% 0 0 0 round var(--radius-panel, 12px));
-			opacity: 1;
-			translate: none;
-			transition:
-				clip-path 300ms cubic-bezier(0.22, 1, 0.36, 1),
-				transform 300ms ease;
-		}
-		.stream[data-shown="true"] {
-			/* Reveal from the bottom upward. Open, the clip stands 32px outside the panel with the
-			   panel's corner grown by as much, so the shadow is whole: a clip at the panel's edge
-			   cut the shadow off outside it and left it showing in the corners inside it, a grey
-			   square under each rounded corner. */
-			clip-path: inset(-32px round calc(var(--radius-panel, 12px) + 32px));
-		}
-	}
-	@media ((max-width: 1100px) or (pointer: coarse)) and (prefers-reduced-motion: reduce) {
-		.stream {
-			clip-path: none;
-			opacity: 0;
-			transition: opacity 160ms ease;
-		}
-		.stream[data-shown="true"] {
-			opacity: 1;
-		}
-	}
-}
-
-@layer components {
-	/*
-	 * The history button in the composer bar: visible on narrow screens and coarse-pointer
-	 * devices, hidden when wide + fine-pointer (desktop with plenty of room to float the stream).
-	 */
-	.history-btn {
-		display: none;
-	}
-	@media (max-width: 1100px), (pointer: coarse) {
-		/* grid, not flex: `.icon-button` centres its icon with `place-items`, which flex ignores. */
-		.history-btn {
-			display: grid;
-		}
-	}
 }
 
 @layer components {

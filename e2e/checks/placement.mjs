@@ -83,18 +83,16 @@ say(
 	`${back ? Math.round(nearest(back, others)) : "?"} px to the nearest, on a board ${back?.w} wide`,
 );
 
-// --- the new-board button, first in the tools column ----------------------------------
+// --- a new board, asked for over the wire (people no longer make boards from the UI) ------
 
 await openPanel(page);
 await settle(page, 300);
 const before = new Set((await onScreen()).map((board) => board.path));
-await page.locator("button[data-new-board-button]").click();
-await settle(page, 300);
-await page.locator('.popover [data-new-board="board"]').click();
+link.send({ type: "board.create" });
 await settle(page, 2500);
 
 const made = (await onScreen()).find((board) => !before.has(board.path));
-say("the ＋ in the corner makes a board on the canvas", made !== undefined, JSON.stringify((await onScreen()).map((b) => b.path)));
+say("board.create makes a board on the canvas", made !== undefined, JSON.stringify((await onScreen()).map((b) => b.path)));
 say("…in the view, not at the bottom of the deck", made?.inView === true, JSON.stringify(made));
 const neighbours = (await onScreen()).filter((board) => board.path !== made?.path);
 say(

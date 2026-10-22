@@ -651,14 +651,13 @@ export function AgentPill(props: {
 			</button>
 
 			{/* Hairlines are decoration, and the first thing to go when the line is short. */}
-			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+			<span class="pill-sep" aria-hidden="true" />
 
 			{/*
 			 * The agent whose stage this is: its face and its name, as one button. Pressing it
 			 * opens the agent list, and picking a row goes to that agent's stage.
 			 *
-			 * The name stops at 160px and goes on a phone, where the face alone still says whose
-			 * window this is and its ring still says what the agent is doing.
+			 * The name stops at 160px.
 			 */}
 			<AgentMenu
 				chats={props.chats}
@@ -684,12 +683,12 @@ export function AgentPill(props: {
 						<Show when={active()} fallback={<span class="pill-agent-name">No agent</span>}>
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={20} ring={1.5} />}
 						</Show>
-						<Show when={name()}>{(label) => <span class="pill-agent-name max-[768px]:hidden">{label()}</span>}</Show>
+						<Show when={name()}>{(label) => <span class="pill-agent-name">{label()}</span>}</Show>
 						<Icon of={ChevronDown} size={12} />
 					</button>
 				)}
 			/>
-			<NewAgentButton onNew={props.onNew} class="max-[480px]:hidden" />
+			<NewAgentButton onNew={props.onNew} />
 
 			{/*
 				The stage: what this agent's work is kept in, and the button that opens the manager.
@@ -702,7 +701,7 @@ export function AgentPill(props: {
 			<Show when={props.onStages}>
 				{(_on) => (
 					<>
-						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+						<span class="pill-sep" aria-hidden="true" />
 						<button
 							type="button"
 							class="chip-button pill-agent pill-stage"
@@ -717,7 +716,7 @@ export function AgentPill(props: {
 							<span class="pill-stage-glyph" aria-hidden="true">
 								<DecksMark size={15} />
 							</span>
-							<Show when={props.stage}>{(name) => <span class="pill-agent-name max-[768px]:hidden">{name()}</span>}</Show>
+							<Show when={props.stage}>{(name) => <span class="pill-agent-name">{name()}</span>}</Show>
 							<Icon of={ChevronDown} size={12} />
 						</button>
 						<Show when={props.viewOnly}>
@@ -736,7 +735,7 @@ export function AgentPill(props: {
 				)}
 			</Show>
 
-			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+			<span class="pill-sep" aria-hidden="true" />
 
 
 			{/*

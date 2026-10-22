@@ -9,7 +9,6 @@ import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf }
 import { WorkingSign } from "./StatusLine.tsx";
 import { turnCards, type TurnCard } from "./turn-cards.ts";
 import { signPlacement } from "./working-sign.ts";
-import { attachPullClose, attachSwipeClose } from "./swipe-close.ts";
 import { Turn } from "./Turn.tsx";
 
 /**
@@ -200,18 +199,6 @@ export function Stream(props: {
 	 * applied to that rather than to everything held.
 	 */
 	const cards = createMemo<TurnCard[]>(() => turnCards(shown()));
-
-	/*
-	 * A swipe toward the right edge puts the history away, and releasing mid-gesture puts it
-	 * back — the same rule iOS and Android use for a sheet. Vertical drags are never touched,
-	 * so scrolling the column still scrolls.
-	 */
-	onMount(() => {
-		const detach = attachSwipeClose(column, shownNow, close);
-		onCleanup(detach);
-		// And down, by the grip on its header (on a phone, where the header is not a float's handle).
-		if (head) onCleanup(attachPullClose(column, head, shownNow, close));
-	});
 
 	/*
 	 * The wheel scrolls the column from anywhere over it, not only over a card.
@@ -408,14 +395,10 @@ export function Stream(props: {
 		 * invisible surface that ate the wheel would be a canvas that had stopped working for
 		 * no visible reason.
 		 *
-		 * Under 1100px it is as wide as the composer, and the width's override is a utility rather
-		 * than a `@media` block in the stylesheet — a media query inside `@layer components` still
-		 * loses to a utility on the same element, so the responsive half has to be the strong
-		 * one. The base geometry stays in `stream.css`, where it can read `--dock` and `env()`,
-		 * and where it stands under a finger or on a narrow screen is in `shell.css`.
+		 * The base geometry is in `stream.css`, where it can read `--dock` and `env()`.
 		 */
 		<section
-			class="stream max-[1100px]:w-auto"
+			class="stream"
 			ref={column}
 			data-shown={shownNow()}
 			aria-label="The conversation"
@@ -430,26 +413,8 @@ export function Stream(props: {
 			 * surface itself was a second answer to a question already answered, and it cost the
 			 * top of the newest card a hover target that did nothing else.
 			 *
-			 * Two other ways out survive, and neither is a control: Escape, and a swipe toward
-			 * the right edge on a touchscreen. Both go through `closeHistory`, so the corner
-			 * button always agrees with the screen.
-			 */}
-			{/*
-			 * `pointer-events-auto` on the roll below 1100px, where the column is a sheet.
-			 *
-			 * The column takes no pointer events and its cards take their own, so the gaps
-			 * between turns are still canvas — you can drag a board through one. That is the
-			 * right trade beside the canvas and the wrong one over it: on a phone this is a
-			 * full-width sheet, the canvas behind it is neither visible nor reachable, and a
-			 * finger landing in a gap did nothing at all. Which is what "the history will not
-			 * scroll" was — it scrolled fine from a card, and a card is not what a thumb hits.
-			 *
-			 * The roll rather than the whole column, so the empty space *above* the topmost
-			 * card — the column is anchored to the bottom — stays canvas even in sheet mode.
-			 * And a utility rather than a `@media` block in `stream.css`, because the base
-			 * `pointer-events: none` is in the components layer and a media query in there
-			 * would lose to it… no: it would lose to any utility, which is the same rule read
-			 * from the other end. The strong half has to be the variant.
+			 * One other way out survives, and it is not a control: Escape. It goes through
+			 * `closeHistory`, so the corner button always agrees with the screen.
 			 */}
 			{/*
 			 * The header: whose thread this is, and the handle to move it by.
@@ -460,8 +425,6 @@ export function Stream(props: {
 			 * button calls, so the two never disagree.
 			 */}
 			<div class="stream-head" ref={head}>
-				{/* The grip a phone pulls the history down by (`attachPullClose`); hidden where the header moves a float. */}
-				<span class="stream-grip" aria-hidden="true" />
 				<span class="stream-head-name">{props.name}</span>
 				<span class="stream-head-state">{props.state === "idle" ? "" : props.state}</span>
 				<button type="button" class="icon-button stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => close()}>
@@ -469,7 +432,7 @@ export function Stream(props: {
 				</button>
 			</div>
 			<div
-				class="stream-roll max-[1100px]:pointer-events-auto"
+				class="stream-roll"
 				ref={scroller}
 				/*
 				 * Two questions on every scroll, and they are different questions. `measure`
