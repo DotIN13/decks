@@ -45,29 +45,6 @@ const STAND_IN_TRIES = 50;
 const PICTURE_RETRY_MS = [2000, 5000, 15000, 30000, 60000];
 /** Pictures from the worker that come within this long of the first are laid out for together. */
 const PICTURES_BATCH_MS = 16;
-/**
- * How far past each edge of the window the canvas is drawn, in screen pixels. A pan slides the canvas
- * last drawn rather than drawing it again, until the window reaches its edge: drawing the whole window
- * was the most of a pan's time on the GPU (110 ms from a wheel step to its frame at 22% on a 2× screen).
- */
-const SLACK_PX = 320;
-/**
- * The margin on a touch screen (its main pointer coarse) or in a small window (`slackFor`): a pinch
- * on an iPad mini paints and hands over every tile of the canvas, three times the window's area at
- * 320, which took 94 to 135 tiles a pinch and 620 ms to be sharp after it; at 96, 34 to 57 tiles and
- * 510 ms. A finger's pan is slower than a wheel's fling, so the smaller margin still slides.
- */
-const TOUCH_SLACK_PX = 96;
-/** A window no longer than this on its long side, in CSS pixels, is small (a phone, a tablet's). */
-const SMALL_WINDOW_PX = 1100;
-
-/** The canvas's margin past a `width` × `height` window: `TOUCH_SLACK_PX` on a touch screen or in a small window, else `SLACK_PX`. */
-function slackFor(width: number, height: number): number {
-	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-	return coarse || Math.max(width, height) <= SMALL_WINDOW_PX ? TOUCH_SLACK_PX : SLACK_PX;
-}
-/** The largest canvas side a GPU is sure to take, in device pixels. */
-const MAX_SIDE = 8192;
 
 /** What the stage last did, for checks and the crash recorder to read: the old sheet's counters, and the engine's. */
 /**
@@ -169,8 +146,7 @@ export class StageEngine {
 	private indexed: readonly SceneBoard[] = [];
 	private boardBoxes = "";
 	private size = { w: 0, h: 0 };
-	/** The canvas's margin past the window, in screen pixels, and the stage rectangle it was last drawn for. */
-	private slack = 0;
+	/** The stage rectangle the canvas was last drawn for: the window's, at the camera then. */
 	private drawnAt: { x: number; y: number; zoom: number } | undefined;
 	private boards: readonly SceneBoard[] = [];
 	private boardKey = "";
@@ -738,12 +714,17 @@ export class StageEngine {
 		this.draw();
 	}
 
-	/** The canvas the window's size and its margin (`slackFor`) more on each side, in device pixels; the engine's surface follows in `frame`. */
+	/**
+	 * The canvas the window's size, in device pixels; the engine's
+	 * surface follows in `frame`. It is drawn again for every camera, as one cheap draw of the tiles
+	 * and pictures as textured quads, and placed over the window wherever the world has moved
+	 * (`place`), as the old engine's was: a canvas a margin bigger than the window, slid during a
+	 * pan rather than drawn, made the worker paint that margin too (120 tiles at rest, not 50).
+	 */
 	private fitCanvases(): void {
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		this.slack = Math.max(0, Math.min(slackFor(this.view.width, this.view.height), Math.floor((MAX_SIDE / dpr - Math.max(this.view.width, this.view.height)) / 2)));
-		const cssW = this.view.width + 2 * this.slack;
-		const cssH = this.view.height + 2 * this.slack;
+		const cssW = this.view.width;
+		const cssH = this.view.height;
 		const w = Math.max(1, Math.round(cssW * dpr));
 		const h = Math.max(1, Math.round(cssH * dpr));
 		if (w === this.size.w && h === this.size.h) return;
@@ -758,27 +739,17 @@ export class StageEngine {
 		}
 	}
 
-	/** The stage rectangle the canvas covers at the camera now: the window and the slack round it. */
+	/** The stage rectangle the canvas covers at the camera now: the window's. */
 	private drawRect(): { x: number; y: number; zoom: number; width: number; height: number } {
 		const { x, y } = this.corner();
-		const m = this.slack / this.camera.zoom;
-		return { x: x - m, y: y - m, zoom: this.camera.zoom, width: this.view.width + 2 * this.slack, height: this.view.height + 2 * this.slack };
+		return { x, y, zoom: this.camera.zoom, width: this.view.width, height: this.view.height };
 	}
 
 	/**
-	 * Whether the canvas last drawn still shows this camera, moved: the zoom is the same and the
-	 * window is inside what was drawn. Only while the camera moves; at rest it is drawn again, centred
-	 * and on whole pixels.
+	 * The canvas sits in the world (`Stage.tsx`), after the board pages, so it is placed in stage
+	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
+	 * undone, so it covers exactly the window.
 	 */
-	private slides(): boolean {
-		const at = this.drawnAt;
-		if (!at || !this.moving || at.zoom !== this.camera.zoom) return false;
-		const { x, y } = this.corner();
-		const zoom = this.camera.zoom;
-		return x >= at.x && y >= at.y && x + this.view.width / zoom <= at.x + (this.view.width + 2 * this.slack) / zoom && y + this.view.height / zoom <= at.y + (this.view.height + 2 * this.slack) / zoom;
-	}
-
-	/** The canvas sits in the world (`Stage.tsx`), so it is placed in stage units at the rectangle it was drawn for, and the world's transform moves it. */
 	private place(): void {
 		const at = this.drawnAt;
 		if (!this.over || !at) return;
@@ -801,7 +772,7 @@ export class StageEngine {
 	/** In the call that moves the board pages, and drawn there, so the two land in one frame. */
 	setCamera(camera: Camera): void {
 		this.camera = camera;
-		if (!this.slides()) this.draw();
+		this.draw();
 		this.sendCamera();
 		this.wantBoardPictures();
 		if (camera.zoom !== this.sharperZoom) {
@@ -823,7 +794,7 @@ export class StageEngine {
 		this.sendCamera();
 		if (!moving) {
 			this.wantBoardPictures();
-			// Drawn again where the camera came to rest: the slack round it again, and on whole pixels.
+			// Drawn again where the camera came to rest, at the tiles' resting scale.
 			this.draw();
 		}
 	}
@@ -835,7 +806,6 @@ export class StageEngine {
 
 	private sendCamera(): void {
 		if (!this.view.width) return;
-		// The worker paints tiles for the slack too, so a pan slides onto drawing rather than an empty margin.
 		const { x, y, zoom, width, height } = this.drawRect();
 		const dpr = Math.min(2, devicePixelRatio || 1);
 		// Pinching, the tiles are painted at half the screen's density (`setPinching`).
@@ -984,7 +954,7 @@ export class StageEngine {
 	/** What had been sent when the tiles that arrived last were asked for: shown once they are drawn. */
 	private seenAtDraw = 0;
 
-	/** Draw the canvas now, for the window and its slack: from a camera that left what was drawn, or when anything else changes. */
+	/** Draw the canvas now, for the window: the camera moved, or anything else changed. */
 	draw(): void {
 		if (!this.page || !this.view.width || this.paused) return;
 		// A draw now is the one a batch of tiles asked for in the next frame.
@@ -1471,7 +1441,6 @@ export class StageEngine {
 		this.page.frameLifted(drawn.x, drawn.y, drawn.zoom, Math.min(2, devicePixelRatio || 1), drawn.width, drawn.height);
 		this.drawnAt = { x: drawn.x, y: drawn.y, zoom: drawn.zoom };
 		this.place();
-		// Measured once placed: the canvas may have been slid from where it now is.
 		const at = canvas.getBoundingClientRect();
 		if (!at.width || !at.height) {
 			this.draw();
