@@ -30,7 +30,7 @@ const RUNS = Math.max(1, Number(process.env.RENDER_PERF_RUNS ?? 5));
 const ONLY = process.env.RENDER_PERF_ONLY ? new Set(process.env.RENDER_PERF_ONLY.split(",")) : undefined;
 const want = (name) => !ONLY || ONLY.has(name);
 const ITEMS = Number(process.env.RENDER_PERF_ITEMS ?? 2000);
-/** A CPU profile of the drags (`RENDER_PERF_PROFILE=<file>.cpuprofile`), for finding where a step goes. */
+/** CPU profiles of the drags and the edits (`RENDER_PERF_PROFILE=<prefix>`: `<prefix>.drag.cpuprofile`, `<prefix>.edit.cpuprofile`), for finding where the time goes. */
 const PROFILE = process.env.RENDER_PERF_PROFILE;
 /** A page flag to measure with and without, alternating (`RENDER_PERF_AB=<name>`, see the drag and the edit). */
 const AB = process.env.RENDER_PERF_AB;
@@ -96,6 +96,15 @@ const quiet = (quietMs = 1500, cap = 30000) =>
 		},
 		{ quietMs, cap },
 	);
+const profileStart = async () => {
+	if (!PROFILE) return;
+	await cdp.send("Profiler.enable");
+	await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+	await cdp.send("Profiler.start");
+};
+const profileStop = async (name) => {
+	if (PROFILE) writeFileSync(`${PROFILE}.${name}.cpuprofile`, JSON.stringify((await cdp.send("Profiler.stop")).profile));
+};
 const frame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done())));
 
 /** Put helpers in the page: the camera, wheel events on the stage, one a frame. */
@@ -253,11 +262,7 @@ if (want("drag")) {
 	const per = [];
 	let tried = 0;
 	const STEPS = 60;
-	if (PROFILE) {
-		await cdp.send("Profiler.enable");
-		await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
-		await cdp.send("Profiler.start");
-	}
+	await profileStart();
 	/** Drag a note 60 steps, one a frame: main-thread ms per step after the first five, or undefined when the press lifted nothing. */
 	const dragOnce = async ({ x, y }) => {
 		await page.mouse.move(x, y);
@@ -287,7 +292,7 @@ if (want("drag")) {
 		const step = await dragOnce(note);
 		if (step !== undefined) per.push(step);
 	}
-	if (PROFILE) writeFileSync(PROFILE, JSON.stringify((await cdp.send("Profiler.stop")).profile));
+	await profileStop("drag");
 	say("drags lifted their note", per.length === RUNS, `${per.length} timed of ${tried} tried`);
 	keep("dragStepMs", per, ms);
 	/*
@@ -325,10 +330,16 @@ if (want("edit")) {
 			before?.();
 			for (const f of globalThis.__perfPresented) f();
 		};
+		// When the drawing with the edit reaches the stage's engine: the server's part of the time.
+		const setDoc = engine.setDoc.bind(engine);
+		engine.setDoc = (...args) => {
+			globalThis.__perfDocAt = Date.now();
+			return setDoc(...args);
+		};
 	});
-	const times = [];
-	for (let run = 0; run < RUNS; run++) {
-		const id = `perf-edit-${run}`;
+	/** An agent's insert, `n`th: ms from sending it to the frame that shows it, and the page's main-thread ms in between. */
+	const editOnce = async (n) => {
+		const id = `perf-edit-${n}`;
 		const cam = await page.evaluate(() => globalThis.__perf.camera());
 		const seen = page.evaluate(
 			(id) =>
@@ -350,14 +361,49 @@ if (want("edit")) {
 			id,
 		);
 		await frame();
+		const before = await taskSeconds();
 		const sent = Date.now();
-		const x1 = Math.round(cam.x - 300 + run * 130);
-		const y1 = Math.round(cam.y + 150);
-		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id, metadata: { type: "decks.markdown" }, content: `An agent's note, number ${run}`, width: 120 }, box: { x1, y1 } }] });
-		times.push((await seen) - sent);
+		const x1 = Math.round(cam.x - 300 + (n % 5) * 130);
+		const y1 = Math.round(cam.y + 150 + Math.floor(n / 5) * 40);
+		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id, metadata: { type: "decks.markdown" }, content: `An agent's note, number ${n}`, width: 120 }, box: { x1, y1 } }] });
+		const at = await seen;
+		const task = ((await taskSeconds()) - before) * 1000;
+		const arrived = await page.evaluate(() => globalThis.__perfDocAt);
 		await quiet(1000);
+		return { ms: at - sent, task, server: arrived - sent };
+	};
+	const times = [];
+	const tasks = [];
+	const server = [];
+	let made = 0;
+	await profileStart();
+	for (let run = 0; run < RUNS; run++) {
+		const { ms: t, task, server: s } = await editOnce(made++);
+		times.push(t);
+		tasks.push(task);
+		server.push(s);
 	}
+	await profileStop("edit");
 	keep("editToFrameMs", times, ms);
+	keep("editTaskMs", tasks, ms);
+	keep("editServerMs", server, ms);
+	if (AB) {
+		const on = { ms: [], task: [] };
+		const off = { ms: [], task: [] };
+		for (let pair = 0; pair < WIDE; pair++) {
+			for (const flag of pair % 2 ? [true, false] : [false, true]) {
+				await page.evaluate(({ AB, flag }) => (globalThis[AB] = flag), { AB, flag });
+				const { ms: t, task } = await editOnce(made++);
+				(flag ? on : off).ms.push(t);
+				(flag ? on : off).task.push(task);
+			}
+		}
+		await page.evaluate((AB) => delete globalThis[AB], AB);
+		keep("editToFrameMsFlagOn", on.ms, ms);
+		keep("editToFrameMsFlagOff", off.ms, ms);
+		keep("editTaskMsFlagOn", on.task, ms);
+		keep("editTaskMsFlagOff", off.task, ms);
+	}
 }
 
 // --- a long pen stroke --------------------------------------------------------------------------------
