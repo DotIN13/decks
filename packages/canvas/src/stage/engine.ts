@@ -309,6 +309,12 @@ export class StageEngine {
 		this.doc = doc;
 		this.nodes = undefined;
 		this.base = base;
+		/*
+		 * What a delete hid while it waited is the drawing's business again: the answer has it gone, or,
+		 * after an undo, back. The engines are told (below, after the drawing), or they went on hiding a
+		 * restored item until the page was loaded again.
+		 */
+		const unhide = this.viewState.hidden.length > 0;
 		this.viewState.hidden = [];
 		if (!this.page) return;
 		/*
@@ -333,6 +339,7 @@ export class StageEngine {
 				}
 			}
 		}
+		if (unhide) this.sendView();
 		this.laidOut();
 		this.needFonts();
 		// A drop that moved things glides them in from where they were let go, from this very frame.
