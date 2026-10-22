@@ -16,6 +16,9 @@ interface Scope {
 const scope = self as unknown as Scope;
 
 let engine: WorkerEngine | undefined;
+/** The scheme the engine's markdown reader reads in. */
+let dark = false;
+const EMPTY = '{"version":"2.14","children":[]}';
 let camera: Extract<ToWorker, { type: "camera" }> | undefined;
 let painting = false;
 /** A paint is coming (`paintSoon`). */
@@ -40,17 +43,27 @@ let got = 0;
 /** `got` when the page was last sent tiles, or told there were none to paint. */
 let told = -1;
 const early: ToWorker[] = [];
+/** Taking the messages that came before the engine was up (`start`). */
+let replaying = false;
 
 /**
  * Paint once the messages already here are taken (or in `ms`): fonts, pictures and icons that come
  * together are laid out and painted for once (the engine settles them at its next paint), not once each.
  */
 function paintSoon(ms = 0): void {
-	soon ??= setTimeout(() => {
+	// A paint asked for sooner than the one coming (the fonts waited for have come) moves it up.
+	const at = performance.now() + ms;
+	if (soon !== undefined) {
+		if (at >= soonAt) return;
+		clearTimeout(soon);
+	}
+	soonAt = at;
+	soon = setTimeout(() => {
 		soon = undefined;
 		paint();
 	}, ms);
 }
+let soonAt = 0;
 
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
 function paint(): void {
@@ -99,36 +112,58 @@ function report(): void {
 	if (wanted.length) scope.postMessage({ type: "wanted", urls: wanted });
 }
 
+/** The engine loaded and the worker's device open (`boot`), before the drawing comes. */
+let booted: ReturnType<typeof boot> | undefined;
+function boot(message: { backend?: string; lowMemory?: boolean; module?: WebAssembly.Module }) {
+	const opening = (async () => {
+		const chosen = backendNamed(message.backend);
+		const stage = await chosen.load(message.module);
+		const size = stage.WorkerEngine.tileSize();
+		const canvas = new OffscreenCanvas(size, size);
+		const gpu = await stage.openOffscreen(canvas, size, size, chosen.name, message.lowMemory);
+		return { chosen, stage, canvas, gpu };
+	})();
+	// Said when the drawing comes (`start`), which the page is listening for.
+	opening.catch(() => {});
+	return opening;
+}
+
 async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void> {
-	const chosen = backendNamed(message.backend);
-	const stage = await chosen.load();
-	const size = stage.WorkerEngine.tileSize();
-	const canvas = new OffscreenCanvas(size, size);
-	const gpu = await stage.openOffscreen(canvas, size, size, chosen.name, message.lowMemory);
+	// A page that sent no `boot` (one from before it) says the backend here.
+	const { chosen, stage, canvas, gpu } = await (booted ??= boot(message));
 	const backend = gpu.backend();
-	engine = new stage.WorkerEngine(message.doc, message.dark);
+	// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
+	engine = new stage.WorkerEngine(EMPTY, message.dark);
 	engine.setGpu(gpu, canvas);
 	// A lost device or context: the page starts the worker again, with a new canvas.
 	chosen.watch(canvas, { lost: () => scope.postMessage({ type: "lost" }), restored: () => {}, isLost: () => engine?.lost() ?? false });
 	engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 	engine.setMath(mathTypesetter());
+	dark = message.dark;
+	engine.reload(message.doc, message.dark);
 	if (message.fontsDue) waitForFonts();
 	docWaited = !!message.docDue;
+	// All of them before anything is painted: the drawing, the fonts it names and the camera come in
+	// any order while the engine starts, and a paint after the first would be painted again after the next.
+	replaying = true;
 	for (const one of early.splice(0)) take(one);
+	replaying = false;
 	scope.postMessage({ type: "ready", backend });
 	paintSoon();
 }
 
 function take(message: ToWorker): void {
 	if (!engine) {
-		if (message.type !== "init") early.push(message);
+		if (message.type !== "init" && message.type !== "boot") early.push(message);
 		return;
 	}
 	switch (message.type) {
 		case "doc":
 			docWaited = false;
+			// The reader first, and only for a new scheme: given, it lays out the drawing it has.
+			if (message.dark !== dark) engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
+			dark = message.dark;
 			engine.reload(message.doc, message.dark);
-			engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 			break;
 		case "edits":
 			try {
@@ -166,9 +201,11 @@ function take(message: ToWorker): void {
 			camera = message;
 			break;
 		case "init":
+		case "boot":
 			break;
 	}
 	report();
+	if (replaying) return;
 	// What arrives in bursts waits for the rest of the burst; anything else (the camera above all) is painted for at once.
 	if (message.type === "icon" || message.type === "picture" || message.type === "fonts" || message.type === "fontsDue") paintSoon();
 	else paint();
@@ -176,6 +213,10 @@ function take(message: ToWorker): void {
 
 scope.onmessage = ({ data }) => {
 	got++;
+	if (data.type === "boot") {
+		booted ??= boot(data);
+		return;
+	}
 	if (data.type === "init") {
 		void start(data).catch((error: unknown) => scope.postMessage({ type: "failed", message: `the render worker did not start: ${String((error as Error)?.message ?? error)}` }));
 		return;

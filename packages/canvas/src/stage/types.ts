@@ -82,6 +82,8 @@ export type ToWorker =
 	 * the page has no drawing yet (`doc` is empty), which comes as a `doc` message. The worker paints
 	 * nothing until they have, or for 300 ms, rather than paint every tile twice.
 	 */
+	/** First, as soon as the page has the engine: the backend's build, as the page's compiled module when it has one, for the worker to open its device with before the drawing comes. */
+	| { type: "boot"; backend: string; lowMemory?: boolean; module?: WebAssembly.Module }
 	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }

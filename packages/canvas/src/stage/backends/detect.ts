@@ -26,8 +26,8 @@ export type Watch = (canvas: EventTarget, on: { lost: () => void; restored: () =
 /** A backend this browser has: the build to load, and how its device is lost and comes back. */
 export interface Backend {
 	name: BackendName;
-	/** The engine's module for this backend, initialised. */
-	load: () => Promise<StageModule>;
+	/** The engine's module for this backend, initialised: from `compiled` when given (the page's, posted to its worker), else fetched and compiled. */
+	load: (compiled?: WebAssembly.Module) => Promise<StageModule>;
 	watch: Watch;
 }
 
@@ -47,13 +47,13 @@ export class NoBackend extends Error {
 }
 
 const BACKENDS: Record<BackendName, Backend> = {
-	webgpu: { name: "webgpu", load: () => import("@decks/stage").then(started), watch: webgpu.watch },
+	webgpu: { name: "webgpu", load: (compiled) => import("@decks/stage").then((module) => started(module, compiled)), watch: webgpu.watch },
 	// The same calls; only the wasm's own exports (`InitOutput`) differ between the builds.
-	webgl2: { name: "webgl2", load: () => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule)), watch: webgl.watch },
+	webgl2: { name: "webgl2", load: (compiled) => import("@decks/stage/gl").then((module) => started(module as unknown as StageModule, compiled)), watch: webgl.watch },
 };
 
-async function started(module: StageModule): Promise<StageModule> {
-	await module.default();
+async function started(module: StageModule, compiled?: WebAssembly.Module): Promise<StageModule> {
+	await module.default(compiled ? { module_or_path: compiled } : undefined);
 	return module;
 }
 

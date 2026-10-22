@@ -565,6 +565,13 @@ impl PageEngine {
 	}
 }
 
+/// This engine's compiled `WebAssembly.Module`, which the page posts to its render worker so the
+/// worker instantiates it rather than fetch and compile its own copy.
+#[wasm_bindgen(js_name = engineModule)]
+pub fn wasm_module() -> JsValue {
+	wasm_bindgen::module()
+}
+
 #[wasm_bindgen]
 pub struct WorkerEngine {
 	worker: Worker,

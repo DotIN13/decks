@@ -23,7 +23,7 @@ import { BoxIndex, type Rect } from "../spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
-import { detect, type Detected } from "./backends/detect.ts";
+import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { noticeFor } from "./backends/notice.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
@@ -69,6 +69,14 @@ type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tile
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
+
+type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
+
+/** The engine's compiled module, for the worker to start from (`boot`). */
+function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
+	const module: unknown = stage.engineModule();
+	return module instanceof WebAssembly.Module ? module : undefined;
+}
 
 /** What the page engine laid out again since it was last asked (`Page::layout_changes`). */
 type LayoutChanges = {
@@ -121,7 +129,11 @@ export class StageEngine {
 	 */
 	private picturesAsked = new Map<string, { url: string; source: string; tries: number; size?: number; failed?: number }>();
 	/** Fonts loaded, kept to give an engine started again after its device was lost. */
-	private fonts: Array<{ family: string; bytes: Uint8Array; fallback: boolean }> = [];
+	/**
+	 * The font files fetched, kept for an engine started again as the file (`blob`); `bytes` until
+	 * both engines have them, then handed (transferred, not copied) to the worker.
+	 */
+	private fonts: Font[] = [];
 	private iconsAsked = new Set<string>();
 	private fetching = 0;
 	private lifted = new Set<string>();
@@ -205,12 +217,38 @@ export class StageEngine {
 	}
 
 	private async start(over: HTMLCanvasElement): Promise<void> {
+		try {
+			await this.open(over);
+		} catch (error) {
+			// A worker started for an engine that did not come up is let go with it.
+			if (!this.page) {
+				this.worker?.terminate();
+				this.worker = undefined;
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Start both engines, side by side: the worker is made first, so its script loads while the page
+	 * finds its backend and compiles the engine; it is then handed the compiled module (`boot`) and
+	 * opens its device while the page opens its own, and it makes its engine when the drawing comes
+	 * (`init`). Each used to wait for the one before.
+	 */
+	private async open(over: HTMLCanvasElement): Promise<void> {
 		this.prefetchFonts();
+		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
+		this.posted = 0;
+		this.postedContent = 0;
+		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		const found = (this.detected ??= await detect());
 		const stage = await found.backend.load();
 		if (this.disposed) return;
+		this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
 		this.fitCanvases();
 		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
+		// Fonts already handed to an engine before (this is a restart) are read from their files again.
+		await Promise.all(this.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
 		if (this.disposed) return gpu.free();
 		this.backend = gpu.backend();
 		this.maxPicture = gpu.maxPictureSize();
@@ -224,21 +262,21 @@ export class StageEngine {
 				return { paths: new Set(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedBy };
 			},
 		};
-		this.page = new stage.PageEngine(doc, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
+		// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
+		this.page = new stage.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
 		this.page.setMath(mathTypesetter());
+		if (doc !== EMPTY) this.page.setDocument(doc);
 		this.paused = false;
-		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
-		this.posted = 0;
-		this.postedContent = 0;
-		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		// Fonts already here go to both engines now; those still coming (asked for before the engine
 		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
 		this.giveFonts(this.fonts, false);
 		this.needFonts();
 		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc });
 		this.postFonts(this.fonts);
+		// The camera now, not when the worker says it is ready: a page busy laying out fonts heard that late.
+		this.sendCamera();
 		this.unwatch = found.backend.watch(over, { lost: () => this.lose(), restored: () => void this.restart(), isLost: () => this.page?.lost() ?? false });
 		this.viewKey = "";
 		this.sendView();
@@ -351,7 +389,6 @@ export class StageEngine {
 				break;
 			case "ready":
 				this.workerBackend = message.backend;
-				this.sendCamera();
 				break;
 		}
 	}
@@ -475,6 +512,9 @@ export class StageEngine {
 	private whole(doc: PenDocument | undefined): void {
 		const text = doc ? JSON.stringify(doc) : EMPTY;
 		this.page?.setDocument(text);
+		// The fonts its words name are asked for first, so a worker still to paint its first view hears
+		// they are coming before it has the drawing, and waits for them rather than paint it twice.
+		this.needFonts();
 		this.post({ type: "doc", doc: text, dark: this.scheme === "dark" });
 	}
 
@@ -1035,7 +1075,9 @@ export class StageEngine {
 				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
 					try {
 						const response = await fetch(url);
-						if (response.ok) return { file, bytes: new Uint8Array(await response.arrayBuffer()) };
+						if (!response.ok) continue;
+						const blob = await response.blob();
+						return { file, blob, bytes: new Uint8Array(await blob.arrayBuffer()) };
 					} catch {
 						/* the next address */
 					}
@@ -1045,7 +1087,7 @@ export class StageEngine {
 		).then((loaded) => {
 			this.fontsPending -= files.length;
 			// Kept first: an engine started (or started again) is given them from here.
-			const fonts = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
+			const fonts: Font[] = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, blob: one.blob, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
 			this.fonts.push(...fonts);
 			if (!this.page || this.disposed) return;
 			this.giveFonts(fonts, true);
@@ -1057,18 +1099,24 @@ export class StageEngine {
 	 * Fonts to the page's engine, in the order the chain lists them (so fallbacks are tried in the
 	 * app's order), laid out once for all of them; `show` lays the stage out for the stage and draws.
 	 */
-	private giveFonts(fonts: ReadonlyArray<{ family: string; bytes: Uint8Array; fallback: boolean }>, show: boolean): void {
+	private giveFonts(fonts: readonly Font[], show: boolean): void {
 		if (!this.page || !fonts.length) return;
-		for (const { family, bytes, fallback } of fonts) this.page.addFont(family, bytes, fallback, true);
+		for (const { family, bytes, fallback } of fonts) if (bytes) this.page.addFont(family, bytes, fallback, true);
 		this.page.layOut();
 		if (!show) return;
 		this.laidOut();
 		this.draw();
 	}
 
-	/** The same fonts to the worker, in one message (none, when every file failed: it hears how many are still due): it lays out and paints once for all of them. */
-	private postFonts(fonts: ReadonlyArray<{ family: string; bytes: Uint8Array; fallback: boolean }>): void {
-		this.post({ type: "fonts", fonts: fonts.map(({ family, bytes, fallback }) => ({ name: family, bytes, fallback })), due: this.fontsPending });
+	/**
+	 * The same fonts to the worker, in one message (none, when every file failed: it hears how many
+	 * are still due): it lays out and paints once for all of them. Their bytes are transferred, not
+	 * copied (the page's engine has copied them already); the files are kept.
+	 */
+	private postFonts(fonts: readonly Font[]): void {
+		const sent = fonts.filter((font): font is Font & { bytes: Uint8Array } => !!font.bytes);
+		this.post({ type: "fonts", fonts: sent.map(({ family, bytes, fallback }) => ({ name: family, bytes, fallback })), due: this.fontsPending }, sent.map((font) => font.bytes.buffer as ArrayBuffer));
+		for (const font of sent) delete (font as Font).bytes;
 	}
 
 	// --- gestures --------------------------------------------------------------------------------
