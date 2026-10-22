@@ -22,7 +22,7 @@ import { docIndex, drawnNodes } from "../pen/doc-index.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
-import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
+import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
 import { noticeFor } from "./backends/notice.ts";
 
@@ -105,6 +105,24 @@ export function pixelsFirst(): boolean {
 	const agent = typeof navigator === "undefined" ? "" : navigator.userAgent;
 	return /AppleWebKit\//.test(agent) && !/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(agent);
 }
+
+/**
+ * How much of a frame the page spends taking the worker's tiles in (`takeTiles`): this many
+ * milliseconds, and under WebKit, whose clock counts whole milliseconds, no more than `bytes` tiles
+ * of bytes or `pictures` tiles of pictures a frame either; what is left waits for the next frame,
+ * the window's tiles first. A pinch's tiles taken in all at once held frames on an iPad mini for
+ * 40 to 100 ms. `globalThis.__decksTileBudget` changes it, for measuring.
+ */
+const TILE_BUDGET = { ms: 4, bytes: 3, pictures: 2 };
+const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...(globalThis as { __decksTileBudget?: Partial<typeof TILE_BUDGET> }).__decksTileBudget });
+/** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
+const tileScale = new DataView(new ArrayBuffer(4));
+function tileArea(t: { scale: number; x: number; y: number }): [number, number, number] {
+	tileScale.setUint32(0, t.scale);
+	const side = TILE_SIDE / tileScale.getFloat32(0);
+	return [t.x * side, t.y * side, side];
+}
+const TILE_SIDE = 512;
 
 /** The engine's compiled module, for the worker to start from (`boot`). */
 function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
@@ -328,6 +346,7 @@ export class StageEngine {
 	private lose(): void {
 		if (this.paused) return;
 		this.paused = true;
+		this.dropTileQueue();
 		this.worker?.terminate();
 		this.worker = undefined;
 		this.page?.free();
@@ -381,33 +400,31 @@ export class StageEngine {
 		}
 		switch (message.type) {
 			case "tiles":
-				this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
-				// Nothing painted (the worker says it has nothing left for this camera): the frame on screen, or the one coming, is filled in.
-				if (!message.tiles.length) {
+				// Nothing painted (the worker says it has nothing left for this camera) and nothing waiting: the frame on screen, or the one coming, is filled in.
+				if (!message.tiles.length && !this.tileQueue.length) {
+					this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
 					if (this.settledNext && !this.drawFrame) {
 						this.settledNext = false;
 						sheetStats().settledAt = performance.now();
 					}
 					break;
 				}
+				// Taken in at the next frames, a few a frame (`takeTiles`); a tile painted again replaces the one waiting.
 				for (const t of message.tiles) {
-					if (t.bitmap) this.page.putTile(t.scale, t.x, t.y, t.bitmap);
-					else {
-						this.page.putTilePixels(t.scale, t.x, t.y, new Uint8Array(t.pixels), t.stride);
-						sheetStats().pixelTiles = (sheetStats().pixelTiles ?? 0) + 1;
-					}
+					const key = `${t.scale},${t.x},${t.y}`;
+					const i = this.tileQueue.findIndex((q) => q.key === key);
+					if (i >= 0) this.tileQueue.splice(i, 1)[0]?.tile.bitmap?.close();
+					this.tileQueue.push({ key, tile: t });
 				}
-				sheetStats().tiles = (sheetStats().tiles ?? 0) + message.tiles.length;
-				if (message.left === 0 && message.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
-				{
-					const gone = JSON.parse(this.page.evict()) as Array<[number, number, number]>;
-					if (gone.length) this.post({ type: "dropped", keys: gone });
-				}
-				// On screen with the next frame's one draw, however many batches come before it.
-				this.seenAtDraw = this.sent;
-				this.drawSoon();
+				// What the worker says of the latest batch holds once every tile before it is in.
+				this.tileBatch = { left: message.left, rest: message.rest ?? message.left, got: message.got, sent: this.sent };
+				this.takeTilesSoon();
 				break;
 			case "discarded":
+				if (this.tileQueue.length) {
+					const gone = new Set(message.keys.map(([sc, x, y]) => `${sc},${x},${y}`));
+					this.tileQueue = this.tileQueue.filter((q) => !gone.has(q.key) || void q.tile.bitmap?.close());
+				}
 				this.page.forgetTiles(JSON.stringify(message.keys));
 				this.drawSoon();
 				break;
@@ -824,6 +841,90 @@ export class StageEngine {
 		});
 	}
 	private drawFrame = 0;
+
+	/** Tiles from the worker not yet taken in, oldest first, and what it said with the latest batch. */
+	private tileQueue: Array<{ key: string; tile: TileFromWorker }> = [];
+	private tileBatch: { left: number; rest: number; got: number; sent: number } | undefined;
+	private tileFrame = 0;
+	private coarseClock: boolean | undefined;
+
+	/** Take tiles in at the next frame, and draw them in it. */
+	private takeTilesSoon(): void {
+		if (this.tileFrame) return;
+		this.tileFrame = requestAnimationFrame(() => {
+			this.tileFrame = 0;
+			if (!this.disposed) this.takeTiles();
+		});
+	}
+
+	/**
+	 * Take in the tiles waiting, the window's first, until this frame's share (`TILE_BUDGET`) is
+	 * spent, and draw; what is left is taken at the next frame. When none is left, what the worker
+	 * said with its latest batch holds: the window sharp (`sharpAt`), or filled in (`settledAt`).
+	 */
+	private takeTiles(): void {
+		const page = this.page;
+		if (!page || this.paused) return this.dropTileQueue();
+		const queue = this.tileQueue;
+		if (!queue.length) return;
+		const budget = tileBudget();
+		// Counted too where the clock is coarse (WebKit, where tiles come as bytes).
+		const coarse = (this.coarseClock ??= pixelsFirst());
+		// The window's tiles first, in the order they came.
+		if (queue.length > 1) {
+			const { x, y } = this.corner();
+			const w = this.view.width / this.camera.zoom;
+			const h = this.view.height / this.camera.zoom;
+			const seen = (t: TileFromWorker) => {
+				const [tx, ty, side] = tileArea(t);
+				return tx < x + w && tx + side > x && ty < y + h && ty + side > y;
+			};
+			const inView = queue.filter((q) => seen(q.tile));
+			if (inView.length && inView.length < queue.length) this.tileQueue = [...inView, ...queue.filter((q) => !seen(q.tile))];
+		}
+		const start = performance.now();
+		let bytes = 0;
+		let pictures = 0;
+		let taken = 0;
+		for (let first = this.tileQueue[0]; first; first = this.tileQueue[0]) {
+			const next = first.tile;
+			if (taken > 0) {
+				if (performance.now() - start >= budget.ms) break;
+				if (coarse && (next.bitmap ? pictures >= budget.pictures : bytes >= budget.bytes)) break;
+			}
+			this.tileQueue.shift();
+			if (next.bitmap) {
+				page.putTile(next.scale, next.x, next.y, next.bitmap);
+				pictures++;
+			} else {
+				page.putTilePixels(next.scale, next.x, next.y, new Uint8Array(next.pixels), next.stride);
+				sheetStats().pixelTiles = (sheetStats().pixelTiles ?? 0) + 1;
+				bytes++;
+			}
+			taken++;
+		}
+		sheetStats().tiles = (sheetStats().tiles ?? 0) + taken;
+		const gone = JSON.parse(page.evict()) as Array<[number, number, number]>;
+		if (gone.length) this.post({ type: "dropped", keys: gone });
+		const batch = this.tileBatch;
+		if (!this.tileQueue.length && batch) {
+			this.tileBatch = undefined;
+			this.settledNext = batch.rest === 0 && batch.got >= this.posted && this.fontsPending === 0;
+			if (batch.left === 0 && batch.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
+			this.seenAtDraw = batch.sent;
+		}
+		this.draw();
+		if (this.tileQueue.length) this.takeTilesSoon();
+	}
+
+	/** Let go of the tiles waiting: the engine they were for is gone. */
+	private dropTileQueue(): void {
+		for (const q of this.tileQueue) q.tile.bitmap?.close();
+		this.tileQueue = [];
+		this.tileBatch = undefined;
+		cancelAnimationFrame(this.tileFrame);
+		this.tileFrame = 0;
+	}
 	/** What had been sent when the tiles that arrived last were asked for: shown once they are drawn. */
 	private seenAtDraw = 0;
 
@@ -1542,6 +1643,7 @@ export class StageEngine {
 	dispose(): void {
 		this.disposed = true;
 		cancelAnimationFrame(this.drawFrame);
+		this.dropTileQueue();
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
 		this.worker?.terminate();
