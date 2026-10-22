@@ -1115,7 +1115,12 @@ export function App() {
 
 	/** The editor on screen (`createEditor`), for what this app asks of it from outside: a board's page loaded again. */
 	const [editorHandle, setEditorHandle] = createSignal<CanvasHandle>();
-	// A board whose page has to load again without a new revision (`state.nonces`): told to the editor.
+	// The app's scheme, to the editor at each switch: it draws ink, cards and board pages in it.
+	createEffect(() => {
+		const dark = scheme() === "dark";
+		untrack(editorHandle)?.setDark(dark);
+	});
+		// A board whose page has to load again without a new revision (`state.nonces`): told to the editor.
 	let nonces: Record<string, unknown> | undefined;
 	createEffect(() => {
 		const now: Record<string, unknown> = { ...(state.nonces ?? {}) };
@@ -1161,6 +1166,8 @@ export function App() {
 						 */
 						const editor = createEditor({
 							text: "",
+							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
+							dark: untrack(scheme) === "dark",
 							renderer: current.renderer,
 							toolbar: false,
 							state: {
