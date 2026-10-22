@@ -195,15 +195,17 @@ impl Page {
 	/// starts again from them. A drag's step re-lays only the arrows it bends; an edit, what it reached.
 	///
 	/// `{ all, roots: [{ id, base, items: [[id, x, y, w, h, parent, i, theme]], cards: [{ id, i, box, pad, links, scrollers }] }], removed: [id], bases: [[id, base]] }`:
-	/// an item's paint order is its root's `base` plus `i` plus one, as in `layout_json`.
+	/// an item's paint order is its root's `base` plus `i` plus one, as in `layout_json`. With `all`
+	/// only `tops` is said, `[[id, base, items]]` for every root: the page reads `layout_json` and
+	/// `cards_json` whole, which is quicker to make and to read than the same thing root by root.
 	pub fn layout_changes(&mut self) -> Value {
 		self.layout_calls += 1;
 		let call = self.layout_calls;
-		let mut roots = Vec::new();
+		let mut changed = Vec::new();
 		let mut bases = Vec::new();
 		let mut removed = Vec::new();
 		let mut order = 0u32;
-		for root in &self.scene.roots {
+		for (at, root) in self.scene.roots.iter().enumerate() {
 			let base = order;
 			order += root.tree.items.len() as u32;
 			match self.sent_layout.get_mut(&root.handle) {
@@ -220,12 +222,12 @@ impl Page {
 							removed.push(Value::String(std::mem::take(&mut old.id)));
 						}
 					}
-					roots.push(self.root_json(root, base));
+					changed.push((at, base));
 					self.sent_layout.insert(root.handle, SentRoot { id: root.id.clone(), version: root.version, base, seen: call });
 				}
 			}
 		}
-		if self.sent_layout.len() > self.scene.roots.len() || removed.len() + roots.len() + bases.len() > 0 {
+		if self.sent_layout.len() > self.scene.roots.len() || removed.len() + changed.len() + bases.len() > 0 {
 			self.sent_layout.retain(|_, sent| {
 				if sent.seen == call {
 					return true;
@@ -236,8 +238,22 @@ impl Page {
 				false
 			});
 		}
-		let all = roots.len() == self.scene.roots.len();
-		json!({ "all": all, "roots": roots, "removed": removed, "bases": bases })
+		if changed.len() == self.scene.roots.len() {
+			let mut base = 0u32;
+			let tops: Vec<Value> = self
+				.scene
+				.roots
+				.iter()
+				.map(|root| {
+					let top = json!([root.id, base, root.tree.items.len()]);
+					base += root.tree.items.len() as u32;
+					top
+				})
+				.collect();
+			return json!({ "all": true, "tops": tops, "roots": [], "removed": [], "bases": [] });
+		}
+		let roots: Vec<Value> = changed.into_iter().map(|(at, base)| self.root_json(&self.scene.roots[at], base)).collect();
+		json!({ "all": false, "roots": roots, "removed": removed, "bases": bases })
 	}
 
 	/// One root's items as `layout_json` has them (with their index in the root for the order) and its cards.
@@ -1227,10 +1243,8 @@ mod tests {
 		let mut page = Page::new(doc, false, "s").unwrap();
 		let ids = |v: &Value, key: &str| -> Vec<String> { v[key].as_array().unwrap().iter().map(|r| if r.is_string() { r.as_str().unwrap().to_owned() } else if r.is_array() { r[0].as_str().unwrap().to_owned() } else { r["id"].as_str().unwrap().to_owned() }).collect() };
 		let first = page.layout_changes();
-		assert_eq!(first["all"], true);
-		assert_eq!(ids(&first, "roots"), ["a", "f", "e"]);
-		assert_eq!(first["roots"][1]["items"].as_array().unwrap().len(), 2);
-		assert_eq!(first["roots"][2]["base"], 3);
+		assert_eq!(first["all"], true, "the first time, read whole");
+		assert_eq!(ids(&first, "roots").len(), 0);
 		let none = page.layout_changes();
 		assert_eq!((none["all"].as_bool(), ids(&none, "roots").len(), ids(&none, "removed").len(), ids(&none, "bases").len()), (Some(false), 0, 0, 0));
 		// A child edited: only its top-level item, with the child where it went.
@@ -1264,8 +1278,12 @@ mod tests {
 		page.set_document(doc).unwrap();
 		let again = page.layout_changes();
 		assert_eq!(again["all"], true);
-		assert_eq!(ids(&again, "roots"), ["a", "f", "e"]);
-		assert_eq!(ids(&again, "removed"), ["n"]);
+		// One root changed of three: told root by root, with its items and their place in it.
+		edit(&mut page, r#"[{"op":"set","id":"e","key":"x","value":700}]"#);
+		let e = page.layout_changes();
+		assert_eq!((e["all"].as_bool(), ids(&e, "roots")), (Some(false), vec!["e".to_owned()]));
+		assert_eq!(e["roots"][0]["base"], 3);
+		assert_eq!(e["roots"][0]["items"][0][6], 0);
 	}
 
 	#[test]

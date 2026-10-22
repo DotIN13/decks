@@ -68,6 +68,8 @@ const EMPTY = '{"version":"2.14","children":[]}';
 /** What the page engine laid out again since it was last asked (`Page::layout_changes`). */
 type LayoutChanges = {
 	all: boolean;
+	/** With `all`: every top-level item, its first paint order and how many items it holds. */
+	tops?: Array<[string, number, number]>;
 	roots: Array<{ id: string; base: number; items: Array<[string, number, number, number, number, string | null, number, ThemeState]>; cards: RootCard[] }>;
 	removed: string[];
 	bases: Array<[string, number]>;
@@ -479,11 +481,7 @@ export class StageEngine {
 				bounds.delete(id);
 			}
 		};
-		if (changes.all) {
-			placed.clear();
-			bounds.clear();
-			this.laid.clear();
-		}
+		if (changes.all) return this.laidOutWhole(changes.tops ?? [], nodes, quiet);
 		// Whether the map is still in paint order after the changes: items set again keep their place, new ones go last.
 		let inOrder = changes.bases.length === 0;
 		let last = -1;
@@ -536,6 +534,43 @@ export class StageEngine {
 			this.placedIndex = undefined;
 		}
 		this.drawnDoc = doc;
+		if (quiet) return;
+		this.writeHits();
+		this.drawn?.();
+	}
+	/** Everything laid out again (a new drawing, the scheme, a font): read whole, in one list and one of cards. */
+	private laidOutWhole(tops: Array<[string, number, number]>, nodes: Map<string, PenNode>, quiet: boolean): void {
+		if (!this.page) return;
+		const placed = new Map<string, Placed>();
+		this.laid.clear();
+		const roots = tops.map(([id, base, count]) => {
+			const root: RootLaid = { base, items: [], cards: [] };
+			this.laid.set(id, root);
+			return { root, end: base + count };
+		});
+		let at = 0;
+		const rootFor = (order: number) => {
+			while (at < roots.length && order > roots[at]!.end) at++;
+			return roots[at]?.root;
+		};
+		for (const [id, x, y, w, h, parent, order, theme] of JSON.parse(this.page.layout()) as Array<[string, number, number, number, number, string | null, number, ThemeState]>) {
+			const node = nodes.get(id);
+			if (!node) continue;
+			placed.set(id, { node, box: { x, y, w, h }, parent: parent ?? undefined, theme, order });
+			const root = rootFor(order);
+			root?.items.push([id, order - root.base - 1]);
+		}
+		at = 0;
+		for (const { order, ...card } of JSON.parse(this.page.cards()) as CardGeometry[]) {
+			const root = rootFor(order);
+			root?.cards.push({ ...card, i: order - root.base - 1 });
+		}
+		this.placed = placed;
+		this.bounds = boundsOf(placed);
+		this.cardList = undefined;
+		this.placedList = undefined;
+		this.placedIndex = undefined;
+		this.drawnDoc = this.doc;
 		if (quiet) return;
 		this.writeHits();
 		this.drawn?.();
