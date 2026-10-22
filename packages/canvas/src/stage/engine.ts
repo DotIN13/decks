@@ -825,8 +825,23 @@ export class StageEngine {
 		if (!this.view.width) return;
 		// The worker paints tiles for the slack too, so a pan slides onto drawing rather than an empty margin.
 		const { x, y, zoom, width, height } = this.drawRect();
-		this.post({ type: "camera", x, y, zoom, dpr: Math.min(2, devicePixelRatio || 1), width, height, moving: this.moving });
+		const dpr = Math.min(2, devicePixelRatio || 1);
+		// Pinching, the tiles are painted at half the screen's density (`setPinching`).
+		this.post({ type: "camera", x, y, zoom, dpr: this.pinching && this.moving ? dpr / 2 : dpr, width, height, moving: this.moving });
 	}
+
+	/**
+	 * Fingers are pinching the stage (not a pan, not a wheel): while they do, the worker paints its
+	 * tiles at half the screen's density, a quarter of the pixels a tile, and the sharp ones when they
+	 * lift. A pinch on an iPad mini asked for 35 to 135 tiles, each about 2 ms of the worker's time
+	 * and a copy into the page's texture; text is soft only while the fingers move.
+	 */
+	setPinching(on: boolean): void {
+		if (on === this.pinching) return;
+		this.pinching = on;
+		if (this.moving) this.sendCamera();
+	}
+	private pinching = false;
 
 	/**
 	 * Draw in the next frame, once, however many of the worker's messages come before it. The worker

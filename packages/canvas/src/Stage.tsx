@@ -1432,6 +1432,8 @@ export function Stage(props: {
 	let noCoast = false;
 	/** The gesture so far has been a pinch: its lift ends the moving state at once (`stoppedMoving`). */
 	let pinched = false;
+	/** Tiles at half density while pinching (`StageEngine.setPinching`); `__decksHalfPinch = false` turns it off, for measuring. */
+	const halfWhilePinching = () => (globalThis as { __decksHalfPinch?: boolean }).__decksHalfPinch !== false;
 	/**
 	 * A finger of this document's, in the stage's own coordinates.
 	 *
@@ -1471,6 +1473,7 @@ export function Stage(props: {
 				trail = [];
 				if (thrown) coast(thrown);
 				else if (pinched) stoppedMoving();
+				penLayer.setPinching(false);
 			}
 			return { kind: "idle" };
 		}
@@ -1478,6 +1481,7 @@ export function Stage(props: {
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
 			noCoast = true;
+			if (!pinched && halfWhilePinching()) penLayer.setPinching(true);
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
