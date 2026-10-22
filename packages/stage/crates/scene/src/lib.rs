@@ -15,6 +15,12 @@ use serde_json::Value;
 use stage_doc::{Applied, Document, Handle};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Root versions, counted across every scene in the process: a scene made again (a new document, the
+/// other scheme) never gives a root a version an earlier scene's root had, so what is keyed on one
+/// (the painter's caches, the page's last layout sent, `Page::layout_changes`) never mistakes the two.
+static VERSIONS: AtomicU64 = AtomicU64::new(0);
 
 use geometry::Mat;
 use index::Index;
@@ -154,6 +160,33 @@ impl Scene {
 			updated.reordered = a.parents.contains(&None);
 			refs_too |= updated.reordered;
 		}
+		// The common change, a drag's step or an edit: items inside top-level items that stay where
+		// they are, nothing reusable. Those roots are laid out again in place, and the index of the
+		// top level refitted to their new extents, rather than every root moved through a map.
+		if !all && !updated.reordered && !refs_too && !dirty.is_empty() {
+			dirty.sort_unstable();
+			dirty.dedup();
+			let kept = dirty.iter().all(|h| self.at.get(h).is_some_and(|&i| doc.node(*h).is_some_and(|n| n.id == self.roots[i].id)));
+			if kept {
+				let sources = Sources::new(doc);
+				let mut refit = true;
+				for h in dirty {
+					let i = self.at[&h];
+					let before = self.roots[i].extent;
+					self.versions = VERSIONS.fetch_add(1, Ordering::Relaxed) + 1;
+					self.roots[i] = self.build(&sources, h, measure);
+					let after = self.roots[i].extent;
+					if after != before {
+						refit = refit && self.top.refit(i as u32, after);
+					}
+					updated.roots.push((h, Some(before)));
+				}
+				if !refit {
+					self.top = Index::build(self.roots.iter().enumerate().map(|(i, r)| (i as u32, r.extent)));
+				}
+				return updated;
+			}
+		}
 		let top = doc.child_list(None);
 		let mut old: HashMap<Handle, Root> = std::mem::take(&mut self.roots).into_iter().map(|r| (r.handle, r)).collect();
 		let sources = Sources::new(doc);
@@ -176,7 +209,7 @@ impl Scene {
 			match kept {
 				Some(root) if !stale => roots.push(root),
 				kept => {
-					self.versions += 1;
+					self.versions = VERSIONS.fetch_add(1, Ordering::Relaxed) + 1;
 					updated.roots.push((handle, kept.map(|r| r.extent)));
 					roots.push(self.build(&sources, handle, measure));
 				}

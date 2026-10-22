@@ -427,6 +427,13 @@ impl PageEngine {
 		self.page.layout_json().to_string()
 	}
 
+	/// The layout as it changed since the last call (`Page::layout_changes`): what the page reads after
+	/// each change instead of `layout` and `cards` whole.
+	#[wasm_bindgen(js_name = layoutChanges)]
+	pub fn layout_changes(&mut self) -> String {
+		self.page.layout_changes().to_string()
+	}
+
 	/// Every item under a stage point, topmost first.
 	#[wasm_bindgen(js_name = pickAll)]
 	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> String {

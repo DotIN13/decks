@@ -87,6 +87,18 @@ pub struct Page {
 	scales: Option<(u32, Vec<u32>)>,
 	frame: u64,
 	next_texture: u32,
+	/// What `layout_changes` last told the page, by root: its id, version and first paint order.
+	sent_layout: HashMap<stage_doc::Handle, SentRoot>,
+	/// Counts `layout_changes` calls, to find the roots that went (`SentRoot::seen` behind it).
+	layout_calls: u64,
+}
+
+/// A root as `layout_changes` last reported it.
+struct SentRoot {
+	id: String,
+	version: u64,
+	base: u32,
+	seen: u64,
 }
 
 impl Page {
@@ -95,7 +107,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1 })
+		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -175,6 +187,92 @@ impl Page {
 		Value::Array(out)
 	}
 
+	/// The layout as it changed since the last call: the roots laid out again (new ones included) with
+	/// their items and cards, the ones gone, and the roots kept whose first paint order moved. `all`
+	/// when every root is in `roots` (the first call, a new document, the scheme, a font), so the page
+	/// starts again from them. A drag's step re-lays only the arrows it bends; an edit, what it reached.
+	///
+	/// `{ all, roots: [{ id, base, items: [[id, x, y, w, h, parent, i, theme]], cards: [{ id, i, box, pad, links, scrollers }] }], removed: [id], bases: [[id, base]] }`:
+	/// an item's paint order is its root's `base` plus `i` plus one, as in `layout_json`.
+	pub fn layout_changes(&mut self) -> Value {
+		self.layout_calls += 1;
+		let call = self.layout_calls;
+		let mut roots = Vec::new();
+		let mut bases = Vec::new();
+		let mut removed = Vec::new();
+		let mut order = 0u32;
+		for root in &self.scene.roots {
+			let base = order;
+			order += root.tree.items.len() as u32;
+			match self.sent_layout.get_mut(&root.handle) {
+				Some(sent) if sent.id == root.id && sent.version == root.version => {
+					if sent.base != base {
+						sent.base = base;
+						bases.push(json!([root.id, base]));
+					}
+					sent.seen = call;
+				}
+				sent => {
+					if let Some(old) = sent {
+						if old.id != root.id {
+							removed.push(Value::String(std::mem::take(&mut old.id)));
+						}
+					}
+					roots.push(self.root_json(root, base));
+					self.sent_layout.insert(root.handle, SentRoot { id: root.id.clone(), version: root.version, base, seen: call });
+				}
+			}
+		}
+		if self.sent_layout.len() > self.scene.roots.len() || removed.len() + roots.len() + bases.len() > 0 {
+			self.sent_layout.retain(|_, sent| {
+				if sent.seen == call {
+					return true;
+				}
+				if !sent.id.is_empty() {
+					removed.push(Value::String(std::mem::take(&mut sent.id)));
+				}
+				false
+			});
+		}
+		let all = roots.len() == self.scene.roots.len();
+		json!({ "all": all, "roots": roots, "removed": removed, "bases": bases })
+	}
+
+	/// One root's items as `layout_json` has them (with their index in the root for the order) and its cards.
+	fn root_json(&self, root: &stage_scene::Root, base: u32) -> Value {
+		let mut items = Vec::new();
+		let mut cards = Vec::new();
+		for (i, (item, place)) in root.tree.items.iter().zip(&root.placed).enumerate() {
+			if !place.visible {
+				continue;
+			}
+			let r = place.rect;
+			let parent = item.parent.map(|p| root.tree.items[p as usize].id.as_str());
+			let theme: serde_json::Map<String, Value> = place.theme.0.iter().map(|(k, v)| (k.clone(), Value::String(v.clone()))).collect();
+			items.push(json!([item.id, r.x, r.y, r.w, r.h, parent, i, theme]));
+			if let Some(mut card) = self.card_json(item, place) {
+				card["i"] = json!(i);
+				cards.push(card);
+			}
+		}
+		json!({ "id": root.id, "base": base, "items": items, "cards": cards })
+	}
+
+	/// A markdown card's links and wide tables, without its order; `None` for anything else.
+	fn card_json(&self, item: &stage_scene::tree::Item, place: &stage_scene::layout::Placed) -> Option<Value> {
+		if !place.visible || !stage_text::is_markdown(item) {
+			return None;
+		}
+		let Some(Value::String(content)) = self.scene.vars.resolve(item.get("content"), &place.theme) else { return None };
+		let pad = if item.kind() == "text" { 0.0 } else { stage_scene::layout::NOTE_PAD };
+		let style = stage_scene::layout::text_style(item, &self.scene.vars, &place.theme);
+		let card = self.text.card(content, &style, (place.rect.w - pad * 2.0).max(1.0) as f32, stage_text::Align::Left);
+		let r = place.rect;
+		let links: Vec<Value> = card.links.iter().map(|(x, y, w, h, href, s)| json!({ "x": x, "y": y, "w": w, "h": h, "href": href, "scroller": s })).collect();
+		let scrollers: Vec<Value> = card.scrollers.iter().map(|(x, y, w, h, c)| json!({ "x": x, "y": y, "w": w, "h": h, "content": c })).collect();
+		Some(json!({ "id": item.id, "box": { "x": r.x, "y": r.y, "w": r.w, "h": r.h }, "pad": pad, "links": links, "scrollers": scrollers }))
+	}
+
 	/// The ids of every item under a stage point, topmost first.
 	pub fn pick_all(&self, x: f64, y: f64, slop: f64) -> Value {
 		let ids: Vec<&str> = self.scene.pick_all(x, y, slop).into_iter().map(|(r, i)| self.scene.roots[r as usize].tree.items[i as usize].id.as_str()).collect();
@@ -184,23 +282,15 @@ impl Page {
 	/// Each markdown card's links and wide tables, for a press to be answered with: `{ id, order,
 	/// box, pad, links, scrollers }`, the links and tables from the card's words' top-left.
 	pub fn cards_json(&self) -> Value {
-		let vars = &self.scene.vars;
 		let mut out = Vec::new();
 		let mut order = 0u32;
 		for root in &self.scene.roots {
 			for (item, place) in root.tree.items.iter().zip(&root.placed) {
 				order += 1;
-				if !place.visible || !stage_text::is_markdown(item) {
-					continue;
+				if let Some(mut card) = self.card_json(item, place) {
+					card["order"] = json!(order);
+					out.push(card);
 				}
-				let Some(Value::String(content)) = vars.resolve(item.get("content"), &place.theme) else { continue };
-				let pad = if item.kind() == "text" { 0.0 } else { stage_scene::layout::NOTE_PAD };
-				let style = stage_scene::layout::text_style(item, vars, &place.theme);
-				let card = self.text.card(content, &style, (place.rect.w - pad * 2.0).max(1.0) as f32, stage_text::Align::Left);
-				let r = place.rect;
-				let links: Vec<Value> = card.links.iter().map(|(x, y, w, h, href, s)| json!({ "x": x, "y": y, "w": w, "h": h, "href": href, "scroller": s })).collect();
-				let scrollers: Vec<Value> = card.scrollers.iter().map(|(x, y, w, h, c)| json!({ "x": x, "y": y, "w": w, "h": h, "content": c })).collect();
-				out.push(json!({ "id": item.id, "order": order, "box": { "x": r.x, "y": r.y, "w": r.w, "h": r.h }, "pad": pad, "links": links, "scrollers": scrollers }));
 			}
 		}
 		Value::Array(out)
@@ -1043,6 +1133,56 @@ mod tests {
 		assert!(screen.len() == 4 && screen.iter().all(|&(x, y)| y == 17 && (15..=18).contains(&x)), "{screen:?}");
 		assert_eq!(overview, [(0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (2, 4), (3, 4), (4, 4)].into_iter().collect(), "{dropped:?}");
 		assert!(paint_all(&mut worker).is_empty());
+	}
+
+	#[test]
+	fn the_layout_is_told_as_it_changed() {
+		let doc = r#"{"version":"2.14","children":[
+			{"type":"rectangle","id":"a","x":0,"y":0,"width":100,"height":100},
+			{"type":"frame","id":"f","layout":"none","x":300,"y":0,"width":200,"height":200,"children":[{"type":"rectangle","id":"k","x":10,"y":10,"width":20,"height":20}]},
+			{"type":"ellipse","id":"e","x":600,"y":0,"width":50,"height":50}]}"#;
+		let mut page = Page::new(doc, false, "s").unwrap();
+		let ids = |v: &Value, key: &str| -> Vec<String> { v[key].as_array().unwrap().iter().map(|r| if r.is_string() { r.as_str().unwrap().to_owned() } else if r.is_array() { r[0].as_str().unwrap().to_owned() } else { r["id"].as_str().unwrap().to_owned() }).collect() };
+		let first = page.layout_changes();
+		assert_eq!(first["all"], true);
+		assert_eq!(ids(&first, "roots"), ["a", "f", "e"]);
+		assert_eq!(first["roots"][1]["items"].as_array().unwrap().len(), 2);
+		assert_eq!(first["roots"][2]["base"], 3);
+		let none = page.layout_changes();
+		assert_eq!((none["all"].as_bool(), ids(&none, "roots").len(), ids(&none, "removed").len(), ids(&none, "bases").len()), (Some(false), 0, 0, 0));
+		// A child edited: only its top-level item, with the child where it went.
+		let edit = |page: &mut Page, json: &str| {
+			let list: Vec<Value> = serde_json::from_str(json).unwrap();
+			let edits: Vec<_> = list.iter().map(|v| stage_doc::edits::Edit::from_json(v).unwrap()).collect();
+			page.apply_edits(&edits).unwrap();
+		};
+		edit(&mut page, r#"[{"op":"set","id":"k","key":"x","value":50}]"#);
+		let one = page.layout_changes();
+		assert_eq!(one["all"], false);
+		assert_eq!(ids(&one, "roots"), ["f"]);
+		assert_eq!(one["roots"][0]["items"][1][1], 350.0);
+		// A drag's step that bends nothing re-lays nothing.
+		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
+		assert_eq!(ids(&page.layout_changes(), "roots").len(), 0);
+		page.preview(None).unwrap();
+		// A child added: the frame again, and the ellipse after it starts one later.
+		edit(&mut page, r#"[{"op":"insert","id":"k2","parent":"f","after":"k","props":{"type":"rectangle","width":5,"height":5}}]"#);
+		let more = page.layout_changes();
+		assert_eq!(ids(&more, "roots"), ["f"]);
+		assert_eq!(more["bases"], json!([["e", 4]]));
+		// A top-level item gone, one new at the end.
+		edit(&mut page, r#"[{"op":"remove","id":"a"},{"op":"insert","id":"n","parent":null,"after":"e","props":{"type":"rectangle","width":5,"height":5}}]"#);
+		let swap = page.layout_changes();
+		assert_eq!(ids(&swap, "removed"), ["a"]);
+		assert_eq!(ids(&swap, "roots"), ["n"]);
+		assert_eq!(swap["roots"][0]["base"], 4);
+		assert_eq!(swap["bases"], json!([["f", 0], ["e", 3]]));
+		// A new document: everything again.
+		page.set_document(doc).unwrap();
+		let again = page.layout_changes();
+		assert_eq!(again["all"], true);
+		assert_eq!(ids(&again, "roots"), ["a", "f", "e"]);
+		assert_eq!(ids(&again, "removed"), ["n"]);
 	}
 
 	#[test]

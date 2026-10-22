@@ -11,13 +11,14 @@
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
-import { diff, expand, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, walk, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { fontFiles, isFallbackFamily, type FontNeed } from "../pen/font-files.ts";
 import { iconUrl, parseIcon } from "../pen/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
 import { boundsOf } from "../pen/bounds.ts";
+import { docIndex, drawnNodes } from "../pen/doc-index.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
@@ -63,6 +64,17 @@ type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tile
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
+
+/** What the page engine laid out again since it was last asked (`Page::layout_changes`). */
+type LayoutChanges = {
+	all: boolean;
+	roots: Array<{ id: string; base: number; items: Array<[string, number, number, number, number, string | null, number, ThemeState]>; cards: RootCard[] }>;
+	removed: string[];
+	bases: Array<[string, number]>;
+};
+/** A card as the engine sends it with its top-level item: its place in that item's tree (`i`) rather than its paint order. */
+type RootCard = Omit<CardGeometry, "order"> & { i: number };
+type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[] };
 
 /**
  * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet had (`canvas/pen/layer.ts`)
@@ -131,11 +143,10 @@ export class StageEngine {
 	private marksSeen = -1;
 
 	/** Every item as laid out, by id, with its node; and what each item covers. */
-	placed: ReadonlyMap<string, Placed> = new Map();
-	bounds: ReadonlyMap<string, Frame> = new Map();
+	placed: ReadonlyMap<string, Placed> = new Map<string, Placed>();
+	bounds: ReadonlyMap<string, Frame> = new Map<string, Frame>();
 	/** The document the layout was made from. */
 	drawnDoc: PenDocument | undefined;
-	private cards: CardGeometry[] = [];
 	private scrolls = new Map<string, number>();
 	private penHit?: CanvasRenderingContext2D;
 	/** Not used by this engine: kept so the stage can treat both alike. */
@@ -334,7 +345,6 @@ export class StageEngine {
 		if (doc === this.doc && base === this.base) return;
 		const before = this.doc;
 		this.doc = doc;
-		this.nodes = undefined;
 		this.base = base;
 		/*
 		 * What a delete hid while it waited is the drawing's business again: the answer has it gone, or,
@@ -444,26 +454,99 @@ export class StageEngine {
 		this.post({ type: "doc", doc: text, dark: this.scheme === "dark" });
 	}
 
-	/** Take in the page engine's layout: every item's box with its node, what it covers, the cards. */
-	private laidOut(): void {
+	/**
+	 * Take in what the page engine laid out again since the last time (`layoutChanges`): each item's box
+	 * with its node, what it covers, the cards. Only the top-level items it re-laid are read, so a
+	 * drag's step (the arrows it bends) and an edit (what it reached) cost what they changed, not the
+	 * canvas. `placed` stays in paint order.
+	 *
+	 * `quiet` (a drag's step that only moves things, `showPreview`): the click shapes over boards and
+	 * the stage's readers of the layout (`drawn`) wait for the gesture's end, since nothing they read
+	 * changed but the arrows the drag bends.
+	 */
+	private laidOut(quiet = false): void {
 		if (!this.page) return;
 		const doc = this.doc;
-		const nodes = new Map<string, PenNode>();
-		if (doc) for (const node of walk(expand(doc))) nodes.set(node.id, node);
-		const placed = new Map<string, Placed>();
-		for (const [id, x, y, w, h, parent, order, theme] of JSON.parse(this.page.layout()) as Array<[string, number, number, number, number, string | null, number, ThemeState]>) {
-			const node = nodes.get(id);
-			if (!node) continue;
-			placed.set(id, { node, box: { x, y, w, h }, parent: parent ?? undefined, theme, order });
+		const changes = JSON.parse(this.page.layoutChanges()) as LayoutChanges;
+		const nodes = doc ? drawnNodes(doc) : new Map<string, PenNode>();
+		const placed = this.placed as Map<string, Placed>;
+		const bounds = this.bounds as Map<string, Frame>;
+		const forget = (root: RootLaid) => {
+			for (const [id] of root.items) {
+				placed.delete(id);
+				bounds.delete(id);
+			}
+		};
+		if (changes.all) {
+			placed.clear();
+			bounds.clear();
+			this.laid.clear();
 		}
-		this.placed = placed;
-		this.bounds = boundsOf(placed);
-		this.cards = JSON.parse(this.page.cards()) as CardGeometry[];
+		// Whether the map is still in paint order after the changes: items set again keep their place, new ones go last.
+		let inOrder = changes.bases.length === 0;
+		let last = -1;
+		for (const root of this.laid.values()) last = Math.max(last, root.base);
+		for (const id of changes.removed) {
+			const root = this.laid.get(id);
+			if (!root) continue;
+			forget(root);
+			this.laid.delete(id);
+		}
+		for (const [id, base] of changes.bases) {
+			const root = this.laid.get(id);
+			if (!root) continue;
+			root.base = base;
+			for (const [item, i] of root.items) {
+				const was = placed.get(item);
+				if (was) placed.set(item, { ...was, order: base + i + 1 });
+			}
+		}
+		for (const { id, base, items, cards } of changes.roots) {
+			const was = this.laid.get(id);
+			const subset = new Map<string, Placed>();
+			const ids: Array<[string, number]> = [];
+			for (const [item, x, y, w, h, parent, i, theme] of items) {
+				const node = nodes.get(item);
+				if (!node) continue;
+				subset.set(item, { node, box: { x, y, w, h }, parent: parent ?? undefined, theme, order: base + i + 1 });
+				ids.push([item, i]);
+			}
+			if (was) {
+				const same = was.items.length === ids.length && was.items.every(([item], at) => item === ids[at]![0]);
+				if (!same) {
+					forget(was);
+					inOrder = false;
+				}
+			} else if (base < last) inOrder = false;
+			for (const [item, one] of subset) placed.set(item, one);
+			for (const [item, frame] of boundsOf(subset)) bounds.set(item, frame);
+			this.laid.set(id, { base, items: ids, cards });
+		}
+		if (!inOrder) {
+			// Put back in paint order: an item came inside a top-level one, or the top level changed order.
+			const all = [...placed.values()].sort((a, b) => a.order - b.order);
+			placed.clear();
+			for (const one of all) placed.set(one.node.id, one);
+		}
+		if (changes.all || changes.roots.length || changes.removed.length || changes.bases.length) {
+			this.cardList = undefined;
+			this.placedList = undefined;
+			this.placedIndex = undefined;
+		}
 		this.drawnDoc = doc;
-		this.placedList = [...placed.values()];
-		this.placedIndex = undefined;
+		if (quiet) return;
 		this.writeHits();
 		this.drawn?.();
+	}
+	/** Each top-level item as last laid out: its first paint order, its items with their place in it, its cards. */
+	private laid = new Map<string, RootLaid>();
+	private cardList: CardGeometry[] | undefined;
+	/** The markdown cards, in paint order, made from `laid` when first asked for after a change. */
+	private cards(): CardGeometry[] {
+		if (this.cardList) return this.cardList;
+		const list: CardGeometry[] = [];
+		for (const root of this.laid.values()) for (const { i, ...card } of root.cards) list.push({ ...card, order: root.base + i + 1 });
+		return (this.cardList = list);
 	}
 
 	setView(view: { width: number; height: number }): void {
@@ -546,7 +629,7 @@ export class StageEngine {
 		}
 		// The click shapes follow the window: written again once it leaves the area they cover.
 		const w = this.hitWindow;
-		if (w && this.placedList.length) {
+		if (w && this.placed.size) {
 			const seen = this.windowRect(0);
 			const drifted = this.bandZoom > 0 && (camera.zoom > this.bandZoom * 1.25 || camera.zoom < this.bandZoom * 0.8);
 			if (drifted || seen.x < w.x || seen.y < w.y || seen.x + seen.w > w.x + w.w || seen.y + seen.h > w.y + w.h) this.writeHits();
@@ -682,7 +765,7 @@ export class StageEngine {
 				clearTimeout(this.boardsLanding);
 			}
 			this.lift(this.page.setPreview(this.shown ?? "[]"));
-			this.laidOut();
+			this.laidOut(this.shown === undefined || this.moveOnly);
 		} else if (this.boardsOnly && this.shown === undefined) {
 			clearTimeout(this.boardsLanding);
 			this.boardsLanding = setTimeout(() => this.landBoards(), 2000);
@@ -913,6 +996,8 @@ export class StageEngine {
 
 	private showPreview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		if (!this.page) return;
+		// Only moved: nothing the stage reads of the layout changes but the arrows bent, so it is told at the end.
+		this.moveOnly = !!moving?.size && [...moving.values()].every((one) => one.w === undefined && one.h === undefined && one.radius === undefined && (!one.set || Object.keys(one.set).length === 0));
 		if (moving?.size) {
 			const fresh = [...moving.keys()].filter((id) => !this.lifted.has(id));
 			if (fresh.length) {
@@ -934,12 +1019,11 @@ export class StageEngine {
 			this.offset = { dx: 0, dy: 0 };
 			if (this.lifted.size) this.post({ type: "drop", ids: [...this.lifted] });
 		}
-		this.laidOut();
+		this.laidOut(this.moveOnly);
 		this.draw();
 	}
-
-	/** The drawing's items by id, made when first asked for after each new drawing. */
-	private nodes: Map<string, PenNode> | undefined;
+	/** The gesture shown only moves what it carries (`showPreview`). */
+	private moveOnly = false;
 
 	/**
 	 * A library shape being resized or rounded shows its outline as the saved drawing will have it
@@ -951,8 +1035,7 @@ export class StageEngine {
 		if (!this.doc) return list;
 		for (const [at, [id, change]] of list.entries()) {
 			if (change.w === undefined && change.h === undefined && change.radius === undefined) continue;
-			if (!this.nodes) this.nodes = new Map([...walk(this.doc.children)].map((node) => [node.id, node]));
-			const node = this.nodes.get(id);
+			const node = docIndex(this.doc).get(id)?.node;
 			const outline = node && isShape(node) ? shapeOutline(node) : undefined;
 			if (!node || !outline) continue;
 			const w = change.w ?? node.width;
@@ -1043,10 +1126,14 @@ export class StageEngine {
 		this.writeHits();
 	}
 
-	private placedList: Placed[] = [];
+	/** `placed` as a list, and an index of what each covers, made when first asked for after a change. */
+	private placedList: Placed[] | undefined;
 	private placedIndex: BoxIndex | undefined;
+	private list(): Placed[] {
+		return (this.placedList ??= [...this.placed.values()]);
+	}
 	private index(): BoxIndex {
-		return (this.placedIndex ??= new BoxIndex(this.placedList.map((one) => this.bounds.get(one.node.id) ?? one.box)));
+		return (this.placedIndex ??= new BoxIndex(this.list().map((one) => this.bounds.get(one.node.id) ?? one.box)));
 	}
 
 	/** The window on the stage, grown by `more` windows on each side. */
@@ -1070,7 +1157,8 @@ export class StageEngine {
 		const shapes: SVGElement[] = [];
 		const reach = this.view.width > 0 ? this.windowRect(1) : undefined;
 		this.hitWindow = reach;
-		const near = reach ? this.index().search(reach).map((at) => this.placedList[at]!) : this.placedList;
+		const list = this.list();
+		const near = reach ? this.index().search(reach).map((at) => list[at]!) : list;
 		for (const placed of near) {
 			const { node, box } = placed;
 			if (node.type === "group" || isShape(node) || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
@@ -1181,7 +1269,7 @@ export class StageEngine {
 
 	private cardAt(point: { x: number; y: number }) {
 		let found: CardGeometry | undefined;
-		for (const card of this.cards) {
+		for (const card of this.cards()) {
 			const { box } = card;
 			if (this.viewState.hidden.includes(card.id) || (found && card.order < found.order)) continue;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
