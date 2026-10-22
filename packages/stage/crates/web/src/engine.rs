@@ -73,6 +73,8 @@ pub struct Page {
 	/// The boards drawn as their picture in the last frame, and the live ones carried as one.
 	pub pictured: Vec<String>,
 	pub carrying: Vec<String>,
+	/// Goes up when `pictured` or `carrying` changes, so the page asks for them only then.
+	pub marks: u32,
 	pub doc: Document,
 	pub scene: Scene,
 	pub history: History,
@@ -80,6 +82,9 @@ pub struct Page {
 	/// Tile pictures the page holds: key → (texture, when last drawn).
 	pub tiles: HashMap<Key, (u32, u64)>,
 	pub budget: usize,
+	/// The scales tiles are held at, nearest the scale wanted first, and that scale: made again only
+	/// when a tile of a new scale comes or one goes, or another scale is wanted (`frame`).
+	scales: Option<(u32, Vec<u32>)>,
 	frame: u64,
 	next_texture: u32,
 }
@@ -90,7 +95,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, frame: 0, next_texture: 1 })
+		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1 })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -264,6 +269,7 @@ impl Page {
 		self.next_texture += 1;
 		let t = self.next_texture;
 		self.tiles.insert(key, (t, self.frame));
+		self.scales = None;
 		t
 	}
 
@@ -302,7 +308,7 @@ impl Page {
 		let boards: &[BoardPlace] = if self.only_lifted { &[] } else { &self.boards };
 		for board in boards {
 			let carried = self.carry.0.contains(&board.path);
-			let picture = self.pictures.get(&format!("board:{}", board.path));
+			let picture = self.pictures.get(&board.picture);
 			if board.live && !(carried && picture.is_some()) {
 				continue;
 			}
@@ -329,9 +335,10 @@ impl Page {
 				over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color::straight([colour[0], colour[1], colour[2], 0.6], 1.0)), stroke: Some((1.5, stage_paint::list::Align::Center)) });
 			}
 		}
-		if !self.only_lifted {
+		if !self.only_lifted && (pictured != self.pictured || carrying != self.carrying) {
 			self.pictured = pictured;
 			self.carrying = carrying;
+			self.marks = self.marks.wrapping_add(1);
 		}
 		// Over: the tiles, one per place. Each place shows the sharpest tile held for it; where the
 		// tile at the scale asked for has not come yet, the part of a coarser one that covers it, and
@@ -339,12 +346,18 @@ impl Page {
 		// only sharper ones). Never two scales layered in a place: tiles are clear where nothing is
 		// drawn, so a stale one under a fresh one would show through.
 		let want = scale_for(camera.zoom * dpr, moving);
-		let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).collect::<HashSet<_>>().into_iter().collect();
-		// Nearest the scale wanted first, sharper before blurrier at the same distance.
-		scales.sort_by(|a, b| {
-			let d = |s: u32| ((f32::from_bits(s) as f64).ln() - (want as f64).ln()).abs();
-			d(*a).total_cmp(&d(*b)).then(f32::from_bits(*b).total_cmp(&f32::from_bits(*a)))
-		});
+		let scales = match self.scales.take() {
+			Some((at, scales)) if at == want.to_bits() => scales,
+			_ => {
+				let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).collect::<HashSet<_>>().into_iter().collect();
+				// Nearest the scale wanted first, sharper before blurrier at the same distance.
+				scales.sort_by(|a, b| {
+					let d = |s: u32| ((f32::from_bits(s) as f64).ln() - (want as f64).ln()).abs();
+					d(*a).total_cmp(&d(*b)).then(f32::from_bits(*b).total_cmp(&f32::from_bits(*a)))
+				});
+				scales
+			}
+		};
 		// A ghost of what a drag carries is the lifted items alone, with no tiles under them.
 		let places = if self.only_lifted { Vec::new() } else { Grid::covering(&view, want, 0) };
 		for key in places {
@@ -369,6 +382,7 @@ impl Page {
 				t.1 = self.frame;
 			}
 		}
+		self.scales = Some((want.to_bits(), scales));
 		// The lifted items, drawn fresh, and the stroke under the pen.
 		if !self.lifted.is_empty() && !self.hide_lifted {
 			let skip = HashSet::new();
@@ -552,7 +566,11 @@ impl Page {
 
 	/// The worker discarded these tiles (stale, at a scale not in use): let them go.
 	pub fn forget_tiles(&mut self, keys: &[Key]) -> Vec<u32> {
-		keys.iter().filter_map(|k| self.tiles.remove(k).map(|(t, _)| t)).collect()
+		let gone: Vec<u32> = keys.iter().filter_map(|k| self.tiles.remove(k).map(|(t, _)| t)).collect();
+		if !gone.is_empty() {
+			self.scales = None;
+		}
+		gone
 	}
 
 	/// A place no tile of its scale or coarser covers: the sharper tiles of the one scale nearest
@@ -607,7 +625,11 @@ impl Page {
 		let mut old: Vec<(u64, Key)> = self.tiles.iter().filter(|(k, (_, used))| !overview.contains(k) && *used < shown).map(|(k, (_, used))| (*used, *k)).collect();
 		old.sort();
 		let excess = (self.tiles.len() - self.budget).min(old.len());
-		old.into_iter().take(excess).filter_map(|(_, k)| self.tiles.remove(&k).map(|(t, _)| (k, t))).collect()
+		let gone: Vec<(Key, u32)> = old.into_iter().take(excess).filter_map(|(_, k)| self.tiles.remove(&k).map(|(t, _)| (k, t))).collect();
+		if !gone.is_empty() {
+			self.scales = None;
+		}
+		gone
 	}
 }
 
@@ -1082,18 +1104,23 @@ mod tests {
 		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
 		page.tile_texture(Key { scale: 1f32.to_bits(), x: 1, y: 0 });
 		page.pictures.held.insert("board:boards/x.html".into(), (900, 400, 300));
-		let board = |live| BoardPlace { path: "boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
+		let board = |live| BoardPlace { path: "boards/x.html".into(), picture: "board:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
 		page.boards = vec![board(false)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
 		let tile = over.ops.iter().position(|op| matches!(op, Op::Picture { .. }));
 		assert!(matches!((picture, tile), (Some(p), Some(t)) if p < t), "the picture first, then the tiles: {picture:?} {tile:?}");
 		assert_eq!(page.pictured, vec!["boards/x.html".to_owned()]);
+		// The marks move only when what is pictured does: a frame the same as the last leaves them.
+		let marks = page.marks;
+		page.frame(cam, 1.0, 1200.0, 800.0, false);
+		assert_eq!(page.marks, marks);
 		// Live: its page shows through the tiles' hole, with nothing of the board drawn.
 		page.boards = vec![board(true)];
 		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		assert!(page.pictured.is_empty());
+		assert_ne!(page.marks, marks);
 	}
 
 	#[test]
@@ -1247,6 +1274,8 @@ impl ViewState {
 #[derive(Clone, Debug, Default)]
 pub struct BoardPlace {
 	pub path: String,
+	/// The address its picture is held under (`board:<path>`), made once with the place.
+	pub picture: String,
 	pub x: f64,
 	pub y: f64,
 	pub w: f64,

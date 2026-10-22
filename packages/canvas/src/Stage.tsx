@@ -1772,6 +1772,8 @@ export function Stage(props: {
 
 	/** `rendered`, as a set to look a board up in. */
 	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+	/** The boards may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
+	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
 
 	/**
 	 * On screen as of the camera's last rest, with a tenth of the window to spare. A page loaded for
@@ -2157,7 +2159,7 @@ export function Stage(props: {
 			data-engine="true"
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
-			data-scaling={scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET}
+			data-scaling={layered()}
 			data-gliding={gliding()}
 			/* Boards drawn as pictures while the camera moves: their pages are hidden (`canvas.css`). */
 			data-pictures={picturesNow() ? "true" : undefined}

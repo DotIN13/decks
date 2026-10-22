@@ -369,8 +369,10 @@ impl PageEngine {
 			.iter()
 			.filter_map(|b| {
 				let n = |k: &str| b.get(k).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+				let path = b.get("path")?.as_str()?.to_owned();
 				Some(crate::engine::BoardPlace {
-					path: b.get("path")?.as_str()?.to_owned(),
+					picture: format!("board:{path}"),
+					path,
 					x: n("x"),
 					y: n("y"),
 					w: n("w"),
@@ -386,6 +388,18 @@ impl PageEngine {
 	/// Boards a drag carries (`["path", …]`), and how far.
 	pub fn carry(&mut self, paths: &str, dx: f64, dy: f64) {
 		self.page.carry = (ids(paths).into_iter().collect(), dx, dy);
+	}
+
+	/// A number that goes up whenever `pictured` or `carrying` would answer differently.
+	#[wasm_bindgen(js_name = boardMarks)]
+	pub fn board_marks(&self) -> u32 {
+		self.page.marks
+	}
+
+	/// Whether `wantedPictures` has anything to say: asked before it, so most frames make no JSON.
+	#[wasm_bindgen(js_name = hasWanted)]
+	pub fn has_wanted(&self) -> bool {
+		!self.page.pictures.wanted.borrow().is_empty()
 	}
 
 	/// The boards drawn as their picture in the last frame.

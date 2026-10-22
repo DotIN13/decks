@@ -84,6 +84,8 @@ export class StageEngine {
 	private hitWindow: Rect | undefined;
 	private bandZoom = 0;
 	private boardIndex = new BoxIndex([]);
+	/** The boards `boardIndex` answers for, in its order: `boards` when it is up to date with them. */
+	private indexed: readonly SceneBoard[] = [];
 	private boardBoxes = "";
 	private size = { w: 0, h: 0 };
 	/** The canvas's margin past the window, in screen pixels, and the stage rectangle it was last drawn for. */
@@ -125,6 +127,8 @@ export class StageEngine {
 	carrying: ((paths: ReadonlySet<string>) => void) | undefined;
 	private picturedKey = "";
 	private carryingKey = "";
+	/** The engine's `boardMarks` when `pictured` and `carrying` were last read: read again only when it moves. */
+	private marksSeen = -1;
 
 	/** Every item as laid out, by id, with its node; and what each item covers. */
 	placed: ReadonlyMap<string, Placed> = new Map();
@@ -240,6 +244,7 @@ export class StageEngine {
 		this.lifted.clear();
 		this.picturedKey = "";
 		this.carryingKey = "";
+		this.marksSeen = -1;
 		this.drawnAt = undefined;
 		this.shown = undefined;
 	}
@@ -606,26 +611,36 @@ export class StageEngine {
 			this.sharpNext = false;
 			sheetStats().sharpAt ??= performance.now();
 		}
-		const pictured = this.page.pictured();
-		if (pictured !== this.picturedKey) {
-			this.picturedKey = pictured;
-			this.pictured?.(new Set(JSON.parse(pictured) as string[]));
+		// Asked for in JSON only when the engine says they changed: most frames, nothing did.
+		const marks = this.page.boardMarks();
+		if (marks !== this.marksSeen) {
+			this.marksSeen = marks;
+			const pictured = this.page.pictured();
+			if (pictured !== this.picturedKey) {
+				this.picturedKey = pictured;
+				this.pictured?.(new Set(JSON.parse(pictured) as string[]));
+			}
+			const carrying = this.page.carrying();
+			if (carrying !== this.carryingKey) {
+				this.carryingKey = carrying;
+				this.carrying?.(new Set(JSON.parse(carrying) as string[]));
+			}
 		}
-		const carrying = this.page.carrying();
-		if (carrying !== this.carryingKey) {
-			this.carryingKey = carrying;
-			this.carrying?.(new Set(JSON.parse(carrying) as string[]));
-		}
-		this.wantPictures(JSON.parse(this.page.wantedPictures()) as string[]);
+		if (this.page.hasWanted()) this.wantPictures(JSON.parse(this.page.wantedPictures()) as string[]);
 		this.presented?.();
 	}
 
 	// --- boards --------------------------------------------------------------------------------
 
 	setBoards(boards: readonly SceneBoard[]): void {
+		const was = this.boards;
 		this.boards = boards;
 		const key = JSON.stringify(boards.map((b) => [b.path, b.x, b.y, b.w, b.h, b.live, b.news, b.glow, b.picture]));
-		if (key === this.boardKey || !this.page) return;
+		if (key === this.boardKey || !this.page) {
+			// The same boxes as the ones the index was made for: it answers for these too.
+			if (key === this.boardKey && this.indexed === was) this.indexed = boards;
+			return;
+		}
 		this.boardKey = key;
 		this.page.setBoards(JSON.stringify(boards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h, live: b.live, news: b.news, glow: b.glow }))));
 		const boxes = boards.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
@@ -634,6 +649,7 @@ export class StageEngine {
 			this.boardIndex = new BoxIndex(boards.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h })));
 			this.writeHits();
 		}
+		this.indexed = boards;
 		/*
 		 * A board whose picture changed is asked for again, against the board's own address: the one
 		 * fetched carries a size (`&w=480`), and comparing that one forgot every server picture on each
@@ -713,7 +729,9 @@ export class StageEngine {
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w;
 		const top = this.camera.y - h;
-		for (const board of this.boards) {
+		// The boards near the window, from the index `setBoards` keeps (built from these boards, in their order).
+		const near = this.indexed !== this.boards ? this.boards : this.boardIndex.search({ x: left, y: top, w: w * 2, h: h * 2 }).map((at) => this.boards[at]!);
+		for (const board of near) {
 			if (!board.picture || (board.live && !board.ready)) continue;
 			if (board.x + board.w < left || board.x > left + w * 2 || board.y + board.h < top || board.y > top + h * 2) continue;
 			const key = `board:${board.path}`;
