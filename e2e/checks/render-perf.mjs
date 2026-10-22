@@ -1,5 +1,5 @@
 /**
- * What the stage costs, on a big canvas: nine numbers, each the median of `RENDER_PERF_RUNS` (5) runs
+ * What the stage costs, on a big canvas: ten numbers, each the median of `RENDER_PERF_RUNS` (5) runs
  * (9 for the two per-frame times, see `WIDE`).
  *
  * Not a pass/fail check: it measures, and says only that each number could be measured. The canvas
@@ -18,10 +18,12 @@
  *   a tile painted after the note is in the layout.
  * - strokeEndMs: main-thread time per frame over the last 60 of 600 pointer moves (10 s at 60 Hz) of a
  *   pen stroke, one CDP mouse move a frame.
+ * - imageLoadMs: main-thread time while 24 image fills arrive and are painted (see "image fills arriving").
  * - fillAfterPanMs: the end of a fast pan at 50% onto drawing not yet painted to the first frame with
  *   every tile of the window there at its resting scale (see "a fast pan filled in").
  */
 import { mkdirSync, writeFileSync } from "node:fs";
+import { crc32, deflateSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WEB, deckState, open, say, socket } from "../harness.mjs";
@@ -32,7 +34,7 @@ const RUNS = Math.max(1, Number(process.env.RENDER_PERF_RUNS ?? 5));
 const ONLY = process.env.RENDER_PERF_ONLY ? new Set(process.env.RENDER_PERF_ONLY.split(",")) : undefined;
 const want = (name) => !ONLY || ONLY.has(name);
 const ITEMS = Number(process.env.RENDER_PERF_ITEMS ?? 2000);
-/** CPU profiles of the drags and the edits (`RENDER_PERF_PROFILE=<prefix>`: `<prefix>.drag.cpuprofile`, `<prefix>.edit.cpuprofile`), for finding where the time goes. */
+/** CPU profiles of the drags, the edits and the pictures (`RENDER_PERF_PROFILE=<prefix>`: `<prefix>.drag.cpuprofile`, `<prefix>.edit.cpuprofile`, `<prefix>.images.cpuprofile`), for finding where the time goes. */
 const PROFILE = process.env.RENDER_PERF_PROFILE;
 /** A page flag to measure with and without, alternating (`RENDER_PERF_AB=<name>`, see the drag and the edit). */
 const AB = process.env.RENDER_PERF_AB;
@@ -65,6 +67,32 @@ const median = (values) => {
 	return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
 const ms = (v) => Math.round(v * 10) / 10;
+/** A `width` by `height` PNG of soft colour bands and a checker, the same every time. */
+const perfPicture = (width, height) => {
+	const rows = Buffer.alloc((width * 3 + 1) * height);
+	for (let y = 0; y < height; y++) {
+		const row = y * (width * 3 + 1);
+		for (let x = 0; x < width; x++) {
+			const checker = ((x >> 5) + (y >> 5)) % 2 ? 24 : 0;
+			rows[row + 1 + x * 3] = (x * 255) / width;
+			rows[row + 2 + x * 3] = (y * 255) / height;
+			rows[row + 3 + x * 3] = 128 + checker;
+		}
+	}
+	const chunk = (type, data) => {
+		const head = Buffer.alloc(8);
+		head.writeUInt32BE(data.length);
+		head.write(type, 4, "latin1");
+		const crc = Buffer.alloc(4);
+		crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])));
+		return Buffer.concat([head, data, crc]);
+	};
+	const header = Buffer.alloc(13);
+	header.writeUInt32BE(width);
+	header.writeUInt32BE(height, 4);
+	header.set([8, 2, 0, 0, 0], 8);
+	return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+};
 
 // --- the canvas, and the agent on it ------------------------------------------------------------------
 const deck = await deckState();
@@ -484,6 +512,64 @@ if (want("frameEdit")) {
 	keep("frameEditTiles", tiles, Math.round);
 }
 
+// --- image fills arriving ----------------------------------------------------------------------------
+/*
+ * imageLoadMs: the page's main-thread time from an agent's insert of 24 rectangles filled with
+ * pictures (each its own address, a 1600 by 1200 PNG) at 50% on the window to the stage at rest with
+ * every picture in and painted. Each run's pictures are new to the page (the address's query differs),
+ * and they are taken off again after it. With `RENDER_PERF_AB`, runs alternate with the flag set and not.
+ */
+if (want("images")) {
+	const folder = join(deck.path, "canvases", PERF_CANVAS);
+	writeFileSync(join(folder, "perf-picture.png"), perfPicture(1600, 1200));
+	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
+	await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
+	await quiet();
+	const N = 24;
+	let made = 0;
+	let tilesPainted = [];
+	const fillOnce = async () => {
+		const run = made++;
+		const ids = Array.from({ length: N }, (_, i) => `perf-picture-${run}-${i}`);
+		const ops = ids.map((id, i) => ({ op: "insert", node: { type: "rectangle", id, width: 400, height: 300, fill: { type: "image", url: `perf-picture.png?run=${run}&n=${i}`, mode: "fill" } }, box: { x1: HOME.x - 1370 + (i % 6) * 460, y1: HOME.y - 690 + Math.floor(i / 6) * 350 } }));
+		const had = await page.evaluate(() => globalThis.__decksEngine.stats().pictures);
+		const tilesBefore = await page.evaluate(() => globalThis.__decksSheet.tiles);
+		await frame();
+		const before = await taskSeconds();
+		link.send({ type: "stage.pen.edit", agentId, ops });
+		const all = await until(() => page.evaluate((want) => globalThis.__decksEngine.stats().pictures >= want, had + N), 20000);
+		await quiet(1000);
+		const task = ((await taskSeconds()) - before) * 1000;
+		tilesPainted.push((await page.evaluate(() => globalThis.__decksSheet.tiles)) - tilesBefore);
+		link.send({ type: "stage.pen.edit", agentId, ops: ids.map((id) => ({ op: "delete", id })) });
+		await until(() => page.evaluate((id) => !globalThis.__decksRust.placed.has(id), ids[0]), 10000);
+		await quiet(1000);
+		return all ? task : NaN;
+	};
+	await fillOnce();
+	const tasks = [];
+	tilesPainted = [];
+	await profileStart();
+	for (let run = 0; run < RUNS; run++) tasks.push(await fillOnce());
+	await profileStop("images");
+	keep("imageLoadMs", tasks, ms);
+	// Not one of the numbers: the tiles painted while they came.
+	keep("imageLoadTiles", tilesPainted, Math.round);
+	if (AB) {
+		const on = [];
+		const off = [];
+		for (let pair = 0; pair < RUNS; pair++) {
+			for (const flag of pair % 2 ? [true, false] : [false, true]) {
+				await page.evaluate(({ AB, flag }) => (globalThis[AB] = flag), { AB, flag });
+				(flag ? on : off).push(await fillOnce());
+			}
+		}
+		await page.evaluate((AB) => delete globalThis[AB], AB);
+		keep("imageLoadMsFlagOn", on, ms);
+		keep("imageLoadMsFlagOff", off, ms);
+	}
+}
+
 // --- a long pen stroke --------------------------------------------------------------------------------
 if (want("stroke")) {
 	await page.locator('[aria-label="Draw on the canvas"]:visible').click();
@@ -518,7 +604,7 @@ if (want("stroke")) {
 }
 
 say("no errors on the page", errors.length === 0, errors.slice(0, 3).join(" | "));
-const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs", "fillAfterPanMs"].map((k) => [k, result[k]]));
+const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs", "fillAfterPanMs", "imageLoadMs"].map((k) => [k, result[k]]));
 const extra = Object.fromEntries(Object.entries(result).filter(([k]) => k !== "runs" && !(k in metrics)));
 const report = { ...metrics, ...extra, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS, ...(AB ? { ab: AB } : {}) } };
 mkdirSync(dirname(OUT), { recursive: true });
