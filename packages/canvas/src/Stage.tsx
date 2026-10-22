@@ -1123,7 +1123,8 @@ export function Stage(props: {
 	 * after their tails. When the last finger lifts from a pinch there is no next step to wait for,
 	 * and the tails (160 and 300 ms) were that much more of tiles painted at the moving scale before
 	 * the sharp ones were asked for (on an iPad mini, sharp about 620 ms after the lift). A wheel or
-	 * a trackpad's pinch has no lift, so it keeps the tails.
+	 * a trackpad's pinch has no lift, so it keeps the tails. `__decksPinchTail = true` keeps them after
+	 * a pinch too, for measuring.
 	 */
 	const stoppedMoving = () => {
 		clearTimeout(moveSettle);
@@ -1472,7 +1473,7 @@ export function Stage(props: {
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
 				trail = [];
 				if (thrown) coast(thrown);
-				else if (pinched) stoppedMoving();
+				else if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
 				penLayer.setPinching(false);
 			}
 			return { kind: "idle" };
