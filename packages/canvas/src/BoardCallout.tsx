@@ -10,8 +10,6 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Trash from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
-import Maximize from "lucide-solid/icons/maximize-2";
-import Presentation from "lucide-solid/icons/presentation";
 import Scan from "lucide-solid/icons/scan";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 
@@ -27,7 +25,7 @@ const GAP = 10;
  *
  * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
- * actions (focus, present, a new tab, hide) are not offered.
+ * actions (a new tab, hide) are not offered.
  */
 export function BoardCallout(props: {
 	board?: Board;
@@ -38,8 +36,6 @@ export function BoardCallout(props: {
 	camera: Camera;
 	view: Viewport;
 	onOpen: () => void;
-	onFocus?: () => void;
-	onPresent?: () => void;
 	onHide?: () => void;
 	/** Comment on the whole board: the popup a selection gets, opened by the pill. */
 	onComment?: () => void;
@@ -105,25 +101,6 @@ export function BoardCallout(props: {
 			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the board to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
-			<Show when={props.onFocus}>
-				<button type="button" role="menuitem" class="icon-button" aria-label="Focus" title="Focus on this board" onClick={() => props.onFocus?.()}>
-					<Icon of={Maximize} size={16} />
-				</button>
-			</Show>
-			<Show when={props.onPresent && props.board && !props.board.live}>
-				<button
-					type="button"
-					role="menuitem"
-					class="icon-button"
-					aria-label={props.board?.format === "slides" ? "Present" : "Fullscreen"}
-					title={props.board?.format === "slides" ? "Present the slides" : "Fullscreen"}
-					onClick={() => props.onPresent?.()}
-				>
-					<Show when={props.board?.format === "slides"} fallback={<Icon of={Presentation} size={16} />}>
-						<span class="callout-word">Present</span>
-					</Show>
-				</button>
-			</Show>
 			<Show when={props.board && !props.board.live ? props.board : undefined}>
 				{(board) => (
 				<a role="menuitem" class="icon-button" aria-label="New tab" title="Open in a new tab" href={canvasHost().fileUrl(board().path)} target="_blank" rel="noopener">

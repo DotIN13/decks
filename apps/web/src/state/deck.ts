@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type ServerMessage, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { trackZoneWith } from "../lib/time.ts";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
@@ -80,12 +80,6 @@ function createDeck() {
 		defaultKind: AgentKind;
 		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 		/**
-		 * What each agent is doing to which board, from `agent.act`: the cursor and the editing
-		 * marks the canvas draws for an agent at work (`canvas/acts.ts`). One per agent, the
-		 * latest; a finished one lingers long enough to be seen and is then dropped.
-		 */
-		acts: Record<string, Extract<ServerMessage, { type: "agent.act" }> | undefined>;
-		/**
 		 * What this install can run, and what each runtime is called, from the greeting.
 		 *
 		 * Empty until the first frame arrives, which is why `runtimes` below has a fallback.
@@ -113,7 +107,6 @@ function createDeck() {
 		agents: {} as Record<string, AgentRecord | undefined>,
 		contexts: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
-		acts: {} as Record<string, Extract<ServerMessage, { type: "agent.act" }> | undefined>,
 		defaultKind: "pi" as AgentKind,
 		runtimes: [] as RuntimeInfo[],
 		accounts: [] as ClaudeAccount[],
@@ -208,7 +201,6 @@ export function resetDeck(): void {
 		contexts: {},
 		nonces: {},
 		cursor: undefined,
-		acts: {},
 		runtimes: [],
 		accounts: [],
 		settings: {},

@@ -125,14 +125,13 @@ test("a card's block: the one under the point, or the one level with it in the m
 	assert.equal(blockAt(scene, { x: 50, y: 570 }, "card"), undefined);
 });
 
-test("a board's picture: the last in file order, never one drawn as a page or in focus", () => {
+test("a board's picture: the last in file order, never one drawn as a page", () => {
 	const boards = [
 		{ path: "a", x: 0, y: 0, w: 100, h: 100 },
 		{ path: "b", x: 50, y: 50, w: 100, h: 100 },
 	];
 	assert.equal(pictureAt(boards, { x: 75, y: 75 }, new Set()), "b");
 	assert.equal(pictureAt(boards, { x: 75, y: 75 }, new Set(["b"])), "a");
-	assert.equal(pictureAt(boards, { x: 75, y: 75 }, new Set(), "b"), "a");
 	assert.equal(pictureAt(boards, { x: 100, y: 100 }, new Set(["a", "b"])), undefined);
 	assert.equal(pictureAt(boards, { x: 150, y: 150 }, new Set()), "b");
 	assert.equal(pictureAt(boards, { x: 151, y: 150 }, new Set()), undefined);

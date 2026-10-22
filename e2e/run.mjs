@@ -73,30 +73,6 @@ const CHECKS = [
 	 */
 	{ file: "highlighting.mjs", needsAgent: false },
 	/*
-	 * The renderer's own check, and the one that decides whether the editor may replace the frame:
-	 * every board rendered by the new package, compared against the browser's parse of the same
-	 * bytes. It needs no agent and no canvas — it drives `apps/web/editor.html`, which mounts only
-	 * `@decks/editor`.
-	 */
-	{ file: "render-fidelity.mjs", needsAgent: false },
-	/*
-	 * What a press means: the four answers of phase 3's selection policy, driven by real presses
-	 * through the editor's frame.
-	 */
-	{ file: "select-nodes.mjs", needsAgent: false },
-	/*
-	 * The gestures: drag, resize, duplicate, the palette, delete — one op each, driven by a real mouse.
-	 * The other half of the proof is `editor-ops.test.ts` on the server, where those ops write files.
-	 */
-	{ file: "gestures.mjs", needsAgent: false },
-	/*
-	 * A flow document edited as fields. This is the other half of the fixture's flow board,
-	 * and the first coverage in the suite of the *document* editor: the field half of
-	 * `Editor.ts` ran on component boards only, and the reason a flow board was handed to the
-	 * source textarea was an assumption about markdown that a flow board does not share.
-	 */
-	{ file: "editing.mjs", needsAgent: false },
-	/*
 	 * Which board is selected, and the one way in that did not work: a press on the board itself.
 	 * Its own check because it is one rule with four readers — the inspector, the arrow keys, the
 	 * focus view and the bar's own menu all ask the canvas which board is selected.

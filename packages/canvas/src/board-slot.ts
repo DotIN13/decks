@@ -1,5 +1,4 @@
 import type { Board, Camera } from "@decks/protocol";
-import type { AgentAct } from "./acts.ts";
 import type { BoardView } from "./editor/index.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import type { RendererChoice } from "./lib/renderer.ts";
@@ -19,32 +18,10 @@ export interface StageBoardProps {
 	camera: Camera;
 	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
 	mounted: boolean;
-	/** Whether this is the board the focus view is showing (`state/ui.ts`). */
-	focused?: boolean;
-	/** Enter or leave that view for *this* board — the button in its own title bar. */
-	onFocus?: () => void;
-
-	/**
-	 * Where to put the node, when the caller is not the canvas.
-	 *
-	 * Absent on the canvas — the board's own world position is right there and the world's
-	 * transform applies the camera. The focus view passes `{ x: 0, y: 0 }`: it has neither.
-	 */
-	origin?: { x: number; y: number };
-	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
+	/** Whether the board is on screen or within a viewport of it. */
 	visible: boolean;
 	selected: boolean;
-	/** Where an agent is pointing, in board coordinates. */
-	cursor?: { x: number; y: number; label: string; color: string };
-	/** Agents at work on this board: a cursor each, and the blocks they hold or just wrote (`acts.ts`). */
-	acts?: AgentAct[];
-	/**
-	 * Where an agent's cursor stands for its act on this board, in board coordinates, or undefined
-	 * once the act has left it. The cursor itself is drawn by the stage (`Stage.tsx`), so it glides
-	 * from board to board rather than leaving one and appearing on the next.
-	 */
-	onActPoint?: (agentId: string, at: { x: number; y: number } | undefined) => void;
-	/** The board's size just changed from outside a drag: its box and bar ease to it (`Stage`'s `sizingPaths`). */
+	/** The board's size just changed from outside a drag: its box eases to it (`Stage`'s `sizingPaths`). */
 	sizing?: boolean;
 	/**
 	 * The board is news — an agent named it and the person has not read it — drawn as a glow in
@@ -118,21 +95,13 @@ export interface StageBoardProps {
 	 * `decks.canvas.read()`). Reported once per load, with the revision it was measured at.
 	 */
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
-	/** Only for a deck: take it fullscreen. */
-	onPresent?: () => void;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
-	/** Comment on the whole board, from its title bar. */
-	onComment?: () => void;
 	/**
 	 * Comment on words selected in the board's page: the words, the block they are in, and where
 	 * they are on screen. A host's page from another origin says what is selected (`board.js`).
 	 */
 	onCommentWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
-	/** The stage's layer that does not zoom, where the title bar lives (`Stage.tsx`); none on a touch screen. */
-	barLayer?: HTMLElement | undefined;
-	/** Put a bar on screen for a board at this place and width, and keep it there as the camera moves. */
-	placeBar?: (bar: HTMLElement, at: { x: number; y: number; w: number }) => void;
 	/** Canvas gestures that start inside the frame and belong to the stage. */
 	gestures: FrameGestureHost;
 	/**

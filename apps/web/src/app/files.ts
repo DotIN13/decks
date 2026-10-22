@@ -5,7 +5,6 @@ import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
 import { CARD, MEDIA } from "@decks/pen";
 import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "@decks/canvas/internal/pen/card-frame.ts";
-import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
 import { selected } from "../state/selection.ts";
@@ -127,7 +126,13 @@ function sizeLabel(bytes: number): string {
  * position at all and mentions the path where the caret is; and a paste has neither, so it
  * lands on the selected board, at the middle of it.
  */
-export function createFileDrops(deps: { editor: EditorHost }) {
+/** What the drop path needs of the app: a board patched, and whether boards take edits now. */
+export interface BoardEdits {
+	patch(path: string, patches: BoardPatch[]): void;
+	enabled(): boolean;
+}
+
+export function createFileDrops(deps: { editor: BoardEdits }) {
 	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
 	const created = new Map<string, (path: string) => void>();
 
@@ -751,5 +756,5 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		});
 	};
 
-	return { drops, addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
+	return { drops, dropOnBoard, addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
 }

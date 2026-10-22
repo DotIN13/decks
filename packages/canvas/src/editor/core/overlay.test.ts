@@ -46,8 +46,7 @@ test("boards picked up move with a board drag; the app's selected board follows 
 	assert.deepEqual(selectionOutlines(base({ selected: "boards/one.html", boardDrag: drag }), scene), [{ id: "board:boards/one.html", role: "board", x: 1010, y: 20, w: 400, h: 300 }]);
 	assert.deepEqual(selectionOutlines(base({ selected: "boards/one.html", ownDrag: { path: "boards/one.html", x: 7, y: 8 } }), scene), [{ id: "board:boards/one.html", role: "board", x: 7, y: 8, w: 400, h: 300 }]);
 	assert.deepEqual(selectionOutlines(base({ selected: "boards/one.html", boardResize: { path: "boards/one.html", x: 990, y: 0, w: 500, h: 310 } }), scene), [{ id: "board:boards/one.html", role: "board", x: 990, y: 0, w: 500, h: 310 }]);
-	// Not in the focus view, and not twice when it is picked up as well.
-	assert.deepEqual(selectionOutlines(base({ selected: "boards/one.html", focus: "boards/one.html" }), scene), []);
+	// Not twice when it is picked up as well.
 	assert.equal(selectionOutlines(base({ selected: "boards/one.html", boardPicks: ["boards/one.html"] }), scene).length, 1);
 });
 

@@ -11,7 +11,8 @@ import Sun from "lucide-solid/icons/sun";
 import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
-import type { EditorHost, Tool } from "./board/Editor.ts";
+import type { Tool } from "./board/tools.ts";
+import { createFileDrops, type BoardEdits } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
@@ -21,7 +22,6 @@ import { cameraOntoPage } from "@decks/canvas/internal/camera/morph.ts";
 import { flyAlong } from "./app/fly-along.ts";
 import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS } from "@decks/canvas/internal/lib/spring.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
-import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
@@ -42,8 +42,6 @@ import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
-import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./board/inspect.ts";
-import { Inspector } from "./board/Inspector.tsx";
 import { InkBar } from "@decks/canvas/internal/ink/InkBar.tsx";
 import { PenBar } from "@decks/canvas/internal/pen/PenBar.tsx";
 import { setPenTool } from "@decks/canvas/internal/state/pen-tools.ts";
@@ -61,8 +59,6 @@ import { mintBoardToken } from "./board/board-token.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
-import { Present } from "./present/Present.tsx";
-import { PresentEmbed } from "./present/PresentEmbed.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./agents/AgentPill.tsx";
@@ -696,18 +692,6 @@ export function App() {
 	});
 	const stageBoards = (): Board[] => shownBoards;
 
-	/**
-	 * Who to tell when the selection moves.
-	 *
-	 * Each board frame draws its own selection overlay, so all of them need to hear:
-	 * the one that gained the selection to draw it, and the one that lost it to stop.
-	 */
-	const selectionListeners = new Set<() => void>();
-	createEffect(() => {
-		component();
-		for (const listener of selectionListeners) listener();
-	});
-
 	/*
 	 * What `handleFrame` may touch (`app/frames.ts`). **Three fields**, and each has a reason
 	 * to be here: a request registry `app/files.ts` owns and mints, a signal whose one reader
@@ -722,266 +706,25 @@ export function App() {
 		focusAgent: (id) => focusAgent(id),
 	};
 
-	const editor: EditorHost = {
-		tool: () => tool(),
-		resetTool: () => setTool("select"),
-		selected: () => component(),
-		select: (selection) => {
-			setComponent(selection);
-			if (selection) setSelected(selection.path);
-		},
-		onSelectionChange: (listener) => {
-			selectionListeners.add(listener);
-			return () => selectionListeners.delete(listener);
-		},
+	/** What a file dropped on a board needs: the board patched (`board.patch` on the socket), in edit mode. */
+	const boardEdits: BoardEdits = {
 		patch: (path, patches) => patchBoard(path, patches),
-		undo: (path) => send({ type: "board.undo", path }),
-		pickFile: (board) =>
-			new Promise<string | undefined>((resolve) => {
-				setPicking({
-					board,
-					// Without a board it is the composer's paperclip: the file goes into the message.
-					purpose: board ? "embed" : "attach",
-					resolve: (picked: string | undefined) => {
-						setPicking(undefined);
-						resolve(picked);
-					},
-				});
-			}),
-		notice: (text) => notice("info", text),
-		/*
-		 * The whole of browse mode is this line.
-		 *
-		 * It was "are we zoomed in far enough": below `INTERACT_ZOOM` a frame takes no pointer
-		 * events, so there is nothing to edit with. Browse mode is a second reason for the
-		 * same gate to be shut — and because every listener in `Editor.ts` already consulted
-		 * it, dragging, selecting, the handle and double-click-to-retype all stand down
-		 * together with no new interception logic anywhere.
-		 *
-		 * What is *not* gated is what makes browse mode worth having: the frame still takes
-		 * pointer events, so text selects and copies, and a board that is a game is playable.
-		 */
 		enabled: () => zoomInteractive() && mode() === "edit",
-		reveal: (path, box) => {
-			const board = state.boards.find((candidate) => candidate.path === path);
-			const stage = document.querySelector(".stage");
-			if (!board || !stage) return;
-			/*
-			 * The room to aim for. The bottom is the keyboard plus the dock that sits above
-			 * it — a caret tucked behind the input bar is as lost as one behind the keys —
-			 * and the top is the title bar the canvas already runs under.
-			 */
-			const dock = document.querySelector(".dock")?.getBoundingClientRect().height ?? 0;
-			setCamera(
-				keepVisible(
-					camera(),
-					{ width: stage.clientWidth, height: stage.clientHeight },
-					{ x: board.x + box.x, y: board.y + box.y, w: box.w, h: box.h },
-					{ top: 12, bottom: obscured().bottom + dock + 12 },
-				),
-			);
-		},
 	};
-
-	/**
-	 * The selected component as the inspector needs it (`board/inspect.ts`).
-	 *
-	 * Read from the live document rather than kept in the store: the board is
-	 * same-origin (§4) and the DOM is already the truth about what is on screen, so a
-	 * second copy of "what class does this have" would be one more thing to invalidate.
-	 * Re-read when the selection changes, when the board's revision changes (our own
-	 * write, or the agent's), and when a reload is forced — those three cover every way
-	 * the component under the selection can become something else.
-	 */
-	const [shape, setShape] = createSignal<Shape | undefined>(undefined);
-
-	/*
-	 * Tell the right edge whether the inspector has anything to describe.
-	 *
-	 * Here rather than in the inspector, because "describable" is all three of these at
-	 * once: a component is selected, the camera is close enough for a board to take pointer
-	 * events at all, and no past revision is being previewed. The panel knows the first;
-	 * only this component knows all three.
-	 *
-	 * And it is an effect rather than a call inside `setComponent`, because the zoom and the
-	 * preview can turn it off without the selection changing — the edge would otherwise keep
-	 * showing an inspector for something that had stopped being selectable.
-	 */
-	createEffect(() => {
-		setInspectable(shape() !== undefined && zoomInteractive() && !preview());
-	});
-	createEffect(() => {
-		const selection = component();
-		if (!selection) {
-			setShape(undefined);
-			return;
-		}
-		// Read as dependencies, not for their values.
-		void state.boards.find((board) => board.path === selection.path)?.rev;
-		void state.nonces[selection.path];
-		setShape(readShape(selection.path, selection.id));
-	});
-
-	/**
-	 * An inspector edit: the live document, then the file.
-	 *
-	 * Both halves, because the frame is pinned to the revision it loaded (§7) — a patch
-	 * alone would be a change the user cannot see until somebody else writes the board.
-	 * The exception is a duplicate, whose markup exists only in the file; `patches.ts`
-	 * is where that unpins.
-	 */
-	/**
-	 * Which board the focus view would show: the selected one, or the one being looked at.
-	 *
-	 * The selection first, because that is what a person has just pointed at. Otherwise the
-	 * board nearest the middle of the view, which is the one in front of them — the alternative
-	 * was "the first in the deck", which is a board they may not be able to see.
-	 */
-	const focusTarget = (): string | undefined => {
-		const chosen = selected();
-		if (chosen) return chosen;
-		const at = camera();
-		let best: { path: string; away: number } | undefined;
-		for (const board of stageBoards()) {
-			const away = Math.hypot(board.x + board.w / 2 - at.x, board.y + board.h / 2 - at.y);
-			if (!best || away < best.away) best = { path: board.path, away };
-		}
-		return best?.path;
-	};
-
-	/**
-	 * The focus view on or off — one key (`d`), one button, and Escape to come back.
-	 *
-	 * Nothing to show is a sentence rather than a mode with an empty page in it: with no boards
-	 * at all the view has nothing to be a view *of*, and a canvas that went blank on a keypress
-	 * and needed the same key to come back would read as a fault.
-	 */
-	/*
-	 * Opening a board is the camera arriving, and the page taking over on the last frame.
-	 *
-	 * The reading view is not a camera trick — the canvas stops being drawn and a page is laid
-	 * out — so the arrival has to end *exactly* where that page will be (`cameraOntoPage`), at the
-	 * same scale, and then the page replaces the canvas with nothing to see. The camera you had is
-	 * kept, and the way out flies back to it rather than to a fit, so the canvas is where you put
-	 * it down. On iOS's spring, `SPRING_MS` in and a stiffer one out; nothing but the swap with reduced motion.
-	 */
-	let focusReturn: { camera: Camera; path: string } | undefined;
-	const stageGeometry = () => {
-		const stageEl = document.querySelector(".stage");
-		if (!stageEl) return undefined;
-		const rect = stageEl.getBoundingClientRect();
-		const style = getComputedStyle(stageEl);
-		const px = (name: string, fallback: number) => {
-			const value = parseFloat(style.getPropertyValue(name));
-			return Number.isFinite(value) ? value : fallback;
-		};
-		return { view: { width: rect.width, height: rect.height }, insets: { left: px("--inset-left", 0), right: px("--inset-right", 0), top: px("--inset-top", 52) } };
-	};
-	const enterFocus = (path: string) => {
-		const board = stageBoards().find((one) => one.path === path);
-		const geometry = stageGeometry();
-		if (!board || !geometry || reducedMotion()) {
-			setFocus(path);
-			return;
-		}
-		focusReturn = { camera: camera(), path };
-		flyAlong(camera(), cameraOntoPage(board, geometry.view, { ...geometry.insets, right: 0 }, { fills: board.fills === true }), boxOf(board), geometry.view, SPRING_MS, () => {
-			// Only if nothing else was asked for while it flew.
-			if (focusReturn?.path === path) setFocus(path);
+	/** The file picker: for a board's embed, or (with no board) the composer's paperclip. */
+	const pickFile = (board?: string) =>
+		new Promise<string | undefined>((resolve) => {
+			setPicking({
+				board,
+				purpose: board ? "embed" : "attach",
+				resolve: (picked: string | undefined) => {
+					setPicking(undefined);
+					resolve(picked);
+				},
+			});
 		});
-	};
-	const leaveFocus = () => {
-		const back = focusReturn;
-		focusReturn = undefined;
-		setFocus(undefined);
-		const board = back ? stageBoards().find((one) => one.path === back.path) : undefined;
-		const geometry = stageGeometry();
-		if (!back || !board || !geometry || reducedMotion()) return;
-		flyAlong(camera(), back.camera, boxOf(board), geometry.view, SPRING_BACK_MS, undefined, SPRING_BACK_RESPONSE);
-	};
 
-	const toggleFocus = (wanted?: string) => {
-		// The board's own button names it, so that path wins; the key and the rule behind it
-		// pass nothing and get the target below.
-		const path = wanted ?? focusTarget();
-		if (focus() !== undefined && (focus() === path || wanted === undefined)) {
-			leaveFocus();
-			return;
-		}
-		if (!path) {
-			notice("warn", "No board to focus. Put one on the canvas first.");
-			return;
-		}
-		enterFocus(path);
-	};
-
-	/**
-	 * A selected box's file as something to fill the window with.
-	 *
-	 * The overlay is told what the *box* said — the path, the page range — rather than being
-	 * handed the frame's document, because it mounts its own frame on the file's URL and has
-	 * nothing of the board's to read it from (`present/PresentEmbed.tsx`). The board is named
-	 * too: an embed's path is relative to the board that wrote it, which is exactly what
-	 * `urlFor` in `lib/board.js` and `embedUrl` in `lib/api.ts` both need.
-	 */
-	const embedPresenting = (box: Shape): Presenting => ({
-		kind: "embed",
-		board: box.path,
-		raw: box.attrs["data-embed"] ?? "",
-		...(box.attrs["data-pages"] === undefined ? {} : { pages: box.attrs["data-pages"] }),
-		...(box.attrs["data-poster"] === undefined ? {} : { poster: box.attrs["data-poster"] }),
-		title: `${box.attrs["data-embed"] ?? "file"} — ${box.id}`,
-	});
-
-	/**
-	 * What fullscreen means *now*: the embed in the selected box, or the board.
-	 *
-	 * One key with one meaning per level — `f` fullscreens the selection if it is an embed and
-	 * the board otherwise — and it is answered here because the selection is this component's.
-	 * The stage knows which board, and the box is a `Shape` the inspector is already reading.
-	 * The path check is the load-bearing part: a box selected on *another* board must not
-	 * change what `f` does to this one.
-	 */
-	const presentingFor = (path: string, at: number): Presenting => {
-		const box = shape();
-		if (box && box.path === path && box.family === "embed" && box.attrs["data-embed"]) return embedPresenting(box);
-		return { kind: "board", path, at };
-	};
-
-	const inspect = (edit: Edit) => {
-		const current = shape();
-		if (!current) return;
-		applyLive(current, edit);
-		editor.patch(current.path, patchesFor(current, edit));
-		if (edit.kind === "remove") {
-			setComponent(undefined);
-			return;
-		}
-		// A rename moves the selection with it: the id *is* how the component is
-		// addressed, here as in the file, and the old one now names nothing.
-		const id = edit.kind === "rename" ? edit.to : current.id;
-		if (edit.kind === "rename") setComponent({ path: current.path, id });
-		setShape(readShape(current.path, id));
-	};
-
-	/**
-	 * A file dragged in from the desktop, landing on a board as an embed (§3).
-	 *
-	 * The order matters and is the reason this is not two lines: the bytes have to be
-	 * *in* the deck before a board can point at them, so every file is uploaded first
-	 * and the inserts go out afterwards as **one** patch. One patch and not one each
-	 * because a patch carries the revision it was composed against — a second patch
-	 * sent before the first has come back would be refused as stale, and three files
-	 * dropped together would land as one.
-	 *
-	 * Uploads are sequential rather than parallel, so the progress line means
-	 * something: four bars all at 30% is not information anybody can act on.
-	 */
-	/*
-	 * Files arriving from outside: dropped, pasted, or picked (`app/files.ts`). Five routes,
-	 * one destination — the bytes are copied into the deck's `assets/`.
-	 */
-	const files = createFileDrops({ editor });
+	const files = createFileDrops({ editor: boardEdits });
 	const { addFile, drops, intoComposer } = files;
 
 
@@ -1364,7 +1107,6 @@ export function App() {
 		setSelected(path);
 		setComponent(undefined);
 		// The board lands on the canvas, under a presentation if one is up: that ends it.
-		if (presenting()) setPresenting(undefined);
 		flyToBoards([board], { animate: true });
 		return true;
 	};
@@ -1472,6 +1214,7 @@ export function App() {
 										setComponent(undefined);
 									}),
 								onOpenLink: openLinkedBoard,
+								onFiles: (path, list, at) => void files.dropOnBoard(path, list, at),
 								news: newsGlow,
 								onRead: (path) => send({ type: "board.seen", path }),
 								onHide: (path) => void act("canvas.delete", [path]),
@@ -1635,23 +1378,6 @@ export function App() {
 					]}
 				/>
 
-				{/* The selection's properties. Same visibility rule as the palette — below
-				    `INTERACT_ZOOM` a board takes no pointer events and nothing can be
-				    selected — and off entirely while a past revision is being previewed,
-				    which is a read-only view of a board that no longer exists (§6.7). */}
-				<Inspector
-					shape={shape()}
-					onFullscreen={() => {
-						const box = shape();
-						if (box) setPresenting(embedPresenting(box));
-					}}
-					/* Edit-only: it is a properties panel, and a panel whose fields cannot be
-					   applied is a panel that lies about what it does. */
-					visible={zoomInteractive() && !preview() && mode() === "edit"}
-					onEdit={inspect}
-					pickFile={() => editor.pickFile(shape()?.path)}
-					onClose={() => setComponent(undefined)}
-				/>
 
 				<Show when={commenting()} keyed>
 					{(target) => (
@@ -2043,7 +1769,7 @@ export function App() {
 							// selected board — a message is not a board, and `@../assets/x.png` means
 							// nothing to the agent reading it.
 							const agentId = state.focused;
-							void editor.pickFile(undefined).then((path) => {
+							void pickFile(undefined).then((path) => {
 								if (path) setDraft({ text: `@${path}`, at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
 							});
 						}}
@@ -2054,51 +1780,6 @@ export function App() {
 					/>
 				</div>
 
-
-				{/*
-					Presenting a deck: an overlay over the whole app, not a change to the canvas.
-				
-					Last in the tree so it is last in paint order, and mounted only while it is up —
-					`Show` rather than a hidden layer, because the overlay captures the keyboard and one
-					that is merely invisible would still be taking Escape.
-				*/}
-				<Show when={presenting()} keyed>
-					{(showing) => {
-						if (showing.kind === "embed") {
-							return (
-								<PresentEmbed
-									board={showing.board}
-									raw={showing.raw}
-									{...(showing.pages === undefined ? {} : { pages: showing.pages })}
-									{...(showing.poster === undefined ? {} : { poster: showing.poster })}
-									title={showing.title}
-									onExit={() => setPresenting(undefined)}
-								/>
-							);
-						}
-						const board = () => state.boards.find((candidate) => candidate.path === showing.path);
-						return (
-							<Show when={board()} keyed>
-								{(deck) => (
-									<Present
-										board={deck}
-										at={showing.at}
-										onExit={() => setPresenting(undefined)}
-										onOpenBoard={openLinkedBoard}
-										onLeave={(at) => {
-											// Put the canvas's own frame on the slide you finished on, so
-											// leaving fullscreen is not a jump back in the talk.
-											const frame = document.querySelector(
-												`.board-node[data-path="${showing.path.replace(/"/g, '\\"')}"] iframe`,
-											) as HTMLIFrameElement | null;
-											(frame?.contentWindow as { __deck?: { go(n: number): void } } | null)?.__deck?.go(at);
-										}}
-									/>
-								)}
-							</Show>
-						);
-					}}
-				</Show>
 
 				{/* No zoombar. "Where am I looking" is a menu chip in the top-right cluster
 				    now, which is one place for it and gives the bottom-right corner back. */}

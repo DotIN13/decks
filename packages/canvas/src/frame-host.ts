@@ -94,23 +94,6 @@ export interface FrameGestureHost {
 	/** ⌘+ / ⌘− / ⌘0, which a board frame takes rather than letting Chrome zoom the page. */
 	zoom(direction: ZoomKey): void;
 	/**
-	 * A double-click inside a flow or slides board: open it as its own source.
-	 *
-	 * Forwarded out rather than handled in the board, because the textarea belongs to the
-	 * app — it has to be positioned and scaled with the board, and a board's own document
-	 * knows neither the camera nor the zoom.
-	 */
-	/**
-	 * Whether this board's double-click belongs to the source editor rather than the fields.
-	 *
-	 * Named by path because the frame knows which board it is and the selection does not have
-	 * to be it — a board can be double-clicked without having been clicked first. `target` is
-	 * what was under the pointer: on a flow board a double-click on a *run* is the field
-	 * editor's, and only a double-click on the document around it opens the rich editor — so
-	 * the answer depends on where in the board the gesture landed, not only on the board.
-	 */
-	editSource(path: string, alt: boolean, target: EventTarget | null): boolean;
-	/**
 	 * The arrow keys, when the focused board is a deck.
 	 *
 	 * Returns whether there was a deck to page — so a plain board's arrows fall through to

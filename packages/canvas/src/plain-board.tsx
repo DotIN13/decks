@@ -71,7 +71,7 @@ export interface PlainBoardExtras {
 export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	const at = createMemo(() => {
 		const resized = props.view.resized();
-		return props.origin ?? { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
+		return { x: resized?.x ?? props.board.x, y: resized?.y ?? props.board.y };
 	});
 	const size = () => {
 		const resized = props.view.resized();

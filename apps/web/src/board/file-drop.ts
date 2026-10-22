@@ -31,7 +31,7 @@
  * misses every board is answered with a sentence instead of a lost session.
  */
 
-import { typingInto } from "./Editor.ts";
+import { typingInto } from "./tools.ts";
 
 /** Whether a drag is carrying files, as opposed to text or a component of its own. */
 export function carriesFiles(transfer: DataTransfer | null): boolean {

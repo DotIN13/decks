@@ -119,9 +119,8 @@ export type OutlineInput = {
 	boardDrag?: { paths: readonly string[]; dx: number; dy: number } | undefined;
 	/** A board moving itself, by a finger on its edge. */
 	ownDrag?: { path: string; x: number; y: number } | undefined;
-	/** The board the app has selected, and the one in the focus view. */
+	/** The board the app has selected. */
 	selected?: string | undefined;
-	focus?: string | undefined;
 	/** A board being resized by its handles. */
 	boardResize?: (Rect & { path: string }) | undefined;
 	marquee?: Corners | undefined;
@@ -179,7 +178,7 @@ export function selectionOutlines(input: OutlineInput, scene: SceneQuery): Outli
 	}
 	// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
 	const chosen = input.selected;
-	const board = chosen && chosen !== input.focus && !input.boardPicks.includes(chosen) ? input.boards.find((candidate) => candidate.path === chosen) : undefined;
+	const board = chosen && !input.boardPicks.includes(chosen) ? input.boards.find((candidate) => candidate.path === chosen) : undefined;
 	if (board) {
 		const sized = input.boardResize;
 		const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };

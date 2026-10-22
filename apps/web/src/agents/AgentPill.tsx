@@ -10,7 +10,7 @@ import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
-import type { CanvasMode, Tool } from "../board/Editor.ts";
+import type { CanvasMode, Tool } from "../board/tools.ts";
 import { DecksMark, Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
