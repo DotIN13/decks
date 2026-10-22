@@ -8,12 +8,11 @@ const card = (fields: Record<string, unknown> = {}) => node({ metadata: { type: 
 const none = { targets: [], threshold: 6 };
 const box = { x: 0, y: 0, w: 100, h: 50 };
 
-test("a handle drags its own edges, and a slide deck has no top or bottom", () => {
+test("a handle drags its own edges", () => {
 	assert.deepEqual(handleEdges("nw"), ["x1", "y1"]);
 	assert.deepEqual(handleEdges("se"), ["x2", "y2"]);
 	assert.deepEqual(handleEdges("e"), ["x2"]);
-	assert.deepEqual(handleEdges("se", true), ["x2"]);
-	assert.deepEqual(handleEdges("n", true), []);
+	assert.deepEqual(handleEdges("n"), ["y1"]);
 });
 
 test("an edge drag moves that edge; past the other one the box flips", () => {
@@ -116,19 +115,6 @@ test("a board stops at 320 × 200 at the edge being dragged; the other stays put
 	assert.equal(snapped.guides.length, 1);
 });
 
-test("a slide deck keeps its aspect: by a side or corner its width sizes it, by its top or bottom its height", () => {
-	const start = { x: 0, y: 0, w: 1600, h: 900 };
-	const slides = { ...none, slides: true };
-	// By its bottom, 90 taller: 1760 wide, about its middle.
-	assert.deepEqual(boardResizeStep(start, "s", { x: 0, y: 90 }, {}, slides).box, { x: -80, y: 0, w: 1760, h: 990 });
-	// By its top, 450 shorter: the bottom stays, half as wide, still centred.
-	assert.deepEqual(boardResizeStep(start, "n", { x: 300, y: 450 }, {}, slides).box, { x: 400, y: 450, w: 800, h: 450 });
-	// Never narrower than a board can be: 320 wide is 180 tall.
-	assert.deepEqual(boardResizeStep(start, "s", { x: 0, y: -2000 }, {}, slides).box, { x: 640, y: 0, w: 320, h: 180 });
-	assert.deepEqual(boardResizeStep(start, "se", { x: -800, y: 999 }, { shift: true }, slides).box, { x: 0, y: 0, w: 800, h: 450 });
-	assert.deepEqual(boardResizeStep(start, "w", { x: 1500, y: 0 }, {}, slides).box, { x: 1280, y: 0, w: 320, h: 180 });
-});
-
 test("a board's lift moves it only when its corner moved, and sizes it only when its size changed", () => {
 	const start = { x: 0, y: 0, w: 800, h: 600 };
 	assert.deepEqual(boardResizeEnd(start, start), {});
@@ -187,6 +173,4 @@ test("Shift on a board with no size to keep does not divide by it", () => {
 	const step = boardResizeStep(flat, "se", { x: 500, y: 300 }, { shift: true }, none);
 	assert.deepEqual(step.box, { x: 0, y: 0, w: 500, h: 300 });
 	assert.ok(Object.values(step.box).every(Number.isFinite));
-	assert.ok(Object.values(boardResizeStep(flat, "se", { x: 500, y: 300 }, {}, { ...none, slides: true }).box).every(Number.isFinite));
-	assert.ok(Object.values(boardResizeStep(flat, "s", { x: 0, y: 300 }, {}, { ...none, slides: true }).box).every(Number.isFinite));
 });

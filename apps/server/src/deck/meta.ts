@@ -1,4 +1,4 @@
-import { defaultWidth, formatOf } from "./kinds.ts";
+import { BOARD_W } from "../boards/templates.ts";
 /**
  * What a board says about itself, read from the top of the file.
  *
@@ -15,8 +15,6 @@ export interface BoardMeta {
 	h?: number;
 	bg?: string;
 	poster?: string;
-	/** A slide deck's aspect, `"16:9"` by default — see `deck/kinds.ts`. */
-	aspect?: string;
 }
 
 const TITLE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -68,19 +66,10 @@ export function readBoardMeta(html: string): BoardMeta {
 		// Written by hand as often as by an agent, so a broken one is ignored
 		// rather than fatal — the board still renders at the default size.
 		try {
-			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown; aspect?: unknown };
+			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown };
 			if (Number.isFinite(Number(parsed.w))) meta.w = Number(parsed.w);
 			if (Number.isFinite(Number(parsed.h))) meta.h = Number(parsed.h);
 			if (typeof parsed.bg === "string") meta.bg = parsed.bg;
-			/*
-			 * `aspect` is here for an HTML deck, which has nowhere else to put it.
-			 *
-			 * A `.slides.md` declares it in front-matter; reveal's own markup has no
-			 * equivalent — the slide size is an argument to `Reveal.initialize`, which is a
-			 * script this view deliberately does not run. So it goes in the tag every board
-			 * already carries rather than in something invented for the purpose.
-			 */
-			if (typeof parsed.aspect === "string" && parsed.aspect) meta.aspect = parsed.aspect;
 		} catch {
 			/* ignored: see above */
 		}
@@ -99,13 +88,13 @@ export function readBoardMeta(html: string): BoardMeta {
  * a reader saw the tag as text.
  *
  * Other keys are carried through, in either place: `bg`, `theme` and anything a later version adds to
- * the tag; `title`, `aspect` and the rest of the front-matter. A board with neither gets one, because
+ * the tag; `title` and the rest of the front-matter. A board with neither gets one, because
  * a board written by hand is still a board and refusing to resize it would be a rule about how it was
  * authored.
  */
 export function withBoardSize(path: string, source: string, size: { w?: number; h?: number }): string {
 	if (!HTML_FILE.test(path)) return withFrontMatterWidth(source, size);
-	return withTagSize(source, size, defaultWidth(formatOf(path)));
+	return withTagSize(source, size, BOARD_W);
 }
 
 /**
@@ -200,22 +189,19 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
  * What a board says about itself — an HTML document or a markdown file.
  *
  * The interesting field is the title, and the interesting decision is that it comes from the
- * **content**. A rail listing `notes.md`, `report.html`, `talk.slides.md` has no information
+ * **content**. A rail listing `notes.md`, `report.html`, `plan.html` has no information
  * in it; a rail listing what those documents are called is the whole point of having one. So
  * the first `#` of a markdown file, or the `<title>` of a document, and the filename only
  * when neither exists.
  *
- * Front-matter is read for `w` and `aspect`, and deliberately not for anything else. It is
+ * Front-matter is read for `title` and `w`, and deliberately not for anything else. It is
  * how a board an agent writes can declare its own width the way an HTML board can — without
  * it, an agent could create a markdown board but not size it, and would have to ask the user
- * to drag the edge. Not a full YAML parser: three keys, one line each, at the top of the
+ * to drag the edge. Not a full YAML parser: two keys, one line each, at the top of the
  * file, in the same spirit as the regex above.
  *
- * **An HTML file has no front-matter**, so for one of those the same three fields are taken
- * from `<meta name="board">` — the tag every board in every deck already carries. That is
- * what lets a `.slides.html` declare a 4:3 aspect: reveal's markup has no place to say it,
- * and inventing a place would be a second way to describe a file that already describes
- * itself.
+ * **An HTML file has no front-matter**, so for one of those the same fields are taken
+ * from `<meta name="board">` — the tag every board in every deck already carries.
  */
 export function readMeta(path: string, source: string): BoardMeta {
 	const meta: BoardMeta = HTML_FILE.test(path) ? readBoardMeta(source) : {};
@@ -226,7 +212,6 @@ export function readMeta(path: string, source: string): BoardMeta {
 			if (!pair) continue;
 			const value = (pair[2] ?? "").replace(/^["']|["']$/g, "");
 			if (pair[1] === "title" && value) meta.title = value;
-			else if (pair[1] === "aspect" && value) meta.aspect = value;
 			else if (pair[1] === "w") {
 				const w = Number(value);
 				if (Number.isFinite(w) && w > 0) meta.w = Math.round(w);

@@ -11,7 +11,6 @@
 import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
 import FilePlus from "lucide-solid/icons/file-plus";
 import Paperclip from "lucide-solid/icons/paperclip";
-import Presentation from "lucide-solid/icons/presentation";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { stagePoint } from "../../camera/coords.ts";
 import { canvasHost } from "../../host.ts";
@@ -49,8 +48,8 @@ export type InsertHost = {
 	idsBut: (also: string) => NextId;
 	/** Follow a press to its lift (`dom/pointer.ts`, `follow`). */
 	follow: (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => void;
-	/** A board where the menu was opened, in stage pixels: an ordinary board or a slide deck (`Stage`'s `onCreateBoard`). */
-	createBoard: (at: Pt, format: "board" | "slides") => void;
+	/** A board where the menu was opened, in stage pixels (`Stage`'s `onCreateBoard`). */
+	createBoard: (at: Pt) => void;
 	/** A file from the picker, placed by what it is, centred at a point (`Stage`'s `onOpenDocument`). */
 	openDocument: (at: Pt) => void;
 };
@@ -163,7 +162,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 
 	/**
 	 * The canvas menu: everything that can be added, at the place a double-click or a double-tap on
-	 * bare canvas landed, on every device. A board or a slide deck first, then the drawing's tools.
+	 * bare canvas landed, on every device. A board first, then the drawing's tools.
 	 * One gesture means one thing everywhere: it used to make a board straight away with a mouse and
 	 * open the tools with a finger. A pick makes the thing there; the arrow, which needs a drag, is
 	 * put in hand.
@@ -174,10 +173,10 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 		if (!canvasHost().canWrite()) return;
 		setCanvasMenu({ client: { x: event.clientX, y: event.clientY }, world: worldAt(event), stage: stagePoint(event as PointerEvent) });
 	};
-	const boardFromMenu = (format: "board" | "slides") => {
+	const boardFromMenu = () => {
 		const menu = canvasMenu();
 		setCanvasMenu(undefined);
-		if (menu) host.createBoard(menu.stage, format);
+		if (menu) host.createBoard(menu.stage);
 	};
 	const documentFromMenu = () => {
 		const menu = canvasMenu();
@@ -251,8 +250,8 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 export type InsertMenuApi = ReturnType<typeof createInsertMenu>;
 
 /**
- * The canvas menu, at the point it was opened (`core/insert.ts`, `menuPlace`): a board, a slide
- * deck and a file where boards can be made, then the drawing's tools where it can be edited; and
+ * The canvas menu, at the point it was opened (`core/insert.ts`, `menuPlace`): a board and a file
+ * where boards can be made, then the drawing's tools where it can be edited; and
  * the insert panel a shape or an icon is picked in.
  */
 export function InsertMenu(props: { menu: InsertMenuApi; board: boolean; document: boolean; editable: boolean }) {
@@ -276,26 +275,19 @@ export function InsertMenu(props: { menu: InsertMenuApi; board: boolean; documen
 							}}
 						>
 							<Show when={props.board}>
-								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => props.menu.boardFromMenu("board")}>
+								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={props.menu.boardFromMenu}>
 									<span class="row-icon">
 										<Icon of={FilePlus} size={15} />
 									</span>
 									<span class="row-label">Board</span>
 									<span class="row-note">.html</span>
 								</button>
-								<button type="button" role="menuitem" data-row data-flat="true" data-new-board="slides" onClick={() => props.menu.boardFromMenu("slides")}>
-									<span class="row-icon">
-										<Icon of={Presentation} size={15} />
-									</span>
-									<span class="row-label">Slides</span>
-									<span class="row-note">.slides.html</span>
-								</button>
 								<Show when={props.document}>
 									<button type="button" role="menuitem" data-row data-flat="true" data-new-board="document" onClick={props.menu.documentFromMenu}>
 										<span class="row-icon">
 											<Icon of={Paperclip} size={15} />
 										</span>
-										{/* Bold like Board and Slides beside it, which are bold because they carry a note. */}
+										{/* Bold like Board beside it, which is bold because it carries a note. */}
 										<span class="row-label row-name">Open File…</span>
 									</button>
 								</Show>

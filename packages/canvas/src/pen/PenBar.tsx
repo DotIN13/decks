@@ -6,7 +6,6 @@ import ChevronLeft from "lucide-solid/icons/chevron-left";
 import FilePlus from "lucide-solid/icons/file-plus";
 import Paperclip from "lucide-solid/icons/paperclip";
 import FileText from "lucide-solid/icons/file-text";
-import Presentation from "lucide-solid/icons/presentation";
 import FrameIcon from "lucide-solid/icons/frame";
 import GripHorizontal from "lucide-solid/icons/grip-horizontal";
 import Redo2 from "lucide-solid/icons/redo-2";
@@ -58,7 +57,7 @@ export function PenBar(props: {
 	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
 	onExport: (ids: string[]) => void;
 	/** A new board in the middle of the view, of the format chosen (`App.tsx`). */
-	onNewBoard?: (format: "board" | "slides") => void;
+	onNewBoard?: () => void;
 	/** A file chosen in the file picker and put in the middle of the view, placed by what it is. */
 	onOpenFile?: () => void;
 }) {
@@ -119,7 +118,7 @@ export function PenBar(props: {
 			<For each={TOOLS}>
 				{(entry) => (
 					<>
-					{/* The board button, between the words and the arrow: one press opens Board and Slides. */}
+					{/* The board button, between the words and the arrow: one press opens its menu. */}
 					<Show when={entry.tool === "arrow" && props.onNewBoard}>
 						<button
 							ref={newButton}
@@ -130,8 +129,8 @@ export function PenBar(props: {
 							aria-haspopup="menu"
 							aria-expanded={!!making()}
 							data-on={making() ? "soft" : undefined}
-							title="A new board or slide deck"
-							aria-label="A new board or slide deck"
+							title="A new board"
+							aria-label="A new board"
 							onClick={toggleMaking}
 						>
 							<Icon of={FilePlus} size={15} />
@@ -194,19 +193,12 @@ export function PenBar(props: {
 			{(at) => (
 				<Portal mount={portalLayer()}>
 					<div ref={newMenu} class="popover" role="menu" aria-label="A new board" style={{ left: `${at().left}px`, top: `${at().top}px`, width: "220px" }}>
-						<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => make(() => props.onNewBoard?.("board"))}>
+						<button type="button" role="menuitem" data-row data-flat="true" data-new-board="board" onClick={() => make(() => props.onNewBoard?.())}>
 							<span class="row-icon">
 								<Icon of={FilePlus} size={15} />
 							</span>
 							<span class="row-label">Board</span>
 							<span class="row-note">.html</span>
-						</button>
-						<button type="button" role="menuitem" data-row data-flat="true" data-new-board="slides" onClick={() => make(() => props.onNewBoard?.("slides"))}>
-							<span class="row-icon">
-								<Icon of={Presentation} size={15} />
-							</span>
-							<span class="row-label">Slides</span>
-							<span class="row-note">.slides.html</span>
 						</button>
 					</div>
 				</Portal>

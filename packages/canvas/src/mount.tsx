@@ -60,8 +60,8 @@ export interface CanvasOptions {
 		list?(): Board[];
 		/** A board's page measured itself (same-origin pages only): its size and how it reads, for the host's agents. */
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }): void;
-		/** A double-click on empty canvas: make a board there (or a deck of slides). Absent: nothing happens. */
-		onCreate?(at: { x: number; y: number }, format?: "board" | "slides"): void;
+		/** A double-click on empty canvas: make a board there. Absent: nothing happens. */
+		onCreate?(at: { x: number; y: number }): void;
 		/** The canvas menu's Open document, at a point. */
 		onOpenDocument?(at: { x: number; y: number }): void;
 		/** A link on a board to another board: open it, and say whether this host has it. */

@@ -11,7 +11,6 @@ import { Acts } from "./agents/acts.ts";
 import { BoardService } from "./boards/service.ts";
 import { EvalTrust } from "./boards/eval-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
-import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
@@ -194,7 +193,7 @@ export class App {
 			 */
 			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
-			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
+			newBoard: (options) => this.boards.newBoard(options),
 			newMirror: (options) => this.boards.newMirror(options),
 			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),

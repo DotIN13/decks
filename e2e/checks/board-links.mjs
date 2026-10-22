@@ -16,7 +16,7 @@
  * The same assertion ends every case, and it is the point of the whole feature: the board that
  * carried the link is still the board in the frame.
  */
-import { editMode, open, pressBoardAction, resetStage, say, selectBoard, settle, socket } from "../harness.mjs";
+import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
 
 const { browser, context, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
@@ -179,27 +179,6 @@ const edited = await onCanvas();
 // Nor does the browser's own default: the board's page is still the board, not the file it links to.
 const stayed = await frame().locator("body").evaluate(() => location.pathname);
 say("in edit mode a link is part of the component, and does nothing", !edited.includes(LINKED) && stayed.endsWith("/plan.html"), `${edited.join(" ")} | page ${stayed}`);
-
-// --- and from a presented board ---------------------------------------------------------
-
-/*
- * The overlay draws its own frame rather than a `BoardFrame`, so it wires the same ask up
- * itself (`Present.tsx`) — and a board opened there has to end the presentation, because the
- * canvas it lands on is underneath the overlay.
- */
-await editMode(page, false);
-link.send({ type: "board.hide", path: LINKED });
-await settle(page, 500);
-await focus(SOURCE);
-await selectBoard(page, SOURCE);
-const presented = await pressBoardAction(page, ["Present", "Fullscreen"]);
-await settle(page, 900);
-const overlay = await page.evaluate(() => Boolean(document.querySelector(".present")));
-await page.frameLocator(".present .present-frame").locator('a[href="risks.html"]').click();
-await settle(page, 1000);
-const closed = await page.evaluate(() => !document.querySelector(".present"));
-const landed = (await onCanvas()).includes(LINKED);
-say("a link on a presented board opens it, and ends the presentation", presented && overlay && closed && landed, JSON.stringify({ presented, overlay, closed, landed }));
 
 link.close();
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));

@@ -297,9 +297,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			for (const one of sized) {
 				const file = service.fileBoard(one.path);
 				if (!file || file.fills) continue;
-				if (file.format === "slides") {
-					if (one.w !== undefined) service.resize(one.path, { w: one.w });
-				} else service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
+				service.resize(one.path, { ...(one.w !== undefined ? { w: one.w } : {}), ...(one.h !== undefined ? { h: one.h } : {}) });
 				if (agent.person) service.wrote(one.path, "you");
 			}
 			children = pens.read(name).children as unknown as Record<string, unknown>[];

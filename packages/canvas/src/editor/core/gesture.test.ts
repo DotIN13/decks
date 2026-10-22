@@ -274,7 +274,7 @@ test("a document's bottom handle writes the height dragged, a floor, and shows i
 		state = result.state;
 		return result;
 	};
-	go({ type: "press-board-handle", handle: "s", box: { path: "boards/doc.html", slides: false, x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
+	go({ type: "press-board-handle", handle: "s", box: { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 }, ...at(380, 642) });
 	assert.deepEqual(go({ type: "move", ...at(380, 342) }).state.boardResize, { path: "boards/doc.html", x: 0, y: 0, w: 760, h: 642 });
 	const lifted = go({ type: "release", ...at(380, 342, {}, 2000) });
 	assert.deepEqual(lifted.effects.find((one) => one.do === "board-size"), { do: "board-size", path: "boards/doc.html", size: { w: 760, h: 342 } });
@@ -328,7 +328,7 @@ test("two presses on a frame's top handle hug it again; slower, or on another ha
 });
 
 test("a board's handle sizes it with Shift keeping its shape; the box is held until the board is at it", () => {
-	const box = { path: "boards/one.html", slides: false, x: 1000, y: 0, w: 400, h: 300 };
+	const box = { path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 };
 	const { state, steps } = run(initialState("edit"), [
 		{ type: "press-board-handle", handle: "se", box, ...at(1400, 300) },
 		{ type: "move", ...at(1600, 310, { shift: true }) },

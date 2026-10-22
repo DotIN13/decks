@@ -225,8 +225,8 @@ export const VERBS: readonly Verb[] = [
 		group: "board",
 		...deckChange,
 		summary:
-			'Write a blank board in a canvas\'s own boards/ (`canvas`, or your own canvas) and return it; placing it is the canvas\'s job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design; "slides" is a reveal deck of <section>s. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.',
-		params: [p("options", obj({ title: str(), format: opt(lit("board", "slides")), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
+			'Write a blank board in a canvas\'s own boards/ (`canvas`, or your own canvas) and return it; placing it is the canvas\'s job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence; the board is one HTML page you design. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.',
+		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
 		result: Board,
 	},
 	{ name: "board.get", group: "board", ...deckRead, summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
@@ -473,7 +473,7 @@ export const ALIASES: readonly Verb[] = [
 		...deckChange,
 		alias: "decks.board.create, then decks.canvas.insert",
 		summary: "Old name: write a blank board and place it on your canvas at `at`.",
-		params: [p("options", obj({ title: str(), format: opt(lit("board", "slides")), w: opt(num()), h: opt(num()), at: opt(Corner) }))],
+		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), at: opt(Corner) }))],
 		result: str(),
 	},
 	{

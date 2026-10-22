@@ -5,7 +5,6 @@ import { readFile } from "node:fs/promises";
 import { renderShell } from "./boards/shell.ts";
 import { LIB_FOREVER, libVersion, splitLibVersion, versionLibRefs } from "./deck/lib-version.ts";
 import { normalizeBoardPath } from "./deck/schema.ts";
-import { readMeta } from "./deck/meta.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
@@ -596,21 +595,16 @@ export function createHttpApp(app: App): Express {
 			 * the shell stays *relative* and a nested board resolves its own sibling.
 			 */
 			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
-			// A board that has to be rendered *into* a document: a `.md`, a deck, or a page
+			// A board that has to be rendered *into* a document: a `.md`, or a page
 			// from somewhere else (`deck/kinds.ts`).
 			if (board?.shell) {
 				res.type("html").send(
 					versionLibRefs(renderShell({
 						path: board.path,
-						format: board.format,
 						shell: board.shell,
 						title: board.title,
 						w: board.w,
 						h: board.h,
-						// The fullscreen overlay asks for the same board and wants it to fill the
-						// window instead of its own rectangle.
-						...(req.query.present === undefined ? {} : { present: true }),
-						...(aspectOf(app.deck, board.path) ? { aspect: aspectOf(app.deck, board.path) as string } : {}),
 					}), libVersion(app.deck.path)),
 				);
 				return;
@@ -1319,20 +1313,6 @@ function sendFile(res: Response, target: string): Promise<void> {
 	});
 }
 
-
-/**
- * A deck's declared aspect, read from the file rather than carried on the board record.
- *
- * It is only wanted at the moment a shell is rendered, and the board record is a thing the
- * whole app holds in memory — a field that one route reads once does not belong on it.
- */
-function aspectOf(deck: { path: string }, boardPath: string): string | undefined {
-	try {
-		return readMeta(boardPath, readFileSync(join(deck.path, boardPath), "utf8")).aspect;
-	} catch {
-		return undefined;
-	}
-}
 
 /**
  * A web page with `lib/embed-guest.js` put first in its head, so it takes the scrolls it can use and

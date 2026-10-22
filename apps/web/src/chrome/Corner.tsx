@@ -5,7 +5,6 @@ import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
 import FilePlus from "lucide-solid/icons/file-plus";
-import Presentation from "lucide-solid/icons/presentation";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
@@ -33,18 +32,6 @@ import { PictureProgress } from "./PictureProgress.tsx";
  * `@media` block in `agents.css`: a layer keeps its precedence inside a media query, so the
  * stylesheet would lose to the utilities on the same element and do nothing at all.
  */
-
-/**
- * What a new board can be, in the order a press is likely to want it.
- *
- * The extension is shown beside each one rather than explained: it is the whole of how a
- * format is declared — `deck/kinds.ts` reads a board's format back out of its filename — so
- * seeing it here is seeing the mechanism rather than a decoration.
- */
-const FORMATS: Array<{ format: "board" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
-	{ format: "board", label: "Board", extension: ".html", note: "One document: blocks that say where they go are placed, the rest flow", icon: FilePlus },
-	{ format: "slides", label: "Slides", extension: ".slides.html", note: "A reveal deck: one <section> per slide, paged with the arrow keys", icon: Presentation },
-];
 
 /** The zoom stops the menu offers, as percentages. */
 const STOPS = [50, 100, 200];
@@ -78,15 +65,7 @@ export function Corner(props: {
 	/** Frame what is on the canvas — the `0` key's job, and the button beside the readout. */
 	onFit: () => void;
 	/** A new, empty board, straight onto the canvas. */
-	/**
-	 * A new board, of a format.
-	 *
-	 * The argument is what this control was missing: three formats were recognised — a
-	 * component board of boxes, a markdown document, a reveal deck — and the only way to get
-	 * either of the last two was to write the file by hand, because this button sent
-	 * `board.create` with nothing on it and the server defaulted to component.
-	 */
-	onNewBoard: (format?: "board" | "slides") => void;
+	onNewBoard: () => void;
 	/**
 	 * Take every board off the canvas.
 	 *
@@ -404,24 +383,14 @@ export function Corner(props: {
 					</span>
 					<span class="row-label">Fit the boards</span>
 				</button>
-				{/* The same three, as rows, because on a phone this menu *is* the toolbar. */}
-				<For each={FORMATS}>
-					{(choice) => (
-						<button
-							type="button"
-							data-row
-							data-flat="true"
-							class="hidden max-[640px]:flex"
-							onClick={() => props.onNewBoard(choice.format)}
-						>
-							<span class="row-icon">
-								<Icon of={choice.icon} size={15} />
-							</span>
-							<span class="row-label">{choice.label}</span>
-							<span class="row-note">{choice.extension}</span>
-						</button>
-					)}
-				</For>
+				{/* The new-board button as a row, because on a phone this menu *is* the toolbar. */}
+				<button type="button" data-row data-flat="true" class="hidden max-[640px]:flex" onClick={() => props.onNewBoard()}>
+					<span class="row-icon">
+						<Icon of={FilePlus} size={15} />
+					</span>
+					<span class="row-label">Board</span>
+					<span class="row-note">.html</span>
+				</button>
 				<button
 					type="button"
 					data-row

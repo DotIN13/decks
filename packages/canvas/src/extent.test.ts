@@ -66,7 +66,6 @@ test("a board that reads top to bottom is drawn as tall as its content, at least
 	// The stage gave it 240; its content measured 689: drawn at 689. Dragged to 900 it stays 900.
 	assert.equal(shownHeight({ h: 240 }, 689), 689);
 	assert.equal(shownHeight({ h: 900 }, 689), 900);
-	// A board of placed boxes is never measured as flowing, and a deck keeps its aspect.
+	// A board of placed boxes is never measured as flowing.
 	assert.equal(shownHeight({ h: 240 }, undefined), 240);
-	assert.equal(shownHeight({ h: 540, format: "slides" }, 800), 540);
 });

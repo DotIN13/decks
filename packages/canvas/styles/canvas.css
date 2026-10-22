@@ -1,265 +1,9 @@
 /*
  * The canvas's own surfaces — the ones that are not the chrome and not a board.
  *
- * There is one today: presenting a deck. In `styles/` beside the others rather than in
- * `index.css` for the reason stated at the top of that file — a surface with its own
- * vocabulary is easier to read as a file than as a section.
+ * In `styles/` beside the others rather than in `index.css` for the reason stated at the top
+ * of that file — a surface with its own vocabulary is easier to read as a file than as a section.
  */
-/*
- * ── Presenting ────────────────────────────────────────────────────────────────────────
- *
- * A board, fullscreen. An overlay rather than a moved frame: the canvas keeps its own frame,
- * camera and current state behind this, so leaving puts you back exactly where you were
- * (`present/Present.tsx`).
- *
- * Every format, and the frame is the one thing that differs. A deck is a fixed 960×540 slide
- * and gets the letterbox; a flow document is a page and gets the window, scrolling inside it;
- * a component board is a fixed rectangle of positioned boxes and is shown at its own size,
- * centred, with the overlay scrolling if it is taller than the window — the same 1:1 it has
- * on its own, and the one place an interactive board is guaranteed to be clickable, since a
- * board on the canvas below half zoom takes no pointer events at all.
- */
-@layer components {
-	.present {
-		position: fixed;
-		z-index: var(--z-present);
-		display: grid;
-		overflow: auto;
-		inset: 0;
-		background: #0b0d10;
-		place-items: center;
-	}
-
-	/*
-	 * A designed board is fitted too, to the window's width or height, whichever runs out first
-	 * (`present/Present.tsx`): its box is the scaled size and the frame inside is scaled from its
-	 * corner. Any other frame ignores the box, which then lays out as if it were not there.
-	 */
-	.present:not([data-shell]):not([data-format="slides"]) {
-		overflow: hidden;
-	}
-
-	.present-fit {
-		display: contents;
-	}
-
-	.present-fit[style] {
-		display: block;
-		overflow: hidden;
-	}
-
-	/* A slide is fitted, never scrolled — `slides.js` scales it to this box. */
-	.present[data-format="slides"] {
-		overflow: hidden;
-	}
-
-	/*
-	 * The frame is the slide's own aspect and no bigger. `slides.js` scales the slide to
-	 * whatever box it is given, so the letterboxing is this rule and nothing else — and the
-	 * bars are the overlay's own background rather than a colour the deck chose.
-	 */
-	.present-frame {
-		border: 0;
-		background: #fff;
-	}
-
-	.present[data-format="slides"] .present-frame {
-		width: min(100vw, calc(100vh * 16 / 9));
-		height: min(100vh, calc(100vw * 9 / 16));
-		/*
-		 * The slide takes no pointer events while it is being presented.
-		 *
-		 * Not decoration: an iframe that can be clicked is an iframe that can take the
-		 * focus, and a focused board document receives the keystrokes itself — so ← → and
-		 * Space went into the slide and nothing paged. There is nothing in a slide to click
-		 * during a talk, so the cost is nil and the overlay keeps the keyboard.
-		 *
-		 * A document and a component board are the other way round on purpose: their keys are
-		 * their own, and a button on a board is a button.
-		 */
-		pointer-events: none;
-	}
-
-	/*
-	 * A wrapped file, filling the window: a markdown board or a page from somewhere else, whose
-	 * height nobody has measured. This is the one frame whose inner document does the scrolling.
-	 * Every other board is presented at the size it was written at, which is the size it is read
-	 * at on the canvas (`present/Present.tsx`).
-	 */
-	.present[data-shell]:not([data-format="slides"]) .present-frame {
-		width: 100%;
-		height: 100%;
-	}
-
-	/*
-	 * ── One embed, filling the window ─────────────────────────────────────────────────
-	 *
-	 * The same overlay and the same frame as a board, for a file inside a box on one: a box
-	 * has no address of its own, so this is the app mounting the file the way the board drew
-	 * it (`present/PresentEmbed.tsx`). `data-family` is what the file *is*, read from the path
-	 * the board wrote, and it decides which of these rules applies.
-	 */
-	.present.embed-present[data-family="pdf"] .present-frame,
-	.present.embed-present[data-family="html"] .present-frame {
-		width: 100%;
-		height: 100%;
-	}
-
-	/* The image, fitted rather than cropped, on the app's own panel colour so a transparent
-	   PNG is not floating in a black window. */
-	.present-image {
-		max-width: 100%;
-		max-height: 100%;
-		object-fit: contain;
-	}
-
-	/* A film, fitted the same way: a window shaped for one aspect never crops another. */
-	.present-video {
-		max-width: 100%;
-		max-height: 100%;
-		object-fit: contain;
-	}
-
-	/* A sound has no picture, so the window holds its name over the controls. */
-	.present-audio {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		align-items: center;
-		width: 100%;
-		max-width: 560px;
-	}
-
-	.present-audio > .name {
-		font-size: 15px;
-		color: var(--muted);
-		text-align: center;
-		overflow-wrap: anywhere;
-	}
-
-	.present-audio > audio {
-		width: 100%;
-	}
-
-	/*
-	 * A document, in a column — which is the whole difference between reading a markdown file
-	 * and reading a wall of text. On the app's surface colours because the overlay's own
-	 * background is the dark a *slide* wants and this is not a slide.
-	 */
-	.present-doc,
-	.present-text {
-		overflow: auto;
-		width: 100%;
-		max-width: 760px;
-		max-height: 100%;
-		margin: 0 auto;
-		padding: 40px 32px;
-		border-radius: var(--radius-doc);
-		background: var(--panel);
-		color: var(--fg);
-	}
-
-	.present-text {
-		font-family: var(--mono, monospace);
-		font-size: var(--type-copy);
-		white-space: pre-wrap;
-	}
-
-	/* A file the browser will not draw: its name, and the bytes. Nothing else to say. */
-	.present-file {
-		display: flex;
-		gap: 14px;
-		align-items: center;
-		padding: 14px 18px;
-		border-radius: var(--radius-doc);
-		background: var(--panel);
-		color: var(--fg);
-	}
-
-	.present-file .name {
-		font-family: var(--mono, monospace);
-		font-size: var(--type-copy);
-	}
-
-	/* The overlay is what has focus, so it must not draw a focus ring around the whole
-	   screen. */
-	.present:focus,
-	.present:focus-visible {
-		outline: 0;
-	}
-
-	.present-bar {
-		position: absolute;
-		bottom: 20px;
-		display: flex;
-		gap: 8px;
-		align-items: center;
-		padding: 6px 8px;
-		border-radius: var(--radius-pill);
-		background: rgb(255 255 255 / 10%);
-		backdrop-filter: blur(6px);
-		transition: opacity 200ms ease;
-	}
-
-	/* Out of the way until the pointer moves — a presentation with permanent buttons on it
-	   is a demo of a tool rather than a talk. `pointer-events` goes with the opacity so an
-	   invisible bar cannot swallow a click meant for the slide. */
-	.present[data-idle="true"] :is(.present-bar, .present-exit) {
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	/* The way out, top centre. */
-	.present-exit {
-		position: absolute;
-		top: 16px;
-		left: 50%;
-		height: 30px;
-		padding: 0 12px;
-		border: 0;
-		border-radius: var(--radius-pill);
-		/* Dark glass, so it reads over a white page as well as over the black around one. */
-		background: rgb(16 18 22 / 62%);
-		backdrop-filter: blur(6px);
-		box-shadow: 0 0 0 1px rgb(255 255 255 / 12%);
-		color: #fff;
-		font-family: var(--mono, monospace);
-		font-size: var(--type-note);
-		cursor: pointer;
-		transform: translateX(-50%);
-		transition: opacity 200ms ease, background-color 120ms ease;
-	}
-
-	.present-exit:hover {
-		background: rgb(16 18 22 / 80%);
-	}
-
-	.present-step {
-		display: grid;
-		width: 30px;
-		height: 30px;
-		border: 0;
-		border-radius: var(--radius-pill);
-		background: rgb(255 255 255 / 12%);
-		color: #fff;
-		font-size: var(--type-title);
-		cursor: pointer;
-		place-items: center;
-	}
-
-	.present-step:hover {
-		background: rgb(255 255 255 / 22%);
-	}
-
-	.present-count {
-		min-width: 54px;
-		color: rgb(255 255 255 / 70%);
-		font-family: var(--mono, monospace);
-		font-size: var(--type-ui);
-		text-align: center;
-	}
-}
-
 /*
  * ── The focus view: one board, as a page ─────────────────────────────────────────────
  *
@@ -483,7 +227,7 @@
 	 *
 	 * `display: none` is the obvious way and it is not the same thing: a subtree the browser is
 	 * not laying out has its documents dropped, so frames come back reloaded — a live board
-	 * re-asked for its feed, a deck back on its first slide, whatever was being edited gone.
+	 * re-asked for its feed, whatever was being edited gone.
 	 * Measured both ways with a marker on each frame's own window; `visibility` holds them.
 	 *
 	 * `visibility: hidden` still lays the subtree out, so the documents stay alive; `inert` (on
@@ -1043,13 +787,6 @@
 	width: 13px;
 	height: 13px;
 }
-	/* Present, on a deck: a word, at the width it needs. */
-	.bar-layer .chrome .act[data-word="true"] {
-	width: auto;
-	padding: 0 7px;
-	font-size: 11px;
-	letter-spacing: 0.02em;
-}
 	/* A hairline before Hide: the one action that takes the board away. */
 	.bar-layer .chrome .act.hide {
 	position: relative;
@@ -1101,13 +838,6 @@
 	.stage > .board-callout > a.icon-button {
 	color: var(--muted);
 	text-decoration: none;
-}
-	/* Present, on a slide deck: the word the bar said, at the width it needs. */
-	.stage > .board-callout > .icon-button:has(> .callout-word) {
-	width: auto;
-	padding: 0 8px;
-	font-size: var(--type-ui);
-	font-weight: 500;
 }
 	/* A hairline before Hide: the one action that takes the board away. */
 	.stage > .board-callout > .callout-rule {

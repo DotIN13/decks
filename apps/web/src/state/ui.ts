@@ -55,16 +55,6 @@ const panelOpensWith = (): boolean => {
 
 function createUi() {
 	/**
-	 * The deck being presented, and the slide it opened on.
-	 *
-	 * Browser-only, and deliberately: paging a deck is a *view*, not a change to it. Putting
-	 * the slide number in the file would make every page-turn a write and the deck's git
-	 * history a log of somebody presenting — so the cost is that a reload opens on slide
-	 * one, which is the right way round.
-	 */
-	const [presenting, setPresenting] = createSignal<Presenting | undefined>();
-
-	/**
 	 * The board being edited as its own source, once its file has arrived.
 	 *
 	 * Fetched rather than read out of the frame. The frame holds the *rendered* markdown, and
@@ -260,8 +250,7 @@ function createUi() {
 	 * The board being read on its own, filling the canvas.
 	 *
 	 * A *view* of the canvas rather than an overlay: the chrome stays, so the inspector, the
-	 * composer and every panel work exactly as they do beside the canvas — which is the whole
-	 * difference between this and `Present`. What changes is that the camera is confined to one
+	 * composer and every panel work exactly as they do beside the canvas. What changes is that the camera is confined to one
 	 * board, so the canvas becomes a page you scroll (`canvas/Stage.tsx`).
 	 */
 	const [focus, setFocus] = createSignal<string | undefined>();
@@ -302,8 +291,6 @@ function createUi() {
 	return {
 		focus,
 		setFocus,
-		presenting,
-		setPresenting,
 		editingSource,
 		setEditingSource,
 		openSource,
@@ -339,26 +326,12 @@ function createUi() {
 export type Ui = ReturnType<typeof createUi>;
 
 
-/**
- * What is filling the window: a board, or one embed inside one.
- *
- * Two kinds in one signal rather than two signals, because they are one state — only one
- * thing can be fullscreen, and whatever leaves is whichever is up. A board carries the slide
- * it was on; an embed carries what the box said, because the overlay has no board document
- * to read it from (`present/PresentEmbed.tsx`).
- */
-export type Presenting =
-	| { kind: "board"; path: string; at: number }
-	| { kind: "embed"; board: string; raw: string; pages?: string; poster?: string; title: string };
-
 /** The app's one set of browser state. Tests build their own with `createUi()`. */
 export const ui = createUi();
 
 export const {
 	focus,
 	setFocus,
-	presenting,
-	setPresenting,
 	editingSource,
 	setEditingSource,
 	openSource,

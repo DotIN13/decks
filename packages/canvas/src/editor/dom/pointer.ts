@@ -307,8 +307,7 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
 	 * to not snap, Shift to keep the shape. The board is drawn at the new box at once; letting go
 	 * moves it if a left or top edge was dragged, and writes the size to its file, and the box is held
-	 * until the board is at it (`editor/core/gesture.ts`, `landBoardResize`). A slide deck's height
-	 * follows from its aspect, so it is sized by its width alone.
+	 * until the board is at it (`editor/core/gesture.ts`, `landBoardResize`).
 	 */
 	const resizeBoard = (event: PointerEvent, handle: Handle) => {
 		const box = host.handles.board();

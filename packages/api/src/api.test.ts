@@ -54,7 +54,7 @@ test("arguments that fit pass, and the wrong ones get a sentence with the signat
 	const create = VERB_BY_NAME.get("board.create")!;
 	assert.equal(checkArgs(create, [{ title: "T" }]), undefined);
 	assert.match(checkArgs(create, [{ titel: "T" }])!, /options\.title is missing/);
-	assert.match(checkArgs(create, [{ title: "T", format: "deck" }])!, /one of "board", "slides"/);
+	assert.match(checkArgs(create, [{ title: "T", format: "slides" }])!, /has no key "format"/, "there are no slide decks");
 	assert.match(checkArgs(create, [{ title: "T", at: { x1: 0, y1: 0 } }])!, /has no key "at"/, "a new board is not placed");
 
 	const move = VERB_BY_NAME.get("move")!;

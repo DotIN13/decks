@@ -18,7 +18,7 @@ test("a zip written here is read back by the browser's reader, stored and deflat
 });
 
 function board(path: string, extra: Partial<Board> = {}): Board {
-	return { path, title: path, format: "board", x: 0, y: 0, w: 1000, h: 400, rev: 1, ...extra } as Board;
+	return { path, title: path, x: 0, y: 0, w: 1000, h: 400, rev: 1, ...extra } as Board;
 }
 
 test("a bundle carries the stage, its boards, what they name, lib, and pictures, and leaves out other boards", async () => {

@@ -11,7 +11,7 @@ import { setMode, setSelected } from "../state/selection.ts";
 import { setDrawing, setInkSelection } from "@decks/canvas/tools";
 import { setPenSelection, setPenTool } from "@decks/canvas/tools";
 import { setCommenting } from "../state/comments.ts";
-import { setFocus, setPicking, setPresenting, setSettings } from "../state/ui.ts";
+import { setFocus, setPicking, setSettings } from "../state/ui.ts";
 import { stop } from "../state/socket.ts";
 import { setBackend, setPairing } from "./backend.ts";
 import { readAddress } from "./connection.ts";
@@ -60,7 +60,6 @@ function forget(): void {
 	setCommenting(undefined);
 	setFocus(undefined);
 	setPicking(undefined);
-	setPresenting(undefined);
 	setSettings(false);
 }
 

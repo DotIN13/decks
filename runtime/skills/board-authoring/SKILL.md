@@ -48,10 +48,6 @@ description: How to write a board. One format: a one-screen page you design, who
   smallest type and any content wider than the board. Fix what it says is over; when it says
   "One screen", stop.
 
-**The one other format, when asked for**
-
-- `format: "slides"`: a `.slides.html` reveal deck, one `<section>` per slide, 960 by 540.
-
 **Placed blocks: the rules**
 
 - **Direct Children & IDs:** Every movable widget must be a direct child of `<body>`, styled with

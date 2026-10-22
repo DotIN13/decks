@@ -10,8 +10,6 @@ import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import { zoomKey } from "./zoom-keys.ts";
-import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./lib/slide-keys.ts";
-import { cssEscape } from "./lib/css-escape.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
 import { velocityFrom, type Sample } from "@decks/ui";
@@ -203,8 +201,8 @@ export function Stage(props: {
 	 * The gesture that makes a board. Absent means the app does not want one, and nothing is
 	 * asked of the server.
 	 */
-	/** A board where the canvas menu was opened, in stage pixels: an ordinary board or a slide deck. */
-	onCreateBoard?: (at: { x: number; y: number }, format?: "board" | "slides") => void;
+	/** A board where the canvas menu was opened, in stage pixels. */
+	onCreateBoard?: (at: { x: number; y: number }) => void;
 	/** A file from the picker, placed by what it is, centred at a point (the Add menu's Open File…). */
 	onOpenDocument?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
@@ -433,19 +431,6 @@ export function Stage(props: {
 				return;
 			}
 			/*
-			 * A **focused** deck takes the arrows, and an unfocused one takes nothing.
-			 *
-			 * Clicking a board is the ask. Without that a deck parked in the corner of the
-			 * canvas would swallow every arrow key meant for something else — and there is
-			 * no conflict to arbitrate with the editor's own nudge, because that only fires
-			 * when a component is selected and a deck has no components.
-			 */
-			const slide = slideKey(event, "focused");
-			if (slide && drive(props.selected, slide)) {
-				event.preventDefault();
-				return;
-			}
-			/*
 			 * A key with a modifier on it is not one of ours.
 			 *
 			 * Every shortcut here is a bare key — `V S C T E` for the tools, `0 1 + -` for
@@ -477,57 +462,6 @@ export function Stage(props: {
 			removeEventListener("keydown", keydown);
 			removeEventListener("keyup", keyup);
 		});
-	});
-
-	/**
-	 * The slide handle inside a deck board's frame, if that board is a deck and has loaded.
-	 *
-	 * Found by query rather than by a registry the frames push into. The frames are
-	 * same-origin by design (§4) and `Editor.ts` already reaches into their documents, so
-	 * this adds no new coupling — and a registry would need every frame to remember to
-	 * deregister, which is a lifetime bug waiting for the first board that unmounts
-	 * mid-turn.
-	 */
-	const deckIn = (path: string): DeckHandle | undefined => {
-		// By the frame's own path rather than its box, which is the one lookup every renderer shares.
-		const node = element?.querySelector(`iframe[data-path="${cssEscape(path)}"]`) as HTMLIFrameElement | null;
-		return (node?.contentWindow as { __deck?: DeckHandle } | null)?.__deck;
-	};
-
-	/** Act on a deck, and say whether there was one to act on. */
-	const drive = (path: string | undefined, action: SlideAction): boolean => {
-		if (!path) return false;
-		const board = props.boards.find((candidate) => candidate.path === path);
-		if (!board) return false;
-		// Nothing presents from here any more; the key is still taken, as it was, on a board that is not live.
-		if (action === "present") return !board.live;
-		if (board.format !== "slides") return false;
-		const deck = deckIn(path);
-		if (!deck) return false;
-		if (action === "next") deck.next();
-		else if (action === "prev") deck.prev();
-		else if (action === "first") deck.first();
-		else if (action === "last") deck.last();
-		return true;
-	};
-
-	/*
-	 * One slide, or the whole deck's shape.
-	 *
-	 * Driven from here because the *canvas* knows the zoom and a board does not: a document
-	 * inside a scaled frame cannot tell how large it is being drawn. The threshold is the
-	 * one the canvas already uses for pointer events, so the sheet appears exactly where a
-	 * deck stops being pageable.
-	 */
-	// A memo, so the frames are only asked when the answer changes — not on every frame
-	// of a gesture, which is how often the camera does.
-	const decksMode = createMemo(() => deckMode(props.camera.zoom, INTERACT_ZOOM));
-	createEffect(() => {
-		const mode = decksMode();
-		for (const board of props.boards) {
-			if (board.format !== "slides") continue;
-			deckIn(board.path)?.setMode(mode);
-		}
 	});
 
 	/**
@@ -564,7 +498,7 @@ export function Stage(props: {
 	onCleanup(() => penLayer.dispose());
 	/** What the editor asks of the scene (`editor/core/scene.ts`), answered from the engine. */
 	const sceneBoards = createMemo(() =>
-		props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, ...(board.format === "slides" ? { slides: true } : {}) })),
+		props.boards.map((board) => ({ path: board.path, x: board.x, y: board.y, w: board.w, h: board.h })),
 	);
 	const scene = tsScene(penLayer, () => props.pen?.doc, sceneBoards);
 	createEffect(() => penLayer.setView(view()));
@@ -728,7 +662,7 @@ export function Stage(props: {
 			camera: () => props.camera,
 			freshId: () => freshId(),
 			idsBut: (id) => freshIds(id),
-			createBoard: (at, format) => props.onCreateBoard?.(at, format),
+			createBoard: (at) => props.onCreateBoard?.(at),
 			openDocument: (at) => props.onOpenDocument?.(at),
 		},
 	});
@@ -1700,14 +1634,6 @@ export function Stage(props: {
 		 * a board frame forwards the *intent* rather than a key name, because `shortcut` takes
 		 * a bare key and `zoom-keys.ts` has already read the modifier.
 		 */
-		/*
-		 * The arrows, arriving from inside a board's own document.
-		 *
-		 * Which is the normal case rather than the exotic one: clicking a deck to focus it
-		 * puts the caret inside its frame, so the keystroke that follows never reaches the
-		 * app's window at all.
-		 */
-		slide: (action) => drive(props.selected, action),
 		zoom: (direction) => {
 			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
 			else pushCamera(zoomAbout(localCamera, view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));

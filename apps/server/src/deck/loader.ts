@@ -4,7 +4,8 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readMeta } from "./meta.ts";
-import { defaultWidth, fillsOf, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
+import { fillsOf, isBoardFile, liveKindOf, shellFor } from "./kinds.ts";
+import { BOARD_W } from "../boards/templates.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
@@ -336,7 +337,7 @@ export class Deck {
 			board.namedAt = previous.namedAt;
 			board.seenAt = previous.seenAt;
 			// A file that states no height keeps the one the board had; one that does is that height.
-			if (board.format !== "slides" && (this.floors.get(path) ?? 0) === 0) board.h = previous.h;
+			if ((this.floors.get(path) ?? 0) === 0) board.h = previous.h;
 		} else {
 			autoPlace([board], this.boards);
 		}
@@ -379,7 +380,6 @@ export class Deck {
 	private describe(path: string): Board {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
-		const format = formatOf(path);
 		// A stub that draws itself from `postMessage`, if this is one.
 		const live = liveKindOf(source);
 		// Whether the file is a document already, or content that has to be wrapped in one.
@@ -392,12 +392,11 @@ export class Deck {
 		 * Where the size comes from: **the board's own file**, and nowhere else.
 		 *
 		 * A board says its width in `<meta name="board">` (or in front-matter, if it is markdown) and
-		 * may say a height there too; a slide deck says its width and derives its height from the
-		 * aspect. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote the
+		 * may say a height there too. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote the
 		 * file — which is what every resize does — could appear to do nothing, and a board's width was
 		 * unchangeable for as long as the record disagreed with the file.
 		 */
-		const width = meta.w ?? defaultWidth(format);
+		const width = meta.w ?? BOARD_W;
 		/*
 		 * **A stated height is a floor.** It is the room somebody dragged out or the number `decks.canvas.fit`
 		 * wrote, and the browser's measurement raises the board above it the moment the content needs
@@ -413,19 +412,16 @@ export class Deck {
 		 * document nobody can measure, and the short one for ours, because a board that grows into its
 		 * content on load looks like it is arriving where one that shrinks looks broken.
 		 */
-		const floor = format === "slides" ? 0 : meta.h ?? 0;
+		const floor = meta.h ?? 0;
 		this.floors.set(path, floor);
 		const rev = revisionOf(source);
 		// Read before, at this revision, when browsers still sized boards (`heights`).
-		const known = format === "slides" ? undefined : this.heights.get(path);
+		const known = this.heights.get(path);
 		// The file's own height when it states one, as its agent wrote it; an old reading only when it does not.
-		const height = format === "slides" ? slideHeight(width, meta.aspect) : floor || (known?.rev === rev ? known.h : shell === "foreign" ? FOREIGN_H : START_H);
+		const height = floor || (known?.rev === rev ? known.h : shell === "foreign" ? FOREIGN_H : START_H);
 		return {
 			path,
-			// `.slides.html` before `.html`, or a deck with no title of its own is called
-			// `talk.slides` in the rail.
-			title: meta.title ?? basename(path).replace(/\.(slides\.(?:html?|md)|html?|mdx?)$/i, ""),
-			format,
+			title: meta.title ?? basename(path).replace(/\.(html?|mdx?)$/i, ""),
 			...(shell ? { shell } : {}),
 			x: 0,
 			y: 0,

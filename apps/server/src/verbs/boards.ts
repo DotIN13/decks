@@ -1,5 +1,5 @@
 import { stageBoardsDir } from "../deck/stage-boards.ts";
-import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
+import { boardWidth } from "../boards/templates.ts";
 import { withBox } from "./context.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
@@ -17,22 +17,10 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number; at?: { x1: number; y1: number } | { x: number; y: number } }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; w?: number; h?: number; at?: { x1: number; y1: number } | { x: number; y: number } }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
 			const named = cornerOf(options.at);
-			/*
-			 * What the board *is as a file*, which is all a new board is allowed to choose.
-			 *
-			 * `board` is the default and is nearly always the answer: one HTML document, whose
-			 * root-level blocks are placed where they say and flow where they do not, and whose
-			 * height is measured. `slides` is a reveal deck, which is a different thing to read
-			 * rather than a different way to write one. The two words that used to name the two
-			 * board formats, `component` and `flow`, both mean `board` now. The extension is
-			 * derived from this and never named — see `boards/templates.ts`.
-			 */
-			const format = asBoardFormat(options.format ?? "board");
-			if (!format) throw new Error(`Unknown format ${options.format}; use one of ${BOARD_FORMATS.join(", ")}`);
 			/*
 			 * There are no templates any more — every board starts blank — but the arguments
 			 * are still accepted rather than refused. This signature is in the `stage.d.ts`
@@ -46,7 +34,7 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 			}
 
 			/*
-			 * The width, when nobody said one: the format's own, held inside the screen.
+			 * The width, when nobody said one: the default, held inside the screen.
 			 *
 			 * A phone is what makes it worth doing rather than suggesting: at a 390px
 			 * viewport every default is wider than the screen, and the board has to fit the
@@ -54,12 +42,11 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 			 * *was* asked for is used at any size, and 1200 is advice in the note below.
 			 */
 			const view = viewport();
-			const width = boardWidth(options.w, view?.width, format);
+			const width = boardWidth(options.w, view?.width);
 			// A new board is made in the canvas it lands on, the caller's own (`deck/layout.ts`).
 			const stageName = agent.stageName?.();
 			const path = service.newBoard({
 				title,
-				format,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 				...(stageName ? { folder: stageBoardsDir(stageName) } : {}),
 			});
@@ -97,7 +84,6 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 		 *
 		 * - **Clamped**: 320 wide is about the narrowest board the templates use, and the ceiling is
 		 *   well past the tallest board in the deck; a resize is not the place to find a typo.
-		 * - **A slide deck takes only the width**, in its own file: its height follows from its aspect.
 		 * - **The canvas first, then the file.** The file's write is what the canvas on screen waits for
 		 *   to let go of the box it was dragged to, and it reads the board's size there from the
 		 *   canvas: the other way round, a board made shorter came back at its old height for a moment.
@@ -113,14 +99,6 @@ export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard"
 			const h = bounded(size.h, 200, 8000);
 			if (w === undefined && h === undefined) throw new Error("A resize needs a width, a height, or both, as numbers");
 			const by = () => (agent.person ? service.wrote(path, "you") : agent.acted?.("resize", path));
-			if (file.format === "slides") {
-				if (w !== undefined) {
-					service.resize(path, { w });
-					by();
-				}
-				const deck = service.fileBoard(path) ?? file;
-				return { path, w: deck.w, h: deck.h };
-			}
 			const sized = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
 			agent.sized?.(path, { w: w ?? file.w, h: h ?? file.h });
 			if (!file.fills && ((w !== undefined && w !== file.w) || (h !== undefined && h !== file.h))) service.resize(path, sized);

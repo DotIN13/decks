@@ -65,7 +65,7 @@ export type Gesture =
 	| { kind: "radius"; start: Rect & RadiusStart & { id: string }; radius: number; moved: boolean }
 	| { kind: "arrowEnd"; id: string; which: Which; node: PenNode; metadata: Record<string, unknown>; stays: Pt; own?: JoinedEnd | undefined; slid?: { item: string; side: JoinedEnd["side"]; at: number } | undefined; moved: boolean }
 	| { kind: "arrowBend"; id: string; node: PenNode; route: ArrowHandles["route"]; start: NonNullable<ReturnType<typeof bendStart>>; next?: Record<string, unknown> | undefined; moved: boolean }
-	| { kind: "boardResize"; path: string; handle: Handle; slides: boolean; least?: number | undefined; start: Rect; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean };
+	| { kind: "boardResize"; path: string; handle: Handle; least?: number | undefined; start: Rect; targets: readonly Rect[]; from: Pt; next: Rect; moved: boolean };
 
 /** One input to the editor. */
 export type Input =
@@ -77,7 +77,7 @@ export type Input =
 	| ({ type: "press-block"; id: string } & PointerInput)
 	/** A press on one of the selected item's eight handles (`box` is the handles' box as drawn). */
 	| ({ type: "press-handle"; handle: Handle; box: Rect & { id: string } } & PointerInput)
-	| ({ type: "press-board-handle"; handle: Handle; box: Rect & { path: string; slides: boolean } } & PointerInput)
+	| ({ type: "press-board-handle"; handle: Handle; box: Rect & { path: string } } & PointerInput)
 	| ({ type: "press-radius"; handle: Rect & RadiusStart & { id: string } } & PointerInput)
 	| ({ type: "press-arrow-end"; which: Which; ends: ArrowHandles } & PointerInput)
 	| ({ type: "press-arrow-bend"; ends: ArrowHandles } & PointerInput)
@@ -179,7 +179,7 @@ export function landBoardResize(state: EditorState, board: (BoardBox & { rev: nu
 	if (!board) return { ...state, boardResize: undefined };
 	const at = board.x === held.x && board.y === held.y && board.w === held.w;
 	if (board.rev === held.released.rev && !(at && board.h === held.h)) return state;
-	return at && (board.slides || board.h >= held.h) ? { ...state, boardResize: undefined } : state;
+	return at && board.h >= held.h ? { ...state, boardResize: undefined } : state;
 }
 
 /** A second press on the same handle, without a drag, soon after: a handle's double-click. */
@@ -425,10 +425,10 @@ function pressHandle(state: EditorState, input: Input & PointerInput, scene: Sce
 			});
 		}
 		case "press-board-handle": {
-			const { path, slides } = input.box;
+			const { path } = input.box;
 			const start = { x: input.box.x, y: input.box.y, w: input.box.w, h: input.box.h };
 			const least = scene.boards().find((board) => board.path === path)?.least;
-			return done({ ...state, gesture: { kind: "boardResize", path, handle: input.handle, slides, least, start, targets: snapTargets(scene, [], [path], ctx.view), from: input.at, next: start, moved: false } });
+			return done({ ...state, gesture: { kind: "boardResize", path, handle: input.handle, least, start, targets: snapTargets(scene, [], [path], ctx.view), from: input.at, next: start, moved: false } });
 		}
 		case "press-radius":
 			return done({ ...state, gesture: { kind: "radius", start: input.handle, radius: input.handle.radius, moved: false } });
@@ -481,7 +481,7 @@ function move(state: EditorState, p: PointerInput, scene: SceneQuery, ctx: Gestu
 			};
 		}
 		case "boardResize": {
-			const step = boardResizeStep(g.start, g.handle, { x: p.at.x - g.from.x, y: p.at.y - g.from.y }, { shift: p.mods.shift, free: isFree(p.mods) }, { targets: g.targets, threshold: SNAP_PX / ctx.zoom, slides: g.slides });
+			const step = boardResizeStep(g.start, g.handle, { x: p.at.x - g.from.x, y: p.at.y - g.from.y }, { shift: p.mods.shift, free: isFree(p.mods) }, { targets: g.targets, threshold: SNAP_PX / ctx.zoom });
 			// The drag's height is written; a document is shown no shorter than its content.
 			return done({ ...state, guides: step.guides, boardResize: { path: g.path, ...shownBoardResize(step.box, g.least) }, gesture: { ...g, next: step.box, moved: true } });
 		}

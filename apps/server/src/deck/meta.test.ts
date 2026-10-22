@@ -88,51 +88,37 @@ test("a size is a positive whole number of pixels", () => {
 	assert.deepEqual(readBoardMeta(withBoardSize("boards/a.html", html, { w: 640.4, h: -12 })), { w: 640, h: 1 });
 });
 
-/*
- * Where a *deck* says what shape it is, per format.
- *
- * A `.slides.md` has front-matter. Reveal's HTML has nowhere at all — its slide size is an
- * argument to `Reveal.initialize`, a script this view deliberately does not run — so an HTML
- * deck declares it in `<meta name="board">`, the tag every board already carries. Without
- * this, every HTML deck was 16:9 and a 4:3 one could not be written.
- */
-test("an HTML deck declares its aspect in the tag every board already has", () => {
+test("a leftover deck file is read like any other: its size from the tag, an aspect ignored", () => {
 	const meta = readMeta(
 		"boards/talk.slides.html",
 		`<!doctype html><html><head><title>The talk</title>
 		<meta name="board" content='{"aspect":"4:3","w":1200}' />
 		</head><body class="reveal"><div class="slides"><section>One</section></div></body></html>`,
 	);
-	assert.equal(meta.aspect, "4:3");
-	assert.equal(meta.w, 1200);
-	assert.equal(meta.title, "The talk", "from `<title>`, as any document's is");
+	assert.deepEqual(meta, { title: "The talk", w: 1200 });
 });
 
-test("a markdown deck still declares it in front-matter, and neither reads the other's", () => {
-	const md = readMeta("boards/talk.slides.md", "---\ntitle: Talk\naspect: 4:3\n---\n\n# One\n");
-	assert.equal(md.aspect, "4:3");
+test("a markdown file reads front-matter, and a tag in it is text", () => {
+	const md = readMeta("boards/notes.md", "---\ntitle: Talk\nw: 800\n---\n\n# One\n");
+	assert.equal(md.w, 800);
 	assert.equal(md.title, "Talk");
 
 	// A markdown file with a `<meta>` tag in it is a markdown file with a tag in it.
-	const stray = readMeta("boards/notes.md", `<meta name="board" content='{"aspect":"4:3"}' />\n\n# Notes\n`);
-	assert.equal(stray.aspect, undefined);
+	const stray = readMeta("boards/notes.md", `<meta name="board" content='{"w":640}' />\n\n# Notes\n`);
+	assert.equal(stray.w, undefined);
 	assert.equal(stray.title, "Notes");
 });
 
 test("front-matter outranks the tag on an HTML file, because it is the more deliberate one", () => {
 	// Not a shape anybody writes on purpose; asserted so the precedence is decided rather
 	// than emergent, and so a future reader knows which line to change.
-	const meta = readMeta(
-		"boards/odd.slides.html",
-		`---\naspect: 1:1\n---\n<meta name="board" content='{"aspect":"4:3"}' />\n<section>One</section>\n`,
-	);
-	assert.equal(meta.aspect, "1:1");
+	const meta = readMeta("boards/odd.html", `---\nw: 700\n---\n<meta name="board" content='{"w":900}' />\n<section>One</section>\n`);
+	assert.equal(meta.w, 700);
 });
 
 test("an HTML document with no tag keeps saying nothing about its size", () => {
 	const meta = readMeta("boards/report.html", "<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
 	assert.equal(meta.w, undefined);
-	assert.equal(meta.aspect, undefined);
 	assert.equal(meta.title, "Report");
 });
 

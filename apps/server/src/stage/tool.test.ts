@@ -59,9 +59,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		newMirror: () => "boards/mirrors/x.html",
 		newAppBoard: () => "boards/apps/x.html",
 		newBoard: (options) => {
-			// The extension is the server's business and comes from the format — the stub
-			// mirrors the real table so a test can assert *which file* a format asked for.
-			const extension = options.format === "slides" ? ".slides.html" : ".html";
+			// Every board is one HTML file, as the real service writes it.
+			const extension = ".html";
 			// In the folder it is asked for, as the real service does: a canvas's own boards/ (`deck/layout.ts`).
 			const path = `${options.folder ?? "boards"}/${options.title.toLowerCase().replace(/\W+/g, "-")}${extension}`;
 			mkdirSync(join(root, options.folder ?? "boards"), { recursive: true });
@@ -173,7 +172,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		service,
 		/** What was actually written to disk, which is the only place a board's size lives. */
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
-		/** For a test that needs a board of a format the stub's `newBoard` does not write. */
+		/** For a test that needs a board the stub's `newBoard` does not write. */
 		write: (path: string, html: string) => {
 			writeFileSync(join(root, path), html);
 			deck.refresh(path);
@@ -217,13 +216,13 @@ test("with no reading from a browser, it says nothing rather than making a numbe
  * the screen rather than a limit being enforced. So what is asserted is the shape of the
  * default and the fact that an explicit width is never touched.
  */
-test("a default width is the format's own, or the screen when the screen is smaller", async () => {
+test("a default width is the board's own, or the screen when the screen is smaller", async () => {
 	/** The width the file was written with — the only place a board's size lives. */
 	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
 	const onWide = await runCode(wide.tool, `return await stage.newBoard({ title: "Wide" })`);
-	assert.equal(widthOf(wide.read("canvases/ada/boards/wide.html")), 1000, "the format's own width, on a screen with room to spare");
+	assert.equal(widthOf(wide.read("canvases/ada/boards/wide.html")), 1000, "the board's own width, on a screen with room to spare");
 	assert.match(onWide.text, /board width 1000/);
 	wide.cleanup();
 
@@ -233,7 +232,7 @@ test("a default width is the format's own, or the screen when the screen is smal
 	assert.match(onPhone.text, /board width 390\. One screen/);
 	phone.cleanup();
 
-	// A huge screen is not an invitation: the format's own width is still the answer.
+	// A huge screen is not an invitation: the board's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
 	await runCode(huge.tool, `return await stage.newBoard({ title: "Huge" })`);
 	assert.equal(widthOf(huge.read("canvases/ada/boards/huge.html")), 1000);
@@ -483,7 +482,7 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	const { tool, hold, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	write("canvases/ada/boards/page.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
 	const page = deck.board("canvases/ada/boards/page.html");
-	assert.equal(page?.format, "board");
+	assert.ok(page);
 	extents.set("canvases/ada/boards/page.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
 	hold("canvases/ada/boards/page.html");
@@ -555,45 +554,21 @@ test("a fit of a wide board leaves it wide and says nothing about width", async 
 	cleanup();
 });
 
-/*
- * A format is what the board *is as a file*, and the thing worth pinning is that asking for
- * one reaches the server — for a long time the only way to a markdown board or a deck was to
- * write the file by hand, because this call had no way to say which you wanted.
- */
-test("a format reaches the service, and decides the file", async () => {
-	const { tool, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-
-	const deck = await runCode(tool, `return await stage.newBoard({ title: "The plan out loud", format: "slides" })`);
-	assert.match(deck.text.split("\n")[0] ?? "", /canvases\/ada\/boards\/the-plan-out-loud\.slides\.html/);
-	assert.ok(read("canvases/ada/boards/the-plan-out-loud.slides.html"), "and the file is the one the format names");
-
-	const doc = await runCode(tool, `return await stage.newBoard({ title: "Notes", format: "flow" })`);
-	assert.match(doc.text.split("\n")[0] ?? "", /boards\/notes\.html/);
-	// And the width it was sized at is the *format's* default: a page is 1000.
-	assert.match(doc.text, /board width 1000/);
-	assert.match(deck.text, /board width 960/, "a deck opens 1:1 with a slide's own layout");
-
-	// Nothing said is a page (`flow`), which is what an agent is taught to write.
+// Every new board is one HTML page: there is no format to ask for, and a slide deck is not one.
+test("a new board is an .html page, whatever format an old caller asks for", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
 	const board = await runCode(tool, `return await stage.newBoard({ title: "Ordinary" })`);
 	assert.match(board.text.split("\n")[0] ?? "", /boards\/ordinary\.html/);
-	cleanup();
-});
-
-test("an unknown format is refused by name rather than quietly becoming a board", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const result = await runCode(tool, `return await stage.newBoard({ title: "Talk", format: "reveal" })`);
-
-	assert.equal(result.isError, true);
-	// The words a caller reaches for — `reveal`, `markdown`, `deck` — are not formats, and a
-	// silent fallback to a board would write a page for a talk.
-	assert.match(result.text, /Unknown format reveal/);
-	assert.match(result.text, /board, slides/);
+	assert.match(board.text, /board width 1000/);
+	// An old caller still saying `format: "slides"` gets an ordinary board.
+	const deck = await runCode(tool, `return await stage.newBoard({ title: "Talk", format: "slides" })`);
+	assert.match(deck.text.split("\n")[0] ?? "", /boards\/talk\.html/);
 	cleanup();
 });
 
 test("a shape asked for is answered with a blank board, and the note says so", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const result = await runCode(tool, `return await stage.newBoard({ title: "Talk", format: "slides", kind: "report" })`);
+	const result = await runCode(tool, `return await stage.newBoard({ title: "Talk", kind: "report" })`);
 
 	assert.equal(result.isError, false);
 	// Templates are gone: every board starts blank, whatever shape was asked for, and the

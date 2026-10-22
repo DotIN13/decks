@@ -82,8 +82,7 @@ export type ClientMessage =
 	 * A board dragged to a new size by the person holding the mouse.
 	 *
 	 * Where the number *lives* is the server's to decide rather than the browser's: a board's
-	 * size is written into its own `<meta>` tag, and a slide deck's height follows from its
-	 * aspect instead. Either dimension on its own is allowed, and a height written there is a
+	 * size is written into its own `<meta>` tag. Either dimension on its own is allowed, and a height written there is a
 	 * floor — the content raises it when it needs more room, and never clips.
 	 */
 	| { type: "board.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
@@ -131,23 +130,13 @@ export type ClientMessage =
 	 * it); it is a bare `string` here because the protocol package cannot depend on the
 	 * server, and an unknown one falls back to `blank` rather than failing — the worst
 	 * outcome of a typo should be an empty board.
-	 *
-	 * `format` is what the board *is as a file*: `board` or `slides`. It is a different
-	 * question from `kind`, which is the shape it starts with.
-	 *
-	 * **The extension is not on the wire, deliberately.** The server derives it from the
-	 * format (`.html`, `.slides.html`), because a board's format is read back out of its
-	 * filename — so a caller that could name the file could ask for a slide deck and be
-	 * handed a board, correctly, with nothing to say why. Absent means `board`. The words
-	 * `component` and `flow` are still accepted and both mean `board`: they named the two
-	 * formats that are now one.
 	 */
 	/**
 	 * A new board. `title`, `size` and `at` are for a board made to hold something — a file
 	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
 	 */
 	/** `document` names a file to open as a page you type into; the board made for it opens it. */
-	| { type: "board.create"; /** The stage on screen, which the new board joins. */ stage?: string; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
+	| { type: "board.create"; /** The stage on screen, which the new board joins. */ stage?: string; kind?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *

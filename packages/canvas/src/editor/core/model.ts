@@ -11,11 +11,11 @@ export type Pt = { x: number; y: number };
 /** A box on the stage, in stage pixels. */
 export type Rect = Frame;
 /**
- * A board as the stage places it; a slide deck (`slides`) keeps its aspect. `least` is the height a
+ * A board as the stage places it. `least` is the height a
  * board that reads top to bottom needs for its content: what it is drawn at, at least, and what a
  * drag of its height cannot go under, since its height is a floor its content raises.
  */
-export type BoardBox = { path: string; x: number; y: number; w: number; h: number; slides?: boolean; least?: number };
+export type BoardBox = { path: string; x: number; y: number; w: number; h: number; least?: number };
 /**
  * What a press on the stage's drawing does: `select` picks up, every other tool makes one item and
  * hands back to `select`. The page keeps the armed one (`state/pen-tools.ts`).

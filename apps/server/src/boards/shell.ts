@@ -1,5 +1,4 @@
 import { basename } from "node:path";
-import type { BoardFormat } from "./templates.ts";
 
 /**
  * The document a non-component board is served as.
@@ -29,7 +28,6 @@ import type { BoardFormat } from "./templates.ts";
 export interface ShellSpec {
 	/** Deck-relative path of the real file, e.g. `boards/notes.md`. */
 	path: string;
-	format: BoardFormat;
 	/**
 	 * Which kind of content is being wrapped — `deck/kinds.ts` decides, and it is the one
 	 * thing this file cannot work out for itself.
@@ -43,16 +41,6 @@ export interface ShellSpec {
 	title: string;
 	w: number;
 	h: number;
-	/** A deck's aspect, passed through so `slides.js` scales without re-reading the file. */
-	aspect?: string;
-	/**
-	 * Being presented: fill the window rather than the board's rectangle.
-	 *
-	 * A board document lays out at the board's own size — 960 wide for a deck — which is
-	 * right on the canvas and wrong in a fullscreen overlay, where the slide sat at 960px in
-	 * the corner of a 1500px frame. One class on the body, and the CSS does the rest.
-	 */
-	present?: boolean;
 }
 
 /**
@@ -79,7 +67,7 @@ export function renderShell(spec: ShellSpec): string {
 	 * extension from the *written* path with the query stripped, for its own older reason.
 	 */
 	const file = `${escapeAttribute(basename(spec.path))}?raw=1`;
-	const body = spec.format === "slides" ? slidesBody(file, spec.aspect) : flowBody(file, spec.shell === "foreign");
+	const body = flowBody(file, spec.shell === "foreign");
 	return `<!doctype html>
 <html lang="en">
 	<head>
@@ -88,7 +76,7 @@ export function renderShell(spec: ShellSpec): string {
 		<meta name="board" content='${escapeAttribute(meta)}' />
 		<link rel="stylesheet" href="${LIB}/board.css" />
 	</head>
-	<body class="board board-shell${spec.present ? " board-present" : ""}" data-format="${spec.format}">
+	<body class="board board-shell">
 ${body}
 		<script src="${LIB}/board.js"></script>
 	</body>
@@ -120,18 +108,6 @@ function flowBody(file: string, framed: boolean): string {
 	const box = framed ? "left: 0; top: 0; width: 100%; height: 100%" : "left: 0; top: 0; width: 100%";
 	const flag = framed ? " data-framed=\"true\"" : "";
 	return `		<div class="doc" data-id="body"${flag} data-embed="${file}" style="${box}"></div>`;
-}
-
-/**
- * A deck.
- *
- * The slide view is `lib/slides.js`, loaded by `board.js` when it sees `data-slides` —
- * the same lazy pattern mermaid and pdf.js already use, so a deck costs nothing to a board
- * that is not one.
- */
-function slidesBody(file: string, aspect?: string): string {
-	const attribute = aspect ? ` data-aspect="${escapeAttribute(aspect)}"` : "";
-	return `		<div class="deck" data-id="deck" data-slides="${file}"${attribute} style="left: 0; top: 0; width: 100%; height: 100%"></div>`;
 }
 
 /** Five entities, the same five `deck/meta.ts` decodes. */

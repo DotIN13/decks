@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { asBoardFormat } from "../boards/templates.ts";
 import type { WireContext, WirePart } from "./context.ts";
 import { asPerson } from "../verbs/person.ts";
 import { putOn } from "../stage/canvas-ops.ts";
@@ -38,11 +37,6 @@ export const boards = {
 	 * it next, as `decks.canvas.fit` and `decks.canvas.update` write it; and the canvas file, as the size of the
 	 * board's item there (`setSize`), which is how big it is drawn on that canvas. Every other canvas
 	 * holding the board keeps its own size for it. The canvas sends this once, on letting go.
-	 *
-	 * A **slide** deck takes only the width: its height follows from its aspect, and the width goes
-	 * to the deck's own file — the `<meta>` tag of an HTML deck,
-	 * front-matter of a markdown one. `deck.json` used to keep it, which made a deck's width the one
-	 * number you could not read off the deck.
 	 *
 	 * Clamped, like everything else a browser sends: 320 wide is about the narrowest board this
 	 * app's own templates use, and the ceiling is well past the tallest board in the deck — a
@@ -109,14 +103,11 @@ export const boards = {
 	 * agent's context — so the agent you are talking to can see the thing you just
 	 * made without being told about it.
 	 *
-	 * An unknown `kind` and an unknown `format` are the same bargain: the worst outcome of a
-	 * bad name should be an empty board rather than a refusal, and every board is blank
-	 * anyway — the `kind` left over from when there were templates is ignored, whatever it
-	 * says, and a format that is not one of the two becomes a board. `component` and `flow`
-	 * are still understood and both mean `board`: they named the two formats that are one.
+	 * An unknown `kind` is no refusal: the worst outcome of a bad name should be an empty board,
+	 * and every board is blank anyway — the `kind` left over from when there were templates is
+	 * ignored, whatever it says.
 	 */
 	"board.create": (message, reply, wire) => {
-		const format = asBoardFormat(message.format) ?? "board";
 		/*
 		 * A title, a size and a place when the browser has something to put on the board: a
 		 * file dropped on empty canvas, which gets a board of its own where it was dropped.
@@ -148,7 +139,7 @@ export const boards = {
 				reply({ type: "notice", level: "warn", text: (error as Error).message });
 				return;
 			}
-		} else path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
+		} else path = wire.boards.newBoard({ title, ...(size ? { size } : {}) });
 		place(path);
 		function place(path: string) {
 			const { name, agent: onStage } = stageFor(message, wire);

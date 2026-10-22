@@ -22,8 +22,8 @@ import type { TextSession } from "../core/text.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
 import { createEffects, type EffectHost } from "./effects.ts";
 
-/** A board as the editor needs it from the app: where it is, its revision, and whether it is a slide deck. */
-export type HostBoard = { path: string; x: number; y: number; w: number; h: number; rev: number; format?: string | undefined; title?: string | undefined };
+/** A board as the editor needs it from the app: where it is and its revision. */
+export type HostBoard = { path: string; x: number; y: number; w: number; h: number; rev: number; title?: string | undefined };
 
 export type EditorHost = {
 	scene: SceneQuery;
@@ -150,7 +150,7 @@ export function createEditor(host: EditorHost) {
 		const held = boardResize();
 		if (!held?.released) return;
 		const board = host.boards().find((candidate) => candidate.path === held.path);
-		update((now) => landBoardResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev, ...(board.format === "slides" ? { slides: true } : {}) } : undefined));
+		update((now) => landBoardResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
 	});
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {

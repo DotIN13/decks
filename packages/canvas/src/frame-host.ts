@@ -1,5 +1,4 @@
 import type { ZoomKey } from "./zoom-keys.ts";
-import type { SlideAction } from "./lib/slide-keys.ts";
 import type { Finger, TouchStep } from "./touch.ts";
 
 /**
@@ -93,11 +92,4 @@ export interface FrameGestureHost {
 	key(name: string): boolean;
 	/** ⌘+ / ⌘− / ⌘0, which a board frame takes rather than letting Chrome zoom the page. */
 	zoom(direction: ZoomKey): void;
-	/**
-	 * The arrow keys, when the focused board is a deck.
-	 *
-	 * Returns whether there was a deck to page — so a plain board's arrows fall through to
-	 * whatever else wants them rather than being swallowed by a handler that did nothing.
-	 */
-	slide(action: SlideAction): boolean;
 }

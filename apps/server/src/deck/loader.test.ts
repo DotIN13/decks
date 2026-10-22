@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Deck } from "./loader.ts";
 import { withBoardSize } from "./meta.ts";
-import { slideHeight } from "./kinds.ts";
 import { realPathOf } from "./roots.ts";
 
 function board(title: string, w?: number, h?: number): string {
@@ -13,7 +12,7 @@ function board(title: string, w?: number, h?: number): string {
 	return `<!doctype html><html><head><title>${title}</title>${meta}</head><body class="board"></body></html>`;
 }
 
-/** A deck in reveal's own markup — a size this app keeps in the record rather than the file. */
+/** A deck in reveal's own markup, left from when slide decks were a board format: read as any HTML page now. */
 function slideDeck(title: string): string {
 	return `<!doctype html><html><head><title>${title}</title></head><body class="reveal"><div class="slides"></div></body></html>`;
 }
@@ -167,7 +166,8 @@ test("a board's size is its own file's, and deck.json's copy is ignored", () => 
 	const deck = Deck.open(root);
 	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700], "the file's numbers, not the record's");
 	assert.equal(deck.board("boards/talk.slides.html")?.w, 1440);
-	assert.equal(deck.board("boards/talk.slides.html")?.h, slideHeight(1440, undefined));
+	assert.equal(deck.board("boards/talk.slides.html")?.shell, "foreign", "a leftover deck is a page from somewhere else, not a deck");
+	assert.ok((deck.board("boards/talk.slides.html")?.h ?? 0) > 0);
 	assert.deepEqual(
 		[deck.board("boards/a.html")?.w, deck.board("boards/a.html")?.h],
 		[800, 600],
@@ -265,11 +265,10 @@ test("boards are found in subdirectories, and non-boards are not", () => {
 		deck.boards.map((b) => b.path),
 		["boards/a.html", "boards/nested/b.htm", "boards/notes.md", "boards/talk.slides.md"],
 	);
-	// And each one knows what it is. Three of the four are boards, whatever they are written
-	// in: the one distinction left is the deck, which is paged rather than read.
+	// And each one knows how it is delivered: ours as it is, markdown wrapped, a leftover deck too.
 	assert.deepEqual(
-		deck.boards.map((b) => b.format),
-		["board", "board", "board", "slides"],
+		deck.boards.map((b) => b.shell),
+		[undefined, undefined, "content", "content"],
 	);
 	// The title comes from the content: a rail full of filenames is a rail with nothing in it.
 	assert.equal(deck.boards.find((b) => b.path === "boards/notes.md")?.title, "Notes");

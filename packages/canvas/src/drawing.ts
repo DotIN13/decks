@@ -51,7 +51,6 @@ export function boardsOf(doc: PenDocument): Board[] {
 		boards.push({
 			path: boardPath(node),
 			title: typeof node.name === "string" && node.name ? node.name : boardPath(node),
-			format: "board",
 			x: num(node.x, 0),
 			y: num(node.y, 0),
 			w: num(node.width, 960),

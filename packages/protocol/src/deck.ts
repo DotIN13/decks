@@ -43,24 +43,12 @@ export interface Board {
 	path: string;
 	title: string;
 	/**
-	 * What this board is, as a file — a `board` or a deck of `slides` (`deck/kinds.ts`).
-	 *
-	 * There were three: `component` for positioned boxes and `flow` for a document that
-	 * reflows. They are one now. A board is an HTML document whose root-level blocks are
-	 * absolutely positioned, and a block that is not placed is a block that flows — which is
-	 * a property of the element, read where it matters (the editor asks the browser for a
-	 * node's computed position) rather than a property of the file. What is left in this
-	 * field is the one difference a reader can see before the frame loads: a deck is paged
-	 * with the arrow keys and is laid out at a fixed size, and a board is not.
-	 */
-	format: "board" | "slides";
-	/**
 	 * How the frame has to be *given* this board, when the file is not a document already.
 	 *
 	 * Absent for a board this app wrote: it is a complete document already. Present for a
-	 * file that has to be rendered *into* one — `content`, which is a `.md` or a deck in
-	 * either dialect — and for `foreign`, an HTML page from somewhere else, which gets a
-	 * document too and is put in a sandboxed frame inside it because it may carry scripts.
+	 * file that has to be rendered *into* one — `content`, which is a `.md` — and for `foreign`,
+	 * an HTML page from somewhere else, which gets a document too and is put in a sandboxed
+	 * frame inside it because it may carry scripts.
 	 *
 	 * On the wire because the browser sizes on it: a sandboxed page cannot be measured from
 	 * outside, so that one board keeps the height in its file where every other board
@@ -71,9 +59,8 @@ export interface Board {
 	 * What this board is a live view of, when it is one: `chat` for a mirror, `web` for the
 	 * shared-Chrome card, `agents` for an orchestration board.
 	 *
-	 * Read off the file's own `data-live` attribute — the same cheap source scan `format`
-	 * comes from — because the board that draws itself from `postMessage` has no content of
-	 * its own to look at. On the wire because two decisions depend on it and both are the
+	 * Read off the file's own `data-live` attribute — a cheap source scan — because the board
+	 * that draws itself from `postMessage` has no content of its own to look at. On the wire because two decisions depend on it and both are the
 	 * app's: a live board has nothing to open in a tab (there is no app in a bare tab to feed
 	 * it), and nothing to fill a window with.
 	 */

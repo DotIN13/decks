@@ -382,7 +382,7 @@ export function OverlayLayer(
 			</Show>
 			<Show when={o().boardHandles}>
 				{(box) => (
-					<For each={boardHandleList(box().slides)}>
+					<For each={boardHandleList()}>
 						{(handle) => {
 							const size = () => HANDLE_PX / props.zoom;
 							const at = () => handleAt(box(), handle, size());

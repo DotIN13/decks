@@ -22,11 +22,11 @@ export interface Box {
 
 /**
  * How tall a board is drawn: the height the stage gives it, raised to its content's when the board
- * reads top to bottom (`measureFrame`, `flows`) and was measured taller. A slide deck's height is
- * its aspect's, and a board of placed boxes is the size it is given.
+ * reads top to bottom (`measureFrame`, `flows`) and was measured taller. A board of placed boxes is
+ * the size it is given.
  */
-export function shownHeight(board: { h: number; format?: string }, flowing: number | undefined): number {
-	return board.format !== "slides" && flowing !== undefined && flowing > board.h ? flowing : board.h;
+export function shownHeight(board: { h: number }, flowing: number | undefined): number {
+	return flowing !== undefined && flowing > board.h ? flowing : board.h;
 }
 
 /** The bottom-right corner of everything, or nothing at all for an empty board. */

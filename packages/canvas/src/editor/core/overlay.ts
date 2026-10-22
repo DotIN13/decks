@@ -34,8 +34,8 @@ export type Outline = Rect & {
 	/** Notes and cards have a board's corners, and so does the outline round one. */
 	round?: true;
 };
-/** The selected board's eight handles (a slide deck's too: its top and bottom size it by its height, its width following). */
-export type BoardHandles = Outline & { path: string; slides: boolean };
+/** The selected board's eight handles. */
+export type BoardHandles = Outline & { path: string };
 /** The outline round what the pointer is over: an item (`id`) or a board (`board`). */
 export type HoverBox = Rect & { id?: string; board?: true; round?: true };
 /** Where a card block's grip goes: level with the middle of the block's first line, at its left edge. */
@@ -237,7 +237,7 @@ export function boardHandles(outlines: readonly Outline[], input: { resizable: b
 	const path = outlines[0]!.id.slice("board:".length);
 	const board = input.boards.find((candidate) => candidate.path === path);
 	if (!board) return undefined;
-	return { ...outlines[0]!, path, slides: !!board.slides };
+	return { ...outlines[0]!, path };
 }
 
 /** The two ends of the one selected arrow as drawn, and its middle, for the handles that pick them up. */
@@ -493,11 +493,8 @@ export const gripHidden = (drag: Offset, resizing: boolean) => !!(drag.dx || dra
 
 /* ---- Where things sit, in stage pixels, with screen sizes divided by the zoom by the caller. ---- */
 
-/**
- * The handles a board has: all eight, a slide deck's too. A deck keeps its aspect whichever it is
- * dragged by (`resize.ts`, `boardResizeStep`). `slides` is kept for the callers that say which board.
- */
-export const boardHandleList = (_slides: boolean): readonly Handle[] => HANDLES;
+/** The handles a board has: all eight (`resize.ts`, `boardResizeStep`). */
+export const boardHandleList = (): readonly Handle[] => HANDLES;
 
 /** A resize handle answers a press this many screen pixels across, whatever size it is drawn. */
 export const HANDLE_HIT_PX = 15;

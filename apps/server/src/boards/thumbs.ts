@@ -760,14 +760,12 @@ export class ThumbService {
 			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: job.ahead ? AHEAD_READY_MS : READY_MS }).catch(() => {});
 			const clipOf = (b: Pick<Board, "w" | "h">) => (entire ? { ...thumbClip(b), height: Math.max(150, Math.min(Math.round(b.h), WHOLE_MAX_H)) } : thumbClip(b));
 			let clip = clipOf(job.board);
-			if (job.board.format !== "slides") {
-				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
-				// Never below what the board says it is: a stated height is a floor everywhere
-				// else (`deck/loader.ts`), and a picture cropped under it would be a different
-				// board from the one on the canvas.
-				const h = Math.max(measured, job.board.h);
-				if (measured > 0 && h !== job.board.h) clip = clipOf({ w: job.board.w, h });
-			}
+			const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
+			// Never below what the board says it is: a stated height is a floor everywhere
+			// else (`deck/loader.ts`), and a picture cropped under it would be a different
+			// board from the one on the canvas.
+			const h = Math.max(measured, job.board.h);
+			if (measured > 0 && h !== job.board.h) clip = clipOf({ w: job.board.w, h });
 			const shot =
 				job.kind === "whole"
 					? await wholeShot(page, clip, wholeScale({ w: job.board.w, h: tall }))

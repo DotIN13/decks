@@ -1527,55 +1527,6 @@
 	}
 
 	/** A live component: fed by the app, over `postMessage`, and never from the file. */
-	/**
-	 * Draw a slide deck, and hand the app the handle it pages with.
-	 *
-	 * The handle goes on `window.__deck` rather than being returned, because the thing that
-	 * drives it is in the *parent* document: the arrow keys arrive in the app's own
-	 * keyboard handler or are forwarded out of this frame by `frame-gestures.ts`, and
-	 * neither of those can await a promise this function returned. One deck per board, so
-	 * one global is the whole of the addressing needed.
-	 */
-	async function mountSlides(element) {
-		const file = element.getAttribute("data-slides");
-		if (!file) return;
-		try {
-			const [slides, response] = await Promise.all([needModule("slides.js"), fetch(new URL(file, location.href))]);
-			if (!response.ok) throw new Error(`${response.status}`);
-			const source = await response.text();
-			const deck = slides.mountDeck(element, source, {
-				/*
-				 * How a slide's body becomes a slide, and it differs by format.
-				 *
-				 * A markdown deck goes through the board's own renderer, so a slide gets the
-				 * same marked, KaTeX and mermaid a `[data-md]` component does — one renderer,
-				 * not two. A reveal HTML deck is *already* markup: it is inserted as-is and
-				 * then offered to KaTeX, which is the only enhancement that makes sense on
-				 * hand-written HTML. Running it through marked instead would have been the
-				 * tempting one line, and it mangles a deck the moment a `<section>` indents
-				 * its contents four spaces — which reveal's own examples do.
-				 */
-				render: slides.isHtmlDeck(file)
-					? async (into, markup) => {
-							into.innerHTML = markup;
-							await renderMath(into);
-							await highlightCode(into);
-						}
-					: (into, markdown) => renderMarkdown(into, markdown),
-			});
-			window.__deck = deck;
-			/*
-			 * Re-fit on resize, because a board is dragged and a fullscreen overlay is a
-			 * different size again. Cheap: it sets one custom property and two pixel
-			 * widths, and it is the only thing that has to happen when the box changes.
-			 */
-			new ResizeObserver(() => deck.fit()).observe(element);
-		} catch (error) {
-			element.textContent = `Cannot read ${file}: ${(error && error.message) || "unknown error"}`;
-			element.classList.add("embed-missing");
-		}
-	}
-
 	async function mountLive(host) {
 		try {
 			const module = await needModule("live-chat.js");
@@ -1692,17 +1643,6 @@
 		}
 		for (const element of document.querySelectorAll('[data-live="app"]')) {
 			work.push(mountLiveApp(element));
-		}
-		/*
-		 * A slide deck, which is neither a document nor live.
-		 *
-		 * `[data-slides]` names a deck file — reveal's HTML, or its markdown plugin's
-		 * dialect. The view is
-		 * `slides.js`, loaded on demand like every other renderer here — so a deck costs a
-		 * board that is not one exactly nothing.
-		 */
-		for (const element of document.querySelectorAll("[data-slides]")) {
-			work.push(mountSlides(element));
 		}
 		/*
 		 * Maths in a document block's own markup.

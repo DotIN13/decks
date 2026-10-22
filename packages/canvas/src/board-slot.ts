@@ -80,10 +80,8 @@ export interface StageBoardProps {
 	 * at the size being asked for, with the document still at its old one inside it — and the
 	 * write happens once, at the end, which is also what makes one gesture one revision.
 	 *
-	 * Only the dimensions the file can hold arrive here. A board sends both — a height is a floor
-	 * in its `<meta>` tag, which the content raises when it needs to — and a slide deck sends the
-	 * width alone, because its height follows from its aspect (`wire/boards.ts` decides that, not
-	 * this file).
+	 * A board sends both dimensions — a height is a floor in its `<meta>` tag, which the content
+	 * raises when it needs to (`wire/boards.ts` decides where they go, not this file).
 	 */
 	onResize?: (size: { w: number; h: number }) => void;
 	onOpen: () => void;

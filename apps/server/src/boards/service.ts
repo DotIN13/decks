@@ -6,17 +6,14 @@ import type { Board, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "./snapshots.ts";
 import { Authors, Seen } from "./authors.ts";
 import {
-	extensionFor,
 	MIRROR_SIZE,
 	renderBlank,
-	renderSlides,
 	renderMirror,
 	renderWebBoard,
 	renderDocBoard,
 	renderAppBoard, renderFileBoard,
 	slugFor,
 	WEB_BOARD_SIZE,
-	type BoardFormat,
 } from "./templates.ts";
 import type { Deck } from "../deck/loader.ts";
 import { onlySizeChanged, withBoardSize } from "../deck/meta.ts";
@@ -267,8 +264,8 @@ export class BoardService {
 	 * is the object that owns writing a board and recording a revision — a resize that skipped
 	 * the record would be the one edit the time machine did not have.
 	 *
-	 * The format rules are the caller's, not this one's: a flow document's height is its
-	 * content, and a deck's follows from its aspect, so those callers send one dimension.
+	 * The rules are the caller's, not this one's: a flow document's height is its content, so
+	 * that caller sends one dimension.
 	 */
 	resize(path: string, size: { w?: number; h?: number }): Board {
 		const board = this.deck.board(path);
@@ -329,18 +326,13 @@ export class BoardService {
 	 * The name is minted from the title and made unique by suffixing, so an agent answering
 	 * three questions about the same thing gets `-2` and `-3` rather than an error.
 	 */
-	newBoard(options: { title: string; format?: BoardFormat; size?: { w?: number; h?: number }; folder?: string }): string {
+	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string {
 		/*
-		 * The extension comes from the format and from nowhere else.
-		 *
-		 * `deck/kinds.ts` reads a board's format back out of its name, so these two cannot be
-		 * allowed to disagree: a file asked for as slides and written as `.html` would simply
-		 * *be* a board, correctly, with nothing anywhere to say why. The board itself is
-		 * always blank when it is created — there are no templates any more; the examples a
-		 * board can be modelled on live in `examples/` beside the deck, refreshed on restart.
+		 * Always `.html`, and always blank when it is created — there are no templates any more;
+		 * the examples a board can be modelled on live in `examples/` beside the deck, refreshed
+		 * on restart.
 		 */
-		const format = options.format ?? "board";
-		const extension = extensionFor(format);
+		const extension = ".html";
 		const base = slugFor(options.title);
 		// `boards/`, or a canvas's own board folder (`deck/stage-boards.ts`).
 		const folder = options.folder ?? "boards";
@@ -352,7 +344,7 @@ export class BoardService {
 
 		const file = this.deck.fileOf(path);
 		// Written for `boards/`, so re-pointed when it is made deeper.
-		const html = relink(format === "slides" ? renderSlides(options.title, options.size) : renderBlank(options.title, options.size), "boards", folder);
+		const html = relink(renderBlank(options.title, options.size), "boards", folder);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);

@@ -5,7 +5,7 @@ import { hitReach, anchorAt, arrowAnchors, distances, measure, arrowEnds, boardH
 
 const boards = [
 	{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 },
-	{ path: "boards/deck.html", x: 1600, y: 0, w: 640, h: 360, slides: true },
+	{ path: "boards/deck.html", x: 1600, y: 0, w: 640, h: 360 },
 ];
 const scene = fakeScene(
 	[
@@ -85,13 +85,12 @@ test("the radius handle: a rectangle's corners, gone while the item is carried o
 	assert.equal(radiusInset(40, 9, 25), 25);
 });
 
-test("board handles: one board alone, resizable, not carried; a slide deck has all eight", () => {
+test("board handles: one board alone, resizable, not carried; all eight", () => {
 	const outlines = selectionOutlines(base({ selected: "boards/deck.html" }), scene);
-	assert.deepEqual(boardHandles(outlines, { resizable: true, carrying: false, boards }), { id: "board:boards/deck.html", role: "board", x: 1600, y: 0, w: 640, h: 360, path: "boards/deck.html", slides: true });
+	assert.deepEqual(boardHandles(outlines, { resizable: true, carrying: false, boards }), { id: "board:boards/deck.html", role: "board", x: 1600, y: 0, w: 640, h: 360, path: "boards/deck.html" });
 	assert.equal(boardHandles(outlines, { resizable: false, carrying: false, boards }), undefined);
 	assert.equal(boardHandles(outlines, { resizable: true, carrying: true, boards }), undefined);
-	assert.deepEqual(boardHandleList(true), ["nw", "n", "ne", "e", "se", "s", "sw", "w"]);
-	assert.equal(boardHandleList(false).length, 8);
+	assert.deepEqual(boardHandleList(), ["nw", "n", "ne", "e", "se", "s", "sw", "w"]);
 	// Under 10 screen pixels both ways the handles would cover the board: at 1%, 640 × 360 is 6.4 × 3.6.
 	assert.equal(boardHandles(outlines, { resizable: true, carrying: false, boards, zoom: 0.01 }), undefined);
 	assert.ok(boardHandles(outlines, { resizable: true, carrying: false, boards, zoom: 0.02 }));

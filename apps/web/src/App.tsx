@@ -14,7 +14,6 @@ import { shownHeight } from "./board/extent.ts";
 import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
-import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
 import { camera, glide, moveCamera, reducedMotion, setCamera } from "./state/camera.ts";
 import { cameraOntoPage } from "@decks/canvas/camera";
@@ -34,7 +33,7 @@ import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state}
 import { pens } from "./state/pens.ts";
 import { optionFor } from "./chat/composer/thinking.ts";
 import { notice } from "./state/notices.ts";
-import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
+import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
@@ -659,8 +658,7 @@ export function App() {
 	 * content flows is what a drag or a `decks.canvas.fit` gave it, and the board is drawn at least as tall as its
 	 * content measures here, so it never clips a paragraph. Read in each browser and never written back:
 	 * two browsers whose fonts lay it out a pixel apart each draw their own, rather than answering each
-	 * other's height for ever. A slide deck's height is its aspect's, and a board of placed boxes is
-	 * the size it is given.
+	 * other's height for ever. A board of placed boxes is the size it is given.
 	 *
 	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or
 	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
@@ -875,13 +873,13 @@ export function App() {
 	/* A new board from the tools column or the phone's ⋯ menu. Asked for by name, so the camera can
 	   arrive on it: the server places a new board in the middle of this stage's view and clear of
 	   what is there, which is near but not always on screen when the middle is taken. */
-	const newBoard = (format?: "board" | "slides") => {
+	const newBoard = () => {
 		if (!state.focused) {
 			notice("info", "Make an agent first: a board is made on an agent's canvas.");
 			return;
 		}
 		void files
-			.askForBoard((request) => send({ type: "board.create", ...(format ? { format } : {}), request }))
+			.askForBoard((request) => send({ type: "board.create", request }))
 			.then((path) => {
 				if (!path) return;
 				setSelected(path);
@@ -1086,7 +1084,7 @@ export function App() {
 		if (opening && source) move(path, source.x + source.w + 32, source.y);
 		send({ type: "board.play", path });
 		setSelected(path);
-		// The board lands on the canvas, under a presentation if one is up: that ends it.
+		// The board lands on the canvas.
 		flyToBoards([board], { animate: true });
 		return true;
 	};
@@ -1185,8 +1183,8 @@ export function App() {
 									noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
 									send({ type: "board.extent", path, ...extent });
 								},
-								onCreate: (at, format) =>
-									void files.boardAt(at, format).then((path) => {
+								onCreate: (at) =>
+									void files.boardAt(at).then((path) => {
 										if (!path) return;
 										setSelected(path);
 									}),

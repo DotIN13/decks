@@ -7,7 +7,7 @@ const NOW = 1_700_000_000_000;
 const HOUR = 60 * 60 * 1000;
 
 function board(path: string, over: Partial<Board> = {}): Board {
-	return { path, title: path, format: "board", x: 0, y: 0, w: 800, h: 600, rev: 1, inContext: [], ...over };
+	return { path, title: path, x: 0, y: 0, w: 800, h: 600, rev: 1, inContext: [], ...over };
 }
 
 test("a board is news until the person reads it, and again once it is named after that", () => {

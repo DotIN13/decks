@@ -16,7 +16,7 @@ import { THUMB_WIDTH, thumbClip, thumbName, ThumbService } from "./thumbs.ts";
  */
 type Browser = import("playwright").Browser;
 
-const board = (path: string, rev = 1, w = 1000, h = 2000): Board => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [], format: "component" }) as unknown as Board;
+const board = (path: string, rev = 1, w = 1000, h = 2000): Board => ({ path, rev, w, h, title: path, x: 0, y: 0, inContext: [] }) as Board;
 
 function fake() {
 	const opened: Array<{ url: string; viewport: unknown; scale: unknown; scheme: unknown }> = [];
@@ -216,7 +216,7 @@ test("a flow document is measured in the page and pictured to that height, witho
 	const chrome = fake();
 	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => chrome.browser);
 	// The record still carries the 240px placeholder; the page says 1234.
-	const flow = { ...board("boards/notes.html", 3, 720, 240), format: "board" } as Board;
+	const flow = board("boards/notes.html", 3, 720, 240);
 	const asked = thumbs.get(flow, "light");
 	await tick();
 	await chrome.release();

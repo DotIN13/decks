@@ -11,7 +11,6 @@ import { basename, keepRows, matches, panelSections } from "./panel-groups.ts";
 
 const board = (path: string, title = path): Board => ({
 	path,
-	format: "board",
 	title,
 	x: 0,
 	y: 0,

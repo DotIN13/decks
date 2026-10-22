@@ -4,7 +4,6 @@ import { join, posix, relative, sep } from "node:path";
 import type { Board } from "@decks/protocol";
 import type { PenDocument } from "@decks/pen";
 import { renderShell } from "../boards/shell.ts";
-import { readMeta } from "../deck/meta.ts";
 import type { ThumbScheme } from "../boards/thumbs.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 
@@ -168,13 +167,7 @@ export async function buildBundle(source: BundleSource): Promise<{ manifest: Bun
 			queue.push(board.path);
 		}
 		if (board.shell) {
-			let aspect: string | undefined;
-			try {
-				aspect = readMeta(board.path, readFileSync(join(deckPath, board.path), "utf8")).aspect;
-			} catch {
-				aspect = undefined;
-			}
-			const html = renderShell({ path: board.path, format: board.format, shell: board.shell, title: board.title, w: board.w, h: board.h, ...(aspect ? { aspect } : {}) });
+			const html = renderShell({ path: board.path, shell: board.shell, title: board.title, w: board.w, h: board.h });
 			served.push({ name: `served/${board.path}`, data: Buffer.from(html, "utf8") });
 			servedPaths.push(board.path);
 		}

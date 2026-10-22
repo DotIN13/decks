@@ -273,7 +273,6 @@
 	--z-float: 30; /* over the work and under a menu: a notice, the ink tools */
 	--z-menu: 40; /* menus and popovers */
 	--z-popup: 60; /* the comment popup, which opens over a menu */
-	--z-present: 200; /* the present view: a board filling the window */
 	color-scheme: light;
 }
 

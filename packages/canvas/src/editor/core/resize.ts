@@ -23,23 +23,23 @@ export type SnapOptions = { targets: readonly Rect[]; threshold: number };
 /** Never smaller than a board can be. */
 export const BOARD_MIN = { w: 320, h: 200 };
 
-/** The edges a handle drags. A slide deck's height follows from its width, so it has no top or bottom edge. */
-export function handleEdges(handle: Handle, slides = false): Edge[] {
+/** The edges a handle drags. */
+export function handleEdges(handle: Handle): Edge[] {
 	return [
 		...(handle.includes("w") ? (["x1"] as const) : []),
 		...(handle.includes("e") ? (["x2"] as const) : []),
-		...(!slides && handle.includes("n") ? (["y1"] as const) : []),
-		...(!slides && handle.includes("s") ? (["y2"] as const) : []),
+		...(handle.includes("n") ? (["y1"] as const) : []),
+		...(handle.includes("s") ? (["y2"] as const) : []),
 	];
 }
 
 /** The box's edges with the handle's ones moved by the pointer. */
-function dragged(start: Rect, handle: Handle, delta: Pt, slides: boolean): Edges {
+function dragged(start: Rect, handle: Handle, delta: Pt): Edges {
 	return {
 		x1: start.x + (handle.includes("w") ? delta.x : 0),
 		x2: start.x + start.w + (handle.includes("e") ? delta.x : 0),
-		y1: start.y + (!slides && handle.includes("n") ? delta.y : 0),
-		y2: start.y + start.h + (!slides && handle.includes("s") ? delta.y : 0),
+		y1: start.y + (handle.includes("n") ? delta.y : 0),
+		y2: start.y + start.h + (handle.includes("s") ? delta.y : 0),
 	};
 }
 
@@ -100,7 +100,7 @@ function snappedShape(box: Edges, start: Rect, handle: Handle, mods: ResizeMods,
  */
 export function resizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions & { floor?: number; narrowest?: number }): { box: Rect; guides: Guide[] } {
 	const shaping = mods.shift && handle.length === 2 && start.w > 0 && start.h > 0;
-	const moved = shaping ? snappedShape(dragged(start, handle, delta, false), start, handle, mods, options) : snapped(dragged(start, handle, delta, false), handleEdges(handle), mods, options);
+	const moved = shaping ? snappedShape(dragged(start, handle, delta), start, handle, mods, options) : snapped(dragged(start, handle, delta), handleEdges(handle), mods, options);
 	let { x1, y1, x2, y2 } = moved.box;
 	const narrowest = options.narrowest ?? 4;
 	// A card's least width holds the edge that is not dragged where it is, rather than flipping the card.
@@ -117,45 +117,22 @@ export function resizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeM
 
 /**
  * One move of a board's handle. As an item's, but the edge being dragged stops at `BOARD_MIN`
- * (the other stays put) rather than flipping, and a slide deck keeps its aspect: by a side or a
- * corner it is sized by its width, its top staying put and its height following; by its top or
- * bottom, by its height, its width following about its middle. Shift does nothing to a deck.
+ * (the other stays put) rather than flipping.
  */
-export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions & { slides?: boolean }): { box: Rect; guides: Guide[] } {
-	const slides = !!options.slides;
-	// A deck by its top or bottom: sized by its height, its width following the aspect, about its middle.
-	if (slides && (handle === "n" || handle === "s")) return deckByHeight(start, handle, delta, mods, options);
+export function boardResizeStep(start: Rect, handle: Handle, delta: Pt, mods: ResizeMods, options: SnapOptions): { box: Rect; guides: Guide[] } {
 	// Shift on a corner keeps the shape, and snaps after it (`snappedShape`); never for a board with no size to keep.
-	const shaping = !slides && mods.shift && handle.length === 2 && start.w > 0 && start.h > 0;
-	const moved = shaping ? snappedShape(dragged(start, handle, delta, false), start, handle, mods, options) : snapped(dragged(start, handle, delta, slides), handleEdges(handle, slides), mods, options);
+	const shaping = mods.shift && handle.length === 2 && start.w > 0 && start.h > 0;
+	const moved = shaping ? snappedShape(dragged(start, handle, delta), start, handle, mods, options) : snapped(dragged(start, handle, delta), handleEdges(handle), mods, options);
 	let { x1, y1, x2, y2 } = moved.box;
 	if (x2 - x1 < BOARD_MIN.w) {
 		if (handle.includes("w")) x1 = x2 - BOARD_MIN.w;
 		else x2 = x1 + BOARD_MIN.w;
 	}
-	if (!slides && y2 - y1 < BOARD_MIN.h) {
+	if (y2 - y1 < BOARD_MIN.h) {
 		if (handle.includes("n")) y1 = y2 - BOARD_MIN.h;
 		else y2 = y1 + BOARD_MIN.h;
 	}
-	const w = Math.round(x2 - x1);
-	return { box: { x: Math.round(x1), y: Math.round(y1), w, h: slides ? (start.w > 0 ? Math.round((start.h * w) / start.w) : start.h) : Math.round(y2 - y1) }, guides: moved.guides };
-}
-
-/**
- * A slide deck dragged by its top or bottom handle: the dragged edge (snapped) sets its height, its
- * width keeps the deck's aspect, centred where it was, and it is never narrower than `BOARD_MIN`.
- */
-function deckByHeight(start: Rect, handle: "n" | "s", delta: Pt, mods: ResizeMods, snap: SnapOptions): { box: Rect; guides: Guide[] } {
-	const moved = snapped(dragged(start, handle, delta, false), handleEdges(handle), mods, snap);
-	let { y1, y2 } = moved.box;
-	const least = start.w > 0 ? (BOARD_MIN.w * start.h) / start.w : 0;
-	if (y2 - y1 < least) {
-		if (handle === "n") y1 = y2 - least;
-		else y2 = y1 + least;
-	}
-	const h = Math.round(y2 - y1);
-	const w = start.h > 0 ? Math.round((h * start.w) / start.h) : start.w;
-	return { box: { x: Math.round(start.x + (start.w - w) / 2), y: Math.round(y1), w, h }, guides: moved.guides };
+	return { box: { x: Math.round(x1), y: Math.round(y1), w: Math.round(x2 - x1), h: Math.round(y2 - y1) }, guides: moved.guides };
 }
 
 /**

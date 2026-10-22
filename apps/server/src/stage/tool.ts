@@ -8,7 +8,6 @@ import type { ActBox, ActKind, AgentKind, AgentMode, AgentState, Camera, Identit
 import { guidelinesFile } from "@decks/runtime";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
-import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { serverText } from "./text.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";

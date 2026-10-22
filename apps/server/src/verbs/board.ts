@@ -1,6 +1,6 @@
 import { canvasFolder, canvasOfPath } from "../deck/layout.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
-import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
+import { boardWidth } from "../boards/templates.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
@@ -32,13 +32,11 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 	return {
 		board: {
 			list: async () => service.allBoards().map(asBoard),
-			create: async (options: { title: string; format?: string; w?: number; h?: number; canvas?: string }) => {
+			create: async (options: { title: string; w?: number; h?: number; canvas?: string }) => {
 				const title = options?.title?.trim();
 				if (!title) throw new Error("A board needs a title: the finding it states, as a sentence.");
-				const format = asBoardFormat(options.format ?? "board");
-				if (!format) throw new Error(`Unknown format ${options.format}; use one of ${BOARD_FORMATS.join(", ")}`);
 				const view = viewport();
-				const width = boardWidth(options.w, view?.width, format);
+				const width = boardWidth(options.w, view?.width);
 				/*
 				 * A board is made in a canvas's own boards/, the one named or the caller's own, so the canvas
 				 * stands alone (`deck/layout.ts`).
@@ -51,7 +49,7 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 				}
 				if (!stageName) throw new Error('A board is made in a canvas: name it with { canvas }. decks canvas list names them.');
 				needPens().mayWrite(stageName);
-				const path = service.newBoard({ title, format, size: { w: width, ...(options.h ? { h: options.h } : {}) }, folder: stageBoardsDir(stageName) });
+				const path = service.newBoard({ title, size: { w: width, ...(options.h ? { h: options.h } : {}) }, folder: stageBoardsDir(stageName) });
 				agent.worked?.(path);
 				if (view) notes.push(`viewport ${view.width}×${view.height} px`);
 				notes.push(

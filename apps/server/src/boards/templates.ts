@@ -15,67 +15,10 @@
  */
 
 /**
- * What a board *is*, as a file — the only choice a new board makes.
- *
- * - `board` — an HTML document with `data-id`s on its root-level blocks. A block that
- *   states where it goes is placed; a block that does not flows. Its height is whatever
- *   its content is, unless the file states one.
- * - `slides` — a reveal deck, one `<section>` per slide, laid out at a fixed size and
- *   scaled rather than reflowed.
- *
- * There were two board formats until this was written — `component` for placed boxes and
- * `flow` for a document — and they are one. Both words are still accepted from a caller
- * (`asBoardFormat`) and both mean `board`.
+ * The width a new board starts at when nobody asked for one: 1000, which is the measure a board is
+ * written to and about as wide as one is read at.
  */
-export type BoardFormat = "board" | "slides";
-
-export const BOARD_FORMATS: readonly BoardFormat[] = ["board", "slides"];
-
-/**
- * What a new board of each format is called, and what it starts from.
- *
- * **The extension is derived from the format, never named by the caller.** A format and a
- * filename that could disagree is the one failure this design set out to make impossible:
- * `deck/kinds.ts` reads a board's format back *out of* its name, so a file called `.md` that
- * was asked for as slides would simply be a flow board and nothing would say why.
- */
-const FORMATS: Record<BoardFormat, { extension: string }> = {
-	/*
-	 * `.html`, not `.md` — every board this app writes is a single HTML file.
-	 *
-	 * A document board used to be markdown, which meant the deck held two kinds of file and
-	 * the markdown ones had to be wrapped in a synthesised document to be shown at all. An
-	 * HTML board *is* the document: it carries board.css and board.js and holds its content
-	 * in blocks of its own. Markdown is still read (`deck/kinds.ts`); it is no longer what
-	 * gets created.
-	 */
-	board: { extension: ".html" },
-	// `.slides.html` rather than `.slides.md`: HTML *is* reveal, and markdown is a plugin in
-	// it. Both are read (`lib/slides.js` picks its splitter from the extension); a deck this
-	// app creates is the native one.
-	slides: { extension: ".slides.html" },
-};
-
-/** The extension a board of this format takes. */
-export function extensionFor(format: BoardFormat): string {
-	return FORMATS[format].extension;
-}
-
-export function isBoardFormat(value: unknown): value is BoardFormat {
-	return typeof value === "string" && (BOARD_FORMATS as readonly string[]).includes(value);
-}
-
-/**
- * A format from whatever a caller said, including the two words that are now one thing.
- *
- * `component` and `flow` named the formats this one replaced, and they are all over the
- * wire, the agent tool's arguments and anybody's notes. Both answer `board`; anything
- * unrecognised answers nothing, and the caller's own default takes over.
- */
-export function asBoardFormat(value: unknown): BoardFormat | undefined {
-	if (isBoardFormat(value)) return value;
-	return value === "component" || value === "flow" ? "board" : undefined;
-}
+export const BOARD_W = 1000;
 
 /**
  * The width a board is worth keeping under, and it is **guidance, not a limit**.
@@ -93,16 +36,13 @@ export function asBoardFormat(value: unknown): BoardFormat | undefined {
 export const WIDE_BOARD_W = 1200;
 
 /**
- * A width a board may actually be: what was asked for, or the format's own, clamped.
+ * A width a board may actually be: what was asked for, or the default (`BOARD_W`), clamped.
  *
  * `viewport` is the room the canvas has (`decks.view.viewport()`), and `undefined` means nobody
- * is looking — a board written by an agent nobody is watching gets the format's default
- * rather than a guess, because a guess would be indistinguishable from a measurement at the
- * point it got used. The format's own default is 1000 for a board, which is about as wide as
- * one is read at, and 960 for a deck, which is the logical width a slide is laid out at so it
- * opens at 1:1 with its own layout.
+ * is looking — a board written by an agent nobody is watching gets the default rather than a
+ * guess, because a guess would be indistinguishable from a measurement at the point it got used.
  */
-export function boardWidth(wanted: number | undefined, viewport: number | undefined, format: BoardFormat = "board"): number {
+export function boardWidth(wanted: number | undefined, viewport: number | undefined): number {
 	/*
 	 * The room on screen, or nothing — and **no ceiling of our own**.
 	 *
@@ -114,7 +54,7 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
 	// A width somebody typed is theirs, whatever it is. The default is the only thing this
 	// function decides, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
-	return Math.max(320, Math.min(defaultFormatWidth(format), room));
+	return Math.max(320, Math.min(BOARD_W, room));
 }
 
 /**
@@ -137,7 +77,7 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
  * every root-level block is out of the flow, so two of them cannot push each other about.
  */
 export function renderBlank(title: string, size?: { w?: number; h?: number }): string {
-	const w = Math.round(size?.w ?? defaultFormatWidth("board"));
+	const w = Math.round(size?.w ?? BOARD_W);
 	// A stated height is a floor and a new board wants none — but a caller that asked for a
 	// size meant it, so an explicit one is written and the content raises it if it needs to.
 	const h = size?.h ? `,"h":${Math.round(size.h)}` : "";
@@ -187,36 +127,6 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
 	</body>
 </html>
 `;
-}
-
-/**
- * The document for a new deck of slides: one empty slide.
- *
- * No width arithmetic and no layout, which is the difference from a board: a slide is laid
- * out at a fixed logical size. Blank too, for the same reason — the shape is the agent's.
- */
-export function renderSlides(title: string, size?: { w?: number }): string {
-	const w = Math.round(size?.w ?? defaultFormatWidth("slides"));
-	return `<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>${escapeHtml(title)}</title>
-		<meta name="board" content='{"w":${w},"aspect":"16:9"}' />
-	</head>
-	<body class="reveal">
-		<div class="slides">
-			<section>
-				<h1>${escapeHtml(title)}</h1>
-			</section>
-		</div>
-	</body>
-</html>
-`;
-}
-
-function defaultFormatWidth(format: BoardFormat): number {
-	return format === "slides" ? 960 : 1000;
 }
 
 /**

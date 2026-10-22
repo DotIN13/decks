@@ -76,7 +76,7 @@ export interface Verbs {
 	 * Old name: write a blank board and place it on your canvas at `at`. @deprecated Use
 	 * decks.board.create, then decks.canvas.insert.
 	 */
-	newBoard(options: { title: string; format?: "board" | "slides"; w?: number; h?: number; at?: Corner }): Promise<string>;
+	newBoard(options: { title: string; w?: number; h?: number; at?: Corner }): Promise<string>;
 	/** Old name: size a board's height to its content on a canvas. @deprecated Use decks.canvas.fit. */
 	fit(path: string, options?: { canvas?: string; margin?: number }): Promise<{ path: string; w: number; h: number; content?: { w: number; h: number; page?: number } }>;
 	/** Old name: set a board's size outright. @deprecated Use decks.canvas.update(board, { size }). */
@@ -241,11 +241,11 @@ export interface Verbs {
 		/**
 		 * Write a blank board in a canvas's own boards/ (`canvas`, or your own canvas) and return it;
 		 * placing it is the canvas's job (decks.canvas.insert({ type: "board", board: path }, { beside })).
-		 * The title is the finding, as a sentence. `format` "board" (default) is one HTML page you design;
-		 * "slides" is a reveal deck of <section>s. A canvas is a folder that stands alone
-		 * (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.
+		 * The title is the finding, as a sentence; the board is one HTML page you design. A canvas is a
+		 * folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it
+		 * is copied in.
 		 */
-		create(options: { title: string; format?: "board" | "slides"; w?: number; h?: number; canvas?: string }): Promise<Board>;
+		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Board>;
 		/** A board's path and title (the finding it states), and who last wrote it. */
 		get(board: string): Promise<Board>;
 		/**

@@ -578,10 +578,8 @@ let ITEM_WASH = "";
 			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
 			return box ? Math.round(Number.parseFloat(getComputedStyle(box).boxShadow.split(" ").at(-1)) * m.a * 10) / 10 : 0;
 		});
-		// Eight handles, or six on a slides board, whose height is its slides' and not the person's to drag.
-		const count = /\.slides\.(html|md)$/.test(target.path) ? 6 : 8;
-		const near = await until(() => handles().then((h) => (h.length === count ? h : undefined)), 3000);
-		say("a selected board has an item's handles (eight, or six on a slides board)", !!near && near.every((w) => w === 9), JSON.stringify({ path: target.path, near }));
+		const near = await until(() => handles().then((h) => (h.length === 8 ? h : undefined)), 3000);
+		say("a selected board has an item's handles (eight)", !!near && near.every((w) => w === 9), JSON.stringify({ path: target.path, near }));
 		const nearLine = await outline();
 		await page.keyboard.press("Control+Minus");
 		await settle(page, 700);
