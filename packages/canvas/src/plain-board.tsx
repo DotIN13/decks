@@ -126,8 +126,11 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	 * canvas from 60 frames a second to 26 with nothing touched. Picked, it plays.
 	 */
 	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+	/** Each load of the page, which forgets what it was told. Said whether or not the page is a guest: `board.js` and `embed-guest.js` both hear it. */
+	const [loads, setLoads] = createSignal(0);
 	createEffect(() => {
-		if (!coarse || !guest()) return;
+		loads();
+		if (!coarse || !live()) return;
 		frame?.contentWindow?.postMessage({ t: "decks:still", still: !props.selected }, "*");
 	});
 	const wired = () => live() && guest() && !inert();
@@ -352,6 +355,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						src={props.sandboxed ? withStorage(src(), props.sandboxed.key()) : src()}
 						sandbox={props.sandboxed ? SHARED_SANDBOX : undefined}
 						onLoad={() => {
+							setLoads((n) => n + 1);
 							say(live());
 							measure();
 						}}

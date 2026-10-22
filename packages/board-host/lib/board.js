@@ -159,6 +159,24 @@
 		});
 	}
 
+	/*
+	 * Held still: on a touch screen the canvas asks a board nobody has picked to stop its CSS
+	 * animations (`plain-board.tsx`, `decks:still`): a looping one repaints every frame and takes the
+	 * canvas's own frames away. Picked again, it plays on. `embed-guest.js` hears the same, for pages
+	 * without this script.
+	 */
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent || event.data?.t !== "decks:still") return;
+		let style = document.querySelector("style[data-decks-still]");
+		if (event.data.still === true) {
+			if (style) return;
+			style = document.createElement("style");
+			style.setAttribute("data-decks-still", "");
+			style.textContent = "*, *::before, *::after { animation-play-state: paused !important; }";
+			(document.head ?? document.documentElement).append(style);
+		} else style?.remove();
+	});
+
 	function needStyle(file) {
 		const key = `style:${file}`;
 		if (loaded.has(key)) return loaded.get(key);
