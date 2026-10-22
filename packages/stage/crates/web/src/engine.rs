@@ -820,13 +820,26 @@ impl Worker {
 		self.grid.invalidate_all();
 	}
 
+	/// The tiles a change reaches are painted again: in a root laid out again, what each changed item
+	/// painted before and paints now (`Root::changed_ink`), so a word changed in a big frame repaints
+	/// that word's tiles, not the frame's; the whole extent, before and after, when its items changed.
 	fn invalidate(&mut self, updated: &Updated) {
 		self.version += 1;
 		for (handle, before) in &updated.roots {
+			let root = self.scene.root(*handle);
+			let was = updated.old.iter().find(|r| r.handle == *handle);
+			if let (Some(root), Some(was)) = (root, was) {
+				if let Some(areas) = root.changed_ink(was) {
+					for area in &areas {
+						self.grid.invalidate(area);
+					}
+					continue;
+				}
+			}
 			if let Some(b) = before {
 				self.grid.invalidate(b);
 			}
-			if let Some(root) = self.scene.root(*handle) {
+			if let Some(root) = root {
 				self.grid.invalidate(&root.extent);
 			}
 		}
@@ -1115,6 +1128,49 @@ mod tests {
 		page.preview(None).unwrap();
 		assert_eq!(geometry(&page, "ab"), before);
 		assert!(page.lifted.contains("ab"));
+	}
+
+	#[test]
+	fn a_change_inside_a_big_frame_repaints_the_change_not_the_frame() {
+		// A 2,000 px frame of sixteen squares on a 1:1 screen of 2,048 by 1,536: the window's tiles are 4 by 3
+		// (and the overview's are the same ones here).
+		let squares: Vec<String> = (0..16).map(|i| format!(r##"{{"type":"rectangle","id":"s{i}","x":{},"y":{},"width":100,"height":100,"fill":"#88aaff"}}"##, 60 + (i % 4) * 480, 60 + (i / 4) * 360)).collect();
+		let stage = format!(r##"{{"version":"2.14","children":[{{"type":"frame","id":"big","layout":"none","x":0,"y":0,"width":2000,"height":1500,"fill":"#eeeeee","children":[{}]}}]}}"##, squares.join(","));
+		let mut worker = Worker::new(&stage, false).unwrap();
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		let mut paint_all = |worker: &mut Worker| {
+			let mut keys = std::collections::BTreeSet::new();
+			loop {
+				let batch = worker.next(cam, 1.0, 2048.0, 1536.0, false, 64);
+				if batch.is_empty() {
+					return keys;
+				}
+				for (key, _) in batch {
+					worker.sent(key);
+					keys.insert((key.x, key.y));
+				}
+			}
+		};
+		paint_all(&mut worker);
+		let edit = |worker: &mut Worker, json: &str| {
+			let list: Vec<Value> = serde_json::from_str(json).unwrap();
+			let edits: Vec<_> = list.iter().map(|v| stage_doc::edits::Edit::from_json(v).unwrap()).collect();
+			worker.apply_edits(&edits).unwrap();
+		};
+		assert!(paint_all(&mut worker).is_empty());
+		// One square's colour: the two tiles it is on (540 to 640 across, 420 to 520 down).
+		edit(&mut worker, r##"[{"op":"set","id":"s5","key":"fill","value":"#ff0000"}]"##);
+		assert_eq!(paint_all(&mut worker), [(1, 0), (1, 1)].into_iter().collect());
+		// The frame's own colour: every tile it covers, in the window and the margin painted round it.
+		edit(&mut worker, r##"[{"op":"set","id":"big","key":"fill","value":"#dddddd"}]"##);
+		let whole = paint_all(&mut worker).len();
+		assert!(whole >= 12, "{whole}");
+		// A square moved: where it was and where it went.
+		edit(&mut worker, r##"[{"op":"set","id":"s0","key":"x","value":1500}]"##);
+		assert_eq!(paint_all(&mut worker), [(0, 0), (2, 0), (3, 0)].into_iter().collect());
+		// A square added: the frame's whole extent, as before (its items changed).
+		edit(&mut worker, r##"[{"op":"insert","id":"s16","parent":"big","after":"s15","props":{"type":"rectangle","x":10,"y":10,"width":5,"height":5}}]"##);
+		assert_eq!(paint_all(&mut worker).len(), whole);
 	}
 
 	#[test]

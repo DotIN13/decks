@@ -67,6 +67,9 @@ pub struct Grid {
 	frame: u64,
 	next_texture: u32,
 	free: Vec<u32>,
+	/// How many tiles are held at each scale, so `invalidate` looks tiles up where an area is rather
+	/// than going through every tile held at every scale.
+	scales: HashMap<u32, usize>,
 }
 
 impl Grid {
@@ -92,13 +95,43 @@ impl Grid {
 	}
 
 	/// Mark every tile `area` paints on stale, at every scale: half a pixel of soft edge included.
+	/// At each scale the tiles under the area are looked up by their place in the grid; an area with
+	/// more places under it than tiles held there (a whole-stage change) goes through those tiles instead.
 	pub fn invalidate(&mut self, area: &Rect) {
-		for (key, tile) in self.tiles.iter_mut() {
+		let hits = |key: &Key| {
 			let edge = 0.5 / key.scale();
 			let a = key.area();
 			let grown = Rect { x: area.x - edge, y: area.y - edge, w: area.w + edge * 2.0, h: area.h + edge * 2.0 };
-			if grown.x < a.right() && a.x < grown.right() && grown.y < a.bottom() && a.y < grown.bottom() {
-				tile.dirty = true;
+			grown.x < a.right() && a.x < grown.right() && grown.y < a.bottom() && a.y < grown.bottom()
+		};
+		let mut through = false;
+		for (&scale, &held) in &self.scales {
+			let s = f32::from_bits(scale) as f64;
+			let side = TILE as f64 / s;
+			let edge = 0.5 / s;
+			let (x0, x1) = (((area.x - edge) / side).floor() - 1.0, ((area.right() + edge) / side).ceil() + 1.0);
+			let (y0, y1) = (((area.y - edge) / side).floor() - 1.0, ((area.bottom() + edge) / side).ceil() + 1.0);
+			let places = (x1 - x0) * (y1 - y0);
+			if !places.is_finite() || places > held as f64 || x0 < i32::MIN as f64 || x1 > i32::MAX as f64 || y0 < i32::MIN as f64 || y1 > i32::MAX as f64 {
+				through = true;
+				continue;
+			}
+			for y in y0 as i32..y1 as i32 {
+				for x in x0 as i32..x1 as i32 {
+					let key = Key { scale, x, y };
+					if let Some(tile) = self.tiles.get_mut(&key) {
+						if hits(&key) {
+							tile.dirty = true;
+						}
+					}
+				}
+			}
+		}
+		if through {
+			for (key, tile) in self.tiles.iter_mut() {
+				if hits(key) {
+					tile.dirty = true;
+				}
 			}
 		}
 	}
@@ -139,17 +172,29 @@ impl Grid {
 				self.next_texture - 1
 			}),
 		};
-		self.tiles.insert(key, Tile { texture: Some(texture), painted: version, dirty: false, used: frame });
+		if self.tiles.insert(key, Tile { texture: Some(texture), painted: version, dirty: false, used: frame }).is_none() {
+			*self.scales.entry(key.scale).or_default() += 1;
+		}
 		texture
 	}
 
 	/// The page let go of a tile's picture: paint it again when it is wanted.
 	pub fn forget(&mut self, key: &Key) -> Option<u32> {
 		let tile = self.tiles.remove(key)?;
+		self.held_one_less(key.scale);
 		if let Some(t) = tile.texture {
 			self.free.push(t);
 		}
 		tile.texture
+	}
+
+	fn held_one_less(&mut self, scale: u32) {
+		if let Some(n) = self.scales.get_mut(&scale) {
+			*n -= 1;
+			if *n == 0 {
+				self.scales.remove(&scale);
+			}
+		}
 	}
 
 	/// Let go of the tiles past the budget that are used longest ago and not in `keep`; returns
@@ -164,6 +209,7 @@ impl Grid {
 		let excess = self.tiles.len() - self.budget;
 		for (_, key) in old.into_iter().take(excess) {
 			if let Some(tile) = self.tiles.remove(&key) {
+				self.held_one_less(key.scale);
 				if let Some(t) = tile.texture {
 					self.free.push(t);
 					out.push(t);
@@ -201,6 +247,47 @@ mod tests {
 		assert_eq!(grid.to_paint(&keys, 10), vec![Key { scale: 1f32.to_bits(), x: 0, y: 0 }]);
 		let gone = grid.evict(&keys[..2]);
 		assert_eq!(gone.len(), 1);
+	}
+
+	#[test]
+	fn invalidating_finds_the_same_tiles_by_place_as_by_going_through_them_all() {
+		let mut grid = Grid::new(10_000, 1);
+		for scale in [0.5f32, 1.0, 1.3, 2.0] {
+			for y in -6..6 {
+				for x in -8..8 {
+					grid.painted(Key { scale: scale.to_bits(), x, y }, 1);
+				}
+			}
+		}
+		let areas = [
+			Rect { x: 10.0, y: 10.0, w: 1.0, h: 1.0 },
+			Rect { x: -700.0, y: 300.5, w: 900.0, h: 2.0 },
+			Rect { x: 511.9, y: -0.2, w: 0.1, h: 0.1 },
+			Rect { x: -1e6, y: -1e6, w: 2e6, h: 2e6 },
+			Rect { x: 393.846, y: 0.0, w: 0.0, h: 0.0 },
+		];
+		for area in areas {
+			for t in grid.tiles.values_mut() {
+				t.dirty = false;
+			}
+			grid.invalidate(&area);
+			let got: std::collections::BTreeSet<Key> = grid.tiles.iter().filter(|(_, t)| t.dirty).map(|(k, _)| *k).collect();
+			let want: std::collections::BTreeSet<Key> = grid
+				.tiles
+				.keys()
+				.filter(|k| {
+					let edge = 0.5 / k.scale();
+					let a = k.area();
+					let g = Rect { x: area.x - edge, y: area.y - edge, w: area.w + edge * 2.0, h: area.h + edge * 2.0 };
+					g.x < a.right() && a.x < g.right() && g.y < a.bottom() && a.y < g.bottom()
+				})
+				.copied()
+				.collect();
+			assert_eq!(got, want, "{area:?}");
+			assert!(!got.is_empty());
+		}
+		grid.forget(&Key { scale: 1f32.to_bits(), x: 0, y: 0 });
+		assert_eq!(grid.scales[&1f32.to_bits()], 16 * 12 - 1);
 	}
 
 	#[test]

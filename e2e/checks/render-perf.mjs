@@ -406,6 +406,30 @@ if (want("edit")) {
 	}
 }
 
+// --- tiles painted after a change inside a frame -----------------------------------------------------
+/*
+ * Not one of the eight: the tiles the worker paints again when an agent changes one note's words inside
+ * a big frame, at 50%. The frame (2,400 by 1,500, 24 notes placed where they say) is the agent's own,
+ * put at the window's middle first: the perf canvas's columns are a tile or two big, too small to tell.
+ */
+if (want("frameEdit")) {
+	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
+	await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
+	const notes = Array.from({ length: 24 }, (_, i) => ({ type: "note", id: `perf-big-${i}`, metadata: { type: "decks.markdown" }, content: `Note ${i} in the big frame`, width: 220, x: 40 + (i % 6) * 390, y: 40 + Math.floor(i / 6) * 360 }));
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "frame", id: "perf-big", name: "Big frame", layout: "none", fill: "#f3f4f6", width: 2400, height: 1500, children: notes }, box: { x1: HOME.x - 1200, y1: HOME.y - 750 } }] });
+	await until(() => page.evaluate(() => globalThis.__decksRust.placed.has("perf-big-23")), 10000);
+	await quiet();
+	const tiles = [];
+	for (let run = 0; run < RUNS; run++) {
+		const before = await page.evaluate(() => globalThis.__decksSheet.tiles);
+		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: "perf-big-8", set: { content: `Note 8, said again ${run}` } }] });
+		await until(() => page.evaluate((run) => String(globalThis.__decksRust.placed.get("perf-big-8")?.node.content).endsWith(` ${run}`), run), 5000);
+		await quiet(1000);
+		tiles.push((await page.evaluate(() => globalThis.__decksSheet.tiles)) - before);
+	}
+	keep("frameEditTiles", tiles, Math.round);
+}
+
 // --- a long pen stroke --------------------------------------------------------------------------------
 if (want("stroke")) {
 	await page.locator('[aria-label="Draw on the canvas"]:visible').click();

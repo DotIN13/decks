@@ -87,6 +87,41 @@ pub struct Root {
 	pub version: u64,
 }
 
+impl Root {
+	/// Where this root paints differently from `was`, the same root laid out before: for each item
+	/// whose fields, place, theme, turn or shown-ness changed, what it and everything inside it
+	/// painted before and paints now. `None` when the two do not hold the same items in the same order
+	/// (one came, went or moved among its siblings): its whole extent then, before and after.
+	pub fn changed_ink(&self, was: &Root) -> Option<Vec<Rect>> {
+		let (now, then) = (&self.tree.items, &was.tree.items);
+		if now.len() != then.len() || now.iter().zip(then).any(|(a, b)| a.id != b.id || a.parent != b.parent) {
+			return None;
+		}
+		let mut marked = vec![false; now.len()];
+		let mut out = Vec::new();
+		for i in 0..now.len() {
+			let (a, b) = (&self.placed[i], &was.placed[i]);
+			let own = (!Rc::ptr_eq(&now[i].props, &then[i].props) && *now[i].props != *then[i].props)
+				|| a.rect != b.rect
+				|| a.visible != b.visible
+				|| (!Rc::ptr_eq(&a.theme, &b.theme) && *a.theme != *b.theme)
+				|| self.world[i].0 != was.world[i].0
+				|| self.ink[i] != was.ink[i];
+			// What is inside a changed item paints under its opacity, its clip, its turn: changed with it.
+			marked[i] = own || now[i].parent.is_some_and(|p| marked[p as usize]);
+			if marked[i] {
+				if b.visible {
+					out.push(was.ink[i]);
+				}
+				if a.visible {
+					out.push(self.ink[i]);
+				}
+			}
+		}
+		Some(out)
+	}
+}
+
 /// What an update changed, for the painter and the page.
 #[derive(Clone, Debug, Default)]
 pub struct Updated {
@@ -96,6 +131,9 @@ pub struct Updated {
 	pub removed: Vec<(String, Rect)>,
 	/// The order of the top level changed.
 	pub reordered: bool,
+	/// The roots in `roots` as they were before (the ones kept, laid out again): what changed in them is
+	/// found item by item (`Root::changed_ink`), so a change inside a big frame repaints that change only.
+	pub old: Vec<Root>,
 }
 
 /// What a press found: the item, and the items it is inside, from the top level down.
@@ -174,7 +212,8 @@ impl Scene {
 					let i = self.at[&h];
 					let before = self.roots[i].extent;
 					self.versions = VERSIONS.fetch_add(1, Ordering::Relaxed) + 1;
-					self.roots[i] = self.build(&sources, h, measure);
+					let built = self.build(&sources, h, measure);
+					updated.old.push(std::mem::replace(&mut self.roots[i], built));
 					let after = self.roots[i].extent;
 					if after != before {
 						refit = refit && self.top.refit(i as u32, after);
@@ -210,8 +249,12 @@ impl Scene {
 				Some(root) if !stale => roots.push(root),
 				kept => {
 					self.versions = VERSIONS.fetch_add(1, Ordering::Relaxed) + 1;
-					updated.roots.push((handle, kept.map(|r| r.extent)));
+					updated.roots.push((handle, kept.as_ref().map(|r| r.extent)));
 					roots.push(self.build(&sources, handle, measure));
+					// Kept for a change worked out item by item; not for a scene laid out whole.
+					if let Some(was) = kept.filter(|_| !all) {
+						updated.old.push(was);
+					}
 				}
 			}
 		}
