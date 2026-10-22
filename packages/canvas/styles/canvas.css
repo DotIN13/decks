@@ -2236,18 +2236,18 @@
 	}
 
 	/* A board drawn by `PlainBoard`: its title above it, to move it by, outside the board's box so the
-	   page and the sheet's picture of it both start at the box's top. `--zoom` is the camera's, set on
-	   the title itself (the Decks app registers it as not inherited), so it reads at 12px on screen at any zoom. */
+	   page and the sheet's picture of it both start at the box's top. Sized in stage pixels, so it
+	   scales with the board and a zoom writes nothing to it. */
 	.plain-board-bar {
 		position: absolute;
 		left: 0;
 		bottom: 100%;
 		max-width: 100%;
-		padding: 0 2px calc(4px / var(--zoom, 1));
+		padding: 0 2px 4px;
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
-		font-size: calc(12px / var(--zoom, 1));
+		font-size: 12px;
 		color: var(--muted);
 		cursor: grab;
 		user-select: none;

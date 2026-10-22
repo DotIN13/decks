@@ -323,7 +323,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		>
 			<div class="shade" aria-hidden="true" />
 			<Show when={props.visible}>
-				<div class="plain-board-bar" title={props.board.path} style={{ "--zoom": String(zoom()) }} onPointerDown={press} onDblClick={() => props.onOpen()}>
+				<div class="plain-board-bar" title={props.board.path} onPointerDown={press} onDblClick={() => props.onOpen()}>
 					{props.board.title}
 				</div>
 			</Show>

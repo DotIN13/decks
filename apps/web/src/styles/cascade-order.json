@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "3d655edbfb75f72f41faf681ed0aed54fb00468c9b542058a1795daf53814886",
+	"hash": "d5d57eb277d32dbc1a39ef06ed26a25594e27aa4f61f069da2010b88956a54a1",
 	"rules": 1288,
 	"sheets": 20,
 	"ties": 0,
@@ -916,7 +916,7 @@
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-previewing=\"true\"] .board-node > .surface > iframe{pointer-events:none}"],
 		["packages/canvas/styles/canvas.css",".stage[data-pictures=\"true\"] .board-node iframe{visibility:hidden}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .plain-board-comment{position:absolute;z-index:5;padding:5px 10px;border:0;border-radius:8px;background:var(--fg);color:var(--bg);font:500 12px/1.2 var(--font-sans);white-space:nowrap;box-shadow:var(--shadow);cursor:pointer}"],
-		["packages/canvas/styles/canvas.css","@layer components ▸ .plain-board-bar{position:absolute;left:0;bottom:100%;max-width:100%;padding:0 2px calc(4px / var(--zoom, 1));overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(12px / var(--zoom, 1));color:var(--muted);cursor:grab;user-select:none}"],
+		["packages/canvas/styles/canvas.css","@layer components ▸ .plain-board-bar{position:absolute;left:0;bottom:100%;max-width:100%;padding:0 2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;color:var(--muted);cursor:grab;user-select:none}"],
 		["styles/stages.css","@layer components ▸ .stage-manager{position:fixed;inset:0;z-index:var(--z-popup);display:grid;place-items:center;box-sizing:border-box;padding:32px;background:rgb(10 10 12 / 34%);-webkit-backdrop-filter:blur(6px) saturate(115%);backdrop-filter:blur(6px) saturate(115%);opacity:0;pointer-events:none;transition:opacity 140ms ease}"],
 		["styles/stages.css","@layer components ▸ .stage-manager[data-open]{opacity:1;pointer-events:auto}"],
 		["styles/stages.css","@layer components ▸ .stage > *{transition:opacity 140ms ease}"],
