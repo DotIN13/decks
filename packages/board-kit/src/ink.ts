@@ -140,6 +140,135 @@ function outline(pts: Pt[], size: number): string {
 }
 
 /**
+ * `strokeShape` for a stroke that grows: the same path text, character for character, at every
+ * length, but each call shapes only the points added since the last one, and the end, which a new
+ * point bends. Shaping all of a long stroke again for every frame it is drawn cost more each frame
+ * the longer it got.
+ *
+ * Every piece of the path but its end is fixed once the point after it has come: the centre line's
+ * curve through point i is made from points i and i + 1; an outline's side at point i from points
+ * i − 1 to i + 1, and its way back runs from the end to the start, so it is kept back to front and
+ * each new piece goes at its front. Points that are not the ones last given grown by more (a new
+ * array, fewer points, the last one changed, another tool or size) are shaped from the start.
+ */
+export interface InkShaper {
+	shape(stroke: InkStroke): { d: string; filled: boolean };
+}
+
+export function inkShaper(): InkShaper {
+	type XY = { x: number; y: number };
+	let points: number[] | undefined;
+	let tool: InkStroke["tool"] | undefined;
+	let size = 0;
+	/** Points read so far, and whether the pressure moved among them. */
+	const pts: Pt[] = [];
+	let varies = false;
+	/** The centre line: `M` and the curves through points 1 … n − 2. */
+	let line = "";
+	/** The outline, fixed up to point `fixed` − 1 (a point's sides need the point after it). */
+	let fixed = 0;
+	const radius: number[] = [];
+	const left: XY[] = [];
+	const right: XY[] = [];
+	const normal = { nx: 0, ny: -1 };
+	/** The left side's curves through 1 … fixed − 2, and the way back's through fixed − 1 … 1, in the order drawn. */
+	let leftRun = "";
+	let backRun = "";
+
+	const reset = (stroke: InkStroke) => {
+		points = stroke.points;
+		tool = stroke.tool;
+		size = stroke.size;
+		pts.length = 0;
+		varies = false;
+		line = "";
+		fixed = 0;
+		radius.length = 0;
+		left.length = 0;
+		right.length = 0;
+		normal.nx = 0;
+		normal.ny = -1;
+		leftRun = "";
+		backRun = "";
+	};
+	const q = (a: XY, b: XY) => `Q${f(a.x)} ${f(a.y)} ${f((a.x + b.x) / 2)} ${f((a.y + b.y) / 2)}`;
+	/** Point i of the outline (as `outline` makes it), turning `towards` when the point has a direction. */
+	const sides = (i: number, towards: { nx: number; ny: number }) => {
+		const pt = pts[i] as Pt;
+		const before = pts[i - 1]?.p ?? pt.p;
+		const after = pts[i + 1]?.p ?? pt.p;
+		const r = widthAt(size, (before + pt.p * 2 + after) / 4) / 2;
+		const from = pts[i - 1] ?? pt;
+		const to = pts[i + 1] ?? pt;
+		const dx = to.x - from.x;
+		const dy = to.y - from.y;
+		const length = Math.hypot(dx, dy);
+		if (length > 1e-6) {
+			towards.nx = -dy / length;
+			towards.ny = dx / length;
+		}
+		return { r, l: { x: pt.x + towards.nx * r, y: pt.y + towards.ny * r }, rt: { x: pt.x - towards.nx * r, y: pt.y - towards.ny * r } };
+	};
+	const outlineNow = (): string => {
+		const n = pts.length;
+		for (; fixed < n - 1; fixed++) {
+			const i = fixed;
+			const { r, l, rt } = sides(i, normal);
+			radius.push(r);
+			left.push(l);
+			right.push(rt);
+			if (i >= 2) leftRun += q(left[i - 1] as XY, l);
+			if (i >= 1) backRun = q(rt, right[i - 1] as XY) + backRun;
+		}
+		// The last point, from a copy of the normal: it changes when the next one comes.
+		const end = sides(n - 1, { ...normal });
+		const start = left[0] ?? end.l;
+		const startRadius = f(radius[0] ?? end.r);
+		const endRadius = f(end.r);
+		const leftEnd = n >= 3 ? q(left[n - 2] as XY, end.l) : "";
+		const backEnd = right[0] ?? end.rt;
+		return (
+			`M${f(start.x)} ${f(start.y)}${leftRun}${leftEnd}L${f(end.l.x)} ${f(end.l.y)}` +
+			`A${endRadius} ${endRadius} 0 0 1 ${f(end.rt.x)} ${f(end.rt.y)}${backRun}L${f(backEnd.x)} ${f(backEnd.y)}` +
+			`A${startRadius} ${startRadius} 0 0 1 ${f(start.x)} ${f(start.y)}Z`
+		);
+	};
+	/** The points given are the ones read, and maybe more after them. */
+	const grown = (stroke: InkStroke) => {
+		if (stroke.points !== points || stroke.tool !== tool || stroke.size !== size) return false;
+		const last = pts[pts.length - 1];
+		if (!last) return true;
+		const at = (pts.length - 1) * 3;
+		return stroke.points.length >= at + 3 && stroke.points[at] === last.x && stroke.points[at + 1] === last.y && stroke.points[at + 2] === last.p;
+	};
+
+	return {
+		shape(stroke) {
+			if (!grown(stroke)) reset(stroke);
+			const from = pts.length;
+			for (let i = from * 3; i + 2 < stroke.points.length; i += 3) pts.push({ x: stroke.points[i] ?? 0, y: stroke.points[i + 1] ?? 0, p: stroke.points[i + 2] ?? 0.5 });
+			const first = pts[0];
+			if (!first) return { d: "", filled: false };
+			if (stroke.tool === "pen" && !varies) {
+				for (let i = from; i < pts.length; i++) {
+					if (Math.abs((pts[i] as Pt).p - first.p) > 0.02) {
+						varies = true;
+						break;
+					}
+				}
+			}
+			if (varies) return { d: outlineNow(), filled: true };
+			const n = pts.length;
+			if (n === 1) return { d: `M${f(first.x)} ${f(first.y)}l0.01 0`, filled: false };
+			line ||= `M${f(first.x)} ${f(first.y)}`;
+			for (let i = Math.max(1, from - 1); i < n - 1; i++) line += q(pts[i] as Pt, pts[i + 1] as Pt);
+			const last = pts[n - 1] as Pt;
+			return { d: `${line}L${f(last.x)} ${f(last.y)}`, filled: false };
+		},
+	};
+}
+
+/**
  * Fewer points for the same line (Ramer-Douglas-Peucker on x and y, pressure carried along).
  *
  * A pencil reports 240 points a second and most of them sit on the line between their

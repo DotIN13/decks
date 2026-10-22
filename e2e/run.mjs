@@ -168,6 +168,8 @@ const CHECKS = [
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
 	{ file: "same-drawing.mjs", needsAgent: false },
+	/* A long stroke drawn as it grows is the stroke shaped whole, and its last frames cost less than shaping it whole each frame. */
+	{ file: "ink-long-stroke.mjs", needsAgent: false },
 	/*
 	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
 	 * as a still with a badge on it, and nothing decoding until it is pressed.

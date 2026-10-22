@@ -6,6 +6,7 @@ import {
 	inkCommit,
 	inkHistory,
 	inkRedo,
+	inkShaper,
 	inkUndo,
 	lassoPick,
 	moveStroke,
@@ -75,4 +76,51 @@ test("undo and redo walk the lists the drawing has been, and a new stroke ends t
 	assert.equal(inkUndo(history), history, "nothing before the first list");
 	history = inkCommit(history, [b]);
 	assert.equal(inkRedo(history), history, "drawing again is a new future");
+});
+
+test("a stroke shaped as it grows is the same path, character for character, as shaped whole", () => {
+	let seed = 7;
+	const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+	const kinds: Array<{ name: string; tool: InkStroke["tool"]; pressure: (i: number) => number; grow: number }> = [
+		{ name: "a mouse", tool: "pen", pressure: () => 0.5, grow: 1 },
+		{ name: "a pencil", tool: "pen", pressure: () => Math.round(rand() * 100) / 100, grow: 1 },
+		{ name: "a pencil pressing only later", tool: "pen", pressure: (i) => (i < 40 ? 0.5 : 0.3 + rand() * 0.5), grow: 1 },
+		{ name: "a pencil, samples coming several at once", tool: "pen", pressure: () => 0.2 + rand() * 0.7, grow: 4 },
+		{ name: "a marker", tool: "marker", pressure: () => rand(), grow: 2 },
+	];
+	for (const kind of kinds) {
+		for (const length of [1, 2, 3, 5, 600, 2000]) {
+			const shaper = inkShaper();
+			const points: number[] = [];
+			let x = 100;
+			let y = 100;
+			for (let i = 0; i < length; ) {
+				for (let k = 0; k < kind.grow && i < length; k++, i++) {
+					// Now and then a sample on the same spot, which has no direction of its own.
+					if (rand() > 0.1) {
+						x += (rand() - 0.4) * 9;
+						y += (rand() - 0.5) * 7;
+					}
+					points.push(Math.round(x * 100) / 100, Math.round(y * 100) / 100, kind.pressure(i));
+				}
+				const stroke = { id: "live", tool: kind.tool, color: "ink" as const, size: 4, points };
+				assert.deepEqual(shaper.shape(stroke), strokeShape(stroke), `${kind.name}, ${points.length / 3} of ${length} points`);
+			}
+		}
+	}
+});
+
+test("a shaper given other points than it last had starts again", () => {
+	const shaper = inkShaper();
+	const one = { id: "a", tool: "pen" as const, color: "ink" as const, size: 4, points: [0, 0, 0.5, 10, 0, 0.5, 20, 5, 0.5] };
+	assert.deepEqual(shaper.shape(one), strokeShape(one));
+	// Held still: the stroke becomes a line from its start, in place.
+	one.points.splice(3, 6, 30, 30, 0.5);
+	assert.deepEqual(shaper.shape(one), strokeShape(one));
+	one.points.splice(3, 3, 40, 10, 0.5);
+	assert.deepEqual(shaper.shape(one), strokeShape(one));
+	const other = { ...one, points: [5, 5, 0.2, 6, 9, 0.9] };
+	assert.deepEqual(shaper.shape(other), strokeShape(other));
+	const bigger = { ...other, size: 9 };
+	assert.deepEqual(shaper.shape(bigger), strokeShape(bigger));
 });

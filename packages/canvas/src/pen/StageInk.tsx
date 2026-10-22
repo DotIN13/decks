@@ -1,4 +1,4 @@
-import { hitStroke, inkBounds, inkPaint, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
+import { hitStroke, inkBounds, inkPaint, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../state/ink.ts";
@@ -188,6 +188,7 @@ export function StageInk(props: {
 		const had = !!live || !!reshape;
 		live = undefined;
 		reshape = undefined;
+		shaper = inkShaper();
 		if (had) sendInk();
 		loop?.setAttribute("d", "");
 	};
@@ -200,8 +201,15 @@ export function StageInk(props: {
 		reshape = drawn;
 		sendInk();
 	};
+	/*
+	 * The stroke under the pen is shaped as it grows (`inkShaper`): only its new points and its end
+	 * each frame, to the same path as shaping it whole. `__inkWhole` set shapes it whole each frame,
+	 * as it was, for measuring the two in one page.
+	 */
+	let shaper = inkShaper();
 	const liveOf = (drawn: Extract<Gesture, { kind: "draw" }>): LiveInk => {
-		const shape = strokeShape({ id: "live", ...drawn.stroke, points: drawn.points });
+		const stroke = { id: "live", ...drawn.stroke, points: drawn.points };
+		const shape = (globalThis as { __inkWhole?: boolean }).__inkWhole ? strokeShape(stroke) : shaper.shape(stroke);
 		return {
 			id: "live",
 			d: shape.d,
