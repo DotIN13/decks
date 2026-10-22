@@ -26,6 +26,14 @@ import { WEB, deckState, open, say, socket } from "../harness.mjs";
 import { PERF_CANVAS, writePerfCanvas } from "../perf-canvas.mjs";
 
 const RUNS = Math.max(1, Number(process.env.RENDER_PERF_RUNS ?? 5));
+/** Only these measures (`RENDER_PERF_ONLY=drag,edit`), and a canvas of this many items (`RENDER_PERF_ITEMS`, 2,000). */
+const ONLY = process.env.RENDER_PERF_ONLY ? new Set(process.env.RENDER_PERF_ONLY.split(",")) : undefined;
+const want = (name) => !ONLY || ONLY.has(name);
+const ITEMS = Number(process.env.RENDER_PERF_ITEMS ?? 2000);
+/** A CPU profile of the drags (`RENDER_PERF_PROFILE=<file>.cpuprofile`), for finding where a step goes. */
+const PROFILE = process.env.RENDER_PERF_PROFILE;
+/** A page flag to measure with and without, alternating (`RENDER_PERF_AB=<name>`, see the drag and the edit). */
+const AB = process.env.RENDER_PERF_AB;
 /*
  * The two main-thread times per frame are about a millisecond, and on a Mac other work shares, a run
  * wanders by more than 10%: they take a run first that is not counted (it paints what the rest find
@@ -53,14 +61,14 @@ const ms = (v) => Math.round(v * 10) / 10;
 
 // --- the canvas, and the agent on it ------------------------------------------------------------------
 const deck = await deckState();
-const made = writePerfCanvas(deck.path);
+const made = writePerfCanvas(deck.path, { items: ITEMS });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 say("the server says which agent is focused", !!agentId);
 link.send({ type: "agent.stage", id: agentId, stage: PERF_CANVAS });
 // Asked for as well: an agent already on the canvas is sent nothing new.
 setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
-const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= 1000), 20000);
+const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= Math.min(1000, ITEMS / 2)), 20000);
 say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.boards} boards`);
 
 const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, boards: false });
@@ -152,9 +160,9 @@ const keep = (key, values, round) => {
 	const sharp = [];
 	// One open more than the runs, the first left out: it compiles the engine and lays the canvas
 	// out for the first time, which no later open of the page does.
-	for (let run = -1; run < RUNS; run++) {
+	for (let run = -1; run < (want("load") ? RUNS : 0); run++) {
 		if (run > -1) await page.goto(`${WEB}/`, { waitUntil: "load" });
-		await page.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 1000, null, { timeout: 30000 });
+		await page.waitForFunction((n) => (globalThis.__decksRust?.placed?.size ?? 0) >= n, Math.min(1000, ITEMS / 2), { timeout: 30000 });
 		await page.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
 		await quiet(2000, 40000);
 		const stats = await page.evaluate(() => ({ tiles: globalThis.__decksSheet.tiles, sharpAt: globalThis.__decksSheet.sharpAt }));
@@ -162,8 +170,10 @@ const keep = (key, values, round) => {
 		tiles.push(stats.tiles);
 		sharp.push(stats.sharpAt ?? NaN);
 	}
-	keep("tilesAtLoad", tiles, Math.round);
-	keep("firstSharpMs", sharp, ms);
+	if (want("load")) {
+		keep("tilesAtLoad", tiles, Math.round);
+		keep("firstSharpMs", sharp, ms);
+	}
 }
 
 await helpers();
@@ -175,7 +185,7 @@ await page.evaluate(() => globalThis.__perf.zoomTo(1));
 await quiet();
 
 // --- a small zoom: 100% → 103%, and 3% on from there for each run -------------------------------------
-{
+if (want("zoom")) {
 	const tiles = [];
 	for (let run = 0; run < RUNS; run++) {
 		const before = await page.evaluate(() => globalThis.__decksSheet.tiles);
@@ -187,7 +197,7 @@ await quiet();
 }
 
 // --- page draws per zoom frame ------------------------------------------------------------------------
-{
+if (want("draws")) {
 	const draws = [];
 	const FRAMES = 40;
 	for (let run = 0; run < RUNS; run++) {
@@ -205,7 +215,7 @@ await quiet();
 }
 
 // --- main-thread time per pan frame at 50% ------------------------------------------------------------
-{
+if (want("pan")) {
 	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
 	await quiet();
 	const per = [];
@@ -220,7 +230,7 @@ await quiet();
 }
 
 // --- main-thread time per drag step -------------------------------------------------------------------
-{
+if (want("drag")) {
 	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
 	await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
 	await quiet();
@@ -243,9 +253,13 @@ await quiet();
 	const per = [];
 	let tried = 0;
 	const STEPS = 60;
-	for (const { x, y } of notes) {
-		if (per.length >= RUNS) break;
-		tried++;
+	if (PROFILE) {
+		await cdp.send("Profiler.enable");
+		await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+		await cdp.send("Profiler.start");
+	}
+	/** Drag a note 60 steps, one a frame: main-thread ms per step after the first five, or undefined when the press lifted nothing. */
+	const dragOnce = async ({ x, y }) => {
 		await page.mouse.move(x, y);
 		await frame();
 		await page.mouse.down();
@@ -260,20 +274,49 @@ await quiet();
 			await page.mouse.move(x + s * 3, y + s * 1.5);
 			await frame();
 		}
-		if (held) per.push(((await taskSeconds()) - before) * 1000 / (STEPS - 5));
+		const step = held ? ((await taskSeconds()) - before) * 1000 / (STEPS - 5) : undefined;
 		await page.mouse.up();
 		await until(async () => (await page.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000);
 		await page.keyboard.press("Escape");
 		await quiet(1000);
+		return step;
+	};
+	for (const note of notes) {
+		if (per.length >= RUNS) break;
+		tried++;
+		const step = await dragOnce(note);
+		if (step !== undefined) per.push(step);
 	}
+	if (PROFILE) writeFileSync(PROFILE, JSON.stringify((await cdp.send("Profiler.stop")).profile));
 	say("drags lifted their note", per.length === RUNS, `${per.length} timed of ${tried} tried`);
 	keep("dragStepMs", per, ms);
+	/*
+	 * `RENDER_PERF_AB=<name>`: the same drags again with `globalThis[name]` set and not, alternating in
+	 * this one page (each note dragged once each way, which goes first taking turns), for a change
+	 * that keeps its old way behind that flag while it is proved. The note is found where the last drag left it.
+	 */
+	if (AB) {
+		const on = [];
+		const off = [];
+		for (const [at, { id }] of notes.entries()) {
+			if (on.length >= WIDE && off.length >= WIDE) break;
+			for (const flag of at % 2 ? [true, false] : [false, true]) {
+				await page.evaluate(({ AB, flag }) => (globalThis[AB] = flag), { AB, flag });
+				const r = await page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+				const step = r ? await dragOnce({ x: r.x + r.width / 2, y: r.y + Math.min(20, r.height / 2) }) : undefined;
+				if (step !== undefined) (flag ? on : off).push(step);
+			}
+		}
+		await page.evaluate((AB) => delete globalThis[AB], AB);
+		keep("dragStepMsFlagOn", on, ms);
+		keep("dragStepMsFlagOff", off, ms);
+	}
 	await page.keyboard.press("Escape");
 	await quiet(800);
 }
 
 // --- an agent's edit to the frame that shows it -------------------------------------------------------
-{
+if (want("edit")) {
 	await page.evaluate(() => {
 		const engine = globalThis.__decksRust;
 		const before = engine.presented;
@@ -318,7 +361,7 @@ await quiet();
 }
 
 // --- a long pen stroke --------------------------------------------------------------------------------
-{
+if (want("stroke")) {
 	await page.locator('[aria-label="Draw on the canvas"]:visible').click();
 	await page.waitForTimeout(300);
 	const per = [];
@@ -352,7 +395,8 @@ await quiet();
 
 say("no errors on the page", errors.length === 0, errors.slice(0, 3).join(" | "));
 const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs"].map((k) => [k, result[k]]));
-const report = { ...metrics, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS } };
+const extra = Object.fromEntries(Object.entries(result).filter(([k]) => k !== "runs" && !(k in metrics)));
+const report = { ...metrics, ...extra, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS, ...(AB ? { ab: AB } : {}) } };
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, `${JSON.stringify(report, null, "\t")}\n`);
 console.log(`METRICS ${JSON.stringify(report)}`);

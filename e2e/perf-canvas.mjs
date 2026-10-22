@@ -63,7 +63,16 @@ export function perfCanvas({ items = 2000, boards = 100 } = {}) {
 	const files = [];
 	let made = 0;
 	const cells = GRID * GRID;
-	for (let c = 0; c < cells; c++) {
+	/*
+	 * A smaller canvas (fewer than 20 items a cell) fills the cells nearest the origin first, where the
+	 * page opens and the check drags and edits, so it is the same kind of busy there, only smaller.
+	 */
+	const order = Array.from({ length: cells }, (_, c) => c);
+	if (items < cells * 20) {
+		const far = (c) => Math.hypot((c % GRID) - GRID / 2 + 0.5, Math.floor(c / GRID) - GRID / 2 + 0.5);
+		order.sort((a, b) => far(a) - far(b) || a - b);
+	}
+	for (const c of order) {
 		// Centred on the origin, where a canvas opens: the page's first view is a busy one.
 		const ox = ((c % GRID) - GRID / 2) * CELL.w;
 		const oy = (Math.floor(c / GRID) - GRID / 2) * CELL.h;
