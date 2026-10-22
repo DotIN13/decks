@@ -1111,13 +1111,26 @@ export function Stage(props: {
 		moveSettle = setTimeout(() => setMoving(false), 160);
 	};
 	onCleanup(() => clearTimeout(moveSettle));
-
 	const nowScaling = () => {
 		if (!scaling()) setScaling(true);
 		clearTimeout(scaleSettle);
 		scaleSettle = setTimeout(() => setScaling(false), 300);
 	};
 	onCleanup(() => clearTimeout(scaleSettle));
+
+	/**
+	 * The camera has stopped and nothing more is coming: the moving and scaling states end now, not
+	 * after their tails. When the last finger lifts from a pinch there is no next step to wait for,
+	 * and the tails (160 and 300 ms) were that much more of tiles painted at the moving scale before
+	 * the sharp ones were asked for (on an iPad mini, sharp about 620 ms after the lift). A wheel or
+	 * a trackpad's pinch has no lift, so it keeps the tails.
+	 */
+	const stoppedMoving = () => {
+		clearTimeout(moveSettle);
+		clearTimeout(scaleSettle);
+		if (moving()) setMoving(false);
+		if (scaling()) setScaling(false);
+	};
 
 
 
@@ -1417,6 +1430,8 @@ export function Stage(props: {
 	let trail: Sample[] = [];
 	let trailAt = { x: 0, y: 0 };
 	let noCoast = false;
+	/** The gesture so far has been a pinch: its lift ends the moving state at once (`stoppedMoving`). */
+	let pinched = false;
 	/**
 	 * A finger of this document's, in the stage's own coordinates.
 	 *
@@ -1442,6 +1457,7 @@ export function Stage(props: {
 				trail = [];
 				trailAt = { x: 0, y: 0 };
 				noCoast = false;
+				pinched = false;
 			}
 			setPanning(true);
 			return { kind: "idle" };
@@ -1454,6 +1470,7 @@ export function Stage(props: {
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
 				trail = [];
 				if (thrown) coast(thrown);
+				else if (pinched) stoppedMoving();
 			}
 			return { kind: "idle" };
 		}
@@ -1461,6 +1478,7 @@ export function Stage(props: {
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
 			noCoast = true;
+			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
 			return step;
