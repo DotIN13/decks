@@ -9,10 +9,10 @@
 		"./comments": "./src/public/comments.ts",
 		"./tools": "./src/public/tools.ts",
 		"./camera": "./src/public/camera.ts",
+		"./host": "./src/public/host.ts",
 		"./styles.css": "./styles/standalone.css",
 		"./canvas.css": "./dist/canvas.css",
-		"./styles/*": "./styles/*",
-		"./internal/*": "./src/*"
+		"./styles/*": "./styles/*"
 	},
 	"scripts": {
 		"typecheck": "tsc -p tsconfig.json --noEmit",

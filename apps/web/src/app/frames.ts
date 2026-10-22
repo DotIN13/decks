@@ -1,7 +1,7 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
-import { handsOn } from "@decks/canvas/internal/camera/touched.ts";
+import { handsOn } from "@decks/canvas/camera";
 import { seenPicture } from "../canvas/shots/adaptors.ts";
 import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
@@ -9,7 +9,7 @@ import { prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../camera/agent-views.ts";
-import { runStageCall } from "@decks/canvas/internal/stage-ops.ts";
+import { runStageCall } from "@decks/canvas/host";
 import { scratch } from "../state/agent.ts";
 import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";

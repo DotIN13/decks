@@ -1,4 +1,4 @@
-import { scheme, setCanvasScheme, type Scheme } from "@decks/canvas/internal/lib/theme.ts";
+import { scheme, setCanvasScheme, type Scheme } from "@decks/canvas/host";
 
 export type { Scheme };
 

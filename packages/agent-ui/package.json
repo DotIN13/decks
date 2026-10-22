@@ -13,7 +13,6 @@
 			"types": "./vite-plugin.d.mts",
 			"default": "./vite-plugin.mjs"
 		},
-		"./internal/*": "./src/*",
 		"./styles/*": "./styles/*"
 	},
 	"files": [
