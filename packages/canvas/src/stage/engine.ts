@@ -921,11 +921,11 @@ export class StageEngine {
 		return list;
 	}
 
-	/** The stroke still under the pen, drawn by the page each frame. */
+	/** Strokes to draw over everything until they are in the drawing, at the next frame however often they change. */
 	ink(strokes: readonly LiveInk[], _warm?: boolean): void {
 		sheetStats().ink = strokes.length;
 		this.page?.setInk(JSON.stringify(strokes));
-		this.draw();
+		this.drawSoon();
 	}
 
 	hide(ids: ReadonlySet<string> | undefined): void {

@@ -120,6 +120,16 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		if (!guest()) return;
 		frame?.contentWindow?.postMessage({ t: "decks:marks", marks: marks.map((m) => ({ id: m.id, quote: m.quote, ...(m.component ? { component: m.component } : {}) })) }, "*");
 	});
+	/*
+	 * On a touch screen a board nobody has picked holds its CSS animations still
+	 * (`embed-guest.js`, `decks:still`): a looping one repaints every frame, and on an iPad two such boards took the
+	 * canvas from 60 frames a second to 26 with nothing touched. Picked, it plays.
+	 */
+	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+	createEffect(() => {
+		if (!coarse || !guest()) return;
+		frame?.contentWindow?.postMessage({ t: "decks:still", still: !props.selected }, "*");
+	});
 	const wired = () => live() && guest() && !inert();
 
 	let frame: HTMLIFrameElement | undefined;

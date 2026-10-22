@@ -14,10 +14,12 @@ export const STAGE_INK = "stage";
  * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
  *
  * What is drawn goes into the stage's `.pen` file as ink (`ink.ts`), one pen `path` per stroke,
- * through the same edits an agent sends. All ink is drawn on the stage's one sheet (`scene.ts`):
- * the strokes in the file as items, and the stroke under the pen, before it is in the file, handed
- * to the engine as it grows (`StageEngine.ink`). This glass draws nothing of the ink itself; it takes
- * the pointer, and shows the lasso's loop and the box round what the lasso took.
+ * through the same edits an agent sends. The strokes in the file are drawn on the stage's one sheet
+ * (`scene.ts`) as items. The stroke under the pen, before it is in the file, is drawn here, on this
+ * glass, as SVG paths shaped as the sheet shapes ink, at most once a frame: handing it to the sheet
+ * redrew the whole sheet, three screens of pixels, for every sample, and on an iPad that is two
+ * samples a frame (Safari gives no coalesced events). The glass also takes the pointer, and shows
+ * the lasso's loop and the box round what the lasso took.
  *
  * **Which pointer draws.** A pen always does, with its pressure. A mouse does. A finger does until
  * a pen has been seen in this session; from then on a finger is the canvas's, and goes on up to the
@@ -39,12 +41,18 @@ export function StageInk(props: {
 	onShift: (ids: readonly string[], dx: number, dy: number) => void;
 	/** Take back the last edit, or put it back: a two- or three-finger tap. */
 	onStep?: (direction: "undo" | "redo") => void;
+	/** A gesture on the glass has begun, or ended: the stage shows boards as pictures meanwhile. */
+	onStroke?: (on: boolean) => void;
 }) {
 	let loop: SVGPathElement | undefined;
-	/** The stroke under the pen, as the sheet draws it. */
+	/** The stroke under the pen, as it is drawn. */
 	let live: LiveInk | undefined;
-	/** The painter is loaded when the draw tool is picked up, so the first stroke is not waiting on it. */
-	props.layer.ink([], true);
+	/** The stroke has new samples since it was last shaped: it is shaped again at the next frame. */
+	let reshape: Extract<Gesture, { kind: "draw" }> | undefined;
+	/** Where the live paths go, and each one drawn, with the path text it last had. */
+	let inkLayer: SVGGElement | undefined;
+	const shown = new Map<string, { el: SVGPathElement; d: string }>();
+	let frame = 0;
 
 	/*
 	 * A finished stroke stays on the sheet as live ink until the stage has drawn it: it is sent to the
@@ -54,7 +62,42 @@ export function StageInk(props: {
 	 * seconds if the edit never came back.
 	 */
 	const waiting = new Map<string, { ink: LiveInk; timer: ReturnType<typeof setTimeout> }>();
-	const sendInk = () => props.layer.ink([...[...waiting.values()].map((held) => held.ink), ...(live ? [live] : [])]);
+	/** Draw the live strokes at the next frame, however many samples come before it. */
+	const sendInk = () => {
+		if (!frame) frame = requestAnimationFrame(paintInk);
+	};
+	const paintInk = () => {
+		frame = 0;
+		if (reshape) live = liveOf(reshape);
+		reshape = undefined;
+		const want = [...[...waiting.values()].map((held) => held.ink), ...(live ? [live] : [])];
+		const keep = new Set(want.map((ink) => ink.id));
+		for (const [id, path] of shown) {
+			if (keep.has(id)) continue;
+			path.el.remove();
+			shown.delete(id);
+		}
+		for (const ink of want) {
+			let path = shown.get(ink.id);
+			if (!path) {
+				const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+				el.setAttribute("class", "ink-live");
+				el.setAttribute("stroke-linecap", "round");
+				el.setAttribute("stroke-linejoin", "round");
+				inkLayer?.append(el);
+				path = { el, d: "" };
+				shown.set(ink.id, path);
+			}
+			if (path.d === ink.d) continue;
+			path.d = ink.d;
+			// As the sheet paints ink (`paint_ink`): a pressure stroke is its outline filled, nonzero as SVG's own rule; any other a round line.
+			path.el.setAttribute("d", ink.d);
+			path.el.setAttribute("fill", ink.filled ? ink.color : "none");
+			path.el.setAttribute("stroke", ink.filled ? "none" : ink.color);
+			path.el.setAttribute("stroke-width", String(ink.size));
+			path.el.setAttribute("opacity", String(ink.opacity));
+		}
+	};
 	const settle = (id: string) => {
 		const held = waiting.get(id);
 		if (!held) return;
@@ -63,12 +106,29 @@ export function StageInk(props: {
 		sendInk();
 	};
 	const hold = (id: string) => {
+		if (reshape) live = liveOf(reshape);
+		reshape = undefined;
 		if (!live) return;
+		// The path drawn for the live stroke is this one now: no frame without it.
+		const path = shown.get(live.id);
+		if (path) {
+			shown.delete(live.id);
+			shown.set(id, path);
+		}
 		waiting.set(id, { ink: { ...live, id }, timer: setTimeout(() => settle(id), 5000) });
 	};
+	/*
+	 * In the file is not yet on the sheet: the sheet's worker paints the tiles it falls in after the
+	 * drawing arrives, so the glass keeps its copy a moment longer, where both show as one.
+	 */
+	const SHEET_CATCHES_UP_MS = 250;
 	createEffect(() => {
 		const drawn = new Set(props.strokes().map((stroke) => stroke.id));
-		for (const id of [...waiting.keys()]) if (drawn.has(id)) settle(id);
+		for (const [id, held] of waiting) {
+			if (!drawn.has(id)) continue;
+			clearTimeout(held.timer);
+			held.timer = setTimeout(() => settle(id), SHEET_CATCHES_UP_MS);
+		}
 	});
 
 	type Gesture =
@@ -127,8 +187,9 @@ export function StageInk(props: {
 	});
 
 	const clearLive = () => {
-		const had = !!live;
+		const had = !!live || !!reshape;
 		live = undefined;
+		reshape = undefined;
 		if (had) sendInk();
 		loop?.setAttribute("d", "");
 	};
@@ -136,10 +197,14 @@ export function StageInk(props: {
 	/** The `ink` colour as the pen variable resolves it (`inkVariableEdit`): dark on light, light on dark. */
 	const inkHex = () => (scheme() === "dark" ? "#e6e6e6" : "#1f2328");
 
-	/** The stroke under the pen, handed to the sheet on every sample; the sheet draws it at its next frame. */
+	/** The stroke under the pen has changed: it is shaped and drawn at the next frame. */
 	const paintLive = (drawn: Extract<Gesture, { kind: "draw" }>) => {
+		reshape = drawn;
+		sendInk();
+	};
+	const liveOf = (drawn: Extract<Gesture, { kind: "draw" }>): LiveInk => {
 		const shape = strokeShape({ id: "live", ...drawn.stroke, points: drawn.points });
-		live = {
+		return {
 			id: "live",
 			d: shape.d,
 			filled: shape.filled,
@@ -147,7 +212,6 @@ export function StageInk(props: {
 			size: drawn.stroke.size,
 			opacity: drawn.stroke.tool === "marker" ? 0.4 : 1,
 		};
-		sendInk();
 	};
 
 	const erase = (erasing: Extract<Gesture, { kind: "erase" }>, x: number, y: number) => {
@@ -168,6 +232,7 @@ export function StageInk(props: {
 		if (gesture.kind === "draw") clearTimeout(gesture.timer);
 		if (gesture.kind === "scale") setResizing(undefined);
 		gesture = undefined;
+		props.onStroke?.(false);
 		clearLive();
 	};
 
@@ -284,6 +349,7 @@ export function StageInk(props: {
 		// The button on the barrel, or the other end of the pen, erases whatever tool is in hand.
 		const rubber = event.pointerType === "pen" && (event.button === 5 || (event.buttons & 32) !== 0);
 
+		props.onStroke?.(true);
 		if (tool === "eraser" || rubber) {
 			setInkSelection(undefined);
 			gesture = { kind: "erase", pointer: event.pointerId, gone: new Set() };
@@ -380,6 +446,7 @@ export function StageInk(props: {
 		event.stopPropagation();
 		const done = gesture;
 		gesture = undefined;
+		props.onStroke?.(false);
 		if (done.kind === "draw") clearTimeout(done.timer);
 		if (done.kind === "scale") setResizing(undefined);
 		if (done.kind === "draw" && event.type !== "pointercancel") {
@@ -437,7 +504,7 @@ export function StageInk(props: {
 		cancel();
 		setInkSelection(undefined);
 		for (const id of [...waiting.keys()]) settle(id);
-		props.layer.ink([]);
+		cancelAnimationFrame(frame);
 	});
 
 	return (
@@ -454,6 +521,7 @@ export function StageInk(props: {
 			onContextMenu={(event) => event.preventDefault()}
 		>
 			<g transform={transform()}>
+				<g ref={inkLayer} class="ink-live-layer" pointer-events="none" />
 				<path ref={loop} class="ink-loop" d="" />
 				<Show when={selection()}>
 					{(box) => (

@@ -241,6 +241,23 @@
 	});
 
 	/*
+	 * Held still: on a touch screen the canvas asks a page nobody has picked to stop its CSS
+	 * animations (`plain-board.tsx`): a looping one repaints every frame and takes the canvas's own
+	 * frames away. Picked again, it plays on from where it stopped.
+	 */
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent || event.data?.t !== "decks:still") return;
+		let style = document.querySelector("style[data-decks-still]");
+		if (event.data.still === true) {
+			if (style) return;
+			style = document.createElement("style");
+			style.setAttribute("data-decks-still", "");
+			style.textContent = "*, *::before, *::after { animation-play-state: paused !important; }";
+			(document.head ?? document.documentElement).append(style);
+		} else style?.remove();
+	});
+
+	/*
 	 * A middle-drag, or a drag with Space held, pans the canvas wherever it starts, as over a board.
 	 * The pointer is handed up as it moves; the board replays it to `frame-gestures.ts`.
 	 */
