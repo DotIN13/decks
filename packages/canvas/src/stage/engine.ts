@@ -51,6 +51,21 @@ const PICTURES_BATCH_MS = 16;
  * was the most of a pan's time on the GPU (110 ms from a wheel step to its frame at 22% on a 2× screen).
  */
 const SLACK_PX = 320;
+/**
+ * The margin on a touch screen (its main pointer coarse) or in a small window (`slackFor`): a pinch
+ * on an iPad mini paints and hands over every tile of the canvas, three times the window's area at
+ * 320, which took 94 to 135 tiles a pinch and 620 ms to be sharp after it; at 96, 34 to 57 tiles and
+ * 510 ms. A finger's pan is slower than a wheel's fling, so the smaller margin still slides.
+ */
+const TOUCH_SLACK_PX = 96;
+/** A window no longer than this on its long side, in CSS pixels, is small (a phone, a tablet's). */
+const SMALL_WINDOW_PX = 1100;
+
+/** The canvas's margin past a `width` × `height` window: `TOUCH_SLACK_PX` on a touch screen or in a small window, else `SLACK_PX`. */
+function slackFor(width: number, height: number): number {
+	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+	return coarse || Math.max(width, height) <= SMALL_WINDOW_PX ? TOUCH_SLACK_PX : SLACK_PX;
+}
 /** The largest canvas side a GPU is sure to take, in device pixels. */
 const MAX_SIDE = 8192;
 
@@ -694,10 +709,10 @@ export class StageEngine {
 		this.draw();
 	}
 
-	/** The canvas the window's size and `SLACK_PX` more on each side, in device pixels; the engine's surface follows in `frame`. */
+	/** The canvas the window's size and its margin (`slackFor`) more on each side, in device pixels; the engine's surface follows in `frame`. */
 	private fitCanvases(): void {
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		this.slack = Math.max(0, Math.min(SLACK_PX, Math.floor((MAX_SIDE / dpr - Math.max(this.view.width, this.view.height)) / 2)));
+		this.slack = Math.max(0, Math.min(slackFor(this.view.width, this.view.height), Math.floor((MAX_SIDE / dpr - Math.max(this.view.width, this.view.height)) / 2)));
 		const cssW = this.view.width + 2 * this.slack;
 		const cssH = this.view.height + 2 * this.slack;
 		const w = Math.max(1, Math.round(cssW * dpr));
