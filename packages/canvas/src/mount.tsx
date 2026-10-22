@@ -1,6 +1,6 @@
-import { baseTheme, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
+import { baseTheme, emptyDocument, parse, placements, serialize, type Frame, type PenDocument, type PenEdit } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
-import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack } from "solid-js";
+import { batch, createComputed, createEffect, createMemo, createRoot, createSignal, on, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { render } from "solid-js/web";
 import { fitInto, frames } from "./camera/camera.ts";
@@ -122,6 +122,10 @@ export interface CanvasOptions {
 	};
 	/** The camera moved (a pan, a zoom, a fit). */
 	onCamera?: (camera: Camera) => void;
+	/** The select tool picked by its key (V): a host with tools of its own puts them down too. */
+	onSelectTool?: () => void;
+	/** The canvas shown, by name: the stage lands on a new one, and each board's token names it. */
+	canvasName?: () => string | undefined;
 	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
 	onViewport?: (viewport: { width: number; height: number }) => void;
 	/** Boards or items dragged onto the host's composer, to talk about them. */
@@ -213,33 +217,58 @@ let insetsWatched = false;
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
 
 /**
- * Mount the Decks canvas in `host`: the stage, its camera, the drawing's tools and properties,
- * and ink, editing a `.pen` document held here. Every change the person makes is applied here at
- * once and reported to `onEdits`; `setDocument` takes one from elsewhere.
+ * State a host keeps itself and the editor reads and writes (the Decks app's camera, selection and
+ * mode are the app's own): each a getter and a setter. What is not given, the editor keeps.
+ */
+export interface EditorState {
+	camera?: [Accessor<Camera>, (camera: Camera) => void];
+	/** A glide the host asked for, with the camera it set: the stage animates to it while the token is new. */
+	glide?: Accessor<{ token: number; ms: number } | undefined>;
+	selected?: [Accessor<string | undefined>, (path: string | undefined) => void];
+	mode?: [Accessor<"edit" | "browse">, (mode: "edit" | "browse") => void];
+	/** Whether ink is in hand. */
+	inking?: Accessor<boolean>;
+	/**
+	 * The drawing as the host has it (with `document`, the host owns it), and the folder its own
+	 * addresses are read against; undefined while there is none to show.
+	 */
+	pen?: Accessor<{ doc: PenDocument; base: string } | undefined>;
+	/** Where the canvas opens: undefined while the host does not know yet. */
+	opening?: Accessor<{ camera?: Camera } | undefined>;
+}
+
+/** The editor, made in the host's own tree (`createEditor`): its handle, and what it draws. */
+export interface Editor {
+	handle: CanvasHandle;
+	/** The stage alone, for a host that lays out its own work area and tool bars (the Decks app). */
+	surface: () => JSX.Element;
+	/** The whole editor: the stage in its work area, the drawing's tools and ink (`mountCanvas`). */
+	root: () => JSX.Element;
+	dispose(): void;
+}
+
+/**
+ * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
+ * drawing's tools and properties, and ink. `mountCanvas` puts one in an element for any page; a
+ * Solid app (the Decks app) makes one where its layout wants the stage, with its own state given
+ * in `state`.
  *
  * One canvas to a page: the tools and the host's answers are module state, as they are in the
  * Decks app.
  */
-export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHandle {
-	/*
-	 * What the host's panels cover, so a fit frames into the canvas between them and the camera
-	 * keeps what is picked clear of them: each panel standing beside the canvas says so with
-	 * `data-inset="left"` (or right, top, bottom), as the Decks app's do. Once a page.
-	 */
-	if (!insetsWatched && typeof document !== "undefined") {
-		insetsWatched = true;
-		watchInsets();
-	}
+export function createEditor(
+	options: CanvasOptions & {
+		state?: EditorState;
+		/** How big the stage is on screen. Default: the window. */
+		size?: () => { width: number; height: number };
+		/** The scheme changed (`setDark`): a host paints it where its own styles read it. */
+		onScheme?: (scheme: "light" | "dark") => void;
+	},
+): Editor {
+	const size = () => options.size?.() ?? { width: innerWidth, height: innerHeight };
+	// No text is an empty drawing: a host that gives its drawing as state (`state.pen`) has none yet.
+	const first: PenDocument = options.text.trim() ? parse(options.text) : emptyDocument();
 	const base = options.base ?? (typeof location === "undefined" ? "/" : location.href);
-	const answers: Partial<CanvasHost> = {
-		fileUrl: options.resolveUrl ?? ((path) => new URL(path, new URL(base, typeof location === "undefined" ? "http://canvas.invalid/" : location.href)).href),
-		canWrite: () => !options.readOnly,
-		boardLink: options.boardLink ?? (() => undefined),
-		iconUrl: options.icons,
-		// A host that reads deck files by path reads the drawing's pictures the same way.
-		...(options.resolveUrl ? { pictureUrl: (url: string) => options.resolveUrl!(url) } : {}),
-	};
-	setCanvasHost(answers);
 
 	// ---- views, per scope (`options.views`) ----
 	const views = options.views ? createAgentViews(options.views.key ?? "canvas", options.views.storage) : undefined;
@@ -250,36 +279,37 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	/** The view kept for a scope, if it still shows something on this drawing. */
 	const kept = (scope: string | undefined, d: PenDocument, scheme: "light" | "dark") => {
 		const v = scope && views ? views.of(scope, undefined) : undefined;
-		return v && frames(v.camera, { width: host.clientWidth, height: host.clientHeight }, boxesOf(d, scheme)) ? v : undefined;
+		return v && frames(v.camera, size(), boxesOf(d, scheme)) ? v : undefined;
 	};
 	const firstScope = options.views ? untrack(options.views.scope) : undefined;
-	const firstView = kept(firstScope, parse(options.text), options.dark ? "dark" : "light");
+	const firstView = kept(firstScope, first, options.dark ? "dark" : "light");
 
-	const opening = firstView?.camera ?? options.camera ?? fitAll(parse(options.text), { width: host.clientWidth, height: host.clientHeight }, options.dark ? "dark" : "light");
-	const [camera, setCameraSignal] = createSignal<Camera>(opening);
+	const opening = firstView?.camera ?? options.camera ?? fitAll(first, size(), options.dark ? "dark" : "light");
+	const [camera, setCameraSignal] = options.state?.camera ?? createSignal<Camera>(opening);
+	// A host that keeps the camera opens it on the kept view too.
+	if (options.state?.camera && firstView) setCameraSignal(firstView.camera);
 	/** How many times each board's page has been told to load again (`reloadBoard`). */
 	const [reloads, setReloads] = createSignal<Record<string, number>>({});
-	const [mode, setModeSignal] = createSignal<"edit" | "browse">(options.mode ?? "edit");
-	const [selected, setSelected] = createSignal<string | undefined>();
+	const [mode, setModeSignal] = options.state?.mode ?? createSignal<"edit" | "browse">(options.mode ?? "edit");
+	const [selected, setSelected] = options.state?.selected ?? createSignal<string | undefined>();
 	const [dark, setDarkSignal] = createSignal(options.dark === true);
 	const look = () => (dark() ? "dark" : "light");
 	/*
 	 * On the host, and on the page's root as the Decks app does: the menus and panels the canvas
 	 * opens in a portal on <body> read their colours from there.
 	 */
-	const rootScheme = document.documentElement.dataset.colorScheme;
 	const paintScheme = () => {
 		setCanvasScheme(look());
-		host.dataset.colorScheme = look();
-		document.documentElement.dataset.colorScheme = look();
+		options.onScheme?.(look());
 	};
 	paintScheme();
 
-	const drawing = createDrawing(options.text, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
+	const drawing = createDrawing(first, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
 	/** What the drawing's own addresses are read against; a host that moves between canvases says so with `setDocument`. */
 	const [penBase, setPenBase] = createSignal(base);
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
-	const [glideAsk, setGlideAsk] = createSignal<{ token: number; ms: number }>();
+	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
+	const glideAsk = () => options.state?.glide?.() ?? ownGlide();
 	let glides = 0;
 	const { doc, edit, step, moveBoard, resizeBoard, removeBoard } = drawing;
 
@@ -358,87 +388,110 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 	// Each board's frame is handed its own token, by the host's way of asking for one.
 	const boardHost = options.boards?.mintBoardToken ? createBoardHost({ mint: options.boards.mintBoardToken }) : undefined;
 
-	const dispose = render(() => {
-		const pen = createMemo(() => ({ doc: doc(), base: penBase() }));
-		/*
-		 * In the canvas's own root, as every computation here is. Made beside the drawing, it belonged to
-		 * whatever was running when the host called `mountCanvas` (Studio mounts from an effect), and
-		 * went with it the next time that ran: the boards stopped following the drawing, so a board
-		 * moved once and then stayed where the stage last saw it however often it was dragged.
-		 */
-		/*
-		 * The same object for a board from one drawing to the next, its fields changed in place, as the
-		 * Decks app's store keeps them: the stage keys each board's slot on its object, and a fresh list
-		 * on every edit rebuilt every slot and reloaded every board's page after any drag.
-		 */
-		const [boards, setBoards] = createStore<Board[]>([]);
-		createComputed(() => setBoards(reconcile(options.boards?.list ? options.boards.list() : boardsOf(doc()), { key: "path" })));
-		/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
-		const inking = createMemo(() => inkOn() && mode() === "browse");
-		return (
-			<div class="decks-canvas app" data-mode={mode()}>
-				<div class="work">
-					<div class="surface" data-surface="stage">
-						<div class="surface-layer" data-layer="stage">
-							<Stage
-								mode={mode()}
-								renderer={options.renderer ?? "dom"}
-								picturesWhileMoving={options.picturesWhileMoving !== false}
-								boardsMayStart={options.boards?.mayStart ? options.boards.mayStart() : true}
-								switching={options.boards?.switching?.() ?? false}
-								{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}
-								{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
-								{...(options.boards?.onCreate && editable ? { onCreateBoard: options.boards.onCreate } : {})}
-								{...(options.boards?.onOpenDocument && editable ? { onOpenDocument: options.boards.onOpenDocument } : {})}
-								{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
-								news={options.boards?.news?.() ?? {}}
-								{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
-								{...(options.onViewport ? { onViewport: options.onViewport } : {})}
-								{...(options.onRefer ? { onRefer: options.onRefer } : {})}
-								{...(options.onEdgeSwipe ? { onEdgeSwipe: options.onEdgeSwipe } : {})}
-								glide={glideAsk()}
-								boardPill={true}
-								{...(options.onProperties ? { onProperties: options.onProperties } : {})}
-								opening={{ camera: opening }}
-								boards={boards}
-								pen={pen()}
-								{...editing}
-								onPenStep={step}
-								drawing={inking()}
-								camera={camera()}
-								setCamera={setCamera}
-								selected={selected()}
-								onSelect={(path) => {
-									setSelected(path);
-									options.onSelect?.(path);
-									/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
-									if (!path) host.querySelector<HTMLElement>(".stage")?.focus();
-								}}
-								onMove={moveBoard}
-								frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
-								shots={
-									options.boards?.shots ??
-									(() => ({
-										picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
-										ownPicture: true,
-									}))
-								}
-								{...commenting}
-							/>
-						</div>
+	// A drawing the host gives as state is the one shown; the editor's own copy follows it, for its board calls.
+	if (options.state?.pen) createComputed(() => {
+		const given = options.state!.pen!();
+		if (given) drawing.set(given.doc);
+	});
+	const pen = createMemo(() => {
+		if (!options.state?.pen) return { doc: doc(), base: penBase() };
+		const given = options.state.pen();
+		return given ? { doc: doc(), base: given.base } : undefined;
+	});
+	/*
+	 * Owned by whoever makes the editor (mountCanvas's own root, or the host's component), never by
+	 * an effect that runs again: made in Studio's effect once, the boards stopped following the
+	 * drawing, so a board moved once and then stayed where the stage last saw it.
+	 */
+	/*
+	 * The same object for a board from one drawing to the next, its fields changed in place, as the
+	 * Decks app's store keeps them: the stage keys each board's slot on its object, and a fresh list
+	 * on every edit rebuilt every slot and reloaded every board's page after any drag.
+	 */
+	const [boards, setBoards] = createStore<Board[]>([]);
+	/*
+	 * A host's list may be a store of its own (the Decks app's): read whole here, every board and
+	 * field, so this follows it; reconciling a store's proxy reads it untracked, and the boards would
+	 * show only when something else happened to run this again.
+	 */
+	createComputed(() => {
+		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : boardsOf(doc());
+		setBoards(reconcile(given, { key: "path" }));
+	});
+	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
+	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
+	const stageView = () => (
+		<Stage
+			mode={mode()}
+			renderer={options.renderer ?? "dom"}
+			picturesWhileMoving={options.picturesWhileMoving !== false}
+			boardsMayStart={options.boards?.mayStart ? options.boards.mayStart() : true}
+			switching={options.boards?.switching?.() ?? false}
+			{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}
+			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
+			{...(options.boards?.onCreate && editable ? { onCreateBoard: options.boards.onCreate } : {})}
+			{...(options.boards?.onOpenDocument && editable ? { onOpenDocument: options.boards.onOpenDocument } : {})}
+			{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
+			news={options.boards?.news?.() ?? {}}
+			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
+			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
+			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
+			{...(options.onEdgeSwipe ? { onEdgeSwipe: options.onEdgeSwipe } : {})}
+			glide={glideAsk()}
+			boardPill={true}
+			{...(options.onProperties ? { onProperties: options.onProperties } : {})}
+			opening={options.state?.opening ? options.state.opening() : { camera: opening }}
+			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
+			onTool={() => {
+				setPenTool("select");
+				options.onSelectTool?.();
+			}}
+			boards={boards}
+			pen={pen()}
+			{...editing}
+			onPenStep={step}
+			drawing={inking()}
+			camera={camera()}
+			setCamera={setCamera}
+			selected={selected()}
+			onSelect={(path) => {
+			setSelected(path);
+			options.onSelect?.(path);
+			/* A press on bare canvas takes the focus, which is how an edit in a note or a board ends (as in the Decks app). */
+			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
+			}}
+			onMove={moveBoard}
+			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
+			shots={
+			options.boards?.shots ??
+			(() => ({
+			picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
+			ownPicture: true,
+			}))
+			}
+			{...commenting}
+		/>
+	);
+	const surface = () => stageView();
+	const root = () => (
+		<div class="decks-canvas app" data-mode={mode()}>
+			<div class="work">
+				<div class="surface" data-surface="stage">
+					<div class="surface-layer" data-layer="stage">
+						{stageView()}
 					</div>
 				</div>
-				<Show when={editable && !inking()}>
-					<PenBar tools={options.toolbar !== false} doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
-				</Show>
-				<Show when={editable && inking()}>
-					<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
-				</Show>
 			</div>
-		);
-	}, host);
+			<Show when={editable && !inking()}>
+				<PenBar tools={options.toolbar !== false} doc={doc()} onEdit={edit} onStep={step} onArm={() => {}} onExport={(ids) => options.onExport?.(ids)} />
+			</Show>
+			<Show when={editable && inking()}>
+				<InkBar onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => edit(ids.map((id) => ({ op: "delete", id })))} />
+			</Show>
+		</div>
+	);
 
-	return {
+	const handle: CanvasHandle = {
 		setDocument: (next, at) => {
 			if (at !== undefined) setPenBase(at);
 			drawing.set(next);
@@ -472,7 +525,7 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		},
 		tool: () => untrack(penTool),
 		select: (ids) => setPenSelection(ids),
-		fit: () => setCamera(fitAll(untrack(doc), { width: host.clientWidth, height: host.clientHeight }, look())),
+		fit: () => setCamera(fitAll(untrack(doc), size(), look())),
 		edit,
 		undo: () => step("undo"),
 		redo: () => step("redo"),
@@ -483,10 +536,63 @@ export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHa
 		dispose() {
 			disposeViews?.();
 			tools();
-			dispose();
 			boardHost?.dispose();
 			setDrawing(false);
 			setPenTool("select");
+		},
+	};
+	return { handle, surface, root, dispose: () => handle.dispose() };
+}
+
+/**
+ * Mount the Decks canvas in `host`: the stage, its camera, the drawing's tools and properties,
+ * and ink, editing a `.pen` document held here. Every change the person makes is applied here at
+ * once and reported to `onEdits` (or, with `document`, handed to the host); `setDocument` takes
+ * one from elsewhere. Any page can use it; a Solid app can use `createEditor` in its own tree.
+ */
+export function mountCanvas(host: HTMLElement, options: CanvasOptions): CanvasHandle {
+	/*
+	 * What the host's panels cover, so a fit frames into the canvas between them and the camera
+	 * keeps what is picked clear of them: each panel standing beside the canvas says so with
+	 * `data-inset="left"` (or right, top, bottom), as the Decks app's do. Once a page.
+	 */
+	if (!insetsWatched && typeof document !== "undefined") {
+		insetsWatched = true;
+		watchInsets();
+	}
+	/*
+	 * The scheme on the host, and on the page's root as the Decks app does: the menus and panels the
+	 * canvas opens in a portal on <body> read their colours from there.
+	 */
+	const rootScheme = document.documentElement.dataset.colorScheme;
+	// What the canvas asks its host (`host.ts`); a Solid app making the editor itself answers them itself.
+	const base = options.base ?? (typeof location === "undefined" ? "/" : location.href);
+	const answers: Partial<CanvasHost> = {
+		fileUrl: options.resolveUrl ?? ((path) => new URL(path, new URL(base, typeof location === "undefined" ? "http://canvas.invalid/" : location.href)).href),
+		canWrite: () => !options.readOnly,
+		boardLink: options.boardLink ?? (() => undefined),
+		iconUrl: options.icons,
+		// A host that reads deck files by path reads the drawing's pictures the same way.
+		...(options.resolveUrl ? { pictureUrl: (url: string) => options.resolveUrl!(url) } : {}),
+	};
+	setCanvasHost(answers);
+	let made!: Editor;
+	const disposeRender = render(() => {
+		made = createEditor({
+			...options,
+			size: () => ({ width: host.clientWidth, height: host.clientHeight }),
+			onScheme: (scheme) => {
+				host.dataset.colorScheme = scheme;
+				document.documentElement.dataset.colorScheme = scheme;
+			},
+		});
+		return made.root();
+	}, host);
+	return {
+		...made.handle,
+		dispose() {
+			made.dispose();
+			disposeRender();
 			delete host.dataset.colorScheme;
 			if (rootScheme === undefined) delete document.documentElement.dataset.colorScheme;
 			else document.documentElement.dataset.colorScheme = rootScheme;

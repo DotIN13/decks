@@ -55,8 +55,9 @@ import { addComment, commenting, removeComment, setCommenting, takeComments, wai
 import { drawing, setDrawing } from "@decks/canvas/internal/state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import "./app/canvas-host.ts";
-import { Stage } from "@decks/canvas/internal/Stage.tsx";
-import { BoardFrame } from "./board/BoardFrame.tsx";
+import { createEditor, isSharedBoard, type CanvasHandle } from "@decks/canvas";
+import { boardUrl } from "./lib/api.ts";
+import { mintBoardToken } from "./board/board-token.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -1370,6 +1371,19 @@ export function App() {
 
 
 
+	/** The editor on screen (`createEditor`), for what this app asks of it from outside: a board's page loaded again. */
+	const [editorHandle, setEditorHandle] = createSignal<CanvasHandle>();
+	// A board whose page has to load again without a new revision (`state.nonces`): told to the editor.
+	let nonces: Record<string, unknown> | undefined;
+	createEffect(() => {
+		const now: Record<string, unknown> = { ...(state.nonces ?? {}) };
+		const was = nonces;
+		nonces = now;
+		const handle = untrack(editorHandle);
+		if (!handle || !was) return;
+		for (const path of Object.keys(now)) if (now[path] !== was[path]) handle.reloadBoard(path);
+	});
+
 	return (
 		<div class="app" data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
 			{/*
@@ -1395,266 +1409,102 @@ export function App() {
 				<div class="surface" data-surface="stage">
 					<div class="surface-layer" data-layer="stage">
 				<Show when={stageBuild()} keyed>
-					{(current) => (
-					<Stage
-						renderer={current.renderer}
+					{(current) => {
 						/*
-						 * Where the canvas opens, decided here rather than in the canvas.
-						 *
-						 * `viewOnSwitch` is the same three cases a switch uses, so opening a
-						 * conversation on a reload and coming back to it later land in the same
-						 * place for the same reasons. Passing the decision rather than the view
-						 * also gets the ordering right: the conversation arrives with the agent
-						 * list, which is not always the first thing to arrive, and `undefined`
-						 * (not known yet) has to be told apart from "nothing remembered".
+						 * The shared editor (`@decks/canvas`'s `createEditor`), as Studio's is: plain boards shown as
+						 * pictures while the camera moves, the pill instead of title bars. This app keeps what is its
+						 * own: the drawing is its server's (`document`), and the camera, selection, mode and ink are
+						 * this app's state, so the agent-centric camera (per agent and canvas, on this device) and
+						 * agents moving the view work as before.
 						 */
-						opening={state.focused ? { camera: openingCamera() } : undefined}
-						boardsMayStart={boardsMayStart()}
-						switching={switchingCanvas()}
-						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
-						onBoardsStarted={canvasOpened}
-						mode={mode()}
-						boards={stageBoards()}
-						/*
-						 * A plain prop, never a spread: a conditional spread makes every prop the stage reads
-						 * depend on it, so each drawing update re-ran the camera's effects and cut a fly short.
-						 */
-						pen={stagePen()}
-						onPenEdit={(ops) => {
-							const agentId = state.focused;
-							if (agentId) void editDrawing(agentId, ops);
-						}}
-						onPenStep={penStep}
-						drawing={inking()}
-						camera={camera()}
-						glide={glide()}
-						setCamera={setCameraAndReport}
-						selected={selected()}
-						/*
-						 * The board, or the file inside the box that is selected on it.
-						 *
-						 * One key with one meaning per level, which is the design's rule: `f`
-						 * fullscreens the selection when the selection *is* an embed, and the board
-						 * otherwise. Answered here rather than in `Stage` because the selection is
-						 * this component's — the stage knows the board, and the box is a shape
-						 * (`board/inspect.ts`) that the inspector is already reading.
-						 */
-						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
-						onEditSource={openSource}
-						{...(focus() === undefined ? {} : { focus: focus()! })}
-						onFocusToggle={() => toggleFocus()}
-						{...(presenting()?.kind === "board" ? { presenting: (presenting() as { path: string }).path } : {})}
-						focusBar={{
-							...(stageOf(state.focused) ? { canvas: stageOf(state.focused)!.title } : {}),
-							boardsOpen: boardsOpen(),
-							onToggleBoards: () => showBoards(!boardsOpen()),
-							historyOn: historyShown(),
-							onHistory: toggleHistory,
-							mode: mode(),
-							onMode: (next) => {
-								if (next === "edit") setDrawing(false);
-								setMode(next);
+						const editor = createEditor({
+							text: "",
+							renderer: current.renderer,
+							toolbar: false,
+							state: {
+								pen: stagePen,
+								opening: () => (state.focused ? { camera: openingCamera() } : undefined),
+								camera: [camera, setCameraAndReport],
+								glide,
+								selected: [
+									selected,
+									(path) => {
+										setSelected(path);
+										setComponent(undefined);
+									},
+								],
+								mode: [mode, setMode],
+								inking: drawing,
 							},
-						}}
-						onFocusBoard={(path) => toggleFocus(path)}
-						{...(editingSource() ? { editingPath: editingSource()!.path } : {})}
-						/*
-						 * A press on the canvas outside the component lets it go.
-						 *
-						 * Every caller of this is the user pressing on bare stage or on a board's
-						 * own title bar, and both of those are "not the component" — so the
-						 * component selection goes with the board one rather than surviving it in
-						 * a panel still describing something nobody is pointing at. Pressing
-						 * *inside* a board is `Editor`'s to interpret, and it already clears the
-						 * selection for a press that lands on no component; the chrome panels are
-						 * not this handler's callers at all, which is what keeps a click on the
-						 * inspector from dismissing the thing it is about.
-						 */
-						onSelect={(path) => {
-							setSelected(path);
-							setComponent(undefined);
-							/*
-							 * A press outside every board takes the focus, which is how an edit inside one ends.
-							 *
-							 * The frame cannot hear a press that lands outside it, and a `<div>` cannot take focus
-							 * by itself — so without this the frame keeps focus, `focusout` never fires inside it,
-							 * and a run or a caret stays open with its outline drawn after somebody has clicked
-							 * away. Moving focus to the canvas is the one move every editor already understands:
-							 * the frame blurs, and each of them closes what it had open.
-							 *
-							 * Only for a press that named no board: a press *inside* one is the frame's own, and
-							 * taking focus from it there would end the edit the press was meant to make.
-							 */
-							if (!path) (document.querySelector(".stage") as HTMLElement | null)?.focus?.();
-						}}
-						onMove={move}
-						/*
-						 * A resize is the board's size on this stage, kept in the stage file; it comes back as a
-						 * `board.changed` at the same revision, so the page in the frame stays as it is. A deck's
-						 * slides take their width from the deck's own file, and reload at it.
-						 */
-						onResize={(path, size) => void act("canvas.update", [path, { size }])}
-						flowHeight={(path) => flowHeights()[path]}
-						/*
-						 * A double-click on empty canvas makes a blank board, centred where it landed.
-						 * `files.boardAt` owns the request-and-hear-the-path dance, because the server
-						 * mints the name and only it knows what the path is.
-						 */
-						onCreateBoard={(at, format) =>
-							void files.boardAt(at, format).then((path) => {
-								if (!path) return;
-								setSelected(path);
-								setComponent(undefined);
-							})
-						}
-						onOpenDocument={(at) =>
-							void files.fileAt(at).then((path) => {
-								if (!path) return;
-								setSelected(path);
-								setComponent(undefined);
-							})
-						}
-						onHide={(path) => void act("canvas.delete", [path])}
-						cursor={state.cursor}
-						acts={state.acts}
-						stageName={state.focused ? pens()[state.focused]?.stage : undefined}
-						agentLabel={(agentId, name) => {
-							// "Name · Model", as a design tool tags a collaborator: the model by the name its picker shows.
-							// The live model first: a switch arrives as `agent.model`, which moves the agent's
-							// state and not its chat row, so the row alone kept the model the chat started on.
-							const chat = state.chats.find((one) => one.id === agentId);
-							const current = state.agents[agentId]?.model ?? chat?.model;
-							const model = current ? (optionFor(runtimeFor(chat?.kind)?.models ?? [], current)?.label ?? current.model) : undefined;
-							return model ? `${name} · ${model}` : name;
-						}}
-						news={newsGlow()}
-						onRead={(path) => send({ type: "board.seen", path })}
-						onViewport={() => reportCameraSoon(camera())}
-						onExtent={(path, { flows, ...extent }) => {
-							noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
-							send({ type: "board.extent", path, ...extent });
-						}}
-						/* A board is drawn by the app's own frame, with what only the app has: its editor, drops, live chats and revisions. */
-						frame={(slot) => (
-							<BoardFrame
-								{...slot}
-								nonce={state.nonces?.[slot.board.path]}
-								editor={editor}
-								drops={drops(slot.board.path)}
-								showRev={frameRevs[slot.board.path]}
-								previewSha={preview()?.boards?.[slot.board.path]}
-								/*
-								 * A live board draws itself from a conversation this app is already
-								 * holding — every agent's, not only the focused one, because the registry
-								 * greets the browser with all of them. Accessors rather than values: which
-								 * conversation a board wants is only known once it has loaded and asked.
-								 */
-								transcript={(agentId) => {
-									// A mirror of a chat nobody has opened here asks for it, like opening it would.
-									ensureHistory(agentId);
-									return state.agents[agentId]?.transcript;
-								}}
-								webStatus={() => state.web}
-								onWebReply={(reply) => {
-									if (reply.decks === "live.web.answer") send({ type: "web.answer", id: reply.id, ok: reply.ok });
-									else send({ type: "web.stop" });
-								}}
-								agentIdentity={(agentId) => {
-									const identity = state.identities[agentId];
-									return identity ? { name: identity.name, color: identity.color } : undefined;
-								}}
-								/*
-								 * What that agent is doing, in the sign's own words.
-								 *
-								 * The mirror draws a working line at the foot of its transcript, and it is the same
-								 * sentence the dock and the column say — `workingWords` is the one place that decides
-								 * between "working…", "typing…" and "running tools…". A board that read the words off
-								 * the transcript instead, as it used to, could only tell that *something* was
-								 * happening, and called all three of them "working…".
-								 */
-								working={(agentId) => {
-									const chat = state.chats.find((one) => one.id === agentId);
-									const identity = state.identities[agentId];
-									return chat && identity ? workingWords(chat.state, identity.name) : undefined;
-								}}
-								{...(editingSource()?.path === slot.board.path
-									? {
-											editing: {
-												/*
-												 * Committed as bytes, because that is what this editor edits.
-												 *
-												 * There used to be a second commit here — a batch of ops from a GrapesJS
-												 * model, with a fallback to the bytes when the ops could not express the
-												 * change. Both are gone with that editor, and this is the `source` op:
-												 * the whole file, written as the person typed it. Unchanged text is
-												 * dropped here rather than sent, so opening the editor and closing it
-												 * without touching anything is not a write.
-												 */
-												source: editingSource()!.source,
-												onCommit: (text: string) => {
-													const open = editingSource();
-													setEditingSource(undefined);
-													if (!open) return;
-													const board = state.boards.find((candidate) => candidate.path === open.path);
-													if (!board || text === open.source) return;
-													send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
-												},
-												onCancel: () => setEditingSource(undefined),
-											},
-										}
-									: {})}
-							/>
-						)}
-						shots={() => {
-							const adaptor = shotAdaptor();
-							const capture = adaptor.capture;
-							return {
-								picture: (board, look) => adaptor.picture(board, look),
-								ownPicture: adaptor.id !== "canvas",
-								...(capture ? { capture: (frame: HTMLIFrameElement, board: Board) => capture.call(adaptor, frame, board) } : {}),
-							};
-						}}
-						onComment={(comment) => setCommenting({ ...comment, open: true })}
-						onTool={pickTool}
-						preview={preview()?.boards}
-						/*
-						 * A link on a board, pointing at another board.
-						 *
-						 * The board will not follow it — a frame has no back button, so the board being read
-						 * would be replaced by the one it linked to — and asks here instead. Only a link to a
-						 * board file gets this far; everything else opened in a tab at the click. The answer is
-						 * whether this deck holds that board: `true` and it is on the canvas beside the board
-						 * that linked to it, `false` and there is a notice saying there is no board there.
-						 */
-						onOpenBoard={openLinkedBoard}
-						/*
-						 * Dropped on the composer: talk about it.
-						 *
-						 * Each arrives as a **pill**, the object the comment pill already is: an icon, a
-						 * colour of its own, and the thing it stands for carried inside it rather than
-						 * guessed back out of a label (`chat/composer/draft.ts`). What the agent reads
-						 * for one is its address — `@boards/plan.html`, which is how a dropped file is
-						 * already spelled, and `@item:<id>` for something drawn on the stage.
-						 *
-						 * Through the same one-shot draft handoff a dropped file uses, so a sentence
-						 * half typed survives it.
-						 */
-						onRefer={(pills) =>
-							setDraft({
-								text: "",
-								pills,
-								at: Date.now(),
-								insert: true,
-								...(state.focused ? { agentId: state.focused } : {}),
-							})
-						}
-						/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
-						   the browser's copy is the whole of it: the server keeps no preview state,
-						   which is also why a reload has always been an accidental escape hatch. */
-						onLeavePreview={clearPreview}
-						onEdgeSwipe={edgeSwipe}
-					/>
-					)}
+							document: {
+								send: (ops) => {
+									const agentId = state.focused;
+									if (agentId) void editDrawing(agentId, ops);
+								},
+								step: penStep,
+							},
+							canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
+							boards: {
+								list: stageBoards,
+								page: (path) => {
+									const board = state.boards.find((one) => one.path === path);
+									return board ? boardUrl(board) : undefined;
+								},
+								mintBoardToken: mintBoardToken,
+								sandboxed: isSharedBoard,
+								mayStart: boardsMayStart,
+								switching: switchingCanvas,
+								onStarted: canvasOpened,
+								onExtent: (path, { flows, ...extent }) => {
+									noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
+									send({ type: "board.extent", path, ...extent });
+								},
+								onCreate: (at, format) =>
+									void files.boardAt(at, format).then((path) => {
+										if (!path) return;
+										setSelected(path);
+										setComponent(undefined);
+									}),
+								onOpenDocument: (at) =>
+									void files.fileAt(at).then((path) => {
+										if (!path) return;
+										setSelected(path);
+										setComponent(undefined);
+									}),
+								onOpenLink: openLinkedBoard,
+								news: newsGlow,
+								onRead: (path) => send({ type: "board.seen", path }),
+								onHide: (path) => void act("canvas.delete", [path]),
+								shots: () => {
+									const adaptor = shotAdaptor();
+									const capture = adaptor.capture;
+									return {
+										picture: (board, look) => adaptor.picture(board, look),
+										ownPicture: adaptor.id !== "canvas",
+										...(capture ? { capture: (frame: HTMLIFrameElement, board: Board) => capture.call(adaptor, frame, board) } : {}),
+									};
+								},
+							},
+							onViewport: () => reportCameraSoon(camera()),
+							onComment: (comment) => setCommenting({ ...comment, open: true }),
+							onSelectTool: () => pickTool("select"),
+							onRefer: (pills) =>
+								setDraft({
+									text: "",
+									pills,
+									at: Date.now(),
+									insert: true,
+									...(state.focused ? { agentId: state.focused } : {}),
+								}),
+							onEdgeSwipe: edgeSwipe,
+						});
+						setEditorHandle(editor.handle);
+						onCleanup(() => {
+							setEditorHandle(undefined);
+							editor.dispose();
+						});
+						return editor.surface();
+					}}
 				</Show>
 					</div>
 				</div>

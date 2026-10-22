@@ -62,6 +62,8 @@ export interface PlainBoardExtras {
 	onFiles?: ((files: File[], at: { x: number; y: number }, how: "drop" | "paste") => void) | undefined;
 	/** Raised by the host when the board's file changed where its page comes from: the page loads again. */
 	reload?: number | undefined;
+	/** The canvas the board is on, for its token's calls. */
+	stage?: (() => string | undefined) | undefined;
 	/** Words on this board with a comment waiting on them: kept marked in its page (`board.js`). */
 	marks?: Array<{ id: string; quote: string; component?: string }> | undefined;
 }
@@ -333,7 +335,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 							frame = element;
 							// Its board's own token, for the board's buttons, handed to this frame alone (`board-host.ts`);
 							// a friend's board, sandboxed, has none, and its storage is kept here (`board-storage.ts`).
-							const detach = props.sandboxed ? attachBoardStorage(element, props.sandboxed.key, sandboxKeeper) : props.boardHost?.attach(element, { path: () => props.board.path, page: src });
+							const detach = props.sandboxed ? attachBoardStorage(element, props.sandboxed.key, sandboxKeeper) : props.boardHost?.attach(element, { path: () => props.board.path, page: src, ...(props.stage ? { stage: props.stage } : {}) });
 							if (detach) onCleanup(detach);
 						}}
 						class="plain-board-page"

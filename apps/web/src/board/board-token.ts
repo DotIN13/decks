@@ -11,7 +11,7 @@ import { stageOnScreen } from "../state/decks.ts";
  * posts it to that board's frame alone, at the origin of the address it was given. The board then
  * calls its verbs itself: this page passes no call on for it.
  */
-async function mint(path: string, stage?: string): Promise<string | undefined> {
+export async function mintBoardToken(path: string, stage?: string): Promise<string | undefined> {
 	const response = await fetch(api("/tokens"), {
 		method: "POST",
 		headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -22,7 +22,7 @@ async function mint(path: string, stage?: string): Promise<string | undefined> {
 	return answer.token;
 }
 
-export const boardTokens = createBoardHost({ mint });
+export const boardTokens = createBoardHost({ mint: mintBoardToken });
 
 /** Hand this frame its board's token whenever its page asks; answers what stops it. */
 export function attachBoardToken(frame: HTMLIFrameElement, path: () => string): () => void {
