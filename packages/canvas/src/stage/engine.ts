@@ -73,10 +73,13 @@ type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array 
  * WebKit (Safari, and every browser on iOS and iPadOS), whose copy of a worker's picture into a
  * texture (`copyExternalImageToTexture`) costs the page's thread about 2 ms a 512-pixel tile on an
  * iPad mini 6, against 0.17 ms to write its bytes (`writeTexture`): a pinch's tiles took 180 to 300
- * ms of it. Chromium copies a picture in about 0.04 ms, so it keeps pictures, which cost the worker
- * nothing to read back. WebKit is told by its user agent: AppleWebKit without Chrome's, Chromium's
- * or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is WebKit).
- * `globalThis.__decksTilePixels` (true or false), set before the stage opens, says it instead.
+ * ms of it. Chromium copies a picture in about 0.04 ms at the median (now and then 12 ms, waiting
+ * on the GPU process, which is why tiles are taken in outside the frame's callback: `takeTilesSoon`),
+ * and keeps pictures: as bytes, zooming was as smooth (14 to 20 frames of 180 over 9 ms either
+ * way), but a fast pan was filled in 17 to 48 ms instead of 7 to 8, every tile waiting for its read
+ * back from the worker's device. WebKit is told by its user agent: AppleWebKit without Chrome's,
+ * Chromium's or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is
+ * WebKit). `globalThis.__decksTilePixels` (true or false), set before the stage opens, says it instead.
  */
 export function pixelsFirst(): boolean {
 	const forced = (globalThis as { __decksTilePixels?: boolean }).__decksTilePixels;
@@ -890,8 +893,10 @@ export class StageEngine {
 	private tick(): void {
 		this.tickFrame = 0;
 		if (this.disposed) return;
-		if (this.tileQueue.length) this.takeTiles();
 		if (this.dirty) this.drawNow();
+		// A new frame's share of taking tiles in, spent after its draw (`takeTilesSoon`).
+		this.frameTaken = { ms: 0, bytes: 0, pictures: 0 };
+		if (this.tileQueue.length) this.takeTilesSoon();
 	}
 
 	/** Draw the canvas at the next frame (`tick`), once however many changes come before it. */
@@ -917,14 +922,35 @@ export class StageEngine {
 	private tileBatch: { left: number; rest: number; got: number; sent: number } | undefined;
 	private coarseClock: boolean | undefined;
 
-	/** Take tiles in at the next frame, and draw them in it (`tick`). */
+	/**
+	 * Take tiles in soon, in a task of their own (`takeTiles`), and draw them at the next frame
+	 * (`tick`): never in the frame's callback before its draw, where a copy that waited on the GPU
+	 * process (12 ms once, in Chromium) made that frame late, and the draw after it too. A frame's
+	 * share (`TILE_BUDGET`) is spent once, in one or more tasks after its draw; what is left waits
+	 * for the next frame's.
+	 */
 	private takeTilesSoon(): void {
-		this.tickSoon();
+		if (this.takePosted || this.disposed || !this.tileQueue.length) return;
+		const budget = tileBudget();
+		if (this.frameTaken.ms >= budget.ms) return void this.tickSoon();
+		this.takePosted = true;
+		if (!this.takeChannel) {
+			this.takeChannel = new MessageChannel();
+			this.takeChannel.port1.onmessage = () => {
+				this.takePosted = false;
+				if (!this.disposed) this.takeTiles();
+			};
+		}
+		this.takeChannel.port2.postMessage(0);
 	}
+	private takeChannel: MessageChannel | undefined;
+	private takePosted = false;
+	/** What taking tiles in has spent of this frame's share since its draw. */
+	private frameTaken = { ms: 0, bytes: 0, pictures: 0 };
 
 	/**
 	 * Take in the tiles waiting, the window's first, until this frame's share (`TILE_BUDGET`) is
-	 * spent, and draw; what is left is taken at the next frame. When none is left, what the worker
+	 * spent, and draw them at the next frame; what is left is taken after that frame's draw. When none is left, what the worker
 	 * said with its latest batch holds: the window sharp (`sharpAt`), or filled in (`settledAt`).
 	 */
 	private takeTiles(): void {
@@ -934,7 +960,7 @@ export class StageEngine {
 		if (!queue.length) return;
 		const budget = tileBudget();
 		// Counted too where the clock is coarse (WebKit, where tiles come as bytes).
-		const coarse = (this.coarseClock ??= pixelsFirst());
+		const coarse = (this.coarseClock ??= webKit());
 		// The window's tiles first, in the order they came.
 		if (queue.length > 1) {
 			const { x, y } = this.corner();
@@ -948,13 +974,14 @@ export class StageEngine {
 			if (inView.length && inView.length < queue.length) this.tileQueue = [...inView, ...queue.filter((q) => !seen(q.tile))];
 		}
 		const start = performance.now();
-		let bytes = 0;
-		let pictures = 0;
+		const spent = this.frameTaken;
+		let { bytes, pictures } = spent;
 		let taken = 0;
 		for (let first = this.tileQueue[0]; first; first = this.tileQueue[0]) {
 			const next = first.tile;
-			if (taken > 0) {
-				if (performance.now() - start >= budget.ms) break;
+			// At least one a frame, however long the last frame's took.
+			if (taken > 0 || spent.bytes + spent.pictures > 0) {
+				if (spent.ms + performance.now() - start >= budget.ms) break;
 				if (coarse && (next.bitmap ? pictures >= budget.pictures : bytes >= budget.bytes)) break;
 			}
 			this.tileQueue.shift();
@@ -970,6 +997,7 @@ export class StageEngine {
 			}
 			taken++;
 		}
+		this.frameTaken = { ms: spent.ms + performance.now() - start, bytes, pictures };
 		sheetStats().tiles = (sheetStats().tiles ?? 0) + taken;
 		const batch = this.tileBatch;
 		if (!this.tileQueue.length && batch) {
@@ -978,9 +1006,9 @@ export class StageEngine {
 			if (batch.left === 0 && batch.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
 			this.seenAtDraw = batch.sent;
 		}
-		// Drawn in this frame's one draw (`tick`); what is left is taken at the next frame.
-		this.dirty = true;
-		if (this.tileQueue.length) this.tickSoon();
+		// Drawn in the next frame's one draw (`tick`), which takes what is left after it.
+		if (taken) this.draw();
+		else this.tickSoon();
 	}
 
 	/**
@@ -1728,6 +1756,7 @@ export class StageEngine {
 	dispose(): void {
 		this.disposed = true;
 		cancelAnimationFrame(this.tickFrame);
+		this.takeChannel?.port1.close();
 		this.dropTileQueue();
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
