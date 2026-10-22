@@ -528,6 +528,7 @@ export class StageEngine {
 		if (!gliding) this.draw();
 		// A drag of boards alone that was let go: its arrows are now the drawing's own, routed where the boards landed.
 		if (this.boardsOnly && !this.carriedCount) this.landBoards();
+		else if (this.boardsOnly) this.boardsAnswered = true;
 		// A gesture let go: the drawing that answers it is here, so what it lifted goes back into the tiles.
 		if (this.settling) {
 			this.settling = false;
@@ -1199,6 +1200,7 @@ export class StageEngine {
 		if (!this.page) return;
 		this.page.carry(JSON.stringify(paths), offset.dx, offset.dy);
 		if (paths.length) {
+			this.boardsAnswered = false;
 			if (this.shown === undefined) {
 				this.boardsOnly = true;
 				clearTimeout(this.boardsLanding);
@@ -1207,7 +1209,9 @@ export class StageEngine {
 			this.laidOut(this.shown === undefined || this.moveOnly);
 		} else if (this.boardsOnly && this.shown === undefined) {
 			clearTimeout(this.boardsLanding);
-			this.boardsLanding = setTimeout(() => this.landBoards(), 2000);
+			// The drawing that answers the drop came while the boards were held where they were dropped (`editor/core/gesture.ts`, `holdBoards`): its arrows are routed already.
+			if (this.boardsAnswered) this.landBoards();
+			else this.boardsLanding = setTimeout(() => this.landBoards(), 2000);
 		}
 		this.draw();
 	}
@@ -1216,6 +1220,8 @@ export class StageEngine {
 	private carriedCount = 0;
 	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
 	private boardsOnly = false;
+	/** A drawing came since the boards were last carried a step: the one that answers their drop, if they are let go of now. */
+	private boardsAnswered = false;
 	private boardsLanding: ReturnType<typeof setTimeout> | undefined;
 	private landBoards(): void {
 		clearTimeout(this.boardsLanding);

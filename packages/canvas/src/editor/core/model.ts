@@ -40,6 +40,8 @@ export type Corners = { x1: number; y1: number; x2: number; y2: number };
 /** An item being resized: its box now, and where its given box starts (a path drawn inside its viewBox differs). */
 export type ResizeBox = Rect & { id: string; given?: Pt };
 /** A board being resized by its handles; once let go, the revision the write will pass and when the box is let go of anyway. */
+/** A board drag let go: where each board was asked to go, and when it is let go of anyway. */
+export type BoardDragLanding = { to: readonly { path: string; x: number; y: number }[]; until: number };
 export type BoardResizeBox = Rect & { path: string; released?: { rev: number; until: number } };
 /** A shape being drawn with a tool, corner to corner. */
 export type DraftBox = Corners & { tool: PenTool };
@@ -68,8 +70,12 @@ export type EditorState = {
 	gesture?: Gesture | undefined;
 	/** The selection's move, held after the lift until the drawing that answers it is drawn. */
 	drag: Offset;
-	/** The boards a drag carries. */
-	boardDrag?: { paths: readonly string[]; dx: number; dy: number } | undefined;
+	/**
+	 * The boards a drag carries. Once let go (`released`), held where they were dropped until the
+	 * boards are at the places the move asked for (`landBoardDrag`), or `until` passes: the move goes
+	 * to the server, and until its answer the boards would otherwise be drawn back where they were.
+	 */
+	boardDrag?: { paths: readonly string[]; dx: number; dy: number; released?: BoardDragLanding } | undefined;
 	/** A board moving itself, by a finger on its edge (`BoardFrame`'s own drag). */
 	ownDrag?: { path: string; x: number; y: number } | undefined;
 	/** An item being resized as the pointer has it, and as the sheet has drawn it (a frame behind). */

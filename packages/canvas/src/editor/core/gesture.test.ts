@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeScene, type FakeItem } from "./fake-scene.ts";
-import { BOARD_HOLD_MS, initialState, landBoardResize, RADIUS_HOLD_MS, SETTLE_MS, step, withSelection, type Effect, type GestureContext, type Input, type PointerInput, type Step } from "./gesture.ts";
+import { BOARD_HOLD_MS, initialState, landBoardDrag, landBoardResize, RADIUS_HOLD_MS, SETTLE_MS, step, withSelection, type Effect, type GestureContext, type Input, type PointerInput, type Step } from "./gesture.ts";
 import type { EditorState, Mods } from "./model.ts";
 
 /**
@@ -225,7 +225,7 @@ test("a marquee picks what is wholly inside it as it goes, and Shift adds that t
 	assert.deepEqual(round.selection.boards, ["boards/one.html"]);
 });
 
-test("a board pressed is the app's selected board, and a drag carries it and moves it on the lift", () => {
+test("a board pressed is the app's selected board, and a drag carries it, moves it on the lift, and holds it there until it lands", () => {
 	const { state, steps } = run(withSelection(initialState("edit"), { items: ["a"] }), [
 		{ type: "press-board", path: "boards/one.html", ...at(1100, 100) },
 		{ type: "move", ...at(1150, 160) },
@@ -237,9 +237,15 @@ test("a board pressed is the app's selected board, and a drag carries it and mov
 	// Boards alone: the drawn items' offset and preview are not touched.
 	assert.deepEqual(steps[1]!.state.drag, { dx: 0, dy: 0 });
 	assert.equal(steps[1]!.preview, undefined);
-	assert.deepEqual(steps[2]!.effects.at(-1), { do: "move-boards", moves: [{ path: "boards/one.html", x: 1050, y: 60 }] });
+	assert.deepEqual(steps[2]!.effects.find((effect) => effect.do === "move-boards"), { do: "move-boards", moves: [{ path: "boards/one.html", x: 1050, y: 60 }] });
 	assert.ok(!kinds(steps[2]!.effects).includes("settle"));
-	assert.equal(state.boardDrag, undefined);
+	// Still carried where it was dropped until the boards have it there, or the hold runs out.
+	const until = steps[2]!.effects.find((effect) => effect.do === "wake");
+	assert.deepEqual(state.boardDrag, { paths: ["boards/one.html"], dx: 50, dy: 60, released: { to: [{ path: "boards/one.html", x: 1050, y: 60 }], until: (until as { at: number }).at } });
+	assert.equal(landBoardDrag(state, [{ path: "boards/one.html", x: 1000, y: 0, w: 400, h: 300 }]).boardDrag, state.boardDrag);
+	assert.equal(landBoardDrag(state, [{ path: "boards/one.html", x: 1050, y: 60, w: 400, h: 300 }]).boardDrag, undefined);
+	assert.equal(landBoardDrag(state, []).boardDrag, undefined);
+	assert.equal(step(state, { type: "tick", time: (until as { at: number }).at }, scene, ctx()).state.boardDrag, undefined);
 	// Shift takes the board into the picks, or out, and carries nothing.
 	const shift = step(initialState("edit"), { type: "press-board", path: "boards/one.html", ...at(1100, 100, { shift: true }) }, scene, ctx());
 	assert.deepEqual(shift.state.selection.boards, ["boards/one.html"]);

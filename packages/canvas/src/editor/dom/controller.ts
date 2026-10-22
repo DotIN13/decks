@@ -15,7 +15,7 @@ import { arrowEndItem, ids as penIds, isArrow, type MediaItem, type Op, type Pen
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { feedSelection, keptSelection } from "../../state/pen-tools.ts";
 import { glideShift } from "../core/overlay.ts";
-import { initialState, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
+import { initialState, landBoardDrag, landBoardResize, pruneBoards, selectMade, shownDrag, step, withSelection, type GestureContext, type Input, type PointerInput } from "../core/gesture.ts";
 import type { BoardBox, DraftBox, EditorState, Offset, PenTool, PointerKind, Pt, Rect, ResizeBox, SideHintBox } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
 import type { TextSession } from "../core/text.ts";
@@ -151,6 +151,12 @@ export function createEditor(host: EditorHost) {
 		if (!held?.released) return;
 		const board = host.boards().find((candidate) => candidate.path === held.path);
 		update((now) => landBoardResize(now, board ? { path: board.path, x: board.x, y: board.y, w: board.w, h: board.h, rev: board.rev} : undefined));
+	});
+	/* Boards a drag let go of are held where they were dropped until the boards are there (`landBoardDrag`): asked again whenever the boards change. */
+	createEffect(() => {
+		if (!boardDrag()?.released) return;
+		const boards = host.boards();
+		update((now) => landBoardDrag(now, boards));
 	});
 	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
 	createEffect(() => {

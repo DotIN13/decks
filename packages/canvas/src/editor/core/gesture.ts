@@ -345,8 +345,9 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drop: {} };
 		const ops = moveOps(scene, ids, offset.dx, offset.dy, into, slot);
 		if (ids.length) next = settle(next, p.time, ctx, effects, landingBoxes(scene, ids, offset, into));
-		effects.push({ do: "move-boards", moves: boardMoves(scene.boards(), state.selection.boards, offset.dx, offset.dy) });
-		return { state: { ...next, boardDrag: undefined }, ops, effects };
+		const moves = boardMoves(scene.boards(), state.selection.boards, offset.dx, offset.dy);
+		effects.push({ do: "move-boards", moves });
+		return { state: holdBoards(next, state.boardDrag, moves, p.time, effects), ops, effects };
 	}
 	const moved = g.kind === "move";
 	const referring = moved && ctx.overComposer(p.client, ids, boards);
@@ -385,9 +386,39 @@ function releaseCarry(state: EditorState, g: Gesture & Carry, p: PointerInput, s
 		next = { ...next, drag: ZERO };
 	} else if (ids.length) next = settle(next, p.time, ctx, effects, p.mods.alt ? undefined : landingBoxes(scene, ids, offset, into));
 	// A copy lands where it was let go and moves nothing else: only a move glides.
-	effects.push({ do: "move-boards", moves: boardMoves(scene.boards(), boards, offset.dx, offset.dy) });
-	next = { ...next, boardDrag: undefined };
+	const moves = boardMoves(scene.boards(), boards, offset.dx, offset.dy);
+	effects.push({ do: "move-boards", moves });
+	next = holdBoards(next, state.boardDrag, moves, p.time, effects);
 	return { state: next, ops, effects, ...(preview === null ? { preview } : {}) };
+}
+
+/**
+ * The boards a drag let go of stay where they were dropped, carried as they were, until they are at
+ * the places the move asked for (`landBoardDrag`): the move is the server's to make, and until its
+ * answer the boards' boxes are still the old ones, so letting the carry go at the lift drew each
+ * board back where it was picked up for the round trip, then where it was dropped. Let go of anyway
+ * after `BOARD_HOLD_MS`, if the move is refused or lands elsewhere.
+ */
+function holdBoards(state: EditorState, carried: EditorState["boardDrag"], moves: readonly BoardMove[], time: number, effects: Effect[]): EditorState {
+	const moving = moves.filter((move) => carried?.paths.includes(move.path));
+	if (!carried || !moving.length) return { ...state, boardDrag: undefined };
+	const until = time + BOARD_HOLD_MS;
+	effects.push({ do: "wake", at: until });
+	return { ...state, boardDrag: { paths: carried.paths, dx: carried.dx, dy: carried.dy, released: { to: moving, until } } };
+}
+
+/**
+ * Boards let go of after a drag are put down once every one is where its move asked (the boards
+ * as the host has them now), or is gone; a new drag replaces the hold.
+ */
+export function landBoardDrag(state: EditorState, boards: readonly BoardBox[]): EditorState {
+	const held = state.boardDrag?.released;
+	if (!held) return state;
+	const landed = held.to.every((move) => {
+		const board = boards.find((one) => one.path === move.path);
+		return !board || (Math.abs(board.x - move.x) <= 1 && Math.abs(board.y - move.y) <= 1);
+	});
+	return landed ? { ...state, boardDrag: undefined } : state;
 }
 
 /** A gesture let go with its edit sent: the engine is told, and it waits for the drawing that answers it. */
@@ -649,6 +680,8 @@ export function step(state: EditorState, input: Input, scene: SceneQuery, ctx: G
 			if (next.radius?.done && next.radius.until !== undefined && next.radius.until <= input.time) next = { ...next, radius: undefined };
 			const held = next.boardResize?.released;
 			if (held && held.until <= input.time) next = { ...next, boardResize: undefined };
+			const dropped = next.boardDrag?.released;
+			if (dropped && dropped.until <= input.time) next = { ...next, boardDrag: undefined };
 			return { state: next, ops: [], effects: [], ...(preview === null ? { preview } : {}) };
 		}
 		case "carry-pending":

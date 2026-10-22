@@ -7,8 +7,14 @@
  * Dropped into a slot of a frame that arranges its children, it glides from where it was let go to
  * where it lands, and the siblings that make room glide too (`editor/core/glide.ts`). Its outline
  * glides with it, frame by frame, rather than jumping ahead to where it lands.
+ *
+ * A board dragged and let go stays where it was dropped until the server's answer has it there
+ * (`editor/core/gesture.ts`, `holdBoards`): its page and the engine's picture of it, sampled every
+ * frame with the server's messages held back 400 ms, never go back to where it was picked up. A
+ * live board and one shown as a picture, in Chromium and in WebKit.
  */
-import { editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { zoomStep } from "../backends-kit.mjs";
+import { boardEdge, editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -18,6 +24,135 @@ const until = async (test, ms = 8000) => {
 		await new Promise((resolve) => setTimeout(resolve, 150));
 	}
 };
+
+/**
+ * The server's messages to the page held back while `lag.ms` is set, in order: a round trip as slow
+ * as a far network's, so what the stage shows between a drop and its answer lasts long enough to see.
+ * Routed before a reload, which the page's socket then goes through.
+ */
+const lag = { ms: 0 };
+async function laggedSocket(page) {
+	let queue = Promise.resolve();
+	await page.routeWebSocket(/\/ws/, (ws) => {
+		const server = ws.connectToServer();
+		ws.onMessage((message) => server.send(message));
+		server.onMessage((message) => {
+			const ms = lag.ms;
+			queue = queue.then(() => (ms ? new Promise((resolve) => setTimeout(resolve, ms)) : undefined)).then(() => ws.send(message));
+		});
+	});
+	await page.reload({ waitUntil: "load" });
+	await rest(page, { start: 300 });
+}
+
+/**
+ * A board dragged by its edge (live) or its picture, let go, and where it is drawn every frame for
+ * 1.5 s after: its node's box on screen and the engine's box for its picture (the board's box plus
+ * the carried offset while carried). None may be back at the box it was picked up from.
+ */
+async function boardStaysDropped(page, label, { picture }) {
+	const candidates = await page.evaluate((picture) => {
+		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
+		return window.__decksBoards()
+			.filter((one) => {
+				const r = one.rect;
+				return pictured.has(one.path) === picture && r.width >= 40 && r.x >= 300 && r.y >= 60 && r.right <= innerWidth - 200 && r.bottom <= innerHeight - 160;
+			})
+			.map((one) => one.path);
+	}, picture);
+	let pick;
+	let grip;
+	for (const path of candidates) {
+		grip = await boardEdge(page, path);
+		grip ??= await page.evaluate((path) => {
+			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
+			const r = window.__decksBoards().find((one) => one.path === path).rect;
+			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (at(x, y) && !document.elementFromPoint(x, y)?.closest("iframe, a, button")) return { x, y };
+			}
+			return null;
+		}, path);
+		if (grip) {
+			pick = { path };
+			break;
+		}
+	}
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await page.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	const from = await page.evaluate((path) => {
+		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		return { x: board.x, y: board.y };
+	}, pick.path);
+	await page.evaluate((path) => {
+		const engine = globalThis.__decksRust;
+		globalThis.__boardFrames = [];
+		globalThis.__boardSampling = true;
+		const sample = () => {
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			const box = engine.boards.find((one) => one.path === path);
+			const carried = engine.carriedCount > 0;
+			globalThis.__boardFrames.push({
+				t: performance.now(),
+				node: node ? [node.getBoundingClientRect().x, node.getBoundingClientRect().y] : null,
+				drawn: box ? [box.x + (carried ? engine.carriedBy.dx : 0), box.y + (carried ? engine.carriedBy.dy : 0)] : null,
+			});
+			if (globalThis.__boardSampling) requestAnimationFrame(sample);
+		};
+		requestAnimationFrame(sample);
+	}, pick.path);
+	const startNode = await page.evaluate((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect().toJSON(), pick.path);
+	await page.mouse.move(grip.x, grip.y);
+	await page.mouse.down();
+	for (let i = 1; i <= 12; i++) {
+		await page.mouse.move(grip.x + i * 12, grip.y + i * 6);
+		await page.waitForTimeout(25);
+	}
+	await page.waitForTimeout(100);
+	lag.ms = 400;
+	const dropAt = await page.evaluate(() => performance.now());
+	await page.mouse.up();
+	await page.waitForTimeout(1500);
+	lag.ms = 0;
+	const frames = await page.evaluate(() => {
+		globalThis.__boardSampling = false;
+		return globalThis.__boardFrames;
+	});
+	const after = frames.filter((f) => f.t > dropAt);
+	const to = await page.evaluate((path) => {
+		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
+		return { x: board.x, y: board.y };
+	}, pick.path);
+	say(`${label}: the board moved`, Math.abs(to.x - from.x) > 20 && Math.abs(to.y - from.y) > 10, JSON.stringify({ from, to }));
+	// Nearer where it was picked up than where it was dropped: drawn back at the old place.
+	const back = (at, a, b) => at && Math.hypot(at[0] - a[0], at[1] - a[1]) < Math.hypot(at[0] - b[0], at[1] - b[1]);
+	const drawnBack = after.filter((f) => back(f.drawn, [from.x, from.y], [to.x, to.y]));
+	say(`${label}: the engine never draws it back where it was picked up after the drop`, after.length > 20 && drawnBack.length === 0, `${drawnBack.length} of ${after.length} frames, first ${JSON.stringify(drawnBack[0])}, ${JSON.stringify({ from, to })}`);
+	if (startNode) {
+		const endNode = after.at(-1)?.node;
+		const nodeBack = after.filter((f) => endNode && back(f.node, [startNode.x, startNode.y], endNode));
+		say(`${label}: …nor its page`, !!endNode && nodeBack.length === 0, `${nodeBack.length} of ${after.length} frames, first ${JSON.stringify(nodeBack[0])}, picked up at ${[startNode.x, startNode.y]}, landed at ${endNode}`);
+	}
+	await settle(page, 300);
+}
+
+/** Zoomed out until the boards are pictures, not pages. */
+async function zoomToPictures(page) {
+	for (let i = 0; i < 16; i++) {
+		if (await page.evaluate(() => window.__decksBoards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		await zoomStep(page, 60);
+		await settle(page, 350);
+	}
+	await settle(page, 600);
+}
+
+async function boardDrops(page, engine) {
+	await laggedSocket(page);
+	await editMode(page, true);
+	await boardStaysDropped(page, `${engine}, a live board`, { picture: false });
+	await zoomToPictures(page);
+	await boardStaysDropped(page, `${engine}, a board shown as a picture`, { picture: true });
+}
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
@@ -113,6 +248,15 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await settle(page, 300);
 }
 
-say("no errors on the page", errors.length === 0, errors.join(" | "));
 link.close?.();
+await boardDrops(page, "Chromium");
+say("no errors on the page", errors.length === 0, errors.join(" | "));
 await browser.close();
+
+{
+	const { browser, page, errors } = await open({ width: 1400, height: 900, engine: "webkit" });
+	await rest(page, { start: 0 });
+	await boardDrops(page, "WebKit");
+	say("no errors on the page in WebKit", errors.length === 0, errors.join(" | "));
+	await browser.close();
+}
