@@ -1,5 +1,5 @@
 import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "./board-storage.ts";
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
@@ -162,7 +162,15 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	};
 	onCleanup(() => clearTimeout(measuring));
 	// The file changed: the same address again loads what it says now. Its gestures wait for its next hello.
-	createEffect(on(() => props.reload, () => {
+	/*
+	 * Loaded again only when the count goes up: the effect also runs when the board's object is
+	 * replaced, which a host may do at every edit of the drawing, and then reloaded every board's page
+	 * for each stroke (0.7 s held on an iPad with two boards).
+	 */
+	let reloadCount = untrack(() => props.reload);
+	createEffect(on(() => props.reload, (now) => {
+		if (now === reloadCount) return;
+		reloadCount = now;
 		if (!frame?.src) return;
 		setGuest(false);
 		frame.src = frame.src;
