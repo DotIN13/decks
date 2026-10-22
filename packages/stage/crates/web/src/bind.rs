@@ -534,15 +534,16 @@ impl PageEngine {
 	/// Draw the screen for a camera, under and over the boards' pages. Call it in the same
 	/// animation frame that moves the pages. Returns how many draw operations it made.
 	#[allow(clippy::too_many_arguments)]
-	/// `zooming`: the zoom is changing, so tiles are wanted at the power of two under it.
-	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool) -> u32 {
+	/// `want`: the scale the worker's latest camera wants its tiles at (`scaleFor`, an `f32`'s bits),
+	/// shown once they cover the window; 0 for the exact zoom times `dpr`.
+	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, want: u32) -> u32 {
 		let Some(gpu) = &mut self.gpu else { return 0 };
 		let size = ((width * dpr).round() as u32, (height * dpr).round() as u32);
 		if size != self.size {
 			gpu.resize(size.0, size.1);
 			self.size = size;
 		}
-		let over = self.page.frame(Camera { x, y, zoom }, dpr, width, height, zooming);
+		let over = self.page.frame(Camera { x, y, zoom }, dpr, width, height, want);
 		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
 		let n = over.ops.len() as u32;
 		gpu.draw(Target::Screen, &over);
@@ -561,7 +562,7 @@ impl PageEngine {
 	#[wasm_bindgen(js_name = frameLifted)]
 	pub fn frame_lifted(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64) -> u32 {
 		self.page.only_lifted = true;
-		let n = self.frame(x, y, zoom, dpr, width, height, false);
+		let n = self.frame(x, y, zoom, dpr, width, height, 0);
 		self.page.only_lifted = false;
 		n
 	}
@@ -589,6 +590,18 @@ impl PageEngine {
 		}
 		let list: Vec<String> = gone.iter().map(|(k, _)| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
 		format!("[{}]", list.join(","))
+	}
+
+	/// The scale shown (`Page::shown_scale`), as an `f32`'s bits.
+	#[wasm_bindgen(js_name = shownScale)]
+	pub fn shown_scale(&self) -> u32 {
+		self.page.shown_scale()
+	}
+
+	/// Show the level wanted at the next frame, whole or not: its tiles stopped coming.
+	#[wasm_bindgen(js_name = showWanted)]
+	pub fn show_wanted(&mut self) {
+		self.page.show_wanted();
 	}
 
 	#[wasm_bindgen(js_name = tileCount)]

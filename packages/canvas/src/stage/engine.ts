@@ -43,6 +43,8 @@ const STAND_IN_RETRY_MS = 1200;
 const STAND_IN_TRIES = 50;
 /** How long to wait before asking again for a picture that did not load, each time it fails again. */
 const PICTURE_RETRY_MS = [2000, 5000, 15000, 30000, 60000];
+/** A level whose tiles stop coming before they cover the window is shown anyway this long after the last. */
+const SHOW_ANYWAY_MS = 2000;
 /** Pictures from the worker that come within this long of the first are laid out for together. */
 const PICTURES_BATCH_MS = 16;
 
@@ -924,6 +926,8 @@ export class StageEngine {
 				if (coarse && (next.bitmap ? pictures >= budget.pictures : bytes >= budget.bytes)) break;
 			}
 			this.tileQueue.shift();
+			// A tile of a level not shown yet: it is shown once its level covers the window, or once its tiles stop coming for `SHOW_ANYWAY_MS`.
+			if (next.scale !== this.overviewScale && next.scale !== page.shownScale()) this.showAnywaySoon();
 			if (next.bitmap) {
 				page.putTile(next.scale, next.x, next.y, next.bitmap);
 				pictures++;
@@ -935,8 +939,6 @@ export class StageEngine {
 			taken++;
 		}
 		sheetStats().tiles = (sheetStats().tiles ?? 0) + taken;
-		const gone = JSON.parse(page.evict()) as Array<[number, number, number]>;
-		if (gone.length) this.post({ type: "dropped", keys: gone });
 		const batch = this.tileBatch;
 		if (!this.tileQueue.length && batch) {
 			this.tileBatch = undefined;
@@ -947,6 +949,21 @@ export class StageEngine {
 		this.draw();
 		if (this.tileQueue.length) this.takeTilesSoon();
 	}
+
+	/**
+	 * Show the level wanted in `SHOW_ANYWAY_MS` whether it covers the window or not, unless another of
+	 * its tiles comes first: the old engine's word that a level was whole could fail to come, and so
+	 * can a tile here.
+	 */
+	private showAnywaySoon(): void {
+		clearTimeout(this.showAnyway);
+		this.showAnyway = setTimeout(() => {
+			if (this.disposed || !this.page) return;
+			this.page.showWanted();
+			this.draw();
+		}, SHOW_ANYWAY_MS);
+	}
+	private showAnyway: ReturnType<typeof setTimeout> | undefined;
 
 	/** Let go of the tiles waiting: the engine they were for is gone. */
 	private dropTileQueue(): void {
@@ -969,7 +986,11 @@ export class StageEngine {
 		}
 		this.shownSeen = Math.max(this.shownSeen, this.seenAtDraw);
 		const at = this.drawRect();
-		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.zooming);
+		// At the scale the worker's latest camera wants: shown once its tiles cover the window (`Page::frame`).
+		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.wantScale ?? 0);
+		// The tiles let go of: past the budget, or of the level a new one replaced.
+		const gone = this.page.evict();
+		if (gone !== "[]") this.post({ type: "dropped", keys: JSON.parse(gone) as Array<[number, number, number]> });
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
 		this.place();
 		this.lastOps = ops;
@@ -1676,6 +1697,7 @@ export class StageEngine {
 		this.dropTileQueue();
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
+		clearTimeout(this.showAnyway);
 		this.worker?.terminate();
 		this.worker = undefined;
 		this.page?.free();

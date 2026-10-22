@@ -84,9 +84,14 @@ pub struct Page {
 	/// Tile pictures the page holds: key → (texture, when last drawn).
 	pub tiles: HashMap<Key, (u32, u64)>,
 	pub budget: usize,
-	/// The scales tiles are held at, nearest the scale wanted first, and that scale: made again only
-	/// when a tile of a new scale comes or one goes, or another scale is wanted (`frame`).
-	scales: Option<(u32, Vec<u32>)>,
+	/// The scales tiles are held at besides the one shown and the one wanted, nearest the scale
+	/// wanted first, and those two: made again only when a tile of a new scale comes or one goes, or
+	/// another scale is wanted or shown (`frame`).
+	scales: Option<((u32, u32), Vec<u32>)>,
+	/// The level shown (its scale's bits): tiles of the level wanted wait unseen until they cover the window.
+	shown: Option<u32>,
+	/// Show the level wanted at the next frame, whole or not (`show_wanted`).
+	show_wanted: bool,
 	frame: u64,
 	next_texture: u32,
 	/// What `layout_changes` last told the page, by root: its id, version and first paint order.
@@ -111,7 +116,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
+		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, shown: None, show_wanted: false, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -406,6 +411,53 @@ impl Page {
 		Value::Array(out)
 	}
 
+
+	/// Draw `place` from the tiles of scale `sc`, cut to it, if they cover it whole: one coarser tile,
+	/// two or four where it straddles them, or the sharper ones that lie in it. False, and nothing
+	/// drawn, if any is missing; unless not `whole`, when those held are drawn, and false only if none is.
+	fn draw_at(&mut self, place: &Rect, sc: u32, whole: bool, snap: &dyn Fn(&Rect) -> (f32, f32, f32, f32), over: &mut DrawList) -> bool {
+		let side = TILE as f64 / f32::from_bits(sc) as f64;
+		// The place's edges lie on another grid: a hair of overlap is not a tile it needs.
+		let eps = side * 1e-6;
+		let (x0, y0) = (((place.x + eps) / side).floor(), ((place.y + eps) / side).floor());
+		let (x1, y1) = (((place.right() - eps) / side).ceil(), ((place.bottom() - eps) / side).ceil());
+		let count = (x1 - x0) * (y1 - y0);
+		if count.is_nan() || count > 256.0 {
+			return false;
+		}
+		let keys = || (y0 as i32..y1 as i32).flat_map(move |y| (x0 as i32..x1 as i32).map(move |x| Key { scale: sc, x, y }));
+		if if whole { !keys().all(|k| self.tiles.contains_key(&k)) } else { !keys().any(|k| self.tiles.contains_key(&k)) } {
+			return false;
+		}
+		for k in keys() {
+			let Some((texture, used)) = self.tiles.get_mut(&k) else { continue };
+			*used = self.frame;
+			let a = k.area();
+			let cx = a.x.max(place.x);
+			let cy = a.y.max(place.y);
+			let cut = Rect { x: cx, y: cy, w: a.right().min(place.right()) - cx, h: a.bottom().min(place.bottom()) - cy };
+			if cut.w <= 0.0 || cut.h <= 0.0 {
+				continue;
+			}
+			let uv = [((cut.x - a.x) / a.w) as f32, ((cut.y - a.y) / a.h) as f32, ((cut.right() - a.x) / a.w) as f32, ((cut.bottom() - a.y) / a.h) as f32];
+			let (px, py, pw, ph) = snap(&cut);
+			over.push(Op::Picture { texture: *texture, x: px, y: py, w: pw, h: ph, uv, opacity: 1.0 });
+		}
+		true
+	}
+
+	/// The scale shown, as an `f32`'s bits (0 before the first frame): a tile of another one that
+	/// arrives is held unseen until its level covers the window.
+	pub fn shown_scale(&self) -> u32 {
+		self.shown.unwrap_or(0)
+	}
+
+	/// Show the level wanted at the next frame whether or not it covers the window: its tiles have
+	/// stopped coming (the page's timer), so waiting longer would show nothing new.
+	pub fn show_wanted(&mut self) {
+		self.show_wanted = true;
+	}
+
 	/// A tile's picture arrived: the texture to put it in (the caller copies the picture there).
 	pub fn tile_texture(&mut self, key: Key) -> u32 {
 		if let Some((t, _)) = self.tiles.get(&key) {
@@ -428,7 +480,7 @@ impl Page {
 	///
 	/// A board going live loses its picture in the frame that shows its page; no tile is painted
 	/// again for it. Tiles and pictures lie on whole device pixels.
-	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool) -> DrawList {
+	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, want: u32) -> DrawList {
 		self.frame += 1;
 		// Room for three windows of tiles at this screen's size, with the ring round them, and never
 		// under the floor: a 2x screen needs far more than a 1x one.
@@ -485,17 +537,35 @@ impl Page {
 			self.carrying = carrying;
 			self.marks = self.marks.wrapping_add(1);
 		}
-		// Over: the tiles, one per place. Each place shows the sharpest tile held for it; where the
-		// tile at the scale asked for has not come yet, the part of a coarser one that covers it, and
-		// failing that the sharper tiles of one scale that lie in it, drawn smaller (a zoom out holds
-		// only sharper ones). Never two scales layered in a place: tiles are clear where nothing is
-		// drawn, so a stale one under a fresh one would show through.
-		let want = scale_for(camera.zoom * dpr, zooming);
+		/*
+		 * Over: the tiles, one per place of the window's grid at the scale wanted. The level shown is
+		 * the one whose tiles cover the window: tiles of a new level (a zoom's) are held unseen until
+		 * every place of the window has one, then shown in one frame, as the old engine swapped its
+		 * levels; until then the level shown before is drawn stretched, never a patchwork of the two.
+		 * The other levels are kept, unseen, until the budget lets them go (`evict`): a zoom back
+		 * paints none of them again. A place the level shown does not cover (a pan's new
+		 * edge, the far side of a zoom out) shows the nearest other level that covers it whole, the
+		 * overview's at worst. Never two scales layered in a place: tiles are clear where nothing is
+		 * drawn, so a stale one under a fresh one would show through.
+		 */
+		let want = if want != 0 { f32::from_bits(want) } else { scale_for(camera.zoom * dpr, false) };
+		let wanted = want.to_bits();
+		// A ghost of what a drag carries is the lifted items alone, with no tiles under them.
+		let places = if self.only_lifted { Vec::new() } else { Grid::covering(&view, want, 0) };
+		if !self.only_lifted && self.shown != Some(wanted) {
+			let whole = self.shown.is_none() || self.show_wanted || places.iter().all(|k| self.tiles.contains_key(k));
+			if whole {
+				self.shown = Some(wanted);
+			}
+		}
+		self.show_wanted = false;
+		let shown = self.shown.unwrap_or(wanted);
 		let scales = match self.scales.take() {
-			Some((at, scales)) if at == want.to_bits() => scales,
+			Some((at, scales)) if at == (wanted, shown) => scales,
 			_ => {
-				let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).collect::<HashSet<_>>().into_iter().collect();
-				// Nearest the scale wanted first, sharper before blurrier at the same distance.
+				// The other levels held, the one waiting to be shown left out: nearest the scale wanted
+				// first, sharper before blurrier at the same distance.
+				let mut scales: Vec<u32> = self.tiles.keys().map(|k| k.scale).filter(|&sc| sc != shown && sc != wanted).collect::<HashSet<_>>().into_iter().collect();
 				scales.sort_by(|a, b| {
 					let d = |s: u32| ((f32::from_bits(s) as f64).ln() - (want as f64).ln()).abs();
 					d(*a).total_cmp(&d(*b)).then(f32::from_bits(*b).total_cmp(&f32::from_bits(*a)))
@@ -503,31 +573,16 @@ impl Page {
 				scales
 			}
 		};
-		// A ghost of what a drag carries is the lifted items alone, with no tiles under them.
-		let places = if self.only_lifted { Vec::new() } else { Grid::covering(&view, want, 0) };
 		for key in places {
 			let place = key.area();
-			let found = scales.iter().find_map(|&sc| {
-				let side = TILE as f64 / f32::from_bits(sc) as f64;
-				let k = Key { scale: sc, x: (place.cx() / side).floor() as i32, y: (place.cy() / side).floor() as i32 };
-				// A coarser tile covers the whole place; a sharper one only part of it.
-				let a = k.area();
-				(a.x <= place.x + 1e-6 && a.y <= place.y + 1e-6 && a.right() >= place.right() - 1e-6 && a.bottom() >= place.bottom() - 1e-6).then_some(())?;
-				self.tiles.get(&k).map(|(t, _)| (k, *t))
-			});
-			let Some((k, texture)) = found else {
-				self.sharper_in(&place, &scales, want, &snap, &mut over);
+			if self.draw_at(&place, shown, true, &snap, &mut over) || scales.iter().any(|&sc| self.draw_at(&place, sc, true, &snap, &mut over)) {
 				continue;
-			};
-			let a = k.area();
-			let uv = [((place.x - a.x) / a.w) as f32, ((place.y - a.y) / a.h) as f32, ((place.right() - a.x) / a.w) as f32, ((place.bottom() - a.y) / a.h) as f32];
-			let (x, y, w, h) = snap(&place);
-			over.push(Op::Picture { texture, x, y, w, h, uv, opacity: 1.0 });
-			if let Some(t) = self.tiles.get_mut(&k) {
-				t.1 = self.frame;
 			}
+			// Nothing covers it whole (a zoom out before the overview is in): what there is of the
+			// level shown, or failing that of the nearest level with any of it.
+			let _ = self.draw_at(&place, shown, false, &snap, &mut over) || scales.iter().any(|&sc| self.draw_at(&place, sc, false, &snap, &mut over));
 		}
-		self.scales = Some((want.to_bits(), scales));
+		self.scales = Some(((wanted, shown), scales));
 		// The lifted items, drawn fresh, and the stroke under the pen.
 		if !self.lifted.is_empty() && !self.hide_lifted {
 			let skip = HashSet::new();
@@ -731,46 +786,6 @@ impl Page {
 			self.scales = None;
 		}
 		gone
-	}
-
-	/// A place no tile of its scale or coarser covers: the sharper tiles of the one scale nearest
-	/// its own that has any there, each cut to the place. A scale whose tiles would be too many to
-	/// look up for one place is passed over.
-	fn sharper_in(&mut self, place: &Rect, scales: &[u32], want: f32, snap: &dyn Fn(&Rect) -> (f32, f32, f32, f32), over: &mut DrawList) {
-		for &sc in scales {
-			let s = f32::from_bits(sc);
-			if s <= want {
-				continue;
-			}
-			let side = TILE as f64 / s as f64;
-			let (x0, y0) = ((place.x / side).floor() as i32, (place.y / side).floor() as i32);
-			let (x1, y1) = ((place.right() / side).ceil() as i32, (place.bottom() / side).ceil() as i32);
-			if ((x1 - x0) as i64) * ((y1 - y0) as i64) > 256 {
-				continue;
-			}
-			let mut drew = false;
-			for y in y0..y1 {
-				for x in x0..x1 {
-					let k = Key { scale: sc, x, y };
-					let Some((texture, used)) = self.tiles.get_mut(&k) else { continue };
-					*used = self.frame;
-					let a = k.area();
-					let cx = a.x.max(place.x);
-					let cy = a.y.max(place.y);
-					let cut = Rect { x: cx, y: cy, w: a.right().min(place.right()) - cx, h: a.bottom().min(place.bottom()) - cy };
-					if cut.w <= 0.0 || cut.h <= 0.0 {
-						continue;
-					}
-					let uv = [((cut.x - a.x) / a.w) as f32, ((cut.y - a.y) / a.h) as f32, ((cut.right() - a.x) / a.w) as f32, ((cut.bottom() - a.y) / a.h) as f32];
-					let (px, py, pw, ph) = snap(&cut);
-					over.push(Op::Picture { texture: *texture, x: px, y: py, w: pw, h: ph, uv, opacity: 1.0 });
-					drew = true;
-				}
-			}
-			if drew {
-				return;
-			}
-		}
 	}
 
 	/// Tiles past the budget, drawn longest ago: forget their textures and tell the worker. Never
@@ -1456,7 +1471,7 @@ mod tests {
 		// A missed batch is noticed.
 		assert!(worker.apply(&changes, generation + 5).is_err());
 		// No boards placed yet: only tiles.
-		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		// A drag: the worker repaints its tile on screen without the square, and the page draws it. The
 		// overview's tile waits for the drop: nothing shows it during a drag.
@@ -1466,7 +1481,7 @@ mod tests {
 		// The drag's moves are the page's alone: the worker paints nothing.
 		page.preview(Some(vec![("a".into(), Preview { dx: 50.0, dy: 0.0, set: vec![] })])).unwrap();
 		assert_eq!(paint_all(&mut worker, &mut page, &mut gpu), 0, "moving a lifted item paints no tiles");
-		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert!(over.ops.iter().any(|op| matches!(op, Op::Shape { .. })), "the page draws it");
 		// Let go: saved, and the saved drawing is what both draw.
 		let saved = crate::wire::parse(r#"[{"op":"set","id":"a","key":"x","value":1150}]"#).unwrap();
@@ -1488,18 +1503,18 @@ mod tests {
 		page.pictures.held.insert("board:boards/x.html".into(), (900, 400, 300));
 		let board = |live| BoardPlace { path: "boards/x.html".into(), picture: "board:boards/x.html".into(), x: 600.0, y: 0.0, w: 400.0, h: 300.0, live, news: None, glow: false };
 		page.boards = vec![board(false)];
-		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		let picture = over.ops.iter().position(|op| matches!(op, Op::Shape { paint: stage_paint::list::Paint::Image { texture: 900, .. }, .. }));
 		let tile = over.ops.iter().position(|op| matches!(op, Op::Picture { .. }));
 		assert!(matches!((picture, tile), (Some(p), Some(t)) if p < t), "the picture first, then the tiles: {picture:?} {tile:?}");
 		assert_eq!(page.pictured, vec!["boards/x.html".to_owned()]);
 		// The marks move only when what is pictured does: a frame the same as the last leaves them.
 		let marks = page.marks;
-		page.frame(cam, 1.0, 1200.0, 800.0, false);
+		page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert_eq!(page.marks, marks);
 		// Live: its page shows through the tiles' hole, with nothing of the board drawn.
 		page.boards = vec![board(true)];
-		let over = page.frame(cam, 1.0, 1200.0, 800.0, false);
+		let over = page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		assert!(over.ops.iter().all(|op| matches!(op, Op::Picture { .. })));
 		assert!(page.pictured.is_empty());
 		assert_ne!(page.marks, marks);
@@ -1514,18 +1529,60 @@ mod tests {
 			page.tile_texture(key);
 		}
 		let on_screen = page.tiles.len();
-		page.frame(cam, 1.0, 1200.0, 800.0, false);
+		page.frame(cam, 1.0, 1200.0, 800.0, 0);
 		// Far more tiles than the budget arrive elsewhere.
 		for x in 0..400 {
 			page.tile_texture(Key { scale: 1f32.to_bits(), x: 100 + x, y: 50 });
 		}
-		page.frame(Camera { x: 0.0, y: 0.0, zoom: 1.0 }, 1.0, 1200.0, 800.0, false);
+		page.frame(Camera { x: 0.0, y: 0.0, zoom: 1.0 }, 1.0, 1200.0, 800.0, 0);
 		let gone = page.evict();
 		assert!(!gone.is_empty());
 		for key in Grid::covering(&Rect { x: 0.0, y: 0.0, w: 1200.0, h: 800.0 }, 1.0, 0) {
 			assert!(page.tiles.contains_key(&key), "a tile on screen was evicted");
 		}
 		assert!(on_screen > 0);
+	}
+
+	#[test]
+	fn a_new_level_is_shown_only_once_it_covers_the_window_and_then_alone() {
+		let mut page = Page::new(STAGE, false, "s").unwrap();
+		let view = Rect { x: 0.0, y: 0.0, w: 1200.0, h: 800.0 };
+		let one = 2f32.to_bits();
+		let two = 4f32.to_bits();
+		for key in Grid::covering(&view, 2.0, 0) {
+			page.tile_texture(key);
+		}
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		let textures = |page: &Page, over: &DrawList| -> HashSet<u32> {
+			let scale_of: HashMap<u32, u32> = page.tiles.iter().map(|(k, (t, _))| (*t, k.scale)).collect();
+			over.ops.iter().filter_map(|op| if let Op::Picture { texture, .. } = op { scale_of.get(texture).copied() } else { None }).collect()
+		};
+		let over = page.frame(cam, 2.0, 1200.0, 800.0, one);
+		assert_eq!(page.shown_scale(), one);
+		assert_eq!(textures(&page, &over), [one].into());
+		// The zoom asks for scale 4: its tiles come one by one, unseen, the level shown stretched.
+		let wanted = Grid::covering(&view, 4.0, 0);
+		for key in &wanted[..wanted.len() - 1] {
+			page.tile_texture(*key);
+			let over = page.frame(cam, 2.0, 1200.0, 800.0, two);
+			assert_eq!(textures(&page, &over), [one].into(), "no patchwork of two levels");
+		}
+		assert!(page.evict().is_empty());
+		// The last one: the new level is shown whole, in one frame, and the old one let go.
+		page.tile_texture(*wanted.last().unwrap());
+		let over = page.frame(cam, 2.0, 1200.0, 800.0, two);
+		assert_eq!(page.shown_scale(), two);
+		assert_eq!(textures(&page, &over), [two].into());
+		// The old level is kept unseen, for a zoom back.
+		assert!(page.tiles.keys().any(|k| k.scale == one));
+		// Tiles that stop coming are shown anyway when the page says so.
+		let three = 3f32.to_bits();
+		page.tile_texture(Key { scale: three, x: 0, y: 0 });
+		page.frame(cam, 2.0, 1200.0, 800.0, three);
+		assert_eq!(page.shown_scale(), two);
+		page.show_wanted();
+		page.frame(cam, 2.0, 1200.0, 800.0, three);
+		assert_eq!(page.shown_scale(), three);
 	}
 
 	#[test]
@@ -1540,7 +1597,7 @@ mod tests {
 		}
 		// Zoomed out to a fifth: no tile at that scale or coarser is held, only the ones at 1.
 		let far = Camera { x: -2000.0, y: -2000.0, zoom: 0.2 };
-		let over = page.frame(far, 1.0, 1200.0, 800.0, true);
+		let over = page.frame(far, 1.0, 1200.0, 800.0, scale_for(0.2, true).to_bits());
 		let pictures = over.ops.iter().filter(|op| matches!(op, Op::Picture { .. })).count();
 		assert!(pictures >= 6, "the sharper tiles stand in: {pictures}");
 	}
