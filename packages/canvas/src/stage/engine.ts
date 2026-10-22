@@ -754,11 +754,17 @@ export class StageEngine {
 	 * units at the rectangle it was drawn for and scaled by one over the zoom: the world's transform
 	 * undone, so it covers exactly the window.
 	 */
-	private place(): void {
+	private place(): boolean {
 		const at = this.drawnAt;
-		if (!this.over || !at) return;
-		this.over.style.transform = `translate(${at.x}px, ${at.y}px) scale(${1 / at.zoom})`;
+		if (!this.over || !at) return false;
+		const transform = `translate(${at.x}px, ${at.y}px) scale(${1 / at.zoom})`;
+		// Compared with the one set, not the style's, which the browser writes back rounded.
+		if (transform === this.placedAs) return false;
+		this.placedAs = transform;
+		this.over.style.transform = transform;
+		return true;
 	}
+	private placedAs = "";
 
 	setScheme(scheme: "light" | "dark"): void {
 		if (scheme === this.scheme) return;
@@ -1007,7 +1013,13 @@ export class StageEngine {
 		const gone = this.page.evict();
 		if (gone !== "[]") this.post({ type: "dropped", keys: JSON.parse(gone) as Array<[number, number, number]> });
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
-		this.place();
+		/*
+		 * Moved as well as drawn: drawn once more at the next frame, where the camera stops. WebKit can
+		 * show a canvas whose place changed with the picture it had before (a screenshot at rest after
+		 * a zoom showed the step before it until anything drew again); a draw with the place unchanged
+		 * shows the last one. While the camera moves, the next frame draws anyway.
+		 */
+		if (this.place()) this.draw();
 		this.lastOps = ops;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
 		if (this.sharpNext && !this.moving) {
