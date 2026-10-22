@@ -81,6 +81,11 @@ type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array 
 export function pixelsFirst(): boolean {
 	const forced = (globalThis as { __decksTilePixels?: boolean }).__decksTilePixels;
 	if (typeof forced === "boolean") return forced;
+	return webKit();
+}
+
+/** WebKit (Safari, and every browser on iOS and iPadOS), by its user agent, as `pixelsFirst` tells it. */
+function webKit(): boolean {
 	const agent = typeof navigator === "undefined" ? "" : navigator.userAgent;
 	return /AppleWebKit\//.test(agent) && !/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(agent);
 }
@@ -765,6 +770,7 @@ export class StageEngine {
 		return true;
 	}
 	private placedAs = "";
+	private webKit: boolean | undefined;
 
 	setScheme(scheme: "light" | "dark"): void {
 		if (scheme === this.scheme) return;
@@ -1014,12 +1020,12 @@ export class StageEngine {
 		if (gone !== "[]") this.post({ type: "dropped", keys: JSON.parse(gone) as Array<[number, number, number]> });
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
 		/*
-		 * Moved as well as drawn: drawn once more at the next frame, where the camera stops. WebKit can
-		 * show a canvas whose place changed with the picture it had before (a screenshot at rest after
-		 * a zoom showed the step before it until anything drew again); a draw with the place unchanged
-		 * shows the last one. While the camera moves, the next frame draws anyway.
+		 * Moved as well as drawn, under WebKit: drawn once more at the next frame, where the camera
+		 * stops. WebKit can show a canvas whose place changed with the picture it had before (a
+		 * screenshot at rest after a zoom showed the step before it until anything drew again); a draw
+		 * with the place unchanged shows the last one. While the camera moves, the next frame draws anyway.
 		 */
-		if (this.place()) this.draw();
+		if (this.place() && (this.webKit ??= webKit())) this.draw();
 		this.lastOps = ops;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
 		if (this.sharpNext && !this.moving) {
