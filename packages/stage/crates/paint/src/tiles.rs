@@ -3,8 +3,8 @@
 //!
 //! Tiles live in the stage's own space, so a pan paints nothing it has already painted. At rest the
 //! scale is the exact zoom times the screen's pixel ratio, so every glyph sits on whole pixels; while
-//! a zoom moves, tiles are painted at powers of two and stretched, so a pinch does not paint every
-//! scale it passes through. A tile whose contents changed is kept, and shown, until its new picture
+//! a zoom moves, tiles are painted at the power of two under it and stretched, so a pinch does not
+//! paint every scale it passes through. A tile whose contents changed is kept, and shown, until its new picture
 //! arrives: a late tile is stale for a frame, never missing and never misplaced.
 
 use stage_scene::Rect;
@@ -36,12 +36,13 @@ impl Key {
 /// The most tiles a window asks for, its border included; a window that touches more asks for those alone.
 pub const HELD: usize = 48;
 
-/// The scale tiles are painted at: exact at rest, the next power of two above while zooming.
-pub fn scale_for(zoom_times_dpr: f64, moving: bool) -> f32 {
+/// The scale tiles are painted at: exact at rest; while zooming, the power of two at or under it,
+/// never finer than the screen, as the old engine did. It changes once each time the zoom halves or
+/// doubles, and between those its tiles are drawn stretched rather than painted again.
+pub fn scale_for(zoom_times_dpr: f64, zooming: bool) -> f32 {
 	let s = zoom_times_dpr.clamp(1.0 / 256.0, 256.0);
-	// Moving, the nearest power of two: never more than √2 off, so a zoom keeps few scales in flight
-	// and at most a quarter of the tiles rounding up would have asked for.
-	if moving { 2f64.powf(s.log2().round()) as f32 } else { s as f32 }
+	// A hair over a power of two (the float the zoom lands on) rounds to it, not to the one below.
+	if zooming { 2f64.powf((s.log2() + 1e-9).floor()) as f32 } else { s as f32 }
 }
 
 /// The overview's scale: the whole stage in at most four tiles a side, a power of two. Its tiles are
@@ -328,11 +329,13 @@ mod tests {
 	}
 
 	#[test]
-	fn zooming_uses_the_nearest_power_of_two() {
+	fn zooming_uses_the_power_of_two_at_or_under_the_screen() {
 		assert_eq!(scale_for(1.3, true), 1.0);
-		assert_eq!(scale_for(1.5, true), 2.0);
+		assert_eq!(scale_for(1.99, true), 1.0);
+		assert_eq!(scale_for(2.0, true), 2.0);
 		assert_eq!(scale_for(2.13, true), 2.0);
 		assert_eq!(scale_for(0.3, true), 0.25);
+		assert_eq!(scale_for(0.24, true), 0.125);
 		assert_eq!(scale_for(1.3, false), 1.3);
 	}
 }
