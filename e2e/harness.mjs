@@ -82,17 +82,47 @@ export function personToken(api) {
 	return tokens.get(api);
 }
 
+/** Drop the token kept for `api`: the runner starts a new server, with a new token, on the same address for each check. */
+export function forgetPersonToken(api) {
+	tokens.delete(typeof api === "string" ? api : API);
+}
+
 /** The headers that make a check's request the person's. */
 export async function asPerson(api) {
 	return { authorization: `Bearer ${await personToken(api)}` };
 }
 
-/** The deck the server actually has open, straight from the API. */
+/*
+ * A library board played onto a canvas lands as the canvas's own copy, `canvases/<name>/boards/<file>`
+ * (`deck/stage-boards.ts`), and the deck lists both. The copy is the board on the canvas.
+ */
+const copyOf = (path) => (/^canvases\/[^/]+\/boards\//.test(path) ? `boards/${path.split("/").slice(3).join("/")}` : undefined);
+
+/**
+ * The deck the server actually has open, straight from the API. A library board that a canvas holds a
+ * copy of is left out of `boards`, so `boards` is what is on the canvases: a check counting the boards
+ * on screen counts each once. `library` is every board the deck lists.
+ */
 export async function deckState(api) {
 	api = typeof api === "string" ? api : API;
 	const response = await fetch(`${api}/api/deck`, { headers: await asPerson(api) });
 	if (!response.ok) throw new Error(`GET /api/deck -> ${response.status}`);
-	return (await response.json()).deck;
+	const deck = (await response.json()).deck;
+	const copied = new Set(deck.boards.map((board) => copyOf(board.path)).filter(Boolean));
+	return { ...deck, library: deck.boards, boards: deck.boards.filter((board) => !copied.has(board.path)) };
+}
+
+/**
+ * The path the stage shows a board under: a library path (`boards/plan.html`) is its canvas copy's
+ * when the stage has that and not the library board itself; any other path is itself.
+ */
+export async function stagePath(page, path) {
+	return page.evaluate((wanted) => {
+		const all = window.__decksBoards?.() ?? [];
+		if (!/^boards\//.test(wanted) || all.some((one) => one.path === wanted)) return wanted;
+		const file = wanted.slice("boards/".length);
+		return all.find((one) => /^canvases\/[^/]+\/boards\//.test(one.path) && one.path.split("/").slice(3).join("/") === file)?.path ?? wanted;
+	}, path);
 }
 
 /**
@@ -113,10 +143,11 @@ export async function preflight() {
 	return deck;
 }
 
-/** A board file inside the deck under test. */
+/** A board file inside the deck under test: the canvas's copy of it when a canvas holds one, so a change to it reaches the canvas. */
 export async function boardPath(name) {
 	const deck = await deckState();
-	return `${deck.path}/boards/${name}`;
+	const copy = deck.boards.find((board) => copyOf(board.path) === `boards/${name}`);
+	return `${deck.path}/${copy ? copy.path : `boards/${name}`}`;
 }
 
 export function read(file) {
@@ -245,21 +276,17 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
  * `__boardReady` is set by `board-host/lib/board.js` once the document has rendered its
  * components, which is the same signal the app itself waits for.
  */
-/**
- * Turn editing on, by pressing the pencil in the left cluster.
- *
- * Through the real control rather than by reaching into the app's state, because "the pencil
- * turns editing on" is itself worth asserting and this is the only place that does it. Idempotent:
- * a check that calls it twice, or after `open({ edit: true })`, gets one edit mode.
- */
+/** What a check that edits the drawing used to ask for, kept for those checks: browse, with the pen put away. */
 export async function editMode(page, on = true) {
-	const now = await page.evaluate(() => document.querySelector(".stage")?.dataset.mode ?? "browse");
-	if ((now === "edit") === on) return;
-	// The one on screen: in the focus view the canvas's toolbar is put away and the view's header has the switch.
-	await page.locator(on ? '[aria-label="Edit the boards"]:visible' : '[aria-label="Browse the boards"]:visible').click();
-	await page.waitForFunction((want) => (document.querySelector(".stage")?.dataset.mode ?? "browse") === want, on ? "edit" : "browse", {
-		timeout: 4000,
-	});
+	/*
+	 * There is no edit mode any more: browse (the cursor) moves and retypes what is drawn, and a
+	 * board's page is never edited from the canvas (`AgentPill.tsx`, the mode set). So either way
+	 * this puts the canvas in browse with the pen put away, which is what editing a drawing needs.
+	 */
+	void on;
+	const browse = page.locator('[aria-label="Browse the boards"]:visible').first();
+	if ((await browse.count()) && (await browse.getAttribute("aria-pressed")) !== "true") await browse.click();
+	await page.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
@@ -819,6 +846,7 @@ export function rangeOfAttr(html, attr, value) {
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
 export async function selectBoard(page, path, { timeout = 4000 } = {}) {
+	path = await stagePath(page, path);
 	// A board below the live zoom has no node, only its picture on the stage's sheet (`Stage.tsx`): the stage says where it is.
 	const spot = () => page.evaluate((wanted) => {
 		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
@@ -932,6 +960,7 @@ export async function pressBoardAction(page, label) {
  * screen and uncovered, or null. The band shows on a board whose page takes the pointer.
  */
 export async function boardEdge(page, path) {
+	path = await stagePath(page, path);
 	// The bands are drawn on the board under the pointer (or the selected one), so point at it first.
 	const box = await page.locator(`.board-node[data-path="${path}"]`).boundingBox();
 	if (box) {

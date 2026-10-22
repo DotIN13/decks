@@ -229,7 +229,7 @@ const urls = (i) => ({ api: `http://127.0.0.1:${API_BASE + 2 * i}`, web: `http:/
  */
 process.env.DECKS_E2E_API = urls(0).api;
 process.env.DECKS_E2E_WEB = urls(0).web;
-const { resetStage } = await import("./harness.mjs");
+const { resetStage, forgetPersonToken } = await import("./harness.mjs");
 
 /** Every process group this run started, so every way out can take them with it. */
 const groups = new Set();
@@ -550,6 +550,7 @@ try {
 				setup += Date.now() - at;
 				at = Date.now();
 				// The whole deck on the canvas, where the fixture puts it: most checks expect to see every board.
+				forgetPersonToken(urls(i).api);
 				await resetStage(urls(i).api);
 				result = await runCheck(join(here, "checks", check.file), urls(i));
 			} catch (error) {

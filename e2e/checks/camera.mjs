@@ -197,10 +197,10 @@ await liveZoom(page);
 // 3. The embeds on the sources board.
 // Zoomed in about that board until it is live: fitted, the fixture is just under the live zoom.
 for (let i = 0; i < 12; i++) {
-	const live = await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true" && !!document.querySelector('.board-node[data-path="boards/sources.html"] iframe'));
+	const live = await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true" && !!document.querySelector('.board-node[data-path$="/boards/sources.html"] iframe'));
 	if (live) break;
 	await page.evaluate(() => {
-		const r = document.querySelector('.board-node[data-path="boards/sources.html"]').getBoundingClientRect();
+		const r = document.querySelector('.board-node[data-path$="/boards/sources.html"]').getBoundingClientRect();
 		document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, bubbles: true, cancelable: true }));
 	});
 	await settle(page, 350);
@@ -227,7 +227,7 @@ say("foreign html is in a sandboxed nested frame", embeds.nested === "allow-scri
 say("an unresolvable embed says so", embeds.missing === "missing", `kind=${embeds.missing}`);
 
 // 4. A file changed on disk reaches the frame, with nobody asking it to.
-const srcBefore = await page.evaluate(() => document.querySelector('.board-node[data-path="boards/plan.html"] iframe').src);
+const srcBefore = await page.evaluate(() => document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe').src);
 write(
 	plan,
 	original.replace(
@@ -236,12 +236,12 @@ write(
 	),
 );
 await page.waitForFunction(
-	() => Boolean(document.querySelector('.board-node[data-path="boards/plan.html"] iframe')?.contentDocument?.querySelector('[data-id="live-check"]')),
+	() => Boolean(document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe')?.contentDocument?.querySelector('[data-id="live-check"]')),
 	null,
 	{ timeout: 15000 },
 );
 const live = await page.evaluate(() => {
-	const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
+	const frame = document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe');
 	return { src: frame?.src, found: Boolean(frame?.contentDocument?.querySelector('[data-id="live-check"]')) };
 });
 say("an edit on disk reaches the frame unaided", live.found && live.src !== srcBefore, `new src ${live.src?.split("?")[1]}`);

@@ -21,7 +21,7 @@
  * that board, whatever its format, in either mode** — and it does so without reloading the frame,
  * because a selection that redrew the page under the pointer would be worse than no selection.
  */
-import { boardPath, editMode, flyToBoard, open, resetStage, say, settle } from "../harness.mjs";
+import { boardPath, editMode, flyToBoard, open, resetStage, say, settle, stagePath } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 await resetStage(page);
@@ -53,7 +53,7 @@ const inside = (board) => {
  * Not the bar's centre: the acts at the right-hand end hold the buttons, and a double-click that
  * lands on one of them presses it.
  */
-const first = (await boardPath("plan.html")) && "boards/plan.html";
+const first = (await boardPath("plan.html")) && (await stagePath(page, "boards/plan.html"));
 await flyToBoard(page, first);
 await settle(page, 900);
 say("flying to a board selects it from its title bar", (await selected()).includes(first), (await selected()).join(", ") || "nothing selected");
