@@ -4,6 +4,7 @@ import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
 import { measureFrame } from "./extent.ts";
+import { scheme } from "./lib/theme.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
@@ -125,9 +126,34 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	 * (`embed-guest.js`, `decks:still`): a looping one repaints every frame, and on an iPad two such boards took the
 	 * canvas from 60 frames a second to 26 with nothing touched. Picked, it plays.
 	 */
-	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 	/** Each load of the page, which forgets what it was told. Said whether or not the page is a guest: `board.js` and `embed-guest.js` both hear it. */
 	const [loads, setLoads] = createSignal(0);
+	/*
+	 * The canvas's scheme on the page, at each load and each change, so a light canvas does not hold
+	 * dark pages because the system is dark. A page this window can reach gets `data-theme` set on it,
+	 * as the Decks app's board frame did; any other is told (`board.js`, `decks:theme`). A board that
+	 * chose its own theme keeps it.
+	 */
+	createEffect(() => {
+		loads();
+		const theme = scheme();
+		if (!live() || !frame) return;
+		let root: HTMLElement | undefined;
+		try {
+			root = frame.contentDocument?.documentElement ?? undefined;
+		} catch {
+			root = undefined;
+		}
+		if (root) {
+			if (root.dataset.themeChosen !== "true" && !(root.dataset.theme && root.dataset.deckPainted !== "true")) {
+				root.dataset.theme = theme;
+				root.dataset.deckPainted = "true";
+			}
+			return;
+		}
+		frame.contentWindow?.postMessage({ t: "decks:theme", theme }, "*");
+	});
+	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 	createEffect(() => {
 		loads();
 		if (!coarse || !live()) return;

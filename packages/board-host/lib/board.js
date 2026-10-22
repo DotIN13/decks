@@ -554,8 +554,23 @@
 		board.style.height = stated === undefined ? "auto" : `${stated}px`;
 		board.style.minHeight = stated === undefined ? "100vh" : "";
 		board.dataset.bg = typeof meta.bg === "string" ? meta.bg : "grid";
-		if (typeof meta.theme === "string") document.documentElement.dataset.theme = meta.theme;
+		if (typeof meta.theme === "string") {
+			document.documentElement.dataset.theme = meta.theme;
+			document.documentElement.dataset.themeChosen = "true";
+		}
 	}
+
+	/*
+	 * The canvas's scheme, for a page it cannot reach into (another address, a sandbox): the canvas
+	 * says it at each load and change (`plain-board.tsx`, `decks:theme`). A board whose author chose
+	 * its theme in its `<meta>` keeps it.
+	 */
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent || event.data?.t !== "decks:theme") return;
+		const theme = event.data.theme;
+		if ((theme !== "light" && theme !== "dark") || document.documentElement.dataset.themeChosen === "true") return;
+		document.documentElement.dataset.theme = theme;
+	});
 
 	/*
 	 * A new size from the canvas's handles, applied to the page as it is (`BoardFrame.tsx`). The
