@@ -90,6 +90,8 @@ export type ToWorker =
 	| { type: "pixels"; on: boolean }
 	/** How long after the camera last changed the worker still paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measuring in one page. */
 	| { type: "afterMove"; ms: number }
+	/** The stage is sharp and idle: make what a first gesture would otherwise make (`WorkerEngine::warm`). */
+	| { type: "warm" }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
 	/** The page is fetching fonts: as `fontsDue`, while the worker has not yet painted its first view. */

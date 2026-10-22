@@ -362,6 +362,9 @@ function take(message: ToWorker): void {
 		case "afterMove":
 			afterMoveMs = message.ms;
 			break;
+		case "warm":
+			engine.warm();
+			break;
 		case "pixels":
 			pixels = message.on && gpuBackend === "webgpu";
 			break;

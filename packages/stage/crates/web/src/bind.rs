@@ -322,6 +322,9 @@ impl PageEngine {
 	pub fn put_tile(&mut self, scale: u32, x: i32, y: i32, bitmap: web_sys::ImageBitmap) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let id = self.page.tile_texture(key(scale, x, y));
+		if gpu.texture_handle(id).is_none() {
+			gpu.texture_from_spare(id, TextureKind::Color, TILE_SIZE, TILE_SIZE);
+		}
 		let _ = copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)), true);
 	}
 
@@ -336,7 +339,7 @@ impl PageEngine {
 		}
 		let id = self.page.tile_texture(key(scale, x, y));
 		if gpu.texture_handle(id).is_none_or(|t| t.width() != TILE_SIZE || t.height() != TILE_SIZE) {
-			gpu.texture(id, TextureKind::Color, TILE_SIZE, TILE_SIZE, None);
+			gpu.texture_from_spare(id, TextureKind::Color, TILE_SIZE, TILE_SIZE);
 		}
 		let texture = gpu.texture_handle(id).expect("just made").clone();
 		gpu.write_pixels(pixels, stride, &texture, TILE_SIZE, TILE_SIZE);
@@ -550,6 +553,23 @@ impl PageEngine {
 		n
 	}
 
+	/// Make now, in idle time before the first gesture, what a zoom or a drag would otherwise make
+	/// the first time it needs it (`Gpu::warm`): every pipeline the page draws with, the glyph
+	/// textures (the page draws text only for lifted items and ink), and with `spares` (not on a
+	/// device short of memory) a window's worth of spare tile textures, which tiles let go of in a
+	/// zoom go back to and new ones come from, a megabyte each.
+	pub fn warm(&mut self, spares: bool) {
+		let Some(gpu) = &mut self.gpu else { return };
+		gpu.warm(false);
+		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
+		if spares {
+			let (w, h) = self.size;
+			let across = w.div_ceil(TILE_SIZE) as usize + 1;
+			let down = h.div_ceil(TILE_SIZE) as usize + 1;
+			gpu.make_spares(TextureKind::Color, TILE_SIZE, TILE_SIZE, across * down);
+		}
+	}
+
 	/// Show the lifted items or not, while a ghost of them stands in.
 	#[wasm_bindgen(js_name = showLifted)]
 	pub fn show_lifted(&mut self, on: bool) {
@@ -575,7 +595,7 @@ impl PageEngine {
 		let gone = self.page.forget_tiles(&keys);
 		if let Some(gpu) = &mut self.gpu {
 			for t in gone {
-				gpu.forget(t);
+				gpu.forget_to_spare(t);
 			}
 		}
 	}
@@ -585,7 +605,7 @@ impl PageEngine {
 		let gone = self.page.evict();
 		if let Some(gpu) = &mut self.gpu {
 			for (_, t) in &gone {
-				gpu.forget(*t);
+				gpu.forget_to_spare(*t);
 			}
 		}
 		let list: Vec<String> = gone.iter().map(|(k, _)| format!("[{},{},{}]", k.scale, k.x, k.y)).collect();
@@ -652,6 +672,18 @@ impl WorkerEngine {
 	/// The device went away (WebGPU's device lost, WebGL's context lost): the page starts again.
 	pub fn lost(&self) -> bool {
 		self.gpu.as_ref().is_some_and(|g| g.lost())
+	}
+
+	/// Make now, in idle time, what painting would otherwise make the first time it needs it
+	/// (`Gpu::warm`): every pipeline, a multisampled tile and a layer tile, the glyph textures, and
+	/// the tile it paints into to read back (`paintPixels`) where it can.
+	pub fn warm(&mut self) {
+		let Some(gpu) = &mut self.gpu else { return };
+		gpu.warm(true);
+		stage_paint::flush_glyphs(&mut self.worker.atlas.borrow_mut(), gpu);
+		if gpu.api() == stage_gpu::Api::WebGpu && gpu.texture_handle(READ_TILE).is_none() {
+			gpu.texture(READ_TILE, TextureKind::Color, TILE_SIZE, TILE_SIZE, None);
+		}
 	}
 
 	#[wasm_bindgen(js_name = tileSize)]

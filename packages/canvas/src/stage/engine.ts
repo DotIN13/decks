@@ -290,6 +290,7 @@ export class StageEngine {
 		this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
 		this.fitCanvases();
 		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
+		this.lowMemory = !!found.lowMemory;
 		// Fonts already handed to an engine before (this is a restart) are read from their files again.
 		await Promise.all(this.fonts.map(async (font) => (font.bytes ??= new Uint8Array(await font.blob.arrayBuffer()))));
 		if (this.disposed) return gpu.free();
@@ -307,6 +308,7 @@ export class StageEngine {
 		};
 		// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
 		this.page = new stage.PageEngine(EMPTY, this.scheme === "dark", `s${Math.random().toString(36).slice(2, 7)}`);
+		this.warmed = false;
 		this.page.setGpu(gpu);
 		this.page.setMarkdownReader(cardReader(this.scheme));
 		this.page.setMath(mathTypesetter());
@@ -1017,6 +1019,28 @@ export class StageEngine {
 	}
 
 	/**
+	 * Once the stage is first sharp, in idle time before any gesture, both engines make what a
+	 * first zoom or drag would otherwise make in its first frames (`PageEngine::warm`,
+	 * `WorkerEngine::warm`): every pipeline they draw with, the glyph textures, spare tile textures
+	 * (not on a device short of memory).
+	 * Again after the engines start again (a lost device). `__decksWarm = false` leaves it out, for measuring.
+	 */
+	private warmSoon(): void {
+		if (this.warmed || (globalThis as { __decksWarm?: boolean }).__decksWarm === false) return;
+		this.warmed = true;
+		const idle = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+		const warm = () => {
+			if (this.disposed || !this.page) return;
+			this.page.warm(!this.lowMemory);
+			this.post({ type: "warm" });
+		};
+		if (idle) idle(warm, { timeout: 500 });
+		else setTimeout(warm, 50);
+	}
+	private warmed = false;
+	private lowMemory = false;
+
+	/**
 	 * Show the level wanted in `SHOW_ANYWAY_MS` whether it covers the window or not, unless another of
 	 * its tiles comes first: the old engine's word that a level was whole could fail to come, and so
 	 * can a tile here.
@@ -1064,6 +1088,7 @@ export class StageEngine {
 		if (this.sharpNext && !this.moving) {
 			this.sharpNext = false;
 			sheetStats().sharpAt ??= performance.now();
+			this.warmSoon();
 		}
 		if (this.settledNext) {
 			this.settledNext = false;

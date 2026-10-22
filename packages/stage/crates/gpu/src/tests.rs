@@ -461,3 +461,28 @@ fn fixtures_match_their_goldens() {
 	}
 	assert!(!small.lost());
 }
+
+/// A texture let go of to the spares comes back for the next of its size and kind, and drawn after
+/// a warm-up (`Gpu::warm`) the picture is the same as without one.
+#[test]
+fn spares_come_back_and_warming_draws_the_same() {
+	let Some(mut cold) = gpu() else { return };
+	let Some(mut g) = gpu() else { return };
+	g.warm(true);
+	assert_eq!(draw_shapes(&mut g), draw_shapes(&mut cold));
+	g.make_spares(TextureKind::Color, 64, 64, 2);
+	g.texture_from_spare(7, TextureKind::Color, 64, 64);
+	let first = g.texture_handle(7).unwrap().clone();
+	g.forget_to_spare(7);
+	assert!(g.texture_handle(7).is_none());
+	g.texture_from_spare(8, TextureKind::Color, 64, 64);
+	assert_eq!(g.texture_handle(8).unwrap(), &first, "the spare let go of last is used first");
+	// No more spares are kept than the cap.
+	for id in 20..25 {
+		g.texture_from_spare(id, TextureKind::Color, 64, 64);
+	}
+	for id in 20..25 {
+		g.forget_to_spare(id);
+	}
+	assert_eq!(g.spare_textures[&(64, 64, TextureKind::Color as u8)].len(), 2);
+}
