@@ -416,6 +416,9 @@ if (want("edit")) {
 		const setDoc = engine.setDoc.bind(engine);
 		engine.setDoc = (...args) => {
 			globalThis.__perfDocAt = Date.now();
+			// The tiles in when the drawing came: a frame with more shows the edit. Taken here, not at the
+			// first frame after it, which since the page draws once a frame may already have taken them.
+			globalThis.__perfTilesAtDoc = globalThis.__decksSheet.tiles;
 			return setDoc(...args);
 		};
 	});
@@ -427,12 +430,9 @@ if (want("edit")) {
 			(id) =>
 				new Promise((done) => {
 					const engine = globalThis.__decksRust;
-					let mark;
 					const check = () => {
 						if (!engine.placed.has(id)) return;
-						const tiles = globalThis.__decksSheet.tiles;
-						if (mark === undefined) mark = tiles;
-						else if (tiles > mark) {
+						if (globalThis.__decksSheet.tiles > globalThis.__perfTilesAtDoc) {
 							globalThis.__perfPresented = globalThis.__perfPresented.filter((f) => f !== check);
 							done(Date.now());
 						}

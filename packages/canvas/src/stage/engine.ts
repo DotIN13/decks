@@ -386,7 +386,7 @@ export class StageEngine {
 				// Nothing painted (the worker says it has nothing left for this camera) and nothing waiting: the frame on screen, or the one coming, is filled in.
 				if (!message.tiles.length && !this.tileQueue.length) {
 					this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
-					if (this.settledNext && !this.drawFrame) {
+					if (this.settledNext && !this.dirty) {
 						this.settledNext = false;
 						sheetStats().settledAt = performance.now();
 					}
@@ -862,32 +862,52 @@ export class StageEngine {
 	private pinching = false;
 
 	/**
-	 * Draw in the next frame, once, however many of the worker's messages come before it. The worker
-	 * posts tiles a few at a time, and a page busy with a pan takes them in a burst: drawing for each
-	 * drew the canvas fifteen times in three milliseconds, all in one frame (`engine-slide.mjs`).
+	 * The frame's one draw. Cameras, tiles from the worker and every other change only mark the canvas
+	 * to be drawn (`draw`); it is drawn once, in the next animation frame's callback (`tick`), which
+	 * runs before the browser paints, so the drawing still lands in the same frame as the board pages
+	 * the world's transform moved. A pinch's two fingers move the camera twice a frame, a wheel or a
+	 * trackpad may too, and tiles come in bursts: each drew the canvas again (2 draws a frame for a
+	 * two-event pinch, 1.2 for a wheel zoom).
 	 */
-	private drawSoon(): void {
-		if (this.drawFrame) return;
-		this.drawFrame = requestAnimationFrame(() => {
-			this.drawFrame = 0;
-			if (!this.disposed) this.draw();
-		});
+	private dirty = false;
+	private tickFrame = 0;
+	private tickSoon(): void {
+		if (this.tickFrame || this.disposed) return;
+		this.tickFrame = requestAnimationFrame(() => this.tick());
 	}
-	private drawFrame = 0;
+	private tick(): void {
+		this.tickFrame = 0;
+		if (this.disposed) return;
+		if (this.tileQueue.length) this.takeTiles();
+		if (this.dirty) this.drawNow();
+	}
+
+	/** Draw the canvas at the next frame (`tick`), once however many changes come before it. */
+	draw(): void {
+		this.dirty = true;
+		this.tickSoon();
+	}
+
+	/**
+	 * Draw now what is marked to be drawn: for a caller already in an animation frame's callback (a
+	 * glide's or a coast's step, which move the camera), whose change would otherwise be drawn a frame
+	 * after the world moved.
+	 */
+	flush(): void {
+		if (this.dirty) this.drawNow();
+	}
+	private drawSoon(): void {
+		this.draw();
+	}
 
 	/** Tiles from the worker not yet taken in, oldest first, and what it said with the latest batch. */
 	private tileQueue: Array<{ key: string; tile: TileFromWorker }> = [];
 	private tileBatch: { left: number; rest: number; got: number; sent: number } | undefined;
-	private tileFrame = 0;
 	private coarseClock: boolean | undefined;
 
-	/** Take tiles in at the next frame, and draw them in it. */
+	/** Take tiles in at the next frame, and draw them in it (`tick`). */
 	private takeTilesSoon(): void {
-		if (this.tileFrame) return;
-		this.tileFrame = requestAnimationFrame(() => {
-			this.tileFrame = 0;
-			if (!this.disposed) this.takeTiles();
-		});
+		this.tickSoon();
 	}
 
 	/**
@@ -946,8 +966,9 @@ export class StageEngine {
 			if (batch.left === 0 && batch.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
 			this.seenAtDraw = batch.sent;
 		}
-		this.draw();
-		if (this.tileQueue.length) this.takeTilesSoon();
+		// Drawn in this frame's one draw (`tick`); what is left is taken at the next frame.
+		this.dirty = true;
+		if (this.tileQueue.length) this.tickSoon();
 	}
 
 	/**
@@ -970,20 +991,14 @@ export class StageEngine {
 		for (const q of this.tileQueue) q.tile.bitmap?.close();
 		this.tileQueue = [];
 		this.tileBatch = undefined;
-		cancelAnimationFrame(this.tileFrame);
-		this.tileFrame = 0;
 	}
 	/** What had been sent when the tiles that arrived last were asked for: shown once they are drawn. */
 	private seenAtDraw = 0;
 
-	/** Draw the canvas now, for the window: the camera moved, or anything else changed. */
-	draw(): void {
+	/** Draw the canvas now, for the window: the frame's one draw (`tick`), or one that cannot wait (`flush`, `cutFromCarried`). */
+	private drawNow(): void {
+		this.dirty = false;
 		if (!this.page || !this.view.width || this.paused) return;
-		// A draw now is the one a batch of tiles asked for in the next frame.
-		if (this.drawFrame) {
-			cancelAnimationFrame(this.drawFrame);
-			this.drawFrame = 0;
-		}
 		this.shownSeen = Math.max(this.shownSeen, this.seenAtDraw);
 		const at = this.drawRect();
 		// At the scale the worker's latest camera wants: shown once its tiles cover the window (`Page::frame`).
@@ -1469,7 +1484,7 @@ export class StageEngine {
 		this.place();
 		const at = canvas.getBoundingClientRect();
 		if (!at.width || !at.height) {
-			this.draw();
+			this.drawNow();
 			return undefined;
 		}
 		const sx = canvas.width / at.width;
@@ -1480,7 +1495,8 @@ export class StageEngine {
 		out.width = Math.max(1, Math.round(rect.width * sx));
 		out.height = Math.max(1, Math.round(rect.height * sy));
 		out.getContext("2d")?.drawImage(canvas, left * sx, top * sy, rect.width * sx, rect.height * sy, 0, 0, out.width, out.height);
-		this.draw();
+		// Drawn whole again before the browser paints, whatever frame this is.
+		this.drawNow();
 		return out;
 	}
 	/** The lifted items drawn or not, while a ghost of them stands in. */
@@ -1693,7 +1709,7 @@ export class StageEngine {
 
 	dispose(): void {
 		this.disposed = true;
-		cancelAnimationFrame(this.drawFrame);
+		cancelAnimationFrame(this.tickFrame);
 		this.dropTileQueue();
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);

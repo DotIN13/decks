@@ -1183,6 +1183,8 @@ export function Stage(props: {
 			last = now;
 			v = step.v;
 			writeCamera(pan(localCamera, step.dx, step.dy));
+			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
+			penLayer.flush();
 			if (Math.hypot(v.vx, v.vy) < 0.01) {
 				coastRaf = undefined;
 				return;
@@ -1243,6 +1245,8 @@ export function Stage(props: {
 			if (mine !== glideToken) return;
 			const t = Math.min(1, (performance.now() - at) / ms);
 			writeCamera(t >= 1 ? to : between(from, to, curve(t)));
+			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
+			penLayer.flush();
 			if (t >= 1) {
 				glideRaf = undefined;
 				setGliding(false);
