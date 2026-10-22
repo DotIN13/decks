@@ -33,6 +33,9 @@ impl Key {
 	}
 }
 
+/// The most tiles a window asks for, its border included; a window that touches more asks for those alone.
+pub const HELD: usize = 48;
+
 /// The scale tiles are painted at: exact at rest, the next power of two above while zooming.
 pub fn scale_for(zoom_times_dpr: f64, moving: bool) -> f32 {
 	let s = zoom_times_dpr.clamp(1.0 / 256.0, 256.0);
@@ -91,6 +94,23 @@ impl Grid {
 			let d = |k: &Key| (k.x as f64 + 0.5 - cx).powi(2) + (k.y as f64 + 0.5 - cy).powi(2);
 			d(a).total_cmp(&d(b))
 		});
+		keys
+	}
+
+	/// The tiles to paint for a window, `view` (stage units), at `scale`: every tile the window
+	/// touches, the middle first, then the border of half a tile round it, nearest first, as far as
+	/// `HELD` tiles in all (never fewer than the window's own), as the old engine asked for its
+	/// tiles. A pan paints the edge it uncovers as it goes; no ring of whole tiles is painted ahead.
+	pub fn wanted(view: &Rect, scale: f32) -> Vec<Key> {
+		let side = TILE as f64 / scale as f64;
+		let grown = Rect { x: view.x - side / 2.0, y: view.y - side / 2.0, w: view.w + side, h: view.h + side };
+		let touches = |k: &Key| {
+			let a = k.area();
+			a.x < view.right() && view.x < a.right() && a.y < view.bottom() && view.y < a.bottom()
+		};
+		let (mut keys, border): (Vec<Key>, Vec<Key>) = Grid::covering(&grown, scale, 0).into_iter().partition(touches);
+		let room = HELD.max(keys.len()) - keys.len();
+		keys.extend(border.into_iter().take(room));
 		keys
 	}
 
@@ -288,6 +308,23 @@ mod tests {
 		}
 		grid.forget(&Key { scale: 1f32.to_bits(), x: 0, y: 0 });
 		assert_eq!(grid.scales[&1f32.to_bits()], 16 * 12 - 1);
+	}
+
+	#[test]
+	fn a_window_wants_its_own_tiles_then_half_a_tile_round_it() {
+		// 1,400 by 900 at scale 1 from (100, 100): the window touches 3 by 2 tiles (0..1536, 0..1024).
+		let view = Rect { x: 100.0, y: 100.0, w: 1400.0, h: 900.0 };
+		let keys = Grid::wanted(&view, 1.0);
+		let seen = Grid::covering(&view, 1.0, 0);
+		assert_eq!(&keys[..seen.len()], &seen[..], "the window's own first, the middle first");
+		// Half a tile round it (-156..1756, -156..1256): columns -1..3, rows -1..2, 20 tiles in all.
+		assert_eq!(keys.len(), 20);
+		assert!(keys.iter().all(|k| (-1..=3).contains(&k.x) && (-1..=2).contains(&k.y)));
+		// A big window's border is cut at `HELD`; its own tiles never are.
+		let big = Rect { x: 0.0, y: 0.0, w: 4000.0, h: 3000.0 };
+		assert_eq!(Grid::wanted(&big, 1.0).len(), HELD.max(Grid::covering(&big, 1.0, 0).len()));
+		let huge = Rect { x: 0.0, y: 0.0, w: 6000.0, h: 5000.0 };
+		assert_eq!(Grid::wanted(&huge, 1.0), Grid::covering(&huge, 1.0, 0));
 	}
 
 	#[test]

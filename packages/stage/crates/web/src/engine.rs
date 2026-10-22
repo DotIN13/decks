@@ -1074,11 +1074,11 @@ impl Worker {
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		/*
-		 * While the page holds items lifted (a drag), only what is on screen is painted: the margin and
+		 * While the page holds items lifted (a drag), only what is on screen is painted: the border and
 		 * the overview are not seen until a pan or a zoom out, and wait, still marked, for the drop.
 		 */
 		let holding = !self.lifted.is_empty();
-		let wanted = Grid::covering(&view, scale, if moving || holding { 0 } else { 1 });
+		let wanted = if holding { Grid::covering(&view, scale, 0) } else { Grid::wanted(&view, scale) };
 		let mut keys = self.grid.to_paint(&wanted, limit);
 		// Once the view has all it needs, the overview: the whole stage at one small scale.
 		if keys.len() < limit && !holding {
