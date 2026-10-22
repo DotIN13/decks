@@ -1,6 +1,7 @@
 import tailwind from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { get } from "node:http";
 import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 // The alerts' cues at /sounds/, from @decks/canvas (they were public/sounds).
@@ -75,7 +76,15 @@ function tabSession(): Plugin {
 				const page = path === "/" || path === "/index.html" || !/^\/(?:api|c|ws|app|node|rnode|@|src|node_modules)(?:\/|$)|\.[a-z0-9]+$/i.test(path);
 				if (req.method !== "GET" || !page || req.headers["sec-fetch-dest"] !== "document" || req.headers["sec-fetch-mode"] !== "navigate") return next();
 				try {
-					const served = await (await fetch(`http://127.0.0.1:${API_PORT}/`, { headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" } })).text();
+					// By node:http: fetch sets the sec-fetch headers itself (mode "cors"), and the harness hands a token only to a navigation.
+					const served = await new Promise<string>((done, fail) => {
+						get(`http://127.0.0.1:${API_PORT}/`, { headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" } }, (response) => {
+							let text = "";
+							response.setEncoding("utf8");
+							response.on("data", (chunk: string) => (text += chunk));
+							response.on("end", () => done(text));
+						}).on("error", fail);
+					});
 					const token = /<meta name="decks-session" content="([^"]+)">/.exec(served)?.[1];
 					const html = await server.transformIndexHtml(req.url ?? "/", readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8"));
 					res.setHeader("Content-Type", "text/html; charset=utf-8");

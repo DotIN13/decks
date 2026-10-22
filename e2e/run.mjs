@@ -16,6 +16,7 @@
  */
 import { spawn } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { get } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -346,9 +347,25 @@ async function ping(url) {
 	}
 }
 
+/*
+ * Every request to the harness carries a token, from this machine too: the person's, read from the
+ * page the server serves a tab (`harness.mjs`, `personToken`). Read afresh on each try here, since
+ * the harness keeps the first answer and the first try is made before the server is up.
+ */
 async function deckPath(api) {
 	try {
-		const response = await fetch(`${api}/api/deck`);
+		// By node:http, since fetch sets the sec-fetch headers itself and the page is a tab's only when they say so.
+		const html = await new Promise((done, fail) => {
+			get(`${api}/`, { headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" } }, (response) => {
+				let text = "";
+				response.setEncoding("utf8");
+				response.on("data", (chunk) => (text += chunk));
+				response.on("end", () => done(text));
+			}).on("error", fail);
+		});
+		const token = /<meta name="decks-session" content="([^"]+)">/.exec(html)?.[1];
+		if (!token) return undefined;
+		const response = await fetch(`${api}/api/deck`, { headers: { authorization: `Bearer ${token}` } });
 		if (!response.ok) return undefined;
 		return (await response.json())?.deck?.path;
 	} catch {

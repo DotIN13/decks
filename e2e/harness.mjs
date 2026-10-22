@@ -523,6 +523,12 @@ export async function socket(api) {
  * A URL is for the runner, which has one server per worker and so no single `API` to read;
  * checks call it with their page, or nothing, and get this process's `API`.
  */
+/*
+ * A library board played onto a canvas lands as the canvas's own copy, `canvases/<name>/boards/<file>`
+ * (`deck/stage-boards.ts`), so a board is on it when its path is, or that copy's is.
+ */
+const onCanvas = (inPlay, path) => inPlay.includes(path) || (/^boards\//.test(path) && inPlay.some((one) => /^canvases\/[^/]+\/boards\//.test(one) && one.split("/").slice(3).join("/") === path.slice("boards/".length)));
+
 export async function resetStage(at) {
 	const api = typeof at === "string" ? at : API;
 	const deck = await deckState(api);
@@ -566,14 +572,14 @@ export async function resetStage(at) {
 		while (Date.now() < resend) {
 			await new Promise((resolve) => setTimeout(resolve, 25));
 			landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
-			if (agent && wanted.every((path) => landed.includes(path))) break;
+			if (agent && wanted.every((path) => onCanvas(landed, path))) break;
 		}
-		if (agent && wanted.every((path) => landed.includes(path))) break;
+		if (agent && wanted.every((path) => onCanvas(landed, path))) break;
 	}
 	link.close();
 	if (!agent) throw new Error("resetStage: the server never said which agent is focused");
-	if (!wanted.every((path) => landed.includes(path))) {
-		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s stage`);
+	if (!wanted.every((path) => onCanvas(landed, path))) {
+		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s stage: wanted ${wanted.join(", ")}; on it ${landed.join(", ")}`);
 	}
 	return wanted;
 }
