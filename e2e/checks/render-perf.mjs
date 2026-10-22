@@ -34,6 +34,11 @@ const ITEMS = Number(process.env.RENDER_PERF_ITEMS ?? 2000);
 const PROFILE = process.env.RENDER_PERF_PROFILE;
 /** A page flag to measure with and without, alternating (`RENDER_PERF_AB=<name>`, see the drag and the edit). */
 const AB = process.env.RENDER_PERF_AB;
+/**
+ * Font files served this many ms late (`RENDER_PERF_FONT_MS=400`): a first visit, with fonts not yet
+ * in the browser's cache, for the open-to-rest numbers. Each file is fetched once and kept.
+ */
+const FONT_MS = Number(process.env.RENDER_PERF_FONT_MS ?? 0);
 /*
  * The two main-thread times per frame are about a millisecond, and on a Mac other work shares, a run
  * wanders by more than 10%: they take a run first that is not counted (it paints what the rest find
@@ -73,6 +78,19 @@ say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.bo
 
 const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, boards: false });
 const cdp = await context.newCDPSession(page);
+if (FONT_MS > 0) {
+	const kept = new Map();
+	await context.route(/\.ttf(\?|$)/, async (route) => {
+		const url = route.request().url();
+		if (!kept.has(url)) {
+			const response = await route.fetch();
+			kept.set(url, { status: response.status(), body: await response.body() });
+		}
+		await new Promise((done) => setTimeout(done, FONT_MS));
+		const { status, body } = kept.get(url);
+		await route.fulfill({ status, body, headers: { "content-type": "font/ttf", "access-control-allow-origin": "*", "cache-control": "no-store" } });
+	});
+}
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 const taskSeconds = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration").value;
 
