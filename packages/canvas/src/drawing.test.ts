@@ -102,3 +102,23 @@ test("a drawing the host owns sends every edit and step to the host, and shows o
 	assert.equal((d.doc().children[0] as { content: string }).content, "two");
 	assert.equal(heard.length, 0, "a host-owned drawing reports nothing as the person's own edits");
 });
+
+test("each new drawing comes with the edits that made it, for the stage, and edits from elsewhere are followed", () => {
+	const drawing = createDrawing(sample());
+	const first = drawing.doc();
+	assert.equal(drawing.editsTo(first), undefined, "the first drawing was made by nothing");
+	drawing.edit([{ op: "update", id: "a", set: { content: "two" } }]);
+	const own = drawing.editsTo(drawing.doc());
+	assert.equal(own?.from, first);
+	assert.deepEqual(own?.edits, [{ op: "set", id: "a", key: "content", value: "two" }]);
+	assert.equal(drawing.editsTo(first), undefined, "only for the drawing they made");
+	// Someone else's edit: followed in place, the board item shared with the drawing before.
+	const before = drawing.doc();
+	assert.equal(drawing.follow([{ op: "set", id: "a", key: "x", value: 40 }]), true);
+	assert.equal(drawing.doc().children[0]?.x, 40);
+	assert.equal(drawing.doc().children[1], before.children[1]);
+	assert.equal(drawing.editsTo(drawing.doc())?.from, before);
+	assert.equal(drawing.follow([{ op: "set", id: "nobody", key: "x", value: 1 }]), false, "edits that do not apply: the host sends the whole drawing");
+	drawing.set(sample());
+	assert.equal(drawing.editsTo(drawing.doc()), undefined, "a whole drawing has no edits");
+});

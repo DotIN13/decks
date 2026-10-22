@@ -1,7 +1,7 @@
 import { rebase } from "../connections/connection.ts";
 import { createSignal } from "solid-js";
 import type { ServerMessage } from "@decks/protocol";
-import { applyEdits } from "@decks/pen";
+import { editDocument, type PenDocument, type PenEdit } from "@decks/pen";
 import { send } from "./socket.ts";
 
 /**
@@ -11,7 +11,10 @@ import { send } from "./socket.ts";
  * on every change and read whole by the renderer, so a store's per-field proxies would be work
  * nobody reads. Keyed by agent, because the stage — and so its drawing — is per chat.
  */
-export type StagePen = Omit<Extract<ServerMessage, { type: "stage.pen" }>, "type" | "agentId">;
+export type StagePen = Omit<Extract<ServerMessage, { type: "stage.pen" }>, "type" | "agentId"> & {
+	/** What made `doc` from the drawing held before it, when it came as a delta: the stage's engines apply these. */
+	edits?: { from: PenDocument; edits: readonly PenEdit[] };
+};
 
 const [pens, setPens] = createSignal<Record<string, StagePen>>({});
 
@@ -28,8 +31,10 @@ export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }
 
 /**
  * What changed in a drawing: applied to the copy held when it is the revision the edits are from,
- * as a new document (the renderer reads whole documents). Any other revision, or edits that do not
- * apply, and the whole drawing is asked for again.
+ * as a new document (the renderer reads whole documents) that shares every item the edits did not
+ * reach (`editDocument`), and kept with it, so the stage's engines apply the same edits rather than
+ * comparing the two drawings. Any other revision, or edits that do not apply, and the whole drawing
+ * is asked for again.
  */
 export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.pen.delta" }>): void {
 	const known = pens()[message.agentId];
@@ -38,22 +43,11 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 		return;
 	}
 	try {
-		const doc = applyEdits(known.doc, message.edits);
-		lastEdits.set(message.agentId, { stage: message.stage, from: message.from, rev: message.rev, edits: message.edits });
-		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined } });
+		const doc = editDocument(known.doc, message.edits);
+		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits } } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}
-}
-
-/**
- * The edits that made each drawing's latest revision, for the stage's engine to apply in place of the
- * whole drawing (`stage/engine.ts`). Only ever the last: an engine further behind takes the drawing whole.
- */
-const lastEdits = new Map<string, { stage: string; from: number; rev: number; edits: Extract<ServerMessage, { type: "stage.pen.delta" }>["edits"] }>();
-export function editsTo(agentId: string, stage: string, rev: number) {
-	const last = lastEdits.get(agentId);
-	return last && last.stage === stage && last.rev === rev ? last : undefined;
 }
 
 export function forgetPen(agentId: string): void {

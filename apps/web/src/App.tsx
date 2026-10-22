@@ -606,7 +606,7 @@ export function App() {
 	const stagePen = createMemo(() => {
 		const id = state.focused;
 		const pen = id ? pens()[id] : undefined;
-		return pen ? { doc: pen.doc, base: pen.base } : undefined;
+		return pen ? { doc: pen.doc, base: pen.base, ...(pen.edits ? { edits: pen.edits } : {}) } : undefined;
 	});
 
 	/**

@@ -451,6 +451,12 @@ impl PageEngine {
 		self.page.font_needs().to_string()
 	}
 
+	/// The words and faces of what was laid out again since the last call (all of it the first time), for fonts.
+	#[wasm_bindgen(js_name = fontNeedsChanged)]
+	pub fn font_needs_changed(&mut self) -> String {
+		self.page.font_needs_changed().to_string()
+	}
+
 	/// Lift top-level items for a drag (`["id", …]`): drawn here from now on.
 	pub fn lift(&mut self, items: &str) {
 		self.page.lift(&ids(items));

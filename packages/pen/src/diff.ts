@@ -202,3 +202,99 @@ export function applyEdits(doc: PenDocument, edits: readonly PenEdit[]): PenDocu
 	}
 	return out;
 }
+
+/**
+ * Apply edits as `applyEdits` does, but share what they do not reach: the answer is a new document
+ * whose untouched items are the very objects of `doc`, and only the items edited, the lists they sit
+ * in and the items above them are copies. `doc` is not changed. For a reader that treats documents
+ * as values and is handed one per change (the stage): a copy through JSON of a 2,000-item drawing
+ * was most of the time from an agent's edit to its frame.
+ *
+ * The answer shares items with `doc`, so neither may be changed in place afterwards.
+ */
+export function editDocument(doc: PenDocument, edits: readonly PenEdit[]): PenDocument {
+	const out: PenDocument = { ...doc, children: [...(doc.children ?? [])] };
+	/** Where each item is now: the object in `out` (or still `doc`'s) and its parent's id. */
+	const where = new Map<string, { node: PenNode; parent: string | null }>();
+	const visit = (list: readonly PenNode[], parent: string | null) => {
+		for (const node of list) {
+			where.set(node.id, { node, parent });
+			if (Array.isArray(node.children)) visit(node.children, node.id);
+		}
+	};
+	visit(out.children, null);
+	/** The items and children lists that are this answer's own, safe to change. */
+	const own = new Set<object>([out.children]);
+	const ownList = (parent: string | null): PenNode[] => {
+		if (parent === null) return out.children;
+		const node = ownNode(parent);
+		if (!Array.isArray(node.children)) node.children = [];
+		if (!own.has(node.children)) {
+			node.children = [...node.children];
+			own.add(node.children);
+		}
+		return node.children;
+	};
+	const ownNode = (id: string): PenNode => {
+		const at = where.get(id);
+		if (!at) throw new Error(`no item "${id}"`);
+		if (own.has(at.node)) return at.node;
+		const list = ownList(at.parent);
+		const copy = { ...at.node };
+		list[list.indexOf(at.node)] = copy;
+		own.add(copy);
+		where.set(id, { node: copy, parent: at.parent });
+		return copy;
+	};
+	const put = (list: PenNode[], node: PenNode, after: string | null) => {
+		const at = after === null ? 0 : list.findIndex((n) => n.id === after) + 1;
+		if (after !== null && at === 0) throw new Error(`no sibling "${after}"`);
+		list.splice(at, 0, node);
+	};
+	const forget = (node: PenNode) => {
+		where.delete(node.id);
+		if (Array.isArray(node.children)) for (const child of node.children) forget(child);
+	};
+	const take = (id: string) => {
+		const at = where.get(id);
+		if (!at) throw new Error(`no item "${id}"`);
+		const list = ownList(at.parent);
+		list.splice(list.indexOf(at.node), 1);
+		return at.node;
+	};
+	for (const edit of edits) {
+		switch (edit.op) {
+			case "meta":
+				if (edit.value === undefined) delete out[edit.key];
+				else out[edit.key] = edit.value;
+				break;
+			case "insert": {
+				const node = { ...edit.props, id: edit.id } as PenNode;
+				if (edit.list) own.add((node.children = []));
+				own.add(node);
+				put(ownList(edit.parent), node, edit.after);
+				where.set(node.id, { node, parent: edit.parent });
+				break;
+			}
+			case "remove":
+				forget(take(edit.id));
+				break;
+			case "place": {
+				const node = take(edit.id);
+				put(ownList(edit.parent), node, edit.after);
+				where.set(edit.id, { node, parent: edit.parent });
+				break;
+			}
+			case "set": {
+				const node = ownNode(edit.id);
+				if (edit.key === "children") {
+					if (edit.value === undefined) delete node.children;
+					else if (!Array.isArray(node.children)) own.add((node.children = []));
+				} else if (edit.value === undefined) delete node[edit.key];
+				else node[edit.key] = edit.value;
+				break;
+			}
+		}
+	}
+	return out;
+}

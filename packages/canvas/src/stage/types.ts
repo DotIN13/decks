@@ -12,6 +12,17 @@ export interface PenPreview {
 	set?: Record<string, unknown>;
 }
 
+/**
+ * The edits that made a drawing from the one before it (`from`): the stage's engines apply them in
+ * place of working out what changed, when `from` is the drawing they hold. A host that hears a
+ * drawing's changes as edits (the Decks app's `stage.pen.delta`, a mounted canvas's own `onEdits`)
+ * hands them along with the drawing they make.
+ */
+export interface DocEdits {
+	from: import("@decks/pen").PenDocument;
+	edits: readonly import("@decks/pen").PenEdit[];
+}
+
 /** A board as the stage places it: its box, whether its page is showing, and its picture. */
 export interface SceneBoard {
 	path: string;

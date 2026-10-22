@@ -22,7 +22,7 @@ import { docIndex, drawnNodes } from "../pen/doc-index.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
-import type { CardGeometry, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
+import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, ToWorker } from "./types.ts";
 import { detect, type Detected } from "./backends/detect.ts";
 import { noticeFor } from "./backends/notice.ts";
 
@@ -339,9 +339,11 @@ export class StageEngine {
 
 	/**
 	 * The drawing to show: the server's, or a copy with words being typed. What changed from the one
-	 * held is found by `diff` and applied to both engines in place; one they cannot apply goes whole.
+	 * held is applied to both engines in place: `edits` when they are from the drawing held (the
+	 * server's delta, a mounted canvas's own edit), else what `diff` finds; edits they cannot apply,
+	 * and the drawing goes whole.
 	 */
-	setDoc(doc: PenDocument | undefined, base: string): void {
+	setDoc(doc: PenDocument | undefined, base: string, edits?: DocEdits): void {
 		if (doc === this.doc && base === this.base) return;
 		const before = this.doc;
 		this.doc = doc;
@@ -365,9 +367,9 @@ export class StageEngine {
 		if (!doc) this.whole(undefined);
 		else if (!before) this.whole(doc);
 		else {
-			const edits = diff(before, doc);
-			if (edits.length) {
-				const text = JSON.stringify(edits);
+			const changes = edits && edits.from === before ? edits.edits : diff(before, doc);
+			if (changes.length) {
+				const text = JSON.stringify(changes);
 				try {
 					this.page.applyEdits(text);
 					this.post({ type: "edits", edits: text });
@@ -944,7 +946,8 @@ export class StageEngine {
 	/** Fetch the font files the stage's words need (`font-files.ts`), and hand each to both engines in the chain's order. */
 	private needFonts(): void {
 		if (!this.page) return;
-		const needs = JSON.parse(this.page.fontNeeds()) as FontNeed[];
+		// The words of what was laid out again since the last time: a change brings only its own.
+		const needs = JSON.parse(this.page.fontNeedsChanged()) as FontNeed[];
 		const files = fontFiles(needs).filter((file) => !this.fontsAsked.has(file.key));
 		if (!files.length) return;
 		for (const file of files) this.fontsAsked.add(file.key);

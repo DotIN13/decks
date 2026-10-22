@@ -16,3 +16,4 @@ export type { StageBoardProps } from "./board-slot.ts";
 export type { FrameGestureHost } from "./frame-host.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./state/pen-tools.ts";
+export type { DocEdits } from "./stage/types.ts";

@@ -16,13 +16,14 @@ import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import type { SceneBoard } from "./stage/types.ts";
+import type { DocEdits, SceneBoard } from "./stage/types.ts";
+import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
-import { mediaOf, isCard, ids as penIds, indexOf, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
+import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { firstLine } from "./pen/look.ts";
 import { isLiveFile } from "./pen/card-frame.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
@@ -143,9 +144,11 @@ export function Stage(props: {
 	boards: Board[];
 	/**
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
-	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera.
+	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera. `edits`, when the
+	 * host has them: what made this drawing from the one it gave before, applied by the engines in
+	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
 	 */
-	pen?: { doc: PenDocument; base: string };
+	pen?: { doc: PenDocument; base: string; edits?: DocEdits };
 	/**
 	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire, `decks.canvas.batch` for an agent). Absent
 	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
@@ -490,7 +493,7 @@ export function Stage(props: {
 	 * drew (the window and a margin round it), so a pan moves it with the world until it is drawn again.
 	 */
 	createEffect(() => {
-		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
+		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "", props.pen?.edits);
 		// The drawing has the change in it now, so the panel is no longer showing one (`penLive`).
 		if (untrack(penLive)) setPenLive(undefined);
 	});
@@ -987,7 +990,7 @@ export function Stage(props: {
 	};
 
 	/** An item as the file has it, not as a preview has drawn it. */
-	const penNode = (id: string) => (props.pen ? indexOf(props.pen.doc).get(id)?.node : undefined);
+	const penNode = (id: string) => (props.pen ? docIndex(props.pen.doc).get(id)?.node : undefined);
 
 	/** Move items by `dx dy`, into a frame or out of one when `into` says (`editor/core/ops.ts`). */
 	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, into?: string | null, slot?: number) => penEdit(moveOps(scene, idsToMove, dx, dy, into, slot));
@@ -1865,7 +1868,7 @@ export function Stage(props: {
 	};
 	/** A double-click on a live SVG opens it in a tab. */
 	const openLiveFile = (id: string): boolean => {
-		const index = props.pen ? indexOf(props.pen.doc) : undefined;
+		const index = props.pen ? docIndex(props.pen.doc) : undefined;
 		let node: PenNode | undefined;
 		for (let at = index?.get(id); at && !node; at = at.parent ? index?.get(at.parent.id) : undefined) if (isLiveFile(at.node)) node = at.node;
 		if (!node || typeof node.metadata?.file !== "string") return false;

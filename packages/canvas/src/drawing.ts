@@ -1,6 +1,7 @@
-import { apply, baseTheme, diff, parse, placements, reroute, walk, type Frame, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
+import { apply, baseTheme, diff, editDocument, parse, placements, reroute, walk, type Frame, type PenDocument, type PenEdit, type PenNode } from "@decks/pen";
 import type { Board } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
+import type { DocEdits } from "./stage/types.ts";
 
 /**
  * The drawing a mounted canvas edits (`mount.tsx`): the document, the person's edits applied to it
@@ -14,8 +15,19 @@ export interface Drawing {
 	/** Pen operations, as the person's edit: applied, kept for undo, reported. False when refused or a no-op. */
 	edit(ops: unknown[]): boolean;
 	step(direction: "undo" | "redo"): void;
-	/** A newer drawing from elsewhere: shown, not reported, and the person's undo starts again from it. */
-	set(next: string | PenDocument): void;
+	/**
+	 * A newer drawing from elsewhere: shown, not reported, and the person's undo starts again from it.
+	 * `edits`, when the host has them, are what made it from the drawing held (`DocEdits`).
+	 */
+	set(next: string | PenDocument, edits?: DocEdits): void;
+	/**
+	 * Edits from elsewhere (another device, an agent: what a host hears as a delta), applied to the
+	 * drawing held as `set` would show the drawing they make, without the whole text parsed again.
+	 * False when they do not apply to it: the host sends the whole drawing then (`set`).
+	 */
+	follow(edits: readonly PenEdit[]): boolean;
+	/** The edits that made `doc` from the drawing before it, when it is the drawing now and they are known: the stage applies them. */
+	editsTo(doc: PenDocument): DocEdits | undefined;
 	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
 	moveBoard(path: string, x: number, y: number): void;
 	resizeBoard(path: string, size: { w: number; h: number }): void;
@@ -82,11 +94,18 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		return next;
 	};
 
+	/** What made the drawing now from the one before, when known: `to` is the drawing they made. */
+	let made: (DocEdits & { to: PenDocument }) | undefined;
+	const show = (next: PenDocument, edits?: DocEdits) => {
+		made = edits ? { ...edits, to: next } : undefined;
+		setDoc(next);
+	};
+
 	/** Show `next` and tell the host what changed. */
 	const commit = (prev: PenDocument, next: PenDocument) => {
 		const edits = diff(prev, next);
 		if (edits.length === 0) return false;
-		setDoc(next);
+		show(next, { from: prev, edits });
 		options.onEdits?.(edits, next);
 		return true;
 	};
@@ -111,7 +130,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			 * that answers its gesture, as a server sends one whatever the edit did: a fresh copy is that
 			 * answer, so what was let go glides back into place now rather than when the stage gives up.
 			 */
-			setDoc({ ...prev });
+			show({ ...prev }, { from: prev, edits: [] });
 			return false;
 		}
 		undoStack.push(prev);
@@ -137,10 +156,26 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		doc,
 		edit,
 		step,
-		set(next) {
-			setDoc(typeof next === "string" ? parse(next) : next);
+		set(next, edits) {
+			show(typeof next === "string" ? parse(next) : next, edits);
 			undoStack.length = 0;
 			redoStack.length = 0;
+		},
+		follow(edits) {
+			const now = untrack(doc);
+			let next: PenDocument;
+			try {
+				next = editDocument(now, edits);
+			} catch {
+				return false;
+			}
+			show(next, { from: now, edits });
+			undoStack.length = 0;
+			redoStack.length = 0;
+			return true;
+		},
+		editsTo(at) {
+			return made && made.to === at ? { from: made.from, edits: made.edits } : undefined;
 		},
 		moveBoard(path, x, y) {
 			const id = boardId(path);

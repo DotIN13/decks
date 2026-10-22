@@ -91,6 +91,8 @@ pub struct Page {
 	sent_layout: HashMap<stage_doc::Handle, SentRoot>,
 	/// Counts `layout_changes` calls, to find the roots that went (`SentRoot::seen` behind it).
 	layout_calls: u64,
+	/// The version of each root whose words `font_needs_changed` last told, by root.
+	fonts_sent: HashMap<stage_doc::Handle, u64>,
 }
 
 /// A root as `layout_changes` last reported it.
@@ -107,7 +109,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0 })
+		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -299,9 +301,35 @@ impl Page {
 	/// The words on the stage and the faces they are set in, for the app to fetch fonts for:
 	/// `[{ family, weight, italic, text }]`. A card's words may be bold, italic or code too.
 	pub fn font_needs(&self) -> Value {
-		let vars = &self.scene.vars;
 		let mut out = Vec::new();
 		for root in &self.scene.roots {
+			self.root_font_needs(root, &mut out);
+		}
+		Value::Array(out)
+	}
+
+	/// `font_needs` of the roots laid out again since the last call (all of them the first time): the
+	/// words a change brought, without the whole stage's words read again for every edit.
+	pub fn font_needs_changed(&mut self) -> Value {
+		let mut out = Vec::new();
+		let mut seen = 0;
+		for root in &self.scene.roots {
+			if self.fonts_sent.get(&root.handle) != Some(&root.version) {
+				self.root_font_needs(root, &mut out);
+				self.fonts_sent.insert(root.handle, root.version);
+			}
+			seen += 1;
+		}
+		if self.fonts_sent.len() > seen {
+			let live: HashSet<stage_doc::Handle> = self.scene.roots.iter().map(|r| r.handle).collect();
+			self.fonts_sent.retain(|h, _| live.contains(h));
+		}
+		Value::Array(out)
+	}
+
+	fn root_font_needs(&self, root: &stage_scene::Root, out: &mut Vec<Value>) {
+		let vars = &self.scene.vars;
+		{
 			for (item, place) in root.tree.items.iter().zip(&root.placed) {
 				if !matches!(item.kind(), "text" | "note" | "prompt" | "context") {
 					continue;
@@ -320,7 +348,6 @@ impl Page {
 				}
 			}
 		}
-		Value::Array(out)
 	}
 
 	/// The topmost item under a stage point, as its id path.

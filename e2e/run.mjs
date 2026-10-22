@@ -166,6 +166,8 @@ const CHECKS = [
 	{ file: "stage-goldens.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
+	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
+	{ file: "same-drawing.mjs", needsAgent: false },
 	/*
 	 * A film or a sound as an item on the canvas: pen's own rectangle marked `decks.media`, drawn
 	 * as a still with a badge on it, and nothing decoding until it is pressed.

@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { applyEdits, diff } from "./diff.ts";
+import { applyEdits, diff, editDocument } from "./diff.ts";
 import { parse, type PenDocument, type PenNode } from "./index.ts";
 
 /** Field order inside an item does not matter to anyone reading it; compare as sorted JSON. */
 const canon = (v: unknown): unknown => (Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => [k, canon(x)])) : v);
-const check = (a: PenDocument, b: PenDocument) => assert.deepEqual(canon(applyEdits(a, diff(a, b))), canon(b));
+const check = (a: PenDocument, b: PenDocument) => {
+	const edits = diff(a, b);
+	assert.deepEqual(canon(applyEdits(a, edits)), canon(b));
+	// The sharing copy gives the same drawing, and leaves the one it was given as it was.
+	const before = JSON.stringify(a);
+	assert.deepEqual(canon(editDocument(a, edits)), canon(b));
+	assert.equal(JSON.stringify(a), before);
+};
 
 test("fields, inserts, removals, moves and order", () => {
 	const a = parse(JSON.stringify({ version: "2.14", children: [
@@ -55,4 +62,17 @@ test("every saved stage against every other version of itself", () => {
 		}
 	});
 	for (let i = 0; i + 1 < docs.length; i++) check(docs[i]!, docs[i + 1]!);
+});
+
+test("an edit shares every item it does not reach", () => {
+	const a = parse(JSON.stringify({ version: "2.14", children: [
+		{ type: "frame", id: "f", children: [{ type: "text", id: "t", content: "x" }, { type: "rectangle", id: "r" }] },
+		{ type: "ellipse", id: "e" },
+	] }));
+	const b = editDocument(a, [{ op: "set", id: "t", key: "content", value: "y" }]);
+	assert.equal(b.children[1], a.children[1]);
+	assert.notEqual(b.children[0], a.children[0]);
+	assert.equal(b.children[0]!.children![1], a.children[0]!.children![1]);
+	assert.equal(b.children[0]!.children![0]!.content, "y");
+	assert.equal(a.children[0]!.children![0]!.content, "x");
 });

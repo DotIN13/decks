@@ -9,6 +9,7 @@ import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsOf, createDrawing } from "./drawing.ts";
+import type { DocEdits } from "./stage/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
@@ -160,6 +161,13 @@ export interface CanvasOptions {
 export interface CanvasHandle {
 	/** A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no `onEdits`. */
 	setDocument(text: string | PenDocument, base?: string): void;
+	/**
+	 * What changed in the drawing elsewhere, as edits (`@decks/pen`'s `PenEdit`s, what a host hears as
+	 * a delta): applied to the drawing shown, and by the stage's engines to theirs, so a change costs
+	 * what it touched rather than the whole drawing parsed, compared and laid out again. Not an edit,
+	 * so no `onEdits`. False when they do not apply to the drawing shown: send it whole with `setDocument`.
+	 */
+	applyEdits(edits: readonly PenEdit[], base?: string): boolean;
 	/** Move the camera there, gliding unless `ms` is 0: an agent showing the person something. */
 	glide(camera: Camera, ms?: number): void;
 	/** The drawing as it is now. */
@@ -220,7 +228,8 @@ export interface EditorState {
 	 * The drawing as the host has it (with `document`, the host owns it), and the folder its own
 	 * addresses are read against; undefined while there is none to show.
 	 */
-	pen?: Accessor<{ doc: PenDocument; base: string } | undefined>;
+	/** `edits`, when the host has them: what made this drawing from the one it gave before (`DocEdits`). */
+	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits } | undefined>;
 	/** Where the canvas opens: undefined while the host does not know yet. */
 	opening?: Accessor<{ camera?: Camera } | undefined>;
 }
@@ -379,12 +388,15 @@ export function createEditor(
 	// A drawing the host gives as state is the one shown; the editor's own copy follows it, for its board calls.
 	if (options.state?.pen) createComputed(() => {
 		const given = options.state!.pen!();
-		if (given) drawing.set(given.doc);
+		if (given) drawing.set(given.doc, given.edits);
 	});
+	// With what made the drawing from the last one, when known, so the stage's engines apply just that.
 	const pen = createMemo(() => {
-		if (!options.state?.pen) return { doc: doc(), base: penBase() };
+		const now = doc();
+		const edits = drawing.editsTo(now);
+		if (!options.state?.pen) return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
 		const given = options.state.pen();
-		return given ? { doc: doc(), base: given.base } : undefined;
+		return given ? { doc: now, base: given.base, ...(edits ? { edits } : {}) } : undefined;
 	});
 	/*
 	 * Owned by whoever makes the editor (mountCanvas's own root, or the host's component), never by
@@ -481,6 +493,11 @@ export function createEditor(
 			if (at !== undefined) setPenBase(at);
 			drawing.set(next);
 		},
+		applyEdits: (edits, at) =>
+			batch(() => {
+				if (at !== undefined) setPenBase(at);
+				return drawing.follow(edits);
+			}),
 		// The destination and the journey written together, so the stage never sees one without the other.
 		glide: (to, ms = 420) =>
 			batch(() => {
