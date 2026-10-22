@@ -1,5 +1,5 @@
 /*
- * The board runtime: what turns a file of absolutely-positioned divs into a board.
+ * The board runtime: what turns a page of HTML into a board.
  *
  * A board's head asks for `board.css`, this file, and — on a board this app wrote — an import
  * map. Anything it needs (markdown, maths, diagrams, PDFs) is fetched from the same `lib/`
@@ -515,27 +515,16 @@
 		board.classList.add("board");
 		if (Number.isFinite(Number(meta.w))) board.style.width = `${Number(meta.w)}px`;
 		/*
-		 * A height in the tag is the board's; **no height in the tag is the content's**.
-		 *
-		 * board.css gives the body a fallback height, which is right for a board that states its
-		 * size and wrong for one that does not: the body would be a rectangle of a size nobody
-		 * chose. So a board with no stated height takes its content's, and never less than the
-		 * frame it is being drawn in — `100vh` inside a frame is the rectangle the canvas gave
-		 * this board, so the body is the board even when everything on it is placed and nothing
-		 * is in the flow. Without that floor the body of a board of boxes measures zero, and a
-		 * click meant for the board lands on nothing.
-		 *
-		 * Nothing is clipped either way. A board does not scroll — `overflow: hidden` on the body
-		 * is propagated to the frame's own viewport by the HTML rules, so it is the *frame* that
-		 * crops, and the frame is that same rectangle. The measurement follows a beat later
-		 * (`canvas/extent.ts`) and the rectangle becomes the content's height. A height that *is*
-		 * stated is a floor rather than a ceiling, which is the server's half of the same rule
-		 * (`deck/loader.ts`).
+		 * The height is the content's. A height in the tag is a floor, never a ceiling: the body is
+		 * at least that tall and grows with what is in it, and the canvas measures it a beat later
+		 * (`canvas/extent.ts`) and draws the board that tall — the server's half of the same rule is
+		 * `deck/loader.ts`. With no height in the tag the floor is the frame the board is drawn in
+		 * (`100vh`), so a click anywhere on the board lands on the board.
 		 */
 		const stated = Number.isFinite(Number(meta.h)) ? Number(meta.h) : undefined;
-		board.style.height = stated === undefined ? "auto" : `${stated}px`;
-		board.style.minHeight = stated === undefined ? "100vh" : "";
-		board.dataset.bg = typeof meta.bg === "string" ? meta.bg : "grid";
+		board.style.height = "auto";
+		board.style.minHeight = stated === undefined ? "100vh" : `${stated}px`;
+		board.dataset.bg = typeof meta.bg === "string" ? meta.bg : "plain";
 		if (typeof meta.theme === "string") {
 			document.documentElement.dataset.theme = meta.theme;
 			document.documentElement.dataset.themeChosen = "true";

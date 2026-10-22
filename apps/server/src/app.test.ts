@@ -51,7 +51,7 @@ test("a frame's measurement is reported but sizes nothing, and fit writes it bac
 		assert.equal(measured.clipped, true, "and says its content runs past it");
 
 		const { board: fitted } = await app.stage.fit(TALL);
-		assert.equal(fitted.h, 738, "the content plus the room a fit leaves under the last block");
+		assert.equal(fitted.h, 738, "the content plus a margin: this reading carries no page height (an older frame)");
 		// And the width is the file's, untouched: a fit is a height, not a resize.
 		assert.equal(fitted.w, 900, "the width the board declares");
 

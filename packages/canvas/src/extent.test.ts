@@ -1,20 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { contentExtent, shownHeight } from "./extent.ts";
+import { measureFrame, shownHeight } from "./extent.ts";
 
-const box = (right: number, bottom: number) => ({ right, bottom, width: 10, height: 10 });
-
-test("the extent is the far corner of everything on the board", () => {
-	assert.deepEqual(contentExtent([box(400, 200), box(120, 900), box(360, 80)]), { w: 400, h: 900 });
+test("a board is measured as its page: no named blocks needed", () => {
+	// One flowing page, no `[data-id]` anywhere: the reading is the body's own height, with the
+	// height board.js gave it released for the read.
+	const style = { height: "auto", minHeight: "600px" };
+	const body = {
+		style,
+		innerText: "A heading and a paragraph",
+		scrollWidth: 1000,
+		get scrollHeight() {
+			return style.minHeight === "0" ? 412.4 : 600;
+		},
+	};
+	const doc = { body, documentElement: { scrollWidth: 1000, clientWidth: 1000 }, defaultView: null };
+	const frame = { contentDocument: doc, contentWindow: { __boardReady: true } } as unknown as HTMLIFrameElement;
+	const measured = measureFrame(frame);
+	assert.equal(measured?.h, 413, "a fraction of a pixel counts as a pixel, because the alternative clips");
+	assert.equal(measured?.page, 413);
+	assert.equal(measured?.w, 1000);
+	assert.equal(measured?.at, 1000);
+	assert.equal(style.minHeight, "600px", "and the floor is put back");
 });
 
-test("an empty board has no extent, rather than an extent of nothing", () => {
-	assert.equal(contentExtent([]), undefined);
-	assert.equal(contentExtent([{ right: 0, bottom: 0, width: 0, height: 0 }]), undefined, "a hidden component is not content");
-});
-
-test("a fraction of a pixel counts as a pixel, because the alternative clips", () => {
-	assert.deepEqual(contentExtent([box(400.2, 199.6)]), { w: 401, h: 200 });
+test("a board that has not finished mounting is not measured", () => {
+	const frame = { contentDocument: { body: {} }, contentWindow: { __boardReady: false } } as unknown as HTMLIFrameElement;
+	assert.equal(measureFrame(frame), undefined);
 });
 
 test("a word budget means the same in Chinese as in English", async () => {
@@ -25,7 +37,7 @@ test("a word budget means the same in Chinese as in English", async () => {
 	assert.equal(countWords("TrueSkill 记两个数"), 1 + Math.round(4 / 1.6));
 });
 
-test("a page is measured as a document, and a board of boxes is not", async () => {
+test("a page is measured with its stated height released", async () => {
 	const { documentHeight } = await import("./extent.ts");
 	// The body's height is released for the read, or `board.js` would be answering with the
 	// number in the board's <meta> tag and the board could never shrink.
@@ -62,10 +74,10 @@ test("a board with no stated height is measured without the frame's own height a
 	assert.equal(style.minHeight, "100vh", "and the floor put back");
 });
 
-test("a board that reads top to bottom is drawn as tall as its content, at least, and anything else at its size", () => {
+test("a board is drawn as tall as its content, at least: its given height is a floor", () => {
 	// The stage gave it 240; its content measured 689: drawn at 689. Dragged to 900 it stays 900.
 	assert.equal(shownHeight({ h: 240 }, 689), 689);
 	assert.equal(shownHeight({ h: 900 }, 689), 900);
-	// A board of placed boxes is never measured as flowing.
+	// Not measured yet: drawn at the height it was given.
 	assert.equal(shownHeight({ h: 240 }, undefined), 240);
 });

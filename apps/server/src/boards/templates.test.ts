@@ -8,10 +8,8 @@ import { boardWidth, renderBlank, slugFor, WIDE_BOARD_W } from "./templates.ts";
  * The one decision left in creating a board: nothing is shaped any more.
  *
  * There are no templates — every board the app creates is blank on purpose, heading only,
- * and what it becomes is the writer's. What an agent models a board on is the *examples*
- * in `examples/` (see `lib-sync.ts` and the AGENTS context), which is a different thing
- * from being created from one. These tests pin the blank: that it renders, that it is
- * truly empty, and that it is one HTML file.
+ * and what it becomes is the writer's. These tests pin the blank: that it renders, that it
+ * is truly empty, and that it is one HTML file.
  */
 
 test("a new board is blank, and the loader can read it", () => {
@@ -28,18 +26,16 @@ test("a new board is blank, and the loader can read it", () => {
 });
 
 /*
- * The layout model, in the one board every other board starts as.
- *
- * board.css puts every root-level block out of the page's flow, and `.doc` is the one that
- * covers the board: the origin, the full width, as tall as what is written in it. It states no
- * coordinates of its own, which is also what says it is not a box to be dragged — a block that
- * means to be placed states a `left` and a `top`, and that is the whole of the difference.
+ * The layout model, in the one board every other board starts as: one page that flows, its
+ * content in a `.doc` the width of the board and as tall as what is written in it. Nothing on it
+ * states coordinates.
  */
-test("the blank's one block states no coordinates, so it is the document rather than a box", () => {
+test("the blank's one block states no coordinates: the page flows", () => {
 	const html = renderBlank("T");
 	const block = /<div class="doc"[^>]*>/.exec(html)?.[0] ?? "";
 	assert.ok(block, "the blank has a document block");
-	assert.ok(!/style=/.test(block), `a document block places nothing itself: ${block}`);
+	assert.ok(!/style=/.test(block), `a document block places nothing: ${block}`);
+	assert.ok(!/\bleft:|\btop:/.test(html.replace(/<style>[\s\S]*?<\/style>/, "")), "and nothing on the page is placed by left and top");
 });
 
 test("a new board is blank: the heading and nothing else", () => {
@@ -157,7 +153,7 @@ test("no default is above the width we tell agents to aim under", () => {
 test("a new board is one HTML file that needs no wrapping", () => {
 	const html = renderBlank("Notes on the refresh", { w: 820 });
 	assert.match(html, /<body class="board">/);
-	assert.match(html, /lib\/board\.css/, "the primitives, and the rule that places a root-level block");
+	assert.match(html, /lib\/board\.css/, "the primitives");
 	assert.match(html, /lib\/board\.js/);
 	assert.match(html, /<div class="doc" data-id="doc"/, "a block with an id, so a comment has something to land on");
 	assert.ok(!html.includes("{{"), "no placeholders left");

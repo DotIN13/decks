@@ -45,7 +45,7 @@ test("something that merely contains the word is not a board", () => {
  */
 test("only raw content needs a shell", () => {
 	assert.equal(shellFor("boards/notes.html", '<body class="board flow"></body>'), undefined, "ours: already a document");
-	assert.equal(shellFor("boards/plan.html", board), undefined, "a board of placed boxes, likewise");
+	assert.equal(shellFor("boards/plan.html", board), undefined, "a board of ours, likewise");
 	// A deck left from the slide format is read as what it is: an HTML page that is not ours, or markdown.
 	assert.equal(shellFor("boards/talk.slides.html", '<body class="reveal"></body>'), "foreign", "a leftover reveal deck is a page from somewhere else");
 	assert.equal(shellFor("boards/talk.slides.html", board), undefined, "and one that says board is a board");
@@ -67,7 +67,7 @@ test("the glob, as a predicate", () => {
 });
 
 test("a board fills itself when it is one document or one file", () => {
-	const file = '<body class="board">\n\t\t<div data-id="file" data-embed="../../x.pdf" data-bare style="left: 0; top: 0; right: 0; bottom: 0"></div>';
+	const file = '<body class="board">\n\t\t<div data-id="file" data-embed="../../x.pdf" data-bare></div>';
 	assert.equal(fillsOf(file, undefined), true, "a file board");
 	assert.equal(fillsOf("<body class=\"board\"><div class=\"live\" data-live=\"doc\"></div>", "doc"), true, "a document board");
 	assert.equal(fillsOf('<body class="board"><div data-embed="../x.pdf"></div>', undefined), false, "an embed inside a designed board");

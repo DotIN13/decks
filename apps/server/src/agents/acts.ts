@@ -12,10 +12,10 @@ import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
  *
  * - **A tool call starts.** A write or edit tool naming a file under `boards/` says which board
  *   is about to change. For an edit, the old text it names is looked for in the file as it is
- *   now, and the root block it sits in is the one being held.
+ *   now, and the innermost named block it sits in is the one being held.
  * - **The file lands.** The watcher says the board changed; the file as it was when the tool
- *   call started is diffed against the new one by root-level `data-id`, and the blocks whose
- *   markup differs are what changed.
+ *   call started is diffed against the new one by `data-id`, at any depth, and the blocks whose
+ *   own markup differs are what changed. A board with no names is marked whole.
  * - **A canvas call.** `decks.board.create`, `decks.canvas.fit`, and `decks.canvas.insert`,
  *   `update`, `move` or `delete` on a board name a board and need no diff.
  *
@@ -23,9 +23,9 @@ import type { ActBox, ActKind, ServerMessage } from "@decks/protocol";
  * while the agent writes, and `done` when the file lands or the tool ends without a landing.
  * One message per tool call, never per keystroke, and nothing here writes a byte to a board.
  *
- * The file diff is by root block rather than by character on purpose: a board is a handful
- * of `data-id` blocks, the canvas can only outline a block, and a character diff of two HTML
- * documents would be a lot of work to answer "which box".
+ * The file diff is by named block rather than by character on purpose: the canvas can only
+ * outline a block, and a character diff of two HTML documents would be a lot of work to answer
+ * "which box".
  */
 
 type Node = DefaultTreeAdapterMap["node"];
@@ -183,9 +183,15 @@ function oldText(args: unknown): string | undefined {
 	return undefined;
 }
 
-/** Every root-level block of a board, by `data-id`, with its markup and where it sits in the file. */
-function rootBlocks(html: string): Map<string, { markup: string; start: number; end: number }> {
-	const out = new Map<string, { markup: string; start: number; end: number }>();
+/**
+ * Every named block of a board (an element with a `data-id`, at any depth), in document order.
+ *
+ * `own` is the block's markup with each named block inside it cut out, so a change inside a named
+ * child is that child's change and not also its parent's; `start` and `end` are where it sits in
+ * the file.
+ */
+function namedBlocks(html: string): Map<string, { own: string; start: number; end: number }> {
+	const out = new Map<string, { own: string; start: number; end: number }>();
 	let document: ReturnType<typeof parse>;
 	try {
 		document = parse(html, { sourceCodeLocationInfo: true });
@@ -194,14 +200,40 @@ function rootBlocks(html: string): Map<string, { markup: string; start: number; 
 	}
 	const body = findBody(document as unknown as Node);
 	if (!body) return out;
-	for (const child of body.childNodes) {
-		if (!("tagName" in child)) continue;
-		const element = child as Element;
-		const id = element.attrs.find((attr) => attr.name === "data-id")?.value;
-		if (!id || out.has(id)) continue;
-		const at = element.sourceCodeLocation;
-		out.set(id, { markup: serializeOuter(element), start: at?.startOffset ?? 0, end: at?.endOffset ?? 0 });
-	}
+	const idOf = (element: Element) => element.attrs.find((attr) => attr.name === "data-id")?.value;
+	/** The nearest named elements under `node`. */
+	const namedUnder = (node: Element, into: Element[] = []): Element[] => {
+		for (const child of node.childNodes) {
+			if (!("tagName" in child)) continue;
+			const element = child as Element;
+			if (idOf(element)) into.push(element);
+			else namedUnder(element, into);
+		}
+		return into;
+	};
+	const visit = (node: Element) => {
+		for (const element of namedUnder(node)) {
+			const id = idOf(element) as string;
+			const at = element.sourceCodeLocation;
+			if (!out.has(id)) {
+				let own: string;
+				if (at) {
+					own = "";
+					let from = at.startOffset;
+					for (const inner of namedUnder(element)) {
+						const there = inner.sourceCodeLocation;
+						if (!there) continue;
+						own += `${html.slice(from, there.startOffset)}\u0000${idOf(inner)}\u0000`;
+						from = there.endOffset;
+					}
+					own += html.slice(from, at.endOffset);
+				} else own = serializeOuter(element);
+				out.set(id, { own, start: at?.startOffset ?? 0, end: at?.endOffset ?? 0 });
+			}
+			visit(element);
+		}
+	};
+	visit(body);
 	return out;
 }
 
@@ -216,29 +248,34 @@ function findBody(node: Node): Element | undefined {
 }
 
 /**
- * The root block an edit lands in: the one whose source range holds the old text.
+ * The named block an edit lands in: the innermost one whose source range holds the old text.
  *
  * Undefined when the text is not in the file (the edit will be refused, or it is in the head),
- * or when it sits outside every block. The first occurrence is the one an edit tool replaces.
+ * or when it sits outside every named block. The first occurrence is the one an edit tool replaces.
  */
 export function blockAt(html: string, text: string): string | undefined {
 	const offset = html.indexOf(text);
 	if (offset < 0) return undefined;
-	for (const [id, block] of rootBlocks(html)) {
-		if (offset >= block.start && offset < block.end) return id;
+	let found: { id: string; size: number } | undefined;
+	for (const [id, block] of namedBlocks(html)) {
+		if (offset < block.start || offset >= block.end) continue;
+		const size = block.end - block.start;
+		if (!found || size < found.size) found = { id, size };
 	}
-	return undefined;
+	return found?.id;
 }
 
 /**
- * The root blocks whose markup differs between two versions of a board, plus the ones that are
- * new. A block that was removed has nowhere to be drawn, so it is not named.
+ * The named blocks whose own markup differs between two versions of a board, plus the ones that
+ * are new. A block that was removed has nowhere to be drawn, so it is not named. A change inside a
+ * named block is that block's, not its parent's too. A board with no named blocks gives none, and
+ * the mark falls back to the whole board.
  */
 export function changedBlocks(before: string, after: string): string[] {
-	const was = rootBlocks(before);
+	const was = namedBlocks(before);
 	const out: string[] = [];
-	for (const [id, block] of rootBlocks(after)) {
-		if (was.get(id)?.markup !== block.markup) out.push(id);
+	for (const [id, block] of namedBlocks(after)) {
+		if (was.get(id)?.own !== block.own) out.push(id);
 	}
 	return out;
 }

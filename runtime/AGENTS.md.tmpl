@@ -24,9 +24,9 @@ Plain words and short sentences, no em dashes. Every axis, column and number say
 
 ## How to write one
 
-A board is an ordinary, self-contained HTML page that you design. There is no component library to learn: write your own CSS in the `<style>` in the head, and inside a block lay things out normally with flexbox or grid.
+A board is an ordinary, self-contained HTML page that you design. There is no component library to learn: write your own CSS in the `<style>` in the head, and lay things out normally with flexbox or grid.
 
-**Every root-level block is out of the page's flow.** `board.css` puts the direct children of `<body>` in absolute position, so write inside one block rather than stacking several. The `.doc` block below covers the board, is as tall as its content, and is what makes what you write in it read as a document. To put something at a particular spot instead, add another root-level block with a `left` and a `top` in its own `style`: that one is placed there, and the person can drag it. Both live in one file; there is no second format to choose.
+**The page flows.** Write the content inside the one `.doc` block, top to bottom, the way you would write any web page. The width comes from the `<meta>` tag and the height from what is on the page. Nothing is placed by coordinates: no `position: absolute` blocks, no `left` and `top`.
 
 `decks board create --title "…"` writes this shell and answers with its path; it is on no canvas until you place it (see "Your canvas" below). Fill it in with the Write tool:
 
@@ -48,24 +48,22 @@ A board is an ordinary, self-contained HTML page that you design. There is no co
 		<h1>The finding, as a sentence</h1>
 		…
 	</div>
-	<!-- and a box placed at a point, when you want one:
-	<aside class="card" data-id="aside" style="left: 640px; top: 96px; width: 280px">…</aside> -->
 	<script src="../lib/board.js"></script>
 </body>
 </html>
 ```
 
 - `board.css` brings the colour and type tokens, which follow the app's light and dark mode. Use them instead of hardcoded colours: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger --b-radius --b-font --b-mono`.
-- **No height in the `<meta>` tag.** A board is as tall as what is on it: the browser measures it and the canvas takes that number. A height you do write is a floor the content can raise, which is how you leave room under the last block on purpose.
-- Give each root-level block a stable, meaningful `data-id`: it is how the person comments on a block and how you point at one. Keep `board.js` last: it tells the canvas when the page is ready and how tall it is.
+- **No height in the `<meta>` tag.** A board is as tall as what is on it: the browser measures it and the canvas takes that number. A height you do write is only a floor.
+- A `data-id` is an optional name on a block, anywhere in the page (`<section class="card" data-id="cost">`). Name the blocks a person may want to comment on, or that you may want to point at. Keep `board.js` last: it tells the canvas when the page is ready and how tall it is.
 - A diagram is an inline `<svg viewBox>` you draw. A chart can use `const d3 = await import("d3")` in a `<script type="module">`: the import map in the head names `d3`, `chart.js`, `three` and `gsap`, so keep it.
 - Then `decks canvas fit <path>` (the board must be on the canvas: `decks canvas insert`, below). **`fit` answers with what the browser measured: the height, the word count, the smallest type, anything wider than the board, any box that cuts off its own content, and what happens when each control is pressed. It says which of them is wrong.** A view behind a tab is part of the board, and `fit` is the only one who looks at it unless you do. Act on that instead of taking a screenshot, and when it answers "One screen" the board is done: stop polishing.
 - Edit a board in place (Write, Edit). Never `sed -i` or another rename-save: the canvas stops watching a replaced file. Never edit `lib/`.
 - A link to another board is a relative path, `<a href="other.html">`, and opens beside this one; every other link opens a new tab. `<div data-embed="../path/file.pdf" data-pages="1-2"></div>` shows a real file where it sits. {{ROOTS}}
-- A document the person writes in (a `.md`, `.tex` or `.docx`) is a document board, a board holding only `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md" style="left: 0; top: 0; right: 0; bottom: 0"></div>`, its path relative to the board. The file is edited where it is: the person's typing goes to it, and its history and review are kept apart in `docs/<name>/`, which is not yours to write. Edit the file itself with your own tools: your edit lands at once, highlighted on the words you changed, and the person accepts or rejects it (one at a time or all at once); History shows and restores any earlier version. A Google Doc opens the same way, from its link (Add menu, Document…): edit it with `gdocs_read` and `gdocs_edit`, never by writing its mirror in `docs/`, and your edit is highlighted on its page like any other.
+- A document the person writes in (a `.md`, `.tex` or `.docx`) is a document board, a board holding only `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md"></div>`, its path relative to the board; it fills the board. The file is edited where it is: the person's typing goes to it, and its history and review are kept apart in `docs/<name>/`, which is not yours to write. Edit the file itself with your own tools: your edit lands at once, highlighted on the words you changed, and the person accepts or rejects it (one at a time or all at once); History shows and restores any earlier version. A Google Doc opens the same way, from its link (Add menu, Document…): edit it with `gdocs_read` and `gdocs_edit`, never by writing its mirror in `docs/`, and your edit is highlighted on its page like any other.
 - When the person asks for an app (something to use, with its own pages, data or server, more than one screen of reading), build it in `apps/<name>/` with `decks apps …` and show its board: read the app-building skill first. A board with a few controls is still a board.
 
-The person edits, draws on and comments on boards too. Keep any `<svg data-ink-layer>` you find at the end of a body, and read a board again before assuming it says what you last wrote. A comment arrives as a message naming the board, the block's `data-id` and the words they selected.
+The person comments on boards and draws on the canvas around them; they do not edit a board's page. Still read a board again before assuming it says what you last wrote. A comment arrives as a message naming the board, the block's `data-id` when it has one, and the words they selected.
 
 A screenshot (the board-debug skill has the script) is for a drawing you cannot check any other way: an SVG diagram or a chart. Not for text, tables or layout, which `decks canvas fit` has already measured.
 

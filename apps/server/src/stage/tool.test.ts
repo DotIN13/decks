@@ -467,16 +467,11 @@ test("fit takes the height from the content and leaves the width alone", async (
 });
 
 /*
- * The margin is room under the last placed box, and a page that took it scrolled.
+ * A page is fitted to what it measured, with no margin added.
  *
- * The `<meta>` tag is what `board.js` makes the body's height, so a fit that wrote the
- * measurement plus 48 left a page 48px taller than the document inside it: a strip of nothing
- * along the bottom, and on a board that brings its own CSS there was no `overflow: hidden` to
- * hide it. What the reader got was a scrollbar on a board.
- *
- * It used to be settled by the format. It is settled by the reading now: the frame reports the
- * document's own height beside the blocks' extent, and when the document is the taller of the
- * two it has already accounted for its own room.
+ * The `<meta>` height is a floor on the body, so a fit that wrote the measurement plus 48 left a
+ * page 48px taller than its content: a strip of nothing along the bottom. The page's own height
+ * already holds its bottom padding.
  */
 test("a board that ends in its own padding is fitted exactly, with no margin to scroll", async () => {
 	const { tool, hold, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
@@ -490,8 +485,7 @@ test("a board that ends in its own padding is fitted exactly, with no margin to 
 	// The file, not the record: the tag is what `board.js` makes the body's height, and those
 	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
 	assert.match(read("canvases/ada/boards/page.html"), /"h":604/, "the measurement, and nothing added to it");
-	// A board that ends in a placed box still gets its margin: there the last thing on the board
-	// is a box, and the margin is the room a writer would have left under it.
+	// A reading whose page is shorter than its height (from an older frame) still gets the margin.
 	const plan = deck.board(PLAN);
 	extents.set(PLAN, { rev: plan!.rev, w: 700, h: 1400, page: 900 });
 	hold(PLAN);

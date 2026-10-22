@@ -46,18 +46,6 @@ export function skillsDir(): string {
 }
 
 /**
- * The example boards a deck is seeded with, refreshed on every restart.
- *
- * Nine worked boards — three for coding, three for research, three for business — that use
- * the library catalog a blank board's head carries. They are copied into each deck's
- * `examples/` beside the primitives (`deck/lib-sync.ts`), where agents read them to borrow
- * structure from, and where a browser can open them against the deck's own `lib/`.
- */
-export function examplesDir(): string {
-	return resolve(HERE, "examples");
-}
-
-/**
  * The board primitives a deck copies into itself.
  *
  * A *copy*, and the copy is refreshed whenever a deck is opened (`deck/lib-sync.ts`) — a
@@ -115,7 +103,6 @@ export function antigravityServer(): string {
  */
 export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean }> = [
 	{ path: "skills", what: "what an agent is taught with", dir: true },
-	{ path: "examples", what: "the worked boards agents borrow from, copied into every deck", dir: true },
 	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },
 	{ path: "decks-commands.md", what: "the decks command reference, generated from the verb table" },
 	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },

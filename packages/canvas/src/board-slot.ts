@@ -92,7 +92,7 @@ export interface StageBoardProps {
 	 * out, and the server is where the question gets asked (`decks.canvas.fit`, and `clipped` on
 	 * `decks.canvas.read()`). Reported once per load, with the revision it was measured at.
 	 */
-	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true }) => void;
+	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
 	/**

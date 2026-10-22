@@ -639,26 +639,22 @@ export function App() {
 	};
 
 	/**
-	 * How tall each board whose content flows (a document: a root-level block not placed) was last
-	 * measured, in this browser (`board/extent.ts`, `measureFrame`).
+	 * How tall each board's page was last measured, in this browser (`board/extent.ts`, `measureFrame`).
 	 */
 	const [flowHeights, setFlowHeights] = createSignal<Readonly<Record<string, number>>>({});
-	const noteFlow = (path: string, extent: { h: number; flows?: true }) => {
-		const now = flowHeights()[path];
-		const next = extent.flows ? extent.h : undefined;
-		if (now === next) return;
-		const { [path]: _gone, ...rest } = flowHeights();
-		setFlowHeights(next === undefined ? rest : { ...rest, [path]: next });
+	const noteFlow = (path: string, h: number) => {
+		if (flowHeights()[path] === h) return;
+		setFlowHeights({ ...flowHeights(), [path]: h });
 	};
 
 	/**
 	 * The boards on the focused agent's stage, at the size the stage draws them.
 	 *
-	 * **A document's height is a floor its content raises.** The stage file's height for a board whose
-	 * content flows is what a drag or a `decks.canvas.fit` gave it, and the board is drawn at least as tall as its
-	 * content measures here, so it never clips a paragraph. Read in each browser and never written back:
-	 * two browsers whose fonts lay it out a pixel apart each draw their own, rather than answering each
-	 * other's height for ever. A board of placed boxes is the size it is given.
+	 * **A board's height is a floor its content raises.** The stage file's height for a board is what a
+	 * drag or a `decks.canvas.fit` gave it, and the board is drawn at least as tall as its page measures
+	 * here, so it never clips a paragraph. Read in each browser and never written back: two browsers
+	 * whose fonts lay it out a pixel apart each draw their own, rather than answering each other's
+	 * height for ever.
 	 *
 	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or
 	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
@@ -1179,8 +1175,8 @@ export function App() {
 								mayStart: boardsMayStart,
 								switching: switchingCanvas,
 								onStarted: canvasOpened,
-								onExtent: (path, { flows, ...extent }) => {
-									noteFlow(path, { h: extent.h, ...(flows ? { flows } : {}) });
+								onExtent: (path, extent) => {
+									noteFlow(path, extent.h);
 									send({ type: "board.extent", path, ...extent });
 								},
 								onCreate: (at) =>

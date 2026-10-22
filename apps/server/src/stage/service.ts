@@ -334,19 +334,10 @@ export class StageService {
 		const w = Math.round(options?.w ?? board.w);
 		const { reading: away, ...measured } = await this.measure(path, board.rev, w);
 		/*
-		 * The margin is room under the last *placed* box, and nothing else.
-		 *
-		 * A board of boxes ends where its bottom box ends, and a writer would have left a little
-		 * air under it — so the fitted height is that edge plus a margin. A document ends in its
-		 * own bottom padding, which is already part of what the browser measured, and adding to it
-		 * would make the board 48px taller than the page it is showing: a rectangle with a strip
-		 * of nothing along the bottom.
-		 *
-		 * Which of the two a board is comes from the reading rather than from the file:
-		 * `measured.h` is the greater of the furthest block edge and the document's own height,
-		 * and `measured.page` is that second number alone. When the document is the taller of the
-		 * two it has already accounted for its own room. An older frame sends no `page` at all,
-		 * and then the margin is added, which is what every board did before this.
+		 * A board is one page, and the page ends in its own bottom padding, which is already part of
+		 * what the browser measured (`page`): it is fitted to that exactly. Adding a margin would make
+		 * the board taller than the page it shows, a strip of nothing along the bottom. Only a reading
+		 * with no `page` in it (a frame from an older build) gets the margin.
 		 */
 		const ends = measured.page !== undefined && measured.page >= measured.h;
 		/*

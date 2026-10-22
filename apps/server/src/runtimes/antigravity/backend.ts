@@ -227,7 +227,7 @@ export class AntigravityBackend implements AgentBackend {
 	 * What the model should know about the deck before its first word.
 	 *
 	 * The same briefing the other backends hand their runtimes — a deck is a directory of
-	 * absolutely- positioned HTML boards, and the `decks` command is the way to reach the
+	 * HTML boards, each one flowing page, and the `decks` command is the way to reach the
 	 * user's view. It belongs in the prompt because that is the one channel print mode
 	 * reads; it belongs in the *first* prompt because that is the one the model cannot
 	 * miss, and a conversation that resumes already has it in its history.

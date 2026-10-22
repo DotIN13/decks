@@ -6,9 +6,9 @@
  * The ramp is the same one Picone uses (opencode's v2 system), so a board and the
  * shell around it read as one piece of software.
  *
- * Everything here assumes absolute positioning: a component's `left`/`top`/`width`
- * live in its own `style` attribute, because that is the one place both an agent
- * editing text and a person dragging a box can agree on.
+ * A board is one page that flows: its content reads top to bottom, laid out with ordinary
+ * CSS (flex, grid), as wide as its `<meta>` says and as tall as what is in it. Nothing here
+ * is placed by coordinates.
  *
  * `board.js` renders markdown, maths, diagrams, PDFs, embeds and code — the last of these
  * coloured from the `--b-code-*` tokens in the palette below, so syntax is in the same
@@ -28,17 +28,16 @@ body {
 }
 
 /*
- * The board itself.
+ * The board itself: a page as wide as its `<meta>` says, and as tall as its content.
  *
- * `overflow: hidden` because the stage does the panning: a board that scrolls
- * inside its own frame fights the camera, and a screenshot of it shows a
- * scrollbar instead of the work.
+ * The height is the content's. `board.js` sets the meta's `h`, if there is one, as a floor
+ * (`min-height`), and the canvas measures the page and draws the board that tall, so nothing
+ * is clipped and nothing scrolls inside the frame — the canvas does the panning.
  */
 body.board {
 	position: relative;
-	width: 1200px;
-	height: 800px;
-	overflow: hidden;
+	width: 1000px;
+	height: auto;
 	background-color: var(--b-bg);
 	color: var(--b-fg);
 	font-family: var(--b-font);
@@ -47,7 +46,16 @@ body.board {
 	-webkit-font-smoothing: antialiased;
 }
 
-/* A grid, because absolute positioning without one is guesswork. */
+/*
+ * No scrollbar on the page. The canvas draws a board as tall as its content, so there is
+ * nothing to scroll to; a scrollbar that showed for the beat before the measurement landed
+ * would take its width out of the layout and wrap the text differently from the picture.
+ */
+html:has(> body.board) {
+	scrollbar-width: none;
+}
+
+/* Two backgrounds a board may ask for in its meta (`"bg": "grid"` or `"dots"`); plain is the default. */
 body.board[data-bg="grid"] {
 	background-image:
 		linear-gradient(to right, var(--b-grid) 1px, transparent 1px),
@@ -60,25 +68,23 @@ body.board[data-bg="dots"] {
 	background-size: calc(var(--b-unit) * 4) calc(var(--b-unit) * 4);
 }
 
-body.board > * {
-	position: absolute;
+/*
+ * A board that is one thing edge to edge: a live document, a mirror, a file, an app, the shared
+ * browser's card (the server writes these, `boards/templates.ts`). The thing is the board, so it
+ * fills the frame the canvas gives it — `100vh` inside a frame is that rectangle — and its own
+ * content scrolls inside it.
+ */
+body.board > .live,
+body.board > [data-bare],
+body.board > [data-fill] {
+	position: relative;
+	width: 100%;
+	height: 100vh;
 }
 
 /* --- components --------------------------------------------------------------- */
 
-/*
- * `max-width` only, and the missing `position: absolute` is the point.
- *
- * The rule above already makes a *top-level* component absolute, so saying it again here
- * could only ever reach a **nested** one — and there it did harm: the child left its
- * parent's flow, the parent measured as if it were empty, and whatever came after was
- * overlapped. A table inside a card is a reasonable thing to write, and it renders without
- * complaint, so the mistake was invisible until somebody measured the board.
- *
- * Nesting now flows: `.card > .table`, a callout inside a card, a kpi row inside a
- * section. What makes a component draggable is still being a direct child of `<body>`
- * with a `data-id`, which is unchanged.
- */
+/* Components nest and flow: a table inside a card, a callout inside a section. */
 .card,
 .sticky,
 .text,
@@ -792,7 +798,7 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	--live-accent: var(--b-blue-600);
 	--live-panel: var(--b-grey-50);
 	--live-mine: var(--b-blue-200);
-	position: absolute;
+	position: relative;
 	display: flex;
 	overflow: hidden;
 	box-sizing: border-box;
@@ -1408,54 +1414,26 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 /*
  * ── Documents: `.doc` ─────────────────────────────────────────────────────────────────
  *
- * One block holding a whole document, which is how a board that reads top to bottom is
- * written: a root-level block at the origin, the width of the board, as tall as its own
- * content. It is an ordinary placed block — there is no second format here, and a board can
- * hold one of these beside boxes that are placed anywhere else.
- *
- * It arrives by two routes. A board this app wrote holds its content in a `.doc` of its own;
- * a markdown file or a page from somewhere else is *content*, so the server
- * sends a document built around it (`boards/shell.ts`) carrying the same block. Hence the
- * doubled selectors below: `.board-shell` for what the server wrapped, and `.board` for the
- * file that needed no wrapping.
- *
- * `.board.flow` was what the second of those used to say. Boards written before the two
- * formats became one still say it, and it is simply a word on the body now.
+ * The block a board's content flows in: the width of the board, as tall as what is in it, with
+ * the board's margin as its padding. A board this app wrote holds its content in one of these;
+ * a markdown file or a page from somewhere else is wrapped in one by the server
+ * (`boards/shell.ts`, the `.board-shell` body). `.board.flow`, on boards written earlier, is
+ * just a word on the body now.
  */
-
-/*
- * The document block: full bleed, and as tall as what is in it.
- *
- * Its height is measured and reported back, and padding inside a measured box is height the
- * board grows to hold — so the padding here is the board's own margin rather than something
- * the reading has to be corrected for.
- */
-.board-shell .doc,
 .board .doc {
-	position: absolute;
-	box-sizing: border-box;
+	display: block;
 	width: 100%;
 	padding: 28px 32px;
+	font-size: 14.5px;
+	line-height: 1.65;
 }
 
 /*
- * A document board is a document, not an embed of one.
- *
- * `[data-embed]` draws a card: a header with the filename and a line count, a border, a
- * shadow, and a scrolling body. That is exactly right for a file shown *on* a board and
- * exactly wrong for a board that **is** that file — the board's own title already says what
- * it is, so the header is the filename twice and the border is a card around the whole
- * canvas rectangle.
- *
- * So the rendering is reused and the chrome is dropped, in CSS rather than by teaching
- * `mountEmbed` a second mode. The important line is `overflow: visible`: the body scrolls
- * inside a card, and a board does not scroll — the canvas is the scrolling — so a body that
- * kept its own `overflow: auto` would clip the document at whatever height the board
- * happened to be, which is the failure this format exists to make impossible.
+ * A document board is a document, not an embed of one: the embed's card (a header with the
+ * filename, a border, a scrolling body) is dropped, and the body is as tall as its content,
+ * because the canvas is what scrolls.
  */
-.board-shell .doc.embed,
 .board .doc.embed {
-	display: block;
 	overflow: visible;
 	height: auto;
 	border: 0;
@@ -1464,12 +1442,10 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 	box-shadow: none;
 }
 
-.board-shell .doc > .embed-head,
 .board .doc > .embed-head {
 	display: none;
 }
 
-.board-shell .doc > .embed-body,
 .board .doc > .embed-body {
 	overflow: visible;
 	height: auto;
@@ -1477,51 +1453,24 @@ html[data-decks-focus] .embed[data-bare][data-kind="pdf"] > .embed-body > img {
 }
 
 /*
- * Except when the content is in a nested frame.
- *
- * A plain HTML document is rendered inside a sandboxed iframe — same as any foreign HTML on
- * a board — and an iframe has no intrinsic height. Worse, this one is deliberately
- * opaque-origin, so nothing outside it can measure it either. So a framed flow board keeps a
- * *stored* height and is resized by dragging its edge, and only markdown gets to be exactly
- * as tall as its content. Named here rather than left implicit, because "why does my
- * markdown board self-fit and my HTML one not" deserves an answer in the file.
+ * Except a page from somewhere else, which is drawn in a sandboxed, opaque-origin iframe that
+ * nothing outside can measure: it fills the frame, and the board keeps the height it was given.
  */
-.board-shell .doc[data-framed] {
-	height: 100%;
+.board-shell .doc[data-framed],
+.board-shell .doc[data-framed] > .embed-body {
+	height: 100vh;
 }
 
-.board-shell .doc[data-framed] > .embed-body,
 .board-shell .doc[data-framed] > .embed-body > iframe {
 	height: 100%;
 }
 
 /*
- * A document read at a canvas's distance.
+ * The prose inside a document block, as defaults that lose to any rule the board writes.
  *
- * Slightly larger than a card's body text and looser in the leading, because a document block
- * is the reading surface itself rather than a box on one — the measure is the board's width,
- * and the type has to hold a long line.
- */
-.board-shell .doc .embed-body,
-.board .doc {
-	font-size: 14.5px;
-	line-height: 1.65;
-}
-
-/*
- * And the prose inside a document block this app wrote.
- *
- * The markdown path gets this from `[data-md]`, which styles what it rendered. A board holds
- * hand-written HTML instead, so the same rhythm is stated here: the first heading sits flush
- * with the padding, and everything after it is separated rather than crowded.
- *
- * These are defaults, so they must lose to any rule the board writes. `:where()` takes the
- * `.board .doc` out of their weight: the rhythm counts as a bare tag (0,0,1), which beats the
- * tag defaults near the top of this file only by coming later, and loses to any class a board
- * styles (`.lede { margin: 0 0 26px }`) and to a tag rule in the board's own <style>, which comes
- * after this sheet. Written as `.board .doc p` they weighed (0,2,1) and silently beat those.
- * Not `:where()` round the whole selector: at (0,0,0) the tag defaults above would win instead.
- * The flush first child weighs one class (0,1,0), enough to beat the heading rule after it.
+ * `:where()` takes `.board .doc` out of their weight, so a class the board styles
+ * (`.lede { margin: 0 0 26px }`) or a tag rule in the board's own <style> wins. The flush first
+ * child weighs one class (0,1,0), enough to beat the heading rule after it.
  */
 :where(.board .doc) > :first-child {
 	margin-top: 0;

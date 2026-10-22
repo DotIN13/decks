@@ -7,42 +7,18 @@
  * board is the only place it is laid out, so this is measured here and sent to the server,
  * where `decks.canvas.read()` reports it and `decks.canvas.fit` acts on it.
  *
- * The reading is deliberately of the *components* — the direct children carrying a
- * `data-id` — and not of `scrollWidth`. A board's body is sized to the meta, backgrounds
- * and decorations paint to that edge, and `scrollWidth` therefore answers "how big is the
- * board" on every board ever written. The components answer the question that was asked.
+ * A board is one page that flows, so the reading is of the page: how tall its content is,
+ * with the height its `<meta>` states released for the read (`documentHeight`). The stated
+ * height is a floor the stage applies afterwards (`shownHeight`), never part of the reading,
+ * or a board could never be fitted shorter than it once was.
  */
-
-export interface Box {
-	right: number;
-	bottom: number;
-	width: number;
-	height: number;
-}
 
 /**
- * How tall a board is drawn: the height the stage gives it, raised to its content's when the board
- * reads top to bottom (`measureFrame`, `flows`) and was measured taller. A board of placed boxes is
- * the size it is given.
+ * How tall a board is drawn: the height the stage gives it, raised to its content's when that was
+ * measured taller (`measureFrame`). The given height is a floor, never a ceiling.
  */
-export function shownHeight(board: { h: number }, flowing: number | undefined): number {
-	return flowing !== undefined && flowing > board.h ? flowing : board.h;
-}
-
-/** The bottom-right corner of everything, or nothing at all for an empty board. */
-export function contentExtent(boxes: Box[]): { w: number; h: number } | undefined {
-	let w = 0;
-	let h = 0;
-	let seen = false;
-	for (const box of boxes) {
-		// A hidden component measures 0×0 at the origin; counting it would make every
-		// board's extent at least the origin, which is not a fact about anything.
-		if (box.width <= 0 || box.height <= 0) continue;
-		seen = true;
-		if (box.right > w) w = box.right;
-		if (box.bottom > h) h = box.bottom;
-	}
-	return seen ? { w: Math.ceil(w), h: Math.ceil(h) } : undefined;
+export function shownHeight(board: { h: number }, measured: number | undefined): number {
+	return measured !== undefined && measured > board.h ? measured : board.h;
 }
 
 /**
@@ -123,14 +99,8 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
 }
 
 /**
- * The **document's** own height, which can be taller than the blocks in it.
- *
- * A board of placed boxes keeps the room around its work inside each box's own coordinates,
- * and for one of those this agrees with the reading above. A board written as a document
- * has two pieces below every `[data-id]` there is: the body's own bottom padding, where a
- * page keeps its margins, and a bottom margin that collapsed out of the last block and now
- * sits under it. Neither is in any block's box. Left out, the canvas gives the board a
- * rectangle shorter than the document it is showing, and the page scrolls inside it.
+ * The page's own height: everything in it, the body's padding, and a margin that collapsed
+ * out of the last block.
  *
  * `scrollHeight` answers this, with one catch that is the reason for the lines around it:
  * `board.js` gives the body the height in the board's `<meta>` tag, or when there is none a
@@ -157,41 +127,16 @@ export function documentHeight(doc: Document): number | undefined {
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 
-export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number; flows?: true } | undefined {
+export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; at: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
 	const doc = frame?.contentDocument;
 	const view = frame?.contentWindow as (Window & { __boardReady?: boolean }) | null | undefined;
 	if (!doc || !view?.__boardReady) return undefined;
-	const boxes: Box[] = [];
-	for (const element of doc.querySelectorAll<HTMLElement>("body > [data-id]")) {
-		const rect = element.getBoundingClientRect();
-		// The frame is not scrolled — a board cannot scroll — so viewport coordinates and
-		// board coordinates are the same thing.
-		boxes.push({ right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height });
-	}
-	const extent = contentExtent(boxes);
-	if (!extent) return undefined;
-	/*
-	 * Both readings, on every board.
-	 *
-	 * This used to ask the body whether it said `flow` and measure the document only then. That
-	 * was the format deciding, and the format is gone: a board is blocks, and the two ways the
-	 * content can reach past the last block — a document's own bottom padding, a margin that
-	 * collapsed out of the last block — are worth a `scrollHeight` whatever the board is made of.
-	 * On a board of placed boxes the two numbers come out the same, so nothing changes for one.
-	 *
-	 * `page` travels beside the height rather than being folded into it, because `decks.canvas.fit` needs
-	 * to tell the two apart: a board that ends in a placed box is fitted with room under it, and a
-	 * document that ends in its own padding already has its room.
-	 */
-	/*
-	 * A board that reads top to bottom: one holding a document block (`.doc`, board.css), or one written
-	 * before the formats were one, whose body says `flow`. Its height is a floor its content raises
-	 * (`App.tsx`, `stageBoards`), where a board of placed boxes is the size it is given.
-	 */
-	const flows = !!doc.querySelector("body > .doc") || !!doc.body?.classList.contains("flow");
 	const page = documentHeight(doc);
-	const h = Math.max(extent.h, Math.ceil(page ?? 0));
+	if (page === undefined) return undefined;
+	const h = Math.ceil(page);
+	// How wide the content reaches; a board's width is still the one its `<meta>` states.
+	const w = Math.ceil(Math.max(doc.documentElement.scrollWidth, doc.body?.scrollWidth ?? 0));
 	// The width it was laid out at: `decks.canvas.fit` takes a height only from a layout at the width it fits at.
 	const at = Math.round(doc.documentElement.clientWidth);
-	return { w: extent.w, h, at, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc), ...(flows ? { flows: true as const } : {}) };
+	return { w, h, at, page: h, ...readingOf(doc) };
 }

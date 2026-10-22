@@ -36,6 +36,23 @@ test("changedBlocks: the blocks whose markup differs, and the new ones", () => {
 	assert.deepEqual(changedBlocks(THREE, TWO), []);
 });
 
+/*
+ * A board is one flowing page, so its named blocks sit inside its `.doc`: a change inside one is
+ * that block's, and a change to the page around them is the page's.
+ */
+const page = (card: string, line: string) => board(`<div class="doc" data-id="doc"><h1>T</h1><p>${line}</p><div class="grid"><section class="card" data-id="cost">${card}</section></div></div>`);
+
+test("named blocks inside the page are found at any depth", () => {
+	assert.deepEqual(changedBlocks(page("12", "a"), page("13", "a")), ["cost"], "the card, not the page round it");
+	assert.deepEqual(changedBlocks(page("12", "a"), page("12", "b")), ["doc"], "the page itself");
+	assert.deepEqual(changedBlocks(page("12", "a"), page("13", "b")), ["doc", "cost"]);
+	assert.equal(blockAt(page("12", "a"), "12"), "cost", "the innermost block the text is in");
+	assert.equal(blockAt(page("12", "a"), "<p>a</p>"), "doc");
+	// No names at all: nothing to outline, so the whole board is marked.
+	const bare = (line: string) => board(`<div class="doc"><p>${line}</p></div>`);
+	assert.deepEqual(changedBlocks(bare("a"), bare("b")), []);
+});
+
 /** A host whose clock and timers the test holds. */
 function host(files: Record<string, string>) {
 	const sent: ServerMessage[] = [];

@@ -4,7 +4,7 @@ import { titleCanvas } from "./stage/stage-admin.ts";
 import { runAtOpen } from "./migrations/index.ts";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { examplesDir, runtimeLib } from "@decks/runtime";
+import { runtimeLib } from "@decks/runtime";
 import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
@@ -26,7 +26,7 @@ import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
 import { claudeIdentity, fiveHourOf, probeUsage } from "./runtimes/claude/backend.ts";
 import { mapSeries } from "./lib/series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
-import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
+import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
 import { Cameras } from "./deck/cameras.ts";
@@ -590,13 +590,9 @@ export class App {
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
 		// start brings the primitives forward. `Deck.create` has just done it for a new
-		// one. The examples are refreshed for both, in the same breath: the nine worked
-		// boards live here after every restart, at their current content, so the copy
-		// never drifts from what this build ships. Before `attach()`, deliberately: the
-		// watcher is not running yet, so the one restart that does rewrite files cannot
-		// also reload every board twice.
+		// one. Before `attach()`, deliberately: the watcher is not running yet, so the one
+		// restart that does rewrite files cannot also reload every board twice.
 		if (existing) App.refreshLib(deck);
-		App.refreshExamples(deck);
 		return new App(config, deck);
 	}
 
@@ -614,28 +610,9 @@ export class App {
 		for (const gone of sync.removed) console.log(`[decks] lib/ removed ${gone} — this build no longer ships it`);
 	}
 
-	/**
-	 * Bring a deck's `examples/` up to this build's.
-	 *
-	 * The same content-compared copy as `refreshLib`, so a restart that changed nothing
-	 * writes nothing. Logged rather than sent as a notice, for the same reason: on a
-	 * normal restart it changes nothing and says nothing.
-	 */
-	private static refreshExamples(deck: Deck): void {
-		const sync = syncExamplesDir(App.runtimeExamples, join(deck.path, "examples"));
-		const summary = describeSync(sync);
-		if (summary) console.log(`[decks] examples/ ${summary}`);
-		for (const gone of sync.removed) console.log(`[decks] examples/ removed ${gone} — this build no longer ships it`);
-	}
-
 	/** Where the shipped primitives live, copied into every deck and refreshed on open. */
 	static get runtimeLib(): string {
 		return runtimeLib();
-	}
-
-	/** Where the shipped examples live, copied into every deck and refreshed on open. */
-	static get runtimeExamples(): string {
-		return examplesDir();
 	}
 
 	attach(hub: Hub): void {
@@ -860,7 +837,6 @@ export class App {
 		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
 		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
 		if (existing) App.refreshLib(this.deck);
-		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.pens.setDeck(this.deck.path);
 		this.forwards.setDeck(this.deck.path);

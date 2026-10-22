@@ -3,11 +3,8 @@
  *
  * **One format.** There used to be more: `component` for a canvas of absolutely positioned
  * boxes, `flow` for a document that reflows, and `slides` for a reveal deck. A board is an HTML
- * document, the stylesheet it links puts its root-level blocks in absolute position, and a
- * block that is not placed is a block that flows. Which of those a given block is belongs to
- * the block, and the one place that has to know asks the browser for its computed position
- * rather than asking the file what format it is. A `.slides.html` left over from the deck
- * format is read like any other HTML file.
+ * document whose content flows, top to bottom, as wide as its meta says and as tall as what is
+ * in it. A `.slides.html` left over from the deck format is read like any other HTML file.
  *
  * ### Three kinds of board, and only one of them is foreign
  *

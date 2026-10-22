@@ -4,10 +4,7 @@
  * There are no templates any more. Every board the app creates is blank on purpose — the
  * heading is the title, nothing else — because a served shape turned out to be the wrong
  * bargain: it decided a board's look before the agent had a sentence, and a board that
- * starts shaped is a board the writer keeps the shape of. What an agent reaches for now is
- * the *examples* (`examples/` in the deck, refreshed from `runtime/examples/` on every
- * restart) — worked boards for coding, research and business that show the import map's
- * libraries in use, to borrow structure from rather than to be created from.
+ * starts shaped is a board the writer keeps the shape of.
  *
  * Substitution is a handful of tokens and no template engine, the same as `pi/context.ts`
  * does for `AGENTS.md.tmpl`: `{{TITLE}}`, `{{W}}`, `{{H}}`, and `{{IMPORTMAP}}`, which
@@ -62,19 +59,17 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
  *
  * Heading and nothing else, on purpose, and the whole of what "no templates" means — every
  * board starts the same, and what it becomes is the agent's decision rather than the
- * shell's. The comment in the board is the only guidance: the title is the finding, the
- * import map in the head can reach any library, and the examples beside the deck show what
- * that looks like.
+ * shell's. The comment in the board is the only guidance: the title is the finding, and the
+ * import map in the head can reach any library.
  *
  * **No height in the meta tag.** A height there is a floor the content can raise and never
  * a ceiling, so leaving it out is what makes a new board exactly as tall as what gets
  * written on it. `decks.canvas.fit` writes one in once there is something to measure.
  *
- * The one block it starts with is the document: `.doc`, which board.css puts at the origin at
- * the full width of the board, as tall as its own content. A block beside it that states a
- * `left` and a `top` is placed at that point instead, and is the thing a person can drag. That
- * is the whole of the layout model, and board.css's `body.board > *` is what makes it work:
- * every root-level block is out of the flow, so two of them cannot push each other about.
+ * The one block it starts with is the document: `.doc`, the width of the board and as tall as
+ * its content. A board is one page that flows; everything written on it goes inside that block,
+ * laid out with ordinary CSS. `data-id="doc"` is a name, so a comment or an agent can point at
+ * it, and nothing depends on it.
  */
 export function renderBlank(title: string, size?: { w?: number; h?: number }): string {
 	const w = Math.round(size?.w ?? BOARD_W);
@@ -104,20 +99,13 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
 			("Returning customer share fell after the second tab shipped") rather than a topic or
 			a question, then fill the block under it.
 
-			Every root-level block is out of the page's flow, so write inside this one: it is the
-			width of the board and as tall as its content, which is what makes what you put in it
-			read as a document, top to bottom. A block beside it that states a \`left\` and a
-			\`top\` is placed at that point instead, and can be dragged. Both live in one file, and
-			neither of them is a format.
+			The page flows: write inside this block, top to bottom, and lay it out with ordinary
+			CSS (flex, grid). It is the width of the board and as tall as its content.
 
 			Lead with the finding and stop when it is said. A table beats a paragraph about a
 			comparison, a diagram beats a paragraph about a structure, a number beats an
 			adjective. Then \`decks canvas fit\` it, so the board is the size of what is on it rather
 			than the size you guessed.
-
-			For what a finished board can look like, read the examples in \`examples/\` beside
-			this deck: worked boards for coding, research and business that use the libraries
-			this head's import map names. Borrow their structure; do not start from one.
 		-->
 		<div class="doc" data-id="doc">
 			<h1>${escapeHtml(title)}</h1>
@@ -202,8 +190,8 @@ export const MIRROR_SIZE = { w: 560, h: 900 };
  * by `lib/live-chat.js`. Nothing here is written again as the conversation grows — no
  * watcher event, no revision churn, and a board file somebody can read and understand.
  *
- * The component fills the board and carries an explicit height, so `contentExtent`
- * measures it exactly: a mirror never clips and `decks.canvas.fit` has nothing to do to it. The
+ * The component fills the board (board.css, `body.board > .live`), so the page measures exactly
+ * the board's height: a mirror never clips and `decks.canvas.fit` has nothing to do to it. The
  * growth happens inside, where the list scrolls.
  */
 export function renderMirror(name: string, agentId: string, size?: { w?: number; h?: number }): string {
@@ -223,7 +211,6 @@ export function renderMirror(name: string, agentId: string, size?: { w?: number;
 			data-id="mirror"
 			data-live="chat"
 			data-agent="${escapeHtml(agentId)}"
-			style="left: 0; top: 0; width: ${w}px; height: ${h}px"
 		></div>
 
 		<script src="../../lib/board.js"></script>
@@ -257,7 +244,7 @@ export function renderDocBoard(title: string, dataPath: string, size?: { w?: num
 		<link rel="stylesheet" href="../../lib/board.css" />
 	</head>
 	<body class="board">
-		<div class="live" data-id="doc" data-live="doc" data-path="${escapeAttr(dataPath)}" style="left: 0; top: 0; right: 0; bottom: 0"></div>
+		<div class="live" data-id="doc" data-live="doc" data-path="${escapeAttr(dataPath)}"></div>
 
 		<script src="../../lib/board.js"></script>
 	</body>
@@ -280,7 +267,7 @@ export function renderFileBoard(title: string, src: string, size: { w: number; h
 		<link rel="stylesheet" href="../../lib/board.css" />
 	</head>
 	<body class="board">
-		<div data-id="file" data-embed="${escapeAttr(src)}" data-bare style="left: 0; top: 0; right: 0; bottom: 0"></div>
+		<div data-id="file" data-embed="${escapeAttr(src)}" data-bare></div>
 
 		<script src="../../lib/board.js"></script>
 	</body>
@@ -306,7 +293,7 @@ export function renderAppBoard(name: string, title: string, size?: { w?: number;
 		<link rel="stylesheet" href="../../lib/board.css" />
 	</head>
 	<body class="board">
-		<div class="live" data-id="app" data-live="app" data-app="${escapeAttr(name)}" style="left: 0; top: 0; right: 0; bottom: 0"></div>
+		<div class="live" data-id="app" data-live="app" data-app="${escapeAttr(name)}"></div>
 
 		<script src="../../lib/board.js"></script>
 	</body>
@@ -339,7 +326,6 @@ export function renderWebBoard(size?: { w?: number; h?: number }): string {
 			class="live"
 			data-id="web"
 			data-live="web"
-			style="left: 0; top: 0; width: ${w}px; height: ${h}px"
 		></div>
 
 		<script src="../lib/board.js"></script>

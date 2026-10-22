@@ -209,8 +209,7 @@ function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "card"):
 /**
  * The part of a board a card shows: its full width, and as much height as 4:3 allows.
  *
- * `h` is the board's own height for a component board and a slide, and what the page measured
- * for a flow document, whose record may still be carrying the placeholder.
+ * `h` is the board's height: the larger of what it states and what its page measured.
  */
 export function thumbClip(board: Pick<Board, "w" | "h">): { width: number; height: number; scale: number } {
 	const width = Math.max(200, Math.round(board.w));
@@ -219,29 +218,23 @@ export function thumbClip(board: Pick<Board, "w" | "h">): { width: number; heigh
 }
 
 /**
- * In the page: how far down the board reaches, the way `board/extent.ts` measures it.
+ * In the page: how tall the board's page is, the way `canvas/extent.ts` measures it (`documentHeight`).
  *
- * The components, and for a flow board the whole document — a page keeps its margins on the
- * body, and a margin can collapse out of the last block, so both sit below every `[data-id]`
- * there is. The two measurements have to agree or the picture and the board are different
- * heights; the reasoning is in `extent.ts`, and this is its twin.
+ * The body's own height, with the height and floor `board.js` gave it released for the read, so the
+ * reading is the content's. The two measurements have to agree or the picture and the board are
+ * different heights; the stated height is applied as a floor by the caller.
  */
 const MEASURE = `(() => {
-	let h = 0;
-	for (const el of document.querySelectorAll("body > [data-id]")) {
-		const r = el.getBoundingClientRect();
-		if (r.width > 0 && r.height > 0 && r.bottom > h) h = r.bottom;
-	}
-	if (h === 0) return 0;
-	const held = document.body.style.height;
-	const floor = document.body.style.minHeight;
-	document.body.style.height = "auto";
-	document.body.style.minHeight = "0";
-	const page = document.body.scrollHeight;
-	document.body.style.height = held;
-	document.body.style.minHeight = floor;
-	if (page > h) h = page;
-	return Math.ceil(h);
+	const body = document.body;
+	if (!body) return 0;
+	const held = body.style.height;
+	const floor = body.style.minHeight;
+	body.style.height = "auto";
+	body.style.minHeight = "0";
+	const page = body.scrollHeight;
+	body.style.height = held;
+	body.style.minHeight = floor;
+	return Math.ceil(page);
 })()`;
 
 /**

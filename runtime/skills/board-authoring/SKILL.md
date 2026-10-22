@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to write a board. One format: a one-screen page you design, whose root-level blocks are placed where they say they go. Covers the board.css vocabulary, diagrams, embeds and links. Read before building anything beyond a title, a visual and a few words.
+description: How to write a board. One format: a one-screen HTML page you design, whose content flows top to bottom inside one `.doc`. Covers the board.css vocabulary, diagrams, embeds and links. Read before building anything beyond a title, a visual and a few words.
 ---
 
 # Board authoring
@@ -24,22 +24,20 @@ description: How to write a board. One format: a one-screen page you design, who
   or under it that shows the chosen row. Another: two or three tabs over one chart area.
 - When the person asks for something to use as it stands (a message to send, a section of a protocol, a full list, code), the board holds that thing in full and nothing else. The one-screen rule limits what you add, not what they asked for.
 
-**One format: a page you design, with placed blocks**
+**One format: a page you design, and it flows**
 
-- `decks board create --title …` writes `<body class="board">` with `../lib/board.css`, a `<style>`
-  block and one block: `<div class="doc" data-id="doc">`. Write your own CSS; inside a block, lay
-  out with flexbox or grid.
-- **Root-level blocks are out of the page's flow.** `board.css` puts every direct child of
-  `<body>` in absolute position, so put your content inside one block rather than stacking
-  several. `.doc` covers the board and is as tall as its content, which is what makes it read as
-  a document. A block that states a `left` and a `top` of its own is placed at that point, on an
-  8px grid, and is the thing a person can drag. One file holds both; there is no second format.
-- The height is measured, so a board cannot clip. Leave `h` out of `<meta name="board">`; a height
-  you do write is a floor the content can raise, which is how you keep room under the last block.
+- A board is one self-contained HTML page. `decks board create --title …` writes
+  `<body class="board">` with `../lib/board.css`, a `<style>` block and one block:
+  `<div class="doc" data-id="doc">`. Write everything inside that `.doc`, top to bottom, or straight
+  in `<body>` if you prefer. Lay it out with normal CSS: flexbox and grid for columns and rows.
+- **Nothing is placed by coordinates.** No `position: absolute` blocks on the page, no `left` and
+  `top`, no pixel grid. The content flows, and its order in the file is its order on the board.
+- The width comes from `<meta name="board">` (`"w"`). The height is the content's: the canvas
+  measures the page, so a board cannot clip. Leave `h` out; a height you do write is only a floor.
 - `board.css` brings the tokens, light and dark: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
   --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger
   --b-radius --b-font --b-mono`. Never hardcode a colour the tokens cover.
-- Every root-level block gets a stable, meaningful `data-id`. `board.js` stays last.
+- `board.js` stays last.
 - Patterns that work: a highlighted row in a comparison table; before and after side by side; a
   sequence diagram with three lifelines; a row of large numbers with a one-line label each; one
   chart with a labelled axis and the winning series in the accent colour.
@@ -48,34 +46,28 @@ description: How to write a board. One format: a one-screen page you design, who
   smallest type and any content wider than the board. Fix what it says is over; when it says
   "One screen", stop.
 
-**Placed blocks: the rules**
+**Names and building blocks**
 
-- **Direct Children & IDs:** Every movable widget must be a direct child of `<body>`, styled with
-  inline coordinates (`left`, `top`, `width` on an 8px grid), and assigned a semantic, stable
-  `data-id` (e.g., `data-id="auth-flow"`). A block with no coordinates of its own sits at the
-  origin, which is what the document block relies on.
-- **Editable Word Runs:** Any continuous run of text and phrasing marks (`<b>`, `<a>`, `<span>`)
-  forms a single double-click editable field. Place strings that should be edited independently into
-  separate leaf elements. Never put editable copy in CSS, scripts, or attributes.
-- **Core Primitives:** Interchangeable box containers include `.card`, `.sticky`, `.text`, and
-  `.callout[data-tone="warn|danger|ok"]`. Specialized layout widgets include `.kpi`, `.table`, and
-  `.chip`.
+- **`data-id` is an optional name.** Put one on a block a person may want to comment on, or that
+  you may want to point at later (`data-id="auth-flow"`). Short, stable and meaningful. A block
+  needs no name to be on the board.
+- **Core Primitives:** Box containers include `.card`, `.sticky`, `.text`, and
+  `.callout[data-tone="warn|danger|ok"]`. Specialized widgets include `.kpi`, `.table`, and
+  `.chip`. They nest and flow like any other element.
 - **Markdown & Mermaid:** Add `data-md` (supports KaTeX via `$..$` / `$$..$$`) or `data-mermaid`
-  (always set explicit `width` and `height`). Double-clicking these opens raw source code in an
-  overlay editor.
+  (give a mermaid block a height).
 
 **Visuals, Diagrams, & Embeds**
 
-- **Custom SVG Diagrams:** Never mount raw `<svg>` elements directly under `<body>`. Wrap them inside
-  a standard box (`.card`, `.callout`) with `viewBox` and `width="100%"`. Use grid-derived
-  coordinates, orthogonal elbow paths (`M... H... V...`), explicit arrowhead offsets, and CSS variable
+- **Custom SVG Diagrams:** Put an `<svg>` inside a box (`.card`, `.callout`) with a `viewBox` and
+  `width="100%"`, so it scales with the page. Inside it, use even coordinates, orthogonal elbow paths (`M... H... V...`), explicit arrowhead offsets, and CSS variable
   styling.
 - **Embed External Media:** Embed local files via
-  `<div class="embed" data-embed="../path" style="...">`. For interactive HTML embeds, include
+  `<div class="embed" data-embed="../path" style="height: 480px">`. For interactive HTML embeds, include
   `<script src="../lib/embed-guest.js"></script>` to forward canvas scroll and pinch gestures.
 - **A document to write in is a document board, not an embed.** A `.md`, `.tex` or `.docx` the
   person will type into goes in a board of its own holding one box,
-  `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md" style="left: 0; top: 0; right: 0; bottom: 0"></div>`
+  `<div class="live" data-id="doc" data-live="doc" data-path="../papers/paper.md"></div>`, which fills the board
   (the path relative to the board), at about 1000 by 1100. Markdown and LaTeX are typed into as
   they read, with a toolbar of styles; Word is typed into a paragraph at a time. The file is edited
   where it is: every keystroke goes to it, and its history and review are kept apart in `docs/<name>/`,
@@ -103,8 +95,7 @@ description: How to write a board. One format: a one-screen page you design, who
   nothing added to the board. The colours are the `--b-code-*` tokens, so a code block is light and
   dark with the rest of the board. A fence with no language is drawn plain, because the runtime never
   guesses, and so is a language outside the bundle's common set. Inline `<code>` in a sentence is
-  never coloured. A `pre` is not retypeable in place: its spacing is content. Change code by editing
-  the file, or as the source of a markdown panel.
+  never coloured. Change code by editing the file.
 - **Links: a board link opens a board, anything else opens a tab.** Write a link to another board as
   a path relative to this one, the way an embed is written: `<a href="risks.html">the risks
   board</a>`. Clicking it puts that board on the canvas beside the board that linked to it. Every

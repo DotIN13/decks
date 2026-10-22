@@ -191,9 +191,8 @@ export class BoardService {
 	/**
 	 * The measurement for this board *at this revision*, or nothing.
 	 *
-	 * `h` is the room the content needs — the furthest edge of the root-level blocks, or the
-	 * document's own height, whichever is greater — and `page` is that second number alone, so a
-	 * caller can tell a board that ends in a placed box from one that ends in its own padding.
+	 * `h` is the room the content needs: the page's own height, measured in the browser. `page` is
+	 * the same number, kept for callers that read it.
 	 */
 	extent(path: string, rev: number, at?: number): { w: number; h: number; page?: number } | undefined {
 		const extent = this.extents.get(path);
@@ -328,9 +327,7 @@ export class BoardService {
 	 */
 	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string {
 		/*
-		 * Always `.html`, and always blank when it is created — there are no templates any more;
-		 * the examples a board can be modelled on live in `examples/` beside the deck, refreshed
-		 * on restart.
+		 * Always `.html`, and always blank when it is created — there are no templates any more.
 		 */
 		const extension = ".html";
 		const base = slugFor(options.title);

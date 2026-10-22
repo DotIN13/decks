@@ -85,14 +85,10 @@ ${body}
 }
 
 /**
- * Markdown, or an HTML document.
+ * Markdown, or an HTML document, in one `.doc` block: the board's page, flowing (board.css).
  *
- * `data-id="body"` because the editor addresses components by `data-id` and this board has
- * exactly one — so a double-click has something to land on, and the source editor knows
- * which file it is editing without being told.
- *
- * No inline height: a flow board's height is whatever its content is, and `board.js` reports
- * that measurement back rather than the deck guessing it.
+ * `data-id="body"` is a name, so a comment on the board has a block to land on. No height:
+ * the board is as tall as its content, and the canvas measures it.
  */
 function flowBody(file: string, framed: boolean): string {
 	/*
@@ -101,13 +97,12 @@ function flowBody(file: string, framed: boolean): string {
 	 * Markdown is rendered *into* this document, so the component grows to its content and
 	 * the board can report a true height. A document from somewhere else goes into a
 	 * sandboxed, opaque-origin iframe — which has no intrinsic height and cannot be measured
-	 * from outside — so it gets the board's height and is resized by dragging the edge. It is
-	 * sandboxed because it may carry scripts and must not run in the deck's own origin;
-	 * a flow board *this app* wrote never reaches here at all.
+	 * from outside — so it fills the board's frame (board.css, `.doc[data-framed]`) and keeps
+	 * the height it was given. It is sandboxed because it may carry scripts and must not run
+	 * in the deck's own origin; a board *this app* wrote never reaches here at all.
 	 */
-	const box = framed ? "left: 0; top: 0; width: 100%; height: 100%" : "left: 0; top: 0; width: 100%";
 	const flag = framed ? " data-framed=\"true\"" : "";
-	return `		<div class="doc" data-id="body"${flag} data-embed="${file}" style="${box}"></div>`;
+	return `		<div class="doc" data-id="body"${flag} data-embed="${file}"></div>`;
 }
 
 /** Five entities, the same five `deck/meta.ts` decodes. */

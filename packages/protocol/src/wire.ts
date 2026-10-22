@@ -94,10 +94,8 @@ export type ClientMessage =
 	 * carries the `rev` it was taken at, because a measurement of a document that has
 	 * since been rewritten is not a measurement of anything.
 	 *
-	 * `h` is the room the content needs: the furthest edge of the root-level blocks, or the
-	 * document's own height, whichever is greater. `page` is that second number on its own,
-	 * so `decks.canvas.fit` can tell the two apart — a board of placed boxes is fitted with a margin
-	 * of room under the last one, and a document that ends in its own bottom padding is not.
+	 * `h` is the room the content needs: the page's own height. `page` is the same number; a
+	 * reading without it (an older frame) is fitted with a margin under it.
 	 */
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }

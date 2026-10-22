@@ -12,10 +12,10 @@ Status: **all six milestones built and verified** — deck and stage, one agent,
 
 ## 1. Product definition
 
-A **board** is a local HTML file whose root-level blocks are absolutely positioned. A block that
-states where it goes is placed there; one that does not sits at the origin and holds a document that
-reads top to bottom. That covers what used to be two formats, `component` and `flow`, and they are
-one: a board is a file, and how it lays itself out is CSS rather than a kind. It is where a
+A **board** is a local HTML file: one page whose content flows top to bottom, laid out with
+ordinary CSS, as wide as its `<meta>` says and as tall as its content. What used to be two
+formats, `component` and `flow`, is one: a board is a file, and how it lays itself out is CSS
+rather than a kind. It is where a
 plan gets drafted, and where the agent reports that work is done. Both sides draw on
 it: the agent by editing the file with its ordinary tools, the user by direct
 manipulation. Because a board is a file it is also an artifact — it passes between
@@ -175,20 +175,23 @@ reason.
 ## 3. The board file
 
 ```html
-<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}'>
+<meta name="board" content='{"w":1000}'>
 <link rel="stylesheet" href="../lib/board.css">
-<section class="card" data-id="goal" style="left:40px;top:40px;width:360px">
-  <h3>Goal</h3>
-</section>
-<div data-embed="../papers/oauth.pdf" data-pages="3-5" data-id="spec" …></div>
-<script src="../lib/board.js"></script>
+<body class="board">
+  <div class="doc">
+    <h1>Goal</h1>
+    <section class="card" data-id="goal">…</section>
+    <div data-embed="../papers/oauth.pdf" data-pages="3-5" data-id="spec" …></div>
+  </div>
+  <script src="../lib/board.js"></script>
+</body>
 ```
 
-- Intrinsic size lives in the board's own `<meta>`, because how big a page is, is a
-  property of the page. Position does not; that is the arrangement's business.
-- **Every component carries `data-id`.** It is what makes a board addressable from
-  three directions: the agent edits by unique anchor, the stage highlights by id, and
-  a user's drag becomes a patch against an id rather than against a pixel.
+- The width lives in the board's own `<meta>`, because how wide a page is, is a property
+  of the page; the height is its content's, and a stated `h` is a floor. Position on the
+  canvas does not; that is the arrangement's business.
+- **`data-id` is an optional name on a block.** It lets a person comment on one block and
+  an agent point at one (the stage highlights by id, and change marks outline it).
 - **A run of words the user can retype is a leaf**: an element holding text and no other
   elements. Nothing declares it — the shape is the rule, and a retype is addressed by the
   component's id plus the element-child indices walked in from it (§6.5). What the
@@ -446,14 +449,9 @@ an existing board.
 
 **The shell is blank, and there are no templates.** A board is a heading and the import
 map, and nothing else: a served shape decided too much of the board before the writer had
-a sentence, and a board that starts shaped is a board the writer keeps the shape of. What
-an agent reaches for instead is the **examples** (`runtime/examples`, copied into every
-deck's `examples/` on restart by `deck/lib-sync.ts`, the same content-compared copy as
-`lib/`). Nine worked boards — three for coding, three for research, three for business —
-use the libraries the import map names, and the deck context tells the agent to borrow
-their structure rather than to start from one. The blank document is a string in
-`boards/templates.ts` because it is four lines and there is one of it; the examples are
-files, because they are meant to be read and copied.
+a sentence, and a board that starts shaped is a board the writer keeps the shape of. The
+blank document is a string in `boards/templates.ts` because it is four lines and there is
+one of it.
 
 The write itself lives in `boards/service.ts`, which is where board writes and their
 revisions live; the extension reaches it through `StageService`. The old `kind` and
