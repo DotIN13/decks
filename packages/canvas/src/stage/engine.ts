@@ -134,6 +134,8 @@ export class StageEngine {
 	private view = { width: 0, height: 0 };
 	private scheme: "light" | "dark" = "light";
 	private moving = false;
+	/** The zoom has changed since the camera started moving: tiles are wanted at the power of two under it (`scaleFor`), not the exact scale. */
+	private zooming = false;
 	/** The drawing as both engines hold it, and the address its pictures are relative to. */
 	private doc: PenDocument | undefined;
 	private base = "";
@@ -771,6 +773,8 @@ export class StageEngine {
 
 	/** In the call that moves the board pages, and drawn there, so the two land in one frame. */
 	setCamera(camera: Camera): void {
+		// Zooming once the zoom changes while the camera moves, until it rests (`setMoving`): a pan at one zoom keeps the exact scale.
+		if (this.moving && camera.zoom !== this.camera.zoom) this.zooming = true;
 		this.camera = camera;
 		this.draw();
 		this.sendCamera();
@@ -791,6 +795,7 @@ export class StageEngine {
 	setMoving(moving: boolean): void {
 		if (moving === this.moving) return;
 		this.moving = moving;
+		if (!moving) this.zooming = false;
 		this.sendCamera();
 		if (!moving) {
 			this.wantBoardPictures();
@@ -808,10 +813,10 @@ export class StageEngine {
 		if (!this.view.width) return;
 		const { x, y, zoom, width, height } = this.drawRect();
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		// Pinching, the tiles are painted at half the screen's density (`setPinching`).
-		const sent = { zoom, dpr: this.pinching && this.moving ? dpr / 2 : dpr, moving: this.moving };
+		// Fingers pinching the zoom: tiles at half the screen's density (`setPinching`); a two-finger pan at one zoom keeps the exact scale.
+		const sent = { zoom, dpr: this.pinching && this.zooming ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming };
 		this.post({ type: "camera", x, y, width, height, ...sent });
-		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.moving);
+		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
 		if (want !== undefined && want !== this.wantScale) {
 			this.wantScale = want;
 			this.dropUnwanted();
@@ -964,7 +969,7 @@ export class StageEngine {
 		}
 		this.shownSeen = Math.max(this.shownSeen, this.seenAtDraw);
 		const at = this.drawRect();
-		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.moving);
+		const ops = this.page.frame(at.x, at.y, at.zoom, Math.min(2, devicePixelRatio || 1), at.width, at.height, this.zooming);
 		this.drawnAt = { x: at.x, y: at.y, zoom: at.zoom };
 		this.place();
 		this.lastOps = ops;

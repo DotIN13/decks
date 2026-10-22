@@ -108,7 +108,8 @@ export type ToWorker =
 	| { type: "view"; view: string }
 	| { type: "lift"; ids: string[] }
 	| { type: "drop"; ids: string[] }
-	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean }
+	/** `zooming`: the zoom changed while the camera moves, so tiles are painted at the power of two under it; a pan keeps the exact scale. */
+	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean; zooming?: boolean }
 	| { type: "dropped"; keys: Array<[number, number, number]> };
 
 /**

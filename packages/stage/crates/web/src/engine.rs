@@ -428,7 +428,7 @@ impl Page {
 	///
 	/// A board going live loses its picture in the frame that shows its page; no tile is painted
 	/// again for it. Tiles and pictures lie on whole device pixels.
-	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> DrawList {
+	pub fn frame(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool) -> DrawList {
 		self.frame += 1;
 		// Room for three windows of tiles at this screen's size, with the ring round them, and never
 		// under the floor: a 2x screen needs far more than a 1x one.
@@ -490,7 +490,7 @@ impl Page {
 		// failing that the sharper tiles of one scale that lie in it, drawn smaller (a zoom out holds
 		// only sharper ones). Never two scales layered in a place: tiles are clear where nothing is
 		// drawn, so a stale one under a fresh one would show through.
-		let want = scale_for(camera.zoom * dpr, moving);
+		let want = scale_for(camera.zoom * dpr, zooming);
 		let scales = match self.scales.take() {
 			Some((at, scales)) if at == want.to_bits() => scales,
 			_ => {
@@ -1057,9 +1057,9 @@ impl Worker {
 	///
 	/// For tests and measures: the lists are built one after another without being drawn, so text in
 	/// an earlier one may point at glyphs a later one has replaced. Painting goes through `paint`.
-	pub fn next(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize) -> Vec<(Key, DrawList)> {
+	pub fn next(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool, limit: usize) -> Vec<(Key, DrawList)> {
 		let mut out = Vec::new();
-		self.paint(camera, dpr, width, height, moving, limit, &mut |key, list, _| out.push((key, list)));
+		self.paint(camera, dpr, width, height, zooming, limit, &mut |key, list, _| out.push((key, list)));
 		out
 	}
 
@@ -1068,9 +1068,9 @@ impl Worker {
 	/// replace a glyph it uses. A list whose own glyphs were pushed out while it was built (the texture
 	/// full of them alone) is built again. Returns how many tiles were painted.
 	#[allow(clippy::too_many_arguments)]
-	pub fn paint(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize, draw: &mut dyn FnMut(Key, DrawList, &mut Atlas)) -> usize {
+	pub fn paint(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool, limit: usize, draw: &mut dyn FnMut(Key, DrawList, &mut Atlas)) -> usize {
 		self.settle();
-		let scale = scale_for(camera.zoom * dpr, moving);
+		let scale = scale_for(camera.zoom * dpr, zooming);
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
 		/*
@@ -1121,9 +1121,9 @@ impl Worker {
 	/// How many tiles the window itself (no margin) still needs at the scale it wants: missing, or
 	/// stale. 0 means what the page shows of the window is painted from the drawing as it is now.
 	/// A count for measures (`e2e/checks/render-perf.mjs`): a few lookups, made once per batch.
-	pub fn view_left(&self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> usize {
+	pub fn view_left(&self, camera: Camera, dpr: f64, width: f64, height: f64, zooming: bool) -> usize {
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
-		let wanted = Grid::covering(&view, scale_for(camera.zoom * dpr, moving), 0);
+		let wanted = Grid::covering(&view, scale_for(camera.zoom * dpr, zooming), 0);
 		wanted.iter().filter(|k| self.grid.tiles.get(k).is_none_or(|t| t.dirty || t.texture.is_none())).count()
 	}
 

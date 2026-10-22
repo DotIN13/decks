@@ -90,6 +90,11 @@ function paintNext(): void {
  * zoom at scales no longer wanted by the time they came); at rest, twelve.
  */
 const batchFor = (moving: boolean) => (moving ? 1 : 12);
+/**
+ * Whether the zoom is changing: then tiles are painted at the power of two under it (`scaleFor`);
+ * otherwise, a pan included, at the exact scale. A page from before `zooming` says only `moving`.
+ */
+const zoomingOf = (c: { moving: boolean; zooming?: boolean }) => c.zooming ?? c.moving;
 
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
 function paint(): void {
@@ -104,11 +109,11 @@ function paint(): void {
 	painting = true;
 	try {
 		const c = camera;
-		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
+		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, zoomingOf(c), batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
 		if (tiles.length) {
-			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
+			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, zoomingOf(c));
 			if (left === 0) viewDone = true;
-			const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
+			const rest = zoomingOf(c) ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
 			told = got;
 			scope.postMessage({ type: "tiles", tiles, left, got, rest, overview: engine.overviewScale() }, tiles.map((t) => t.bitmap));
 			report();
@@ -131,15 +136,15 @@ async function paintPixels(): Promise<void> {
 	painting = true;
 	try {
 		const c = camera;
-		const tiles = engine.paintPixels(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; buffer: GPUBuffer; stride: number }>;
+		const tiles = engine.paintPixels(c.x, c.y, c.zoom, c.dpr, c.width, c.height, zoomingOf(c), batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; buffer: GPUBuffer; stride: number }>;
 		if (!tiles.length) {
 			painting = false;
 			nothingToPaint(c);
 			return;
 		}
-		const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
+		const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, zoomingOf(c));
 		if (left === 0) viewDone = true;
-		const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
+		const rest = zoomingOf(c) ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
 		const sentAt = got;
 		await Promise.all(tiles.map((t) => t.buffer.mapAsync(GPUMapMode.READ)));
 		const out = tiles.map((t) => {

@@ -122,8 +122,9 @@ export class PageEngine {
     /**
      * Draw the screen for a camera, under and over the boards' pages. Call it in the same
      * animation frame that moves the pages. Returns how many draw operations it made.
+     * `zooming`: the zoom is changing, so tiles are wanted at the power of two under it.
      */
-    frame(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean): number;
+    frame(x: number, y: number, zoom: number, dpr: number, width: number, height: number, zooming: boolean): number;
     generation(): number;
     /**
      * Whether `wantedPictures` has anything to say: asked before it, so most frames make no JSON.
@@ -314,11 +315,11 @@ export class WorkerEngine {
      * into its texture (`PageEngine::putTilePixels`) rather than copy a picture, which under
      * WebKit costs its thread about 2 ms a tile. Empty on WebGL 2, which has no such buffers here.
      */
-    paintPixels(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, limit: number): Array<any>;
+    paintPixels(x: number, y: number, zoom: number, dpr: number, width: number, height: number, zooming: boolean, limit: number): Array<any>;
     /**
      * Paint up to `limit` tiles the view needs: `[{ scale, x, y, bitmap }]`, bitmaps to transfer.
      */
-    paint(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, limit: number): Array<any>;
+    paint(x: number, y: number, zoom: number, dpr: number, width: number, height: number, zooming: boolean, limit: number): Array<any>;
     putIcon(key: string, json: string): void;
     /**
      * As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
@@ -337,7 +338,7 @@ export class WorkerEngine {
     /**
      * Tiles the window still needs after the last `paint` (`Worker::view_left`), for measures.
      */
-    viewLeft(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean): number;
+    viewLeft(x: number, y: number, zoom: number, dpr: number, width: number, height: number, zooming: boolean): number;
     wantedPictures(): string;
 }
 

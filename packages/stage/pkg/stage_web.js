@@ -380,17 +380,18 @@ export class PageEngine {
     /**
      * Draw the screen for a camera, under and over the boards' pages. Call it in the same
      * animation frame that moves the pages. Returns how many draw operations it made.
+     * `zooming`: the zoom is changing, so tiles are wanted at the power of two under it.
      * @param {number} x
      * @param {number} y
      * @param {number} zoom
      * @param {number} dpr
      * @param {number} width
      * @param {number} height
-     * @param {boolean} moving
+     * @param {boolean} zooming
      * @returns {number}
      */
-    frame(x, y, zoom, dpr, width, height, moving) {
-        const ret = wasm.pageengine_frame(this.__wbg_ptr, x, y, zoom, dpr, width, height, moving);
+    frame(x, y, zoom, dpr, width, height, zooming) {
+        const ret = wasm.pageengine_frame(this.__wbg_ptr, x, y, zoom, dpr, width, height, zooming);
         return ret >>> 0;
     }
     /**
@@ -1048,12 +1049,12 @@ export class WorkerEngine {
      * @param {number} dpr
      * @param {number} width
      * @param {number} height
-     * @param {boolean} moving
+     * @param {boolean} zooming
      * @param {number} limit
      * @returns {Array<any>}
      */
-    paintPixels(x, y, zoom, dpr, width, height, moving, limit) {
-        const ret = wasm.workerengine_paintPixels(this.__wbg_ptr, x, y, zoom, dpr, width, height, moving, limit);
+    paintPixels(x, y, zoom, dpr, width, height, zooming, limit) {
+        const ret = wasm.workerengine_paintPixels(this.__wbg_ptr, x, y, zoom, dpr, width, height, zooming, limit);
         return ret;
     }
     /**
@@ -1064,12 +1065,12 @@ export class WorkerEngine {
      * @param {number} dpr
      * @param {number} width
      * @param {number} height
-     * @param {boolean} moving
+     * @param {boolean} zooming
      * @param {number} limit
      * @returns {Array<any>}
      */
-    paint(x, y, zoom, dpr, width, height, moving, limit) {
-        const ret = wasm.workerengine_paint(this.__wbg_ptr, x, y, zoom, dpr, width, height, moving, limit);
+    paint(x, y, zoom, dpr, width, height, zooming, limit) {
+        const ret = wasm.workerengine_paint(this.__wbg_ptr, x, y, zoom, dpr, width, height, zooming, limit);
         return ret;
     }
     /**
@@ -1154,11 +1155,11 @@ export class WorkerEngine {
      * @param {number} dpr
      * @param {number} width
      * @param {number} height
-     * @param {boolean} moving
+     * @param {boolean} zooming
      * @returns {number}
      */
-    viewLeft(x, y, zoom, dpr, width, height, moving) {
-        const ret = wasm.workerengine_viewLeft(this.__wbg_ptr, x, y, zoom, dpr, width, height, moving);
+    viewLeft(x, y, zoom, dpr, width, height, zooming) {
+        const ret = wasm.workerengine_viewLeft(this.__wbg_ptr, x, y, zoom, dpr, width, height, zooming);
         return ret >>> 0;
     }
     /**

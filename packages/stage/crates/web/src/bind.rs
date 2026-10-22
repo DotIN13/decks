@@ -534,14 +534,15 @@ impl PageEngine {
 	/// Draw the screen for a camera, under and over the boards' pages. Call it in the same
 	/// animation frame that moves the pages. Returns how many draw operations it made.
 	#[allow(clippy::too_many_arguments)]
-	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool) -> u32 {
+	/// `zooming`: the zoom is changing, so tiles are wanted at the power of two under it.
+	pub fn frame(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool) -> u32 {
 		let Some(gpu) = &mut self.gpu else { return 0 };
 		let size = ((width * dpr).round() as u32, (height * dpr).round() as u32);
 		if size != self.size {
 			gpu.resize(size.0, size.1);
 			self.size = size;
 		}
-		let over = self.page.frame(Camera { x, y, zoom }, dpr, width, height, moving);
+		let over = self.page.frame(Camera { x, y, zoom }, dpr, width, height, zooming);
 		stage_paint::flush_glyphs(&mut self.page.atlas.borrow_mut(), gpu);
 		let n = over.ops.len() as u32;
 		gpu.draw(Target::Screen, &over);
@@ -670,12 +671,12 @@ impl WorkerEngine {
 
 	/// Paint up to `limit` tiles the view needs: `[{ scale, x, y, bitmap }]`, bitmaps to transfer.
 	#[allow(clippy::too_many_arguments)]
-	pub fn paint(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, limit: u32) -> js_sys::Array {
+	pub fn paint(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool, limit: u32) -> js_sys::Array {
 		let out = js_sys::Array::new();
 		let (Some(gpu), Some(canvas)) = (&mut self.gpu, &self.canvas) else { return out };
 		// Each tile drawn as soon as its list is built, before the next can replace one of its glyphs.
 		let mut sent = Vec::new();
-		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize, &mut |key, list, atlas| {
+		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, zooming, limit as usize, &mut |key, list, atlas| {
 			stage_paint::flush_glyphs(atlas, gpu);
 			gpu.draw(Target::Screen, &list);
 			let Ok(bitmap) = canvas.transfer_to_image_bitmap() else { return };
@@ -702,7 +703,7 @@ impl WorkerEngine {
 	/// WebKit costs its thread about 2 ms a tile. Empty on WebGL 2, which has no such buffers here.
 	#[allow(clippy::too_many_arguments)]
 	#[wasm_bindgen(js_name = paintPixels)]
-	pub fn paint_pixels(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, limit: u32) -> js_sys::Array {
+	pub fn paint_pixels(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool, limit: u32) -> js_sys::Array {
 		let out = js_sys::Array::new();
 		let Some(gpu) = &mut self.gpu else { return out };
 		if gpu.api() != stage_gpu::Api::WebGpu {
@@ -713,7 +714,7 @@ impl WorkerEngine {
 		}
 		let pool = &mut self.read_back;
 		let mut sent = Vec::new();
-		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize, &mut |key, list, atlas| {
+		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, zooming, limit as usize, &mut |key, list, atlas| {
 			stage_paint::flush_glyphs(atlas, gpu);
 			gpu.draw(Target::Texture(READ_TILE), &list);
 			let n = sent.len();
@@ -747,8 +748,8 @@ impl WorkerEngine {
 
 	/// Tiles the window still needs after the last `paint` (`Worker::view_left`), for measures.
 	#[wasm_bindgen(js_name = viewLeft)]
-	pub fn view_left(&self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool) -> u32 {
-		self.worker.view_left(Camera { x, y, zoom }, dpr, width, height, moving) as u32
+	pub fn view_left(&self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, zooming: bool) -> u32 {
+		self.worker.view_left(Camera { x, y, zoom }, dpr, width, height, zooming) as u32
 	}
 
 	pub fn lift(&mut self, items: &str) {
