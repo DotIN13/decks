@@ -605,6 +605,12 @@ impl WorkerEngine {
 		out
 	}
 
+	/// Tiles the window still needs after the last `paint` (`Worker::view_left`), for measures.
+	#[wasm_bindgen(js_name = viewLeft)]
+	pub fn view_left(&self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool) -> u32 {
+		self.worker.view_left(Camera { x, y, zoom }, dpr, width, height, moving) as u32
+	}
+
 	pub fn lift(&mut self, items: &str) {
 		self.worker.lift(&ids(items));
 	}

@@ -879,6 +879,15 @@ impl Worker {
 		n
 	}
 
+	/// How many tiles the window itself (no margin) still needs at the scale it wants: missing, or
+	/// stale. 0 means what the page shows of the window is painted from the drawing as it is now.
+	/// A count for measures (`e2e/checks/render-perf.mjs`): a few lookups, made once per batch.
+	pub fn view_left(&self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool) -> usize {
+		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
+		let wanted = Grid::covering(&view, scale_for(camera.zoom * dpr, moving), 0);
+		wanted.iter().filter(|k| self.grid.tiles.get(k).is_none_or(|t| t.dirty || t.texture.is_none())).count()
+	}
+
 	/// The tile was painted and sent.
 	pub fn sent(&mut self, key: Key) {
 		self.grid.painted(key, self.version);

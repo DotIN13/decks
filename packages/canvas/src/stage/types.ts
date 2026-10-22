@@ -83,7 +83,11 @@ export type ToWorker =
 export type FromWorker =
 	/** The worker is drawing, with this graphics API (`"webgpu"` or `"webgl2"`). */
 	| { type: "ready"; backend: string }
-	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }> }
+	/**
+	 * A batch of tiles; `left` is how many the window and its margin still need at the scale wanted
+	 * after it, and `got` how many messages the worker had taken when it painted them (for `sharpAt`).
+	 */
+	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>; left: number; got: number }
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }

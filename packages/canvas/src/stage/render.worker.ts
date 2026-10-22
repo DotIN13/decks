@@ -18,6 +18,8 @@ const scope = self as unknown as Scope;
 let engine: WorkerEngine | undefined;
 let camera: Extract<ToWorker, { type: "camera" }> | undefined;
 let painting = false;
+/** Messages taken from the page, every kind: the page compares it with what it posted (`sharpAt` in `engine.ts`). */
+let got = 0;
 const early: ToWorker[] = [];
 
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
@@ -27,7 +29,10 @@ function paint(): void {
 	try {
 		const c = camera;
 		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, c.moving ? 4 : 12) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
-		if (tiles.length) scope.postMessage({ type: "tiles", tiles }, tiles.map((t) => t.bitmap));
+		if (tiles.length) {
+			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
+			scope.postMessage({ type: "tiles", tiles, left, got }, tiles.map((t) => t.bitmap));
+		}
 		report();
 		painting = false;
 		if (tiles.length) setTimeout(paint, 0);
@@ -115,6 +120,7 @@ function take(message: ToWorker): void {
 }
 
 scope.onmessage = ({ data }) => {
+	got++;
 	if (data.type === "init") {
 		void start(data).catch((error: unknown) => scope.postMessage({ type: "failed", message: `the render worker did not start: ${String((error as Error)?.message ?? error)}` }));
 		return;

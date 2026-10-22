@@ -52,8 +52,15 @@ const SLACK_PX = 320;
 const MAX_SIDE = 8192;
 
 /** What the stage last did, for checks and the crash recorder to read: the old sheet's counters, and the engine's. */
-type SheetStats = Record<string, unknown> & { shown?: number; ink?: number };
-const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0 });
+/**
+ * `shown` counts the page's draws and `tiles` the worker's tiles that reached the page. `sharpAt` is
+ * the `performance.now()` of the first draw at rest after a batch from a worker that had every
+ * message the page sent it (the drawing, its fonts, pictures) and had nothing left to paint in the
+ * window and its margin at the resting scale, with no font still being fetched: the first sharp frame.
+ * Measured by `e2e/checks/render-perf.mjs`.
+ */
+type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; sharpAt?: number };
+const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
 
@@ -99,6 +106,13 @@ export class StageEngine {
 	private lifted = new Set<string>();
 	private sent = 0;
 	private shownSeen = 0;
+	/** Messages posted to the worker that is running now, and that count when the last one that changes what it paints was posted. */
+	private posted = 0;
+	private postedContent = 0;
+	/** Font files asked for and not yet given to the engines. */
+	private fontsPending = 0;
+	/** A batch came from a worker with nothing left to paint: the next draw at rest is a sharp one (`sharpAt`). */
+	private sharpNext = false;
 	/** A stage engine that could not start: the stage shows these words (`backends/notice.ts`) rather than drawing nothing silently. */
 	failed: ((notice: string) => void) | undefined;
 	/** After each new layout, so the stage can redraw a selection round what moved. */
@@ -191,6 +205,8 @@ export class StageEngine {
 		this.page.setMath(mathTypesetter());
 		this.paused = false;
 		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
+		this.posted = 0;
+		this.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
 		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory });
 		for (const font of this.fonts) {
@@ -247,7 +263,11 @@ export class StageEngine {
 	}
 
 	private post(message: ToWorker, transfer: Transferable[] = []): void {
-		this.worker?.postMessage(message, transfer);
+		if (this.worker) {
+			this.worker.postMessage(message, transfer);
+			this.posted++;
+			if (message.type !== "camera" && message.type !== "dropped") this.postedContent = this.posted;
+		}
 		this.sent++;
 	}
 
@@ -259,6 +279,8 @@ export class StageEngine {
 		switch (message.type) {
 			case "tiles":
 				for (const t of message.tiles) this.page.putTile(t.scale, t.x, t.y, t.bitmap);
+				sheetStats().tiles = (sheetStats().tiles ?? 0) + message.tiles.length;
+				if (message.left === 0 && message.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
 				{
 					const gone = JSON.parse(this.page.evict()) as Array<[number, number, number]>;
 					if (gone.length) this.post({ type: "dropped", keys: gone });
@@ -580,6 +602,10 @@ export class StageEngine {
 		this.place();
 		this.lastOps = ops;
 		sheetStats().shown = (sheetStats().shown ?? 0) + 1;
+		if (this.sharpNext && !this.moving) {
+			this.sharpNext = false;
+			sheetStats().sharpAt ??= performance.now();
+		}
 		const pictured = this.page.pictured();
 		if (pictured !== this.picturedKey) {
 			this.picturedKey = pictured;
@@ -821,6 +847,7 @@ export class StageEngine {
 		const files = fontFiles(needs).filter((file) => !this.fontsAsked.has(file.key));
 		if (!files.length) return;
 		for (const file of files) this.fontsAsked.add(file.key);
+		this.fontsPending += files.length;
 		void Promise.all(
 			files.map(async (file) => {
 				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
@@ -834,6 +861,7 @@ export class StageEngine {
 				return undefined;
 			}),
 		).then((loaded) => {
+			this.fontsPending -= files.length;
 			// Kept first: an engine started again after a lost device is given them from here.
 			const fonts = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
 			this.fonts.push(...fonts);
