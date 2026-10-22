@@ -55,7 +55,9 @@ export function OverlayLayer(
 		width: `${px}px`,
 		height: `${px}px`,
 		"transform-origin": "0 0",
-		transform: `scale(${1 / props.zoom}) translate(-50%, -50%)${after}`,
+		// A turn (a joined arrow end's diamond) goes before the shift to the middle, so it turns about the
+		// point itself: after it, with the origin at the corner, it swung the diamond half its size away.
+		transform: `scale(${1 / props.zoom})${after} translate(-50%, -50%)`,
 	});
 	/** More than one thing selected: each is outlined thin, and one box round them all is the strong line. */
 	const many = () => !!o().selectionFrame?.many;
