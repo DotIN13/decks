@@ -1084,8 +1084,11 @@ export function Stage(props: {
 	});
 
 
+	/** The camera and window the world was last placed for (`writeTransform`). */
+	let written: { cam: Camera; width: number; height: number } | undefined;
 	const writeTransform = (cam: Camera) => {
 		const v = view();
+		written = { cam, width: v.width, height: v.height };
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
@@ -1257,7 +1260,15 @@ export function Stage(props: {
 			cancelGlide();
 			localCamera = target;
 		}
-		writeTransform(target);
+		/*
+		 * Our own frame coming back (`writeCamera` put it on screen and then told the app) is already
+		 * drawn: placing it again drew nothing new but posted the camera to the worker and looked for
+		 * board pictures a second time each frame. A resize still re-frames.
+		 */
+		const v = view();
+		const w = written;
+		const same = !moved && w !== undefined && w.cam.x === target.x && w.cam.y === target.y && w.cam.zoom === target.zoom && w.width === v.width && w.height === v.height;
+		if (!same) writeTransform(target);
 		if (moved) cameraChanged();
 	});
 
