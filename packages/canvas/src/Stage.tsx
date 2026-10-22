@@ -331,10 +331,12 @@ export function Stage(props: {
 	 * behalf, and a check has no other way to wait for it to arrive without sleeping.
 	 */
 	const [gliding, setGliding] = createSignal(false);
-	/** A gesture on the drawing glass (`StageInk`): boards are pictures for it too, so a page's own animation repaints nothing under the pen. */
-	const [stroking, setStroking] = createSignal(false);
-	/** Boards as pictures for the length of a camera move or a stroke (`picturesWhileMoving`). */
-	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding() || stroking()));
+	/*
+	 * Boards as pictures for the length of a camera move (`picturesWhileMoving`). Not for a stroke:
+	 * on an iPad the pages coming back at the lift held one frame for 0.7 s, and a board's own
+	 * animation, which pictures would have stilled, is already held still there (`plain-board.tsx`).
+	 */
+	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 
 	/*
@@ -2480,7 +2482,6 @@ export function Stage(props: {
 					newId={freshId}
 					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
 					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
-					onStroke={setStroking}
 				/>
 			</Show>
 		</div>

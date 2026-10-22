@@ -41,8 +41,6 @@ export function StageInk(props: {
 	onShift: (ids: readonly string[], dx: number, dy: number) => void;
 	/** Take back the last edit, or put it back: a two- or three-finger tap. */
 	onStep?: (direction: "undo" | "redo") => void;
-	/** A gesture on the glass has begun, or ended: the stage shows boards as pictures meanwhile. */
-	onStroke?: (on: boolean) => void;
 }) {
 	let loop: SVGPathElement | undefined;
 	/** The stroke under the pen, as it is drawn. */
@@ -232,7 +230,6 @@ export function StageInk(props: {
 		if (gesture.kind === "draw") clearTimeout(gesture.timer);
 		if (gesture.kind === "scale") setResizing(undefined);
 		gesture = undefined;
-		props.onStroke?.(false);
 		clearLive();
 	};
 
@@ -349,7 +346,6 @@ export function StageInk(props: {
 		// The button on the barrel, or the other end of the pen, erases whatever tool is in hand.
 		const rubber = event.pointerType === "pen" && (event.button === 5 || (event.buttons & 32) !== 0);
 
-		props.onStroke?.(true);
 		if (tool === "eraser" || rubber) {
 			setInkSelection(undefined);
 			gesture = { kind: "erase", pointer: event.pointerId, gone: new Set() };
@@ -446,7 +442,6 @@ export function StageInk(props: {
 		event.stopPropagation();
 		const done = gesture;
 		gesture = undefined;
-		props.onStroke?.(false);
 		if (done.kind === "draw") clearTimeout(done.timer);
 		if (done.kind === "scale") setResizing(undefined);
 		if (done.kind === "draw" && event.type !== "pointercancel") {
