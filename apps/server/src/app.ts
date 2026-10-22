@@ -580,7 +580,7 @@ export class App {
 	 *
 	 * A data directory that does not exist yet is not an error — it is somebody starting.
 	 * The new deck is deliberately **empty** apart from the primitives: the first thing
-	 * you see is your own canvas, and the demo in `example/` is a thing you opt into by
+	 * you see is your own canvas, and the checks' deck in `e2e/fixture/` is a thing you opt into by
 	 * pointing at it.
 	 */
 	static open(config: Config): App {

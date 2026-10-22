@@ -30,7 +30,7 @@ to the canvas does not rearrange your own boards or fill your own revisions.
 ```bash
 npm run typecheck     # every workspace, including the extension and the browser checks
 npm test              # the unit tests, no model needed, plus the cascade gate's own tests
-npm run test:e2e      # the browser checks, ~2 min, over a throwaway copy of example/
+npm run test:e2e      # the browser checks, ~2 min, over a throwaway copy of e2e/fixture/
 ```
 
 **One more, and it is the one that catches what the others cannot.** The app's 13

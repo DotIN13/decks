@@ -95,7 +95,7 @@ the room `settings.json` and a recents list will want.
 
 **A first run creates an empty deck** — `boards/`, `assets/`, a copy of `runtime/lib`, a
 `deck.json` (`Deck.create`) — and nothing else. Not a copy of the demo: a blank canvas is
-the honest first screen, and `example/` is a data directory you opt into
+the honest first screen, and `e2e/fixture/` is a data directory the browser checks run on
 (`npm run dev:example`).
 
 **The transcripts are not in the deck.** They are Pi's, at

@@ -5,7 +5,7 @@ dist-public/
 .DS_Store
 
 # Per-deck state, not source: revisions, avatars and agent transcripts. Written into
-# whatever data directory is in use, including example/.
+# whatever data directory is in use, including e2e/fixture/.
 .decks/
 .pi/
 
@@ -14,25 +14,25 @@ dist-public/
 /data/
 /data2/
 
-# A copy of runtime/lib, so a board in the example deck is standalone. Written by the
+# A copy of runtime/lib, so a board in the e2e fixture deck is standalone. Written by the
 # server when it opens the deck (`App.refreshLib`), and committing it would duplicate
 # ~9 MB of vendored library on every change to the originals.
-/example/decks/lib/
+/e2e/fixture/decks/lib/
 
 # Local screenshot helpers, kept out of the tree because nothing references them.
 /check.mjs
 /shot.mjs
 
 # Signed-in Claude accounts, written into whatever data directory is in use — including
-# example/, which `npm run dev:example` points at. Real OAuth credentials and session
+# e2e/fixture/, which `npm run dev:example` points at. Real OAuth credentials and session
 # keys, so this is not source and must never be committed.
-/example/claude-accounts/
+/e2e/fixture/claude-accounts/
 
 # The shared-Chrome pairing code. `web-bridge.json` holds the code the extension pairs
 # with, written wherever the server runs, and it is a secret: a committed one is a live
 # one until somebody notices.
-/example/web-bridge.json
+/e2e/fixture/web-bridge.json
 
 # The antigravity runtime's own home, created under the data directory on first use.
-/example/antigravity-home/
+/e2e/fixture/antigravity-home/
 dist-packages/

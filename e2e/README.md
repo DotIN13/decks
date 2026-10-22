@@ -29,7 +29,7 @@ the fixture is a throwaway copy.
 - A pool of `DECKS_E2E_JOBS` workers (default 4). Worker *i* owns the port pair
   `DECKS_E2E_API_PORT + 2·i` / `DECKS_E2E_WEB_PORT + 2·i` (base 4329/4328), and runs one Vite
   (`npm run dev:web`) on its web port for the whole run.
-- For each check, the worker copies `example/` to a fresh `decks-e2e-*` directory under the
+- For each check, the worker copies `e2e/fixture/` to a fresh `decks-e2e-*` directory under the
   system temp, starts the server on it (`node --import tsx src/index.ts` in `apps/server`, the
   `start` script: no `--watch`, so saving a file mid-run cannot restart it), puts the whole deck
   in play (`resetStage`), runs the check — which opens its own browser — then stops that

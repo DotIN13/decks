@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "name": "Example",
+  "boards": {
+    "boards/how-deep-is-the-deep-sea.html": {
+      "x": 0,
+      "y": 2440
+    },
+    "boards/plan.html": {
+      "x": 0,
+      "y": 0
+    },
+    "boards/risks.html": {
+      "x": 860,
+      "y": 798
+    },
+    "boards/sources.html": {
+      "x": 0,
+      "y": 1160
+    }
+  },
+  "roots": [
+    {
+      "path": "../shared",
+      "writable": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 /**
  * Run the browser checks, each against a throwaway deck of its own.
  *
- * The fixture is a copy of `example/`, so the checks run on the same boards a reader can
+ * The fixture is a copy of `e2e/fixture/`, a deck kept only for these checks, so the checks run on boards a reader can
  * open with `npm run dev:example` — and never on a deck somebody is working in. Every check
  * gets a fresh copy and a fresh server on it, so no check sees what another one did, and a
  * pool of workers (`DECKS_E2E_JOBS`, 4 by default) runs several at once. The copies live
@@ -262,18 +262,18 @@ process.on("SIGTERM", () => {
 	process.exit(143);
 });
 
-/** A fresh copy of `example/`, as a check may find it: its own, so whatever it writes is gone after it. */
+/** A fresh copy of `e2e/fixture/`, as a check may find it: its own, so whatever it writes is gone after it. */
 function freshDeck() {
 	const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 	decks.add(data);
-	cpSync(join(root, "example"), data, { recursive: true });
-	// `example/decks/lib` is generated and gitignored, so a fresh clone has to be given one or every
+	cpSync(join(root, "e2e", "fixture"), data, { recursive: true });
+	// `e2e/fixture/decks/lib` is generated and gitignored, so a fresh clone has to be given one or every
 	// board in the fixture loads without its stylesheet.
-	cpSync(join(root, "runtime", "lib"), join(data, "decks", "lib"), { recursive: true });
+	cpSync(join(root, "packages", "board-host", "lib"), join(data, "decks", "lib"), { recursive: true });
 	// Revisions and agent transcripts from whoever ran the example deck last are not fixture.
 	rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });
 	rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
-	// Nor are the signed-in accounts: `example/claude-accounts` is gitignored but exists on any machine
+	// Nor are the signed-in accounts: `e2e/fixture/claude-accounts` is gitignored but exists on any machine
 	// where somebody has logged in from the example deck, and a fixture must not carry real credentials.
 	rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
 	return data;

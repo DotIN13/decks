@@ -7,7 +7,7 @@
 import { Deck } from "../deck/loader.ts";
 import { deckContext } from "./context.ts";
 
-const deck = Deck.open(process.argv[2] ?? "../../example/decks");
+const deck = Deck.open(process.argv[2] ?? "../../e2e/fixture/decks");
 const text = deckContext(deck);
 console.log(`length: ${text.length} chars, ~${Math.round(text.length / 4)} tokens`);
 for (const needle of ["delegate(", "decks canvas insert", "board-debug", "data-id", "interface Stage", "{{"]) {

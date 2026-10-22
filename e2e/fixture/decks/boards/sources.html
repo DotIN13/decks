@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Auth refresh — sources</title>
+		<meta name="board" content='{"w":1600,"h":1120,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="flow" data-id="page" data-migrated="placed" style="position: static; width: 100%">
+		<div class="flow-row" style="display: flex; align-items: flex-start; margin-top: 40px">
+			<div class="text" data-id="heading" style="position: static; flex: none; width: 700px; margin: 0px 0 0 48px">
+			<h2>What this is built on</h2>
+			<p style="color: var(--b-muted)">
+				The real documents, on the board. Not summaries of them.
+			</p>
+		</div>
+		</div>
+		<div class="flow-row" style="display: flex; align-items: flex-start; margin-top: 22px">
+			<div class="embed" data-id="notes" data-embed="../docs/notes.md"
+		 style="position: static; flex: none; width: 520px; margin: 0px 0 0 48px; height: 560px"></div>
+			<div class="embed" data-id="paper" data-embed="../papers/sample.pdf" data-pages="1-2"
+		 style="position: static; flex: none; width: 460px; margin: 4px 0 0 40px; height: 680px"></div>
+			<div class="embed" data-id="report" data-embed="../../shared/report.html"
+		 style="position: static; flex: none; width: 440px; margin: 4px 0 0 40px; height: 420px"></div>
+		</div>
+		<div class="flow-row" style="display: flex; align-items: flex-start; margin-top: 0px">
+			<div class="callout" data-id="note" style="position: static; flex: none; width: 520px; margin: 140px 0 0 48px">
+			An embed that cannot be resolved says so in place, with the path — the way a missing root
+			announces itself instead of leaving a blank rectangle.
+		</div>
+			<div class="embed" data-id="sketch" data-embed="../assets/sketch.svg"
+		 style="position: static; flex: none; width: 440px; margin: 0px 0 0 536px; height: 240px"></div>
+		</div>
+		<div class="flow-row" style="display: flex; align-items: flex-start; margin-top: 24px">
+			<div class="embed" data-id="missing" data-embed="~/nowhere/not-a-file.md"
+		 style="position: static; flex: none; width: 520px; margin: 16px 0 0 48px; height: 160px"></div>
+			<div class="embed" data-id="live" data-embed="../../shared/live-demo.html"
+		 style="position: static; flex: none; width: 440px; margin: 0px 0 0 536px; height: 216px"></div>
+		</div>
+	</div>
+
+		<!-- Deck-relative: stays a relative URL, so this board still works opened as a file. -->
+		<!-- A real PDF, pages 1-2 only: a citation shows the part it means. -->
+		<!--
+			Outside the deck, through a root declared in deck.json. Foreign HTML, so
+			board.js mounts it in a nested sandboxed frame; the page itself prints what
+			it can reach, which is how the quarantine shows its work.
+		-->
+		<!--
+			The other kind of HTML embed: a page that opts in with the embed guest protocol,
+			so it gets the pointer without a veil and posts back the scrolls it cannot use.
+		-->
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

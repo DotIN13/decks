@@ -206,7 +206,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 *
 	 * A Claude agent's runtime asks before a command it judges risky, and an unanswered
 	 * question stops the turn — so a suite with nobody watching would hang rather than
-	 * fail. The fixture is a throwaway copy of `example/`, so allowing is safe here in a
+	 * fail. The fixture is a throwaway copy of `e2e/fixture/`, so allowing is safe here in a
 	 * way it would not be in a real deck. Recorded on `asked` so a check can assert on it.
 	 */
 	const asked = [];
