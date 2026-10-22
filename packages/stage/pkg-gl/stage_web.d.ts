@@ -134,6 +134,10 @@ export class PageEngine {
      */
     landed(items: string): void;
     /**
+     * Lay the drawing out for the pictures put `later` since the last time; false if there were none.
+     */
+    layOutPictures(): boolean;
+    /**
      * Everything laid out again: after a batch of fonts added `later`.
      */
     layOut(): void;
@@ -172,8 +176,9 @@ export class PageEngine {
     /**
      * A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
      * own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
+     * `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
      */
-    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null): void;
+    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null, later?: boolean | null): void;
     /**
      * A tile's picture from the worker, copied into the page's own texture for it.
      */
@@ -298,8 +303,9 @@ export class WorkerEngine {
     putIcon(key: string, json: string): void;
     /**
      * As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
+     * `keep`: the bitmap is left open, to be handed to the page, which copies it too.
      */
-    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null): void;
+    putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null, keep?: boolean | null): void;
     reload(text: string, dark: boolean): void;
     /**
      * The tile canvas, `TILE` pixels square, and the GPU opened on it.
@@ -389,6 +395,7 @@ export interface InitOutput {
     readonly pageengine_hasWanted: (a: number) => number;
     readonly pageengine_landed: (a: number, b: number, c: number) => void;
     readonly pageengine_layOut: (a: number) => void;
+    readonly pageengine_layOutPictures: (a: number) => number;
     readonly pageengine_layout: (a: number) => [number, number];
     readonly pageengine_layoutChanges: (a: number) => [number, number];
     readonly pageengine_lift: (a: number, b: number, c: number) => void;
@@ -399,7 +406,7 @@ export interface InitOutput {
     readonly pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pictured: (a: number) => [number, number];
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number) => void;
+    readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
     readonly pageengine_putTile: (a: number, b: number, c: number, d: number, e: any) => void;
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
@@ -437,7 +444,7 @@ export interface InitOutput {
     readonly workerengine_new: (a: number, b: number, c: number) => [number, number, number];
     readonly workerengine_paint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
     readonly workerengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly workerengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number) => void;
+    readonly workerengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
     readonly workerengine_reload: (a: number, b: number, c: number, d: number) => [number, number];
     readonly workerengine_setGpu: (a: number, b: number, c: any) => void;
     readonly workerengine_setMarkdownReader: (a: number, b: any) => void;
@@ -449,8 +456,8 @@ export interface InitOutput {
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__95: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__96: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__97: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___web_sys_46aa44363d28b235___features__gen_Event__Event______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

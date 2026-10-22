@@ -70,7 +70,12 @@ pub async fn open_stage(canvas: web_sys::HtmlCanvasElement, width: u32, height: 
 /// No texture is made bigger than the device's picture limit: a bigger picture (the page resizes
 /// them first, so it should not come) keeps what fits, and says so. A picture with nothing in it
 /// (closed, or transferred away) is not copied (`copy_extent`), and the answer is false.
+/// Copy a bitmap into texture `id`, and close it, unless `keep` (it is handed on to the page after).
 fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool) -> bool {
+	copy_in_keep(gpu, id, bitmap, size, from_canvas, false)
+}
+
+fn copy_in_keep(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool) -> bool {
 	let Some(_) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (u32::MAX, u32::MAX)) else {
 		web_sys::console::warn_1(&"stage: a picture with nothing in it (closed, or sent elsewhere) was not copied".into());
 		return false;
@@ -87,7 +92,9 @@ fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(
 	let texture = gpu.texture_handle(id).expect("just made").clone();
 	let (cw, ch) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (w, h)).expect("not empty, checked above");
 	gpu.copy_bitmap(bitmap, &texture, cw, ch, from_canvas);
-	bitmap.close();
+	if !keep {
+		bitmap.close();
+	}
 	true
 }
 
@@ -320,14 +327,25 @@ impl PageEngine {
 
 	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
 	/// own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
+	/// `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
 	#[wasm_bindgen(js_name = putPicture)]
-	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>) {
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>, later: Option<bool>) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
 		if copy_in(gpu, id, &bitmap, None, false) {
-			self.page.picture(url, id, w, h);
+			if later.unwrap_or(false) {
+				self.page.picture_unlaid(url, id, w, h);
+			} else {
+				self.page.picture(url, id, w, h);
+			}
 		}
+	}
+
+	/// Lay the drawing out for the pictures put `later` since the last time; false if there were none.
+	#[wasm_bindgen(js_name = layOutPictures)]
+	pub fn lay_out_pictures(&mut self) -> bool {
+		self.page.lay_out_pictures()
 	}
 
 	/// Pictures asked for since the last call, to load: `["url", …]`.
@@ -684,12 +702,13 @@ impl WorkerEngine {
 	}
 
 	/// As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
+	/// `keep`: the bitmap is left open, to be handed to the page, which copies it too.
 	#[wasm_bindgen(js_name = putPicture)]
-	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>) {
+	pub fn put_picture(&mut self, url: &str, bitmap: web_sys::ImageBitmap, width: Option<u32>, height: Option<u32>, keep: Option<bool>) {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.worker.pictures.get(url).map(|p| p.0).unwrap_or(0x8000_0000 + self.worker.pictures.held.len() as u32);
-		if copy_in(gpu, id, &bitmap, None, false) {
+		if copy_in_keep(gpu, id, &bitmap, None, false, keep.unwrap_or(false)) {
 			self.worker.picture(url, id, w, h);
 		}
 	}

@@ -43,6 +43,8 @@ const STAND_IN_RETRY_MS = 1200;
 const STAND_IN_TRIES = 50;
 /** How long to wait before asking again for a picture that did not load, each time it fails again. */
 const PICTURE_RETRY_MS = [2000, 5000, 15000, 30000, 60000];
+/** Pictures from the worker that come within this long of the first are laid out for together. */
+const PICTURES_BATCH_MS = 16;
 /**
  * How far past each edge of the window the canvas is drawn, in screen pixels. A pan slides the canvas
  * last drawn rather than drawing it again, until the window reaches its edge: drawing the whole window
@@ -373,6 +375,16 @@ export class StageEngine {
 				break;
 			case "wanted":
 				this.wantPictures(message.urls);
+				break;
+			case "picture":
+				// Asked for before the engines started again, or for an address since let go: not wanted.
+				if (!this.picturesAsked.has(message.url)) {
+					message.bitmap.close();
+					break;
+				}
+				this.page.putPicture(message.url, message.bitmap, message.width, message.height, true);
+				this.picturesPut++;
+				this.layOutPicturesSoon();
 				break;
 			case "resync":
 				this.post({ type: "doc", doc: this.doc ? JSON.stringify(this.doc) : EMPTY, dark: this.scheme === "dark" });
@@ -953,7 +965,14 @@ export class StageEngine {
 		for (const url of urls) {
 			if (url.startsWith("icon:")) this.fetchIcon(url.slice(5));
 			else if (!this.picturesAsked.has(url)) {
-				this.fetchPicture(url, pictureAddress(url, this.base || location.href), false);
+				const address = pictureAddress(url, this.base || location.href);
+				// `__picturesOnPage`: fetched and decoded here, twice, as before, for measuring the two in one page.
+				if ((globalThis as { __picturesOnPage?: boolean }).__picturesOnPage || !this.worker) this.fetchPicture(url, address, false);
+				else {
+					// The worker fetches and decodes it, and hands it here (`picture`, `receive`).
+					this.picturesAsked.set(url, { url: address, source: url, tries: 0 });
+					this.post({ type: "fetchPicture", url, address: new URL(address, location.href).href, max: this.maxPicture });
+				}
 			}
 		}
 	}
@@ -963,8 +982,12 @@ export class StageEngine {
 		this.picturesAsked.set(key, asked);
 		if (this.fetching >= FETCHES) {
 			setTimeout(() => {
-				if (this.picturesAsked.get(key) === asked) this.picturesAsked.delete(key);
-				this.wantBoardPictures();
+				if (this.picturesAsked.get(key) !== asked) return;
+				this.picturesAsked.delete(key);
+				// A board's is asked for again with the boards in view; an image fill's by its address
+				// (the worker's asking again for it may have come while this one waited, and been let go).
+				if (board) this.wantBoardPictures();
+				else this.wantPictures([key]);
 			}, 200);
 			return;
 		}
@@ -1002,6 +1025,21 @@ export class StageEngine {
 				this.fetching--;
 			});
 	}
+
+	/**
+	 * The drawing laid out for the pictures the worker handed over, once for those that came close
+	 * together: each one laid the whole drawing out again and read it back (3 ms and more on 2,000 items).
+	 */
+	private layOutPicturesSoon(): void {
+		if (this.picturesTimer !== undefined) return;
+		this.picturesTimer = setTimeout(() => {
+			this.picturesTimer = undefined;
+			if (this.disposed || !this.page) return;
+			if (this.page.layOutPictures()) this.laidOut();
+			this.draw();
+		}, PICTURES_BATCH_MS);
+	}
+	private picturesTimer: ReturnType<typeof setTimeout> | undefined;
 
 	/**
 	 * A picture's bitmap, premultiplied, no bigger across than the device keeps one, and its own size

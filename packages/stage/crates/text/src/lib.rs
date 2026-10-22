@@ -121,11 +121,14 @@ pub struct Text {
 	families: Vec<String>,
 	measured: RefCell<HashMap<(String, u64), (f64, f64)>>,
 	/// Cards laid out, by their words, style, width and scheme: measured once, drawn from the same.
-	cards: RefCell<HashMap<(String, u64, bool), std::rc::Rc<card::Card>>>,
+	cards: RefCell<HashMap<CardKey, std::rc::Rc<card::Card>>>,
 	/// Reads a card's markdown; the app's reader when it gave one, this crate's otherwise.
 	reader: Option<Box<dyn Fn(&str) -> Option<Vec<markdown::Block>>>>,
 	/// Pictures' sizes, once they have arrived, so a card can make room for them.
 	pub images: RefCell<HashMap<String, (f32, f32)>>,
+	/// The cards laid out (their keys in `cards`) that asked for each picture's size: a picture
+	/// arriving makes only these stale (`picture`).
+	asked: RefCell<HashMap<String, Vec<CardKey>>>,
 	/// Typesets a formula's TeX (`math.rs`): the app's MathJax, when it gave it.
 	typeset: Option<Box<dyn Fn(&str, bool) -> Option<math::Formula>>>,
 	formulas: RefCell<HashMap<(bool, String), Option<std::rc::Rc<math::Formula>>>>,
@@ -134,6 +137,9 @@ pub struct Text {
 	/// Bumped when a font arrives: everything measured or drawn before it is stale.
 	pub generation: u64,
 }
+
+/// A card's words and style, width and scheme: what a card is laid out again for.
+type CardKey = (String, u64, bool);
 
 impl Default for Text {
 	fn default() -> Self {
@@ -156,6 +162,7 @@ impl Text {
 			typeset: None,
 			formulas: RefCell::new(HashMap::new()),
 			images: RefCell::new(HashMap::new()),
+			asked: RefCell::new(HashMap::new()),
 			dark: false,
 			generation: 0,
 		}
@@ -177,7 +184,21 @@ impl Text {
 	pub fn forget(&mut self) {
 		self.measured.borrow_mut().clear();
 		self.cards.borrow_mut().clear();
+		self.asked.borrow_mut().clear();
 		self.generation += 1;
+	}
+
+	/// A picture arrived, `width` × `height`: the cards that asked for its size are laid out again
+	/// when next asked for. True when there were any, so the drawing is laid out again for them; a
+	/// picture no card shows (an image fill) changes no layout.
+	pub fn picture(&self, url: &str, width: f32, height: f32) -> bool {
+		self.images.borrow_mut().insert(url.to_owned(), (width, height));
+		let Some(keys) = self.asked.borrow_mut().remove(url) else { return false };
+		let mut cards = self.cards.borrow_mut();
+		for key in &keys {
+			cards.remove(key);
+		}
+		true
 	}
 
 	/// The app's markdown reader: source in, blocks out.
@@ -220,9 +241,20 @@ impl Text {
 		}
 		let blocks = self.reader.as_ref().and_then(|r| r(source)).unwrap_or_else(|| markdown::parse(source));
 		let images = self.images.borrow();
-		let size = |url: &str| images.get(url).copied();
+		let wanted = RefCell::new(Vec::<String>::new());
+		let size = |url: &str| {
+			wanted.borrow_mut().push(url.to_owned());
+			images.get(url).copied()
+		};
 		let laid = std::rc::Rc::new(card::layout(self, &blocks, style, width, align, self.dark, &size));
 		drop(images);
+		let mut asked = self.asked.borrow_mut();
+		for url in wanted.into_inner() {
+			let keys = asked.entry(url).or_default();
+			if !keys.contains(&key) {
+				keys.push(key.clone());
+			}
+		}
 		self.cards.borrow_mut().insert(key, laid.clone());
 		laid
 	}

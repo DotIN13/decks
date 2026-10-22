@@ -96,6 +96,11 @@ export type ToWorker =
 	| { type: "fonts"; fonts: Array<{ name: string; bytes: Uint8Array; fallback: boolean }>; due: number }
 	/** `width` × `height`: the picture's own size, when the bitmap was made smaller to fit. */
 	| { type: "picture"; url: string; bitmap: ImageBitmap; width?: number; height?: number }
+	/**
+	 * An image fill or a card's picture for the worker to fetch from `address` and decode, keep, and
+	 * hand to the page as `picture` (`url` is its address in the drawing); no wider or taller than `max`.
+	 */
+	| { type: "fetchPicture"; url: string; address: string; max: number }
 	| { type: "icon"; key: string; shape: string }
 	| { type: "view"; view: string }
 	| { type: "lift"; ids: string[] }
@@ -116,6 +121,8 @@ export type FromWorker =
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }
+	/** A picture asked for with `fetchPicture`, decoded and kept by the worker, for the page to keep too. */
+	| { type: "picture"; url: string; bitmap: ImageBitmap; width: number; height: number }
 	| { type: "resync" }
 	| { type: "error"; message: string }
 	/** The worker could not open a device: the stage shows the notice (`backends/notice.ts`). */

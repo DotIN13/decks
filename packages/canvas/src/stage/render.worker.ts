@@ -112,6 +112,76 @@ function report(): void {
 	if (wanted.length) scope.postMessage({ type: "wanted", urls: wanted });
 }
 
+// --- pictures --------------------------------------------------------------------------------------
+
+/*
+ * Image fills and cards' pictures are fetched and decoded here, once, off the page's thread: the
+ * worker copies the bitmap for its tiles and hands the same bitmap to the page, which copies it for
+ * the items it draws itself (a drag's) and lays the drawing out for its size. The page used to fetch
+ * each, and decode it twice, once for each engine.
+ */
+/** Pictures fetched at once, and a stand-in picture asked for again this often, this many times. */
+const FETCHES = 6;
+const STAND_IN_RETRY_MS = 1200;
+const STAND_IN_TRIES = 50;
+/** How long to wait before asking again for a picture that did not load, each time it fails again. */
+const PICTURE_RETRY_MS = [2000, 5000, 15000, 30000, 60000];
+let fetching = 0;
+const queued: Array<() => void> = [];
+const pictureTries = new Map<string, { tries: number; failed: number }>();
+
+function fetchPicture(message: Extract<ToWorker, { type: "fetchPicture" }>): void {
+	if (fetching >= FETCHES) {
+		queued.push(() => fetchPicture(message));
+		return;
+	}
+	fetching++;
+	const tries = pictureTries.get(message.url) ?? { tries: 0, failed: 0 };
+	pictureTries.set(message.url, tries);
+	void fetch(message.address, { credentials: "same-origin" })
+		.then(async (response) => {
+			if (!response.ok) throw new Error(String(response.status));
+			const standIn = response.headers.get("X-Decks-Stand-In") === "1";
+			const { bitmap, width, height } = await decoded(await response.blob(), message.max);
+			if (!engine) return bitmap.close();
+			// Kept open by the engine, then the page's: it copies it as well, and closes it.
+			engine.putPicture(message.url, bitmap, width, height, true);
+			scope.postMessage({ type: "picture", url: message.url, bitmap, width, height }, [bitmap]);
+			paintSoon();
+			if (standIn && tries.tries++ < STAND_IN_TRIES) setTimeout(() => fetchPicture(message), STAND_IN_RETRY_MS);
+		})
+		.catch(() => {
+			// Not reachable now: drawn without it, as an empty place, and asked again later, a little longer each time.
+			const wait = PICTURE_RETRY_MS[tries.failed];
+			if (wait === undefined) return;
+			tries.failed++;
+			setTimeout(() => fetchPicture(message), wait);
+		})
+		.finally(() => {
+			fetching--;
+			queued.shift()?.();
+		});
+}
+
+/**
+ * A picture's bitmap, premultiplied, no bigger across than both devices keep one (`max`, the page's,
+ * and the worker's own), and its own size (`width` × `height`, which lays it out).
+ */
+async function decoded(blob: Blob, max: number): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+	const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "premultiply" });
+	const { width, height } = bitmap;
+	const cap = Math.min(max, maxPicture);
+	const fit = Math.min(1, cap / Math.max(width, height, 1));
+	if (fit >= 1) return { bitmap, width, height };
+	// From the file again, not from `bitmap`: WebKit's WebGL takes a bitmap made from a bitmap as
+	// straight and premultiplies it a second time (every partly clear pixel too dark).
+	bitmap.close();
+	const smaller = await createImageBitmap(blob, { premultiplyAlpha: "premultiply", resizeWidth: Math.max(1, Math.floor(width * fit)), resizeHeight: Math.max(1, Math.floor(height * fit)), resizeQuality: "high" });
+	return { bitmap: smaller, width, height };
+}
+/** The widest and tallest picture the worker's device keeps. */
+let maxPicture = 4096;
+
 /** The engine loaded and the worker's device open (`boot`), before the drawing comes. */
 let booted: ReturnType<typeof boot> | undefined;
 function boot(message: { backend?: string; lowMemory?: boolean; module?: WebAssembly.Module }) {
@@ -132,6 +202,7 @@ async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void
 	// A page that sent no `boot` (one from before it) says the backend here.
 	const { chosen, stage, canvas, gpu } = await (booted ??= boot(message));
 	const backend = gpu.backend();
+	maxPicture = gpu.maxPictureSize();
 	// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
 	engine = new stage.WorkerEngine(EMPTY, message.dark);
 	engine.setGpu(gpu, canvas);
@@ -181,6 +252,9 @@ function take(message: ToWorker): void {
 			break;
 		case "picture":
 			engine.putPicture(message.url, message.bitmap, message.width, message.height);
+			break;
+		case "fetchPicture":
+			fetchPicture(message);
 			break;
 		case "icon":
 			engine.putIcon(message.key, message.shape);

@@ -418,6 +418,14 @@ export class PageEngine {
         wasm.pageengine_landed(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * Lay the drawing out for the pictures put `later` since the last time; false if there were none.
+     * @returns {boolean}
+     */
+    layOutPictures() {
+        const ret = wasm.pageengine_layOutPictures(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
      * Everything laid out again: after a batch of fonts added `later`.
      */
     layOut() {
@@ -574,15 +582,17 @@ export class PageEngine {
     /**
      * A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
      * own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
+     * `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
      * @param {string} url
      * @param {ImageBitmap} bitmap
      * @param {number | null} [width]
      * @param {number | null} [height]
+     * @param {boolean | null} [later]
      */
-    putPicture(url, bitmap, width, height) {
+    putPicture(url, bitmap, width, height, later) {
         const ptr0 = passStringToWasm0(url, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.pageengine_putPicture(this.__wbg_ptr, ptr0, len0, bitmap, isLikeNone(width) ? Number.MAX_SAFE_INTEGER : (width) >>> 0, isLikeNone(height) ? Number.MAX_SAFE_INTEGER : (height) >>> 0);
+        wasm.pageengine_putPicture(this.__wbg_ptr, ptr0, len0, bitmap, isLikeNone(width) ? Number.MAX_SAFE_INTEGER : (width) >>> 0, isLikeNone(height) ? Number.MAX_SAFE_INTEGER : (height) >>> 0, isLikeNone(later) ? 0xFFFFFF : later ? 1 : 0);
     }
     /**
      * A tile's picture from the worker, copied into the page's own texture for it.
@@ -1033,15 +1043,17 @@ export class WorkerEngine {
     }
     /**
      * As the page's: `width` × `height` is the picture's own size when the bitmap was made smaller.
+     * `keep`: the bitmap is left open, to be handed to the page, which copies it too.
      * @param {string} url
      * @param {ImageBitmap} bitmap
      * @param {number | null} [width]
      * @param {number | null} [height]
+     * @param {boolean | null} [keep]
      */
-    putPicture(url, bitmap, width, height) {
+    putPicture(url, bitmap, width, height, keep) {
         const ptr0 = passStringToWasm0(url, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.workerengine_putPicture(this.__wbg_ptr, ptr0, len0, bitmap, isLikeNone(width) ? Number.MAX_SAFE_INTEGER : (width) >>> 0, isLikeNone(height) ? Number.MAX_SAFE_INTEGER : (height) >>> 0);
+        wasm.workerengine_putPicture(this.__wbg_ptr, ptr0, len0, bitmap, isLikeNone(width) ? Number.MAX_SAFE_INTEGER : (width) >>> 0, isLikeNone(height) ? Number.MAX_SAFE_INTEGER : (height) >>> 0, isLikeNone(keep) ? 0xFFFFFF : keep ? 1 : 0);
     }
     /**
      * @param {string} text
@@ -2308,12 +2320,12 @@ function __wbg_get_imports() {
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 106, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__94);
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 106, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95);
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__96);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0) {
@@ -2360,15 +2372,15 @@ function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__94(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__94(arg0, arg1, arg2);
+function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95(arg0, arg1, arg2);
+function wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__96(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__96(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }

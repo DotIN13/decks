@@ -55,6 +55,8 @@ pub struct Page {
 	pub text: Text,
 	pub atlas: RefCell<Atlas>,
 	pub pictures: Pictures,
+	/// Pictures put whose sizes the layout has not yet taken in (`lay_out_pictures`).
+	pictures_unlaid: bool,
 	/// Items being moved: drawn here each frame, left out of the worker's tiles.
 	pub lifted: HashSet<String>,
 	/// How far each item in a drag has moved, drawn that far away until the drag lets go.
@@ -109,7 +111,7 @@ impl Page {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Page { only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
+		Ok(Page { pictures_unlaid: false, only_lifted: false, hide_lifted: false, boards: Vec::new(), carry: (HashSet::new(), 0.0, 0.0), pictured: Vec::new(), carrying: Vec::new(), marks: 0, offsets: HashMap::new(), preview_undo: Vec::new(), bent: None, view: ViewState::default(), icons: HashMap::new(), text: words, atlas: RefCell::new(Atlas::new()), pictures: Pictures::default(), lifted: HashSet::new(), ink: Vec::new(), doc, scene, history: History::default(), ids: Ids::new(session), tiles: HashMap::new(), budget: 160, scales: None, frame: 0, next_texture: 1, sent_layout: HashMap::new(), layout_calls: 0, fonts_sent: HashMap::new() })
 	}
 
 	/// Apply a batch. `mine` records it for undo: a batch from someone else's session is not.
@@ -693,12 +695,27 @@ impl Page {
 	/// A picture arrived: its texture is made by the caller; this names it. Cards with it are laid
 	/// out again, since their height may change.
 	pub fn picture(&mut self, url: &str, texture: u32, width: u32, height: u32) {
+		self.picture_unlaid(url, texture, width, height);
+		self.lay_out_pictures();
+	}
+
+	/// As `picture`, but the drawing is laid out for it by `lay_out_pictures`: a batch of pictures
+	/// lays it out once.
+	pub fn picture_unlaid(&mut self, url: &str, texture: u32, width: u32, height: u32) {
 		self.pictures.held.insert(url.to_owned(), (texture, width, height));
-		if !url.starts_with("board:") {
-			self.text.images.borrow_mut().insert(url.to_owned(), (width as f32, height as f32));
-			self.text.forget();
-			self.scene.update(&self.doc, None, &self.text);
+		// Only a card that shows it is laid out differently for it (`Text::picture`).
+		if !url.starts_with("board:") && self.text.picture(url, width as f32, height as f32) {
+			self.pictures_unlaid = true;
 		}
+	}
+
+	/// Lay the drawing out for the pictures put since it last was that cards show; false if none.
+	pub fn lay_out_pictures(&mut self) -> bool {
+		if !std::mem::take(&mut self.pictures_unlaid) {
+			return false;
+		}
+		self.scene.update(&self.doc, None, &self.text);
+		true
 	}
 
 	/// A texture id for a picture or a tile, unique on the page.
@@ -797,6 +814,8 @@ pub struct Worker {
 	pub dark: bool,
 	/// The tile pictures the page holds, by the version they were painted at.
 	version: u64,
+	/// The tiles painted without a picture, by its address, while it was not yet here.
+	missing: HashMap<String, Vec<Key>>,
 	/// A font or a picture arrived since the last paint: everything is laid out again and every tile
 	/// painted again, once for however many came (`settle`).
 	relayout: bool,
@@ -810,7 +829,7 @@ impl Worker {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0, relayout: false, repaint: false })
+		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0, missing: HashMap::new(), relayout: false, repaint: false })
 	}
 
 	/// Start again from the whole document: after a lost batch, or a theme change.
@@ -820,6 +839,7 @@ impl Worker {
 		self.text.dark = dark;
 		self.scene = Scene::new(&self.doc, dark, &self.text);
 		self.grid.invalidate_all();
+		self.missing.clear();
 		self.relayout = false;
 		self.repaint = false;
 		Ok(())
@@ -1011,9 +1031,19 @@ impl Worker {
 	/// A picture arrived (its texture made by the caller).
 	pub fn picture(&mut self, url: &str, texture: u32, width: u32, height: u32) {
 		self.pictures.held.insert(url.to_owned(), (texture, width, height));
-		self.text.images.borrow_mut().insert(url.to_owned(), (width as f32, height as f32));
-		self.text.forget();
-		self.relayout = true;
+		// Laid out again, and every tile painted again, for a card that shows it (`Text::picture`);
+		// otherwise only the tiles painted without it are painted again.
+		if self.text.picture(url, width as f32, height as f32) {
+			self.relayout = true;
+		}
+		if let Some(keys) = self.missing.remove(url) {
+			self.version += 1;
+			for key in keys {
+				if let Some(tile) = self.grid.tiles.get_mut(&key) {
+					tile.dirty = true;
+				}
+			}
+		}
 	}
 
 	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere), at the
@@ -1067,11 +1097,19 @@ impl Worker {
 		let n = keys.len();
 		for k in keys {
 			let mut list = DrawList::new(clear);
+			let asked = ctx.wanted.borrow().len();
 			for _ in 0..3 {
 				self.atlas.borrow_mut().begin();
 				list = paint_area(&ctx, k.area(), k.scale(), clear);
 				if !self.atlas.borrow_mut().take_overflow() {
 					break;
+				}
+			}
+			// The pictures this tile was painted without: it is painted again when they come.
+			for url in &ctx.wanted.borrow()[asked..] {
+				let keys = self.missing.entry(url.clone()).or_default();
+				if !keys.contains(&k) {
+					keys.push(k);
 				}
 			}
 			draw(k, list, &mut self.atlas.borrow_mut());
@@ -1177,6 +1215,40 @@ mod tests {
 		page.preview(None).unwrap();
 		assert_eq!(geometry(&page, "ab"), before);
 		assert!(page.lifted.contains("ab"));
+	}
+
+	#[test]
+	fn a_picture_arriving_repaints_the_tiles_painted_without_it() {
+		// Two pictures in a 2,000 by 1,500 frame on a 1:1 screen: one on tile (0, 0), one on tiles (1, 1) and (2, 1).
+		let stage = r##"{"version":"2.14","children":[{"type":"frame","id":"big","layout":"none","x":0,"y":0,"width":2000,"height":1500,"fill":"#eeeeee","children":[
+			{"type":"rectangle","id":"a","x":60,"y":60,"width":200,"height":150,"fill":{"type":"image","url":"a.png","mode":"fill"}},
+			{"type":"rectangle","id":"b","x":900,"y":600,"width":300,"height":200,"fill":{"type":"image","url":"b.png","mode":"fill"}}]}]}"##;
+		let mut worker = Worker::new(stage, false).unwrap();
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		let paint_all = |worker: &mut Worker| {
+			let mut keys = std::collections::BTreeSet::new();
+			loop {
+				let batch = worker.next(cam, 1.0, 2048.0, 1536.0, false, 64);
+				if batch.is_empty() {
+					return keys;
+				}
+				for (key, _) in batch {
+					worker.sent(key);
+					keys.insert((key.x, key.y));
+				}
+			}
+		};
+		assert!(paint_all(&mut worker).len() >= 12);
+		let mut wanted = worker.pictures.take_wanted();
+		wanted.sort();
+		assert_eq!(wanted, ["a.png", "b.png"]);
+		worker.picture("b.png", 0x8000_0001, 800, 600);
+		assert_eq!(paint_all(&mut worker), [(1, 1), (2, 1)].into_iter().collect());
+		worker.picture("a.png", 0x8000_0002, 800, 600);
+		assert_eq!(paint_all(&mut worker), [(0, 0)].into_iter().collect());
+		// A picture nothing painted was waiting for repaints nothing.
+		worker.picture("c.png", 0x8000_0003, 800, 600);
+		assert!(paint_all(&mut worker).is_empty());
 	}
 
 	#[test]
