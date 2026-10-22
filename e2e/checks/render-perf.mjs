@@ -1,5 +1,5 @@
 /**
- * What the stage costs, on a big canvas: eight numbers, each the median of `RENDER_PERF_RUNS` (5) runs
+ * What the stage costs, on a big canvas: nine numbers, each the median of `RENDER_PERF_RUNS` (5) runs
  * (9 for the two per-frame times, see `WIDE`).
  *
  * Not a pass/fail check: it measures, and says only that each number could be measured. The canvas
@@ -18,6 +18,8 @@
  *   a tile painted after the note is in the layout.
  * - strokeEndMs: main-thread time per frame over the last 60 of 600 pointer moves (10 s at 60 Hz) of a
  *   pen stroke, one CDP mouse move a frame.
+ * - fillAfterPanMs: the end of a fast pan at 50% onto drawing not yet painted to the first frame with
+ *   every tile of the window there at its resting scale (see "a fast pan filled in").
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -239,6 +241,40 @@ if (want("draws")) {
 	}
 	// A ratio, not a count: to 0.1.
 	keep("zoomDraws", draws, ms);
+}
+
+// --- a fast pan filled in -----------------------------------------------------------------------------
+/*
+ * From the end of a fast pan at 50% (a fling: 3 frames of 1,500 px, each a window onto drawing not yet
+ * painted, along a row of cells of its own each run) to the first frame drawn with no tile of the
+ * window missing or at another scale than at rest (`settledAt`, `stage/engine.ts`). A slower pan is
+ * filled as it goes: the worker paints a tile in about half a millisecond.
+ */
+if (want("fill")) {
+	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
+	const fill = [];
+	for (let run = -1; run < RUNS; run++) {
+		await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), { x: -6400, y: -5000 + (run + 1) * 2000 });
+		await quiet(1500);
+		const t = await page.evaluate(async () => {
+			const p = globalThis.__perf;
+			let end = 0;
+			for (let i = 0; i < 3; i++) {
+				p.wheel(1500, 0, false);
+				end = performance.now();
+				await p.raf();
+			}
+			while (performance.now() < end + 10000) {
+				const settled = globalThis.__decksSheet?.settledAt ?? 0;
+				if (settled > end) return settled - end;
+				await new Promise((done) => setTimeout(done, 4));
+			}
+			return NaN;
+		});
+		if (run >= 0) fill.push(t);
+		await quiet(1000);
+	}
+	keep("fillAfterPanMs", fill, ms);
 }
 
 // --- main-thread time per pan frame at 50% ------------------------------------------------------------
@@ -482,7 +518,7 @@ if (want("stroke")) {
 }
 
 say("no errors on the page", errors.length === 0, errors.slice(0, 3).join(" | "));
-const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs"].map((k) => [k, result[k]]));
+const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs", "fillAfterPanMs"].map((k) => [k, result[k]]));
 const extra = Object.fromEntries(Object.entries(result).filter(([k]) => k !== "runs" && !(k in metrics)));
 const report = { ...metrics, ...extra, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS, ...(AB ? { ab: AB } : {}) } };
 mkdirSync(dirname(OUT), { recursive: true });

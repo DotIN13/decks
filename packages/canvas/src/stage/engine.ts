@@ -59,8 +59,13 @@ const MAX_SIDE = 8192;
  * message the page sent it (the drawing, its fonts, pictures) and had nothing left to paint in the
  * window and its margin at the resting scale, with no font still being fetched: the first sharp frame.
  * Measured by `e2e/checks/render-perf.mjs`.
+ *
+ * `settledAt` is the latest draw after a batch (or the word that there is nothing to paint) from a
+ * worker that had every message the page sent, cameras included, with no tile of the window missing
+ * or at another scale than the one it has at rest, moving or not, and no font still being fetched:
+ * the frame a pan has filled in (`fillAfterPanMs`).
  */
-type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; sharpAt?: number };
+type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; sharpAt?: number; settledAt?: number };
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
@@ -129,6 +134,8 @@ export class StageEngine {
 	private fontsPending = 0;
 	/** A batch came from a worker with nothing left to paint: the next draw at rest is a sharp one (`sharpAt`). */
 	private sharpNext = false;
+	/** As `sharpNext`, for `settledAt`: the next draw at rest shows the window filled in. */
+	private settledNext = false;
 	/** A stage engine that could not start: the stage shows these words (`backends/notice.ts`) rather than drawing nothing silently. */
 	failed: ((notice: string) => void) | undefined;
 	/** After each new layout, so the stage can redraw a selection round what moved. */
@@ -297,6 +304,15 @@ export class StageEngine {
 		}
 		switch (message.type) {
 			case "tiles":
+				this.settledNext = (message.rest ?? message.left) === 0 && message.got >= this.posted && this.fontsPending === 0;
+				// Nothing painted (the worker says it has nothing left for this camera): the frame on screen, or the one coming, is filled in.
+				if (!message.tiles.length) {
+					if (this.settledNext && !this.drawFrame) {
+						this.settledNext = false;
+						sheetStats().settledAt = performance.now();
+					}
+					break;
+				}
 				for (const t of message.tiles) this.page.putTile(t.scale, t.x, t.y, t.bitmap);
 				sheetStats().tiles = (sheetStats().tiles ?? 0) + message.tiles.length;
 				if (message.left === 0 && message.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
@@ -734,6 +750,10 @@ export class StageEngine {
 		if (this.sharpNext && !this.moving) {
 			this.sharpNext = false;
 			sheetStats().sharpAt ??= performance.now();
+		}
+		if (this.settledNext) {
+			this.settledNext = false;
+			sheetStats().settledAt = performance.now();
 		}
 		// Asked for in JSON only when the engine says they changed: most frames, nothing did.
 		const marks = this.page.boardMarks();

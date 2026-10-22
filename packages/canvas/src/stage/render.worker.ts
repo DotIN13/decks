@@ -37,6 +37,8 @@ const waitForFonts = () => {
 };
 /** Messages taken from the page, every kind: the page compares it with what it posted (`sharpAt` in `engine.ts`). */
 let got = 0;
+/** `got` when the page was last sent tiles, or told there were none to paint. */
+let told = -1;
 const early: ToWorker[] = [];
 
 /**
@@ -66,8 +68,17 @@ function paint(): void {
 		if (tiles.length) {
 			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
 			if (left === 0) viewDone = true;
-			scope.postMessage({ type: "tiles", tiles, left, got }, tiles.map((t) => t.bitmap));
-		} else viewDone = true;
+			const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
+			told = got;
+			scope.postMessage({ type: "tiles", tiles, left, got, rest }, tiles.map((t) => t.bitmap));
+		} else {
+			viewDone = true;
+			// Nothing to paint, the window whole at its resting scale, and the page not told since its last message: it is told, for `settledAt`.
+			if (told !== got && engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) === 0) {
+				told = got;
+				scope.postMessage({ type: "tiles", tiles: [], left: 0, got, rest: 0 });
+			}
+		}
 		report();
 		painting = false;
 		if (tiles.length) setTimeout(paint, 0);

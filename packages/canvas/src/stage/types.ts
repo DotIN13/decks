@@ -107,9 +107,10 @@ export type FromWorker =
 	| { type: "ready"; backend: string }
 	/**
 	 * A batch of tiles; `left` is how many the window and its margin still need at the scale wanted
-	 * after it, and `got` how many messages the worker had taken when it painted them (for `sharpAt`).
+	 * after it, and `got` how many messages the worker had taken when it painted them (for `sharpAt`);
+	 * `rest` what the window still needs at the scale it wants at rest, while the camera moves too (for `settledAt`).
 	 */
-	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>; left: number; got: number }
+	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>; left: number; got: number; rest?: number }
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }
