@@ -224,3 +224,27 @@ test("an arrow joined at both ends, carried on its own, gets no op: it cannot mo
 	// One end free: the free end moves, as before.
 	assert.deepEqual(moveOps(s, ["ar"], 5, 5), [{ op: "update", id: "ar", set: movedBy(s.node("ar")!, 5, 5) }]);
 });
+
+test("an arrow whose joined items were deleted moves as a free one, from where it is drawn", () => {
+	const orphan: FakeItem[] = [
+		...items,
+		{ id: "o", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, width: 90, height: 10, viewBox: [0, 0, 90, 10], geometry: "M2 5 L88 5 M80 9 L88 5 L80 1", metadata: { type: ARROW, from: "gone1", to: { item: "gone2", side: "left" } } } },
+	];
+	const s = fakeScene(orphan, boards);
+	assert.deepEqual(moveOps(s, ["o"], 30, 60), [{ op: "update", id: "o", set: { x: 140, y: 100, metadata: { type: ARROW, from: [142, 105], to: [228, 105] } } }]);
+});
+
+test("deleting what an arrow joins lets that end go where it is drawn, so the arrow stays free", () => {
+	const joined: FakeItem[] = [
+		...items,
+		{ id: "j", type: "path", box: { x: 110, y: 40, w: 90, h: 10 }, extra: { x: 110, y: 40, width: 90, height: 10, viewBox: [0, 0, 90, 10], geometry: "M2 5 L88 5 M80 9 L88 5 L80 1", metadata: { type: ARROW, from: "a", to: "b" } } },
+	];
+	const s = fakeScene(joined, boards);
+	assert.deepEqual(deleteOps(["a"], s), [
+		// `ar` has no line drawn yet, so it has no point to be let go at: it is left as it is.
+		{ op: "update", id: "j", set: { metadata: { type: ARROW, from: [112, 45], to: "b" } } },
+		{ op: "delete", id: "a" },
+	]);
+	// Without the scene, the plain deletes.
+	assert.deepEqual(deleteOps(["a"]), [{ op: "delete", id: "a" }]);
+});

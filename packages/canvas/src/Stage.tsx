@@ -968,7 +968,7 @@ export function Stage(props: {
 		return said.join(" ").replace(/\s+/g, " ").slice(0, 120);
 	};
 	/** Take the selected drawn items off the canvas: the Delete key, and the pill's Delete. */
-	const penDeleteSelected = (selected = editor.items(), ops = deleteOps(selected)) => {
+	const penDeleteSelected = (selected = editor.items(), ops = deleteOps(selected, scene)) => {
 		if (!selected.length) return;
 		// Gone from the sheet at once, and its outline with it in the same frame, not one frame before it.
 		penLayer.hide(new Set(selected));

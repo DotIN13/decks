@@ -59,7 +59,7 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 	const alt = !!press.alt;
 	const key = press.key;
 	if (command && !alt && key.toLowerCase() === "z" && context.canStep) return { handled: true, do: "step", step: press.shift ? "redo" : "undo" };
-	if (selection.length && (key === "Delete" || key === "Backspace")) return { handled: true, do: "delete", ops: deleteOps(selection), select: [] };
+	if (selection.length && (key === "Delete" || key === "Backspace")) return { handled: true, do: "delete", ops: deleteOps(selection, context.scene), select: [] };
 	if (key === "Escape" && (selection.length || boards.length || tool !== "select")) return tool !== "select" ? { handled: true, do: "escape", tool: "select" } : { handled: true, do: "escape", select: [], boards: [] };
 	if (selection.length && command && !alt && key.toLowerCase() === "d") {
 		const { ops, made } = duplicateOps(context.scene, selection, context.nextId);

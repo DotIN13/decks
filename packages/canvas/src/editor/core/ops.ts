@@ -45,11 +45,57 @@ export function movedBy(node: PenNode, dx: number, dy: number): Record<string, u
  * from its ends again after every edit. It gets no op, so the drag lets it go back at once
  * (`releaseCarry`) rather than when the canvas stops waiting for a change that never comes.
  */
-function pinned(node: PenNode, moving: ReadonlySet<string>): boolean {
+function pinned(node: PenNode, moving: ReadonlySet<string>, scene: SceneQuery): boolean {
 	if (!isArrow(node) || !node.metadata) return false;
 	const meta = node.metadata as Record<string, unknown>;
 	const ends = [arrowEndItem(meta.from), arrowEndItem(meta.to)];
-	return ends.every((end) => end !== undefined && !moving.has(end));
+	// An end that names an item no longer there joins nothing: it does not hold the arrow still.
+	return ends.every((end) => end !== undefined && !moving.has(end) && joinsSomething(scene, end));
+}
+
+/** Whether an arrow's end names something still on the stage: an item, or a board by its path. */
+function joinsSomething(scene: SceneQuery, end: string): boolean {
+	return !!scene.node(end) || scene.boards().some((board) => board.path === end);
+}
+
+/**
+ * Where an arrow's two ends are drawn now, on the stage: the first and last point of its line,
+ * the first subpath of its geometry, through its box. Undefined for an arrow with no geometry yet.
+ */
+export function arrowEndsDrawn(node: PenNode): { from: [number, number]; to: [number, number] } | undefined {
+	if (typeof node.geometry !== "string") return undefined;
+	const line = node.geometry.split(/(?=M)/i)[0] ?? "";
+	const n = (line.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []).map(Number);
+	if (n.length < 4) return undefined;
+	const vb = Array.isArray(node.viewBox) ? (node.viewBox as number[]) : undefined;
+	const w = typeof node.width === "number" ? node.width : undefined;
+	const h = typeof node.height === "number" ? node.height : undefined;
+	const sx = vb && w && vb[2] ? w / vb[2] : 1;
+	const sy = vb && h && vb[3] ? h / vb[3] : 1;
+	const ox = (vb?.[0] ?? 0) * sx;
+	const oy = (vb?.[1] ?? 0) * sy;
+	const at = (x: number, y: number): [number, number] => [Math.round(own(node.x) + x * sx - ox), Math.round(own(node.y) + y * sy - oy)];
+	return { from: at(n[0]!, n[1]!), to: at(n[n.length - 2]!, n[n.length - 1]!) };
+}
+
+/**
+ * An arrow's metadata with each end that joins something in `gone` (or no longer there at all) set
+ * to the point it is drawn at now, so the arrow stays where it was, joined to nothing, and can be
+ * moved. Undefined when no end changes.
+ */
+export function freedEnds(node: PenNode, scene: SceneQuery, gone: ReadonlySet<string> = new Set()): Record<string, unknown> | undefined {
+	if (!isArrow(node) || !node.metadata) return undefined;
+	const meta = node.metadata as Record<string, unknown>;
+	const loose = (end: unknown) => {
+		const item = arrowEndItem(end);
+		return item !== undefined && (gone.has(item) || !joinsSomething(scene, item));
+	};
+	const fromLoose = loose(meta.from);
+	const toLoose = loose(meta.to);
+	if (!fromLoose && !toLoose) return undefined;
+	const drawn = arrowEndsDrawn(node);
+	if (!drawn) return undefined;
+	return { ...meta, ...(fromLoose ? { from: drawn.from } : {}), ...(toLoose ? { to: drawn.to } : {}) };
 }
 
 /**
@@ -73,7 +119,7 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 		const node = scene.node(id);
 		if (!node) return [];
 		// Not into another frame: an arrow that cannot move gets nothing.
-		if ((into === undefined || into === (scene.item(id)?.parent ?? null)) && pinned(node, moving)) return [];
+		if ((into === undefined || into === (scene.item(id)?.parent ?? null)) && pinned(node, moving, scene)) return [];
 		/*
 		 * Into a frame, or out of one onto the stage: a `move` with the parent and the box the
 		 * item ends up at **in stage coordinates**, which the server turns into the frame's own
@@ -98,7 +144,9 @@ export function moveOps(scene: SceneQuery, ids: readonly string[], dx: number, d
 			}
 			if (index !== undefined) return [{ op: "move", id, parent: into, index }];
 		}
-		return [{ op: "update", id, set: movedBy(node, dx, dy) }];
+		// An arrow whose ends name items that are gone moves as a free one: those ends become the points they are drawn at.
+		const freed = freedEnds(node, scene);
+		return [{ op: "update", id, set: movedBy(freed ? { ...node, metadata: freed as PenNode["metadata"] } : node, dx, dy) }];
 	});
 }
 
@@ -124,8 +172,28 @@ export function duplicateOps(scene: SceneQuery, ids: readonly string[], nextId: 
 }
 
 /** Take items off the canvas. */
-export function deleteOps(ids: readonly string[]): Op[] {
-	return ids.map((id) => ({ op: "delete", id }));
+export function deleteOps(ids: readonly string[], scene?: SceneQuery): Op[] {
+	const deleting: Op[] = ids.map((id) => ({ op: "delete", id }));
+	if (!scene) return deleting;
+	/*
+	 * An arrow joined to something deleted is let go at that end, where it is drawn now, rather than
+	 * left naming an item that is gone: such an arrow counted as joined at both ends and could not be
+	 * moved. What is inside a deleted frame or group goes with it, so its joins are let go too.
+	 */
+	const gone = new Set<string>();
+	const take = (id: string) => {
+		gone.add(id);
+		for (const child of scene.node(id)?.children ?? []) if (child && typeof child === "object" && "id" in child) take(String((child as PenNode).id));
+	};
+	for (const id of ids) take(id);
+	const freeing: Op[] = [];
+	for (const placed of scene.items()) {
+		const node = placed.node;
+		if (gone.has(node.id) || !isArrow(node)) continue;
+		const freed = freedEnds(node, scene, gone);
+		if (freed) freeing.push({ op: "update", id: node.id, set: { metadata: freed } });
+	}
+	return [...freeing, ...deleting];
 }
 
 /** Boards moved by `dx dy`, each to its own new corner, rounded; a path not on the stage is left out. */
