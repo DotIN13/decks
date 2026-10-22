@@ -668,6 +668,13 @@ export function createHttpApp(app: App): Express {
 				// A friend's board has no storage of its own: the shim keeps it in the page around (`lib/storage-shim.js`).
 				const shared = canvasOfPath(asked);
 				if (shared && isSharedCanvas(shared.name)) page = withScript(page, `${"../".repeat(shared.rest.split("/").length - 1)}lib/storage-shim.js`);
+				/*
+				 * The canvas's bridge beside the board's own `board.js`: the editor hands a board's page the
+				 * pointer only once it has said it is a guest (`plain-board.tsx`), as Studio's pages do, so
+				 * without it no board here could be used, only selected.
+				 */
+				const own = /<script[^>]*\ssrc="([^"]*?)board\.js"/i.exec(page);
+				if (own) page = withGuest(page, `${own[1]}embed-guest.js`);
 				res.type("html").send(page);
 				return;
 			}

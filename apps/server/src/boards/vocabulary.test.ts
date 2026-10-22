@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,7 +20,8 @@ import { applyPatches, mintId } from "./patch.ts";
  * with nothing comparing the copies.
  */
 
-const boardCss = () => readFileSync(join(runtimeDir(), "lib", "board.css"), "utf8");
+/** `lib/` lives in `@decks/board-host` now, not under the runtime folder. */
+const boardCss = () => readFileSync(fileURLToPath(import.meta.resolve("@decks/board-host/lib/board.css")), "utf8");
 const skill = () => readFileSync(join(runtimeDir(), "skills", "board-authoring", "SKILL.md"), "utf8");
 
 test("board.css styles every class the vocabulary names", () => {
