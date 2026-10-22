@@ -126,7 +126,7 @@ export type FromWorker =
 	 * after it, and `got` how many messages the worker had taken when it painted them (for `sharpAt`);
 	 * `rest` what the window still needs at the scale it wants at rest, while the camera moves too (for `settledAt`).
 	 */
-	| { type: "tiles"; tiles: TileFromWorker[]; left: number; got: number; rest?: number }
+	| { type: "tiles"; tiles: TileFromWorker[]; left: number; got: number; rest?: number; overview?: number }
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }

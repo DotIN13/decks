@@ -298,6 +298,7 @@ export class StageEngine {
 		const found = (this.detected ??= await detect());
 		const stage = await found.backend.load();
 		if (this.disposed) return;
+		this.stageModule = stage;
 		this.post({ type: "boot", backend: found.backend.name, lowMemory: found.lowMemory, module: moduleOf(stage) });
 		this.fitCanvases();
 		const gpu = await stage.openStage(over, over.width, over.height, found.backend.name, found.lowMemory);
@@ -411,13 +412,22 @@ export class StageEngine {
 					}
 					break;
 				}
+				if (message.overview !== undefined) this.overviewScale = message.overview;
 				// Taken in at the next frames, a few a frame (`takeTiles`); a tile painted again replaces the one waiting.
+				// One of a scale the zoom has left since it was asked for is let go of at once.
+				const unwanted: Array<[number, number, number]> = [];
 				for (const t of message.tiles) {
+					if (!this.wanted(t)) {
+						t.bitmap?.close();
+						unwanted.push([t.scale, t.x, t.y]);
+						continue;
+					}
 					const key = `${t.scale},${t.x},${t.y}`;
 					const i = this.tileQueue.findIndex((q) => q.key === key);
 					if (i >= 0) this.tileQueue.splice(i, 1)[0]?.tile.bitmap?.close();
 					this.tileQueue.push({ key, tile: t });
 				}
+				if (unwanted.length) this.post({ type: "dropped", keys: unwanted });
 				// What the worker says of the latest batch holds once every tile before it is in.
 				this.tileBatch = { left: message.left, rest: message.rest ?? message.left, got: message.got, sent: this.sent };
 				this.takeTilesSoon();
@@ -829,7 +839,36 @@ export class StageEngine {
 		const { x, y, zoom, width, height } = this.drawRect();
 		const dpr = Math.min(2, devicePixelRatio || 1);
 		// Pinching, the tiles are painted at half the screen's density (`setPinching`).
-		this.post({ type: "camera", x, y, zoom, dpr: this.pinching && this.moving ? dpr / 2 : dpr, width, height, moving: this.moving });
+		const sent = { zoom, dpr: this.pinching && this.moving ? dpr / 2 : dpr, moving: this.moving };
+		this.post({ type: "camera", x, y, width, height, ...sent });
+		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.moving);
+		if (want !== undefined && want !== this.wantScale) {
+			this.wantScale = want;
+			this.dropUnwanted();
+		}
+	}
+	/** The engine's module, for `scaleFor`. */
+	private stageModule: StageModule | undefined;
+	/** The scale the worker's latest camera wants its tiles at (`scaleFor`, an `f32`'s bits), and the overview's (`overviewScale`). */
+	private wantScale: number | undefined;
+	private overviewScale = 0;
+
+	/** Whether a tile is still wanted: at the scale the latest camera wants, or the overview's. Tiles of a scale the zoom has left are not taken in. */
+	private wanted(t: { scale: number }): boolean {
+		return this.wantScale === undefined || t.scale === this.wantScale || t.scale === this.overviewScale;
+	}
+
+	/** Let go of the tiles waiting to be taken in that the latest camera no longer wants, and tell the worker, which paints them again if they are wanted again. */
+	private dropUnwanted(): void {
+		if (!this.tileQueue.length) return;
+		const gone: Array<[number, number, number]> = [];
+		this.tileQueue = this.tileQueue.filter((q) => {
+			if (this.wanted(q.tile)) return true;
+			q.tile.bitmap?.close();
+			gone.push([q.tile.scale, q.tile.x, q.tile.y]);
+			return false;
+		});
+		if (gone.length) this.post({ type: "dropped", keys: gone });
 	}
 
 	/**

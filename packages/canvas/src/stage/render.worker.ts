@@ -73,6 +73,24 @@ let soonAt = 0;
 let pixels = false;
 let gpuBackend = "";
 
+/**
+ * Come back to paint once the messages that came meanwhile are taken: a camera that came while a
+ * tile was painted is what the next tile is painted for. A message to itself, not a timer, which
+ * the browser holds back 4 ms once timers nest.
+ */
+const next = new MessageChannel();
+next.port1.onmessage = () => paint();
+function paintNext(): void {
+	next.port2.postMessage(0);
+}
+
+/**
+ * Tiles painted a batch: while the camera moves, one, so each tile is painted for the newest
+ * camera and none for a scale the zoom has already left (four a batch painted 16 to 68 tiles a
+ * zoom at scales no longer wanted by the time they came); at rest, twelve.
+ */
+const batchFor = (moving: boolean) => (moving ? 1 : 12);
+
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
 function paint(): void {
 	if (painting || !engine || !camera) return;
@@ -92,11 +110,11 @@ function paint(): void {
 			if (left === 0) viewDone = true;
 			const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
 			told = got;
-			scope.postMessage({ type: "tiles", tiles, left, got, rest }, tiles.map((t) => t.bitmap));
+			scope.postMessage({ type: "tiles", tiles, left, got, rest, overview: engine.overviewScale() }, tiles.map((t) => t.bitmap));
 			report();
 		} else nothingToPaint(c);
 		painting = false;
-		if (tiles.length) setTimeout(paint, 0);
+		if (tiles.length) paintNext();
 	} catch (error) {
 		painting = false;
 		scope.postMessage({ type: "error", message: String((error as Error)?.message ?? error) });
@@ -113,7 +131,7 @@ async function paintPixels(): Promise<void> {
 	painting = true;
 	try {
 		const c = camera;
-		const tiles = engine.paintPixels(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, c.moving ? 4 : 12) as Array<{ scale: number; x: number; y: number; buffer: GPUBuffer; stride: number }>;
+		const tiles = engine.paintPixels(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; buffer: GPUBuffer; stride: number }>;
 		if (!tiles.length) {
 			painting = false;
 			nothingToPaint(c);
@@ -130,10 +148,10 @@ async function paintPixels(): Promise<void> {
 			return { scale: t.scale, x: t.x, y: t.y, pixels: bytes, stride: t.stride };
 		});
 		told = sentAt;
-		scope.postMessage({ type: "tiles", tiles: out, left, got: sentAt, rest }, out.map((t) => t.pixels));
+		scope.postMessage({ type: "tiles", tiles: out, left, got: sentAt, rest, overview: engine.overviewScale() }, out.map((t) => t.pixels));
 		report();
 		painting = false;
-		setTimeout(paint, 0);
+		paintNext();
 	} catch (error) {
 		painting = false;
 		scope.postMessage({ type: "error", message: String((error as Error)?.message ?? error) });

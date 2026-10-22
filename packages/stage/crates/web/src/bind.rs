@@ -820,6 +820,19 @@ impl WorkerEngine {
 	pub fn dropped(&mut self, scale: u32, x: i32, y: i32) {
 		self.worker.dropped(key(scale, x, y));
 	}
+
+	/// The scale of the overview's tiles (`overview_scale`), as an `f32`'s bits; 0 for an empty stage.
+	#[wasm_bindgen(js_name = overviewScale)]
+	pub fn overview_scale(&self) -> u32 {
+		self.worker.scene.extent().map_or(0, |e| stage_paint::tiles::overview_scale(&e).to_bits())
+	}
+}
+
+/// The scale tiles are painted at for a zoom times the screen's density (`tiles::scale_for`), as an
+/// `f32`'s bits, so the page knows which tiles the worker's latest camera wants.
+#[wasm_bindgen(js_name = scaleFor)]
+pub fn scale_for(zoom_times_dpr: f64, zooming: bool) -> u32 {
+	stage_paint::tiles::scale_for(zoom_times_dpr, zooming).to_bits()
 }
 
 /// Words measured as the page lays them out, for the server: the same text crate, fonts and
