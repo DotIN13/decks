@@ -185,6 +185,27 @@ export function fontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: Th
 	return needs;
 }
 
+/**
+ * What the stage engine will ask for (`font_needs` in `crates/web/src/engine.rs`), read from the
+ * drawing before the engine is up, so the files are on their way while it loads: each text, note,
+ * prompt and context in its face, and a markdown one in its bold, semibold and italic and in the
+ * monospace face too. Read the same way, so nothing is fetched here that the engine would not ask
+ * for; anything the engine finds besides it fetches itself.
+ */
+export function stageFontNeeds(nodes: readonly PenNode[], doc: PenDocument, theme: ThemeState): FontNeed[] {
+	const needs: FontNeed[] = [];
+	for (const node of walk(nodes)) {
+		if (!["text", "note", "prompt", "context"].includes(node.type) || typeof node.content !== "string") continue;
+		const style = textStyleOf(doc, node, theme);
+		const italic = style.fontStyle === "italic";
+		needs.push({ family: style.fontFamily, weight: style.fontWeight, italic, text: node.content });
+		if (node.metadata?.type !== "decks.markdown") continue;
+		for (const [weight, slanted] of [[600, false], [700, false], [400, true]] as const) needs.push({ family: style.fontFamily, weight, italic: slanted, text: node.content });
+		needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content });
+	}
+	return needs;
+}
+
 /** What one text needs, set in `style`, and read as markdown when it is a card's. */
 export function textNeeds(content: string, style: TextStyle, markdown: boolean): FontNeed[] {
 	const needs: FontNeed[] = [{ family: style.fontFamily, weight: style.fontWeight, italic: style.fontStyle === "italic", text: content }];

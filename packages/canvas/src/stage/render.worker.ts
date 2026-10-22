@@ -18,21 +18,56 @@ const scope = self as unknown as Scope;
 let engine: WorkerEngine | undefined;
 let camera: Extract<ToWorker, { type: "camera" }> | undefined;
 let painting = false;
+/** A paint is coming (`paintSoon`). */
+let soon: ReturnType<typeof setTimeout> | undefined;
+/**
+ * The page is fetching the drawing's fonts (`fontsDue`), or has no drawing yet (`docDue`), and the
+ * first view is not painted yet: the worker waits for them, up to `WAIT_MS` from when it could
+ * first paint (`waitBy`), since tiles painted in a stand-in font, or of an empty stage, are all
+ * painted again when they come.
+ */
+let fontsWaited = false;
+let docWaited = false;
+let waitBy = 0;
+const WAIT_MS = 300;
+/** The first view has been painted whole: fonts that come after are painted when they come. */
+let viewDone = false;
+const waitForFonts = () => {
+	if (!viewDone) fontsWaited = true;
+};
 /** Messages taken from the page, every kind: the page compares it with what it posted (`sharpAt` in `engine.ts`). */
 let got = 0;
 const early: ToWorker[] = [];
 
+/**
+ * Paint once the messages already here are taken (or in `ms`): fonts, pictures and icons that come
+ * together are laid out and painted for once (the engine settles them at its next paint), not once each.
+ */
+function paintSoon(ms = 0): void {
+	soon ??= setTimeout(() => {
+		soon = undefined;
+		paint();
+	}, ms);
+}
+
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
 function paint(): void {
 	if (painting || !engine || !camera) return;
+	if (fontsWaited || docWaited) {
+		waitBy ||= performance.now() + WAIT_MS;
+		const wait = waitBy - performance.now();
+		if (wait > 0) return paintSoon(wait);
+		fontsWaited = docWaited = false;
+	}
 	painting = true;
 	try {
 		const c = camera;
 		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, c.moving ? 4 : 12) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
 		if (tiles.length) {
 			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
+			if (left === 0) viewDone = true;
 			scope.postMessage({ type: "tiles", tiles, left, got }, tiles.map((t) => t.bitmap));
-		}
+		} else viewDone = true;
 		report();
 		painting = false;
 		if (tiles.length) setTimeout(paint, 0);
@@ -66,9 +101,11 @@ async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void
 	chosen.watch(canvas, { lost: () => scope.postMessage({ type: "lost" }), restored: () => {}, isLost: () => engine?.lost() ?? false });
 	engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 	engine.setMath(mathTypesetter());
+	if (message.fontsDue) waitForFonts();
+	docWaited = !!message.docDue;
 	for (const one of early.splice(0)) take(one);
 	scope.postMessage({ type: "ready", backend });
-	paint();
+	paintSoon();
 }
 
 function take(message: ToWorker): void {
@@ -78,6 +115,7 @@ function take(message: ToWorker): void {
 	}
 	switch (message.type) {
 		case "doc":
+			docWaited = false;
 			engine.reload(message.doc, message.dark);
 			engine.setMarkdownReader(cardReader(message.dark ? "dark" : "light"));
 			break;
@@ -88,8 +126,12 @@ function take(message: ToWorker): void {
 				scope.postMessage({ type: "resync" });
 			}
 			break;
-		case "font":
-			engine.addFont(message.name, message.bytes, message.fallback);
+		case "fontsDue":
+			waitForFonts();
+			break;
+		case "fonts":
+			for (const font of message.fonts) engine.addFont(font.name, font.bytes, font.fallback);
+			if (message.due === 0) fontsWaited = false;
 			break;
 		case "picture":
 			engine.putPicture(message.url, message.bitmap, message.width, message.height);
@@ -116,7 +158,9 @@ function take(message: ToWorker): void {
 			break;
 	}
 	report();
-	paint();
+	// What arrives in bursts waits for the rest of the burst; anything else (the camera above all) is painted for at once.
+	if (message.type === "icon" || message.type === "picture" || message.type === "fonts" || message.type === "fontsDue") paintSoon();
+	else paint();
 }
 
 scope.onmessage = ({ data }) => {

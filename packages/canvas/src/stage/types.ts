@@ -77,10 +77,21 @@ export type ToWorker =
 	 * `backend` is the page's (`backends/detect.ts`): the worker loads the same build and opens the
 	 * same API. `lowMemory` is the page's guess too, so both draw with as many samples a pixel.
 	 */
-	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean }
+	/**
+	 * `fontsDue`: the page is fetching the drawing's fonts, which come as `fonts` messages; `docDue`:
+	 * the page has no drawing yet (`doc` is empty), which comes as a `doc` message. The worker paints
+	 * nothing until they have, or for 300 ms, rather than paint every tile twice.
+	 */
+	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
-	| { type: "font"; name: string; bytes: Uint8Array; fallback: boolean }
+	/** The page is fetching fonts: as `fontsDue`, while the worker has not yet painted its first view. */
+	| { type: "fontsDue" }
+	/**
+	 * Font files that came together, in the chain's order: laid out and painted once for all of them.
+	 * `due`: how many files the page is still fetching.
+	 */
+	| { type: "fonts"; fonts: Array<{ name: string; bytes: Uint8Array; fallback: boolean }>; due: number }
 	/** `width` × `height`: the picture's own size, when the bitmap was made smaller to fit. */
 	| { type: "picture"; url: string; bitmap: ImageBitmap; width?: number; height?: number }
 	| { type: "icon"; key: string; shape: string }

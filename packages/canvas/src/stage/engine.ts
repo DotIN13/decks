@@ -11,9 +11,9 @@
  * engines once each.
  */
 import type { PageEngine } from "@decks/stage";
-import { diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
+import { baseTheme, diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, isFallbackFamily, type FontNeed } from "../pen/font-files.ts";
+import { fontFiles, isFallbackFamily, stageFontNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
 import { iconUrl, parseIcon } from "../pen/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
@@ -198,6 +198,7 @@ export class StageEngine {
 	}
 
 	private async start(over: HTMLCanvasElement): Promise<void> {
+		this.prefetchFonts();
 		const found = (this.detected ??= await detect());
 		const stage = await found.backend.load();
 		if (this.disposed) return;
@@ -225,18 +226,18 @@ export class StageEngine {
 		this.posted = 0;
 		this.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
-		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory });
-		for (const font of this.fonts) {
-			this.page.addFont(font.family, font.bytes, font.fallback);
-			this.post({ type: "font", name: font.family, bytes: font.bytes, fallback: font.fallback });
-		}
+		// Fonts already here go to both engines now; those still coming (asked for before the engine
+		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
+		this.giveFonts(this.fonts, false);
+		this.needFonts();
+		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc });
+		this.postFonts(this.fonts);
 		this.unwatch = found.backend.watch(over, { lost: () => this.lose(), restored: () => void this.restart(), isLost: () => this.page?.lost() ?? false });
 		this.viewKey = "";
 		this.sendView();
 		this.boardKey = "";
 		this.setBoards(this.boards);
 		this.laidOut();
-		this.needFonts();
 		this.draw();
 	}
 
@@ -357,7 +358,10 @@ export class StageEngine {
 		 */
 		const unhide = this.viewState.hidden.length > 0;
 		this.viewState.hidden = [];
-		if (!this.page) return;
+		if (!this.page) {
+			this.prefetchFonts();
+			return;
+		}
 		/*
 		 * A drawing that arrives ends any preview: whatever a drag was showing is now the drawing itself.
 		 * The page applies a preview to its own copy and takes it back after, so it is taken back before
@@ -982,11 +986,30 @@ export class StageEngine {
 	private needFonts(): void {
 		if (!this.page) return;
 		// The words of what was laid out again since the last time: a change brings only its own.
-		const needs = JSON.parse(this.page.fontNeedsChanged()) as FontNeed[];
-		const files = fontFiles(needs).filter((file) => !this.fontsAsked.has(file.key));
+		this.fetchFonts(fontFiles(JSON.parse(this.page.fontNeedsChanged()) as FontNeed[]));
+	}
+
+	/**
+	 * Before the engine is up: the files the drawing's words name, read from the drawing here, so
+	 * they are on their way while the engine loads and lays out rather than asked for after. What
+	 * the engine's own reading (`needFonts`) finds besides is fetched then.
+	 */
+	private prefetchFonts(): void {
+		if (this.page || this.prefetched || !this.doc) return;
+		this.prefetched = true;
+		const doc = this.doc;
+		const files = fontFiles(stageFontNeeds(doc.children ?? [], doc, baseTheme(doc, this.scheme === "dark" ? "dark" : "light")));
+		this.fetchFonts(files);
+	}
+	private prefetched = false;
+
+	private fetchFonts(wanted: readonly FontFile[]): void {
+		const files = wanted.filter((file) => !this.fontsAsked.has(file.key));
 		if (!files.length) return;
 		for (const file of files) this.fontsAsked.add(file.key);
 		this.fontsPending += files.length;
+		// A worker still painting its first view waits for them (up to 300 ms) rather than paint it twice.
+		if (this.worker) this.post({ type: "fontsDue" });
 		void Promise.all(
 			files.map(async (file) => {
 				for (const url of [file.url, file.fallback].filter(Boolean) as string[]) {
@@ -1001,18 +1024,31 @@ export class StageEngine {
 			}),
 		).then((loaded) => {
 			this.fontsPending -= files.length;
-			// Kept first: an engine started again after a lost device is given them from here.
+			// Kept first: an engine started (or started again) is given them from here.
 			const fonts = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
 			this.fonts.push(...fonts);
-			if (!this.page) return;
-			// In the order the chain lists them, so fallbacks are tried in the app's order.
-			for (const { family, bytes, fallback } of fonts) {
-				this.page.addFont(family, bytes, fallback);
-				this.post({ type: "font", name: family, bytes, fallback });
-			}
-			this.laidOut();
-			this.draw();
+			if (!this.page || this.disposed) return;
+			this.giveFonts(fonts, true);
+			this.postFonts(fonts);
 		});
+	}
+
+	/**
+	 * Fonts to the page's engine, in the order the chain lists them (so fallbacks are tried in the
+	 * app's order), laid out once for all of them; `show` lays the stage out for the stage and draws.
+	 */
+	private giveFonts(fonts: ReadonlyArray<{ family: string; bytes: Uint8Array; fallback: boolean }>, show: boolean): void {
+		if (!this.page || !fonts.length) return;
+		for (const { family, bytes, fallback } of fonts) this.page.addFont(family, bytes, fallback, true);
+		this.page.layOut();
+		if (!show) return;
+		this.laidOut();
+		this.draw();
+	}
+
+	/** The same fonts to the worker, in one message (none, when every file failed: it hears how many are still due): it lays out and paints once for all of them. */
+	private postFonts(fonts: ReadonlyArray<{ family: string; bytes: Uint8Array; fallback: boolean }>): void {
+		this.post({ type: "fonts", fonts: fonts.map(({ family, bytes, fallback }) => ({ name: family, bytes, fallback })), due: this.fontsPending });
 	}
 
 	// --- gestures --------------------------------------------------------------------------------

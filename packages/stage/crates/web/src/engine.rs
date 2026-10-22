@@ -166,7 +166,17 @@ impl Page {
 
 	/// A font file arrived: words are measured again, so everything is laid out again.
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
+		self.hold_font(name, bytes, fallback);
+		self.lay_out();
+	}
+
+	/// A font file of a batch: kept, and nothing laid out until `lay_out`, once for the batch.
+	pub fn hold_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.text.add_font(name, bytes, fallback);
+	}
+
+	/// Everything laid out again, after a batch of fonts (`hold_font`).
+	pub fn lay_out(&mut self) {
 		self.scene.update(&self.doc, None, &self.text);
 	}
 
@@ -787,6 +797,11 @@ pub struct Worker {
 	pub dark: bool,
 	/// The tile pictures the page holds, by the version they were painted at.
 	version: u64,
+	/// A font or a picture arrived since the last paint: everything is laid out again and every tile
+	/// painted again, once for however many came (`settle`).
+	relayout: bool,
+	/// An icon arrived since the last paint: every tile is painted again, once (`settle`).
+	repaint: bool,
 }
 
 impl Worker {
@@ -795,7 +810,7 @@ impl Worker {
 		let mut words = Text::new();
 		words.dark = dark;
 		let scene = Scene::new(&doc, dark, &words);
-		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0 })
+		Ok(Worker { view: ViewState::default(), icons: HashMap::new(), text: words, pictures: Pictures::default(), lifted: HashSet::new(), landing: Vec::new(), scale: 1.0, discarded: Vec::new(), atlas: RefCell::new(Atlas::new()), doc, scene, grid: Grid::new(4096, 1), dark, version: 0, relayout: false, repaint: false })
 	}
 
 	/// Start again from the whole document: after a lost batch, or a theme change.
@@ -805,7 +820,23 @@ impl Worker {
 		self.text.dark = dark;
 		self.scene = Scene::new(&self.doc, dark, &self.text);
 		self.grid.invalidate_all();
+		self.relayout = false;
+		self.repaint = false;
 		Ok(())
+	}
+
+	/// What fonts, pictures and icons that arrived since the last paint call for, done once: a
+	/// batch of five fonts lays the stage out once and paints each tile once, not five times.
+	pub fn settle(&mut self) {
+		if self.relayout {
+			self.scene.update(&self.doc, None, &self.text);
+		}
+		if self.relayout || self.repaint {
+			self.version += 1;
+			self.grid.invalidate_all();
+		}
+		self.relayout = false;
+		self.repaint = false;
 	}
 
 	/// Apply the page's batch number `generation`. `Err` when one was missed: ask for the whole
@@ -814,6 +845,7 @@ impl Worker {
 		if generation != self.doc.generation + 1 {
 			return Err(format!("batch {generation} after {}: send the whole document", self.doc.generation));
 		}
+		self.settle();
 		let applied = self.doc.apply(changes).map_err(|e| e.0)?;
 		let updated = self.scene.update(&self.doc, Some(&applied), &self.text);
 		self.invalidate(&updated);
@@ -822,18 +854,17 @@ impl Worker {
 
 	/// The server's edits, applied; the tiles they reach are painted again.
 	pub fn apply_edits(&mut self, edits: &[stage_doc::edits::Edit]) -> Result<(), String> {
+		self.settle();
 		let applied = self.doc.apply_edits(edits).map_err(|e| e.0)?;
 		let updated = self.scene.update(&self.doc, Some(&applied), &self.text);
 		self.invalidate(&updated);
 		Ok(())
 	}
 
-	/// A font file arrived: lay out again and repaint every tile.
+	/// A font file arrived: laid out again and every tile repainted, at the next paint (`settle`).
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.text.add_font(name, bytes, fallback);
-		self.scene.update(&self.doc, None, &self.text);
-		self.version += 1;
-		self.grid.invalidate_all();
+		self.relayout = true;
 	}
 
 	/// The tiles a change reaches are painted again: in a root laid out again, what each changed item
@@ -879,6 +910,7 @@ impl Worker {
 
 	/// What the stage hides, mutes or shows live changed: the tiles those items are on are painted again.
 	pub fn set_view(&mut self, next: ViewState) {
+		self.settle();
 		let changed: Vec<String> = next.differs(&self.view);
 		self.view = next;
 		self.version += 1;
@@ -933,6 +965,7 @@ impl Worker {
 
 	/// The page lifted these items: paint their tiles without them.
 	pub fn lift(&mut self, ids: &[String]) {
+		self.settle();
 		self.version += 1;
 		for id in ids {
 			for area in self.ink_areas(id) {
@@ -945,6 +978,7 @@ impl Worker {
 
 	/// The page put them down: paint them back in, and say when every tile they are on is done.
 	pub fn drop_items(&mut self, ids: &[String]) {
+		self.settle();
 		self.version += 1;
 		let mut area: Option<Rect> = None;
 		for id in ids {
@@ -979,16 +1013,14 @@ impl Worker {
 		self.pictures.held.insert(url.to_owned(), (texture, width, height));
 		self.text.images.borrow_mut().insert(url.to_owned(), (width as f32, height as f32));
 		self.text.forget();
-		self.scene.update(&self.doc, None, &self.text);
-		self.version += 1;
-		self.grid.invalidate_all();
+		self.relayout = true;
 	}
 
-	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere).
+	/// An icon arrived: tiles are painted again (an icon is small, but it may be anywhere), at the
+	/// next paint, once for however many came (`settle`).
 	pub fn icon(&mut self, key: &str, shape: IconShape) {
 		self.icons.insert(key.to_owned(), shape);
-		self.version += 1;
-		self.grid.invalidate_all();
+		self.repaint = true;
 	}
 
 	/// The next tiles to paint for a view, with their draw lists: missing ones first, the middle first.
@@ -1007,6 +1039,7 @@ impl Worker {
 	/// full of them alone) is built again. Returns how many tiles were painted.
 	#[allow(clippy::too_many_arguments)]
 	pub fn paint(&mut self, camera: Camera, dpr: f64, width: f64, height: f64, moving: bool, limit: usize, draw: &mut dyn FnMut(Key, DrawList, &mut Atlas)) -> usize {
+		self.settle();
 		let scale = scale_for(camera.zoom * dpr, moving);
 		self.scale = scale;
 		let view = Rect { x: camera.x, y: camera.y, w: width / camera.zoom, h: height / camera.zoom };
@@ -1187,6 +1220,42 @@ mod tests {
 		// A square added: the frame's whole extent, as before (its items changed).
 		edit(&mut worker, r##"[{"op":"insert","id":"s16","parent":"big","after":"s15","props":{"type":"rectangle","x":10,"y":10,"width":5,"height":5}}]"##);
 		assert_eq!(paint_all(&mut worker).len(), whole);
+	}
+
+	#[test]
+	fn fonts_and_icons_that_come_together_are_laid_out_and_painted_once_at_the_next_paint() {
+		let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts");
+		let Ok(inter) = std::fs::read(format!("{dir}/inter_latest_latin-400-normal.ttf")) else { return };
+		let stage = r##"{"version":"2.14","children":[
+			{"type":"text","id":"t","x":0,"y":0,"width":1800,"textGrowth":"fixed-width","fontSize":40,"fontFamily":"Inter","content":"Words across the whole window"},
+			{"type":"rectangle","id":"r","x":0,"y":900,"width":1800,"height":200,"fill":"#88aaff"}
+		]}"##;
+		let mut worker = Worker::new(stage, false).unwrap();
+		let cam = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+		let mut paint_all = |worker: &mut Worker| {
+			let mut painted = 0;
+			loop {
+				let batch = worker.next(cam, 1.0, 2048.0, 1536.0, false, 64);
+				if batch.is_empty() {
+					return painted;
+				}
+				for (key, _) in batch {
+					worker.sent(key);
+					painted += 1;
+				}
+			}
+		};
+		let first = paint_all(&mut worker);
+		assert!(first > 0);
+		// Three fonts and an icon before the next paint: nothing is laid out or marked as each comes,
+		// then the stage is laid out once and each tile painted once.
+		worker.add_font("Inter", inter.clone(), false);
+		worker.add_font("Inter Ext", inter.clone(), false);
+		worker.icon("lucide|x|400", IconShape { view_box: [0.0, 0.0, 24.0, 24.0], parts: Vec::new() });
+		worker.add_font("Noto Sans", inter, true);
+		assert!(worker.grid.tiles.values().all(|t| !t.dirty));
+		assert_eq!(paint_all(&mut worker), first);
+		assert_eq!(paint_all(&mut worker), 0);
 	}
 
 	#[test]

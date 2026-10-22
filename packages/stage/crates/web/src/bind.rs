@@ -194,10 +194,21 @@ impl PageEngine {
 		self.gpu = Some(handle.gpu);
 	}
 
-	/// A font file, under the name the app's chains use; `fallback` for the files tried last.
+	/// A font file, under the name the app's chains use; `fallback` for the files tried last. The
+	/// stage is laid out again, unless `later` (a batch of fonts): then once, by `layOut`.
 	#[wasm_bindgen(js_name = addFont)]
-	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
-		self.page.add_font(name, bytes, fallback);
+	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool, later: Option<bool>) {
+		if later == Some(true) {
+			self.page.hold_font(name, bytes, fallback);
+		} else {
+			self.page.add_font(name, bytes, fallback);
+		}
+	}
+
+	/// Everything laid out again: after a batch of fonts added `later`.
+	#[wasm_bindgen(js_name = layOut)]
+	pub fn lay_out(&mut self) {
+		self.page.lay_out();
 	}
 
 	/// The server's edits (`stage.pen.delta` `edits`, as JSON).
@@ -585,6 +596,8 @@ impl WorkerEngine {
 		TILE_SIZE
 	}
 
+	/// A font file: the stage is laid out again and its tiles painted again at the next paint, once
+	/// for every font, picture and icon that came before it.
 	#[wasm_bindgen(js_name = addFont)]
 	pub fn add_font(&mut self, name: &str, bytes: Vec<u8>, fallback: bool) {
 		self.worker.add_font(name, bytes, fallback);
