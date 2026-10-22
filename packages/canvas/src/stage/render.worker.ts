@@ -87,9 +87,16 @@ function paintNext(): void {
 /**
  * Tiles painted a batch: while the camera moves, one, so each tile is painted for the newest
  * camera and none for a scale the zoom has already left (four a batch painted 16 to 68 tiles a
- * zoom at scales no longer wanted by the time they came); at rest, twelve.
+ * zoom at scales no longer wanted by the time they came); and for `AFTER_MOVE_MS` after it last
+ * changed, at rest too, each tile its own submit with a turn between: Chromium runs every
+ * device's work on its one GPU thread, the page's frames among it, and the zoom's resting level
+ * painted twelve at once came there as one burst just as the zoom stopped. Then twelve.
  */
-const batchFor = (moving: boolean) => (moving ? 1 : 12);
+const batchFor = (moving: boolean) => (moving || performance.now() - movedAt < afterMoveMs ? 1 : 12);
+const AFTER_MOVE_MS = 500;
+let afterMoveMs = AFTER_MOVE_MS;
+/** When the camera last changed its place or zoom. */
+let movedAt = -Infinity;
 /**
  * Whether the zoom is changing: then tiles are painted at the power of two under it (`scaleFor`);
  * otherwise, a pan included, at the exact scale. A page from before `zooming` says only `moving`.
@@ -348,7 +355,12 @@ function take(message: ToWorker): void {
 			for (const [s, x, y] of message.keys) engine.dropped(s, x, y);
 			break;
 		case "camera":
+			// The first camera, the stage opening, is not a move: its tiles come twelve a batch.
+			if (camera && (camera.x !== message.x || camera.y !== message.y || camera.zoom !== message.zoom)) movedAt = performance.now();
 			camera = message;
+			break;
+		case "afterMove":
+			afterMoveMs = message.ms;
 			break;
 		case "pixels":
 			pixels = message.on && gpuBackend === "webgpu";

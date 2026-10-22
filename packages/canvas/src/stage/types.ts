@@ -88,6 +88,8 @@ export type ToWorker =
 	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean; pixels?: boolean }
 	/** Tiles from now on as their bytes, or as pictures: for measuring one way against the other in one page. */
 	| { type: "pixels"; on: boolean }
+	/** How long after the camera last changed the worker still paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measuring in one page. */
+	| { type: "afterMove"; ms: number }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
 	/** The page is fetching fonts: as `fontsDue`, while the worker has not yet painted its first view. */

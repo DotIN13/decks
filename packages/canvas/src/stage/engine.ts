@@ -375,6 +375,11 @@ export class StageEngine {
 		this.post({ type: "pixels", on });
 	}
 
+	/** How long after a camera change the worker paints one tile a batch (`AFTER_MOVE_MS` in `render.worker.ts`): for measures to switch in one page. */
+	afterMove(ms: number): void {
+		this.post({ type: "afterMove", ms });
+	}
+
 	private post(message: ToWorker, transfer: Transferable[] = []): void {
 		if (this.worker) {
 			this.worker.postMessage(message, transfer);
