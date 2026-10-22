@@ -84,7 +84,10 @@ export type ToWorker =
 	 */
 	/** First, as soon as the page has the engine: the backend's build, as the page's compiled module when it has one, for the worker to open its device with before the drawing comes. */
 	| { type: "boot"; backend: string; lowMemory?: boolean; module?: WebAssembly.Module }
-	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean }
+	/** `pixels`: hand tiles over as their bytes, not as pictures (`pixelsFirst` in `engine.ts`); WebGPU only. */
+	| { type: "init"; doc: string; dark: boolean; backend?: string; lowMemory?: boolean; fontsDue?: boolean; docDue?: boolean; pixels?: boolean }
+	/** Tiles from now on as their bytes, or as pictures: for measuring one way against the other in one page. */
+	| { type: "pixels"; on: boolean }
 	| { type: "doc"; doc: string; dark: boolean }
 	| { type: "edits"; edits: string }
 	/** The page is fetching fonts: as `fontsDue`, while the worker has not yet painted its first view. */
@@ -108,6 +111,12 @@ export type ToWorker =
 	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean }
 	| { type: "dropped"; keys: Array<[number, number, number]> };
 
+/**
+ * A tile painted by the worker: a picture (`bitmap`), or its bytes, RGBA8 premultiplied with rows
+ * `stride` bytes apart (`pixels`), as the worker was asked (`init`'s `pixels`).
+ */
+export type TileFromWorker = { scale: number; x: number; y: number } & ({ bitmap: ImageBitmap; pixels?: undefined } | { pixels: ArrayBuffer; stride: number; bitmap?: undefined });
+
 /** Messages from it. */
 export type FromWorker =
 	/** The worker is drawing, with this graphics API (`"webgpu"` or `"webgl2"`). */
@@ -117,7 +126,7 @@ export type FromWorker =
 	 * after it, and `got` how many messages the worker had taken when it painted them (for `sharpAt`);
 	 * `rest` what the window still needs at the scale it wants at rest, while the camera moves too (for `settledAt`).
 	 */
-	| { type: "tiles"; tiles: Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>; left: number; got: number; rest?: number }
+	| { type: "tiles"; tiles: TileFromWorker[]; left: number; got: number; rest?: number }
 	| { type: "landed"; ids: string[] }
 	| { type: "discarded"; keys: Array<[number, number, number]> }
 	| { type: "wanted"; urls: string[] }

@@ -180,6 +180,12 @@ export class PageEngine {
      */
     putPicture(url: string, bitmap: ImageBitmap, width?: number | null, height?: number | null, later?: boolean | null): void;
     /**
+     * A tile's pixels from the worker (`WorkerEngine::paintPixels`), RGBA8 premultiplied, rows
+     * `stride` bytes apart, written into the page's own texture for it: what `putTile` does for a
+     * picture, at a tenth of its cost to the page's thread under WebKit.
+     */
+    putTilePixels(scale: number, x: number, y: number, pixels: Uint8Array, stride: number): void;
+    /**
      * A tile's picture from the worker, copied into the page's own texture for it.
      */
     putTile(scale: number, x: number, y: number, bitmap: ImageBitmap): void;
@@ -297,6 +303,15 @@ export class WorkerEngine {
     lost(): boolean;
     constructor(text: string, dark: boolean);
     /**
+     * As `paint`, but each tile is painted into a texture and copied into a buffer to be read:
+     * `[{ scale, x, y, buffer, stride }]`, `buffer` a `GPUBuffer` the caller maps for reading
+     * (`mapAsync`), copies its bytes out of (RGBA8 premultiplied, rows `stride` bytes apart) and
+     * unmaps before the next call, which uses the same buffers again. The page writes the bytes
+     * into its texture (`PageEngine::putTilePixels`) rather than copy a picture, which under
+     * WebKit costs its thread about 2 ms a tile. Empty on WebGL 2, which has no such buffers here.
+     */
+    paintPixels(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, limit: number): Array<any>;
+    /**
      * Paint up to `limit` tiles the view needs: `[{ scale, x, y, bitmap }]`, bitmaps to transfer.
      */
     paint(x: number, y: number, zoom: number, dpr: number, width: number, height: number, moving: boolean, limit: number): Array<any>;
@@ -408,6 +423,7 @@ export interface InitOutput {
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
     readonly pageengine_putTile: (a: number, b: number, c: number, d: number, e: any) => void;
+    readonly pageengine_putTilePixels: (a: number, b: number, c: number, d: number, e: any, f: number) => void;
     readonly pageengine_redo: (a: number) => [number, number];
     readonly pageengine_roots: (a: number) => [number, number];
     readonly pageengine_setBoards: (a: number, b: number, c: number) => void;
@@ -443,6 +459,7 @@ export interface InitOutput {
     readonly workerengine_lost: (a: number) => number;
     readonly workerengine_new: (a: number, b: number, c: number) => [number, number, number];
     readonly workerengine_paint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
+    readonly workerengine_paintPixels: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
     readonly workerengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly workerengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
     readonly workerengine_reload: (a: number, b: number, c: number, d: number) => [number, number];
@@ -456,8 +473,8 @@ export interface InitOutput {
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined___js_sys_89ffcc1aa63764a9___Function_fn_wasm_bindgen_d9d9da00610227f7___JsValue_____wasm_bindgen_d9d9da00610227f7___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__95: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__96: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__97: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wasm_bindgen_d9d9da00610227f7___sys__JsNullable_wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_d9d9da00610227f7___JsError___true__98: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_d9d9da00610227f7___convert__closures_____invoke___wgpu_f9fd8ba721963722___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

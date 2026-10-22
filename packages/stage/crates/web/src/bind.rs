@@ -325,6 +325,23 @@ impl PageEngine {
 		let _ = copy_in(gpu, id, &bitmap, Some((TILE_SIZE, TILE_SIZE)), true);
 	}
 
+	/// A tile's pixels from the worker (`WorkerEngine::paintPixels`), RGBA8 premultiplied, rows
+	/// `stride` bytes apart, written into the page's own texture for it: what `putTile` does for a
+	/// picture, at a tenth of its cost to the page's thread under WebKit.
+	#[wasm_bindgen(js_name = putTilePixels)]
+	pub fn put_tile_pixels(&mut self, scale: u32, x: i32, y: i32, pixels: &js_sys::Uint8Array, stride: u32) {
+		let Some(gpu) = &mut self.gpu else { return };
+		if pixels.length() < stride * TILE_SIZE {
+			return;
+		}
+		let id = self.page.tile_texture(key(scale, x, y));
+		if gpu.texture_handle(id).is_none_or(|t| t.width() != TILE_SIZE || t.height() != TILE_SIZE) {
+			gpu.texture(id, TextureKind::Color, TILE_SIZE, TILE_SIZE, None);
+		}
+		let texture = gpu.texture_handle(id).expect("just made").clone();
+		gpu.write_pixels(pixels, stride, &texture, TILE_SIZE, TILE_SIZE);
+	}
+
 	/// A picture by its address (an image fill's `url`, or `board:<id>`). `width` × `height` is its
 	/// own size, when the bitmap was made smaller to fit `maxPictureSize`; else the bitmap's.
 	/// `later`: the drawing is laid out for it by `layOutPictures`, once for a batch, not now.
@@ -595,13 +612,20 @@ pub struct WorkerEngine {
 	worker: Worker,
 	gpu: Option<Gpu>,
 	canvas: Option<web_sys::OffscreenCanvas>,
+	/// Buffers tiles are read back into (`paintPixels`), one a tile of a batch, kept between batches.
+	read_back: Vec<wgpu::Buffer>,
 }
+
+/// The worker's texture it paints a tile into to read it back (`paintPixels`), not the canvas.
+const READ_TILE: u32 = 0xE100_0000;
+/// The bytes between rows of a tile read back: a multiple of 256, as WebGPU's copies want.
+const READ_STRIDE: u32 = (TILE_SIZE * 4).div_ceil(256) * 256;
 
 #[wasm_bindgen]
 impl WorkerEngine {
 	#[wasm_bindgen(constructor)]
 	pub fn new(text: &str, dark: bool) -> Result<WorkerEngine, JsError> {
-		Ok(WorkerEngine { worker: Worker::new(text, dark).map_err(err)?, gpu: None, canvas: None })
+		Ok(WorkerEngine { worker: Worker::new(text, dark).map_err(err)?, gpu: None, canvas: None, read_back: Vec::new() })
 	}
 
 	/// The tile canvas, `TILE` pixels square, and the GPU opened on it.
@@ -661,6 +685,57 @@ impl WorkerEngine {
 			set("x", JsValue::from(key.x));
 			set("y", JsValue::from(key.y));
 			set("bitmap", bitmap.into());
+			out.push(&tile);
+			sent.push(key);
+		});
+		for key in sent {
+			self.worker.sent(key);
+		}
+		out
+	}
+
+	/// As `paint`, but each tile is painted into a texture and copied into a buffer to be read:
+	/// `[{ scale, x, y, buffer, stride }]`, `buffer` a `GPUBuffer` the caller maps for reading
+	/// (`mapAsync`), copies its bytes out of (RGBA8 premultiplied, rows `stride` bytes apart) and
+	/// unmaps before the next call, which uses the same buffers again. The page writes the bytes
+	/// into its texture (`PageEngine::putTilePixels`) rather than copy a picture, which under
+	/// WebKit costs its thread about 2 ms a tile. Empty on WebGL 2, which has no such buffers here.
+	#[allow(clippy::too_many_arguments)]
+	#[wasm_bindgen(js_name = paintPixels)]
+	pub fn paint_pixels(&mut self, x: f64, y: f64, zoom: f64, dpr: f64, width: f64, height: f64, moving: bool, limit: u32) -> js_sys::Array {
+		let out = js_sys::Array::new();
+		let Some(gpu) = &mut self.gpu else { return out };
+		if gpu.api() != stage_gpu::Api::WebGpu {
+			return out;
+		}
+		if gpu.texture_handle(READ_TILE).is_none() {
+			gpu.texture(READ_TILE, TextureKind::Color, TILE_SIZE, TILE_SIZE, None);
+		}
+		let pool = &mut self.read_back;
+		let mut sent = Vec::new();
+		self.worker.paint(Camera { x, y, zoom }, dpr, width, height, moving, limit as usize, &mut |key, list, atlas| {
+			stage_paint::flush_glyphs(atlas, gpu);
+			gpu.draw(Target::Texture(READ_TILE), &list);
+			let n = sent.len();
+			if pool.len() <= n {
+				pool.push(gpu.device.create_buffer(&wgpu::BufferDescriptor {
+					label: Some("tile read back"),
+					size: (READ_STRIDE * TILE_SIZE) as u64,
+					usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+					mapped_at_creation: false,
+				}));
+			}
+			let Some(buffer) = pool[n].as_webgpu() else { return };
+			if !gpu.copy_out(READ_TILE, &pool[n], READ_STRIDE) {
+				return;
+			}
+			let tile = js_sys::Object::new();
+			let set = |k: &str, v: &JsValue| js_sys::Reflect::set(&tile, &JsValue::from_str(k), v).ok();
+			set("scale", &JsValue::from(key.scale));
+			set("x", &JsValue::from(key.x));
+			set("y", &JsValue::from(key.y));
+			set("buffer", buffer.as_ref());
+			set("stride", &JsValue::from(READ_STRIDE));
 			out.push(&tile);
 			sent.push(key);
 		});

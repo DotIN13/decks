@@ -65,6 +65,14 @@ function paintSoon(ms = 0): void {
 }
 let soonAt = 0;
 
+/**
+ * Tiles go to the page as their pixels (`paintPixels`) rather than as pictures: the page's
+ * `putTilePixels` writes them into its texture in a tenth of the time WebKit's copy of a picture
+ * takes on its thread (`pixelsFirst` in `engine.ts` says when). Off by default, and on WebGL 2.
+ */
+let pixels = false;
+let gpuBackend = "";
+
 /** Paint what the view needs, a few tiles at a time, and come back for more after the page has had a turn. */
 function paint(): void {
 	if (painting || !engine || !camera) return;
@@ -74,6 +82,7 @@ function paint(): void {
 		if (wait > 0) return paintSoon(wait);
 		fontsWaited = docWaited = false;
 	}
+	if (pixels) return void paintPixels();
 	painting = true;
 	try {
 		const c = camera;
@@ -84,21 +93,63 @@ function paint(): void {
 			const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
 			told = got;
 			scope.postMessage({ type: "tiles", tiles, left, got, rest }, tiles.map((t) => t.bitmap));
-		} else {
-			viewDone = true;
-			// Nothing to paint, the window whole at its resting scale, and the page not told since its last message: it is told, for `settledAt`.
-			if (told !== got && engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) === 0) {
-				told = got;
-				scope.postMessage({ type: "tiles", tiles: [], left: 0, got, rest: 0 });
-			}
-		}
-		report();
+			report();
+		} else nothingToPaint(c);
 		painting = false;
 		if (tiles.length) setTimeout(paint, 0);
 	} catch (error) {
 		painting = false;
 		scope.postMessage({ type: "error", message: String((error as Error)?.message ?? error) });
 	}
+}
+
+/**
+ * `paint`, with the tiles read back from the worker's device and posted as their bytes: the batch
+ * is painted at once, as `paint` does, and posted when the device has copied it out, which takes
+ * the worker a few milliseconds of waiting (no work of the page's). Nothing else paints meanwhile.
+ */
+async function paintPixels(): Promise<void> {
+	if (!engine || !camera) return;
+	painting = true;
+	try {
+		const c = camera;
+		const tiles = engine.paintPixels(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, c.moving ? 4 : 12) as Array<{ scale: number; x: number; y: number; buffer: GPUBuffer; stride: number }>;
+		if (!tiles.length) {
+			painting = false;
+			nothingToPaint(c);
+			return;
+		}
+		const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
+		if (left === 0) viewDone = true;
+		const rest = c.moving ? engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) : left;
+		const sentAt = got;
+		await Promise.all(tiles.map((t) => t.buffer.mapAsync(GPUMapMode.READ)));
+		const out = tiles.map((t) => {
+			const bytes = t.buffer.getMappedRange().slice(0);
+			t.buffer.unmap();
+			return { scale: t.scale, x: t.x, y: t.y, pixels: bytes, stride: t.stride };
+		});
+		told = sentAt;
+		scope.postMessage({ type: "tiles", tiles: out, left, got: sentAt, rest }, out.map((t) => t.pixels));
+		report();
+		painting = false;
+		setTimeout(paint, 0);
+	} catch (error) {
+		painting = false;
+		scope.postMessage({ type: "error", message: String((error as Error)?.message ?? error) });
+	}
+}
+
+/** Nothing to paint: the page is told, once since its last message, when the window is whole at its resting scale (for `settledAt`). */
+function nothingToPaint(c: NonNullable<typeof camera>): void {
+	if (!engine) return;
+	viewDone = true;
+	// Nothing to paint, the window whole at its resting scale, and the page not told since its last message: it is told, for `settledAt`.
+	if (told !== got && engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, false) === 0) {
+		told = got;
+		scope.postMessage({ type: "tiles", tiles: [], left: 0, got, rest: 0 });
+	}
+	report();
 }
 
 /** What the page needs to hear after a change: tiles let go of, items landed, pictures wanted. */
@@ -203,6 +254,8 @@ async function start(message: Extract<ToWorker, { type: "init" }>): Promise<void
 	const { chosen, stage, canvas, gpu } = await (booted ??= boot(message));
 	const backend = gpu.backend();
 	maxPicture = gpu.maxPictureSize();
+	gpuBackend = backend;
+	pixels = !!message.pixels && backend === "webgpu";
 	// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
 	engine = new stage.WorkerEngine(EMPTY, message.dark);
 	engine.setGpu(gpu, canvas);
@@ -273,6 +326,9 @@ function take(message: ToWorker): void {
 			break;
 		case "camera":
 			camera = message;
+			break;
+		case "pixels":
+			pixels = message.on && gpuBackend === "webgpu";
 			break;
 		case "init":
 		case "boot":

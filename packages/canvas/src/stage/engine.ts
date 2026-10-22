@@ -67,12 +67,29 @@ const MAX_SIDE = 8192;
  * or at another scale than the one it has at rest, moving or not, and no font still being fetched:
  * the frame a pan has filled in (`fillAfterPanMs`).
  */
-type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; sharpAt?: number; settledAt?: number };
+type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tiles?: number; pixelTiles?: number; sharpAt?: number; settledAt?: number };
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
 
 type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
+
+/**
+ * Whether the worker hands its tiles to the page as their bytes rather than as pictures: under
+ * WebKit (Safari, and every browser on iOS and iPadOS), whose copy of a worker's picture into a
+ * texture (`copyExternalImageToTexture`) costs the page's thread about 2 ms a 512-pixel tile on an
+ * iPad mini 6, against 0.17 ms to write its bytes (`writeTexture`): a pinch's tiles took 180 to 300
+ * ms of it. Chromium copies a picture in about 0.04 ms, so it keeps pictures, which cost the worker
+ * nothing to read back. WebKit is told by its user agent: AppleWebKit without Chrome's, Chromium's
+ * or Edge's name (Chrome on a Mac says AppleWebKit too; Chrome on iOS says CriOS, and is WebKit).
+ * `globalThis.__decksTilePixels` (true or false), set before the stage opens, says it instead.
+ */
+export function pixelsFirst(): boolean {
+	const forced = (globalThis as { __decksTilePixels?: boolean }).__decksTilePixels;
+	if (typeof forced === "boolean") return forced;
+	const agent = typeof navigator === "undefined" ? "" : navigator.userAgent;
+	return /AppleWebKit\//.test(agent) && !/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(agent);
+}
 
 /** The engine's compiled module, for the worker to start from (`boot`). */
 function moduleOf(stage: StageModule): WebAssembly.Module | undefined {
@@ -275,7 +292,7 @@ export class StageEngine {
 		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
 		this.giveFonts(this.fonts, false);
 		this.needFonts();
-		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc });
+		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc, pixels: pixelsFirst() });
 		this.postFonts(this.fonts);
 		// The camera now, not when the worker says it is ready: a page busy laying out fonts heard that late.
 		this.sendCamera();
@@ -328,6 +345,11 @@ export class StageEngine {
 		}
 	}
 
+	/** Tiles from now on as their bytes (`pixelsFirst`), or as pictures: for measures to switch in one page. */
+	tilePixels(on: boolean): void {
+		this.post({ type: "pixels", on });
+	}
+
 	private post(message: ToWorker, transfer: Transferable[] = []): void {
 		if (this.worker) {
 			this.worker.postMessage(message, transfer);
@@ -339,7 +361,7 @@ export class StageEngine {
 
 	private receive(message: FromWorker): void {
 		if (this.disposed || !this.page) {
-			if (message.type === "tiles") for (const t of message.tiles) t.bitmap.close();
+			if (message.type === "tiles") for (const t of message.tiles) t.bitmap?.close();
 			return;
 		}
 		switch (message.type) {
@@ -353,7 +375,13 @@ export class StageEngine {
 					}
 					break;
 				}
-				for (const t of message.tiles) this.page.putTile(t.scale, t.x, t.y, t.bitmap);
+				for (const t of message.tiles) {
+					if (t.bitmap) this.page.putTile(t.scale, t.x, t.y, t.bitmap);
+					else {
+						this.page.putTilePixels(t.scale, t.x, t.y, new Uint8Array(t.pixels), t.stride);
+						sheetStats().pixelTiles = (sheetStats().pixelTiles ?? 0) + 1;
+					}
+				}
 				sheetStats().tiles = (sheetStats().tiles ?? 0) + message.tiles.length;
 				if (message.left === 0 && message.got >= this.postedContent && this.fontsPending === 0) this.sharpNext = true;
 				{
