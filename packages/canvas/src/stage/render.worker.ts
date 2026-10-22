@@ -112,6 +112,8 @@ function paint(): void {
 		if (wait > 0) return paintSoon(wait);
 		fontsWaited = docWaited = false;
 	}
+	// A fast zoom: no level is painted that it would leave before it came; the page stretches what it holds.
+	if (camera.fast) return;
 	if (pixels) return void paintPixels();
 	painting = true;
 	try {

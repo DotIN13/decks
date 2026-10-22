@@ -103,6 +103,10 @@ function webKit(): boolean {
  * mini on a Mac). `globalThis.__decksTileBudget` changes it, for measuring.
  */
 const TILE_BUDGET = { ms: 4, bytes: 12, pictures: 2 };
+/** A zoom faster than this many doublings a second paints no new level (`zoomRate`), over this window of time; and is painted after this long still. */
+const FAST_ZOOM = 1;
+const ZOOM_RATE_MS = 100;
+const FAST_HOLD_MS = 250;
 const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...(globalThis as { __decksTileBudget?: Partial<typeof TILE_BUDGET> }).__decksTileBudget });
 /** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
 const tileScale = new DataView(new ArrayBuffer(4));
@@ -800,6 +804,14 @@ export class StageEngine {
 		// Zooming once the zoom changes while the camera moves, until it rests (`setMoving`): a pan at one zoom keeps the exact scale.
 		if (this.moving && camera.zoom !== this.camera.zoom) this.zooming = true;
 		this.camera = camera;
+		this.fastZoom = this.moving && this.zooming && this.zoomRate(performance.now(), camera.zoom) > FAST_ZOOM && (globalThis as { __decksSkipLevels?: boolean }).__decksSkipLevels !== false;
+		clearTimeout(this.fastTimer);
+		// Fingers that stop moving but stay down: painted once the zoom has been still a while.
+		if (this.fastZoom)
+			this.fastTimer = setTimeout(() => {
+				this.fastZoom = false;
+				this.sendCamera();
+			}, FAST_HOLD_MS);
 		this.draw();
 		this.sendCamera();
 		this.wantBoardPictures();
@@ -819,7 +831,11 @@ export class StageEngine {
 	setMoving(moving: boolean): void {
 		if (moving === this.moving) return;
 		this.moving = moving;
-		if (!moving) this.zooming = false;
+		if (!moving) {
+			this.zooming = false;
+			this.fastZoom = false;
+			clearTimeout(this.fastTimer);
+		}
 		this.sendCamera();
 		if (!moving) {
 			this.wantBoardPictures();
@@ -827,6 +843,29 @@ export class StageEngine {
 			this.draw();
 		}
 	}
+
+	/**
+	 * How fast the zoom changes, in doublings a second: its change since the first camera of the
+	 * last `ZOOM_RATE_MS`, over the time between them; not known yet, as fast, until they are 16
+	 * ms apart (a zoom's first two frames, whose events may come two in a frame). A slow pinch is under one doubling a second, a wheel's or a fast
+	 * pinch's several, and while that lasts (`fastZoom`) the worker paints no new level, which
+	 * the zoom would leave before the level covered the window (its first frames painted 15 to
+	 * 20 tiles of a level a frame): the page shows the levels it holds stretched or shrunk, the
+	 * overview under any edge they leave bare, and the current level is painted once the zoom
+	 * slows or rests. `__decksSkipLevels = false` paints every level, for measuring.
+	 */
+	private zoomRate(now: number, zoom: number): number {
+		const trail = this.zoomTrail;
+		const level = Math.log2(zoom);
+		while (trail.length && trail[0]![0] < now - ZOOM_RATE_MS) trail.shift();
+		trail.push([now, level]);
+		const from = trail[0]!;
+		if (now - from[0] < 16) return Infinity;
+		return (Math.abs(level - from[1]) * 1000) / (now - from[0]);
+	}
+	private zoomTrail: Array<[number, number]> = [];
+	private fastZoom = false;
+	private fastTimer: ReturnType<typeof setTimeout> | undefined;
 
 	/** The stage point at the window's top-left, from the camera's centre. */
 	private corner(): { x: number; y: number } {
@@ -838,7 +877,7 @@ export class StageEngine {
 		const { x, y, zoom, width, height } = this.drawRect();
 		const dpr = Math.min(2, devicePixelRatio || 1);
 		// Fingers pinching the zoom: tiles at half the screen's density (`setPinching`); a two-finger pan at one zoom keeps the exact scale.
-		const sent = { zoom, dpr: this.pinching && this.zooming ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming };
+		const sent = { zoom, dpr: this.pinching && this.zooming ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
 		this.post({ type: "camera", x, y, width, height, ...sent });
 		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
 		if (want !== undefined && want !== this.wantScale) {
@@ -1791,6 +1830,7 @@ export class StageEngine {
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
 		clearTimeout(this.showAnyway);
+		clearTimeout(this.fastTimer);
 		this.worker?.terminate();
 		this.worker = undefined;
 		this.page?.free();

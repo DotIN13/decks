@@ -113,7 +113,8 @@ export type ToWorker =
 	| { type: "lift"; ids: string[] }
 	| { type: "drop"; ids: string[] }
 	/** `zooming`: the zoom changed while the camera moves, so tiles are painted at the power of two under it; a pan keeps the exact scale. */
-	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean; zooming?: boolean }
+	/** `fast`: the zoom changes faster than about one doubling a second: paint nothing new until it slows or rests (`zoomRate` in `engine.ts`). */
+	| { type: "camera"; x: number; y: number; zoom: number; dpr: number; width: number; height: number; moving: boolean; zooming?: boolean; fast?: boolean }
 	| { type: "dropped"; keys: Array<[number, number, number]> };
 
 /**
