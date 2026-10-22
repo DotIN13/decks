@@ -1,6 +1,5 @@
 /** The frames. Everything that changes state is one of these, and nothing else crosses. */
 
-import type { BoardPatch } from "./boards.ts";
 import type { DocClientMessage, DocServerMessage } from "@decks/docs";
 import type {
 	AgentChat,
@@ -88,7 +87,6 @@ export type ClientMessage =
 	 * floor — the content raises it when it needs more room, and never clips.
 	 */
 	| { type: "board.resize"; path: string; w?: number; h?: number; /** The stage on screen. */ stage?: string }
-	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
 	/**
 	 * How much room this board's content takes, measured in the frame that is showing it.
 	 *
@@ -336,7 +334,6 @@ export type ServerMessage =
 	 * page's time for one number.
 	 */
 	| { type: "board.sized"; path: string; h: number }
-	| { type: "board.patched"; path: string; rev: number; refused?: string }
 	| {
 			type: "agents";
 			chats: AgentChat[];

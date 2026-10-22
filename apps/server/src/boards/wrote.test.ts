@@ -13,7 +13,6 @@ function serviceOn(root: string): { deck: Deck; service: BoardService; sent: Ser
 	const service = new BoardService(deck, {
 		send: (message) => void sent.push(message),
 		state: () => ({ boards: deck.boards }) as unknown as DeckState,
-		edited: () => {},
 		removed: () => {},
 	});
 	return { deck, service, sent };

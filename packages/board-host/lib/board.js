@@ -289,11 +289,6 @@
 	 * `deck/kinds.ts`'s — one list, two readers, and the same bargain `familyOf` makes with
 	 * `embedFamily` on the app's side.
 	 *
-	 * Deliberately silent in **edit mode**, where a press on a link is part of dragging or
-	 * retyping the component it sits in: the click opens nothing, and does not navigate either. `data-decks-edit` is the app's own flag on this
-	 * document (`canvas/BoardFrame.tsx` does the writing), so this needs no second channel to
-	 * ask about it.
-	 *
 	 * Opened as a plain file with no app above it, a board link opens in a tab as well: there
 	 * is nobody to ask, and a new tab beats losing the board being read.
 	 */
@@ -338,15 +333,6 @@
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
 		if (!anchor) return;
-		/*
-		 * In edit mode a link does nothing, and that includes the browser's own nothing: left alone, the
-		 * click navigated the frame to the linked file, and the board being edited was replaced in place.
-		 * The caret is placed on the press, before this, so a link's words can still be retyped.
-		 */
-		if (document.documentElement.hasAttribute("data-decks-edit")) {
-			if (!(anchor.getAttribute("href") ?? "").trim().startsWith("#")) event.preventDefault();
-			return;
-		}
 		const raw = (anchor.getAttribute("href") ?? "").trim();
 		// A jump within this board is the one link that stays in it, and the one `urlFor` is
 		// not asked about.
@@ -401,9 +387,6 @@
 	 * `data-value` otherwise, because a button carries no value and most of what a person
 	 * presses on a board is a button. `data-value` wins where both exist: an author who wrote
 	 * one meant it.
-	 *
-	 * Deliberately silent in **edit mode**, like a link: a press there belongs to the caret or
-	 * the drag, and a board must not run code because somebody was moving a box.
 	 */
 	const BOARD_ROUTE = "/api/board/";
 	let stageClient;
@@ -493,7 +476,6 @@
 
 	function onEvalClick(event) {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-		if (document.documentElement.hasAttribute("data-decks-edit")) return;
 		const target = event.target instanceof Element ? event.target.closest("[data-eval]") : null;
 		if (!target) return;
 		const id = (target.getAttribute("data-eval") ?? "").trim();

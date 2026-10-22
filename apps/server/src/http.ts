@@ -24,7 +24,7 @@ import { verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
-import type { AnyBoardPatch, ServerMessage } from "@decks/protocol";
+import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
 import { guard } from "./auth/guard.ts";
 import { extraHosts, hostAllowed, hostRefusal } from "./auth/hosts.ts";
@@ -303,52 +303,6 @@ export function createHttpApp(app: App): Express {
 		});
 		if (refused) res.status(/no board/i.test(refused) ? 404 : 409).json({ error: refused });
 		else res.json({ path, deleted: true });
-	});
-
-	/*
-	 * Files dropped or pasted onto a board from a front end whose boards are pages of their own
-	 * (Studio's): each a block placed where it landed, in the board's own file, as this app's
-	 * editor inserts one over the socket (`board.patch`). The files are uploaded first
-	 * (`/api/upload`, into the canvas's files/); `embed` is the path the board names them by.
-	 */
-	api.post("/boards/insert", (req, res) => {
-		const body = (req.body ?? {}) as { path?: unknown; blocks?: unknown };
-		const path = typeof body.path === "string" ? body.path : "";
-		const board = path ? app.deck.board(path) : undefined;
-		if (!board) {
-			res.status(404).json({ error: `No board ${path || "(none named)"} here.` });
-			return;
-		}
-		const number = (v: unknown) => typeof v === "number" && Number.isFinite(v);
-		const blocks = Array.isArray(body.blocks) ? body.blocks : [];
-		const patches: AnyBoardPatch[] = [];
-		for (const raw of blocks.slice(0, 50)) {
-			const b = (raw ?? {}) as { embed?: unknown; at?: { left?: unknown; top?: unknown; width?: unknown; height?: unknown }; image?: unknown; poster?: unknown };
-			const at = b.at ?? {};
-			if (typeof b.embed !== "string" || !b.embed || /^[a-z]+:/i.test(b.embed) || ![at.left, at.top, at.width, at.height].every(number)) {
-				res.status(400).json({ error: "Each block is { embed: a path the board names the file by, at: { left, top, width, height } in board pixels, image?, poster? }." });
-				return;
-			}
-			patches.push({
-				op: "insert",
-				kind: b.image === true ? "image" : "embed",
-				id: "",
-				at: { left: at.left as number, top: at.top as number, width: at.width as number, height: at.height as number },
-				embed: b.embed,
-				...(typeof b.poster === "string" && b.poster ? { attrs: { "data-poster": b.poster } } : {}),
-			});
-		}
-		if (!patches.length) {
-			res.status(400).json({ error: "Name at least one block to insert." });
-			return;
-		}
-		// Applied at once: a refusal is the only reply; success goes to every page as `board.patched`.
-		let refused: { rev: number; refused?: string } | undefined;
-		app.boards.patch(path, board.rev, patches, (message) => {
-			if (message.type === "board.patched" && message.refused) refused = message;
-		});
-		if (refused) res.status(409).json({ error: refused.refused, rev: refused.rev });
-		else res.json({ path, rev: app.deck.board(path)?.rev ?? board.rev, inserted: patches.length });
 	});
 
 	api.post("/agents/:id/:act", (req, res) => {

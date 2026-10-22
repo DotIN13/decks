@@ -2,8 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { canvasOfPath, isSharedCanvas, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { relink } from "../deck/stage-boards.ts";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
-import { applyPatches, mintId, PatchRefused } from "./patch.ts";
+import type { Board, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "./snapshots.ts";
 import { Authors, Seen } from "./authors.ts";
 import {
@@ -42,29 +41,24 @@ export interface BoardHooks {
 	 * arrangement rather than sending the board it happens to be holding — see `placed`.
 	 */
 	state(): DeckState;
-	/** The user committed an edit — the agent holding that board is told (§6.5). */
-	edited(path: string, summary: string): void;
 	/** A board is gone: every agent must drop it, or a dead path empties the rail. */
 	removed(path: string): void;
 }
 
 /**
- * The board files: writing them, revisioning them, editing them, and deleting them.
+ * The board files: writing them, revisioning them, and deleting them.
  *
  * This was 340 lines of `app.ts` sitting between the WebSocket router and the account
  * panel, and it is the only part of the server that writes a file a person did not name.
  * It is a service for three reasons that showed up separately:
  *
  * - **A board write and its revision are one act.** Every path that writes a board also
- *   records it — `newBoard`, `newMirror`, `newWebBoard`, `patch`, `undo` — and the one
+ *   records it — `newBoard`, `newMirror`, `newWebBoard`, `undo` — and the one
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
  *   kept here so `decks.canvas.fit` can await it, and it is deliberately not in the deck record: a
  *   headless server has no readings, and the deck is what is on disk.
- * - **It is where a stale write is refused.** A patch carries the revision it was composed
- *   against, and that comparison is the guard that stops an agent's work being silently
- *   undone by a drag that started before it.
  *
  * The hooks are the only way out: this class does not broadcast anything itself, because
  * what a `board.changed` means is different for a browser and for an agent.
@@ -102,7 +96,7 @@ export class BoardService {
 	 *
 	 * **Authorship is said, never detected.** A file event has no author, so nothing here reads
 	 * one off the disk: an agent that fits, shows or reports a board through the stage tool is
-	 * its writer (`stage/tool.ts`), and the canvas editor's patch is the person's. `who` is an
+	 * its writer (`stage/tool.ts`). `who` is an
 	 * agent id or `"you"`. Kept in `.decks/authors.json`, so the byline outlives a restart.
 	 *
 	 * The time is the act's own clock rather than the file's. `seen()` takes the later of the two
@@ -579,115 +573,6 @@ export class BoardService {
 	}
 
 	/**
-	 * Apply a user's edit to a board file (§6.5).
-	 *
-	 * The `rev` the browser composed against is a precondition, not decoration: if
-	 * the agent wrote the file mid-drag, applying anyway would silently undo its work
-	 * — the bug that looks like a haunting. A refusal carries the current rev so the
-	 * browser can re-read the frame and decide whether the gesture still means
-	 * anything.
-	 */
-	patch(path: string, rev: number, patches: AnyBoardPatch[], reply: (message: ServerMessage) => void): void {
-		const board = this.deck.board(path);
-		if (!board) {
-			reply({ type: "board.patched", path, rev: 0, refused: `No such board: ${path}` });
-			return;
-		}
-		const readOnly = this.readOnly(path);
-		if (readOnly) {
-			reply({ type: "board.patched", path, rev: board.rev, refused: readOnly });
-			return;
-		}
-		if (board.rev !== rev) {
-			reply({
-				type: "board.patched",
-				path,
-				rev: board.rev,
-				refused: "That board changed while you were editing it, so it is being re-read.",
-			});
-			return;
-		}
-
-		const file = this.deck.fileOf(path);
-
-		/*
-		 * A board edited as its own source: the file's bytes, written whole.
-		 *
-		 * Handled before `applyPatches` rather than inside it, because that function is
-		 * parse5 over an HTML document and this may be a markdown file: there is nothing to
-		 * parse, address or splice. The write is the whole of the edit.
-		 *
-		 * It used to be refused for a board of placed boxes, on the grounds that replacing
-		 * such a document from a textarea would work once and destroy it. That was the
-		 * format talking: a board is a file, the source editor is opened deliberately (with
-		 * ⌥, `canvas/Stage.tsx`), and every write here is recorded as a revision that undo
-		 * can walk back. What is still refused is a source op *batched* with others, which
-		 * could only mean two writers disagreeing about the same bytes.
-		 */
-		const source = patches.find((patch) => patch.op === "source");
-		if (source) {
-			if (patches.length > 1) {
-				reply({
-					type: "board.patched",
-					path,
-					rev: board.rev,
-					refused: "A source edit replaces the whole file, so it cannot be batched with other changes.",
-				});
-				return;
-			}
-			try {
-				const before = readFileSync(file, "utf8");
-				if (source.text === before) {
-					reply({ type: "board.patched", path, rev: board.rev });
-					return;
-				}
-				writeFileSync(file, source.text);
-				this.revisions.record(path, source.text);
-				this.deck.resync();
-				reply({ type: "board.patched", path, rev: this.deck.board(path)?.rev ?? board.rev });
-				this.hooks.send({ type: "deck.state", deck: this.hooks.state() });
-			} catch (error) {
-				reply({ type: "board.patched", path, rev: board.rev, refused: (error as Error).message });
-			}
-			return;
-		}
-
-		try {
-			const before = readFileSync(file, "utf8");
-			/*
-			 * Ids are minted here, not in the browser.
-			 *
-			 * A name has to be unique against the file as it is now, and only the server
-			 * has that — two tabs inserting at once would otherwise both pick
-			 * `sticky-3`, and the second insert would be refused for a reason that reads
-			 * like a bug. Handed to `applyPatches` as a function rather than applied to
-			 * the batch first, so each insert is named against the file the one before it
-			 * produced: dropping two files on a board is one batch of two inserts.
-			 */
-			const { html, summary } = applyPatches(before, patches, mintId);
-			if (html === before) {
-				reply({ type: "board.patched", path, rev: board.rev });
-				return;
-			}
-			writeFileSync(file, html);
-			this.revisions.record(path, html);
-			const updated = this.deck.refresh(path);
-			// `board.changed` will also arrive from the watcher; this one is immediate,
-			// so the browser's optimistic edit is confirmed without waiting on the disk.
-			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? board.rev });
-			if (updated) {
-				// The person's own act, named and timed like an agent's, so the canvas knows it is
-				// not news to them rather than reading it off the file they just moved.
-				this.wrote(path, "you");
-			}
-			this.hooks.edited(path, summary.join(", "));
-		} catch (error) {
-			const text = error instanceof PatchRefused ? error.message : `Could not apply that edit: ${(error as Error).message}`;
-			reply({ type: "board.patched", path, rev: board.rev, refused: text });
-		}
-	}
-
-	/**
 	 * Undo the last change to a board, whoever made it.
 	 *
 	 * One mechanism for both authors, because the store holds both (§6.7). Undoing
@@ -707,7 +592,6 @@ export class BoardService {
 			this.revisions.pop(path);
 			const updated = this.deck.refresh(path);
 			if (updated) this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
-			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? 0 });
 		} catch (error) {
 			reply({ type: "error", text: `Could not undo: ${(error as Error).message}` });
 		}

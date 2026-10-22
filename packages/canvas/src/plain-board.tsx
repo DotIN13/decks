@@ -54,13 +54,11 @@ function withStorage(address: string | undefined, key: string): string | undefin
 	return address === undefined ? undefined : `${address.split("#")[0]}${storageHash(sandboxKeeper.read(key))}`;
 }
 
-/** What a host adds to a plain board: where its page is, its token, its sandbox, and what it does with files dropped on it. */
+/** What a host adds to a plain board: where its page is, its token and its sandbox. */
 export interface PlainBoardExtras {
 	page?: string | undefined;
 	boardHost?: BoardHost | undefined;
 	sandboxed?: { key: () => string } | undefined;
-	/** Files dropped or pasted onto the board's page, where they landed in board pixels. */
-	onFiles?: ((files: File[], at: { x: number; y: number }, how: "drop" | "paste") => void) | undefined;
 	/** Raised by the host when the board's file changed where its page comes from: the page loads again. */
 	reload?: number | undefined;
 	/** The canvas the board is on, for its token's calls. */
@@ -231,11 +229,23 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			case "decks:embed-ready":
 				setGuest(true);
 				return;
-			// Files dropped or pasted onto the page (`embed-guest.js`), with where, in board pixels.
-			case "decks:files": {
+			/*
+			 * Files dropped on the page (`embed-guest.js`), which never go into a board: the drop is replayed
+			 * on the frame, at the same place on the screen, and bubbles to this document's own drop
+			 * handling, so they land on the canvas there as on empty canvas.
+			 */
+			case "decks:drop": {
 				const files = Array.isArray(message.files) ? message.files.filter((f): f is File => f instanceof File) : [];
-				const at = message.at as { x?: unknown; y?: unknown } | undefined;
-				if (files.length && props.onFiles) props.onFiles(files, { x: num(at?.x), y: num(at?.y) }, message.how === "paste" ? "paste" : "drop");
+				if (!files.length) return;
+				const r = frame.getBoundingClientRect();
+				const scale = r.width / Math.max(1, frame.offsetWidth || size().w);
+				try {
+					const transfer = new DataTransfer();
+					for (const file of files) transfer.items.add(file);
+					frame.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, composed: true, clientX: r.left + num(message.x) * scale, clientY: r.top + num(message.y) * scale, dataTransfer: transfer }));
+				} catch {
+					/* a browser that cannot build a drop: the files are not placed, and nothing goes into the board */
+				}
 				return;
 			}
 			case "decks:selection": {

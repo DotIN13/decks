@@ -118,7 +118,7 @@ await browser.close();
   `mobile.mjs` did that and has been cut, so nothing does it today. A mouse hides exactly the
   bugs a touchscreen has, so a check that means to test touch must not use one.
 - `boardPath(name)` / `read` / `write` / `changed(file, was)` — the fixture's files.
-- `socket()` — drive the protocol the way the client does (`board.play`, `board.patch`).
+- `socket()` — drive the protocol the way the client does (`board.play`, `board.move`).
 - `ask(page, text)` / `idle(page)` — one agent turn. Never swallow the timeout: a prompt
   typed into a still-running turn truncates it, and the truncated reply reads as a bug.
 - A check that creates boards must play them (`board.play`) and delete them in a `finally`.

@@ -160,7 +160,6 @@ export class App {
 			 * positions so that the seeding `stageState` does happens on this path too.
 			 */
 			state: () => this.stageState(),
-			edited: (path, summary) => this.agents.userEdited(path, summary),
 			removed: (path) => this.agents.boardRemoved(path),
 		});
 		this.stage = new StageService(deck, {

@@ -505,299 +505,16 @@ looking at rather than a single frame of it.
 
 ### 6.5 Direct manipulation
 
-The editor is app code over `frame.contentDocument` (§4), and two things follow from
-that. Pointer events inside the frame arrive in the frame's own pixels, which *are*
-board coordinates — the stage's zoom is a transform on an ancestor — so there is no
-camera maths in the editor at all. And the affordances (handles, outline) are elements
-appended to the board's document and marked `data-decks-ui`, never written to the file,
-because patches are declarative and the overlay cannot leak into what is saved.
+A board's own page is **not edited from the canvas**. There was an editor over
+`frame.contentDocument` — drag, retype, an inspector, a palette, files dropped into the page — whose
+gestures went to the server as patches spliced into the file. It is gone, and with it the patch
+messages, the `/api/boards/insert` route and the server's splicer: a board is written by whoever
+writes its file (an agent, a person in their editor), and a new revision simply reloads the page.
 
-A committed gesture becomes a `BoardPatch` the server applies by **splicing the
-original file at parse5 source locations** — not re-serialising, because the agent
-re-reads that file and a re-serialise turns every drag into an unreadable diff. A drag
-rewrites exactly the `style` attribute's byte range and keeps declarations the patch
-never mentioned; everything else in the file comes out identical, which the tests
-assert byte-for-byte. What the splicer cannot do safely — a text edit over a component
-made of markup — is refused with a reason rather than half-applied.
-
-**What "editable" means, and the three mechanisms that cover it.** For a while only one
-thing was: a component whose entire content was plain text. That excluded the shape the
-agent writes most — a card with a heading and a paragraph — and everything about a
-component that is neither its box nor its words. It is now three mechanisms, and
-between them they cover most of every kind:
-
-| | | |
-|---|---|---|
-| **position, size** | drag, resize handle, arrow-key nudge | `update` with `style` |
-| **words** | double-click a run of words and retype it, marks and all, in place or in a source editor | `html` / `text`, addressed by `(id, path)` |
-| **everything else** | the inspector, floating for the selection | `update` with `class` / `attrs`, `rename`, `duplicate`, `order`, `remove` |
-
-Two of those ops existed and nothing reached them: `update` could already carry a
-`class` and an `attrs` map, and `order` had a test and no caller. Most of what follows
-is therefore a UI over the protocol that was already there, and the protocol grew by
-two ops rather than by ten.
-
-**An editable run is a run of words, and its address is where it sits.** A patch carries
-the component's `data-id`, the element-child indices walked into it (`[]` is the component
-itself), the words the browser was showing, and the new content.
-
-Three decisions, and the third of them reversed the second.
-
-*`data-edit`, not a nested `data-id`.* The protocol's one structural rule is that a
-component is a `data-id` on a child of the body, and that a `data-id` *inside* another
-component is therefore not a component — the card around it is. Reusing the attribute for
-parts would blur the only line that defines the vocabulary, and every place that resolves a
-component by id (`elementOf`, `findById`, the stage's highlight) would have had to learn
-"…but only at the top level". So when runs needed naming, they got an attribute of their
-own.
-
-*A name, not an index path.* Typing carried `path: number[]` first, and it was replaced by
-an authored `data-edit` because a path is two derivations of one thing which agree only
-where the DOM's shape *is* the file's. That held for a hand-written card and failed
-completely for anything `board.js` renders: a path into a `[data-md]` panel's `<h2>`
-addressed nothing in the file, so markdown was not editable at all and the editor had to
-refuse such a component up front. The cost was stated and accepted at the time: **a board
-written before the convention had no retypeable text**, with no fallback, because a
-fallback would be the index path again with its failures moved later.
-
-*A path again, because the reason the name won no longer holds.* Rendered panels are now
-edited as their whole **source**, addressed as one component (below) — so a path is only
-ever resolved where the file's tree really is the DOM's, which is the condition it always
-needed. `data-edit` is gone, and three things went with it. A board nobody annotated now
-has retypeable text, which was the standing complaint the app could only answer with "ask
-the agent for a data-edit on it". `duplicate` no longer mints a fresh name for every run
-inside a copy, which it had to do because a name was unique to the whole board. And the
-`insert` templates no longer name the run they write, which they had to do so that
-double-clicking a new sticky's placeholder was not silently a no-op.
-
-What made it safe to go back is one field. A path is only correct against the file the DOM
-was built from, and the two can come apart: the agent rewrites a board while a frame is
-pinned to the revision it loaded (§7), and the same indices then point at an element the
-user never saw. So the patch carries `before`, the text that was on screen, and the server
-refuses if the file disagrees — whitespace-insensitively, because the file indents a
-paragraph across three lines and the browser hands back what it rendered, so the two never
-agree about spaces and always agree about words.
-
-It is the third guard and almost never fires, which is the point rather than a weakness. A
-stale rev is refused outright by the check that was already there, and a board the agent
-rewrote reloads the frame, which abandons the edit in progress. What is left is the window
-between those two — a rev this client legitimately holds against a DOM that has not caught
-up — and nothing but the content check can see it. The name scheme had no equivalent: its
-one wrong answer, two elements sharing a name, was resolved by counting matches rather than
-by checking what was there.
-
-The affordance follows the same rule. A dotted underline appears under the cursor on a leaf
-(`:not(:has(*))` in the frame's own stylesheet), with rendered panels underlined as a whole
-and their insides, embeds and `<svg>` content excluded at equal specificity so they win on
-order. It used to be `[data-edit]:hover`, which could not lie because the attribute *was*
-the address; this one can be wrong in one direction only — a leaf whose file content turns
-out to be markup a parser built no element for is offered and then refused, which is the
-same class of surprise as any optimistic UI and strictly rarer than the old "there is
-nothing to hover here at all".
-
-*Marks are part of the words, so the payload is markup.* A run like `See <a
-href="…">the doc</a>, then <b>ship it</b>` has no plain-text form: sending the words alone
-throws the link and the bold away, which is why an element with markup in it was refused
-outright at first — the client checked `children.length > 0` and the server checked for `<`
-in the byte range. Both are gone. The element is made `contenteditable` and the user treats
-the marks like text: select across a `<b>`, delete it, type through it, add one with the
-platform's own shortcut. What comes back is the element's **inner HTML** (`op: "html"`), and
-`text` stays for the one payload that really is plain — a rendered panel's source, where a
-`<` the user typed must not become a tag.
-
-Which raises the question the whole op turns on: `innerHTML` out of a `contenteditable` is
-*not* what an author would have written. Engines split and merge marks as the caret crosses
-them, leave `<b></b>` behind after a delete, emit a non-breaking space at an inline edge,
-wrap a line break in a `<div>`, and hand over whatever a paste brought — `style` attributes,
-classes, `<meta>`, `<o:p>`. Writing that into a file an agent reads back would undo the
-property this whole area exists for; the note in `escapeText` records that escaping `>`
-alone was enough to rewrite every line of a Mermaid diagram and make the diff unreadable.
-
-So there is a normaliser (`boards/inline-html.ts`), and it runs on the **server**. That
-placement is the one deliberate difference from "write the new inner HTML into the element":
-the rule about what a board file may contain belongs with the file, so there is a single
-implementation, it is testable without a DOM, and a client that is buggy or is not this app
-cannot write markup a board should not hold. It is a phrasing-content allowlist
-(`INLINE_TAGS`, in the protocol beside `BOX_CLASSES` because both sides ask about it),
-attributes filtered to `class`, `href`, `data-*` and a few more, split marks merged, doubled
-ones flattened, empty ones dropped, non-breaking spaces returned to spaces, `>` returned to
-itself, and everything else **unwrapped to its words** rather than dropped — because for both
-ways a foreign tag arrives, a paste and an engine's line break, the text is what the user
-meant and the element is not. The output is deterministic and idempotent, which is what lets
-a commit that only moved the caret produce no diff at all.
-
-Two consequences worth stating, since they are the cost of the model. **A run is one field,
-however many marks it is made of**: clicking a bold word inside a paragraph opens the
-paragraph, because a field whose caret stops at a mark's edge is worse than no field — so a
-row of two `<span>`s is edited together, and select-all in it means all of it. And **the
-underline had to move with the rule**: it asks `:not(:has(:not(<INLINE_TAGS>)))`, no
-descendant that is not phrasing content, which is exactly the question the server asks of the
-parse tree before it will write a run back. One question, one list, so the affordance cannot
-promise an edit the file then refuses.
-
-*Two editing surfaces, because there are two shapes.* Plain text keeps the in-place
-`contenteditable` it always had: that path preserves the file's own whitespace and
-produces a one-line diff, which is the property everything here is for, and it must not
-regress. A `[data-md]` or `[data-mermaid]` component gets a **monospace textarea over
-it** holding its whole source, because what is on screen there is not what the file says
-— `board.js` was handed `## The sequence` and drew an `<h2>`, and there is no byte range
-in the file corresponding to that `<h2>`. So the editable unit is the source, named once
-on the component, and not a rendered block. `board.js` keeps the source it drew from (a
-`WeakMap`, not a `data-source` attribute — the file is the one truth, and a copy in the
-DOM would be a second) and exposes `source` and `redraw` on `window.__board`. A commit
-re-renders that one component rather than reloading the frame, which is what keeps the
-frame pinned to the revision it loaded (§7) — the alternative flashed the whole board for
-one component. A re-render takes `__boardReady` down and puts it back, because everything
-that waits for a board waits on that flag.
-
-The splice keeps the whitespace it found. A paragraph written over three indented lines
-is the normal shape of a board, and replacing the whole inner range pulled the text up
-onto the opening tag and the closing tag up behind it: a three-line diff for a retype.
-Only the text *between* the surrounding whitespace is replaced — and the incoming text
-is trimmed when that whitespace is being kept, because `contenteditable` hands back the
-file's own indentation as part of `textContent` and writing it on top of the indent
-already there put a blank line in the file on every edit. The source editor is the
-multi-line case of the same rule: it shows the block dedented, since that is what the
-markdown parser sees and four stray spaces are a code block, and re-indents it on commit
-so that changing one line of a rendered component is one line of the diff. Two characters are escaped
-on the way in, `&` and `<`, and no longer `>` — a Mermaid source is `A --> B` on every
-line, and escaping that rewrote a whole diagram for a one-line edit.
-
-What is still refused, and honestly: a run whose content is markup (`See <a>the doc</a>`
-cannot survive a plain-text replacement, so the author marks the words instead), a source
-with raw HTML in it (the browser only ever had the element's `textContent`, with the tags
-already dropped, so writing it back is the same loss), a name nothing on the board has,
-and a `data-embed`, whose content is somebody else's file and whose editable thing is the
-path.
-
-**The appearance vocabulary is the stylesheet's, and it is thinner than it looks.**
-`board.css` has five component classes that mean the same thing — a box with prose in
-it: `text`, `sticky`, `card`, `callout` — and one variant attribute,
-`data-tone` (a callout's warn/danger/ok). That is all it has:
-there is no sticky colour, no font size, no alignment. So the inspector offers a class
-switch and a tone, and nothing it invented. **A deck's `lib/` is a copy** — but one
-that is refreshed on every open (§2.1), so the constraint this design was written under
-has softened: a class added to `board.css` reaches an existing deck on its next restart
-instead of never. What survives is the discipline rather than the deadline — the
-vocabulary and the stylesheet are one decision, and inventing `.sticky[data-tone="blue"]`
-in the inspector without the CSS to match is still a control that does nothing.
-`BOX_CLASSES` and the tone lists live in `@decks/protocol` with that written next to them. `kpi`, `table` and `chip`
-are deliberately not in the switch: their CSS styles children the other five do not
-have, so swapping one in produces a component whose content no longer fits it.
-
-`panel` was a fifth and is gone. It differed from `card` in two declarations — a deeper
-background and no shadow — which is too little to choose between under pressure, and the
-inspector offered the choice on every box. A board still saying `class="panel"` gets a box
-with no padding, no border and no background: the words are still where the author put
-them, because `body.board > *` positions every top-level component regardless of its class,
-but it no longer looks like anything. So the removal is paired with rewriting the boards
-that used one, which is why the fixtures, the templates and the skill changed in the same
-commit.
-
-An earlier version of this paragraph claimed such a board "drops out of absolute
-positioning and collapses into document flow". That was read off the `.card, .sticky, …`
-selector list without checking whether anything else granted it, and `body.board > *` does
-— so it is true only of a *nested* `class="panel"`, which was never a component anyway. The
-action was right and the stated failure was worse than the real one.
-
-**The inspector is a floating panel, not a sidebar.** It appears at the top right for
-the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
-below that a board is a tile on a map, its frame takes no pointer events, and there is
-nothing to select. `right: 30px` clears the timeline spine, the one thing on that
-edge that has to stay aimable at all times. It used to be measured against something else —
-the transcript panel opened when the cursor came within 26px of the right edge, so anything
-closer pulled the panel over itself as you reached for it — and that panel is gone; the
-number survives it because the spine still wants the room. A permanent sidebar was the
-obvious alternative and it contradicts §7 — the chrome is away by default because the
-canvas is the work. A context menu was the other, and it is a second place to put the
-same rows, reachable only by knowing it is there; the keyboard covers the frequent ones
-instead (⌘D duplicates, `[` and `]` change order, ⌫ deletes, and the palette's own
-`V S C T E` finally do something).
-
-What the inspector will not offer, on purpose: a colour picker writing
-`background: #f0c`. (The source editor is not a counter-example: it holds a markdown or
-Mermaid source, which is text a `text` patch can splice, and never a component's HTML.) Boards use tokens, the authoring skill tells the agent never to
-write a hex, and widening `update`'s `style` from a rectangle to arbitrary CSS turns a
-byte-range splice into a stylesheet editor. Nor a textarea holding the component's
-HTML: that is re-serialising by hand, and the agent is the fallback editor.
-
-**Two new ops, both of which had to be ops.** `duplicate` copies the component's own
-source bytes with a handful of attributes rewritten inside the copy, because that is the
-only copy that keeps a card's heading, its paragraph and its list — an `insert` composed
-by the browser would produce the palette's placeholder wearing a new name. The `data-id` is
-now the only attribute it rewrites: it used to have to mint a fresh `data-edit` for every
-run inside the copy, because a name was unique to the whole board and two components
-sharing one made a retype of either ambiguous. Two copies have two ids, so an address of
-`(id, path)` distinguishes them by construction. Its name is derived from the original's
-(`goal` → `goal-2`), since an id is the one thing in a board a person and an agent both
-address by hand. `rename` is an op rather than an
-`attrs: { "data-id": … }` write because a name is not an attribute like the others: it
-has to be one a board can use, it has to be one nothing else has, and the op has to
-answer with it. Renaming is worth having despite what it costs — an agent may hold the
-old name in context — because the summary it is told says exactly what changed, which is
-the same mechanism every other edit relies on. It used to have a second job: rewriting
-every `data-from`/`data-to` that named the old id, in one pass of descending offsets,
-because otherwise the file still looked right while an arrow silently stopped being
-drawn. Connectors went, and with them the only thing in a board that named a component
-from outside it, so a rename is now a single-attribute splice. `duplicate` is what still
-needs the multi-splice path, for the copy's `data-id` and its `style`.
-
-**What a family is, after the connector went.** The inspector sorts the selection into
-`box`, `embed` or `other` by its classes and attributes, and no longer by its tag: an
-`<svg>` was a connector by construction, and a hand-drawn diagram is whatever its author
-classed it. A top-level `<svg>` is therefore an `other` — a name, an order, a copy, a
-delete — and gets no drag, no resize and no retype, because every gesture in
-`board/Editor.ts` is `offsetLeft`/`offsetWidth` and an `SVGElement` has neither. The
-authoring skill answers that by putting the drawing inside a box component, which is
-draggable like anything else and scales the `viewBox` with it. A guard in the editor
-rather than a fix: making SVG geometry work would mean a second coordinate path through
-that file for a shape the guidance says not to write.
-
-**A burst of inspector clicks is one patch.** A patch carries the rev it was composed
-against and a stale one is refused (below) — right for "the agent wrote this file while
-you were dragging", absurd for "you clicked three tone swatches". So an edit made while
-a patch is in flight waits (`state/patches.ts`), coalesced — consecutive updates to
-one component merge, and two retypings of one run keep the last — and goes as a single
-batch against the rev the acknowledgement carries. The rev has to come from that
-message: `board.rev` in the store is not updated until `board.changed` arrives one
-message later, so composing against it there would send a stale patch to fix a stale
-patch. The file-drop path (§6.9) found this first and solved it by hand for its own
-batch; this is the general form, and it also fixes the case that was quietly broken
-before there was an inspector — an arrow key held down sends a patch per repeat.
-
-**An inspector edit is applied to the live document as well.** The frame is pinned to
-the revision it loaded so a user's own edit does not reload the board they are working
-on (§7), and that pin assumes the editor has already made the change on screen. Every
-edit therefore does both halves — `setAttribute` and the patch — and asks `board.js` to
-re-mount an embed whose source changed. Deleting was the one that had never done its
-half: the patch took the component out of
-the file and it stayed on screen until something else reloaded the frame. A duplicate
-is the deliberate exception, since its markup exists only in the file; that op unpins
-and takes the reload, exactly as an insert does.
-
-One trap worth naming, because it shipped for an hour: a class swap sends the whole
-attribute, and the editor's own `decks-editing` class lives on that element in that
-document. The first version wrote `class="callout decks-editing"` into the file — the
-overlay leaking into the artifact, which is the one thing the affordances are marked
-for. `readShape` drops every `decks-` class, and a check asserts the file never
-contains one.
-
-Ids are minted on the server, against the file as it is now: two tabs inserting at once
-would both pick `sticky-3` otherwise, and the second would be refused for a reason that
-reads like a bug.
-
-A patch carries the rev it was composed against. If the file changed underneath, the
-patch is refused with the new rev and the browser re-reads the frame — last-write-wins
-on a shared artifact is a bug that looks like a haunting. And a browser's *own* edit
-does not reload its frame: the DOM is already right, so the frame is pinned to the
-revision it loaded and only somebody else's write unpins it.
-
-The agent is told, through `pi.sendMessage({deliverAs: "nextTurn"})`, which rides along
-with the user's next message rather than interrupting a run. An agent holding an
-explicit context hears only about boards in it; an agent holding nothing hears about
-everything, because "no declared context" means the whole deck is its business — and
-that is the common case, so the narrower rule alone meant the notification almost never
-fired.
+What a person changes by hand is the **drawing** around the boards (§7): notes, shapes, cards and
+where each board sits. The canvas's mode says only whether that drawing shows its editing
+affordances: browse reads the boards and still moves and retypes what is drawn; edit adds the
+outlines, grips and distances.
 
 ### 6.6 Seeing a board is the agent's job
 
@@ -959,17 +676,11 @@ there a quota — the cap is per file, not per deck — no rate limit, no scanni
 uploaded, and no re-encoding of images: an uploaded PNG is stored as it arrived and drawn
 by the browser's own decoder. Windows-reserved names (`nul.txt`) are not special-cased.
 
-**The agent hears about it for free.** A drop is an ordinary `insert` patch, so it goes
-through the same path a palette insert does and produces the same "the user edited this
-board" nudge (§6.5) — with the embed's path named in the summary, since "added embed
-#embed-2" would leave the agent unable to see the file the user just dropped without
-re-reading the board to find out what it points at.
-
-**Two inserts in one batch used to collide.** Ids are minted on the server against the
-file as it is (§6.5), and the batch was named up front — so two files dropped together
-both became `embed-1` and the second was refused for a name the first had only just
-taken. `applyPatches` now takes the minting function and calls it per patch, against the
-file the previous patch produced.
+**Nothing is dropped into a board.** A file dropped anywhere on the canvas — over a board's page
+too — lands on the canvas where it was let go: a picture, text, a film or a sound as an item of its
+own, anything else as a file card. A board's page refuses the drop and hands it back
+(`embed-guest.js`, `decks:drop`), and the canvas replays it on the board's frame at the same point
+on the screen, so it reaches the same handler a drop on empty canvas does.
 
 ## 7. The canvas
 
@@ -1024,34 +735,13 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   must *not* travel, and that the zoom was above `INTERACT_ZOOM` first — below it no frame
   takes a pointer at all and every one of those would pass for the wrong reason. That check
   has been cut, so none of this is asserted any more.
-- **A file dropped on a board is the same problem, and the same answer.** A drag from the
-  desktop over a board produces `dragover`/`drop` inside the frame's document and nothing
-  in the app's, so `file-drop.ts` listens inside the frame exactly as `frame-gestures.ts`
-  does. Drag events carry `clientX/clientY` in the frame's pixels, which are board
-  pixels, so the drop point needs no camera maths either — asserted by a check that drops
-  at a known point and reads back the `left`/`top` the server wrote, rather than assumed
-  from the pointer case. The highlight is an element appended to the board's document and
-  marked `data-decks-ui`, like the editor's handles, and it is driven by a *counter* over
-  `dragenter`/`dragleave`: both fire per element crossed and both bubble, so a boolean
-  made the highlight strobe as the cursor passed over a card. A batch flows rightwards
-  from the drop point and wraps at the board's own width; each component is sized for what
-  it holds, an image from its own pixels. The first version cascaded them a few pixels
-  apart, which for five embeds is a pile in which four are unreadable.
+- **A file dropped on a board is the canvas's.** A drag from the desktop over a board produces
+  `dragover`/`drop` inside the frame's document and nothing in the app's, so the page itself
+  refuses it (`embed-guest.js`) and posts the files up with the point; the canvas replays the drop
+  on the frame and it bubbles to the app's document like any other.
 - **The app's document swallows file drags globally**, because the browser's default for a
   dropped file is to navigate to it — which would unload the SPA, socket and camera and
-  all, to show a PNG. Reaching the parent's handler means the drop missed every live
-  board, since a drop over one is consumed inside that frame, and the answer there is a
-  notice: an embed belongs to a board, and inventing a board to hold a file dropped on
-  empty canvas would be the app deciding something it was not asked to. Zoomed out past
-  `INTERACT_ZOOM` the frames take no pointer events at all, so a drop then lands on the
-  stage; the notice says to zoom in when the cursor was over a board.
-- **An insert is the one edit that does want the frame to reload** — and a duplicate, for
-  the same reason. The pin (below) exists because the editor has already mutated the
-  frame's DOM: true of a drag, of a class swap, of a delete, and false of an insert or a
-  copy, whose component exists only in the file because the server mints the id and
-  writes the markup. Pinned, a dropped file landed in `assets/`, landed in the board's
-  source, and appeared nowhere on screen. `needsReload` in `state/patches.ts` is the one
-  place that decides.
+  all, to show a PNG.
 - **Space is held in one place.** Each document only sees the keys pressed while it has
   focus, so a space pressed over the canvas and a drag begun over a board were two
   documents with two opinions. The stage owns the answer and the frames ask it.
@@ -1381,7 +1071,7 @@ All six milestones, each verified against the real app rather than only unit-tes
 | M1 | Deck, stage, embeds: pan/zoom, drag-to-arrange, md/pdf/html/image/text embeds, files dropped in from the desktop, live reload. |
 | M2 | One agent: Pi adapter, transcript, composer, extension-UI bridge, both skills. |
 | M3 | `stage_eval`: stage service, eval, identity, state rebuilt from the branch. |
-| M4 | The user draws: editor, palette, inspector, patches, revisions, undo, the agent is told. |
+| M4 | The user draws: revisions, undo (the in-board editor, palette and inspector have since been removed). |
 | M5 | Many chats: registry, chat list, `stage.send` with board handoff (`stage.delegate` until the verb cut). |
 | M6 | Time machine: rewind / fork / restore on each message, preview from revisions. |
 

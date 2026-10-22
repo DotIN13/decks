@@ -15,10 +15,9 @@ import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
-import { boardChanged, boardSized, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
 import { notice, offer } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
-import { setComponent, setSelected } from "../state/selection.ts";
+import { setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
@@ -116,14 +115,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "deck.state":
 					setState("deck", message.deck);
 					/*
-					 * The greeting is a refresh (§5), so nothing is in flight any more. Said
-					 * out loud because the patch queue depends on it: an edit made while a
-					 * patch is unacknowledged waits for that acknowledgement, and one lost to
-					 * a dropped socket would otherwise leave every later edit to that board
-					 * waiting for a message that is never coming.
-					 */
-					forgetInFlight();
-					/*
 					 * Reconciled by path, not replaced.
 					 *
 					 * A board row owns a live iframe, and Solid re-creates a row whose item
@@ -136,32 +127,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("boards", reconcile(message.deck.boards, { key: "path", merge: false }));
 					hooks.landed();
 					return;
-				case "board.patched": {
-					if (message.refused) {
-						notice("warn", message.refused);
-						/*
-						 * Its optimistic DOM is now a lie: unpin and reload from the file. What
-						 * was queued behind it was composed against that same lie, so the queue
-						 * goes too (`state/patches.ts`) — one warning, not one per held-back
-						 * click.
-						 */
-						patchRefused(message.path);
-						/*
-						 * And the selection, which may name a component that was never renamed or
-						 * a copy that was never made. The frame is about to reload with the
-						 * file's own answer; a selection composed against the refused version of
-						 * it would leave the inspector describing something that does not exist.
-						 */
-						setComponent(undefined);
-						setState("nonces", message.path, (current = 0) => current + 1);
-						return;
-					}
-					// Accepted: our revision is remembered, and whatever was waiting behind it
-					// goes now, against the rev this message carries.
-					patchAccepted(message.path, message.rev);
-					return;
-				}
-
 				case "board.sized": {
 					// One number on one board; the rest of the deck, and this board's document, are as they were.
 					const index = state.boards.findIndex((existing) => existing.path === message.path);
@@ -170,7 +135,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				}
 				case "board.changed": {
 					if (message.removed) {
-						forgetPatches(message.path);
 						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
@@ -184,13 +148,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					if (watchedBeingNamed(board, { focused: state.focused })) {
 						send({ type: "board.seen", path: board.path });
 					}
-					/*
-					 * Whose write it was, which decides whether the frame may reload: our own
-					 * (already on screen), the echo that overtook our acknowledgement, or
-					 * somebody else's — the agent, another tab, an editor (`state/patches.ts`).
-					 */
-					if (message.sized) boardSized(board.path, board.rev, state.boards.find((one) => one.path === board.path)?.rev);
-					else boardChanged(board.path, board.rev);
 					// Merged into the existing row so its frame survives; only a board that
 					// is genuinely new grows the array.
 					//
@@ -198,7 +155,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// the boards with `<For>`, which keys by reference, so replacing the object
 					// at this index makes the row new — and re-creating a row re-creates its
 					// iframe, which reloads the document. That is a full white-flash reload of
-					// the board the user is editing, on every component drag, showing the very
+					// the board on screen, on every change to the deck, showing the very
 					// bytes the live DOM already has. Merging leaves the identity alone and
 					// updates only the fields that moved.
 					const index = state.boards.findIndex((existing) => existing.path === board.path);

@@ -1,18 +1,9 @@
 /**
- * Ink: what a person draws on a board with a pen, a finger or a mouse.
+ * Ink: what a person draws with a pen, a finger or a mouse — the shapes, the colours and the
+ * geometry the canvas's eraser, lasso and moves are computed from.
  *
- * **It lives in the board's own file**, as one `<svg data-ink-layer>` at the end of the body
- * with a `<path>` per stroke. So a drawing is part of the document: an agent reading the
- * board reads the strokes, a revision holds them, and the board draws them on its own, with
- * no app around it.
- *
- * Each path says the same stroke twice, on purpose. `d` is what a browser draws. `data-points`
- * is what was drawn: `x,y,pressure` triples in board pixels, which is what the eraser, the
- * lasso and a later move are computed from. Deriving the second from the first is not
- * possible once a pen's pressure has been turned into an outline.
- *
- * This module is shared: the browser draws with it and the server writes the file with it,
- * so the markup a frame shows while a stroke is being saved is the markup that lands.
+ * A stroke keeps what was drawn: `x,y,pressure` triples, which a browser's outline cannot give
+ * back once a pen's pressure has been turned into one.
  */
 
 /** The colours on offer. `ink` follows the board's foreground, so it reads in light and dark. */
@@ -30,12 +21,6 @@ export interface InkStroke {
 	points: number[];
 }
 
-/** The most one board may hold: the whole list crosses the wire on every change. */
-export const INK_LIMITS = { strokes: 2000, points: 4000 } as const;
-
-/** The attribute that marks the layer. Not a `data-id`: the layer is not a component to drag. */
-export const INK_LAYER = "data-ink-layer";
-
 const PAINT: Record<InkColor, string> = {
 	ink: "var(--b-fg, currentColor)",
 	red: "#e5484d",
@@ -50,118 +35,6 @@ export function inkPaint(color: InkColor): string {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/**
- * Whatever arrived, as strokes that are safe to write into a file.
- *
- * It came off a socket or out of somebody's HTML, so every field is checked: a colour nobody
- * offers, a size that is not a number or points that are not triples drop the stroke, and the
- * list and each stroke are cut at `INK_LIMITS`. Numbers are rounded here, once, so the file
- * and the memory agree.
- */
-export function cleanStrokes(raw: unknown): InkStroke[] {
-	if (!Array.isArray(raw)) return [];
-	const kept: InkStroke[] = [];
-	for (const item of raw) {
-		if (kept.length >= INK_LIMITS.strokes) break;
-		if (!item || typeof item !== "object") continue;
-		const { id, tool, color, size, points } = item as Record<string, unknown>;
-		if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(id)) continue;
-		if (tool !== "pen" && tool !== "marker") continue;
-		if (!INK_COLORS.includes(color as InkColor)) continue;
-		if (typeof size !== "number" || !Number.isFinite(size) || size <= 0 || size > 200) continue;
-		if (!Array.isArray(points) || points.length < 3 || points.length % 3 !== 0) continue;
-		if (!points.every((n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) < 1e6)) continue;
-		const cut = (points as number[]).slice(0, INK_LIMITS.points * 3);
-		kept.push({
-			id,
-			tool,
-			color: color as InkColor,
-			size: round1(size),
-			points: cut.map((n, index) => (index % 3 === 2 ? round2(Math.min(1, Math.max(0, n))) : round1(n))),
-		});
-	}
-	return kept;
-}
-
-// --- the file's side: strokes to markup, and back -------------------------------------
-
-/** `x,y,p x,y,p …`: short, readable in a diff, and one attribute. */
-export function encodePoints(points: number[]): string {
-	const out: string[] = [];
-	for (let i = 0; i + 2 < points.length; i += 3) out.push(`${round1(points[i] ?? 0)},${round1(points[i + 1] ?? 0)},${round2(points[i + 2] ?? 0.5)}`);
-	return out.join(" ");
-}
-
-export function decodePoints(text: string): number[] {
-	const out: number[] = [];
-	for (const triple of text.trim().split(/\s+/)) {
-		const [x, y, p] = triple.split(",").map(Number);
-		if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-		out.push(x, y, p !== undefined && Number.isFinite(p) ? p : 0.5);
-	}
-	return out;
-}
-
-/** One stroke out of a `<path>`'s attributes, or nothing if it is not one. */
-export function strokeFromAttributes(get: (name: string) => string | null): InkStroke | undefined {
-	const [stroke] = cleanStrokes([
-		{
-			id: get("data-ink"),
-			tool: get("data-tool"),
-			color: get("data-color"),
-			size: Number(get("data-size")),
-			points: decodePoints(get("data-points") ?? ""),
-		},
-	]);
-	return stroke;
-}
-
-/** The attributes of one stroke's `<path>`, in the order they are written. */
-export function strokeAttributes(stroke: InkStroke): Array<[string, string]> {
-	const shape = strokeShape(stroke);
-	const paint = inkPaint(stroke.color);
-	const drawn: Array<[string, string]> = shape.filled
-		? [["fill", paint]]
-		: [
-				["fill", "none"],
-				["stroke", paint],
-				["stroke-width", String(stroke.size)],
-				["stroke-linecap", "round"],
-				["stroke-linejoin", "round"],
-			];
-	return [
-		["data-ink", stroke.id],
-		["data-tool", stroke.tool],
-		["data-color", stroke.color],
-		["data-size", String(stroke.size)],
-		...drawn,
-		...(stroke.tool === "marker" ? ([["opacity", "0.4"]] as Array<[string, string]>) : []),
-		["d", shape.d],
-		["data-points", encodePoints(stroke.points)],
-	];
-}
-
-/** The layer's own attributes: over everything, and never in the way of a click. */
-export const INK_LAYER_ATTRIBUTES: Array<[string, string]> = [
-	["class", "ink"],
-	[INK_LAYER, ""],
-	["xmlns", "http://www.w3.org/2000/svg"],
-	["style", "position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2147483000"],
-];
-
-export const INK_TITLE = "Drawn by hand on this board. One path per stroke; data-points is x,y,pressure in board pixels.";
-
-/** The whole layer as it is written into a board, or `""` when there is nothing drawn. */
-export function inkLayerMarkup(strokes: InkStroke[], indent = "\t\t"): string {
-	if (strokes.length === 0) return "";
-	const attrs = (list: Array<[string, string]>) => list.map(([name, value]) => (value === "" ? name : `${name}="${value}"`)).join(" ");
-	const lines = [`<svg ${attrs(INK_LAYER_ATTRIBUTES)}>`, `\t<title>${INK_TITLE}</title>`];
-	for (const stroke of strokes) lines.push(`\t<path ${attrs(strokeAttributes(stroke))} />`);
-	lines.push("</svg>");
-	return lines.map((line, index) => (index === 0 ? line : indent + line)).join("\n");
-}
 
 // --- geometry ------------------------------------------------------------------------
 

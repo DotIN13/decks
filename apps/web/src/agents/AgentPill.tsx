@@ -4,13 +4,12 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
-import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
-import type { CanvasMode, Tool } from "../board/tools.ts";
+import type { CanvasMode } from "../board/tools.ts";
 import { DecksMark, Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
@@ -556,15 +555,9 @@ export function AgentMenu(props: {
 
 export function AgentPill(props: {
 	/**
-	 * Browse or edit. Browse is the default and the safe one.
-	 *
-	 * In browse mode a board is a *document*: text selects and copies, a game plays, a click
-	 * is an ordinary click. In edit mode it is a *drawing*: components drag, a click selects,
-	 * a double-click retypes a run of words. Both pan and zoom.
-	 *
-	 * The toggle lives here because the tools do, and because the tools are meaningless in
-	 * browse mode — they insert components. They fold away with it rather than sitting there
-	 * inert, which is the same argument the corner makes about a control that cannot act.
+	 * The canvas's mode (`board/tools.ts`). This pill only ever asks for browse: a board is a
+	 * *document* — text selects and copies, a game plays, a click is an ordinary click — and
+	 * what is drawn still moves and retypes. Its pages are never edited from the canvas.
 	 */
 	mode: CanvasMode;
 	onMode: (mode: CanvasMode) => void;
@@ -747,10 +740,10 @@ export function AgentPill(props: {
 
 
 			{/*
-				The three modes, as one set, and first after the agent because they change what every
+				The two modes, as one set, and first after the agent because they change what every
 				press on the canvas means: browse (the cursor) reads the boards and moves the drawing,
-				edit (the pencil) opens the boards' pages for editing too, draw (the brush) puts the pen
-				on the stage. The one in force is pressed, in the accent, as a tool picked from a set is.
+				draw (the brush) puts the pen on the stage. A board's own page is never edited from
+				here. The one in force is pressed, in the accent, as a tool picked from a set is.
 
 				No confirmation. A single press is right for something this reversible, and what guards
 				against an accidental one is that the pressed button changes where you can see it.
@@ -770,17 +763,6 @@ export function AgentPill(props: {
 				>
 					<Icon of={MousePointer} size={15} />
 				</button>
-				<button
-					type="button"
-					class="icon-button"
-					data-on={props.mode === "edit" ? "true" : undefined}
-					aria-pressed={props.mode === "edit"}
-					title="Edit the boards: drag components, retype text"
-					aria-label="Edit the boards"
-					onClick={() => props.onMode("edit")}
-				>
-					<Icon of={Pencil} size={15} />
-				</button>
 				{/* Its own tools are a row of their own (`InkBar.tsx`): a pen, a marker, colours and undo do not fit in here. */}
 				<button
 					type="button"
@@ -790,7 +772,7 @@ export function AgentPill(props: {
 					title="Draw on the canvas"
 					aria-label="Draw on the canvas"
 					onClick={() => {
-						// The pen is out only while browsing: a press in edit mode means "this component".
+						// The pen is out only while browsing.
 						if (props.mode === "edit") props.onMode("browse");
 						props.onDrawing(true);
 					}}

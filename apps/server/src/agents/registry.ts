@@ -579,11 +579,6 @@ export class Registry {
 		return to;
 	}
 
-	/** Every agent holding this board hears what the user did to it. */
-	userEdited(path: string, summary: string): void {
-		for (const agent of this.agents) agent.userEdited(path, summary);
-	}
-
 	/** An agent that is gone keeps nothing. */
 	forget(id: string): void {
 		this.snapshots.forget(id);

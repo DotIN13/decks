@@ -54,12 +54,6 @@ export interface CanvasOptions {
 		/** Where a sandboxed board's storage is kept in this page's own storage: one key per harness, canvas and board. */
 		storageKey?(path: string): string;
 		/**
-		 * Files dropped or pasted onto a board's page, and where in board pixels: the host uploads them
-		 * and puts each in the board as a block there (`flow`, `shapeFor` and `embedPath` in
-		 * `@decks/canvas/tools` lay a batch out). Absent: a drop on a board does nothing.
-		 */
-		onFiles?(path: string, files: File[], at: { x: number; y: number }, how: "drop" | "paste"): void;
-		/**
 		 * The host's own records of the boards (their revision, format and title), as its server keeps
 		 * them, in place of the ones read off the drawing. Read reactively.
 		 */
@@ -461,7 +455,7 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={moveBoard}
-			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} onFiles={options.boards?.onFiles ? (files, at, how) => options.boards?.onFiles?.(slot.board.path, files, at, how) : undefined} {...(boardHost ? { boardHost } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
+			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
 			shots={
 			options.boards?.shots ??
 			(() => ({

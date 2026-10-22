@@ -1,8 +1,8 @@
 import { createSignal } from "solid-js";
-import type { CanvasMode, Tool } from "../board/tools.ts";
+import type { CanvasMode } from "../board/tools.ts";
 
 /**
- * What is selected, what tool is in hand, and which mode the canvas is in.
+ * What is selected, and which mode the canvas is in.
  *
  * Layer 0 of the state split: this module imports nothing from the others, and several of
  * them import it. It is the smallest of the three at the bottom of the graph, which is why
@@ -21,25 +21,14 @@ function createSelection() {
 	/** The selected board, by path. */
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 
-	const [tool, setTool] = createSignal<Tool>("select");
-
 	/**
-	 * Browse or edit, and **browse is where every session starts**.
-	 *
-	 * A deck is read far more often than it is drawn, and the failure modes are not
-	 * symmetrical: browsing when you meant to edit costs one press, while editing when you
-	 * meant to browse means a component has moved and been written to disk before you noticed.
-	 *
-	 * Not persisted, deliberately. A mode that enables dragging and is remembered across a
-	 * reload is a mode you can be in without having chosen it this session — which is exactly
-	 * the state the default is protecting against. The cost is one press after a refresh.
+	 * Browse or edit (`board/tools.ts`), and **browse is where every session starts**: a deck is
+	 * read far more often than it is drawn, and browsing still moves and retypes what is drawn.
+	 * Not persisted. A board's own page is never edited from the canvas, in either.
 	 */
 	const [mode, setMode] = createSignal<CanvasMode>("browse");
 
-	/** The selected component within a board, if one is selected. */
-	const [component, setComponent] = createSignal<{ path: string; id: string } | undefined>(undefined);
-
-	return { selected, setSelected, tool, setTool, mode, setMode, component, setComponent };
+	return { selected, setSelected, mode, setMode };
 }
 
 export type Selection = ReturnType<typeof createSelection>;
@@ -47,4 +36,4 @@ export type Selection = ReturnType<typeof createSelection>;
 /** The app's one selection. Tests build their own with `createSelection()`. */
 export const selection = createSelection();
 
-export const { selected, setSelected, tool, setTool, mode, setMode, component, setComponent } = selection;
+export const { selected, setSelected, mode, setMode } = selection;

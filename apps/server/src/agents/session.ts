@@ -1342,26 +1342,6 @@ export class DeckAgent {
 	}
 
 	/**
-	 * Tell the agent the user changed a board.
-	 *
-	 * An agent holding an explicit context hears only about boards in it: one working
-	 * on a different corner of the deck does not need to know that a sticky moved,
-	 * and telling it anyway is context spent on nothing.
-	 *
-	 * An agent holding *nothing* hears about everything, and that case is the common
-	 * one — a fresh agent has attached no boards, so the narrower rule alone meant the
-	 * notification almost never fired. "No declared context" means the whole deck is
-	 * its business, which is also how it behaves in every other respect.
-	 */
-	userEdited(path: string, summary: string): void {
-		if (this.held.length > 0 && !this.held.includes(path)) return;
-		const line = `The user edited ${path}: ${summary}. Read it again before assuming it says what you last wrote.`;
-		// Deduplicated: editing the same board five times before saying anything should
-		// not spend five lines of the next turn saying so.
-		if (!this.pending.includes(line)) this.pending.push(line);
-	}
-
-	/**
 	 * Run one task to completion and report — what a delegating parent awaits (§6.2).
 	 *
 	 * The boards it touched are found by comparing revisions either side of the run,

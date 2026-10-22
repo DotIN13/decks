@@ -45,17 +45,15 @@ const CHECKS = [
 	 *
 	 * Older removals, kept here because the reasons still explain absences: `header.mjs` and
 	 * `panels.mjs` went when the title bar became two clusters and two panels became one,
-	 * and `turn-bar.mjs` went with the spine itself.
+	 * `turn-bar.mjs` went with the spine itself, and `modes.mjs` and `inspector.mjs` went with
+	 * editing a board's page from the canvas.
 	 */
 	{ file: "panel.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "chat-content.mjs", needsAgent: false },
 	{ file: "slash.mjs", needsAgent: false },
 	{ file: "mirror.mjs", needsAgent: false },
-	{ file: "inspector.mjs", needsAgent: false },
 	{ file: "notifications.mjs", needsAgent: false },
-	{ file: "modes.mjs", needsAgent: false },
-	/* Commenting on selected words and drawing on a board, both while browsing. */
 	{ file: "geometry.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },
 	/*
@@ -74,8 +72,8 @@ const CHECKS = [
 	{ file: "highlighting.mjs", needsAgent: false },
 	/*
 	 * Which board is selected, and the one way in that did not work: a press on the board itself.
-	 * Its own check because it is one rule with four readers — the inspector, the arrow keys, the
-	 * focus view and the bar's own menu all ask the canvas which board is selected.
+	 * Its own check because it is one rule with several readers — the arrow keys, the focus view
+	 * and the bar's own menu all ask the canvas which board is selected.
 	 */
 	{ file: "selection.mjs", needsAgent: false },
 	/*
@@ -91,9 +89,8 @@ const CHECKS = [
 	{ file: "board-eval.mjs", needsAgent: false },
 	{ file: "shell.mjs", needsAgent: false },
 	/*
-	 * The focus view: the canvas as one page. Its own check rather than a section of
-	 * `modes.mjs`, because it needs the deck as it opens — a page that has been typed into by
-	 * the sections before it is not a page any more.
+	 * The focus view: the canvas as one page. Its own check because it needs the deck as it
+	 * opens — a page that has been typed into by other checks is not a page any more.
 	 */
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },

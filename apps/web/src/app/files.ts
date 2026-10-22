@@ -1,16 +1,14 @@
 import { onCleanup, onMount } from "solid-js";
-import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "@decks/canvas/camera";
 import { camera } from "../state/camera.ts";
-import { flow, guardDocumentDrops, HEAD_PX, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
+import { guardDocumentDrops, naturalSize } from "../board/file-drop.ts";
 import { CARD, MEDIA } from "@decks/pen";
 import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "@decks/canvas/tools";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
-import { selected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { setDraft, setPicking } from "../state/ui.ts";
-import { embedPath, mayUpload, uploadAsset } from "./upload.ts";
+import { mayUpload, uploadAsset } from "./upload.ts";
 import { api } from "../connections/connection.ts";
 import { openBundle } from "../connections/bundle.ts";
 import { can } from "../connections/backend.ts";
@@ -70,13 +68,6 @@ const folderOf = (name: string) => {
 	const friend = /^shared\/([^/]+)\/([^/]+)$/.exec(name);
 	return friend ? `shared/canvases/${friend[1]}/${friend[2]}` : `canvases/${name}`;
 };
-/** The canvas a deck path is in, by name, or undefined for a path in none (the library, `assets/`). */
-const canvasOfDeckPath = (path: string): string | undefined => {
-	const own = /^canvases\/([^/]+)\//.exec(path);
-	if (own) return own[1];
-	const friend = /^shared\/canvases\/([^/]+)\/([^/]+)\//.exec(path);
-	return friend ? `shared/${friend[1]}/${friend[2]}` : undefined;
-};
 /**
  * A deck path as the canvas on screen's drawing writes it: a file in the canvas's own folder by its
  * path there (`files/a.png`), anything else climbing out of the folder to the deck (`../../assets/a.png`),
@@ -109,30 +100,18 @@ function sizeLabel(bytes: number): string {
 }
 
 /**
- * Files arriving from outside: dropped on a board, on empty canvas, on the input bar, or
- * pasted.
- *
- * Five routes, one destination — a file is copied into the deck's `assets/` and then
- * mentioned by whichever surface caught it — and this is all of them, which was ~200 lines
- * spread through `App.tsx` between the editor and the keyboard wiring.
+ * Files arriving from outside: dropped on the canvas (empty or over a board), on the input bar,
+ * or pasted.
  *
  * **The bytes are always copied into the deck.** A deck is self-contained: an embed of
  * something on your desktop is a board that breaks the moment you tidy up. Identical files
  * are stored once, and nothing is ever overwritten (`files/upload.ts`).
  *
- * Where the four routes differ is only what they have to decide *before* the copy: a drop
- * inside a frame knows the cursor and those pixels are board pixels; a drop on empty canvas
- * has no board yet and has to make one, sized to hold what landed; the input bar has no
- * position at all and mentions the path where the caret is; and a paste has neither, so it
- * lands on the selected board, at the middle of it.
+ * **Nothing goes into a board.** A drop lands on the canvas where it was let go, over a board or
+ * not; a paste lands on the canvas in the middle of the view; the input bar mentions the path
+ * where the caret is.
  */
-/** What the drop path needs of the app: a board patched, and whether boards take edits now. */
-export interface BoardEdits {
-	patch(path: string, patches: BoardPatch[]): void;
-	enabled(): boolean;
-}
-
-export function createFileDrops(deps: { editor: BoardEdits }) {
+export function createFileDrops() {
 	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
 	const created = new Map<string, (path: string) => void>();
 
@@ -158,100 +137,18 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 		});
 	};
 
-	const dropOnBoard = async (path: string, files: File[], at: { x: number; y: number }) => {
-		const board = state.boards.find((candidate) => candidate.path === path);
-		if (!board) return;
-		// Into the files/ of the canvas the board is in; a library board's go to the deck's assets/.
-		const canvas = canvasOfDeckPath(path);
-		if (refusedOn(canvas)) return;
-		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
-		// The insert variant specifically, so the summary below can read back `embed`.
-		const inserts: Extract<BoardPatch, { op: "insert" }>[] = [];
-		const failures: string[] = [];
-		let reused = 0;
-
-		/*
-		 * Laid out before anything is uploaded, and for the whole batch at once. The
-		 * shapes are read from the files locally — an image's own pixels, mostly — and
-		 * `flow` needs to see all of them to put them in a row that wraps at the board's
-		 * edge instead of a pile at the cursor.
-		 */
-		const boxes = flow(await Promise.all(files.map(shapeFor)), at, board.w);
-
-		for (const [index, file] of files.entries()) {
-			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
-			try {
-				const asset = await uploadAsset(
-					file,
-					(fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
-					canvas,
-				);
-				if (asset.reused) reused += 1;
-				/*
-				 * A film was laid out at sixteen by nine, because nothing had read it yet; the
-				 * upload answers with the picture's real size, so the box takes that shape before
-				 * it is written. The poster the server wrote rides along as `data-poster`, which
-				 * is what the player shows before it has decoded a frame (`lib/board.js`).
-				 */
-				const media = asset.media;
-				const shaped = media?.w && media.h ? { ...boxes[index]!, height: Math.round(boxes[index]!.width * (media.h / media.w)) + HEAD_PX } : boxes[index]!;
-				inserts.push({
-					op: "insert",
-					// `image` and `embed` render the same markup; the kind is what names the
-					// component, so `image-1` in the file says what it is without opening it.
-					kind: isImage(file) ? "image" : "embed",
-					id: "",
-					at: shaped,
-					embed: embedPath(path, asset.path),
-					...(media?.poster ? { attrs: { "data-poster": embedPath(path, media.poster) } } : {}),
-				});
-			} catch (error) {
-				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
-			}
-		}
-
-		if (inserts.length > 0) deps.editor.patch(path, inserts);
-		const added =
-			inserts.length === 0
-				? ""
-				: `${inserts.length === 1 ? inserts[0]?.embed?.split("/").pop() : `${inserts.length} files`} added${reused > 0 ? ` (${reused} already in the deck)` : ""}`;
-		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
-	};
-
-	/**
-	 * What a board frame hands back when files are dropped inside it (`file-drop.ts`).
-	 *
-	 * Per board, because the drop belongs to the board it landed on: the frame knows
-	 * where in its own document the cursor was, and those pixels are board pixels.
-	 */
-	const drops = (path: string): FileDropHost => ({
-		enabled: () => deps.editor.enabled(),
-		drop: (files, at) => void dropOnBoard(path, files, at),
-	});
-
 	/**
 	 * One file from the device, copied into the deck, answered as an embed path.
 	 *
-	 * The other end of the file picker (`board/FilePicker.tsx`), and the whole of "getting a
-	 * photo off a phone onto a board": the upload route and the insert path were already there
-	 * for the desktop drag (§6.9), and a drag is the one gesture a touchscreen does not
-	 * have. So this is the same two steps in the other order — the bytes go into the deck
-	 * first, and the path comes back for the component that asked.
+	 * The other end of the file picker (`board/FilePicker.tsx`): the bytes go into the deck's
+	 * `assets/` first, and the path comes back for whoever asked.
 	 */
-	const addFile = async (board: string | undefined, file: File): Promise<string | undefined> => {
-		const canvas = board ? canvasOfDeckPath(board) : undefined;
-		if (refusedOn(canvas)) return undefined;
+	const addFile = async (file: File): Promise<string | undefined> => {
 		const report = working(`Adding ${file.name}…`);
 		try {
-			const asset = await uploadAsset(
-				file,
-				(fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
-				canvas,
-			);
+			const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
 			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
-			// Relative to the board that asked, because a deck is self-contained and an
-			// absolute path is a board that breaks when the deck moves.
-			return board ? embedPath(board, asset.path) : asset.path;
+			return asset.path;
 		} catch (error) {
 			report.done(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, "warn");
 			return undefined;
@@ -268,7 +165,7 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 		const agentId = state.focused;
 		const paths: string[] = [];
 		for (const file of files) {
-			const path = await addFile(undefined, file);
+			const path = await addFile(file);
 			if (path) paths.push(path);
 		}
 		if (paths.length > 0) setDraft({ text: paths.map((path) => `@${path}`).join(" "), at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
@@ -488,40 +385,17 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 	};
 
 	/**
-	 * A file on the clipboard, landing on the selected board.
+	 * Files on the clipboard: on the canvas, in the middle of the view, as a drop there would put them.
 	 *
-	 * The sibling of the drop path, and the one edge §8 listed against §6.9. A paste has no
-	 * cursor position — that is the whole difference from a drop — so it needs a rule
-	 * instead of a point: **the selected board, at the middle of it.** The selection is
-	 * the board the user is working on and it is already visible on screen, which makes
-	 * this the smallest rule that is never surprising; nothing is invented when there is
-	 * no selection, exactly as nothing is invented for a file dropped on empty canvas.
-	 *
-	 * A paste while something is focused belongs to that thing: the composer, an
-	 * inspector field, a run of text being retyped. A screenshot pasted into a sentence
-	 * you are writing is not an embed.
+	 * Never into a board, whatever is selected: nothing is pasted or dropped into a board's page. A
+	 * paste while something is focused belongs to that thing — the composer, a field — so a
+	 * screenshot pasted into a sentence you are writing is not put on the canvas.
 	 */
 	const paste = (files: File[]) => {
 		if (files.length === 0 || refusedOn(stageOnScreen())) return;
-		const path = selected();
-		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
-		if (!board) {
-			// Nothing selected: pictures and text land on the canvas, in the middle of the view.
-			const stage = document.querySelector(".stage");
-			const direct = files.filter(onStage);
-			if (stage && direct.length > 0) {
-				void ontoStage(direct, toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 }));
-				if (direct.length < files.length) notice("info", "Only pictures and text files can go straight on the canvas. Pick a board to paste the rest onto it.");
-				return;
-			}
-			notice("info", "Pick a board first. A pasted file becomes an embed, and an embed lives on a board.");
-			return;
-		}
-		if (!deps.editor.enabled()) {
-			notice("info", "Zoom in until the board is live, then paste.");
-			return;
-		}
-		void dropOnBoard(board.path, files, { x: board.w / 2, y: board.h / 2 });
+		const stage = document.querySelector(".stage");
+		if (!stage) return;
+		void onEmptyCanvas(files, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 });
 	};
 
 	/**
@@ -697,7 +571,7 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 	};
 
 	/**
-	 * The two document-wide listeners: a paste, and a drop that missed every board.
+	 * The two document-wide listeners: a paste, and a drop on the canvas.
 	 *
 	 * Both are on the document because both can land anywhere — over the rail, over the
 	 * conversation, in the gap between boards — and a drop the app does not handle would be
@@ -720,10 +594,9 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 		});
 
 		/*
-		 * Reaching here means the drop missed every live board, since a drop over one is
-		 * consumed inside that frame's document, and missed the input bar, which takes its own.
-		 * Over a board too small to be live it is a notice — zoom in; on empty canvas the files
-		 * get a board of their own, where they were dropped.
+		 * Every file dropped on the canvas reaches here — on empty canvas, and over a board too: a
+		 * board's page hands its drop back to be replayed on its frame (`embed-guest.js`), since nothing
+		 * is dropped into a board. The input bar takes its own. The files land where they were dropped.
 		 */
 		onMount(() => {
 			onCleanup(
@@ -738,16 +611,8 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 						notice("info", "This canvas was opened from a file, so it can only be read.");
 						return;
 					}
-					// A board zoomed out has no node, only its picture on the sheet: the stage says whether one is there.
-					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node, .bar-layer .chrome") ?? (globalThis as { __decksPictureAt?: (x: number, y: number) => string | undefined }).__decksPictureAt?.(at.x, at.y);
-					// While the timeline is being previewed the frames take no pointer events, so
-					// every drop arrives here — and "zoom in" would be a lie about why.
 					if (deps.preview()) {
-						notice("info", "That is a board as it used to be. Let go of the timeline first.");
-						return;
-					}
-					if (over) {
-						notice("info", "Zoom in until the board is live, then drop the file on it.");
+						notice("info", "That is the canvas as it used to be. Let go of the timeline first.");
 						return;
 					}
 					if (files.length > 0) void onEmptyCanvas(files, at);
@@ -756,5 +621,5 @@ export function createFileDrops(deps: { editor: BoardEdits }) {
 		});
 	};
 
-	return { drops, dropOnBoard, addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
+	return { addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
 }

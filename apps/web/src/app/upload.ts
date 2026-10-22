@@ -84,5 +84,3 @@ function send(file: File, onProgress?: (fraction: number) => void, canvas?: stri
 		request.send(file);
 	});
 }
-
-export { embedPath } from "@decks/canvas/tools";

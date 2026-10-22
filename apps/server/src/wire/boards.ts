@@ -7,8 +7,8 @@ import { putOn } from "../stage/canvas-ops.ts";
 /**
  * The board frames: the user's half of the canvas, and the two ways the past comes back.
  *
- * This is where the *user* touches a board — move, play, hide, create, delete, and the
- * drag-and-retype gestures that arrive as patches. The agent's writes do not come through
+ * This is where the *user* touches a board — move, play, hide, create, delete, undo. A board's
+ * own page is never edited from the canvas. The agent's writes do not come through
  * here at all: it edits the file with its own tools, and the watcher tells everyone.
  */
 /**
@@ -72,10 +72,6 @@ export const boards = {
 		 * Two browsers with different fonts read the same board a pixel or two apart, and when both
 		 * readings sized it, each answered the other's for ever.
 		 */
-	},
-
-	"board.patch": (message, reply, wire) => {
-		wire.boards.patch(message.path, message.rev, message.patches, reply);
 	},
 
 	"board.undo": (message, reply, wire) => {

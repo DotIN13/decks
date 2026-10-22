@@ -11,8 +11,7 @@ import Sun from "lucide-solid/icons/sun";
 import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
-import type { Tool } from "./board/tools.ts";
-import { createFileDrops, type BoardEdits } from "./app/files.ts";
+import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
@@ -26,8 +25,7 @@ import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
-import { frameRevs, patchBoard } from "./state/patches.ts";
-import {component, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
+import { mode, selected, setMode, setSelected } from "./state/selection.ts";
 import { on, send, setOnScreen, start } from "./state/socket.ts";
 import { api } from "./connections/connection.ts";
 import { can } from "./connections/backend.ts";
@@ -67,7 +65,7 @@ import { stageOf, stages, viewOnly } from "./state/stages.ts";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
-import {boxOf, fitInto, INTERACT_ZOOM, isPhone, keepVisible, middleOf} from "@decks/canvas/camera";
+import {boxOf, fitInto, isPhone, keepVisible, middleOf} from "@decks/canvas/camera";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable, toggleHistory} from "./state/edge.ts";
@@ -88,8 +86,6 @@ import { act, editDrawing, setPersonStage } from "./state/decks.ts";
  * anywhere until an agent asks about it (M3).
  */
 export function App() {
-	// The camera itself is `state/camera.ts`; this is the one derived reading of it.
-	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
 
@@ -559,8 +555,7 @@ export function App() {
 		// The camera is this conversation's now, moved or not: say so, or its next board is
 		// placed from the reading of whichever stage was on screen before (`camera-report.ts`).
 		reportCamera(camera(), id);
-		/* The board selection follows the camera. It was global, which made it inconsistent
-		   with the *component* selection — the two are the same kind of fact. */
+		/* The board selection follows the camera: each conversation's canvas has its own. */
 		setSelected(selectionOnSwitch(view, playing));
 	};
 
@@ -643,11 +638,6 @@ export function App() {
 		const agentId = state.focused;
 		if (agentId) send({ type: "stage.pen.step", agentId, direction });
 	};
-	/** A board tool, from the palette or its key; one armed tool at a time, so the drawing's is put down. */
-	const pickTool = (next: Tool) => {
-		setTool(next);
-		setPenTool("select");
-	};
 
 	/**
 	 * How tall each board whose content flows (a document: a root-level block not placed) was last
@@ -696,7 +686,7 @@ export function App() {
 	 * What `handleFrame` may touch (`app/frames.ts`). **Three fields**, and each has a reason
 	 * to be here: a request registry `app/files.ts` owns and mints, a signal whose one reader
 	 * is the conversation column, and behaviour that needs the component's own `focusAgent`.
-	 * Everything else the handler uses it imports — the camera, the patch queue, the store.
+	 * Everything else the handler uses it imports — the camera, the store.
 	 */
 	const frames: FrameHooks = {
 		hearBoard: (request, path) => files.hearBoard(request, path),
@@ -706,17 +696,11 @@ export function App() {
 		focusAgent: (id) => focusAgent(id),
 	};
 
-	/** What a file dropped on a board needs: the board patched (`board.patch` on the socket), in edit mode. */
-	const boardEdits: BoardEdits = {
-		patch: (path, patches) => patchBoard(path, patches),
-		enabled: () => zoomInteractive() && mode() === "edit",
-	};
-	/** The file picker: for a board's embed, or (with no board) the composer's paperclip. */
-	const pickFile = (board?: string) =>
+	/** The file picker, for the composer's paperclip. */
+	const pickFile = () =>
 		new Promise<string | undefined>((resolve) => {
 			setPicking({
-				board,
-				purpose: board ? "embed" : "attach",
+				purpose: "attach",
 				resolve: (picked: string | undefined) => {
 					setPicking(undefined);
 					resolve(picked);
@@ -724,11 +708,11 @@ export function App() {
 			});
 		});
 
-	const files = createFileDrops({ editor: boardEdits });
-	const { addFile, drops, intoComposer } = files;
+	const files = createFileDrops();
+	const { addFile, intoComposer } = files;
 
 
-	// A paste, and a drop that missed every board (`app/files.ts`).
+	// A paste, and a drop on the canvas, over a board or not (`app/files.ts`).
 	files.install({ preview });
 	// The window's own facts: the on-screen keyboard, the page-zoom block, the dock's height.
 	installViewport();
@@ -838,8 +822,6 @@ export function App() {
 
 		setState("focused", id);
 		setUnread(id, 0);
-		// A component selected in a board another agent was holding is not your selection.
-		setComponent(undefined);
 
 		/*
 		 * The camera and the selection wait for the stage itself.
@@ -903,7 +885,6 @@ export function App() {
 			.then((path) => {
 				if (!path) return;
 				setSelected(path);
-				setComponent(undefined);
 				frameWhenPlaced(path);
 			});
 	};
@@ -1105,7 +1086,6 @@ export function App() {
 		if (opening && source) move(path, source.x + source.w + 32, source.y);
 		send({ type: "board.play", path });
 		setSelected(path);
-		setComponent(undefined);
 		// The board lands on the canvas, under a presentation if one is up: that ends it.
 		flyToBoards([board], { animate: true });
 		return true;
@@ -1177,10 +1157,7 @@ export function App() {
 								glide,
 								selected: [
 									selected,
-									(path) => {
-										setSelected(path);
-										setComponent(undefined);
-									},
+									(path) => setSelected(path),
 								],
 								mode: [mode, setMode],
 								inking: drawing,
@@ -1212,16 +1189,13 @@ export function App() {
 									void files.boardAt(at, format).then((path) => {
 										if (!path) return;
 										setSelected(path);
-										setComponent(undefined);
 									}),
 								onOpenDocument: (at) =>
 									void files.fileAt(at).then((path) => {
 										if (!path) return;
 										setSelected(path);
-										setComponent(undefined);
 									}),
 								onOpenLink: openLinkedBoard,
-								onFiles: (path, list, at) => void files.dropOnBoard(path, list, at),
 								news: newsGlow,
 								onRead: (path) => send({ type: "board.seen", path }),
 								onHide: (path) => void act("canvas.delete", [path]),
@@ -1237,7 +1211,7 @@ export function App() {
 							},
 							onViewport: () => reportCameraSoon(camera()),
 							onComment: (comment) => setCommenting({ ...comment, open: true }),
-							onSelectTool: () => pickTool("select"),
+							onSelectTool: () => setPenTool("select"),
 							onRefer: (pills) =>
 								setDraft({
 									text: "",
@@ -1279,7 +1253,6 @@ export function App() {
 					onMoreAgents={openAgentsPanel}
 					mode={mode()}
 					onMode={(next) => {
-						// A press while editing means "this component", so the pen is put down first.
 						if (next === "edit") setDrawing(false);
 						setMode(next);
 					}}
@@ -1422,9 +1395,7 @@ export function App() {
 							}}
 							onStep={penStep}
 							onFloat={mountToolsFloat}
-							onArm={(next) => {
-								if (next !== "select") setTool("select");
-							}}
+							onArm={() => {}}
 							onNewBoard={newBoard}
 							onOpenFile={() => {
 								const stage = document.querySelector(".stage");
@@ -1432,7 +1403,6 @@ export function App() {
 								void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
 									if (!path) return;
 									setSelected(path);
-									setComponent(undefined);
 									frameWhenPlaced(path);
 								});
 							}}
@@ -1461,7 +1431,7 @@ export function App() {
 						<FilePicker
 							onPick={(path) => request().resolve(path)}
 							onCancel={() => request().resolve(undefined)}
-							onAdd={(file) => addFile(request().board, file)}
+							onAdd={(file) => addFile(file)}
 							purpose={request().purpose ?? "embed"}
 							{...(request().google ? { onGoogle: (url: string) => request().resolve(`google:${url}`) } : {})}
 						/>
@@ -1776,7 +1746,7 @@ export function App() {
 							// selected board — a message is not a board, and `@../assets/x.png` means
 							// nothing to the agent reading it.
 							const agentId = state.focused;
-							void pickFile(undefined).then((path) => {
+							void pickFile().then((path) => {
 								if (path) setDraft({ text: `@${path}`, at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
 							});
 						}}

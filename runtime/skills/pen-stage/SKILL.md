@@ -28,7 +28,7 @@ boards hides them. To mark out a group, give the frame a stroke and no fill. The
 board everywhere nothing is drawn over it, and not where something is. So keep notes beside a
 board rather than on it, unless covering part of it is the point.
 
-The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
+The person can move, delete and rewrite drawn items by hand, so read before you edit:
 the file may have changed since you last looked.
 
 The examples below are a node script, where `const { decks } = await import(process.env.DECKS_SDK)`

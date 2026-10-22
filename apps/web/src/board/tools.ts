@@ -1,17 +1,6 @@
-import type { ComponentKind } from "@decks/protocol";
-
-/** The tool in hand on the canvas: select, or a kind of block to put on a board. */
-export type Tool = "select" | ComponentKind;
-
 /**
- * What a click on a board means: **browse** reads it (text selects, a game plays), **edit**
- * moves and sizes what is on the canvas.
+ * What a click on the canvas means: **browse** reads the boards (text selects, a game plays, a
+ * link opens) and still moves and retypes what is drawn; **edit** is for changing the drawing,
+ * with its outlines, grips and distances. A board's own page is never edited from the canvas.
  */
 export type CanvasMode = "browse" | "edit";
-
-/** Whether a key or a paste belongs to something being typed in. */
-export function typingInto(target: EventTarget | null): boolean {
-	const element = target as HTMLElement | null;
-	if (!element) return false;
-	return Boolean(element.isContentEditable) || element.tagName === "TEXTAREA" || element.tagName === "INPUT";
-}

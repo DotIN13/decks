@@ -90,9 +90,8 @@ export interface Board {
 	w: number;
 	h: number;
 	/**
-	 * Bumped whenever the file changes. Two jobs: it busts the frame's cache, and
-	 * a patch carries the rev it was composed against so a stale write is refused
-	 * rather than applied (§6.5).
+	 * Bumped whenever the file changes, so the frame's cache is busted and a
+	 * page showing an older revision reloads.
 	 */
 	rev: number;
 	/** `<meta name="poster">`, deck-relative. A cheap rail image for a heavy board. */

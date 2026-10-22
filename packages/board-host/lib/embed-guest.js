@@ -349,63 +349,25 @@
 	);
 
 	/*
-	 * Files dropped or pasted onto a board shown inside another page (Studio's canvas): handed to
-	 * that page with where they landed, in board pixels, and it uploads them and puts each in the
-	 * board as a block there (the harness's `POST /api/boards/insert`). A board only (`body.board`),
-	 * not a page embedded in one; and a paste into something being typed in is that thing's own.
+	 * A file dragged over a board's page is the canvas's, never the board's: nothing is ever dropped
+	 * into a board. The page is another document, so the drop would otherwise land here, and the
+	 * browser's own answer is to open the file in place of the board. So it is refused here and handed
+	 * up with where it landed, in this page's viewport pixels; the canvas replays it at that point
+	 * (`plain-board.tsx`, `decks:drop`), where a drop on empty canvas lands. A board only
+	 * (`body.board`): a page of its own, an app, keeps its own drops.
 	 */
 	const isBoard = () => document.body?.classList.contains("board") === true;
 	const carriesFiles = (transfer) => !!transfer && [...(transfer.types ?? [])].includes("Files");
-	let dragDepth = 0;
-	let veil;
-	const showVeil = (on) => {
-		if (on && !veil) {
-			veil = document.createElement("div");
-			veil.setAttribute("data-decks-ui", "");
-			veil.style.cssText = "position:fixed;inset:6px;border:2px dashed #3b82f6;border-radius:10px;background:rgba(59,130,246,.06);pointer-events:none;z-index:2147483647";
-			document.body.append(veil);
-		}
-		if (!on && veil) {
-			veil.remove();
-			veil = undefined;
-		}
-	};
-	const boardPoint = (event) => ({ x: event.clientX + window.scrollX, y: event.clientY + window.scrollY });
-	document.addEventListener("dragenter", (event) => {
-		if (!isBoard() || !carriesFiles(event.dataTransfer)) return;
-		event.preventDefault();
-		dragDepth += 1;
-		showVeil(true);
-	}, true);
 	document.addEventListener("dragover", (event) => {
 		if (!isBoard() || !carriesFiles(event.dataTransfer)) return;
 		event.preventDefault();
 		event.dataTransfer.dropEffect = "copy";
 	}, true);
-	document.addEventListener("dragleave", (event) => {
-		if (!isBoard() || !carriesFiles(event.dataTransfer)) return;
-		dragDepth = Math.max(0, dragDepth - 1);
-		if (dragDepth === 0) showVeil(false);
-	}, true);
 	document.addEventListener("drop", (event) => {
 		if (!isBoard() || !carriesFiles(event.dataTransfer)) return;
-		// Never the browser's own: it would open the file in place of the board.
 		event.preventDefault();
 		event.stopPropagation();
-		dragDepth = 0;
-		showVeil(false);
 		const files = [...event.dataTransfer.files];
-		if (files.length) post({ t: "decks:files", how: "drop", files, at: boardPoint(event) });
+		if (files.length) post({ t: "decks:drop", files, x: event.clientX, y: event.clientY });
 	}, true);
-	let touched;
-	document.addEventListener("pointerdown", (event) => (touched = boardPoint(event)), true);
-	document.addEventListener("paste", (event) => {
-		if (!isBoard()) return;
-		const target = event.target;
-		if (target instanceof Element && target.closest("input, textarea, [contenteditable]:not([contenteditable=false])")) return;
-		const files = [...(event.clipboardData?.files ?? [])];
-		if (!files.length) return;
-		event.preventDefault();
-		post({ t: "decks:files", how: "paste", files, at: touched ?? { x: window.scrollX + Math.max(16, window.innerWidth / 2 - 160), y: window.scrollY + Math.max(16, window.innerHeight / 2 - 120) } });
-	});
 })();
