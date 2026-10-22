@@ -109,11 +109,13 @@ export function pixelsFirst(): boolean {
 /**
  * How much of a frame the page spends taking the worker's tiles in (`takeTiles`): this many
  * milliseconds, and under WebKit, whose clock counts whole milliseconds, no more than `bytes` tiles
- * of bytes or `pictures` tiles of pictures a frame either; what is left waits for the next frame,
- * the window's tiles first. A pinch's tiles taken in all at once held frames on an iPad mini for
- * 40 to 100 ms. `globalThis.__decksTileBudget` changes it, for measuring.
+ * of bytes (about 0.3 ms each on an iPad mini) or `pictures` tiles of pictures (about 2 ms) a frame
+ * either; what is left waits for the next frame, the window's tiles first. A pinch's tiles taken in
+ * all at once held frames on an iPad mini for 40 to 100 ms. Three tiles of bytes a frame, tried
+ * first, made a pinch's tiles take 300 ms to come in where all at once took 65 (WebKit as an iPad
+ * mini on a Mac). `globalThis.__decksTileBudget` changes it, for measuring.
  */
-const TILE_BUDGET = { ms: 4, bytes: 3, pictures: 2 };
+const TILE_BUDGET = { ms: 4, bytes: 12, pictures: 2 };
 const tileBudget = (): typeof TILE_BUDGET => ({ ...TILE_BUDGET, ...(globalThis as { __decksTileBudget?: Partial<typeof TILE_BUDGET> }).__decksTileBudget });
 /** A tile's place on the stage, `[x, y, side]`, from its key (`scale` is an `f32`'s bits). */
 const tileScale = new DataView(new ArrayBuffer(4));
