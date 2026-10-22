@@ -1,0 +1,360 @@
+/**
+ * What the stage costs, on a big canvas: eight numbers, each the median of `RENDER_PERF_RUNS` (5) runs
+ * (9 for the two per-frame times, see `WIDE`).
+ *
+ * Not a pass/fail check: it measures, and says only that each number could be measured. The canvas
+ * is `perf` (`e2e/perf-canvas.mjs`: 2,000 items and 100 boards), written into this check's deck.
+ * Run it with `node scripts/render-perf.mjs`, which prints the numbers as one JSON object.
+ *
+ * - tilesAtLoad, firstSharpMs: the page opened afresh on the canvas, each run; tiles painted until
+ *   none have come for 2 s, and the first sharp frame (`sharpAt`, `stage/engine.ts`).
+ * - tilesAfterZoom: at rest at 100% on a busy cell, one pinch step of 3% (then 3% again from there,
+ *   for each run, so no run finds the last one's tiles kept), tiles painted until quiet.
+ * - zoomDraws: page draws per frame over 40 frames of pinch, one CDP wheel event (⌃ held) a frame.
+ * - panFrameMs: main-thread time (CDP `TaskDuration`) per frame over 240 frames of two-finger pan at 50%.
+ * - dragStepMs: main-thread time per step of a note dragged (browse mode moves the drawing) at 50%, one pointer move a
+ *   frame (CDP mouse events), the first five steps left out.
+ * - editToFrameMs: an agent's insert (`stage.pen.edit` over the wire) to the first frame drawn with
+ *   a tile painted after the note is in the layout.
+ * - strokeEndMs: main-thread time per frame over the last 60 of 600 pointer moves (10 s at 60 Hz) of a
+ *   pen stroke, one CDP mouse move a frame.
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { WEB, deckState, open, say, socket } from "../harness.mjs";
+import { PERF_CANVAS, writePerfCanvas } from "../perf-canvas.mjs";
+
+const RUNS = Math.max(1, Number(process.env.RENDER_PERF_RUNS ?? 5));
+/*
+ * The two main-thread times per frame are about a millisecond, and on a Mac other work shares, a run
+ * wanders by more than 10%: they take a run first that is not counted (it paints what the rest find
+ * painted), then 2 × RUNS − 1 runs.
+ */
+const WIDE = RUNS * 2 - 1;
+const OUT = process.env.RENDER_PERF_OUT ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../node_modules/.cache/decks-e2e/render-perf.json");
+const W = 1500;
+const H = 950;
+const DPR = 2;
+
+const until = async (test, ms = 15000) => {
+	const deadline = Date.now() + ms;
+	for (;;) {
+		const value = await test();
+		if (value || Date.now() > deadline) return value;
+		await new Promise((done) => setTimeout(done, 150));
+	}
+};
+const median = (values) => {
+	const s = [...values].sort((a, b) => a - b);
+	return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+};
+const ms = (v) => Math.round(v * 10) / 10;
+
+// --- the canvas, and the agent on it ------------------------------------------------------------------
+const deck = await deckState();
+const made = writePerfCanvas(deck.path);
+const link = await socket();
+const agentId = await until(() => link.last("agents")?.focused);
+say("the server says which agent is focused", !!agentId);
+link.send({ type: "agent.stage", id: agentId, stage: PERF_CANVAS });
+// Asked for as well: an agent already on the canvas is sent nothing new.
+setTimeout(() => link.send({ type: "stage.pen.get", agentId }), 1500);
+const onPerf = await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === PERF_CANVAS && m.doc.children.length >= 1000), 20000);
+say("the agent is on the perf canvas", !!onPerf, `${made.items} items, ${made.boards} boards`);
+
+const { browser, page, context, errors } = await open({ width: W, height: H, dpr: DPR, boards: false });
+const cdp = await context.newCDPSession(page);
+await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
+const taskSeconds = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration").value;
+
+/** Until no tile has come for `quietMs` and the camera is still; false if that never happened within `cap`. */
+const quiet = (quietMs = 1500, cap = 30000) =>
+	page.evaluate(
+		async ({ quietMs, cap }) => {
+			const t0 = performance.now();
+			let last = globalThis.__decksSheet?.tiles ?? 0;
+			let at = performance.now();
+			while (performance.now() - t0 < cap) {
+				await new Promise((done) => setTimeout(done, 100));
+				const n = globalThis.__decksSheet?.tiles ?? 0;
+				const d = document.querySelector(".stage")?.dataset;
+				if (n !== last || d?.moving === "true" || d?.gliding === "true") {
+					last = n;
+					at = performance.now();
+				} else if (performance.now() - at >= quietMs) return true;
+			}
+			return false;
+		},
+		{ quietMs, cap },
+	);
+const frame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done())));
+
+/** Put helpers in the page: the camera, wheel events on the stage, one a frame. */
+const helpers = () =>
+	page.evaluate(() => {
+		const stage = () => document.querySelector(".stage");
+		const centre = () => {
+			const r = stage().getBoundingClientRect();
+			return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+		};
+		const wheel = (deltaX, deltaY, ctrlKey) => {
+			const c = centre();
+			stage().dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, ctrlKey, deltaMode: 0, clientX: c.x, clientY: c.y, bubbles: true, cancelable: true }));
+		};
+		const raf = () => new Promise((done) => requestAnimationFrame(() => done()));
+		globalThis.__perf = {
+			camera: () => ({ ...globalThis.__decksRust.camera }),
+			wheel,
+			raf,
+			/** Pinch to `zoom` exactly: 64 scroll units per e-fold (`Stage.tsx`, `PINCH_TRAVEL`), at most ×1.3 a step. */
+			async zoomTo(zoom) {
+				for (let i = 0; i < 200; i++) {
+					const now = globalThis.__decksRust.camera.zoom;
+					const ln = Math.log(zoom / now);
+					if (Math.abs(ln) < 1e-6) return;
+					wheel(0, -64 * Math.max(-Math.log(1.29), Math.min(Math.log(1.29), ln)), true);
+					await raf();
+				}
+			},
+			async panTo(x, y) {
+				for (let i = 0; i < 20; i++) {
+					const c = globalThis.__decksRust.camera;
+					const dx = (x - c.x) * c.zoom;
+					const dy = (y - c.y) * c.zoom;
+					if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+					wheel(dx, dy, false);
+					await raf();
+					await raf();
+				}
+			},
+			/** `frames` frames of wheel events, one each, going back the other way halfway. */
+			async loop(frames, dx, dy, ctrlKey) {
+				for (let i = 0; i < frames; i++) {
+					const back = i >= frames / 2 ? -1 : 1;
+					wheel(dx * back, dy * back, ctrlKey);
+					await raf();
+				}
+			},
+		};
+	});
+
+const result = { runs: {} };
+const keep = (key, values, round) => {
+	result.runs[key] = values.map(round);
+	result[key] = round(median(values));
+	say(`${key} measured`, values.length >= RUNS && values.every(Number.isFinite), JSON.stringify(result.runs[key]));
+};
+
+// --- open to rest: tiles painted, and the first sharp frame -------------------------------------------
+{
+	const tiles = [];
+	const sharp = [];
+	// One open more than the runs, the first left out: it compiles the engine and lays the canvas
+	// out for the first time, which no later open of the page does.
+	for (let run = -1; run < RUNS; run++) {
+		if (run > -1) await page.goto(`${WEB}/`, { waitUntil: "load" });
+		await page.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 1000, null, { timeout: 30000 });
+		await page.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
+		await quiet(2000, 40000);
+		const stats = await page.evaluate(() => ({ tiles: globalThis.__decksSheet.tiles, sharpAt: globalThis.__decksSheet.sharpAt }));
+		if (run < 0) continue;
+		tiles.push(stats.tiles);
+		sharp.push(stats.sharpAt ?? NaN);
+	}
+	keep("tilesAtLoad", tiles, Math.round);
+	keep("firstSharpMs", sharp, ms);
+}
+
+await helpers();
+// Where the canvas opens: the corner of cells 44, 45, 54 and 55.
+const HOME = { x: 0, y: 0 };
+await page.mouse.move(W / 2, H / 2);
+await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
+await page.evaluate(() => globalThis.__perf.zoomTo(1));
+await quiet();
+
+// --- a small zoom: 100% → 103%, and 3% on from there for each run -------------------------------------
+{
+	const tiles = [];
+	for (let run = 0; run < RUNS; run++) {
+		const before = await page.evaluate(() => globalThis.__decksSheet.tiles);
+		await page.evaluate(() => globalThis.__perf.wheel(0, -64 * Math.log(1.03), true));
+		await quiet(1500);
+		tiles.push((await page.evaluate(() => globalThis.__decksSheet.tiles)) - before);
+	}
+	keep("tilesAfterZoom", tiles, Math.round);
+}
+
+// --- page draws per zoom frame ------------------------------------------------------------------------
+{
+	const draws = [];
+	const FRAMES = 40;
+	for (let run = 0; run < RUNS; run++) {
+		const before = await page.evaluate(() => globalThis.__decksSheet.shown);
+		// Real wheel input (CDP), ⌃ held as a pinch has it, one event a frame.
+		for (let i = 0; i < FRAMES; i++) {
+			await cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: W / 2, y: H / 2, deltaX: 0, deltaY: i < FRAMES / 2 ? -2 : 2, modifiers: 2 });
+			await frame();
+		}
+		draws.push(((await page.evaluate(() => globalThis.__decksSheet.shown)) - before) / FRAMES);
+		await quiet(800);
+	}
+	// A ratio, not a count: to 0.1.
+	keep("zoomDraws", draws, ms);
+}
+
+// --- main-thread time per pan frame at 50% ------------------------------------------------------------
+{
+	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
+	await quiet();
+	const per = [];
+	const FRAMES = 240;
+	for (let run = -1; run < WIDE; run++) {
+		const before = await taskSeconds();
+		await page.evaluate((frames) => globalThis.__perf.loop(frames, 12, 5, false), FRAMES);
+		if (run >= 0) per.push(((await taskSeconds()) - before) * 1000 / FRAMES);
+		await quiet(1000);
+	}
+	keep("panFrameMs", per, ms);
+}
+
+// --- main-thread time per drag step -------------------------------------------------------------------
+{
+	await page.evaluate(() => globalThis.__perf.zoomTo(0.5));
+	await page.evaluate(({ x, y }) => globalThis.__perf.panTo(x, y), HOME);
+	await quiet();
+	// Top-level notes whole on screen, clear of the side panel, the toolbars and the composer, pressed
+	// where no board is. A press that lifts nothing (another item over the note) is let go and the next
+	// note tried; only drags that lifted their note are timed.
+	const notes = await page.evaluate(({ W, H }) => {
+		const out = [];
+		for (const [id, placed] of globalThis.__decksRust.placed) {
+			if (placed.node.type !== "note" || placed.parent) continue;
+			const r = globalThis.__decksPenBox?.(id);
+			if (!r || r.left < 330 || r.top < 70 || r.right > W - 20 || r.bottom > H - 150) continue;
+			const at = { x: r.left + r.width / 2, y: r.top + Math.min(20, r.height / 2) };
+			if (globalThis.__decksPictureAt?.(at.x, at.y)) continue;
+			out.push({ id, ...at });
+		}
+		return out;
+	}, { W, H });
+	say("there are notes on screen to drag", notes.length >= RUNS, `${notes.length}`);
+	const per = [];
+	let tried = 0;
+	const STEPS = 60;
+	for (const { x, y } of notes) {
+		if (per.length >= RUNS) break;
+		tried++;
+		await page.mouse.move(x, y);
+		await frame();
+		await page.mouse.down();
+		let before = 0;
+		let held = true;
+		for (let s = 1; s <= STEPS; s++) {
+			if (s === 6) {
+				held = await page.evaluate(() => globalThis.__decksRust.lifted.size > 0);
+				if (!held) break;
+				before = await taskSeconds();
+			}
+			await page.mouse.move(x + s * 3, y + s * 1.5);
+			await frame();
+		}
+		if (held) per.push(((await taskSeconds()) - before) * 1000 / (STEPS - 5));
+		await page.mouse.up();
+		await until(async () => (await page.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000);
+		await page.keyboard.press("Escape");
+		await quiet(1000);
+	}
+	say("drags lifted their note", per.length === RUNS, `${per.length} timed of ${tried} tried`);
+	keep("dragStepMs", per, ms);
+	await page.keyboard.press("Escape");
+	await quiet(800);
+}
+
+// --- an agent's edit to the frame that shows it -------------------------------------------------------
+{
+	await page.evaluate(() => {
+		const engine = globalThis.__decksRust;
+		const before = engine.presented;
+		globalThis.__perfPresented = [];
+		engine.presented = () => {
+			before?.();
+			for (const f of globalThis.__perfPresented) f();
+		};
+	});
+	const times = [];
+	for (let run = 0; run < RUNS; run++) {
+		const id = `perf-edit-${run}`;
+		const cam = await page.evaluate(() => globalThis.__perf.camera());
+		const seen = page.evaluate(
+			(id) =>
+				new Promise((done) => {
+					const engine = globalThis.__decksRust;
+					let mark;
+					const check = () => {
+						if (!engine.placed.has(id)) return;
+						const tiles = globalThis.__decksSheet.tiles;
+						if (mark === undefined) mark = tiles;
+						else if (tiles > mark) {
+							globalThis.__perfPresented = globalThis.__perfPresented.filter((f) => f !== check);
+							done(Date.now());
+						}
+					};
+					globalThis.__perfPresented.push(check);
+					setTimeout(() => done(NaN), 10000);
+				}),
+			id,
+		);
+		await frame();
+		const sent = Date.now();
+		const x1 = Math.round(cam.x - 300 + run * 130);
+		const y1 = Math.round(cam.y + 150);
+		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id, metadata: { type: "decks.markdown" }, content: `An agent's note, number ${run}`, width: 120 }, box: { x1, y1 } }] });
+		times.push((await seen) - sent);
+		await quiet(1000);
+	}
+	keep("editToFrameMs", times, ms);
+}
+
+// --- a long pen stroke --------------------------------------------------------------------------------
+{
+	await page.locator('[aria-label="Draw on the canvas"]:visible').click();
+	await page.waitForTimeout(300);
+	const per = [];
+	const inkBefore = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
+	// Ten seconds at 60 a second: 600 pointer moves, one a frame, the same path each run, so every
+	// stroke has as many points however fast the frames come; the last 60 are timed.
+	const STEPS = 600;
+	const TIMED = 60;
+	for (let run = -1; run < WIDE; run++) {
+		const cx = W / 2;
+		const cy = H / 2;
+		await page.mouse.move(cx, cy);
+		await page.mouse.down();
+		let before = 0;
+		const frames = TIMED;
+		for (let i = 1; i <= STEPS; i++) {
+			if (i === STEPS - TIMED + 1) before = await taskSeconds();
+			const t = i / 60;
+			await page.mouse.move(cx + Math.sin(t * 1.3) * 420, cy + Math.sin(t * 2.1) * 260);
+			await frame();
+		}
+		if (run >= 0) per.push(((await taskSeconds()) - before) * 1000 / frames);
+		await page.mouse.up();
+		await quiet(1500);
+	}
+	const inkAfter = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").length);
+	say("each stroke was drawn as ink", inkAfter - inkBefore === per.length + 1, `${inkAfter - inkBefore} of ${per.length + 1}`);
+	keep("strokeEndMs", per, ms);
+	await page.keyboard.press("Escape");
+}
+
+say("no errors on the page", errors.length === 0, errors.slice(0, 3).join(" | "));
+const metrics = Object.fromEntries(["zoomDraws", "panFrameMs", "dragStepMs", "editToFrameMs", "tilesAfterZoom", "tilesAtLoad", "firstSharpMs", "strokeEndMs"].map((k) => [k, result[k]]));
+const report = { ...metrics, runs: result.runs, setup: { items: made.items, boards: made.boards, width: W, height: H, dpr: DPR, runs: RUNS } };
+mkdirSync(dirname(OUT), { recursive: true });
+writeFileSync(OUT, `${JSON.stringify(report, null, "\t")}\n`);
+console.log(`METRICS ${JSON.stringify(report)}`);
+link.close();
+await browser.close();

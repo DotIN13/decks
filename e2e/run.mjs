@@ -183,6 +183,8 @@ const CHECKS = [
 	{ file: "stages.mjs", needsAgent: false },
 	/* The SDK redesign's view calls in a real browser: reload counted per page, goto, focus on a named canvas. */
 	{ file: "view-calls.mjs", needsAgent: false },
+	/* Measures, not a check: the stage's costs on a 2,000-item canvas (`node scripts/render-perf.mjs`). Run only when named. */
+	{ file: "render-perf.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
@@ -194,7 +196,7 @@ const wanted = process.argv.slice(2).filter((argument) => !argument.startsWith("
 const withAgent = process.env.DECKS_E2E_AGENT === "1";
 const selected = CHECKS.filter((check) => {
 	if (wanted.length > 0) return wanted.some((name) => check.file.startsWith(name.replace(/\.mjs$/, "")));
-	return withAgent || !check.needsAgent;
+	return !check.named && (withAgent || !check.needsAgent);
 });
 const skipped = CHECKS.filter((check) => !selected.includes(check));
 
@@ -573,7 +575,7 @@ try {
 	console.log(`\n${pass} passed, ${fail} failed assertions, ${failedFiles.length} failed check(s), ${((Date.now() - started) / 1000).toFixed(0)}s on ${JOBS} worker(s)`);
 	console.log(`  (a fresh deck and server per check: ${(setup / 1000 / Math.max(1, selected.length)).toFixed(1)}s each, before its time above)`);
 	if (wanted.length > 0 && skipped.length > 0) console.log(`  skipped ${skipped.length} not selected`);
-	else for (const check of skipped) console.log(`  skipped ${check.file} (needs a model; set DECKS_E2E_AGENT=1)`);
+	else for (const check of skipped) console.log(`  skipped ${check.file} (${check.named ? "runs only when named" : "needs a model; set DECKS_E2E_AGENT=1"})`);
 	if (fail > 0 || failedFiles.length > 0) exitCode = 1;
 } catch (error) {
 	console.error(`e2e: ${error.message}`);
