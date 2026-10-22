@@ -104,7 +104,7 @@ function paint(): void {
 	painting = true;
 	try {
 		const c = camera;
-		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, c.moving ? 4 : 12) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
+		const tiles = engine.paint(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving, batchFor(c.moving)) as Array<{ scale: number; x: number; y: number; bitmap: ImageBitmap }>;
 		if (tiles.length) {
 			const left = engine.viewLeft(c.x, c.y, c.zoom, c.dpr, c.width, c.height, c.moving);
 			if (left === 0) viewDone = true;
