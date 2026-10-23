@@ -128,8 +128,9 @@ const SAMPLER = () => {
 	for (const type of ["pointerup", "keydown", "click"])
 		addEventListener(
 			type,
-			() => {
-				if (!ew.armed) return;
+			(event) => {
+				// A chord's modifier goes down first: the key that commits is the one after it.
+				if (!ew.armed || ["Shift", "Control", "Meta", "Alt"].includes(event.key)) return;
 				ew.armed = false;
 				ew.commitAt = performance.now();
 			},
@@ -312,8 +313,13 @@ async function run(engine, { all }) {
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 	const home = (await call("view.camera", [])).value;
 	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
-	await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-	await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000);
+	let there = false;
+	for (let i = 0; i < 4 && !there; i++) {
+		const asked = await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
+		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		if (!there) console.log(`view.move did not land (${JSON.stringify(asked)}); again`);
+	}
+	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
 	const moved = await page.evaluate(() => globalThis.__decksRust.camera);
 	Object.assign(cam, moved);
