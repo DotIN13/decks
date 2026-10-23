@@ -230,11 +230,11 @@ test("queue waits for the turn; send to an idle agent starts one; inbox lists th
 });
 
 test("work the person sends or queues is theirs: not signed by the agent in focus, and no report owed", async () => {
-	const { app, agent, must, cleanup } = await open();
+	const { app, agent, as, must, cleanup } = await open();
 	try {
 		const other = app.agents.create({ name: "Rune" });
 		app.agents.focus(agent.id);
-		const person = { "x-decks-person": "1" };
+		const person = { authorization: `Bearer ${app.tokens.issue({ kind: "person" }).token}`, "x-decks-agent": agent.id };
 		const seen: string[] = [];
 		(other as unknown as { prompt: (text: string) => Promise<void> }).prompt = async (text: string) => {
 			seen.push(text);
@@ -245,7 +245,7 @@ test("work the person sends or queues is theirs: not signed by the agent in focu
 		assert.doesNotMatch(seen[0]!, new RegExp(`${agent.name} sent you|parent agent`));
 
 		await must("agent.queue", ["Rune", { task: "Then the tea one", reply: true }], person);
-		const theirs = (await must("agent.inbox", [], { "x-decks-agent": other.id })).value;
+		const theirs = (await must("agent.inbox", [], as(other.id))).value;
 		assert.equal(theirs[0].from, "You");
 		assert.equal(theirs[0].reply, undefined, "nobody waits on a report");
 	} finally {
@@ -268,9 +268,10 @@ test("clearing your tags at the end of a turn is answered without a request to s
 test("an arrow joined at both ends goes between them, with no note to say where", async () => {
 	const { must, cleanup } = await open();
 	try {
-		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
-		await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: "boards/a.html" }]);
-		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: "boards/a.html", side: "right" }, to: { item: "boards/b.html", side: "left" } } }]);
+		// A placed board is copied into the canvas and has an id there; an arrow joins those ids.
+		const a = (await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }])).value.id;
+		const b = (await must("canvas.insert", [{ type: "board", board: "boards/b.html" }, { beside: a }])).value.id;
+		const arrow = await must("canvas.insert", [{ type: "path", id: "a-to-b", stroke: "#888", strokeWidth: 4, metadata: { type: "decks.arrow", from: { item: a, side: "right" }, to: { item: b, side: "left" } } }]);
 		assert.ok(!arrow.notes.some((note) => /say where/.test(note)), arrow.notes.join(" | "));
 		assert.ok(arrow.value.box.x1 >= 880 && arrow.value.box.x2 <= 1080, `between the boards: ${JSON.stringify(arrow.value.box)}`);
 		const note = await must("canvas.insert", [{ type: "note", content: "Loose" }]);
