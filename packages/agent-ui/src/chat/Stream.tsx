@@ -239,6 +239,8 @@ export function Stream(props: {
 			 * gaps, which lands on the board underneath, is scrolled by hand.
 			 */
 			event.stopPropagation();
+			// Kept from the conversation's own listeners too, so reading up lets go of the foot here (`reading`).
+			if (event.deltaY < 0) readingUp();
 			if (event.target instanceof Node && scroller.contains(event.target)) return;
 			event.preventDefault();
 			scroller.scrollTop = at + event.deltaY;
@@ -355,6 +357,10 @@ export function Stream(props: {
 	 *
 	 * A MutationObserver hands the rows to the last two as they come and go.
 	 */
+	/** Reading up from the foot: set where the column is mounted (below), and called by the window's wheel handler too. */
+	let readingUp: () => void = () => {
+		setPinned(false);
+	};
 	const below = new Set<Element>();
 	let footWatch: IntersectionObserver | undefined;
 	let topWatch: IntersectionObserver | undefined;
@@ -411,6 +417,66 @@ export function Stream(props: {
 			}
 		});
 		rows.observe(scroller, { childList: true });
+
+		/*
+		 * Reading up lets go of the foot at once, on the reader's own gesture, not once the foot has
+		 * left the view. From the foot, the first few pixels of a scroll up are still within the 40px
+		 * the foot observer counts as pinned, and a row growing meanwhile (a reply streaming in, the
+		 * working sign changing its words) pulled the column straight back down: the first scroll up
+		 * from the bottom did not take. A wheel or a key up, or a finger drawing the history down,
+		 * unpins; where the scroll comes to rest, the foot in sight pins again.
+		 */
+		let fingerY: number | undefined;
+		/*
+		 * Asked where a scroll the reader made comes to rest, and not sooner than 250ms after their
+		 * gesture: a follow scroll already under way ends the moment the wheel arrives, and taken as
+		 * the reader's it pinned the column again straight away.
+		 */
+		let readingAt = Number.NEGATIVE_INFINITY;
+		let settleTimer: ReturnType<typeof setTimeout> | undefined;
+		const settle = () => {
+			if (!scroller || pinned()) return;
+			const wait = readingAt + 250 - performance.now();
+			clearTimeout(settleTimer);
+			if (wait > 0) {
+				settleTimer = setTimeout(settle, wait);
+				return;
+			}
+			if (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 40) setPinned(true);
+		};
+		const reading = (readingUp = () => {
+			setPinned(false);
+			readingAt = performance.now();
+			// Where `scrollend` is not sent, the scroll is taken to have come to rest 250ms after the gesture.
+			if (!("onscrollend" in scroller)) settle();
+		});
+		const onWheel = (event: WheelEvent) => {
+			if (event.deltaY < 0) reading();
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)) reading();
+		};
+		const onTouchStart = (event: TouchEvent) => {
+			fingerY = event.touches[0]?.clientY;
+		};
+		const onTouchMove = (event: TouchEvent) => {
+			const y = event.touches[0]?.clientY;
+			if (fingerY !== undefined && y !== undefined && y > fingerY + 2) reading();
+			fingerY = y;
+		};
+		scroller.addEventListener("wheel", onWheel, { passive: true });
+		scroller.addEventListener("keydown", onKey);
+		scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+		scroller.addEventListener("touchmove", onTouchMove, { passive: true });
+		scroller.addEventListener("scrollend", settle);
+		onCleanup(() => {
+			clearTimeout(settleTimer);
+			scroller.removeEventListener("wheel", onWheel);
+			scroller.removeEventListener("keydown", onKey);
+			scroller.removeEventListener("touchstart", onTouchStart);
+			scroller.removeEventListener("touchmove", onTouchMove);
+			scroller.removeEventListener("scrollend", settle);
+		});
 	});
 	onCleanup(() => {
 		footWatch?.disconnect();
@@ -444,6 +510,7 @@ export function Stream(props: {
 			class="stream"
 			ref={column}
 			data-shown={shownNow()}
+			data-pinned={pinned() ? "true" : "false"}
 			aria-label="The conversation"
 		>
 			{/*
