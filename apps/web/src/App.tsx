@@ -288,11 +288,16 @@ export function App() {
 	 * effect on `insets()` that read them got the previous fold's numbers, and a float
 	 * parked on the left stood still when the sidebar folded and then moved when it opened.
 	 */
+	let workRect: { width: number; height: number } | undefined;
 	const workBox = () => {
-		const work = document.querySelector(".work");
-		const rect = work?.getBoundingClientRect();
+		/* While the side panel is dragged the column's own box does not change, only its insets: the
+		   box measured before is used, so a step reads nothing from a layout the drag has just dirtied. */
+		if (!insetsMoving() || !workRect) {
+			const rect = document.querySelector(".work")?.getBoundingClientRect();
+			workRect = { width: rect?.width ?? window.innerWidth, height: rect?.height ?? window.innerHeight };
+		}
 		const { left, right } = insets();
-		return { x: left, y: 0, w: (rect?.width ?? window.innerWidth) - left - right, h: rect?.height ?? window.innerHeight };
+		return { x: left, y: 0, w: workRect.width - left - right, h: workRect.height };
 	};
 	/*
 	 * What a float must not land on: the other floats, as they stand now, in `workBox`'s frame.
@@ -324,6 +329,7 @@ export function App() {
 	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }) => {
 		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
 		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
+		let sized: { w: number; h: number } | undefined;
 		const float = makeFloat(el, {
 			...(stow ? { stow: { ...stow, tabHeight } } : {}),
 			others: otherFloats(el),
@@ -335,7 +341,7 @@ export function App() {
 			ignore,
 			home,
 			bounds: workBox,
-			size: () => ({ w: el.offsetWidth, h: el.offsetHeight }),
+			size: () => (sized = { w: el.offsetWidth, h: el.offsetHeight }),
 			pin,
 			read: () => ({ x: el.offsetLeft, y: el.offsetTop }),
 			apply: (p, atHome, stowed) => {
@@ -357,7 +363,8 @@ export function App() {
 				el.style.left = `${p.x}px`;
 				if (pin === "bottom") {
 					el.style.top = "";
-					el.style.bottom = `${workBox().h - (p.y + el.offsetHeight)}px`;
+					// The height last measured: a step of a panel's resize places it without reading the layout.
+					el.style.bottom = `${workBox().h - (p.y + (sized?.h ?? el.offsetHeight))}px`;
 				} else {
 					el.style.bottom = "";
 					el.style.top = `${p.y}px`;
@@ -389,8 +396,8 @@ export function App() {
 		   sidebar folds. A float restored against the wrong column sits 264px to the left. */
 		createEffect(() => {
 			insets();
-			// Floats are put back against the column once a resize of the panel ends, not at every step of it.
-			if (insetsMoving()) return;
+			// While the side panel is dragged a float follows it step by step, cheaply; it is put back properly once the drag ends.
+			if (insetsMoving()) return float.follow();
 			float.restore();
 		});
 		/* How tall the composer is, as a variable: the focus view pads its foot by it so a
@@ -435,8 +442,8 @@ export function App() {
 		);
 		createEffect(() => {
 			insets();
-			// Floats are put back against the column once a resize of the panel ends, not at every step of it.
-			if (insetsMoving()) return;
+			// While the side panel is dragged a float follows it step by step, cheaply; it is put back properly once the drag ends.
+			if (insetsMoving()) return float.follow();
 			float.restore();
 		});
 		onCleanup(() => float.dispose());

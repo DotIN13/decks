@@ -124,7 +124,7 @@ const SAMPLES = 8;
 export function makeFloat(
 	el: HTMLElement,
 	options: FloatOptions,
-): { restore: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; dispose: () => void } {
+): { restore: () => void; follow: () => void; sendHome: () => void; unstow: () => void; stowed: () => boolean; placeAt: (p: Point) => void; dispose: () => void } {
 	const { key, handle, ignore, home, bounds, size, apply, onChange, storage } = options;
 	const pin: Pin = options.pin ?? "top";
 	const disabled = (): boolean => options.disabled?.() === true;
@@ -209,7 +209,29 @@ export function makeFloat(
 	const onIgnored = (target: EventTarget | null): boolean =>
 		ignore !== undefined && target instanceof Element && target.closest(ignore) !== null;
 
+	/*
+	 * Following bounds that move step by step (a side panel being dragged wider): what `restore`
+	 * measures (the float's size, its home, its tab) and reads from storage (where it was put)
+	 * is read once, at the first step, and each step is only arithmetic on the new bounds. No
+	 * glide, no keeping clear of the others and no snapping home: `restore` does those once the
+	 * bounds stop, which also takes this away.
+	 */
+	let following: { size: Size; home: Point; tab: number; saved: Saved | undefined } | undefined;
+	const follow = (): void => {
+		if (drag || disabled()) return;
+		// At home the stylesheet places it, and follows the bounds by itself.
+		if (current === undefined) return;
+		cancelSettle();
+		following ??= { size: size(), home: home(), tab: tabWidth(), saved: loadFloats(storage)[key] };
+		const box = bounds();
+		const { size: sized, home: at, tab, saved } = following;
+		if (stowed) return place(stowedAt(current.y, sized, box, tab, 12, stowed));
+		if (saved === undefined || saved === "home") return;
+		place(clamp(fromSaved(saved, sized, box, at, 6, pin), sized, box));
+	};
+
 	const restore = (): void => {
+		following = undefined;
 		if (drag) return;
 		cancelSettle();
 		if (disabled()) {
@@ -498,6 +520,7 @@ export function makeFloat(
 
 	return {
 		restore,
+		follow,
 		sendHome,
 		unstow,
 		stowed: () => stowed !== undefined,
