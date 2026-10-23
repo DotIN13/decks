@@ -498,10 +498,10 @@ async function run(engine, { all }) {
 	await op(page, engine, "a note made by a double-click on bare canvas", {
 		probe: { count: true },
 		setup: () => remember(),
-		prepare: () => page.mouse.move(760, 380),
+		prepare: () => page.mouse.move(700, 450),
 		commit: async (arm) => {
 			await arm();
-			await page.mouse.click(760, 380, { clickCount: 2 });
+			await page.mouse.click(700, 450, { clickCount: 2 });
 		},
 		cleanup: async () => {
 			await page.keyboard.press("Escape");

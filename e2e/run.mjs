@@ -168,6 +168,8 @@ const CHECKS = [
 	{ file: "stage-goldens.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
+	/* Every edit a person makes, with the server's answer held back: none shows the drawing as it was before it. Eight minutes, so by name. */
+	{ file: "edits-wait.mjs", needsAgent: false, named: true },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
 	{ file: "same-drawing.mjs", needsAgent: false },
 	/* A long stroke drawn as it grows is the stroke shaped whole, and its last frames cost less than shaping it whole each frame. */
