@@ -6,9 +6,7 @@ import type { Board, DeckState, ServerMessage } from "@decks/protocol";
 import { Revisions } from "./snapshots.ts";
 import { Authors, Seen } from "./authors.ts";
 import {
-	MIRROR_SIZE,
 	renderBlank,
-	renderMirror,
 	renderWebBoard,
 	renderDocBoard,
 	renderAppBoard, renderFileBoard,
@@ -50,7 +48,7 @@ export interface BoardHooks {
  * It is a service for three reasons that showed up separately:
  *
  * - **A board write and its revision are one act.** Every path that writes a board also
- *   records it — `newBoard`, `newMirror`, `newWebBoard`, `undo` — and the one
+ *   records it — `newBoard`, `newWebBoard`, `undo` — and the one
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
@@ -280,7 +278,7 @@ export class BoardService {
 	 * (`deck/layout.ts`). The app boards and the boards the harness makes for itself stay writable.
 	 */
 	readOnly(path: string): string | undefined {
-		if (/^boards\//.test(path) && !/^boards\/(?:apps|mirrors|documents|files)\//.test(path) && path !== "boards/your-chrome.html") {
+		if (/^boards\//.test(path) && !/^boards\/(?:apps|documents|files)\//.test(path) && path !== "boards/your-chrome.html") {
 			return `${path} is in the library, on no canvas, and is read only: place it on a canvas (decks canvas insert copies it in) and change the copy.`;
 		}
 		return this.viewOnly(path);
@@ -376,36 +374,9 @@ export class BoardService {
 	}
 
 	/**
-	 * Write a mirror: a board that is a live view of one agent's conversation.
-	 *
-	 * Beside `newBoard` rather than inside it, because a mirror is not a shape of document
-	 * but a *kind* of board — the file is a stub and its content never comes from disk
-	 * (`boards/templates.ts`, `lib/live-chat.js`). Kept in `boards/mirrors/` so a deck full
-	 * of them still reads as a deck: they are views, and views belong together.
-	 *
-	 * One per agent, deliberately. Asking for a mirror of somebody already mirrored hands
-	 * back the board that exists rather than a second window onto the same conversation —
-	 * which is also what makes the menu item safe to press twice.
-	 */
-	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string {
-		const path = `boards/mirrors/${slugFor(options.name || options.agentId, "mirror")}.html`;
-		const file = this.deck.fileOf(path);
-		// The same agent behind the same name: hand back the window that is already open.
-		if (existsSync(file) && readFileSync(file, "utf8").includes(`data-agent="${options.agentId}"`)) return path;
-
-		const html = renderMirror(options.name || "Conversation", options.agentId, options.size ?? MIRROR_SIZE);
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, html);
-		this.revisions.record(path, html);
-		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
-		return path;
-	}
-
-	/**
 	 * The status board for the shared Chrome: one per deck, made when first asked for.
 	 *
-	 * A stub like a mirror — `data-live="web"` and nothing else — fed from the `web.status`
+	 * A stub — `data-live="web"` and nothing else — fed from the `web.status`
 	 * the browser already holds. Asking again hands back the board that exists.
 	 */
 	newWebBoard(): string {

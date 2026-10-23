@@ -783,9 +783,9 @@ async function run(engine, { all }) {
 		probe: { count: true },
 		prepare: async () => {
 			await remember();
-			await page.click('[aria-label="Draw on the canvas"]');
+			await page.click('.v3-tool[data-tool="pen"]');
 			await page.waitForSelector(".stage-ink");
-			await page.click('.ink-bar [aria-label^="Pen"]');
+			await page.click('.v3-tray [aria-label^="Pen"]');
 			await drag({ x: 600, y: 420 }, { x: 820, y: 470 }, 14);
 		},
 		commit: async (arm) => {
@@ -796,11 +796,11 @@ async function run(engine, { all }) {
 	await op(page, engine, "an ink stroke erased", {
 		probe: { count: true },
 		setup: async () => {
-			await page.click('[aria-label="Draw on the canvas"]');
+			await page.click('.v3-tool[data-tool="pen"]');
 			await page.waitForSelector(".stage-ink");
 		},
 		prepare: async () => {
-			await page.click('.ink-bar [aria-label^="Eraser"]');
+			await page.click('.v3-tray [aria-label^="Eraser"]');
 			await drag({ x: 700, y: 380 }, { x: 712, y: 520 }, 12);
 		},
 		commit: async (arm) => {
@@ -808,7 +808,7 @@ async function run(engine, { all }) {
 			await page.mouse.up();
 		},
 		cleanup: async () => {
-			await page.click('.ink-bar [aria-label="Stop drawing"]').catch(() => {});
+			await page.click('.v3-tool[data-tool="pen"]').catch(() => {});
 			await dropMade();
 		},
 	});

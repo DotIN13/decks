@@ -121,7 +121,7 @@ export function createFileDrops() {
 	 * The server mints the name, so every caller that wants to *do* something with a board it
 	 * asked for — fill it with the file that was dropped, select it, fly to it — has to wait to
 	 * be told what it is called. `ask` is handed the request id to put on its own message, which
-	 * is what lets one registry serve `board.create` and `agent.mirror` alike.
+	 * is what lets one registry serve every request that makes a board.
 	 *
 	 * Ten seconds, then `undefined`: a promise that never settles is a button that never comes
 	 * back, and the caller can say so in a sentence.

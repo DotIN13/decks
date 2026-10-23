@@ -52,6 +52,8 @@ export function Popover(props: {
 	const sub = () => props.placement === "right-start";
 	const [open, setOpen] = createSignal(false);
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>();
+	/** Which side of its trigger the card landed on, so a stylesheet can grow it out of that edge. */
+	const [side, setSide] = createSignal<"above" | "below" | "beside">("below");
 	let trigger: HTMLElement | undefined;
 	let card: HTMLDivElement | undefined;
 
@@ -109,6 +111,7 @@ export function Popover(props: {
 			}
 			left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
 			top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
+			setSide("beside");
 			setAt({ left, top });
 			return;
 		}
@@ -127,6 +130,7 @@ export function Popover(props: {
 		else if (!above && top + c.height > window.innerHeight - MARGIN) top = bar.top - c.height - GUTTER;
 		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
 
+		setSide(top + c.height <= t.top + 1 ? "above" : "below");
 		setAt({ left, top });
 	};
 
@@ -257,6 +261,8 @@ export function Popover(props: {
 					ref={card}
 					class={`popover ${props.class ?? ""}`}
 					data-sub={sub() ? "" : undefined}
+					data-placed={at() ? "" : undefined}
+					data-side={side()}
 					role="menu"
 					aria-label={props.label}
 					/* Hidden until placed, so it never flashes at 0,0 on the way to its corner. */

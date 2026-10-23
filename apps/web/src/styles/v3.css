@@ -1,0 +1,2352 @@
+/*
+ * The harness, version 3 (assets/harness-v3-export-1.zip): the side panel docked at the left with
+ * agents first and the conversation under them, the canvas in the middle, the composer by your
+ * hand, and floating bars of 16px corners on a plain ground.
+ *
+ * **The canvas keeps its own look.** The v3 colours are set on `body`, so the chrome and every
+ * menu portalled into the body take them; `.stage` sets the old ones back for everything drawn on
+ * the canvas (the selection, the pills, the handles, the cursors), and the stage engine reads its
+ * accent off the root element, which this sheet leaves alone. Only the ground under the boards,
+ * `--stage`, is the design's.
+ *
+ * Last in `index.css`, and in the components layer, so a rule here wins a tie with the sheets it
+ * restyles and still loses to a utility.
+ */
+
+body {
+	--v3-bg: #f5f5f5;
+	--v3-panel: #ffffff;
+	--v3-bg2: #f5f5f5;
+	--v3-bg3: #ebebeb;
+	--v3-line: #e6e6e6;
+	--v3-line2: #d9d9d9;
+	--v3-fg: #1e1e1e;
+	--v3-fg2: #767676;
+	--v3-fg3: #b0b0b0;
+	--v3-accent: #2563eb;
+	--v3-accent-soft: #eaf1fe;
+	--v3-ink: #1e1e1e;
+	--v3-ink-fg: #ffffff;
+	--v3-ink-key: #ffffff80;
+	--v3-ink-rule: #ffffff1f;
+	--v3-danger: #e5484d;
+	--v3-spark: #d97757;
+	--v3-shadow: 0 2px 14px rgb(0 0 0 / 12%), 0 0 0 0.5px rgb(0 0 0 / 12%);
+	--v3-menu-shadow: 0 6px 24px rgb(0 0 0 / 28%), 0 0 0 0.5px rgb(0 0 0 / 20%);
+
+	/* The app's own tokens, as v3 has them, for the chrome. */
+	--bg: var(--v3-bg);
+	--stage: var(--v3-bg);
+	--panel: var(--v3-panel);
+	--fg: var(--v3-fg);
+	--muted: var(--v3-fg2);
+	--faint: var(--v3-fg3);
+	--line: var(--v3-line);
+	--line-strong: var(--v3-line2);
+	--border-strong: transparent;
+	--fill: var(--v3-bg3);
+	--color-accent: var(--v3-accent);
+	--color-accent-soft: var(--v3-accent-soft);
+	--color-danger: var(--v3-danger);
+	--shadow: var(--v3-shadow);
+	--radius-panel: 16px;
+	--control-radius: 8px;
+}
+
+[data-color-scheme="dark"] body {
+	--v3-bg: #1e1e1e;
+	--v3-panel: #2c2c2c;
+	--v3-bg2: #383838;
+	--v3-bg3: #444444;
+	--v3-line: #444444;
+	--v3-line2: #555555;
+	--v3-fg: #f0f0f0;
+	--v3-fg2: #a8a8a8;
+	--v3-fg3: #6f6f6f;
+	--v3-accent: #3b82f6;
+	--v3-accent-soft: #1d2b45;
+	--v3-ink: #f0f0f0;
+	--v3-ink-fg: #1e1e1e;
+	--v3-ink-key: #00000080;
+	--v3-ink-rule: #0000001f;
+	--v3-shadow: 0 2px 14px rgb(0 0 0 / 45%), 0 0 0 0.5px rgb(255 255 255 / 10%);
+	--v3-menu-shadow: 0 6px 24px rgb(0 0 0 / 55%), 0 0 0 0.5px rgb(0 0 0 / 40%);
+}
+
+/* The canvas, as it was: everything drawn on it reads the old tokens. */
+.stage {
+	--panel: var(--color-grey-50);
+	--fg: var(--color-grey-1100);
+	--muted: var(--color-grey-700);
+	--faint: var(--color-grey-600);
+	--line: rgb(0 0 0 / 10%);
+	--line-strong: rgb(0 0 0 / 20%);
+	--border-strong: rgb(0 0 0 / 8%);
+	--fill: var(--color-grey-400);
+	--color-accent: #3b5cf6;
+	--color-accent-soft: #d7e2fc;
+	--color-danger: #d92e3c;
+	--shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 18px rgb(0 0 0 / 6%);
+	--radius-panel: 12px;
+}
+[data-color-scheme="dark"] .stage {
+	--panel: var(--color-grey-1000);
+	--fg: var(--color-grey-100);
+	--muted: var(--color-grey-500);
+	--faint: var(--color-grey-600);
+	--line: rgb(255 255 255 / 12%);
+	--line-strong: rgb(255 255 255 / 24%);
+	--border-strong: #ffffff1f;
+	--fill: var(--color-grey-800);
+	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+}
+@media (pointer: coarse) {
+	.stage {
+		--radius-panel: 26px;
+	}
+}
+
+@layer components {
+	/* ---- shared: icon buttons and floating bars ------------------------------------------- */
+
+	.v3-icon {
+		display: grid;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+	}
+	.v3-icon:hover,
+	.v3-icon[data-on="soft"],
+	.v3-icon[aria-haspopup][aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.v3-icon:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: 1px;
+	}
+
+	.v3-bar.float.pill {
+		position: absolute;
+		z-index: 20;
+		height: 44px;
+		gap: 4px;
+		padding: 0 8px 0 6px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.v3-sep {
+		width: 1px;
+		height: 20px;
+		flex: none;
+		margin: 0 2px;
+		background: var(--v3-line);
+	}
+	.v3-chev {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+
+	/* ---- the top-left bar ------------------------------------------------------------------ */
+
+	.v3-topbar.float.pill {
+		top: 12px;
+		left: calc(var(--inset-left, 0px) + 12px);
+		width: max-content;
+		transition: left 160ms ease;
+	}
+	.v3-unfold {
+		background: var(--v3-bg2);
+	}
+	.v3-deck .switcher {
+		height: 32px;
+		padding: 0 8px 0 2px;
+	}
+	.v3-deck .switcher > .v3-chev,
+	.v3-deck .switcher > svg:last-child {
+		display: none;
+	}
+	.v3-agent-chip {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 7px;
+		padding: 0 8px 0 6px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+	}
+	.v3-agent-chip:hover,
+	.v3-agent-chip[data-open="true"] {
+		background: var(--v3-bg3);
+	}
+	.v3-agent-name {
+		max-width: 160px;
+		overflow: hidden;
+		font-size: 13px;
+		font-weight: 500;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.v3-agent-kind {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-canvas-chip {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+	}
+	.v3-canvas-chip:hover,
+	.v3-canvas-chip[data-open="true"] {
+		background: var(--v3-bg3);
+	}
+	.v3-canvas-chip > svg:first-child {
+		color: var(--v3-fg2);
+	}
+	.v3-canvas-name {
+		max-width: 180px;
+		overflow: hidden;
+		font-size: 13px;
+		font-weight: 500;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.v3-viewonly {
+		height: 28px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--v3-accent-soft);
+		color: var(--v3-accent);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+	}
+
+	/* ---- the top-right bar ----------------------------------------------------------------- */
+
+	.v3-topright.float.pill {
+		top: 12px;
+		right: 12px;
+		padding: 0 8px;
+	}
+	.v3-here {
+		display: flex;
+		align-items: center;
+		padding: 0 4px;
+	}
+	/* Each face keeps the ring the agents list draws (`AgentFace`, 1.5px at 1.5px off), so the
+	   overlap is a little less and the panel-coloured border sits just outside the ring. */
+	.v3-here-face {
+		display: grid;
+		margin-left: -5px;
+		padding: 0;
+		border: 3px solid var(--v3-panel);
+		border-radius: 50%;
+		background: none;
+		cursor: pointer;
+		place-items: center;
+	}
+	.v3-here-face:first-child {
+		margin-left: 0;
+	}
+	.v3-here-face[data-current="true"] {
+		position: relative;
+		z-index: 1;
+	}
+	.v3-here-more {
+		margin-left: 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+	}
+
+	/* ---- the zoom bar ---------------------------------------------------------------------- */
+
+	.v3-zoom.float.pill {
+		right: 12px;
+		bottom: calc(12px + env(safe-area-inset-bottom));
+		height: 40px;
+		gap: 2px;
+		padding: 0 4px;
+	}
+	.v3-zoom-btn {
+		width: 30px;
+		height: 30px;
+	}
+	.v3-zoom-value {
+		width: 46px;
+		height: 30px;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		text-align: center;
+	}
+	.v3-zoom-value:hover,
+	.v3-zoom-value[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+
+	/* ---- the tool column ------------------------------------------------------------------- */
+
+	.pen-tools.v3-tools {
+		top: 68px;
+		left: calc(var(--inset-left, 0px) + 12px);
+		width: 46px;
+		max-height: calc(100% - 68px - 12px);
+		gap: 2px;
+		padding: 5px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		transform: none;
+	}
+	.v3-grip {
+		display: grid;
+		width: 36px;
+		height: 14px;
+		flex: none;
+		grid-template-columns: repeat(3, 3px);
+		gap: 2px;
+		place-content: center;
+		cursor: grab;
+		touch-action: none;
+	}
+	.v3-grip > i,
+	.v3-tray-grip > i {
+		width: 3px;
+		height: 3px;
+		border-radius: 50%;
+		background: var(--v3-fg3);
+	}
+	.v3-tool {
+		position: relative;
+		display: grid;
+		width: 36px;
+		height: 36px;
+		flex: none;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+	}
+	.v3-tool:hover,
+	.v3-tool[data-open="true"] {
+		background: var(--v3-bg3);
+	}
+	.v3-tool[data-on="true"] {
+		background: var(--v3-accent);
+		color: #ffffff;
+	}
+	.v3-tool[data-on="true"][data-open="true"],
+	.v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+	}
+	.v3-tool:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: 1px;
+	}
+	/* A family's mark: a small triangle in the corner says a menu is behind the press. */
+	.v3-tool[data-family]::after {
+		position: absolute;
+		right: 3px;
+		bottom: 3px;
+		width: 0;
+		height: 0;
+		border-bottom: 4px solid currentColor;
+		border-left: 4px solid transparent;
+		content: "";
+		opacity: 0.6;
+	}
+	.v3-rule {
+		width: 24px;
+		height: 1px;
+		flex: none;
+		margin: 3px 0;
+		background: var(--v3-line);
+	}
+
+	/* The tools as a row above the composer, on a phone. */
+	.v3-tools[data-row="true"] {
+		position: static;
+		display: flex;
+		width: auto;
+		max-height: none;
+		height: 52px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: 2px;
+		padding: 0 6px;
+		overflow-x: auto;
+		border-radius: 20px;
+		transform: none;
+	}
+	.v3-tools[data-row="true"] .v3-grip,
+	.v3-tools[data-row="true"] .stowtab {
+		display: none;
+	}
+	.v3-tools[data-row="true"] .v3-rule {
+		width: 1px;
+		height: 24px;
+		margin: 0 3px;
+	}
+	.v3-tools[data-row="true"] .v3-tool {
+		width: 40px;
+		height: 40px;
+		border-radius: 12px;
+	}
+
+	/* ---- a tool family's menu: dark in light, light in dark -------------------------------- */
+
+	.v3-menu {
+		position: fixed;
+		z-index: var(--z-menu, 40);
+		display: flex;
+		width: 220px;
+		flex-direction: column;
+		gap: 1px;
+		padding: 6px;
+		border-radius: 8px;
+		background: var(--v3-ink);
+		box-shadow: var(--v3-menu-shadow);
+		color: var(--v3-ink-fg);
+	}
+	.v3-menu-row {
+		display: flex;
+		height: 28px;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 5px;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		font-size: 12.5px;
+		text-align: left;
+	}
+	.v3-menu-row:hover,
+	.v3-menu-row:focus-visible {
+		background: color-mix(in srgb, var(--v3-ink-fg) 12%, transparent);
+		outline: none;
+	}
+	.v3-menu-row[data-on="true"] {
+		background: var(--v3-accent);
+		color: #ffffff;
+	}
+	.v3-menu-label {
+		flex: 1;
+	}
+	.v3-menu-key {
+		color: var(--v3-ink-key);
+		font-family: var(--font-mono);
+		font-size: 11px;
+	}
+	.v3-menu-row[data-on="true"] .v3-menu-key {
+		color: #ffffff80;
+	}
+	.v3-menu-rule {
+		height: 1px;
+		flex: none;
+		margin: 4px 2px;
+		background: var(--v3-ink-rule);
+	}
+
+	/* ---- the side panel -------------------------------------------------------------------- */
+
+	.panel-shell.v3-panel {
+		border: 0;
+		border-right: 1px solid var(--v3-line);
+		border-radius: 0;
+		background: var(--v3-panel);
+		box-shadow: none;
+		padding: 0;
+	}
+	.v3-panel-head {
+		display: flex;
+		height: 52px;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px 0 16px;
+	}
+	.v3-panel-head .panel-mark {
+		min-width: 0;
+		padding: 0;
+	}
+	/* The deck's mark, as v3 draws it: a 26px square with a 1.4px ring, the boards inside. */
+	.v3-panel .switcher,
+	.v3-deck .switcher {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		border: 0;
+		background: transparent;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.v3-panel .switcher-name,
+	.v3-deck .switcher-name {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.v3-nav {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 2px;
+		padding: 0 10px 8px;
+	}
+	.v3-nav-tab {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+	}
+	.v3-nav-tab:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-nav-tab[data-on="true"] {
+		background: var(--v3-accent-soft);
+		color: var(--v3-fg);
+		font-weight: 500;
+	}
+	.v3-nav-tab[data-on="true"] > svg {
+		color: var(--v3-accent);
+	}
+	.v3-search-wrap {
+		display: flex;
+		flex: none;
+		padding: 0 12px 8px;
+	}
+	.v3-search {
+		display: flex;
+		height: 32px;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 8px;
+		padding: 0 6px 0 10px;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg3);
+	}
+	.v3-search input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 12px;
+		outline: none;
+	}
+	.v3-search input::placeholder {
+		color: var(--v3-fg3);
+	}
+	.v3-kbd {
+		display: flex;
+		height: 18px;
+		align-items: center;
+		padding: 0 5px;
+		border: 1px solid var(--v3-line2);
+		border-radius: 4px;
+		color: var(--v3-fg3);
+		font-family: inherit;
+		font-size: 11px;
+		letter-spacing: 0.5px;
+	}
+	.v3-search-clear {
+		width: 20px;
+		height: 20px;
+	}
+
+	.v3-panel .panel-list {
+		min-height: 0;
+		flex: 1 1 auto;
+		padding: 0 8px 10px;
+	}
+	.v3-panel:has(.v3-chat:not([data-folded="true"])) .panel-list {
+		flex: 0 1 auto;
+		max-height: 52%;
+	}
+	.v3-panel .panel-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		margin: 0 0 4px;
+	}
+	.v3-folder-head {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 4px 0 6px;
+		border-radius: 8px;
+	}
+	.v3-folder-toggle {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+	.v3-folder-chev {
+		flex: none;
+		color: var(--v3-fg3);
+	}
+	.v3-folder-icon {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+	.v3-folder-name {
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+	.v3-folder-head .note {
+		color: var(--v3-fg2);
+		font-size: 11px;
+	}
+	.v3-folder-head .new-agent.v3-folder-add {
+		width: 22px;
+		height: 22px;
+		color: var(--v3-fg2);
+		opacity: 1;
+	}
+	.v3-panel .panel-section[data-drop="true"] .v3-folder-head {
+		background: var(--v3-accent-soft);
+	}
+
+	/* An agent's row: its face and ring, its name and kind, what it is doing, then its tags. */
+	.v3-panel .agent-list .agent-row {
+		border-radius: 10px;
+	}
+	.v3-panel .agent-list .agent-row > button[data-row] {
+		min-height: 0;
+		gap: 10px;
+		padding: 6px 10px 6px 28px;
+		border-radius: 10px;
+	}
+	.v3-panel .agent-list .agent-row:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-panel .agent-list .agent-row[data-current="true"],
+	.v3-panel .agent-list .agent-row[data-current="true"]:hover {
+		background: var(--v3-accent-soft);
+	}
+	.v3-panel .agent-list .row-label {
+		color: var(--v3-fg);
+		font-size: 13px;
+		font-weight: 400;
+	}
+	.v3-panel .agent-list .agent-row[data-current="true"] .row-label {
+		font-weight: 500;
+	}
+	.v3-panel .agent-list .kind {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-panel .agent-list .ago {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-panel .agent-list .ago[data-busy="true"] {
+		color: var(--v3-fg2);
+	}
+	.v3-panel .agent-list .tag {
+		height: 16px;
+		padding: 0 5px;
+		border-radius: 5px;
+		background: var(--v3-bg3);
+		color: var(--v3-fg2);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		line-height: 16px;
+	}
+	.v3-panel .agent-list .agent-said {
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+	}
+	.v3-new-agent.new-agent {
+		display: flex;
+		width: auto;
+		height: 32px;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 6px;
+		margin-top: 2px;
+		padding: 0 10px 0 6px;
+		border-radius: 8px;
+		color: var(--v3-fg2);
+		font-size: 12.5px;
+	}
+	.v3-new-agent.new-agent:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+
+	/* The boards list, in v3's type. */
+	.v3-panel .panel-meta {
+		height: 28px;
+		color: var(--v3-fg);
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+	.v3-panel .board-row {
+		border-radius: 8px;
+		font-size: 13px;
+	}
+
+	/* The apps list. */
+	.v3-app-row {
+		display: flex;
+		width: 100%;
+		height: 36px;
+		align-items: center;
+		gap: 10px;
+		padding: 0 10px 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+		text-align: left;
+	}
+	.v3-app-row:hover,
+	.v3-app-row:focus-visible {
+		background: var(--v3-bg2);
+		outline: none;
+	}
+	.v3-app-icon {
+		display: grid;
+		width: 24px;
+		height: 24px;
+		flex: none;
+		place-items: center;
+		border-radius: 6px;
+		background: var(--v3-bg3);
+		color: var(--v3-fg2);
+	}
+	.v3-app-name {
+		min-width: 0;
+		flex: 1;
+	}
+	.v3-app-state {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+	}
+	.v3-app-state[data-status="running"] {
+		color: var(--color-ok, #14ae5c);
+	}
+	.v3-app-state[data-status="broken"] {
+		color: var(--v3-danger);
+	}
+
+	/* ---- the conversation, under the list -------------------------------------------------- */
+
+	.v3-chat {
+		display: flex;
+		min-height: 0;
+		flex: 1 1 0;
+		flex-direction: column;
+		border-top: 1px solid var(--v3-line);
+	}
+	.v3-chat[data-folded="true"] {
+		flex: none;
+		margin-top: auto;
+	}
+	.v3-chat-head {
+		display: flex;
+		height: 44px;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px 0 16px;
+	}
+	.v3-chat-title {
+		display: flex;
+		min-width: 0;
+		align-items: baseline;
+		gap: 8px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+	}
+	.v3-chat-name {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.v3-chat-state {
+		overflow: hidden;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.v3-chat-new {
+		padding: 0 4px;
+		border: 0;
+		background: none;
+		color: var(--v3-accent);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.v3-chat-body {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+	}
+	.v3-chat[data-folded="true"] .v3-chat-body {
+		display: none;
+	}
+
+	/* The conversation itself (`@decks/agent-ui`'s `Stream`), laid flat in the panel. */
+	.v3-chat .stream,
+	.v3-chat .stream[data-shown] {
+		position: static;
+		inset: auto;
+		width: auto;
+		height: auto;
+		max-width: none;
+		min-width: 0;
+		min-height: 0;
+		flex: 1;
+		--gutter: 16px;
+		justify-content: flex-start;
+		overflow: hidden;
+		opacity: 1;
+		pointer-events: auto;
+		translate: none;
+		visibility: visible;
+		resize: none;
+		background: none;
+		box-shadow: none;
+		border: 0;
+		border-radius: 0;
+	}
+	.v3-chat .stream[data-shown] .stream-head {
+		display: none;
+	}
+	.v3-chat .stream[data-shown] .stream-roll {
+		flex: 1 1 auto;
+		gap: 14px;
+		padding: 6px 16px 16px;
+	}
+	.v3-chat .stream[data-shown] .stream-card {
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		box-shadow: none;
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	.v3-chat .stream[data-shown] .stream-mine {
+		--mine: var(--v3-bg3);
+		--mine-fg: var(--v3-fg);
+	}
+	.v3-chat .stream[data-shown] .stream-bubble {
+		max-width: 88%;
+		padding: 8px 12px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-bg3);
+		box-shadow: none;
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	/*
+	 * Rewind and Fork sit under your message as two quiet text buttons, in place of a menu. They
+	 * come up when the pointer is on the message (always, on a touchscreen), so a history of
+	 * questions does not read as a column of controls.
+	 */
+	.v3-chat .stream[data-shown] .stream-acts {
+		gap: 2px;
+		/* Tucked up against the bubble: the message's 6px gap, less 4. */
+		margin-top: -4px;
+	}
+	.v3-chat .stream[data-shown] .stream-act {
+		height: 22px;
+		gap: 4px;
+		padding: 0 7px 0 6px;
+		border-radius: 6px;
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease),
+			opacity 160ms var(--v3-ease);
+	}
+	.v3-chat .stream[data-shown] .stream-act:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		transition-duration: 120ms;
+	}
+	.v3-chat .stream[data-shown] .stream-act:active {
+		background: var(--v3-bg3);
+	}
+	@media (hover: hover) {
+		.v3-chat .stream[data-shown] .stream-mine:not(:hover, :focus-within) .stream-act {
+			opacity: 0;
+		}
+	}
+	.v3-chat .stream[data-shown] .stream-working {
+		padding: 0;
+		border: 0;
+		background: none;
+		box-shadow: none;
+		color: var(--v3-fg2);
+		font-size: 12px;
+	}
+
+	/* The phone's sheet: the same head and turns, over the canvas, out of the composer. */
+	.v3-chat[data-sheet="true"] {
+		position: absolute;
+		z-index: 25;
+		right: 8px;
+		bottom: calc(8px + env(safe-area-inset-bottom) + var(--keyboard));
+		left: 8px;
+		top: calc(76px + env(safe-area-inset-top));
+		border: 0;
+		border-radius: 26px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		overflow: hidden;
+	}
+	.v3-sheet-handle {
+		width: 36px;
+		height: 4px;
+		flex: none;
+		margin: 8px auto 0;
+		border-radius: 2px;
+		background: var(--v3-fg3);
+		opacity: 0.55;
+	}
+	.app[data-phone="true"]:has(.v3-chat[data-sheet="true"]) .dock {
+		z-index: 26;
+	}
+
+	/* ---- the status pill over the composer -------------------------------------------------- */
+
+	.v3-status.float {
+		display: flex;
+		max-width: 100%;
+		height: 34px;
+		align-items: center;
+		align-self: flex-start;
+		gap: 8px;
+		padding: 0 16px 0 12px;
+		border: 0;
+		border-radius: 999px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+	}
+	.v3-status-sign {
+		color: var(--v3-spark);
+		font-size: 15px;
+		animation: v3-spark 2.4s linear infinite;
+	}
+	.v3-status[data-waiting="true"] .v3-status-sign {
+		color: var(--color-warn, #e5a000);
+		animation: none;
+	}
+	@keyframes v3-spark {
+		to {
+			rotate: 360deg;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-status-sign {
+			animation: none;
+		}
+	}
+
+	/* ---- the composer and its queue -------------------------------------------------------- */
+
+	.dock {
+		width: min(620px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
+	}
+	.dock .composer-box {
+		padding: 8px 8px 6px;
+		border: 0;
+		border-radius: 18px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.dock .dock-grip {
+		top: 4px;
+		width: 36px;
+		height: 4px;
+		margin: 0 0 0 -18px;
+		border-radius: 2px;
+		background: var(--v3-fg3);
+		opacity: 0.55;
+	}
+	.dock .dockfield {
+		min-height: 43px;
+		padding: 2px 4px 4px;
+		font-size: 14px;
+	}
+	.dock .dockfield::placeholder,
+	.dock [data-placeholder]::before {
+		color: var(--v3-fg3);
+	}
+	.dock .dock-row {
+		margin-top: 0;
+		gap: 4px;
+	}
+	.dock .dock-row .icon-button {
+		width: 32px;
+		height: 32px;
+		border-radius: 8px;
+		color: var(--v3-fg2);
+	}
+	.dock .dock-row .chip-button {
+		height: 32px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		font-size: 14px;
+	}
+	.dock .dock-row .chip-button:hover,
+	.dock .dock-row .chip-button[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-row .chip-button > svg:first-child:not(:only-child) {
+		display: none;
+	}
+	.dock .send-button {
+		width: 32px;
+		height: 32px;
+		border-radius: 16px;
+		background: var(--v3-accent);
+		color: #ffffff;
+	}
+	.dock .send-button[disabled] {
+		background: var(--v3-bg3);
+		color: var(--v3-fg3);
+	}
+	.dock .send-button[data-stop="true"] {
+		background: var(--v3-danger);
+		color: #ffffff;
+	}
+	.dock .dock-to[data-compact="true"] {
+		margin: 0;
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-chip {
+		height: 32px;
+		gap: 8px;
+		padding: 0 10px 0 8px;
+		border: 0;
+		border-radius: 12px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font-size: 14px;
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-chip:hover,
+	.dock .dock-to[data-compact="true"] .dock-to-chip[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-to[data-compact="true"] .dock-to-name {
+		max-width: 140px;
+		font-size: 14px;
+		font-weight: 400;
+	}
+
+	.dock .composer-queue {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.dock .composer-queue-head {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px 0 4px;
+		color: var(--v3-fg);
+	}
+	.composer-queue-fold.v3-icon {
+		width: 22px;
+		height: 22px;
+		color: var(--v3-fg2);
+	}
+	.composer-queue-title {
+		flex: none;
+		font-size: 12.5px;
+		font-weight: 500;
+	}
+	.composer-queue-note {
+		min-width: 0;
+		color: var(--v3-fg3);
+		font-size: 12px;
+	}
+	.dock .composer-queue-release {
+		flex: none;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--v3-accent);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.dock .composer-queue-row {
+		display: flex;
+		height: 32px;
+		align-items: center;
+		gap: 10px;
+		padding: 0 4px 0 10px;
+		border-radius: 8px;
+	}
+	.dock .composer-queue-head + .composer-queue-row,
+	.dock .composer-queue-row:hover {
+		background: var(--v3-bg2);
+	}
+	.dock .composer-queue-n {
+		width: auto;
+		height: auto;
+		min-width: 0;
+		border-radius: 0;
+		background: none;
+		color: var(--v3-fg3);
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+	}
+	.dock .composer-queue-text {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		color: var(--v3-fg);
+		font-size: 13px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dock .composer-queue-row .icon-button {
+		width: 26px;
+		height: 26px;
+		color: var(--v3-fg2);
+		opacity: 0;
+	}
+	.dock .composer-queue-head + .composer-queue-row .icon-button,
+	.dock .composer-queue-row:hover .icon-button,
+	.dock .composer-queue-row:focus-within .icon-button {
+		opacity: 1;
+	}
+
+	/* ---- the pen tray ---------------------------------------------------------------------- */
+
+	.v3-tray-wrap {
+		position: absolute;
+		z-index: var(--z-float, 30);
+		top: 68px;
+		left: calc(var(--inset-left, 0px) + 66px);
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+	.app[data-phone="true"] .v3-tray-wrap {
+		top: calc(76px + env(safe-area-inset-top));
+		left: 8px;
+		right: 8px;
+		overflow-x: auto;
+	}
+	.v3-tray.float {
+		--tray-body: #f7f7f7;
+		--tray-edge: #c9c9c9;
+		display: flex;
+		height: 96px;
+		align-items: center;
+		gap: 8px;
+		padding: 0 12px 0 6px;
+		overflow: hidden;
+		border: 0;
+		border-radius: 20px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	[data-color-scheme="dark"] .v3-tray.float {
+		--tray-body: #e8e8e8;
+		--tray-edge: #9a9a9a;
+	}
+	.v3-tray-grip {
+		display: grid;
+		width: 14px;
+		height: 30px;
+		flex: none;
+		grid-template-columns: repeat(2, 3px);
+		gap: 2px;
+		place-content: center;
+	}
+	.v3-instruments {
+		display: flex;
+		height: 96px;
+		align-items: flex-start;
+		gap: 12px;
+		padding: 0 4px;
+	}
+	.v3-instrument {
+		width: 26px;
+		height: 90px;
+		flex: none;
+		margin-top: 22px;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		transition: margin-top 160ms ease;
+	}
+	.v3-instrument[data-on="true"] {
+		margin-top: 8px;
+	}
+	.v3-instrument:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: 2px;
+		border-radius: 6px;
+	}
+	.v3-tray-sep {
+		width: 1px;
+		height: 56px;
+		flex: none;
+		background: var(--v3-line);
+	}
+	.v3-wheel {
+		position: relative;
+		width: 34px;
+		height: 34px;
+		flex: none;
+		border-radius: 50%;
+		background: conic-gradient(#f24822, #e5a000, #14ae5c, #2563eb, #7c3aed, #ec4899, #f24822);
+	}
+	.v3-wheel::before {
+		position: absolute;
+		inset: 5px;
+		border-radius: 50%;
+		background: var(--v3-panel);
+		content: "";
+	}
+	.v3-wheel::after {
+		position: absolute;
+		inset: 8px;
+		border-radius: 50%;
+		background: var(--current);
+		content: "";
+	}
+	.v3-swatches {
+		display: grid;
+		grid-template-columns: repeat(3, 22px);
+		gap: 6px;
+	}
+	.v3-swatches[data-off="true"] {
+		opacity: 0.35;
+	}
+	.v3-swatch {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		cursor: pointer;
+	}
+	.v3-swatch::before {
+		width: 17px;
+		height: 17px;
+		border-radius: 50%;
+		background: var(--swatch);
+		box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 15%);
+		content: "";
+	}
+	.v3-swatch[data-on="true"] {
+		box-shadow: 0 0 0 1.5px var(--v3-fg);
+	}
+	.v3-tray-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.v3-tray-actions .v3-icon {
+		width: 30px;
+		height: 30px;
+	}
+	.v3-widths.float {
+		display: flex;
+		width: 280px;
+		gap: 4px;
+		padding: 8px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.v3-width {
+		display: grid;
+		height: 34px;
+		flex: 1;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		cursor: pointer;
+	}
+	.v3-width[data-on="true"] {
+		background: var(--v3-bg2);
+		box-shadow: inset 0 0 0 1.5px var(--v3-accent);
+	}
+	.v3-width > span {
+		display: block;
+		width: 22px;
+		border-radius: 4px;
+	}
+
+	/* ---- the properties panel -------------------------------------------------------------- */
+
+	.props-panel.panel-float {
+		top: 68px;
+		right: 12px;
+		width: 272px;
+		border: 0;
+		border-radius: 16px;
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+	.props-panel .props-head {
+		padding: 10px 10px 10px 14px;
+		border-bottom-color: var(--v3-line);
+	}
+	.props-panel .props-title {
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.props-panel .props-sec {
+		border-top-color: var(--v3-line);
+	}
+	.props-panel .field {
+		height: 28px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+	}
+
+	/* ---- present: the canvas alone ---------------------------------------------------------- */
+
+	.app[data-presenting="true"] :is(.v3-chat[data-sheet="true"], .notices) {
+		display: none !important;
+	}
+
+	/* ---- a phone ------------------------------------------------------------------------------ */
+
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		top: calc(8px + env(safe-area-inset-top));
+		right: 8px;
+		left: 8px;
+		width: auto;
+		height: 52px;
+		padding: 0 8px 0 6px;
+		border-radius: 20px;
+	}
+	.app[data-phone="true"] .v3-topbar [data-phone-hide] {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-chip {
+		height: 36px;
+		border-radius: 12px;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-agent-name {
+		max-width: 96px;
+		font-size: 15px;
+	}
+	.app[data-phone="true"] .v3-topbar .v3-canvas-name {
+		max-width: 96px;
+		font-size: 15px;
+	}
+	/* The phone's `⋯`: the top-right menu, standing at the right end of the one bar. */
+	.v3-phone-more {
+		position: absolute;
+		z-index: 21;
+		top: calc(8px + env(safe-area-inset-top) + 10px);
+		right: 16px;
+	}
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		padding-right: 48px;
+	}
+	.app[data-phone="true"] .dock {
+		right: 8px;
+		left: 8px;
+		width: auto;
+		transform: none;
+	}
+	.app[data-phone="true"] .props-panel.panel-float {
+		top: auto;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		width: auto;
+		/* The bottom 42% of the screen, as the iPhone properties screen has it: what is selected stays in sight above. */
+		max-height: 42%;
+		border-radius: 26px 26px 0 0;
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+	.app[data-phone="true"] .panel-shell.v3-panel {
+		width: min(86vw, 340px) !important;
+		padding-top: env(safe-area-inset-top);
+	}
+
+	/* A touch screen: bigger targets in the bars, as the iPad screens draw them. */
+	@media (pointer: coarse) {
+		.v3-bar.float.pill {
+			height: 52px;
+			border-radius: 20px;
+		}
+		.v3-icon {
+			width: 36px;
+			height: 36px;
+		}
+		.v3-agent-chip,
+		.v3-canvas-chip {
+			height: 36px;
+		}
+		.pen-tools.v3-tools:not([data-row="true"]) {
+			top: 76px;
+			width: 54px;
+			border-radius: 20px;
+		}
+		.v3-tools:not([data-row="true"]) .v3-tool {
+			width: 44px;
+			height: 44px;
+			border-radius: 10px;
+		}
+		.v3-tray-wrap {
+			top: 76px;
+			left: calc(var(--inset-left, 0px) + 74px);
+		}
+		.props-panel.panel-float {
+			top: 76px;
+		}
+	}
+}
+
+@layer components {
+	.dock .dock-row .chip-sub {
+		color: var(--v3-fg2);
+		font-size: 13px;
+	}
+	/* A phone's composer row: the agent, attach, the model and the mic, as the iPhone screens have it. */
+	.app[data-phone="true"] .dock [data-mode-chip],
+	.app[data-phone="true"] .dock .dock-row .chip-sub {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-deck .switcher-name {
+		display: none;
+	}
+	.app[data-phone="true"] .v3-tools[data-row="true"] {
+		gap: 0;
+		padding: 0 4px;
+	}
+	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-tool {
+		width: 38px;
+		height: 40px;
+	}
+	.app[data-phone="true"] .v3-tools[data-row="true"] .v3-rule {
+		margin: 0 1px;
+	}
+}
+
+@layer components {
+	/* On a phone the open panel pushes the canvas aside, and the bars over it go with it. */
+	.app[data-phone="true"] .v3-topbar.float.pill {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 8px);
+		width: calc(100vw - 16px);
+		transition: left 200ms ease;
+	}
+	.app[data-phone="true"] .v3-phone-more {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 100vw - 52px);
+		transition: left 200ms ease;
+	}
+	.app[data-phone="true"] .dock {
+		right: auto;
+		left: calc(var(--inset-left, 0px) + 8px);
+		width: calc(100vw - 16px);
+		transition: left 200ms ease;
+	}
+}
+
+
+/* ===========================================================================================
+ * Motion, rebuilt from the mockup (assets/harness-v3-mock): one system for every v3 control.
+ *
+ *   Hover is a wash: 120 ms in, 200 ms out, nothing moves. Press is a 0.96 squeeze for 90 ms.
+ *   The tool in hand and the panel's tab are one marker each that slides on a spring.
+ *   Menus grow out of the edge they hang from in 160 ms and shrink back in 90 ms.
+ *   Working breathes: a halo swells from the face and fades, every 1.6 s.
+ *   The floats (tools, composer, pen tray) keep their drag, fling and tuck; nothing here
+ *   transitions their position while they are held or flung.
+ * ======================================================================================== */
+body {
+	--v3-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--v3-ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--v3-spring: cubic-bezier(0.3, 1.32, 0.55, 1);
+}
+
+@layer components {
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row, .v3-folder-toggle, .composer-queue-release, .v3-new-agent.new-agent),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button),
+	.v3-panel .agent-list .agent-row {
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease),
+			box-shadow 200ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-nav-tab, .v3-zoom-value, .v3-app-row),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip),
+	.v3-panel .agent-list .agent-row {
+		&:hover {
+			transition-duration: 120ms, 120ms, 120ms, 90ms;
+		}
+	}
+	:is(.v3-icon, .v3-tool, .v3-agent-chip, .v3-canvas-chip, .v3-zoom-value),
+	.dock .dock-row :is(.chip-button, .icon-button, .dock-to-chip, .send-button) {
+		&:active {
+			transform: scale(0.96);
+		}
+	}
+
+	/* ---- the tool in hand: one marker that slides ---------------------------------------- */
+	.v3-tools {
+		position: absolute;
+	}
+	.v3-tools[data-row="true"] {
+		position: relative;
+	}
+	.v3-tool-mark {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 36px;
+		height: 36px;
+		border-radius: 8px;
+		background: var(--v3-accent);
+		box-shadow: 0 2px 8px color-mix(in srgb, var(--v3-accent) 30%, transparent);
+		pointer-events: none;
+		transition:
+			transform 300ms var(--v3-spring),
+			width 300ms var(--v3-spring),
+			height 300ms var(--v3-spring),
+			opacity 160ms var(--v3-ease);
+	}
+	.v3-tool-mark[data-shown="false"],
+	.v3-tool-mark:not([data-shown]) {
+		opacity: 0;
+	}
+	.v3-tools .v3-tool {
+		position: relative;
+		z-index: 1;
+	}
+	.v3-tools .v3-tool[data-on="true"],
+	.v3-tools .v3-tool[data-on="true"]:where([data-tool="pen"], [data-tool="shape"], [data-tool="arrow"], [data-tool="board"]) {
+		background: transparent;
+		color: #ffffff;
+	}
+	.v3-tools .v3-tool[data-on="true"]:hover {
+		background: transparent;
+	}
+	.v3-tools .v3-tool[data-open="true"]:not([data-on="true"]) {
+		background: var(--v3-bg3);
+	}
+	.v3-tool[data-family]::after {
+		transition: transform 200ms var(--v3-ease);
+	}
+	.v3-tool[data-open="true"]::after {
+		transform: translate(1px, 1px);
+	}
+	@media (pointer: coarse) {
+		.v3-tool-mark {
+			border-radius: 10px;
+		}
+	}
+
+	/* ---- the panel's tab: the same, along the strip --------------------------------------- */
+	.v3-nav {
+		position: relative;
+	}
+	.v3-nav-mark {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 30px;
+		border-radius: 8px;
+		background: var(--v3-accent-soft);
+		pointer-events: none;
+		transition:
+			transform 280ms var(--v3-spring),
+			width 280ms var(--v3-spring);
+	}
+	.v3-nav-tab {
+		position: relative;
+		z-index: 1;
+	}
+	.v3-nav-tab[data-on="true"],
+	.v3-nav-tab:hover {
+		background: transparent;
+	}
+	.v3-nav-tab:not([data-on="true"]):hover {
+		color: var(--v3-fg);
+	}
+
+	/* ---- menus grow out of their edge ------------------------------------------------------ */
+	.v3-menu {
+		opacity: 0;
+		transform: scale(0.96);
+		transform-origin: left top;
+		transition:
+			opacity 90ms var(--v3-ease-in),
+			transform 90ms var(--v3-ease-in);
+		pointer-events: none;
+	}
+	.v3-menu[data-above="true"] {
+		transform-origin: left bottom;
+	}
+	.v3-menu[data-open="true"] {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+		transition:
+			opacity 140ms var(--v3-ease),
+			transform 180ms var(--v3-ease);
+	}
+	.v3-menu-row {
+		transition: none;
+	}
+	.popover[data-placed] {
+		animation: v3-pop 170ms var(--v3-ease);
+		transform-origin: top center;
+	}
+	.popover[data-placed][data-side="above"] {
+		transform-origin: bottom center;
+	}
+	.popover[data-placed][data-side="beside"] {
+		transform-origin: left top;
+	}
+	@keyframes v3-pop {
+		from {
+			opacity: 0;
+			transform: scale(0.96);
+		}
+	}
+
+	/* ---- tooltips ---------------------------------------------------------------------------- */
+	.v3-tip {
+		position: fixed;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 5px 8px;
+		border-radius: 6px;
+		background: var(--v3-ink);
+		color: var(--v3-ink-fg);
+		font: 12px/1.3 var(--font-sans);
+		white-space: nowrap;
+		pointer-events: none;
+		opacity: 0;
+		transform: translateY(-2px);
+		transition:
+			opacity 120ms var(--v3-ease),
+			transform 160ms var(--v3-ease);
+	}
+	.v3-tip[data-side="right"] {
+		transform: translateX(-3px);
+	}
+	.v3-tip[data-shown="true"] {
+		opacity: 1;
+		transform: none;
+	}
+	.v3-tip[data-warm="true"] {
+		transition:
+			opacity 60ms,
+			left 120ms var(--v3-ease),
+			top 120ms var(--v3-ease);
+	}
+	.v3-tip-key {
+		color: var(--v3-ink-key);
+		font: 11px var(--font-mono);
+	}
+
+	/* ---- agent rows: the time gives way to the row's actions on approach -------------------- */
+	.v3-panel .agent-list .agent-row :is(.agent-tagbtn, .close) {
+		transition:
+			opacity 160ms var(--v3-ease),
+			transform 200ms var(--v3-ease);
+	}
+	.v3-panel .agent-list .agent-row:not(:hover, :focus-within) :is(.agent-tagbtn, .close) {
+		transform: translateX(4px);
+	}
+
+	/* ---- folders fold by their height ------------------------------------------------------- */
+	.v3-folder-chev {
+		transition: transform 220ms var(--v3-ease);
+	}
+
+	/* ---- the floats: transitions only while they stand at home, never while held or flung --- */
+	.pen-tools.v3-tools:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--v3-ease);
+	}
+	.v3-tray-wrap:not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition: left 260ms var(--v3-ease);
+	}
+	.v3-tray-wrap {
+		--stowtab-w: 20px;
+		--stowtab-h: 48px;
+	}
+	.v3-tray-wrap[data-stowed] > :not(.stowtab) {
+		opacity: 0;
+		pointer-events: none;
+	}
+	.v3-tray-grip {
+		cursor: grab;
+		touch-action: none;
+	}
+	[data-dragging="true"] .v3-tray-grip {
+		cursor: grabbing;
+	}
+
+	/* ---- the pen tray: instruments rise on a spring ----------------------------------------- */
+	.v3-instrument {
+		margin-top: 22px;
+		transition: transform 320ms var(--v3-spring);
+	}
+	.v3-instrument:hover {
+		transform: translateY(-5px);
+	}
+	.v3-instrument[data-on="true"] {
+		transform: translateY(-14px);
+	}
+	.v3-swatch::before {
+		transition: transform 200ms var(--v3-spring);
+	}
+	.v3-swatch:hover::before {
+		transform: scale(1.12);
+	}
+	.v3-swatch {
+		position: relative;
+	}
+	.v3-swatch[data-on="true"] {
+		box-shadow: none;
+	}
+	.v3-swatch::after {
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		box-shadow: 0 0 0 1.5px var(--v3-fg);
+		content: "";
+		opacity: 0;
+		transform: scale(0.7);
+		transition:
+			opacity 160ms var(--v3-ease),
+			transform 260ms var(--v3-spring);
+	}
+	.v3-swatch[data-on="true"]::after {
+		opacity: 1;
+		transform: none;
+	}
+	.v3-wheel {
+		transition: transform 300ms var(--v3-spring);
+	}
+	.v3-tray-wrap {
+		animation: v3-grow 220ms var(--v3-ease);
+		transform-origin: left top;
+	}
+	.v3-widths.float {
+		animation: v3-grow 200ms var(--v3-ease);
+	}
+	@keyframes v3-grow {
+		from {
+			opacity: 0;
+			transform: translateX(-8px) scale(0.97);
+		}
+	}
+
+	/* ---- the properties panel slides in once, for a new selection -------------------------- */
+	.props-panel.panel-float {
+		animation: v3-slide 220ms var(--v3-ease);
+	}
+	@keyframes v3-slide {
+		from {
+			opacity: 0;
+			transform: translateX(12px);
+		}
+	}
+
+	/* ---- the status pill pops from the composer --------------------------------------------- */
+	.v3-status.float {
+		transform-origin: left bottom;
+		animation: v3-pill 300ms var(--v3-spring);
+		transition:
+			box-shadow 200ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	.v3-status.float:hover {
+		box-shadow: 0 8px 28px rgb(0 0 0 / 16%), 0 0 0 0.5px rgb(0 0 0 / 12%);
+	}
+	.v3-status.float:active {
+		transform: scale(0.97);
+	}
+	@keyframes v3-pill {
+		from {
+			opacity: 0;
+			transform: translateY(8px) scale(0.9);
+		}
+	}
+
+	/* ---- the queue: rows hand over their actions on approach ------------------------------- */
+	.dock .composer-queue-row .icon-button {
+		transition:
+			opacity 160ms var(--v3-ease),
+			background-color 200ms var(--v3-ease);
+	}
+	.dock .composer-queue {
+		animation: v3-arrive 240ms var(--v3-ease);
+	}
+	.dock .composer-queue-body {
+		display: grid;
+		grid-template-rows: 1fr;
+		transition: grid-template-rows 240ms var(--v3-ease);
+	}
+	.dock .composer-queue[data-folded="true"] .composer-queue-body {
+		grid-template-rows: 0fr;
+	}
+	.dock .composer-queue-body > div {
+		min-height: 0;
+		overflow: hidden;
+	}
+	.composer-queue-fold svg {
+		transition: transform 220ms var(--v3-ease);
+	}
+	.dock .composer-queue[data-folded="true"] .composer-queue-fold svg {
+		transform: rotate(-90deg);
+	}
+	@keyframes v3-arrive {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+	}
+
+	/* ---- the composer: the send button turns into stop and back ---------------------------- */
+	.dock .send-button {
+		transition:
+			background-color 220ms var(--v3-ease),
+			color 220ms var(--v3-ease),
+			transform 90ms var(--v3-ease);
+	}
+	.dock .composer-box {
+		transition: box-shadow 200ms var(--v3-ease);
+	}
+	.dock .composer-box:focus-within {
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 16%),
+			0 0 0 0.5px rgb(0 0 0 / 12%),
+			0 0 0 1px color-mix(in srgb, var(--v3-accent) 22%, transparent);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.v3-tool-mark,
+		.v3-nav-mark,
+		.v3-menu,
+		.v3-tip,
+		.v3-instrument,
+		.dock .composer-queue-body {
+			transition: none;
+		}
+		.popover[data-placed],
+		.v3-tray-wrap,
+		.props-panel.panel-float,
+		.v3-status.float,
+		.dock .composer-queue {
+			animation: none;
+		}
+	}
+}
+
+@layer components {
+	.v3-instrument[data-on="true"] {
+		margin-top: 22px;
+	}
+}
+
+/* ---- step 3: the side panel ---------------------------------------------------------------- */
+@layer components {
+	/* A workspace folds by its height and turns its chevron, rather than its rows vanishing. */
+	.v3-folder-body {
+		display: grid;
+		grid-template-rows: 1fr;
+		transition: grid-template-rows 240ms var(--v3-ease);
+	}
+	.v3-folder-body[data-open="false"] {
+		grid-template-rows: 0fr;
+	}
+	.v3-folder-body > * {
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	/* A tab's list rises in when the tab changes; rows that are already there stay put. */
+	.v3-panel .panel-list > :is(.panel-section, .v3-apps, .v3-new-agent) {
+		animation: v3-arrive 220ms var(--v3-ease);
+	}
+
+	/*
+	 * The conversation folds by its share of the panel: open it takes the room the list leaves,
+	 * folded it gives that room back and comes to rest at the panel's foot. Its body stays
+	 * mounted, clipped, so nothing in it is redrawn by a fold, and its history is held at the
+	 * bottom while it moves (`App.tsx`, `holdHistory`).
+	 */
+	.v3-chat,
+	.v3-chat[data-folded="true"] {
+		flex: 1 1 44px;
+		margin-top: auto;
+		overflow: hidden;
+		transition: flex-grow 260ms var(--v3-ease);
+	}
+	.v3-chat[data-folded="true"] {
+		flex-grow: 0.00001;
+	}
+	.v3-chat[data-folded="true"] .v3-chat-body {
+		display: flex;
+	}
+	.v3-chat-head .v3-icon svg {
+		transition: transform 220ms var(--v3-ease);
+	}
+	.v3-chat-new {
+		animation: v3-arrive 220ms var(--v3-ease);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-folder-body,
+		.v3-chat {
+			transition: none;
+		}
+		.v3-panel .panel-list > *,
+		.v3-chat-new {
+			animation: none;
+		}
+	}
+}
+
+/* ---- step 4: the composer ------------------------------------------------------------------ */
+@layer components {
+	/* The context dial in the controls row: a ring and its percentage, on a desk and an iPad; a phone keeps it in ⋯. */
+	.dock .composer-ctx {
+		display: inline-flex;
+		align-items: center;
+	}
+	.dock .composer-ctx .dial {
+		height: 32px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--v3-fg2);
+		font: 11.5px var(--font-mono);
+		transition:
+			background-color 200ms var(--v3-ease),
+			color 200ms var(--v3-ease);
+	}
+	.dock .composer-ctx .dial:hover,
+	.dock .composer-ctx .dial[aria-expanded="true"] {
+		background: var(--v3-bg3);
+		color: var(--v3-fg);
+		transition-duration: 120ms;
+	}
+	.dock .composer-ctx .ctx-ring .fill {
+		transition: stroke-dasharray 600ms var(--v3-ease);
+	}
+	.app[data-phone="true"] .dock .composer-ctx {
+		display: none;
+	}
+}
+
+/* ---- step 6: iPad and iPhone ---------------------------------------------------------------- */
+@layer components {
+	/* The phone's sheet leaves quicker than it came, down into the composer. */
+	.v3-chat[data-sheet="true"][data-leaving="true"] {
+		animation: v3-sheet-out 200ms var(--v3-ease-in) forwards;
+		pointer-events: none;
+	}
+	@keyframes v3-sheet-out {
+		to {
+			opacity: 0;
+			transform: translateY(30%) scale(0.94);
+		}
+	}
+	/* The phone's properties rise as a sheet. */
+	.app[data-phone="true"] .props-panel.panel-float {
+		animation: v3-sheet-in 300ms var(--v3-ease);
+	}
+	@keyframes v3-sheet-in {
+		from {
+			transform: translateY(100%);
+		}
+	}
+	/* A narrow screen that is not a phone (an iPad upright) gives the zoom bar's corner to the composer. */
+	@media (max-width: 900px) {
+		.app:not([data-phone="true"]) .v3-zoom {
+			display: none;
+		}
+		.app:not([data-phone="true"]) .dock {
+			width: min(620px, calc(100% - var(--inset-left, 0px) - 120px));
+		}
+	}
+	/* The phone's tool row carries the same marker as the column. */
+	.v3-tools[data-row="true"] .v3-tool-mark {
+		border-radius: 12px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-chat[data-sheet="true"][data-leaving="true"],
+		.app[data-phone="true"] .props-panel.panel-float {
+			animation: none;
+		}
+	}
+}
+
+@layer components {
+	/* The phone's row sits in the composer's stack: none of the column's place applies to it. */
+	.pen-tools.v3-tools[data-row="true"] {
+		position: relative;
+		top: auto;
+		left: auto;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* ---- step 7: the mark, and Present -------------------------------------------------------- */
+@layer components {
+	/* Present: the chrome steps out to its edges instead of vanishing. */
+	/* Only opacity and translate: a float's position is the float's own, and never eased while it is held or flung. */
+	.app :is(.v3-topright, .v3-zoom) {
+		transition:
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app .v3-topbar {
+		transition:
+			left 260ms var(--v3-ease),
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app :is(.pen-tools.v3-tools, .dock):not([data-floating], [data-stowed], [data-dragging], [data-snapping], [data-landing]) {
+		transition:
+			left 260ms var(--v3-ease),
+			opacity 200ms var(--v3-ease),
+			translate 260ms var(--v3-ease);
+	}
+	.app[data-presenting="true"] :is(.v3-topbar, .pen-tools.v3-tools, .v3-tray-wrap) {
+		opacity: 0;
+		translate: -16px 0;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] :is(.v3-topright, .v3-zoom, .props-panel) {
+		opacity: 0;
+		translate: 16px 0;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] .dock {
+		opacity: 0;
+		translate: 0 16px;
+		pointer-events: none;
+	}
+	.app[data-presenting="true"] .panel-shell {
+		display: none !important;
+	}
+}
+
+@layer components {
+	/*
+	 * A float's glide after a flick or a drop is the float system's own transition (`[data-snapping]`,
+	 * `shell.css`): nothing in this sheet may override it, and nothing eases a float's position while
+	 * it is held. The tray glides as the tools and the composer do.
+	 */
+	.v3-tray-wrap[data-snapping="true"],
+	.pen-tools.v3-tools[data-snapping="true"],
+	.dock[data-snapping="true"] {
+		transition:
+			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
+			bottom var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+	.pen-tools.v3-tools[data-dragging="true"],
+	.v3-tray-wrap[data-dragging="true"],
+	.dock[data-dragging="true"] {
+		transition: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-tray-wrap[data-snapping="true"],
+		.pen-tools.v3-tools[data-snapping="true"],
+		.dock[data-snapping="true"] {
+			transition-duration: 0s;
+		}
+	}
+}
+
+@layer components {
+	.pen-tools.v3-tools[data-landing="true"],
+	.v3-tray-wrap[data-landing="true"] {
+		transition: none;
+	}
+}
+
+@layer components {
+	/*
+	 * Tucked behind an edge, a float is only its tab: the column's own surface goes with its tools,
+	 * so what is left showing is the tab and not a strip of the column cut to the tab's width.
+	 */
+	.pen-tools.v3-tools[data-stowed] {
+		overflow: visible;
+		background: transparent;
+		box-shadow: none;
+	}
+	.pen-tools.v3-tools[data-stowed] > .v3-tool-mark {
+		opacity: 0;
+	}
+}
+
+/* ---- the composer's mode and model chips, as Studio draws them ------------------------------ */
+@layer components {
+	/*
+	 * Plain words on one line: the mode capitalised at the ordinary weight ("Auto"), the model in the
+	 * text colour and its thinking after a dot in grey ("Opus 5.5 · medium"), both on the same
+	 * baseline, with a small grey chevron. No tint or bold for a standing mode: the word says it.
+	 */
+	.dock .dock-row .chip-button,
+	.dock .dock-row .chip-button[data-on="true"],
+	.dock .composer-box .chip-button[data-on="true"] {
+		display: inline-flex;
+		height: 32px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg2);
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1;
+	}
+	.dock .dock-row .chip-button:hover,
+	.dock .dock-row .chip-button[aria-expanded="true"] {
+		background: var(--v3-bg3);
+	}
+	.dock .dock-row .chip-button > span:not(.chip-sub) {
+		color: var(--v3-fg);
+		line-height: 1;
+	}
+	.dock .dock-row [data-mode-chip] > span:not(.chip-sub)::first-letter {
+		text-transform: uppercase;
+	}
+	.dock .dock-row .chip-button > .chip-sub {
+		color: color-mix(in srgb, var(--v3-fg2) 55%, var(--v3-fg3));
+		font-size: 13px;
+		line-height: 1;
+	}
+	.dock .dock-row .chip-button > .chevron {
+		width: 12px;
+		height: 12px;
+		color: var(--v3-fg2);
+		opacity: 1;
+	}
+}
+
+/* ---- the conversation's height is the person's ------------------------------------------- */
+@layer components {
+	.v3-chat {
+		position: relative;
+	}
+	/* The line between the list and the conversation, as something to take hold of. */
+	.v3-chat-resize {
+		position: absolute;
+		z-index: 2;
+		top: -4px;
+		right: 0;
+		left: 0;
+		height: 9px;
+		cursor: row-resize;
+		touch-action: none;
+	}
+	/* A full-width line in the accent on approach, as the sidebar's own edge is. */
+	.v3-chat-resize::after {
+		position: absolute;
+		top: 3px;
+		right: 0;
+		left: 0;
+		height: 2px;
+		background: var(--v3-accent);
+		content: "";
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+	.v3-chat-resize:hover::after,
+	.v3-chat-resize:focus-visible::after,
+	.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+		opacity: 1;
+	}
+	.v3-chat-resize:focus-visible {
+		outline: none;
+	}
+	/* Sized by hand: the conversation keeps that height, folds from it, and the list takes the rest. */
+	.panel-shell[data-chat-sized] .v3-chat {
+		flex: 0 0 var(--v3-chat-h);
+		transition: flex-basis 260ms var(--v3-ease);
+	}
+	.panel-shell[data-chat-sized] .v3-chat[data-folded="true"] {
+		flex-basis: 44px;
+	}
+	.panel-shell[data-chat-sized] .panel-list,
+	.v3-panel[data-chat-sized]:has(.v3-chat:not([data-folded="true"])) .panel-list {
+		flex: 1 1 auto;
+		max-height: none;
+	}
+	.panel-shell[data-chat-resizing] .v3-chat {
+		transition: none;
+	}
+	.panel-shell[data-chat-resizing] {
+		cursor: row-resize;
+		user-select: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.panel-shell[data-chat-sized] .v3-chat {
+			transition: none;
+		}
+	}
+}
+
+/* ---- a narrow panel: the strip and the search fit whatever width the panel is dragged to ---- */
+@layer components {
+	.panel-shell.v3-panel {
+		container: v3-panel / inline-size;
+	}
+	.v3-nav {
+		min-width: 0;
+		overflow: hidden;
+	}
+	.v3-nav-tab {
+		min-width: 0;
+		flex: 0 1 auto;
+	}
+	@container v3-panel (max-width: 290px) {
+		.v3-nav-tab > svg {
+			display: none;
+		}
+		.v3-search .v3-kbd {
+			display: none;
+		}
+	}
+	@container v3-panel (max-width: 220px) {
+		.v3-nav {
+			padding-right: 8px;
+			padding-left: 8px;
+		}
+		.v3-nav-tab {
+			padding: 0 8px;
+		}
+	}
+}
+
+@layer components {
+	/* A ⋯ row that is a setting carries its tick at the end, in the accent. */
+	.v3-more-check {
+		display: grid;
+		flex: none;
+		place-items: center;
+		color: var(--v3-accent);
+	}
+	.popover [data-row][disabled] {
+		opacity: 0.45;
+		pointer-events: none;
+	}
+}
+
+@layer components {
+	/* v3's agent face: 24px, in a 24px slot. */
+	.v3-panel .agent-list .agent-row .row-icon {
+		width: 24px;
+		min-width: 24px;
+	}
+}

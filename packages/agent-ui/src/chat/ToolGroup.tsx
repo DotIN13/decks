@@ -14,9 +14,7 @@ import { ToolChip } from "./ToolChip.tsx";
  * tested.
  *
  * **The slots arrive decided**, from `chat/turn-cards.ts`, rather than being worked out here.
- * The grouping is not this component's opinion and is not only this component's business: a
- * mirror board draws the same rows, and it cannot import a `toolSlots` this file happens to
- * call. So the fold runs once, in the module both surfaces are handed, and both draw it.
+ * The grouping is not this component's opinion, so the fold runs once, in its own module.
  *
  * Not a card of its own. A turn that edited three files is *one* object in the column
  * however many calls it made, so these rows sit inside the agent's card with the reply,

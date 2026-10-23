@@ -6,9 +6,7 @@ import { turnCards } from "./turn-cards.ts";
 /**
  * The fold both surfaces draw: a message is a card, a turn is the parts inside one.
  *
- * Worth its own file because the rule is *shared* — the column renders these cards and a
- * mirror board is handed them — so the interesting cases are the ones where the two could
- * disagree about what the conversation contains. One of them already did.
+ * Worth its own file because the folds are the part worth asserting.
  */
 
 const ask = (id: string, text: string, entryId?: string): ChatItem => ({ kind: "user", id, text, at: 0, ...(entryId ? { entryId } : {}) });
@@ -63,12 +61,8 @@ test("a run of finished calls is one slot carrying its own names", () => {
 });
 
 /*
- * The case the mirror board's own copy of this fold got wrong.
- *
- * A turn that has finished and whose only content is thinking said nothing. The column drops
- * it; the copy kept it, so the same conversation had a row in a mirror that was nowhere in the
- * column. Asserted here rather than only over the wire, because it is what a second
- * implementation of the rule cost.
+ * A turn that has finished and whose only content is thinking said nothing, and the column
+ * drops it.
  */
 test("a finished turn with nothing but thinking is not a card", () => {
 	assert.deepEqual(turnCards([ask("u", "go"), say("s", "", { thinking: "…thinking it over…" })]).map((card) => card.kind), ["mine"]);

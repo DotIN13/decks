@@ -11,7 +11,7 @@
 import { sidePoint, type ArrowSide, type Op } from "@decks/pen";
 import { Show } from "solid-js";
 import { canvasHost } from "../../host.ts";
-import { insertPanel, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
+import { insertPanel, penArrowStyle, penIcon, penShape, setInsertPanel, setPenTool } from "../../state/pen-tools.ts";
 import { newCard } from "../../pen/card-frame.ts";
 import { Insert } from "../../pen/Insert.tsx";
 import type { Box } from "../../pen/snap.ts";
@@ -103,7 +103,7 @@ export function createInsertMenu(editor: Editor, text: TextEditing, host: Insert
 					const made = newArrowEnds(startJoin, joinAt(end), at, end, moved);
 					if (!made) return void editor.setDraft(undefined);
 					const { from, to } = made;
-					host.edit([arrowInsertOp(id, from, to)]);
+					host.edit([arrowInsertOp(id, from, to, penArrowStyle())]);
 					keepDraftFor(id);
 					editor.selectMade([id]);
 					return;

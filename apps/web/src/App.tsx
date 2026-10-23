@@ -5,7 +5,6 @@ import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
-import Sun from "lucide-solid/icons/sun";
 import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
@@ -37,7 +36,6 @@ import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
-import { InkBar } from "@decks/canvas/host";
 import { PenBar } from "@decks/canvas/host";
 import { setPenTool } from "@decks/canvas/tools";
 import { pageKey } from "./chat/composer/parked.ts";
@@ -54,19 +52,25 @@ import { mintBoardToken } from "./board/board-token.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
-import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
-import { AgentPill } from "./agents/AgentPill.tsx";
 import { StageManager } from "./canvas/StageManager.tsx";
 import { stageOf, stages, viewOnly } from "./state/stages.ts";
-import { Corner } from "./chrome/Corner.tsx";
+import Eraser from "lucide-solid/icons/eraser";
+import { ToolColumn } from "./v3/ToolColumn.tsx";
+import { PenTray } from "./v3/PenTray.tsx";
+import { TopBar } from "./v3/TopBar.tsx";
+import { TopRight } from "./v3/TopRight.tsx";
+import { ZoomBar } from "./v3/ZoomBar.tsx";
+import { ChatSection, StatusPill } from "./v3/ChatSection.tsx";
+import { installTooltips } from "./v3/tooltip.ts";
+import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
-import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
+import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
 import {boxOf, fitInto, keepVisible, middleOf} from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
-import {historyShown, setInspectable} from "./state/edge.ts";
+import { closeHistory, setInspectable } from "./state/edge.ts";
 import { canvasBox, insets, watchInsets } from "@decks/canvas/camera";
 import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
@@ -287,7 +291,6 @@ export function App() {
 	/** How much of a put-away composer still shows: the tab that brings it back. */
 	const STOW_TAB = 36;
 	let unstowComposer = () => {};
-	let streamEl: HTMLElement | undefined;
 	/*
 	 * The canvas column the floats may move in. The insets come from the signal, not from
 	 * the `--inset-*` variables: the variables are written after the signal settles, so an
@@ -408,20 +411,6 @@ export function App() {
 		}
 		onCleanup(() => float.dispose());
 	});
-	const mountStreamFloat = (head: HTMLDivElement) => {
-		const stream = streamEl ?? (head.closest(".stream") as HTMLElement | null);
-		if (!stream) return;
-		const float = mountFloat(stream, "conversation", head, "button, a", () => {
-			const box = workBox();
-			// The panel's own CSS: `right: 12px`, `top: 64px` (the gutter is 0 once it is a panel).
-			return { x: box.x + box.w - stream.offsetWidth - 12, y: 64 };
-		}, "top");
-		createEffect(() => {
-			insets();
-			float.restore();
-		});
-		onCleanup(() => float.dispose());
-	};
 	/*
 	 * The drawing tools: the third float, taken by the grip at the column's head, on every
 	 * screen. Like the composer, a hard throw at either edge tucks it behind that edge with
@@ -430,7 +419,7 @@ export function App() {
 	 * Home is the CSS's own place, so it is **measured** whenever the column is standing there
 	 * rather than worked out again here, with the window's middle only until it first has been.
 	 */
-	const mountToolsFloat = (tools: HTMLElement, grip: HTMLElement): { unstow: () => void } => {
+	const mountToolsFloat = (tools: HTMLElement, grip: HTMLElement, key = "pen-tools"): { unstow: () => void } => {
 		let seen: { x: number; y: number } | undefined;
 		const home = () => {
 			const work = document.querySelector(".work")?.getBoundingClientRect();
@@ -444,7 +433,7 @@ export function App() {
 		const cssPx = (name: string, fallback: number) => parseFloat(getComputedStyle(tools).getPropertyValue(name)) || fallback;
 		const float = mountFloat(
 			tools,
-			"pen-tools",
+			key,
 			grip,
 			"button, input, label",
 			home,
@@ -576,7 +565,7 @@ export function App() {
 		return id ? state.agents[id]?.transcript ?? [] : [];
 	});
 	createEffect(() => {
-		if (historyShown()) ensureHistory(state.focused);
+		if (chatShown()) ensureHistory(state.focused);
 	});
 	const busy = createMemo(() => {
 		const chat = focusedChat();
@@ -753,6 +742,117 @@ export function App() {
 		showBoards(true);
 		setPanelAsk({ tab: "agents", at: Date.now() });
 	};
+
+	/*
+	 * The v3 layout's own state.
+	 *
+	 * A phone is under 600px wide: its tools are a row above the composer, the top bars are one,
+	 * and the conversation is a sheet that grows out of the status pill. Everywhere else the
+	 * conversation is the side panel's lower half, folded or not, remembered on this device.
+	 */
+	const [viewWidth, setViewWidth] = createSignal(window.innerWidth);
+	onMount(() => {
+		const resized = () => setViewWidth(window.innerWidth);
+		window.addEventListener("resize", resized);
+		onCleanup(() => window.removeEventListener("resize", resized));
+	});
+	const phone = () => viewWidth() < 600;
+	/* The conversation is not a float on the right edge any more, so the edge is the inspector's alone. */
+	onMount(() => closeHistory());
+	onMount(() => onCleanup(installTooltips()));
+	onMount(() => onCleanup(syncRings()));
+	const [chatFolded, setChatFoldedRaw] = createSignal(readChatFolded());
+	const setChatFolded = (folded: boolean) => {
+		setChatFoldedRaw(folded);
+		try {
+			localStorage.setItem(CHAT_FOLDED_KEY, folded ? "1" : "0");
+		} catch {
+			// Kept for the session.
+		}
+	};
+	const [phoneChat, setPhoneChatRaw] = createSignal(false);
+	/* The pill the phone's sheet opens out of, and the sheet's way out: it leaves quicker than it came. */
+	const [sheetFrom, setSheetFrom] = createSignal<DOMRect | undefined>();
+	const [sheetLeaving, setSheetLeaving] = createSignal(false);
+	const setPhoneChat = (open: boolean) => {
+		if (open) {
+			setSheetFrom(document.querySelector(".v3-status")?.getBoundingClientRect());
+			setSheetLeaving(false);
+			return void setPhoneChatRaw(true);
+		}
+		if (!phoneChat() || sheetLeaving()) return;
+		setSheetLeaving(true);
+		setTimeout(() => {
+			setPhoneChatRaw(false);
+			setSheetLeaving(false);
+		}, 200);
+	};
+	/** Whether the conversation is on screen: the panel's lower half, or the phone's sheet. */
+	const chatShown = () => (phone() ? phoneChat() : boardsOpen() && !chatFolded());
+	const openChat = () => {
+		if (phone()) return void setPhoneChat(true);
+		showBoards(true);
+		setChatFolded(false);
+		holdHistory();
+	};
+	/*
+	 * While the conversation grows open or folds, its history stays where it rests: pinned to the
+	 * bottom every frame, so the panel uncovers the messages rather than carrying them along.
+	 */
+	const holdHistory = (ms = 320) => {
+		const until = performance.now() + ms;
+		const pin = () => {
+			for (const roll of document.querySelectorAll<HTMLElement>(".v3-chat .stream-roll")) roll.scrollTop = roll.scrollHeight;
+			if (performance.now() < until) requestAnimationFrame(pin);
+		};
+		pin();
+	};
+	/** Present: the canvas alone, full screen. Escape, or leaving full screen, brings the chrome back. */
+	const [presenting, setPresenting] = createSignal(false);
+	const present = () => {
+		setPresenting(true);
+		void document.documentElement.requestFullscreen?.().catch(() => {});
+	};
+	onMount(() => {
+		const keys = (event: KeyboardEvent) => {
+			if (event.key === "Escape" && presenting()) setPresenting(false);
+		};
+		const left = () => {
+			if (!document.fullscreenElement) setPresenting(false);
+		};
+		window.addEventListener("keydown", keys);
+		document.addEventListener("fullscreenchange", left);
+		onCleanup(() => {
+			window.removeEventListener("keydown", keys);
+			document.removeEventListener("fullscreenchange", left);
+		});
+	});
+	/** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
+	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
+	const loadApps = () =>
+		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
+			if (list) setApps(list.map((app) => ({ name: app.name, title: app.title || app.name, status: app.status, board: app.board })));
+		});
+	const openAppsPanel = () => {
+		showBoards(true);
+		setPanelAsk({ tab: "apps", at: Date.now() });
+	};
+	/** The agents whose canvas is the one on screen: the faces in the top-right bar. */
+	const hereAgents = createMemo(() => {
+		const stage = stageOf(state.focused)?.name;
+		if (!stage) return state.chats.filter((chat) => chat.id === state.focused);
+		return state.chats.filter((chat) => stageOf(chat.id)?.name === stage);
+	});
+	const newCanvas = () => {
+		const agentId = state.focused;
+		if (!agentId) return;
+		void act<{ name: string }>("canvas.create", ["Untitled"], agentId).then((made) => made && act("agent.update", [{ canvas: made.name }], agentId));
+	};
+	const setPen = (on: boolean) => {
+		if (on && mode() === "edit") setMode("browse");
+		setDrawing(on);
+	};
+
 
 
 
@@ -1051,8 +1151,49 @@ export function App() {
 		for (const path of Object.keys(now)) if (now[path] !== was[path]) handle.reloadBoard(path);
 	});
 
+	/** A file of any kind, chosen in the file picker and placed in the middle of the view by what it is. */
+	const openFileAtMiddle = () => {
+		const stage = document.querySelector(".stage");
+		if (!stage) return;
+		void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
+			if (!path) return;
+			setSelected(path);
+			frameWhenPlaced(path);
+		});
+	};
+
+	/**
+	 * What `⋯` holds: clearing the canvas, then the app's own. Highlighting is the pointer's menu now. Fit is the zoom bar's, and the
+	 * context reading the composer's (a phone's ⋯ adds it back, `TopRight.tsx`).
+	 *
+	 * "Highlight on hover" is the canvas's mode: on (`edit`), what is under the pointer is outlined,
+	 * a flow board shows its blocks' grips, and Alt shows distances; off (`browse`), nothing lights
+	 * up and everything still moves, sizes and snaps.
+	 */
+	const moreItems = () => [
+		{
+			label: "Clear the canvas",
+			icon: Eraser,
+			disabled: stageBoards().length === 0,
+			onPick: () => {
+				const paths = stageBoards().map((board) => board.path);
+				if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
+			},
+		},
+		{ label: "Dark mode", icon: Moon, rule: true, checked: scheme() === "dark", onPick: () => toggleScheme() },
+		{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
+		{
+			label: "Settings",
+			icon: SettingsIcon,
+			onPick: () => {
+				setSettings(true);
+				send({ type: "claude.accounts", limits: true });
+			},
+		},
+	];
+
 	return (
-		<div class="app" data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
+		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
 			{/*
 				No title bar.
 				*
@@ -1176,7 +1317,9 @@ export function App() {
 					where notices land, and they had been dodging it — and there is one
 					`data-inset="top"` where there were two.
 				*/}
-				<AgentPill
+				<TopBar
+					panelOpen={boardsOpen() && !phone()}
+					onTogglePanel={() => showBoards(!boardsOpen())}
 					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}
@@ -1185,15 +1328,8 @@ export function App() {
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) })}
 					onClose={closeAgent}
 					onMoreAgents={openAgentsPanel}
-					mode={mode()}
-					onMode={(next) => {
-						if (next === "edit") setDrawing(false);
-						setMode(next);
-					}}
-					drawing={drawing()}
-					onDrawing={setDrawing}
-					boardsOpen={boardsOpen()}
-					onToggleBoards={() => showBoards(!boardsOpen())}
+					phone={phone()}
+					onNewCanvas={newCanvas}
 					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.title } : {})}
 					{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 					{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
@@ -1228,61 +1364,38 @@ export function App() {
 					scheme={scheme()}
 				/>
 
-				<Corner
-					chats={state.chats}
-					identities={state.identities}
-					focused={state.focused}
-					unread={unread}
-					onFocus={focusAgent}
-					onMore={openAgentsPanel}
-					onClose={closeAgent}
-					zoom={camera().zoom}
-					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
-					/*
-					 * Fit what is *on the canvas*, not the whole deck.
-					 *
-					 * `stageBoards()` is already the focused agent's in-play set, so this was
-					 * right — but the menu row said "Fit the whole deck", and a label that
-					 * disagrees with the button is worse than either being wrong on its own. The
-					 * deck can be 112 boards; the canvas is what you are looking at, and fitting
-					 * it is what "where am I" means.
-					 */
-					onFit={() => fitAll(canvasBoxes(), setCamera)}
-					/*
-					 * Off the canvas, one message per board, and *not* out of the context.
-					 * `board.hide` has always drawn that line — the context is the agent's, and
-					 * tidying the view must not strip what it is working from.
-					 */
-					onClearStage={() => {
-						const paths = stageBoards().map((board) => board.path);
-						if (paths.length) void act("canvas.batch", [paths.map((path) => ({ op: "delete", id: path }))]);
-					}}
-					onCanvas={stageBoards().length}
-					/*
-					 * The context reading, which used to be a dial under the input bar. It is a
-					 * row of numbers in `⋯` now, and the corner's own button wears the warning.
-					 */
-					usage={state.focused ? state.agents[state.focused]?.usage : undefined}
-					onContext={() => openUsage(state.focused)}
-					overflow={[
-						{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
-						{
-							label: "Settings",
-							icon: SettingsIcon,
-							onPick: () => {
-								setSettings(true);
-								// Read on open rather than kept in step: every identity in the list comes
-								// from the CLI, and the CLI's own login can change without the deck hearing.
-								send({ type: "claude.accounts", limits: true });
-							},
-						},
-						{
-							label: scheme() === "dark" ? "Switch to light" : "Switch to dark",
-							icon: scheme() === "dark" ? Sun : Moon,
-							onPick: () => toggleScheme(),
-						},
-					]}
-				/>
+				<Show
+					when={!phone()}
+					fallback={
+						<span class="v3-phone-more">
+							<TopRight
+								menuOnly
+								here={[]}
+								identities={state.identities}
+								unread={unread}
+								focused={state.focused}
+								onFocus={focusAgent}
+								onPresent={present}
+								usage={state.focused ? state.agents[state.focused]?.usage : undefined}
+								onContext={() => openUsage(state.focused)}
+								more={moreItems()}
+							/>
+						</span>
+					}
+				>
+					<TopRight
+						here={hereAgents()}
+						identities={state.identities}
+						unread={unread}
+						focused={state.focused}
+						onFocus={focusAgent}
+						onPresent={present}
+						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
+						onContext={() => openUsage(state.focused)}
+						more={moreItems()}
+					/>
+					<ZoomBar zoom={camera().zoom} onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))} onFit={() => fitAll(canvasBoxes(), setCamera)} />
+				</Show>
 
 
 				<Show when={commenting()} keyed>
@@ -1300,7 +1413,8 @@ export function App() {
 				</Show>
 
 				<Show when={drawing() && mode() === "browse"}>
-					<InkBar
+					<PenTray
+						onFloat={(tray, grip) => mountToolsFloat(tray, grip, "pen-tray")}
 						onDone={() => setDrawing(false)}
 						onStep={penStep}
 						onDelete={(ids) => {
@@ -1314,23 +1428,14 @@ export function App() {
 				<Show when={!(drawing() && mode() === "browse") && stagePen()}>
 					{(pen) => (
 						<PenBar
+							tools={false}
 							doc={editorHandle()?.drawn() ?? pen().doc}
 							onEdit={(ops) => {
 								const agentId = state.focused;
 								if (agentId) void editDrawing(agentId, ops);
 							}}
 							onStep={penStep}
-							onFloat={mountToolsFloat}
 							onArm={() => {}}
-							onOpenFile={() => {
-								const stage = document.querySelector(".stage");
-								if (!stage) return;
-								void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
-									if (!path) return;
-									setSelected(path);
-									frameWhenPlaced(path);
-								});
-							}}
 							onExport={(ids) => {
 								const agentId = state.focused;
 								if (!agentId) return;
@@ -1343,6 +1448,11 @@ export function App() {
 							}}
 						/>
 					)}
+				</Show>
+
+				{/* The tools, in every mode and while the pen is out: the pen is one of them (`v3/ToolColumn.tsx`). On a phone, a row in the dock. */}
+				<Show when={stagePen() && !phone()}>
+					<ToolColumn onStep={penStep} onFloat={mountToolsFloat} onApps={openAppsPanel} onOpenFile={openFileAtMiddle} onPen={setPen} mode={mode()} onMode={(next) => setMode(next)} />
 				</Show>
 
 				<Show when={ops()}>
@@ -1417,9 +1527,6 @@ export function App() {
 					onFocusAgent={focusAgent}
 					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}), ...(state.focused ? { near: state.focused } : {}) })}
 					onCloseAgent={closeAgent}
-					onMirrorAgent={(id) =>
-						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))
-					}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
 					onAgentTags={(id, tags) => send({ type: "agent.tags", id, tags })}
@@ -1439,7 +1546,118 @@ export function App() {
 					 */
 					onDelete={(board) => send({ type: "board.delete", path: board.path })}
 					onHide={(board) => void act("canvas.delete", [board.path])}
+					apps={apps()}
+					onAppsOpen={loadApps}
+					onPickApp={(app) => playAndFrame(app.board)}
+					chat={
+						<Show when={!phone()}>
+					<ChatSection
+						chat={focusedChat()}
+						identity={state.identities[state.focused ?? ""]}
+						unread={state.focused ? (unread[state.focused] ?? 0) : 0}
+						folded={chatFolded()}
+						onFold={(folded) => { setChatFolded(folded); holdHistory(); }}
+						
+					>
+						<Stream
+							shown={chatShown()}
+							items={transcript()}
+							/*
+							 * Reaching back, in two parts: whether there is anything there, and how to
+							 * ask for it. The column owns the window over what is held; the server owns
+							 * everything older (`agents/store.ts`), and this is the seam between them.
+							 */
+							more={state.focused ? state.agents[state.focused!]?.moreHistory === true : false}
+							onEarlier={() => (state.focused ? loadEarlier(state.focused!) : Promise.resolve(0))}
+							agentId={state.focused ?? ""}
+							state={focusedChat()?.state ?? "idle"}
+							name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+							agent={focusedChat()?.kind ?? state.defaultKind}
+							{...(atTurn() ? { scrollTo: atTurn()! } : {})}
+							previewing={preview()?.entryId ?? null}
+							timeMachine="buttons"
+							onPreview={(entryId) => {
+								if (!state.focused) return;
+								if (!entryId) {
+									clearPreview();
+									return;
+								}
+								send({ type: "rewind.preview", id: state.focused, entryId });
+							}}
+							onRewind={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "rewind.to", id: state.focused, entryId });
+							}}
+							onFork={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "fork.from", id: state.focused, entryId });
+							}}
+							onRestore={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "boards.restore", id: state.focused, entryId });
+							}}
+						/>
+					</ChatSection>
+						</Show>
+					}
 				/>
+				<Show when={phone() && phoneChat()}>
+					<ChatSection
+						chat={focusedChat()}
+						identity={state.identities[state.focused ?? ""]}
+						unread={state.focused ? (unread[state.focused] ?? 0) : 0}
+						folded={false}
+						onFold={(folded) => (folded ? setPhoneChat(false) : undefined)}
+						from={sheetFrom()}
+						leaving={sheetLeaving()}
+						sheet
+					>
+						<Stream
+							shown={chatShown()}
+							items={transcript()}
+							/*
+							 * Reaching back, in two parts: whether there is anything there, and how to
+							 * ask for it. The column owns the window over what is held; the server owns
+							 * everything older (`agents/store.ts`), and this is the seam between them.
+							 */
+							more={state.focused ? state.agents[state.focused!]?.moreHistory === true : false}
+							onEarlier={() => (state.focused ? loadEarlier(state.focused!) : Promise.resolve(0))}
+							agentId={state.focused ?? ""}
+							state={focusedChat()?.state ?? "idle"}
+							name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+							agent={focusedChat()?.kind ?? state.defaultKind}
+							{...(atTurn() ? { scrollTo: atTurn()! } : {})}
+							previewing={preview()?.entryId ?? null}
+							timeMachine="buttons"
+							onPreview={(entryId) => {
+								if (!state.focused) return;
+								if (!entryId) {
+									clearPreview();
+									return;
+								}
+								send({ type: "rewind.preview", id: state.focused, entryId });
+							}}
+							onRewind={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "rewind.to", id: state.focused, entryId });
+							}}
+							onFork={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "fork.from", id: state.focused, entryId });
+							}}
+							onRestore={(entryId) => {
+								if (!state.focused) return;
+								clearPreview();
+								send({ type: "boards.restore", id: state.focused, entryId });
+							}}
+						/>
+					</ChatSection>
+				</Show>
 
 
 				{/*
@@ -1506,46 +1724,6 @@ export function App() {
 				 * Whether it is up is `state/edge.ts`'s business, not this component's, because
 				 * the same edge is wanted by the inspector and only one of them may have it.
 				 */}
-				<Stream
-					onHead={mountStreamFloat}
-					items={transcript()}
-					/*
-					 * Reaching back, in two parts: whether there is anything there, and how to
-					 * ask for it. The column owns the window over what is held; the server owns
-					 * everything older (`agents/store.ts`), and this is the seam between them.
-					 */
-					more={state.focused ? state.agents[state.focused!]?.moreHistory === true : false}
-					onEarlier={() => (state.focused ? loadEarlier(state.focused!) : Promise.resolve(0))}
-					agentId={state.focused ?? ""}
-					state={focusedChat()?.state ?? "idle"}
-					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
-					agent={focusedChat()?.kind ?? state.defaultKind}
-					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
-					previewing={preview()?.entryId ?? null}
-					onPreview={(entryId) => {
-						if (!state.focused) return;
-						if (!entryId) {
-							clearPreview();
-							return;
-						}
-						send({ type: "rewind.preview", id: state.focused, entryId });
-					}}
-					onRewind={(entryId) => {
-						if (!state.focused) return;
-						clearPreview();
-						send({ type: "rewind.to", id: state.focused, entryId });
-					}}
-					onFork={(entryId) => {
-						if (!state.focused) return;
-						clearPreview();
-						send({ type: "fork.from", id: state.focused, entryId });
-					}}
-					onRestore={(entryId) => {
-						if (!state.focused) return;
-						clearPreview();
-						send({ type: "boards.restore", id: state.focused, entryId });
-					}}
-				/>
 
 				{/*
 				 * The dock: a question if one is waiting, the status row, and the input bar.
@@ -1579,11 +1757,13 @@ export function App() {
 						)}
 					</Show>
 
-					<StatusLine
-						state={focusedChat()?.state ?? "idle"}
-						name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
-						agent={focusedChat()?.kind ?? state.defaultKind}
-					/>
+					{/* Only while nothing else says it: the panel's folded foot does, while the panel is open. */}
+					<Show when={!chatShown() && (phone() || !boardsOpen())}>
+						<StatusPill chat={focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={openChat} />
+					</Show>
+					<Show when={phone() && stagePen() && !phoneChat()}>
+						<ToolColumn row onStep={penStep} onApps={openAppsPanel} onOpenFile={openFileAtMiddle} onPen={setPen} mode={mode()} onMode={(next) => setMode(next)} />
+					</Show>
 
 					<Composer
 						draft={draft()}
@@ -1702,4 +1882,15 @@ function fitAll(boxes: Array<{ x: number; y: number; w: number; h: number }>, se
 	if (!stage || boxes.length === 0) return;
 	const view = { width: stage.clientWidth, height: stage.clientHeight };
 	setCamera(fitInto(boxes, view, canvasBox(view)));
+}
+
+const CHAT_FOLDED_KEY = "decks.chatFolded";
+
+/** Whether the panel's conversation was folded on this device. */
+function readChatFolded(): boolean {
+	try {
+		return localStorage.getItem(CHAT_FOLDED_KEY) === "1";
+	} catch {
+		return false;
+	}
 }

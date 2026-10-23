@@ -172,7 +172,7 @@ export function write(file, text) {
  * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
  * any more.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "boards" } = {}) {
 	/*
 	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
 	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the renderer
@@ -214,17 +214,19 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * symptom was a panel that forgot its tab and its fold partway through a check, which
 	 * reads as a bug in the panel.
 	 */
-	await page.addInitScript(([wanted, renderer]) => {
+	await page.addInitScript(([wanted, renderer, tab]) => {
 		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
+			// The side panel opens on Agents; the checks that find boards in it start on Boards (`panelTab`).
+			if (tab) localStorage.setItem("decks.panelTab", tab);
 			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
 			if (renderer) localStorage.setItem("decks.renderer", renderer);
 		} catch {
 			/* private mode, or a page that has no storage access yet */
 		}
-	}, [scheme, process.env.DECKS_E2E_RENDERER ?? ""]);
+	}, [scheme, process.env.DECKS_E2E_RENDERER ?? "", panelTab]);
 	/*
 	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
 	 * server remembers which agent each browser is on, so there is no address to name a place
@@ -284,8 +286,9 @@ export async function editMode(page, on = true) {
 	 * this puts the canvas in browse with the pen put away, which is what editing a drawing needs.
 	 */
 	void on;
-	const browse = page.locator('[aria-label="Browse the boards"]:visible').first();
-	if ((await browse.count()) && (await browse.getAttribute("aria-pressed")) !== "true") await browse.click();
+	/* Select stands alone and is browsing: pressing it puts the pen and the hand down and turns highlights off. */
+	const browse = page.locator('.v3-tool[data-tool="select"]:visible').first();
+	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await page.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
 	await page.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
@@ -647,7 +650,7 @@ export async function openPanel(page, tab = "context") {
 		 * states. An earlier version asked for `aria-label="Boards"`, matched nothing, and
 		 * fell through to a tool button, which failed with a story about a sticky note.
 		 */
-		await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
+		await page.locator('button[aria-label="Show the side panel"]').first().click();
 		await page.waitForFunction(() => document.querySelector(".panel-shell")?.dataset.open === "true", null, { timeout: 6000 });
 		// It slides; a click landing mid-slide misses the row it was aimed at.
 		await page.waitForTimeout(220);
@@ -676,12 +679,12 @@ export async function openAgents(page) {
  * this to be a function rather than a selector copied eleven times.
  */
 export async function zoom(page) {
-	const text = await page.locator('.pill [aria-label^="Zoom"]').first().textContent();
+	const text = await page.locator('.v3-zoom-value').first().textContent();
 	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
 }
 
 /** The same reading, from inside the page, for a `waitForFunction`. */
-export const ZOOM_IN_PAGE = `Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
+export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
 
 /**
  * Summon the conversation, and wait until it is actually up.

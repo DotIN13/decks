@@ -21,7 +21,7 @@ import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
-import { PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
+import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
 import { firstLine } from "./pen/look.ts";
@@ -320,6 +320,8 @@ export function Stage(props: {
 	 */
 	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
+	/** A press pans: Space is held, or the host's hand tool is on (`state/pen-tools.ts`). */
+	const grabbing = () => spaceHeld() || handTool();
 
 	/*
 	 * Fit into the canvas column rather than into the whole stage.
@@ -600,7 +602,7 @@ export function Stage(props: {
 			drawing: () => !!props.drawing,
 			mode: () => props.mode,
 			tool: penTool,
-			spaceHeld: () => spaceHeld(),
+			spaceHeld: () => grabbing(),
 			boardsNear: (at) =>
 				boardIndex()
 					.search({ x: at.x, y: at.y, w: 0, h: 0 })
@@ -1618,7 +1620,7 @@ export function Stage(props: {
 		pinching: () => touches.count() > 1,
 		pan: (dx, dy) => pushCamera(pan(localCamera, dx, dy)),
 		space: (held) => setSpaceHeld(held),
-		spaceHeld: () => spaceHeld(),
+		spaceHeld: () => grabbing(),
 		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
 		/*
 		 * Where a world point is on the stage right now, from the camera the gestures are
@@ -2216,7 +2218,7 @@ export function Stage(props: {
 			onPointerMove={editor.onPointerMove}
 			onPointerLeave={editor.onPointerLeave}
 			onDblClick={editor.onDblClick}
-			style={{ cursor: spaceHeld() ? "grab" : overLink() ? "pointer" : undefined }}
+			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
 			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
 			<Show when={engineNotice()}>

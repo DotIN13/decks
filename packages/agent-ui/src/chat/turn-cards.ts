@@ -27,7 +27,7 @@ export type TurnCard =
 	| { kind: "notice"; id: string; at?: number; level: "info" | "warn" | "error"; text: string };
 
 /**
- * The transcript as cards: the conversation column's unit of layout, and now a mirror's too.
+ * The transcript as cards: the conversation column's unit of layout.
  *
  * Two folds, and they are different questions. `floatRows` asks what was *said* — a bubble per
  * message, a row per run of tool calls, and nothing at all for a reply that has not started.
@@ -35,13 +35,6 @@ export type TurnCard =
  * the column however many calls it made, so they become one card's `parts`. No turn check is
  * needed to stop them merging across turns, because what starts a turn is a user message,
  * which puts a card of its own in between.
- *
- * **It is here, and not in the component, because a board draws it too.** `lib/live-chat.js`
- * renders a mirror, and until now it carried its own copy of `floatRows` — which had already
- * drifted: the panel drops a finished turn whose only content is thinking, the copy kept it,
- * so the same conversation had a row in the mirror that was not in the column. The fix for a
- * duplicated rule is not a better comment about keeping them in step; it is to stop having
- * two. The app posts these cards (`board/live-chat.ts`) and the board draws what it is given.
  *
  * Pure, and separate from `Turn.tsx`, because the folds are the part worth asserting and a
  * component is a poor place to assert anything.

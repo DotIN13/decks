@@ -56,7 +56,6 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** Every `stage.move`, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
-		newMirror: () => "boards/mirrors/x.html",
 		newAppBoard: () => "boards/apps/x.html",
 		newBoard: (options) => {
 			// Every board is one HTML file, as the real service writes it.
@@ -733,7 +732,6 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 	}
 	const deck = Deck.open(root);
 	const service = new StageService(deck, {
-		newMirror: () => "boards/mirrors/x.html",
 		newAppBoard: () => "boards/apps/x.html",
 		newBoard: () => "",
 		writeBoard: () => {

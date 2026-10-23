@@ -33,9 +33,7 @@ import type { ToolItem } from "./float-rows.ts";
  * the run grows at its end, and never shared between two slots.
  *
  * A group carries its `names` and `more` because its header has to say which calls are behind
- * it, and both surfaces that draw a header need the same answer: the column and a mirror
- * board, which is handed these slots rather than the calls (`chat/turn-cards.ts`). Working the
- * names out at the point of drawing is what left a mirror with its own copy of the rule.
+ * it, worked out once here rather than at the point of drawing (`chat/turn-cards.ts`).
  */
 export type ToolSlot =
 	| { kind: "group"; id: string; calls: ToolItem[]; names: string[]; more: number }

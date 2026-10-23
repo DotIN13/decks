@@ -128,86 +128,27 @@ await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
 say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
 
 /*
- * The user's message carries the time machine, and it is *one* handle now.
- *
- * Three buttons became one that opens a menu, and the reason is the same one that made them
- * icons in the first place: three phrases of grey text under every message ever sent was a
- * second transcript running down the history. So what is asserted is what survived the
- * change — the handle is on the user's message and not the agent's, it is an icon with a
- * name a screen reader can read, it is out of the way until the message is approached, and
- * the message carries the entry id the whole feature is addressed by.
+ * The user's message carries the way back: Rewind and Fork as two named buttons under it, out
+ * of the way until the message is approached, and never on the agent's replies.
  */
 const turn = await page.evaluate(() => {
 	const row = document.querySelector(".stream .stream-mine");
-	const handle = row?.querySelector(".stream-rw");
+	const act = row?.querySelector(".stream-act");
 	return {
 		itemId: row?.dataset.item,
-		handles: document.querySelectorAll(".stream .stream-mine .stream-rw").length,
-		mine: document.querySelectorAll(".stream .stream-mine").length,
-		onAgentCards: document.querySelectorAll(".stream .stream-card .stream-rw").length,
-		named: (handle?.getAttribute("aria-label") ?? "").length > 0,
-		menu: handle?.getAttribute("aria-haspopup"),
-		iconOnly: Boolean(handle && handle.textContent.trim() === "" && handle.querySelector("svg")),
-		hiddenByDefault: handle ? Number(getComputedStyle(handle).opacity) : null,
+		acts: [...(row?.querySelectorAll(".stream-act") ?? [])].map((button) => button.getAttribute("aria-label")),
+		onAgentCards: document.querySelectorAll(".stream .stream-card .stream-act").length,
+		menus: document.querySelectorAll(".stream .stream-rw").length,
+		hiddenByDefault: act ? Number(getComputedStyle(act).opacity) : null,
 	};
 });
-say("every message of yours carries the time machine", turn.mine > 0 && turn.handles === turn.mine, `${turn.handles} of ${turn.mine}`);
+say("your message carries Rewind and Fork", JSON.stringify(turn.acts) === JSON.stringify(["Rewind to here", "Fork from here"]), JSON.stringify(turn.acts));
 say("…and no reply of the agent's does", turn.onAgentCards === 0, `${turn.onAgentCards} on agent cards`);
 say("…addressed by the entry id the message carries", Boolean(turn.itemId), String(turn.itemId));
-say("…as one icon that opens a menu, rather than three phrases of prose", turn.iconOnly && turn.menu === "menu");
-say("…still named for a screen reader", turn.named);
-say("the handle is out of the way until the message is approached", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
+say("…with no menu behind a handle", turn.menus === 0, `${turn.menus} handles`);
+say("the buttons are out of the way until the message is approached", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
 
-/*
- * A board has to be in play for there to be a preview.
- *
- * This agent read three boards and attached none, and an agent holding nothing now puts
- * nothing on the canvas (§2) — so there was no frame whose `src` could swap to a revision,
- * and the assertion read `undefined`. Played over the socket rather than asked for, because
- * what is being tested here is the chrome, not the agent's judgement.
- */
 const link = await socket();
-link.send({ type: "board.play", path: "boards/plan.html" });
-await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
-await settle(page, 600);
-
-// Pressing Preview shows that point's boards; the transcript is not dimmed.
-const before = read(plan);
-await page.locator(".stream .stream-mine").first().hover();
-/*
- * Opened and pressed. Pointing at the handle used to be enough — and that is exactly what
- * was wrong with it: the canvas changed under a cursor crossing the transcript, into a state
- * whose only exit was inside this menu.
- */
-await page.locator(".stream .stream-mine .stream-rw").first().click();
-await page.waitForSelector(".popover", { timeout: 6000 });
-// By the row's label, not the row's whole text: a described row reads "Preview" and then
-// its sentence, and the sentence is not the thing being pressed.
-await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: /^Preview$/ }) }).first().click();
-await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
-const previewing = await page.evaluate(() => ({
-	stage: document.querySelector(".stage")?.dataset.previewing,
-	src: document.querySelector(".board-node iframe")?.getAttribute("src"),
-	transcriptOpacity: Number(getComputedStyle(document.querySelector(".stream .stream-roll > *")).opacity),
-}));
-say("pressing Preview shows the boards at that point", (previewing.src ?? "").startsWith("/api/revision/"), `src=${previewing.src}`);
-say("the transcript is not dimmed while it is up", previewing.transcriptOpacity === 1, `opacity ${previewing.transcriptOpacity}`);
-say("previewing writes nothing", read(plan) === before);
-
-/*
- * And Escape puts them back — the canvas's own way out, which is the other half of making the
- * preview deliberate: moving the pointer away no longer ends it, so something on the canvas
- * has to. (`preview.mjs` covered the badge and its Leave button without spending a turn; it
- * has been cut, so this is the only place either is asserted — and it needs a model.)
- */
-await page.mouse.move(800, 300);
-await page.keyboard.press("Escape");
-await page.waitForFunction(
-	() => (document.querySelector(".board-node iframe")?.getAttribute("src") ?? "").startsWith("/api/board/"),
-	null,
-	{ timeout: 8000 },
-);
-say("Escape puts the live boards back", true);
 
 /*
  * The column does not churn under the cursor.

@@ -58,52 +58,36 @@ const agent = {
 	 * is load-bearing: it means "not known yet", which is a different claim from "empty" —
 	 * and a ring at zero makes the wrong one, which is the one somebody would act on.
 	 */
-	say("no dial before the agent has reported", (await page.evaluate(() => document.querySelectorAll(".hint-row .dial").length)) === 0);
+	/*
+	 * v3 has no hint row under the composer: the reading is a row of `⋯` on every screen, with the
+	 * button itself wearing the warning, and the row opens the numbers.
+	 */
+	const contextRow = () =>
+		page.evaluate(() => {
+			const element = [...document.querySelectorAll(".popover [data-row]")].find((row) => /context usage/i.test(row.innerText ?? ""));
+			return element ? { text: element.innerText.replace(/\s+/g, " ").trim(), ring: element.querySelectorAll(".ctx-ring").length, level: element.querySelector(".ctx-ring")?.dataset.level } : null;
+		});
+	await page.locator('button[aria-label="More"]').first().click();
+	await settle(page, 400);
+	say("no context row before the agent has reported", (await contextRow()) === null);
+	await page.keyboard.press("Escape");
+	await settle(page, 250);
 
 	await feed({ type: "agent.usage", id: "A", usage: { contextTokens: 148_000, contextWindow: 200_000, cost: 1.234 } });
 	await settle(page, 500);
-
-	const dial = await page.evaluate(() => {
-		const element = document.querySelector(".hint-row .dial");
-		return element
-			? {
-					text: element.innerText.trim(),
-					level: element.querySelector(".ctx-ring")?.dataset.level,
-					visible: element.getBoundingClientRect().width > 0,
-					atEnd: Math.abs(element.getBoundingClientRect().right - document.querySelector(".hint-row").getBoundingClientRect().right) < 12,
-				}
-			: null;
-	});
-	say("the dial is in the hint row under the box", dial?.visible === true, JSON.stringify(dial));
-	say("…at its right end", dial?.atEnd === true, JSON.stringify(dial));
-	say("…reading the percentage", dial?.text === "74%", JSON.stringify(dial?.text));
-	/* Amber over 70 and red over 85 — the two points where the next long turn is the one that
-	   gets truncated. The thresholds themselves are unit-tested in `context-usage.test.ts`. */
-	say("…and amber, because 74% is past the first threshold", dial?.level === "warn", dial?.level);
-
-	await page.locator(".hint-row .dial").click();
+	const level = await page.locator('button[aria-label="More"]').first().getAttribute("data-level");
+	say("the ⋯ button wears the warning, amber past 70%", level === "warn", String(level));
+	await page.locator('button[aria-label="More"]').first().click();
 	await settle(page, 400);
-	const popover = await page.evaluate(() => ({
-		open: Boolean(document.querySelector(".popover .big")),
-		percent: document.querySelector(".popover .big")?.textContent,
-		used: [...document.querySelectorAll(".popover .pair")].map((row) => row.innerText.replace(/\s+/g, " ").trim()),
-		modal: document.querySelectorAll(".usage-modal").length,
-	}));
-	say("pressing it opens the numbers as a popover", popover.open && popover.percent === "74%", JSON.stringify(popover.percent));
-	say("…with the figures behind the percentage", popover.used.some((row) => /148,000/.test(row)) && popover.used.some((row) => /200,000/.test(row)), JSON.stringify(popover.used));
-	/* A popover, not a modal: this is the glance. The panel behind its last row is a modal;
-	   `usage.mjs` was its only cover and has been cut. */
-	say("…and no modal on a desktop", popover.modal === 0, String(popover.modal));
-
-	/* The `⋯` row is the phone's answer and must not be drawn here as well. */
+	const row = await contextRow();
+	say("`⋯` has the context row on a desktop too", row !== null, JSON.stringify(row));
+	say("…a ring, the words, and the percentage", row?.ring === 1 && /74%/.test(row?.text ?? ""), JSON.stringify(row));
+	await page.locator(".popover [data-row]").filter({ hasText: /context usage/i }).click();
+	await settle(page, 600);
+	const numbers = await page.evaluate(() => ({ modal: document.querySelectorAll(".usage-modal").length, percent: document.querySelector(".usage-modal .big")?.textContent }));
+	say("…and pressing it opens the numbers", numbers.modal === 1 && numbers.percent === "74%", JSON.stringify(numbers));
 	await page.keyboard.press("Escape");
-	await settle(page, 250);
-	await page.locator('.pill button[aria-label^="More"]').click();
-	await settle(page, 400);
-	const inMenu = await page.evaluate(
-		() => [...document.querySelectorAll(".popover [data-row]")].filter((row) => /context usage/i.test(row.innerText ?? "") && getComputedStyle(row).display !== "none").length,
-	);
-	say("the ⋯ menu has no context row on a fine pointer", inMenu === 0, String(inMenu));
+	await settle(page, 300);
 
 	say("no console errors on a desktop", errors.length === 0, errors.join(" | "));
 	await browser.close();
@@ -132,7 +116,7 @@ const agent = {
 	});
 	say("no dial under the box on a phone", under === "none" || under === "absent", under);
 
-	await page.locator('.pill button[aria-label^="More"]').click();
+	await page.locator('button[aria-label="More"]').first().click();
 	await settle(page, 400);
 	const row = await page.evaluate(() => {
 		const element = [...document.querySelectorAll(".popover [data-row]")].find((candidate) => /context usage/i.test(candidate.innerText ?? ""));
@@ -230,7 +214,7 @@ const agent = {
 	 */
 	await page.locator(".usage-modal [aria-label='Close']").click();
 	await settle(page, 300);
-	await page.locator('.pill button[aria-label^="More"]').click();
+	await page.locator('button[aria-label="More"]').first().click();
 	await settle(page, 300);
 	await page.locator(".popover [data-row]").filter({ hasText: /context usage/i }).click();
 	await settle(page, 600);

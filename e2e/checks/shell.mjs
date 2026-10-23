@@ -29,14 +29,15 @@ if (!agentName) throw new Error("the fixture deck has no agent to address");
 
 const hash = () => page.evaluate(() => location.hash);
 say("the app opens on the stage, at the plain root, and writes nothing into the address", (await hash()) === "" && (await page.getAttribute(".surface", "data-surface")) === "stage", `${JSON.stringify(await hash())} ${await page.getAttribute(".surface", "data-surface")}`);
-/* The pill kept its tools and lost the three things that were about other places: Home, the dashboard's tabs and the canvas's name. */
+/* The v3 top-left bar: whose canvas this is and which canvas, and a new one. With the side panel open its head has the deck's mark and the fold, so the bar has no unfold button. */
 const pill = await page.evaluate(() => ({
-	home: document.querySelectorAll(".pill-home").length,
-	canvas: document.querySelectorAll(".pill-canvas, .canvas-menu").length,
-	tabs: document.querySelectorAll('.pill [role="tab"]').length,
-	boards: document.querySelectorAll('.pill button[aria-label$="the boards panel"]').length,
+	agent: document.querySelectorAll(".v3-topbar .v3-agent-chip").length,
+	canvas: document.querySelectorAll(".v3-topbar .v3-canvas-chip").length,
+	tabs: document.querySelectorAll('.v3-topbar [role="tab"]').length,
+	unfold: document.querySelectorAll('.v3-topbar button[aria-label="Show the side panel"]').length,
+	fold: document.querySelectorAll('.panel-shell button[aria-label="Hide the side panel"]').length,
 }));
-say("the top-left pill has the boards panel's button, and no Home, dashboard tabs or canvas name", pill.home === 0 && pill.canvas === 0 && pill.tabs === 0 && pill.boards === 1, JSON.stringify(pill));
+say("the top-left bar has the agent and the canvas, no tabs, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 0 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
 
 /*
  * The left panel's board rows are an empty box, a name and a dot: no picture of the board, and no board
@@ -47,7 +48,7 @@ say("the top-left pill has the boards panel's button, and no Home, dashboard tab
 {
 	const boardsTab = page.locator('.panel-shell [role="tab"]', { hasText: "Boards" });
 	if ((await page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open)) !== "true") {
-		await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
+		await page.locator('button[aria-label="Show the side panel"]').first().click();
 		await settle(page, 400);
 	}
 	await boardsTab.click();

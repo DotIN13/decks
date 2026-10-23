@@ -47,7 +47,7 @@ const cdp = await context.newCDPSession(page);
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 const taskMs = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration").value * 1000;
 
-await page.click('[aria-label="Draw on the canvas"]');
+await page.click('.v3-tool[data-tool="pen"]');
 await page.waitForSelector(".stage-ink");
 
 await page.evaluate(() => {

@@ -32,7 +32,7 @@ test("a message from another window is not this board's", () => {
 
 test("a message that is not a request to open is ignored", () => {
 	const one = frame();
-	assert.equal(boardOpenOf({ source: one.contentWindow, data: { decks: "live.chat", agent: "x" } }, one), undefined);
+	assert.equal(boardOpenOf({ source: one.contentWindow, data: { decks: "live.web" } }, one), undefined);
 	assert.equal(boardOpenOf({ source: one.contentWindow, data: null }, one), undefined);
 	assert.equal(boardOpenOf({ source: one.contentWindow, data: "boards/notes.html" }, one), undefined);
 });

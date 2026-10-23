@@ -168,9 +168,17 @@ export function statusWords(status: AgentStatus, state: AgentState): string {
  * than one because the row's job is to be scanned in a list of six and the card's is to
  * answer a question, and a row wide enough for the card's phrasing would be the chat list.
  */
+/**
+ * The end of an agent's row, in the panel and the dropdown alike: what it is doing while it works
+ * or asks, and otherwise only how long ago, compactly ("9h", "3d", "now"), or "new" if it never ran.
+ * Whether a finished turn is unread is the face's ring's to say; the full state is the row's title.
+ */
 export function rowWords(status: AgentStatus, state: AgentState, at: number | undefined): string {
-	if (status === "done") return `done · ${since(at)}`;
-	if (status === "idle") return at === undefined ? "never run" : `idle · ${since(at)}`;
+	if (status === "done" || status === "idle") {
+		if (at === undefined) return "new";
+		const ago = since(at);
+		return ago === "just now" ? "now" : ago;
+	}
 	return statusWords(status, state).toLowerCase();
 }
 

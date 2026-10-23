@@ -6,6 +6,8 @@ import Pencil from "lucide-solid/icons/pencil";
 import X from "lucide-solid/icons/x";
 import Square from "lucide-solid/icons/square";
 import Check from "lucide-solid/icons/check";
+import ChevronDown from "lucide-solid/icons/chevron-down";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
 import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../../state/notices.ts";
@@ -488,6 +490,14 @@ export function Composer(props: {
 	let endedAt = 0;
 	const imeOwns = (event: KeyboardEvent) => event.isComposing || event.keyCode === 229 || composing || Date.now() - endedAt < 50;
 
+	/** The queue card folded to its head, which then names the next line. */
+	const [queueFolded, setQueueFolded] = createSignal(false);
+	/** Who the line goes to, for the placeholder and the queue's head. */
+	const recipientName = () => {
+		const dest = props.recipient?.dest;
+		return dest?.kind === "prompt" ? dest.name : "the agent";
+	};
+
 	return (
 		/*
 		 * A stack, and no card of its own: the box below is the card, and the hint row under
@@ -523,15 +533,30 @@ export function Composer(props: {
 			{/* What you queued with Ctrl+Enter, on top of the box: sent one per turn as each ends. */}
 			<Show when={props.queued?.items.length ? props.queued : undefined}>
 				{(queued) => (
-					<div class="composer-queue" role="list" aria-label="Queued messages">
+					<div class="composer-queue" role="list" aria-label="Queued messages" data-folded={queueFolded() ? "true" : undefined}>
 						<div class="composer-queue-head">
-							<span>{queued().held ? "Held by Stop" : "Queued, sent one per turn when this one ends"}</span>
-							<Show when={queued().held}>
-								<button type="button" class="composer-queue-release" onClick={() => props.onQueueAction?.("release")}>
-									Send queued
-								</button>
-							</Show>
+							<button type="button" class="v3-icon composer-queue-fold" aria-expanded={!queueFolded()} title={queueFolded() ? "Show the queue" : "Fold the queue"} aria-label={queueFolded() ? "Show the queue" : "Fold the queue"} onClick={() => setQueueFolded(!queueFolded())}>
+								<Icon of={queueFolded() ? ChevronRight : ChevronDown} size={14} />
+							</button>
+							<span class="composer-queue-title">
+								{queued().items.length} queued for {recipientName()}
+							</span>
+							<span class="composer-queue-note truncate">{queued().held ? "held by Stop" : queueFolded() ? `next: ${queued().items[0]?.text ?? ""}` : "sent one per turn"}</span>
+							<span class="flex-1" />
+							<button
+								type="button"
+								class="composer-queue-release"
+								title={queued().held ? "Send the held queue" : "Send every queued line now, as steers"}
+								onClick={() => {
+									if (queued().held) return props.onQueueAction?.("release");
+									for (const item of queued().items) props.onQueueAction?.("send", item.id);
+								}}
+							>
+								Send all now
+							</button>
 						</div>
+						{/* Folded by its height, so the rows slide shut rather than vanish (`styles/v3.css`). */}
+						<div class="composer-queue-body" aria-hidden={queueFolded()}><div>
 						<For each={queued().items}>
 							{(item, index) => (
 								<div class="composer-queue-row" role="listitem" data-item={item.id}>
@@ -561,6 +586,7 @@ export function Composer(props: {
 								</div>
 							)}
 						</For>
+						</div></div>
 					</div>
 				)}
 			</Show>
@@ -593,9 +619,6 @@ export function Composer(props: {
 				{/* The grip. The bar is a float, and this is the one place a drag may start
 				    that is not the padding: the field and the buttons keep their own gestures. */}
 				<span class="dock-grip" aria-hidden="true" />
-				<Show when={props.recipient} fallback={<Show when={props.destination}>{(word) => <span class="dock-to" data-dest={word()}>{word()}</span>}</Show>}>
-					{(recipient) => <Recipient {...recipient()} />}
-				</Show>
 				{/*
 					The field: text, and a pill for each comment going with it (`DraftField.tsx`).
 					It grows with its words on its own, being a box rather than a textarea, up to
@@ -609,7 +632,7 @@ export function Composer(props: {
 					label="Message this agent"
 					/* A turn in progress does not stop you talking to it. Text sent now steers this turn rather than
 					   starting another one, and the field is the honest place to say so. */
-					placeholder={props.busy ? "Steer this turn…" : "Draft something on a board, or ask…"}
+					placeholder={props.busy ? `Steer ${recipientName()}'s turn…` : `Ask ${recipientName()} to draw, plan or build…`}
 					onDraft={(draft) => {
 						setNodes(draft);
 						if (held !== undefined) parked.set(held, draft);
@@ -723,6 +746,9 @@ export function Composer(props: {
 							</div>
 						}
 					>
+					<Show when={props.recipient} fallback={<Show when={props.destination}>{(word) => <span class="dock-to" data-dest={word()}>{word()}</span>}</Show>}>
+						{(recipient) => <Recipient {...recipient()} compact />}
+					</Show>
 					<Show when={props.onAttach}>
 						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
 							<Icon of={Paperclip} size={15} />
@@ -731,6 +757,7 @@ export function Composer(props: {
 
 					{/* Mode before model, because it is the larger decision: what the agent may
 					    do at all, rather than which one is doing it. */}
+					<span class="flex-1" />
 					<ModeMenu modes={props.modes} mode={props.mode} onMode={props.onMode} />
 					<ModelPicker
 						model={props.model}
@@ -743,7 +770,10 @@ export function Composer(props: {
 						{...(props.onAccountsOpen ? { onAccountsOpen: props.onAccountsOpen } : {})}
 					/>
 
-					<span class="flex-1" />
+					{/* How full the context is, before the mic: a ring and its percentage that opens the numbers (v3). */}
+					<span class="composer-ctx">
+						<ContextDial usage={props.usage} onUsage={props.onUsage} />
+					</span>
 
 					{/* The mic, left of send. While it records, the whole row is the recording's (below). */}
 					<button
@@ -821,10 +851,10 @@ export function Composer(props: {
 			 * Which also means the row is not *only* keycaps again — but the argument for
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
-			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
+			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden" hidden>
 				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} busy={props.busy && !!props.onQueue} />
 				<span class="flex-1" />
-				<ContextDial usage={props.usage} onUsage={props.onUsage} />
+				{/* The dial moved into the controls row (v3): this row stays for the hints only. */}
 			</div>
 		</section>
 	);

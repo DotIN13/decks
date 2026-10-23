@@ -109,7 +109,7 @@ await settle(page, 600);
 // --- the panel, on its Agents tab ---------------------------------------------------
 
 const shown = await page.evaluate(() => Boolean(document.querySelector(".panel-shell")));
-if (!shown) await page.locator('[aria-label*="boards panel" i]').first().click();
+if (!shown) await page.locator('[aria-label="Show the side panel"]').first().click();
 await page.waitForSelector(".panel-shell", { timeout: 5000 });
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
@@ -117,11 +117,11 @@ await settle(page, 400);
 /* The workspace cut, which is the only one, in two lines per agent, which is where it opens. */
 const opened = await page.evaluate(() => ({
 	view: document.querySelector(".panel-view")?.getAttribute("data-view"),
-	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.querySelector(".panel-meta > span")?.textContent}:${one.querySelectorAll(".agent-row").length}`),
+	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.querySelector(".v3-folder-name")?.textContent}:${one.querySelectorAll(".agent-row").length}`),
 }));
 say(
 	"the list opens by workspace, in two lines per agent",
-	opened.view === "lines-2" && JSON.stringify(opened.sections) === JSON.stringify(["irb-84069:2", "political-llm:8", "No workspace:4"]),
+	JSON.stringify(opened.sections) === JSON.stringify(["irb-84069:2", "political-llm:8", "No workspace:4"]),
 	JSON.stringify(opened),
 );
 
@@ -179,7 +179,7 @@ await page.evaluate(() => {
 						said: row.querySelector(".agent-said")?.textContent?.trim(),
 						tags: [...row.querySelectorAll(".agent-tags .tag")].map((tag) => tag.textContent?.trim()),
 						status: row.dataset.status,
-						section: row.closest(".panel-section")?.querySelector(".panel-meta > span")?.textContent,
+						section: row.closest(".panel-section")?.querySelector(".v3-folder-name")?.textContent,
 					}
 				: null;
 		};
@@ -337,23 +337,6 @@ say(
 	filed.notesBefore.includes("workspace:2 want you") && filed.notes.includes("workspace:1 wants you"),
 	`${JSON.stringify(filed.notesBefore)} → ${JSON.stringify(filed.notes)}`,
 );
-
-// --- one line per agent ---------------------------------------------------------------------
-
-/*
- * The square switches every row to one line. That is a prop on the rows, not a new list, so the
- * rows it draws are the rows that were there.
- */
-await page.evaluate(() => window.__hold("to one line"));
-await page.locator('.panel-view[data-view="lines-2"]').click();
-await settle(page, 500);
-const toOne = await page.evaluate(() => window.__verdict());
-say("switching to one line keeps every row the element it was", toOne.kept === toOne.rows, `${toOne.kept} of ${toOne.rows} kept (lost ${toOne.lost.join(", ")})`);
-
-const oneLine = await change("Pi: streaming → tool, in one line", { type: "agent.state", id: "k2", state: "tool" });
-say("in one line, a state change adds no node and removes none", oneLine.churn.added === 0 && oneLine.churn.removed === 0, JSON.stringify(oneLine.churn) + JSON.stringify(oneLine.moved));
-say("…every row is the element it was", oneLine.kept === oneLine.rows, `${oneLine.kept} of ${oneLine.rows} kept`);
-say("…and the working face keeps its pulse", oneLine.pulse.before !== null && oneLine.pulse.after !== null && oneLine.pulse.after > oneLine.pulse.before, JSON.stringify(oneLine.pulse));
 
 // --- nothing threw -------------------------------------------------------------------------
 

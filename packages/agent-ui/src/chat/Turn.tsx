@@ -11,10 +11,8 @@ import type { AgentPart, TurnCard } from "./turn-cards.ts";
 /*
  * A card, and the pieces of one, are `chat/turn-cards.ts`'s now.
  *
- * They were declared here, which was right while the column was the only thing that drew a
- * transcript. A mirror board draws one too, and its copy of the fold had already drifted from
- * this file's — so the fold moved to the one module both ends can be given, and these are
- * re-exported for the readers that still import them from the component that draws them.
+ * They were declared here; the fold moved to its own module, and these are re-exported for the
+ * readers that still import them from the component that draws them.
  */
 export type { AgentPart, TurnCard };
 

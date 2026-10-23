@@ -422,30 +422,19 @@
 	 *
 	 * Out of the flow means out of the flex row, so nothing lays them out but these rules — and
 	 * the slot a button takes is decided by **how many actions come after it**, because the DOM
-	 * order is the display order reversed: pen, mirror, ×.
+	 * order is the display order reversed: pen, ×.
 	 *
 	 * One slot is `--control-sm` plus the 2px between two of them, and the outermost stands 4px
-	 * off the edge. That is the whole arithmetic: 4px, then `--control-sm + 6px`, then
-	 * `2 * --control-sm + 8px`. Each `+` combinator below is one of those sentences — a slot-3
-	 * rule is more specific than the slot-2 rule it also matches, which is what lets the pen
-	 * climb past the second slot it would otherwise sit in.
-	 *
-	 * The mirror is what this was missing. It is a `.close` like the × — deliberately, they are
-	 * the same kind of control — and a second `.close` landed in the ×'s own slot: an × drawn
-	 * inside the picture-in-picture rectangle, each hiding the other's glyph.
+	 * off the edge. That is the whole arithmetic: 4px, then `--control-sm + 6px`. The `+`
+	 * combinator below is that sentence.
 	 */
-	.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn,
-	.agent-list .row-act:has(> .agent-mirrorbtn + .close) > .agent-mirrorbtn {
+	.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn {
 		right: calc(var(--control-sm) + 6px);
-	}
-
-	.agent-list .row-act:has(> .agent-tagbtn + .close + .close) > .agent-tagbtn {
-		right: calc(2 * var(--control-sm) + 8px);
 	}
 
 	/*
 	 * And the first line reserves exactly what they cover: the width the whole body used to
-	 * lose, spent on the one line that had to lose it — one slot, then two, then three.
+	 * lose, spent on the one line that had to lose it — one slot, then two.
 	 */
 	.agent-list .row-act:is(:hover, :focus-within) .agent-line {
 		padding-right: calc(var(--control-sm) + 2px);
@@ -453,10 +442,6 @@
 
 	.agent-list .row-act:is(:hover, :focus-within):has(> .close) .agent-line {
 		padding-right: calc(2 * var(--control-sm) + 4px);
-	}
-
-	.agent-list .row-act:is(:hover, :focus-within):has(> .close + .close) .agent-line {
-		padding-right: calc(3 * var(--control-sm) + 6px);
 	}
 
 	.agent-body {
@@ -810,13 +795,8 @@
 			top: 9px;
 		}
 
-		.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn,
-		.agent-list .row-act:has(> .agent-mirrorbtn + .close) > .agent-mirrorbtn {
+		.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn {
 			right: 34px;
-		}
-
-		.agent-list .row-act:has(> .agent-tagbtn + .close + .close) > .agent-tagbtn {
-			right: 64px;
 		}
 
 		.agent-list .row-act .agent-line {
@@ -825,10 +805,6 @@
 
 		.agent-list .row-act:has(> .close) .agent-line {
 			padding-right: 60px;
-		}
-
-		.agent-list .row-act:has(> .close + .close) .agent-line {
-			padding-right: 90px;
 		}
 	}
 

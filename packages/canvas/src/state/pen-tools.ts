@@ -85,4 +85,18 @@ const [insertPanel, setInsertPanel] = createSignal<InsertPanel | undefined>();
  */
 const [penLive, setPenLive] = createSignal<readonly { id: string; set: Record<string, unknown> }[] | undefined>();
 
+/**
+ * The hand: while it is on, a press on the canvas pans it, as holding Space does (`Stage.tsx`).
+ * A host's tool column turns it on; nothing in the stage turns it off.
+ */
+const [handTool, setHandTool] = createSignal(false);
+
+/**
+ * How the arrow tool draws a new arrow: its route, and whether it has heads. A line is an arrow
+ * with no heads, straight.
+ */
+export type ArrowStyle = { route: "straight" | "curved" | "elbow"; heads?: "end" | "none" };
+const [penArrowStyle, setPenArrowStyle] = createSignal<ArrowStyle>({ route: "curved" });
+
+export { handTool, setHandTool, penArrowStyle, setPenArrowStyle };
 export { insertPanel, penBoxes, penIcon, penLive, penSelection, penShape, penTool, penTyping, setInsertPanel, setPenBoxes, setPenIcon, setPenLive, setPenSelection, setPenShape, setPenTool, setPenTyping };

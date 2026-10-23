@@ -33,100 +33,21 @@ try {
 	 */
 	say("the second turn changed it again", /second turn/i.test(afterSecond));
 
-	/*
-	 * `.stream-mine` is a user message, and the handle on it is `.stream-rw`.
-	 *
-	 * This check used to click a spine block to open the history and then read `.turn-row`,
-	 * a row with three labelled buttons under every message. Both are gone: the spine went
-	 * with the title bar, and the three phrases of grey text became one button that opens a
-	 * menu — three phrases under every message ever sent was a second transcript running
-	 * down the history.
-	 */
+	/* `.stream-mine` is a user message, and Rewind and Fork are the buttons under it. */
 	await openHistory(page);
 	await page.waitForSelector(".stream .stream-mine", { timeout: 8000 });
 	const mine = page.locator(".stream .stream-mine");
 	const rows = await mine.count();
-	say("each user message is a point you can return to", rows >= 2, `${rows} messages with a handle`);
-	say(
-		"…and the handle is one button, not a row of phrases",
-		(await mine.first().locator(".stream-rw").count()) === 1,
-	);
-
-	/*
-	 * The board has to be on the canvas for there to be anything to preview.
-	 *
-	 * An agent holding nothing puts nothing on the canvas (§2), and this check starts a
-	 * fresh agent on purpose — so editing the board is not the same as showing it, and
-	 * every assertion below was reading `null`. Played over the socket rather than asked
-	 * for, because what is being tested is the time machine, not the agent's judgement
-	 * about what belongs on screen. `chrome.mjs` does the same thing for the same reason.
-	 */
+	say("each user message is a point you can return to", rows >= 2, `${rows} messages`);
+	say("…by two buttons under it, not a menu", (await mine.first().locator(".stream-act").count()) === 2 && (await mine.first().locator(".stream-rw").count()) === 0);
 	const link = await socket();
-	link.send({ type: "board.play", path: "boards/plan.html" });
-	await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
-	await settle(page, 600);
-
-	// Previewing the *second* message shows the state after turn one.
-	//
-	// Marked first: the `src` attribute changes before the new document parses, so waiting on
-	// the URL alone and then reading the DOM reads the *old* document and the preview looks
-	// like it did not happen. The marker is only absent once a genuinely new document is in
-	// the frame, and `__boardReady` says it has finished rendering.
-	await page.evaluate(() => {
-		document.querySelector('.board-node[data-path="boards/plan.html"] iframe').contentWindow.__live = true;
-	});
-	const second = mine.nth(1);
-	await second.hover();
-	/*
-	 * Opened and pressed, not hovered. Pointing at the handle used to preview on its own, and
-	 * that is gone: it changed the canvas under a cursor on its way past, and left people in
-	 * a state they had not asked for. `preview.mjs` asserted that absence and has been cut, so
-	 * nothing asserts it now; here the menu is simply the way in.
-	 */
-	await second.locator(".stream-rw").click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-	// By the row's label: a described row reads "Preview" and then its sentence.
-	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: /^Preview$/ }) }).first().click();
-	await page.waitForFunction(
-		() => {
-			const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
-			if (!(frame?.getAttribute("src") ?? "").startsWith("/api/revision/")) return false;
-			return frame.contentWindow?.__live === undefined && frame.contentWindow?.__boardReady === true;
-		},
-		null,
-		{ timeout: 15000 },
-	);
-	const preview = await page.evaluate(() => {
-		const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
-		return { src: frame?.getAttribute("src"), text: frame?.contentDocument?.querySelector('[data-id="timecheck"]')?.textContent?.trim() };
-	});
-	say(
-		"previewing a message shows that point's boards",
-		(preview.text ?? "").trim().toLowerCase() === "first turn",
-		`text=${JSON.stringify(preview.text)}`,
-	);
-	say("previewing writes nothing", read(plan) === afterSecond);
-
-	/*
-	 * Restore is deliberate, and it does write — so it is a row in the menu, behind the rule,
-	 * and it is there whether or not a preview is up. The menu is reopened because pressing
-	 * `Preview` above closed it.
-	 */
-	await second.locator(".stream-rw").click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-	await page.locator(".popover [data-row]").filter({ hasText: /^Restore/ }).first().click();
-	await settle(page, 1500);
-	const restored = read(plan);
-	say("restore boards writes that point back", /first turn/i.test(restored) && !/second turn/i.test(restored));
 
 	// Rewinding truncates the conversation.
 	const before = await page.locator(".stream .stream-roll > *").count();
 	const last = mine.last();
 	const rewound = (await last.locator(".stream-bubble").innerText()).trim();
 	await last.hover();
-	await last.locator(".stream-rw").click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-	await page.locator(".popover [data-row]").filter({ hasText: /^Rewind/ }).first().click();
+	await last.getByRole("button", { name: "Rewind to here" }).click();
 	await page.waitForFunction((was) => document.querySelectorAll(".stream .stream-roll > *").length < was, before, { timeout: 15000 });
 	say("rewinding cuts the transcript back", (await page.locator(".stream .stream-roll > *").count()) < before, `${before} → ${await page.locator(".stream .stream-roll > *").count()} items`);
 
@@ -153,7 +74,7 @@ try {
 	/*
 	 * The runtime really went back, not only the transcript on screen.
 	 *
-	 * Asked from memory, so the board, which Restore already set back, cannot answer for it:
+	 * Asked from memory, so the board cannot answer for it:
 	 * a runtime whose conversation still held the second turn would say "second turn".
 	 */
 	const lastReply = async () => (await page.locator(".stream .stream-roll > *").last().innerText()).trim();
@@ -171,9 +92,7 @@ try {
 	const chatsBefore = chatIds();
 	const third = mine.last();
 	await third.hover();
-	await third.locator(".stream-rw").click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-	await page.locator(".popover [data-row]").filter({ hasText: /^Fork/ }).first().click();
+	await third.getByRole("button", { name: "Fork from here" }).click();
 	let forkId;
 	for (let waited = 0; waited < 30000 && !forkId; waited += 250) {
 		forkId = [...chatIds()].find((id) => !chatsBefore.has(id));

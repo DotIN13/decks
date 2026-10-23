@@ -194,7 +194,6 @@ export class App {
 			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
 			newBoard: (options) => this.boards.newBoard(options),
-			newMirror: (options) => this.boards.newMirror(options),
 			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
 			extent: (path, rev, at) => this.boards.extent(path, rev, at),

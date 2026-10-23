@@ -64,7 +64,8 @@ const spots = await page.evaluate(() => {
 say("the canvas has room for two shapes", spots.length === 2, JSON.stringify(spots));
 
 // --- a shape from the library -----------------------------------------------------------------------
-await page.locator('.pen-tools [data-tool="shape"]').click();
+await page.locator('.v3-tool[data-tool="shape"]').click();
+await page.locator('.v3-menu-row:has-text("More shapes")').click();
 say("the shapes button opens the insert panel on its shapes", await page.locator(".insert-panel .insert-cell[data-shape]").count() >= 30);
 await page.locator('.insert-panel .insert-cell[data-shape="Decision"]').click();
 const armed = await page.evaluate(() => document.querySelector(".stage")?.dataset.penTool);
@@ -84,7 +85,7 @@ const across = await page.evaluate(() => {
 	for (const details of body.querySelectorAll("details")) details.open = true;
 	return { scroll: body.scrollWidth, client: body.clientWidth, panel: document.querySelector(".props-panel").getBoundingClientRect().width };
 });
-say("…276 px wide, and it never scrolls sideways", across.panel === 276 && across.scroll <= across.client, JSON.stringify(across));
+say("…272 px wide, and it never scrolls sideways", across.panel === 272 && across.scroll <= across.client, JSON.stringify(across));
 await page.locator('.props-panel select[aria-label="Kind of shape"]').selectOption("Terminator");
 const swapped = await until(() => {
 	const now = onDisk().children.find((n) => n.id === made?.id);
@@ -152,7 +153,8 @@ if (sv) {
 
 // --- an arrow from a side ----------------------------------------------------------------------------
 await page.keyboard.press("Escape");
-await page.locator('.pen-tools [data-tool="shape"]').click();
+await page.locator('.v3-tool[data-tool="shape"]').click();
+await page.locator('.v3-menu-row:has-text("More shapes")').click();
 await page.locator('.insert-panel .insert-cell[data-shape="Process"]').click();
 const had2 = new Set(shapesNow().map((n) => n.id));
 await page.mouse.click(spots[1].x, spots[1].y);

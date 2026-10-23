@@ -45,6 +45,8 @@ async function shots(target, on, label) {
 	 * A screenshot, and where the boards are on it, in its pixels: a board's picture is the page's own
 	 * (not a tile) and is made again from its page on each visit, a little differently, so it is left out.
 	 */
+	/* The chrome is not what is compared: the floats over the canvas (the tool column, the bars, the composer) are hidden for the picture. */
+	await page.addStyleTag({ content: ".pen-tools, .dock, .v3-bar, .panel-shell, .notices { visibility: hidden !important; }" });
 	const snap = async () => {
 		out.pictures.push((await page.screenshot()).toString("base64"));
 		out.boards.push(await page.evaluate(() => (window.__decksBoards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));

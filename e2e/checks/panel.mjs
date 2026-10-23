@@ -68,9 +68,9 @@ try {
 			.then(() => expected)
 			.catch(() => inset());
 
-	// 264px: the panel is a full-height column at the window's edge now, not a card 12px in.
-	const up = await settled("264px");
-	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "264px", up);
+	// 320px: the v3 panel is a full-height column at the window's edge, not a card 12px in.
+	const up = await settled("320px");
+	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "320px", up);
 
 	/*
 	 * The width is the person's. The handle straddles the panel's right edge; the canvas
@@ -82,10 +82,10 @@ try {
 	await page.mouse.down();
 	await page.mouse.move(edge.x + 4 + 96, 410, { steps: 6 });
 	await page.mouse.up();
-	say("dragging the panel's edge makes it wider, and the canvas is told", (await settled("360px")) === "360px", await inset());
-	say("the width is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === "360");
+	say("dragging the panel's edge makes it wider, and the canvas is told", (await settled("416px")) === "416px", await inset());
+	say("the width is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === "416");
 	await page.locator(".panel-resize").dblclick();
-	say("a double-click on the edge puts the width back", (await settled("264px")) === "264px", await inset());
+	say("a double-click on the edge puts the width back", (await settled("320px")) === "320px", await inset());
 
 	/*
 	 * A tab strip, and it is not the one that was removed.
@@ -106,9 +106,10 @@ try {
 	 * the stage you were already looking at, which is what the app opens on.
 	 */
 	const tabs = await page.locator('.panel-shell [role="tab"]').allInnerTexts();
-	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards"]), JSON.stringify(tabs));
+	say("three tabs, agents first, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards", "Apps"]), JSON.stringify(tabs));
 	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
-	say("…agents first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
+	// The panel remembers its tab on this device; the harness leaves it on Boards (`harness.mjs`, `panelTab`).
+	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
 
 	/*
 	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip
@@ -117,12 +118,13 @@ try {
 	 * back to 28 is exactly the kind of regression nobody files.
 	 */
 	const header = await page.evaluate(() => ({
-		strip: Math.round(document.querySelector(".panel-shell .segmented")?.getBoundingClientRect().height ?? 0),
-		field: Math.round(document.querySelector(".panel-shell .field")?.getBoundingClientRect().height ?? 0),
+		strip: Math.round(document.querySelector(".panel-shell .v3-nav-tab")?.getBoundingClientRect().height ?? 0),
+		field: Math.round(document.querySelector(".panel-shell .v3-search")?.getBoundingClientRect().height ?? 0),
 		label: Math.round(document.querySelector(".panel-meta")?.getBoundingClientRect().height ?? 0),
 	}));
-	say("the strip and the field are both 32px", header.strip === 32 && header.field === 32, JSON.stringify(header));
-	say("…and the section labels grew with them", header.label === 22, `${header.label}px`);
+	// v3: 30px tabs, a 32px search, 28px section heads.
+	say("the tabs are 30px and the field 32px", header.strip === 30 && header.field === 32, JSON.stringify(header));
+	say("…and the section heads are 28px", header.label === 28, `${header.label}px`);
 
 	/*
 	 * Every board is in it, whoever is holding what. A fresh agent holds nothing, so this is
@@ -377,8 +379,7 @@ try {
 	 * unmount: it declares no inset, so the camera takes the whole window back, and it takes
 	 * no clicks, so a board along the left edge is still reachable through where it was.
 	 */
-	const toggle = page.locator('.pill button[aria-label$="the boards panel"]').first();
-	await toggle.click();
+	await page.locator('button[aria-label="Hide the side panel"]').first().click();
 	await page.waitForFunction(() => !document.querySelector("[data-inset='left']"), null, { timeout: 4000 });
 	say("folded, it declares no inset", (await mounted()) === 0);
 	const freed = await settled("0px");
@@ -398,10 +399,10 @@ try {
 	 * and a transform is not a resize, so nothing measured it again. The canvas kept the
 	 * whole window for the rest of the session.
 	 */
-	await toggle.click();
+	await page.locator('button[aria-label="Show the side panel"]').first().click();
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
-	const told = await settled("264px");
-	say("unfolded, the camera is told again", told === "264px", told);
+	const told = await settled("320px");
+	say("unfolded, the camera is told again", told === "320px", told);
 
 	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");

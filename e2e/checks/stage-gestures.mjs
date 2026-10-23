@@ -125,7 +125,7 @@ const count = (selector) => page.evaluate((s) => document.querySelectorAll(s).le
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
 say("the canvas is browsing", (await page.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
-say("…and the stage's seven tools are there, with no cursor among them: that is the browse button", (await count(".pen-tools button[data-tool]")) === 7 && (await count('.pen-tools [data-tool="select"]')) === 0);
+say("…and the tool column is there, select pressed: that is browsing", (await count(".pen-tools button[data-tool]")) >= 10 && (await page.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
 await settle(page, 300);
@@ -598,7 +598,7 @@ let ITEM_WASH = "";
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
-await page.click('[aria-label="Draw on the canvas"]');
+await page.click('.v3-tool[data-tool="pen"]');
 await page.waitForSelector(".stage-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
@@ -637,7 +637,7 @@ await page.waitForSelector(".stage-ink");
 	await page.mouse.up();
 	const stroke = await until(() => onDisk().children.find((n) => !had2.has(n.id) && n.metadata?.type === "decks.ink"));
 	await settle(page, 400);
-	await page.click('.ink-bar [aria-label^="Lasso"]');
+	await page.click('.v3-tray [aria-label^="Lasso"]');
 	await page.mouse.click(p.x + 80, p.y + 10);
 	const corner = await until(() => page.evaluate(() => {
 		const c = document.querySelector('.ink-corner[data-corner="se"]');

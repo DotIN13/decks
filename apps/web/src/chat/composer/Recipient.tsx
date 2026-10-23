@@ -20,6 +20,8 @@ export interface RecipientProps {
 	onClose: (id: string) => void;
 	/** Open the Agents panel, for the agents the list has no room for. */
 	onMore?: () => void;
+	/** In the composer's row: the chip alone, without "To". */
+	compact?: boolean;
 }
 
 /**
@@ -48,12 +50,14 @@ export function Recipient(props: RecipientProps) {
 	const agentId = createMemo(() => agent()?.id);
 	const face = (
 		<Show when={agentId()}>
-			{(id) => <AgentFace chat={props.chats.find((chat) => chat.id === id())!} identity={props.identities[id()]} size={16} ring={1} />}
+			{(id) => <AgentFace chat={props.chats.find((chat) => chat.id === id())!} identity={props.identities[id()]} size={props.compact ? 20 : 16} ring={1} />}
 		</Show>
 	);
 	return (
-		<span class="dock-to" data-dest={props.label} data-kind={props.dest.kind}>
-			<span class="dock-to-word">To</span>
+		<span class="dock-to" data-dest={props.label} data-kind={props.dest.kind} data-compact={props.compact ? "true" : undefined}>
+			<Show when={!props.compact}>
+				<span class="dock-to-word">To</span>
+			</Show>
 			<AgentMenu
 				chats={props.chats}
 				identities={props.identities}

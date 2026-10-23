@@ -15,7 +15,7 @@
  * gesture. So what arrives here is always meant to be a board, and a path this deck does not
  * hold is a broken link, which the app says in a notice.
  *
- * Same-origin, like the rest of the frame protocol (`live-chat.ts`), and guarded the same two
+ * Same-origin, like the rest of the frame protocol, and guarded the same two
  * ways: the message has to come from *this* frame's window, and the path is checked before it
  * is used for anything.
  */

@@ -193,8 +193,7 @@ export function Stream(props: {
 	/**
 	 * The rows, folded into one card per turn.
 	 *
-	 * Which is `chat/turn-cards.ts`'s job now — the fold is shared with the mirror board, which
-	 * draws the same cards and used to draw its own slightly different set of them. What is left
+	 * Which is `chat/turn-cards.ts`'s job now. What is left
 	 * here is the window: `shown()` is the part of the conversation in the DOM, and the fold is
 	 * applied to that rather than to everything held.
 	 */

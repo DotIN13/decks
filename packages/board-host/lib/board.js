@@ -1515,17 +1515,6 @@
 		}
 	}
 
-	/** A live component: fed by the app, over `postMessage`, and never from the file. */
-	async function mountLive(host) {
-		try {
-			const module = await needModule("live-chat.js");
-			module.mountLiveChat(host, { markdown: renderMarkdown });
-		} catch (error) {
-			host.textContent = `Cannot show this conversation: ${error.message}`;
-			host.dataset.state = "broken";
-		}
-	}
-
 	/** A document page, typed into and kept in step with its file — `lib/live-doc.js`, relayed by the app. */
 	async function mountLiveDoc(host) {
 		try {
@@ -1618,12 +1607,9 @@
 		 * Live components, which are not documents.
 		 *
 		 * A `[data-live]` box draws itself from something the app is holding rather than
-		 * from anything in the file — a conversation, today. Loaded on demand like every
+		 * from anything in the file. Loaded on demand like every
 		 * other renderer here, so a board without one never fetches it.
 		 */
-		for (const element of document.querySelectorAll('[data-live="chat"]')) {
-			work.push(mountLive(element));
-		}
 		for (const element of document.querySelectorAll('[data-live="web"]')) {
 			work.push(mountLiveWeb(element));
 		}

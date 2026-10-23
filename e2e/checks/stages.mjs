@@ -108,7 +108,7 @@ say("…and the server says so too", sent.find((one) => one.name === wanted)?.ag
  * several boards at once. Pinned here as well as in the unit test because the number that matters
  * is the one that comes out of the whole round trip — the pick, the boards arriving, the camera.
  */
-const zoom = await page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const zoom = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 say("…at the arriving zoom, the same for every stage", zoom === 30, `${zoom}%`);
 say("…and says nothing about it: a toast for a thing you just did is noise", (await page.evaluate(() => document.querySelectorAll(".notice").length)) === 0);
 

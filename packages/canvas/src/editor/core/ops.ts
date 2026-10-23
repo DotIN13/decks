@@ -305,7 +305,8 @@ export function drawnOp(tool: MakingTool, id: string, at: Pt, end: Pt, options: 
 	return { op: insertOp(node, box, options.parent), node, box: typingBox(tool, x1, y1, w, h) };
 }
 
-/** A new arrow between two ends (`newArrowEnds` in `arrows.ts`), curved, in the drawing's grey. */
-export function arrowInsertOp(id: string, from: unknown, to: unknown): InsertOp {
-	return { op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to, route: "curved" } } as Partial<PenNode> & { type: string } };
+/** A new arrow between two ends (`newArrowEnds` in `arrows.ts`), curved unless asked otherwise, in the drawing's grey. */
+export function arrowInsertOp(id: string, from: unknown, to: unknown, style: { route?: "straight" | "curved" | "elbow"; heads?: "end" | "none" } = {}): InsertOp {
+	const metadata = { type: ARROW, from, to, route: style.route ?? "curved", ...(style.heads && style.heads !== "end" ? { heads: style.heads } : {}) };
+	return { op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata } as Partial<PenNode> & { type: string } };
 }

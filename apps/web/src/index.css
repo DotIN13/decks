@@ -45,6 +45,8 @@
 @import "../../../packages/canvas/styles/properties.css";
 /* The tokens are the canvas's (`@decks/canvas`), after every sheet, where they always were. */
 @import "../../../packages/canvas/styles/tokens.css";
+/* The v3 harness: its colours on the chrome, the canvas kept as it was, and its surfaces (`styles/v3.css`). */
+@import "./styles/v3.css";
 
 
 /*

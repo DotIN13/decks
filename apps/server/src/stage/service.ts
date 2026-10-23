@@ -32,8 +32,6 @@ export interface StageHost {
 	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string;
 	/** The board that shows an app, `boards/apps/<name>.html`; the one it has if it has one. */
 	newAppBoard(name: string, title: string): string;
-	/** A live board: a stub that draws one agent's conversation. See `App.newMirror`. */
-	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string;
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Board;
 	/** What the canvas last measured of this board, if what it measured was this revision. */
@@ -277,17 +275,6 @@ export class StageService {
 	/** A new blank board — the shell, so the agent writes only the content. */
 	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string {
 		return this.host.newBoard(options);
-	}
-
-	/**
-	 * A mirror: a board that is a live view of an agent's conversation.
-	 *
-	 * The file it writes is a stub and stays one — the turns arrive in the browser, from a
-	 * transcript this app is already holding, so nothing here streams and nothing here is
-	 * rewritten as the conversation grows (`lib/live-chat.js`).
-	 */
-	mirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string {
-		return this.host.newMirror(options);
 	}
 
 	/**

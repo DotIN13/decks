@@ -66,7 +66,7 @@ say("flying to a board selects it from its title bar", (await selected()).includ
  * along. The case that did nothing is above that threshold, so the check has to be above it too.
  */
 for (let i = 0; i < 6; i++) {
-	const level = Number(((await page.locator('.pill [aria-label^="Zoom"]').textContent()) ?? "0").replace(/[^0-9.]/g, ""));
+	const level = Number(((await page.locator('.v3-zoom-value').textContent()) ?? "0").replace(/[^0-9.]/g, ""));
 	if (level <= 62) break;
 	await page.keyboard.press("Control+Minus");
 	await settle(page, 300);

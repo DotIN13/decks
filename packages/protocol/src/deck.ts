@@ -56,7 +56,7 @@ export interface Board {
 	 */
 	shell?: "content" | "foreign";
 	/**
-	 * What this board is a live view of, when it is one: `chat` for a mirror, `web` for the
+	 * What this board is a live view of, when it is one: `web` for the
 	 * shared-Chrome card, `agents` for an orchestration board.
 	 *
 	 * Read off the file's own `data-live` attribute — a cheap source scan — because the board

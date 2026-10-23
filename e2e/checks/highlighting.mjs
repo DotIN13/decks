@@ -207,7 +207,7 @@ try {
 		await settle(app.page, 800);
 		for (let attempt = 0; attempt < 8; attempt++) {
 			const level = await app.page.evaluate(() =>
-				Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
+				Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
 			);
 			if (level >= 70 && level <= 200) break;
 			await app.page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");

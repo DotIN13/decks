@@ -162,7 +162,7 @@ function importMapTag(): string {
  * Titles are often not English — the first board written in this app was in Chinese — so
  * anything left after stripping the shape of a filename is kept rather than mangled, and a
  * title that reduces to nothing falls back to `fallback` (the word that names what is being
- * made: `board`, `mirror`, `web`).
+ * made: `board`, `web`).
  */
 export function slugFor(title: string, fallback = "board"): string {
 	const slug = title
@@ -177,46 +177,6 @@ export function slugFor(title: string, fallback = "board"): string {
 
 function escapeHtml(text: string): string {
 	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/** The default size of a mirror: tall and narrow, because a conversation is a column. */
-export const MIRROR_SIZE = { w: 560, h: 900 };
-
-/**
- * The whole document of a live board.
- *
- * Four lines that never change, which is the point: a mirror's content is a conversation
- * the app is already holding, fed in over `postMessage` by `board/live-chat.ts` and drawn
- * by `lib/live-chat.js`. Nothing here is written again as the conversation grows — no
- * watcher event, no revision churn, and a board file somebody can read and understand.
- *
- * The component fills the board (board.css, `body.board > .live`), so the page measures exactly
- * the board's height: a mirror never clips and `decks.canvas.fit` has nothing to do to it. The
- * growth happens inside, where the list scrolls.
- */
-export function renderMirror(name: string, agentId: string, size?: { w?: number; h?: number }): string {
-	const w = Math.round(size?.w ?? MIRROR_SIZE.w);
-	const h = Math.round(size?.h ?? MIRROR_SIZE.h);
-	return `<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>${escapeHtml(name)}, the conversation</title>
-		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
-		<link rel="stylesheet" href="../../lib/board.css" />
-	</head>
-	<body class="board">
-		<div
-			class="live"
-			data-id="mirror"
-			data-live="chat"
-			data-agent="${escapeHtml(agentId)}"
-		></div>
-
-		<script src="../../lib/board.js"></script>
-	</body>
-</html>
-`;
 }
 
 /** The default size of the shared-browser card: a short, wide status card. */
@@ -304,7 +264,7 @@ export function renderAppBoard(name: string, title: string, size?: { w?: number;
 /**
  * The status board for the user's shared Chrome.
  *
- * A stub, like a mirror: the component carries `data-live="web"` and draws itself from the
+ * A stub: the component carries `data-live="web"` and draws itself from the
  * `web.status` the app is already holding (`board/live-chat.ts` feeds it, `lib/live-web.js`
  * draws it). There is deliberately no picture of the tab in it — the tab is on the user's own
  * screen — so the card says which tab is shared, whether it is connected, what the agent did,

@@ -133,6 +133,8 @@ export function NewAgentButton(props: {
 	label?: string;
 	class?: string;
 	size?: number;
+	/** Words beside the `+`, for a row that says what it does ("New agent"). */
+	text?: string;
 }) {
 	let dismiss: (() => void) | undefined;
 	return (
@@ -155,6 +157,7 @@ export function NewAgentButton(props: {
 						onClick={api.toggle}
 					>
 						<Icon of={Plus} size={props.size ?? 15} />
+						<Show when={props.text}>{(text) => <span class="new-agent-text">{text()}</span>}</Show>
 					</button>
 				);
 			}}

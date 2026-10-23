@@ -42,7 +42,8 @@ const middleShown = () => page.evaluate(() => {
 	const [, , , zoom, tx, ty] = m.map(Number);
 	return { x: -tx, y: -ty, zoom };
 });
-const near = (camera) => !!camera && camera.x > 5800 && camera.x < 6900 && camera.y > 3800 && camera.y < 4800;
+/* The window's middle, not the canvas's: the side panel (320px) moves the framed middle half its width right, 533 world units at 0.3. */
+const near = (camera) => !!camera && camera.x > 5600 && camera.x < 6900 && camera.y > 3800 && camera.y < 4800;
 
 // Switch the conversation on screen to that canvas: the camera must land on the notes.
 link.send({ type: "agent.stage", id: focused, stage: canvas });

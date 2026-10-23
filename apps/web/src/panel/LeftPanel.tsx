@@ -1,11 +1,17 @@
 import { Switcher } from "../connections/Switcher.tsx";
 import { can } from "../connections/backend.ts";
 import type { Board, DeckPen } from "@decks/protocol";
-import Rows2 from "lucide-solid/icons/rows-2";
-import Rows3 from "lucide-solid/icons/rows-3";
+import AppWindow from "lucide-solid/icons/app-window";
+import ChevronDown from "lucide-solid/icons/chevron-down";
+import ChevronRight from "lucide-solid/icons/chevron-right";
+import FileText from "lucide-solid/icons/file-text";
+import Folder from "lucide-solid/icons/folder";
+import PanelLeftClose from "lucide-solid/icons/panel-left-close";
+import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
+import Sparkles from "lucide-solid/icons/sparkles";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { BoardRow } from "./BoardRow.tsx";
@@ -75,11 +81,15 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * Two genuinely different collections, which is what makes a strip defensible here — see the
  * note on the `chats` prop.
  */
-export type PanelTab = "agents" | "boards";
+export type PanelTab = "agents" | "boards" | "apps";
 
-/** The strip's order: who is working, then what is on the stage. The panel still opens on Boards. */
-const PANEL_TABS: PanelTab[] = ["agents", "boards"];
-const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Boards" };
+/** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
+const PANEL_TABS: PanelTab[] = ["agents", "boards", "apps"];
+const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Boards", apps: "Apps" };
+const PANEL_TAB_ICON = { agents: Sparkles, boards: FileText, apps: AppWindow };
+
+/** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
+export type PanelApp = { name: string; title: string; status: string; board: string };
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
@@ -148,14 +158,22 @@ export function LeftPanel(props: {
 	onNewAgent?: (workspace: string | undefined, kind: AgentKind) => void;
 
 	onCloseAgent?: (id: string) => void;
-	/** Put a live view of that agent's conversation on the canvas (`board/live-chat.ts`). */
-	onMirrorAgent?: (id: string) => void;
 	/** Replace *your* tags on an agent. Absent means no row can be customised. */
 	onAgentTags?: (id: string, tags: string[]) => void;
 	/** Move an agent into a workspace, or out of one with `null`. */
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/** Rename an agent, from the edit window its row opens. */
 	onAgentRename?: (id: string, name: string) => void;
+
+	// --- the Apps tab -----------------------------------------------------------------
+	/** The deck's apps; asked for when the tab opens. */
+	apps?: PanelApp[];
+	onAppsOpen?: () => void;
+	/** Put an app's board on the canvas and go to it. */
+	onPickApp?: (app: PanelApp) => void;
+
+	/** The conversation, under the list: the v3 panel's lower half (`v3/ChatSection.tsx`). */
+	chat?: JSX.Element;
 }) {
 	const ids = createUniqueId();
 	/*
@@ -163,15 +181,8 @@ export function LeftPanel(props: {
 	 * list, not a question about it. Two is what it opens on, because the second line is the
 	 * one fact worth reading at a glance: what each agent is doing.
 	 */
-	const [lines, setLines] = createSignal<1 | 2>(readLines());
-	const goLines = (next: 1 | 2) => {
-		setLines(next);
-		try {
-			localStorage.setItem(LINES_KEY, String(next));
-		} catch {
-			// A private window with storage off keeps the choice for the session.
-		}
-	};
+	/* Two lines per agent, as v3 draws them: the name, kind and state, then the tags. */
+	const lines = (): 1 | 2 => 2;
 	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
 	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
 	/*
@@ -201,7 +212,36 @@ export function LeftPanel(props: {
 		return { left: side.left, right: side.right, width: side.width, top: row.top, bottom: row.bottom, height: row.height };
 	};
 	const [query, setQuery] = createSignal("");
-	const [tab, setTab] = createSignal<PanelTab>("boards");
+	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
+	const [tab, setTabRaw] = createSignal<PanelTab>(readTab());
+	const setTab = (next: PanelTab) => {
+		setTabRaw(next);
+		try {
+			localStorage.setItem(TAB_KEY, next);
+		} catch {
+			// Kept for the session.
+		}
+	};
+	createEffect(() => {
+		if (tab() === "apps" && props.open) props.onAppsOpen?.();
+	});
+	/* Workspace folders folded shut, remembered on this device. */
+	const [folded, setFolded] = createSignal<Set<string>>(readFolded());
+	const toggleFolder = (id: string) => {
+		const next = new Set(folded());
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		setFolded(next);
+		try {
+			localStorage.setItem(FOLDED_KEY, JSON.stringify([...next]));
+		} catch {
+			// Kept for the session.
+		}
+	};
+	const apps = createMemo(() => {
+		const q = query().trim().toLowerCase();
+		return (props.apps ?? []).filter((app) => !q || app.title.toLowerCase().includes(q) || app.name.toLowerCase().includes(q));
+	});
 	createEffect(() => {
 		const ask = props.ask;
 		if (ask) setTab(ask.tab);
@@ -227,23 +267,43 @@ export function LeftPanel(props: {
 		const from = width();
 		const start = event.clientX;
 		event.preventDefault();
-		handle.setPointerCapture(event.pointerId);
+		try {
+			handle.setPointerCapture(event.pointerId);
+		} catch {
+			// The window listeners below still end the drag.
+		}
 		setResizing(true);
 		// The composer and the pill glide when the sidebar folds; following a drag, a glide
 		// is a lag. Said on the root so their own stylesheets can answer it.
 		document.documentElement.dataset.panelResizing = "true";
-		const move = (moved: PointerEvent) => resizeTo(from + moved.clientX - start);
+		/* However the button comes up, here or anywhere, or a move with no button held: the drag ends. */
+		let done = false;
+		const move = (moved: PointerEvent) => {
+			if (moved.buttons === 0) return end();
+			resizeTo(from + moved.clientX - start);
+		};
 		const end = () => {
-			handle.removeEventListener("pointermove", move);
-			handle.removeEventListener("pointerup", end);
-			handle.removeEventListener("pointercancel", end);
+			if (done) return;
+			done = true;
+			window.removeEventListener("pointermove", move, true);
+			window.removeEventListener("pointerup", end, true);
+			window.removeEventListener("pointercancel", end, true);
+			window.removeEventListener("blur", end);
+			handle.removeEventListener("lostpointercapture", end);
+			try {
+				handle.releasePointerCapture(event.pointerId);
+			} catch {
+				// Already gone.
+			}
 			setResizing(false);
 			delete document.documentElement.dataset.panelResizing;
 			savePanelWidth(width());
 		};
-		handle.addEventListener("pointermove", move);
-		handle.addEventListener("pointerup", end);
-		handle.addEventListener("pointercancel", end);
+		window.addEventListener("pointermove", move, true);
+		window.addEventListener("pointerup", end, true);
+		window.addEventListener("pointercancel", end, true);
+		window.addEventListener("blur", end);
+		handle.addEventListener("lostpointercapture", end);
 	};
 	const onHandleKey = (event: KeyboardEvent) => {
 		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
@@ -348,6 +408,27 @@ export function LeftPanel(props: {
 
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
+	let nav: HTMLDivElement | undefined;
+	let navMark: HTMLSpanElement | undefined;
+	/* The tab marker slides under the tab that is showing, rather than each tab painting its own wash. */
+	const placeNavMark = () => {
+		const on = nav?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+		if (!on || !navMark) return;
+		navMark.style.width = `${on.offsetWidth}px`;
+		navMark.style.transform = `translateX(${on.offsetLeft}px)`;
+	};
+	createEffect(() => {
+		tab();
+		props.open;
+		requestAnimationFrame(placeNavMark);
+	});
+	/* And again whenever the strip changes width: a narrower panel drops the tabs' icons (`styles/v3.css`). */
+	onMount(() => {
+		if (!nav || typeof ResizeObserver === "undefined") return;
+		const watch = new ResizeObserver(() => placeNavMark());
+		watch.observe(nav);
+		onCleanup(() => watch.disconnect());
+	});
 
 	/* `⌘K` used to open a tab as well as take the cursor. There is one list now, so finding
 	   a board is typing at it — and the query it lands on is whatever was already there. */
@@ -521,7 +602,7 @@ export function LeftPanel(props: {
 				 */
 				style={{ width: `${width()}px` }}
 				data-resizing={resizing() ? "true" : undefined}
-				class="float panel-shell fixed z-10 top-0 bottom-0 left-0 flex w-[264px] max-w-[86vw] flex-col rounded-none border-y-0 border-l-0 p-2"
+				class="panel-shell v3-panel fixed z-10 top-0 bottom-0 left-0 flex max-w-[86vw] flex-col"
 			>
 				{/* The right edge, as something to take hold of. A separator in the ARIA
 				    sense: focusable, arrow keys move it, Home puts the default back, and so
@@ -547,112 +628,61 @@ export function LeftPanel(props: {
 					The deck's mark, where a title bar would have put it, and now the switcher too: it names
 					the backend this tab is on and opens the others (`connections/Switcher.tsx`).
 				*/}
-				<div class="panel-mark">
-					<Switcher />
-				</div>
 				{/*
-					The header: which list, then a field over it.
-
-					**Both controls are 32px**, which is `--control-md` — the height a labelled chip
-					in the dock already is, so the panel's header matches the chrome across the top
-					of the app instead of sitting 4px shorter than everything in it. It was 28px
-					(`--field`), a value chosen for a box *inside a row*; asked twice whether that
-					read short, the answer was twice yes.
-
-					A strip is back, and `PanelTab` says why it is not the one that went: these are
-					two collections rather than one with a line through it.
-
-					On a coarse pointer both stay at 40px, which the field already had and which is
-					under the 44px the panel uses for anything pressed.
+					The head: the deck's mark and name (the switcher, `connections/Switcher.tsx`), and the
+					button that folds the panel away. Folded, the top bar carries both (`v3/TopBar.tsx`).
 				*/}
-				<div class="flex flex-none flex-col gap-2 pb-3">
-					{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-					<Show when={props.chats && can("agents")}>
-						{/*
-							The app's `.segmented`, at `h-8` — 28px buttons inside 2px of padding is a 32px
-							strip, matching the field below it. The removed Context/Deck strip was the
-							same object at `h-6`.
-						*/}
-						<div class="segmented w-full" role="tablist" aria-label="Panel">
-							{/*
-								**Agents first, then Boards.**
-
-								The order is the panel's own reading order rather than a claim about
-								which list matters more: the agents are the thing that *changes* while
-								you watch, and a list you check on is read before a list you browse.
-								The panel still opens on Boards, because that is the canvas you were
-								already looking at.
-							*/}
-							<For each={PANEL_TABS}>
-								{(name) => (
-									<button
-										type="button"
-										role="tab"
-										id={`${ids}-tab-${name}`}
-										aria-selected={tab() === name}
-										aria-controls={`${ids}-list`}
-										/* One tab stop for the strip, arrows within it — the ARIA tabs pattern,
-										   which is what keeps the panel three stops rather than five. */
-										tabindex={tab() === name ? 0 : -1}
-										data-on={tab() === name}
-										class="h-7 text-label pointer-coarse:h-9"
-										onClick={() => goTab(name)}
-										onKeyDown={(event) => {
-											if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-											event.preventDefault();
-											/* Left and right are the strip's order, which is this array's:
-											   `agents` then `boards` — so the other one is named here rather
-											   than derived, and these two lines are what a third tab would
-											   have to change. */
-											const step = event.key === "ArrowRight" ? 1 : -1;
-											const next = PANEL_TABS[(PANEL_TABS.indexOf(name) + step + PANEL_TABS.length) % PANEL_TABS.length] ?? name;
-											goTab(next);
-											document.getElementById(`${ids}-tab-${next}`)?.focus();
-										}}
-									>
-										{PANEL_TAB_LABEL[name]}
-									</button>
-								)}
-							</For>
-						</div>
-					</Show>
-					{/*
-						`.field` is 24px by default; the header's rhythm wants 32, and a utility beats
-						the layer it is defined in — which is the whole reason that layer exists.
-
-						`flex-none` is load-bearing, not tidying. `.field` carries `flex: 1` for the
-						inspector's row of four, where it grows sideways; in a *column* that grow is
-						vertical, and a `flex-basis: 0` beats a stated height — so the field measured
-						its input's min-content and came out 19px instead of 32.
-					*/}
-					<div class="flex flex-none gap-1.5">
-					<label class="field h-8 min-w-0 flex-1 gap-1.5 rounded-lg pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
-						<Icon of={Search} class="flex-none text-faint" size={13} />
-						{/*
-							16px on a touch keyboard, like the composer's field and for the same reason:
-							below 16 the browser zooms the page when the input takes focus, which leaves
-							the canvas at a scale nobody chose and the chrome half off screen. It is the
-							one number in this component that is not about how it looks.
-						*/}
+				<div class="v3-panel-head">
+					<div class="panel-mark">
+						<Switcher />
+					</div>
+					<span class="flex-1" />
+					<button type="button" class="v3-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+						<Icon of={PanelLeftClose} size={17} />
+					</button>
+				</div>
+				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
+				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
+					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
+					<For each={PANEL_TABS.filter((name) => name !== "agents" || (props.chats && can("agents")))}>
+						{(name) => (
+							<button
+								type="button"
+								role="tab"
+								id={`${ids}-tab-${name}`}
+								aria-selected={tab() === name}
+								aria-controls={`${ids}-list`}
+								tabindex={tab() === name ? 0 : -1}
+								data-on={tab() === name ? "true" : undefined}
+								class="v3-nav-tab"
+								onClick={() => goTab(name)}
+								onKeyDown={(event) => {
+									if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+									event.preventDefault();
+									const step = event.key === "ArrowRight" ? 1 : -1;
+									const next = PANEL_TABS[(PANEL_TABS.indexOf(name) + step + PANEL_TABS.length) % PANEL_TABS.length] ?? name;
+									goTab(next);
+									document.getElementById(`${ids}-tab-${next}`)?.focus();
+								}}
+							>
+								<Icon of={PANEL_TAB_ICON[name]} size={16} />
+								{PANEL_TAB_LABEL[name]}
+							</button>
+						)}
+					</For>
+				</div>
+				<div class="v3-search-wrap">
+					<label class="v3-search">
+						<Icon of={Search} class="flex-none" size={15} />
 						<input
 							ref={field}
 							type="text"
 							spellcheck={false}
-							class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-							/* Says what it will match, which for agents includes the tags — “who else is
-							   on panel-css” is the question tags exist to answer, and this is the surface
-							   with room to show the answer. */
-							placeholder={
-								tab() === "agents"
-									? `Search ${agentCount()} agent${agentCount() === 1 ? "" : "s"}`
-									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
-							}
+							placeholder={tab() === "agents" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
 								if (event.key === "Escape") {
-									// Clear first, leave second: two presses, and the second is what
-									// hands `⌘\` and the canvas's own keys back.
 									event.preventDefault();
 									if (query()) type("");
 									else event.currentTarget.blur();
@@ -661,19 +691,16 @@ export function LeftPanel(props: {
 									event.preventDefault();
 									focusRow(0);
 								}
-								// The commonest search is two letters from one answer.
 								if (event.key === "Enter") {
 									const only = rows();
 									if (only.length === 1) only[0]?.click();
 								}
 							}}
 						/>
-						<Show when={query()}>
-							{/* `.icon-button` is 28px, and 44px on a coarse pointer, which would burst a
-							    24px field — so this one is sized by a utility instead. */}
+						<Show when={query()} fallback={<kbd class="v3-kbd">⌘K</kbd>}>
 							<button
 								type="button"
-								class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
+								class="v3-icon v3-search-clear"
 								aria-label="Clear the search"
 								onClick={() => {
 									type("");
@@ -684,24 +711,6 @@ export function LeftPanel(props: {
 							</button>
 						</Show>
 					</label>
-					{/*
-						One control beside the search, on Agents only: one line or two per agent. The
-						boards list is one way, a line per board with no picture, so it has nothing to
-						switch. `data-view` is what is showing now, for a check.
-					*/}
-					<Show when={tab() === "agents"}>
-						<button
-							type="button"
-							class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
-							data-view={`lines-${lines()}`}
-							aria-label={lines() === 2 ? "One line per agent" : "Two lines per agent"}
-							title={lines() === 2 ? "One line per agent" : "Two lines per agent"}
-							onClick={() => goLines(lines() === 2 ? 1 : 2)}
-						>
-							<Icon of={lines() === 2 ? Rows3 : Rows2} size={13} />
-						</button>
-					</Show>
-					</div>
 				</div>
 
 				<div
@@ -768,28 +777,19 @@ export function LeftPanel(props: {
 										props.onAgentWorkspace?.(id, section.kind === "workspace" ? section.label : null);
 									}}
 								>
-									<div class="panel-meta meta">
-										<span class="truncate">{section.label}</span>
-										<span class="flex-1" />
-										{/*
-											What the *group* is doing, where the group is a workspace.
-
-											A section you are not in can be the one that needs you, and this is what says so
-											without reading its rows — `1 wants you`, then `2 working`, then nothing. Written in
-											the heading's right-hand column, inboard of the count, so the two are read together.
-										*/}
+									<div class="v3-folder-head" data-folded={folded().has(section.id) ? "true" : undefined}>
+										<button type="button" class="v3-folder-toggle" aria-expanded={!folded().has(section.id)} title={folded().has(section.id) ? `Show ${section.label}` : `Fold ${section.label}`} onClick={() => toggleFolder(section.id)}>
+											<Icon of={folded().has(section.id) ? ChevronRight : ChevronDown} size={13} class="v3-folder-chev" />
+											<Icon of={Folder} size={15} class="v3-folder-icon" />
+											<span class="v3-folder-name truncate">{section.label}</span>
+										</button>
 										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
-										{/*
-											No count: the rows are right under it, and what the slot is for is a
-											`+` — an agent made from under a project's heading is in that project, and one made
-											under `No workspace` is in none.
-										*/}
 										<Show when={props.onNewAgent}>
 											<NewAgentButton
 												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
 												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
-												class="size-5 flex-none rounded-sm pointer-coarse:size-8"
-												size={12}
+												class="v3-folder-add"
+												size={14}
 											/>
 										</Show>
 									</div>
@@ -802,6 +802,8 @@ export function LeftPanel(props: {
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
 									*/}
+									{/* Folded by its height (`styles/v3.css`), so the rows slide shut rather than vanish. */}
+									<div class="v3-folder-body" data-open={folded().has(section.id) ? "false" : "true"} aria-hidden={folded().has(section.id)}>
 									<div class="row-list agent-list" data-lines={lines()}>
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
@@ -817,14 +819,17 @@ export function LeftPanel(props: {
 												taken={(name) => nameTaken(name, row.chat.id)}
 												lines={lines()}
 												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
-												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}
 									</For>
 									</div>
+									</div>
 								</div>
 							)}
 						</For>
+						<Show when={props.onNewAgent}>
+							<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} label="New agent" class="v3-new-agent" size={15} text="New agent" />
+						</Show>
 
 						{/* The same shape of empty state the boards list has, and the same reasoning:
 						    a panel that is blank for a good reason still looks broken without it. */}
@@ -908,7 +913,31 @@ export function LeftPanel(props: {
 						</p>
 					</Show>
 					</Show>
+					<Show when={tab() === "apps"}>
+						<div class="row-list v3-apps">
+							<For each={apps()}>
+								{(app) => (
+									<button type="button" class="v3-app-row" data-row title={`${app.title}: put its board on the canvas`} onClick={() => props.onPickApp?.(app)}>
+										<span class="v3-app-icon" aria-hidden="true">
+											<Icon of={AppWindow} size={15} />
+										</span>
+										<span class="v3-app-name truncate">{app.title}</span>
+										<span class="v3-app-state" data-status={app.status}>
+											{app.status}
+										</span>
+									</button>
+								)}
+							</For>
+							<Show when={apps().length === 0}>
+								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
+									{props.apps === undefined ? "Looking for apps…" : query().trim() ? `No app matches “${query().trim()}”.` : "This deck has no apps yet. Ask an agent for one."}
+								</p>
+							</Show>
+						</div>
+					</Show>
 				</div>
+
+				{props.chat}
 
 				{/* In the one-line view the row says who and what it is doing; the card says the rest. */}
 				<Show when={card()}>
@@ -928,14 +957,26 @@ export function LeftPanel(props: {
 	);
 }
 
-const LINES_KEY = "decks.agentLines";
+const FOLDED_KEY = "decks.foldedWorkspaces";
+const TAB_KEY = "decks.panelTab";
 
-/** The remembered line count for agent rows; two when nothing is stored. */
-function readLines(): 1 | 2 {
+/** The panel's tab when it was last left, or Agents. */
+function readTab(): PanelTab {
 	try {
-		return localStorage.getItem(LINES_KEY) === "1" ? 1 : 2;
+		const saved = localStorage.getItem(TAB_KEY);
+		return saved === "boards" || saved === "apps" ? saved : "agents";
 	} catch {
-		return 2;
+		return "agents";
+	}
+}
+
+/** The workspace folders folded shut on this device. */
+function readFolded(): Set<string> {
+	try {
+		const raw = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
+		return new Set(Array.isArray(raw) ? raw.filter((one): one is string => typeof one === "string") : []);
+	} catch {
+		return new Set();
 	}
 }
 

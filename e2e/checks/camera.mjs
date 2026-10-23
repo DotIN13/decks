@@ -92,7 +92,7 @@ const fitted = await page.evaluate(() => {
 			(r) => r.left >= stage.left - 2 && r.right <= stage.right + 2 && r.top >= stage.top - 2 && r.bottom <= stage.bottom + 2,
 		),
 		count: nodes.length,
-		level: document.querySelector('.pill [aria-label^="Zoom"]').textContent,
+		level: document.querySelector('.v3-zoom-value').textContent,
 	};
 });
 // The count comes from the deck, not a literal: this asserted 3 and started failing the

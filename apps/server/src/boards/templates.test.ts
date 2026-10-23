@@ -108,7 +108,7 @@ test("slugs are file names, and survive titles that are not English", () => {
 	assert.equal(slugFor("蓝翔技校 招生落地页"), "蓝翔技校-招生落地页");
 	// Nothing usable left: fall back to the word for what is being made, not `.html`.
 	assert.equal(slugFor("!!!"), "board");
-	assert.equal(slugFor("!!!", "mirror"), "mirror");
+	assert.equal(slugFor("!!!", "web"), "web");
 	assert.ok(slugFor("x".repeat(200)).length <= 48);
 });
 

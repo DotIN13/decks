@@ -100,15 +100,6 @@ export type ClientMessage =
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
-	/**
-	 * Put a live view of one agent's conversation on the canvas.
-	 *
-	 * The board it makes never changes as the conversation grows — its turns arrive in the
-	 * browser, from a transcript this app already holds (`board/live-chat.ts`). Asking
-	 * twice for the same agent lands on the board that already exists.
-	 */
-	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */
-	| { type: "agent.mirror"; agentId: string; request?: string }
 	| { type: "board.play"; path: string; /** The stage on screen. */ stage?: string }
 	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */
 	| { type: "board.seen"; path: string }
@@ -247,8 +238,7 @@ export type ClientMessage =
 	 */
 	| { type: "chat.earlier"; agentId: string; before: string; limit?: number }
 	/**
-	 * A conversation's history, asked for when it is shown — by opening it, or by a mirror
-	 * board of it. It used to be part of the greeting, for every chat at once: 8.2 MB on the
+	 * A conversation's history, asked for when it is shown — by opening it. It used to be part of the greeting, for every chat at once: 8.2 MB on the
 	 * live deck, with the one on screen greeted last. Answered to the asker alone.
 	 */
 	| { type: "chat.open"; agentId: string }

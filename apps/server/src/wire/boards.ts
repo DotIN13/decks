@@ -172,27 +172,6 @@ export const boards = {
 		wire.boards.deleteBoard(message.path, reply);
 	},
 
-	/*
-	 * A mirror, from the Agents tab.
-	 *
-	 * Created *and* played, the way `board.create` is, because nobody asks for a
-	 * window onto a conversation in order to leave it closed. The name comes from
-	 * the agent rather than from the person pressing the button, so two people
-	 * mirroring the same agent land on the same board.
-	 */
-	"agent.mirror": (message, reply, wire) => {
-		const of = wire.agents.summaries().find((candidate) => candidate.id === message.agentId);
-		if (!of) {
-			reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
-			return;
-		}
-		const path = wire.boards.newMirror({ agentId: of.id, name: of.name });
-		const agent = wire.target();
-		agent.setInPlay([...agent.inPlay, path], { place: true });
-		// After the board is placed, so the browser that asked can fly to where it actually landed.
-		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
-	},
-
 	"boards.restore": (message, reply, wire) => {
 		/*
 		 * The one place a preview turns into a write, and it takes a click of its

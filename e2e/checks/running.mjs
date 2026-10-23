@@ -36,7 +36,7 @@ let sawBusyComposer = false;
 let sign = null;
 for (let i = 0; i < 300; i += 1) {
 	const now = await page.evaluate(() => {
-		const mark = document.querySelector(".statusline[data-working='true'] .mark");
+		const mark = document.querySelector(".v3-status .v3-status-sign");
 		const moving = mark?.querySelector("text, rect");
 		return {
 			/*
@@ -45,7 +45,7 @@ for (let i = 0; i < 300; i += 1) {
 			 * `.stream-roll .turn[data-state="running"]`, and the spine was deleted in the
 			 * rewrite, so the count was of nothing and could only ever be zero.
 			 */
-			dock: document.querySelectorAll('.statusline[data-working="true"]').length,
+			dock: document.querySelectorAll('.v3-status').length,
 			// One control, two meanings: `data-stop` is on it exactly while the agent is not idle.
 			busy: document.querySelector('.send-button[data-stop="true"]') !== null,
 			row: Math.round(document.querySelector(".statusrow")?.getBoundingClientRect().height ?? -1),
@@ -166,7 +166,7 @@ say(
 
 const signAfterCommand = await page.evaluate(() => ({
 	stop: document.querySelector('.send-button[data-stop="true"]') !== null,
-	working: document.querySelectorAll('.statusline[data-working="true"]').length,
+	working: document.querySelectorAll('.v3-status').length,
 }));
 say(
 	"…so the row stops working and the send button stops offering stop",

@@ -90,7 +90,7 @@ const look = () =>
 		const world = document.querySelector(".world");
 		return {
 			world: world ? (world.getAttribute("style") ?? "").replace(/\s+/g, " ") : "?",
-			zoom: document.querySelector('.pill [aria-label^="Zoom"]')?.textContent?.trim(),
+			zoom: document.querySelector('.v3-zoom-value')?.textContent?.trim(),
 			shown: [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path),
 			typed: document.querySelector(".dockfield")?.textContent ?? "",
 			selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,

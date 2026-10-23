@@ -6,7 +6,7 @@ import { send, started } from "./socket.ts";
 /**
  * The browser's window over a conversation, and the server's copy behind it.
  *
- * A history is asked for when a chat is **shown** — opened, or mirrored on a board — rather
+ * A history is asked for when a chat is **shown** — opened — rather
  * than greeted: the greeting used to carry every chat's, 8.2 MB on the live deck, with the
  * one on screen arriving last. Two flags on the agent's scratch record keep that from being
  * asked twice, and they are not reactive because nothing renders from them.

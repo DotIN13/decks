@@ -53,7 +53,6 @@ const CHECKS = [
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "chat-content.mjs", needsAgent: false },
 	{ file: "slash.mjs", needsAgent: false },
-	{ file: "mirror.mjs", needsAgent: false },
 	{ file: "notifications.mjs", needsAgent: false },
 	{ file: "geometry.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },

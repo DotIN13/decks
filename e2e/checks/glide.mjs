@@ -89,7 +89,7 @@ say(
  * rest the pixels and the reading have to be the same number, and that is the whole argument for
  * writing the signal per frame rather than once at the end.
  */
-const pill = await page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const pill = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zoom * 100) <= 1, `${pill}% against ${(to.zoom * 100).toFixed(1)}%`);
 
 // --- a link on a board ------------------------------------------------------------------
@@ -101,7 +101,7 @@ say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zo
  */
 await watched(row("plan.html"), 400);
 for (let i = 0; i < 8; i++) {
-	const level = await page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+	const level = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 	if (level >= 70 && level <= 260) break;
 	await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 	await settle(page, 200);

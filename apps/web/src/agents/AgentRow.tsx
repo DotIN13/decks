@@ -1,5 +1,4 @@
 import type { Identity } from "@decks/protocol";
-import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
@@ -41,14 +40,6 @@ export function AgentRow(props: {
 	onClose: () => void;
 	/** Replace *your* tags on this agent. Absent means the row cannot be customised. */
 	onTags?: (tags: string[]) => void;
-	/**
-	 * Put a live view of this agent's conversation on the canvas.
-	 *
-	 * Here rather than only on the conversation you are reading, because the better half of
-	 * a mirror is the agent you are *not* talking to — and this list is where you are
-	 * looking at them. Absent means the row cannot be mirrored.
-	 */
-	onMirror?: () => void;
 	/**
 	 * Move this agent into a workspace, or out of one with `null`.
 	 *
@@ -121,10 +112,8 @@ export function AgentRow(props: {
 	 * the one thing about a parked agent that is worth reading. The row's `title` still says it
 	 * in words for anyone who rests on it.
 	 */
-	const shortState = () => {
-		if (!chat().dormant) return rowWords(props.row.status, chat().state, chat().lastAt);
-		return chat().lastAt === undefined ? "never run" : since(chat().lastAt);
-	};
+	/* The row's end: what it is doing, or compactly how long ago (`rowWords`); a parked agent the same. */
+	const shortState = () => (chat().dormant ? rowWords("idle", chat().state, chat().lastAt) : rowWords(props.row.status, chat().state, chat().lastAt));
 
 	/**
 	 * The tags on the second line: the agent's own first, then yours — what it says it is doing,
@@ -220,7 +209,7 @@ export function AgentRow(props: {
 					it the avatar and the name stacked instead of sitting side by side.
 				*/}
 				<span class="row-icon">
-					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={props.lines === 1 ? 20 : 26} ring={props.lines === 1 ? 1.5 : 1.75} />
+					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={props.lines === 1 ? 20 : 24} ring={1.5} />
 				</span>
 
 				<span class="agent-body">
@@ -336,33 +325,6 @@ export function AgentRow(props: {
 				that cannot be pressed is worth drawing when its absence would be a mystery, and
 				this is not a mystery.
 			*/}
-			{/*
-				A mirror, beside the ×, and revealed by the same hover.
-
-				It shares `.close`'s styling deliberately: these are both things you can do
-				*to* the row rather than parts of what the row says, and a second vocabulary
-				for the second one would only be a second thing to keep in step.
-
-				`agent-mirrorbtn` is the one thing that has to be its own name. `.agent-list` lays these
-				buttons out by hand — they are out of the flow, so nothing else can — and "which slot
-				is this one in" is asked of the class. Without it the mirror took the ×'s slot.
-			*/}
-			<Show when={props.onMirror}>
-				{(mirror) => (
-					<button
-						class="close agent-mirrorbtn"
-						type="button"
-						title={`Put ${name()}'s conversation on the canvas`}
-						aria-label={`Mirror ${name()} on the canvas`}
-						onClick={(event) => {
-							event.stopPropagation();
-							mirror()();
-						}}
-					>
-						<Icon of={PictureInPicture2} size={13} />
-					</button>
-				)}
-			</Show>
 			<Show when={close()}>
 				{(words) => (
 					<button

@@ -61,7 +61,7 @@ await settle(page, 500);
 await page.evaluate((name) => [...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(name))?.click(), FIXTURE);
 await settle(page, 900);
 for (let i = 0; i < 10; i++) {
-	const level = await page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+	const level = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 	if (level >= 60) break;
 	await page.keyboard.press("=");
 	await settle(page, 120);
