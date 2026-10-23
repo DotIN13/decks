@@ -356,7 +356,9 @@ export class StageEngine {
 			stats: () => ({ tiles: this.page?.tileCount() ?? 0, drawn: [this.lastOps, this.lastOps], engine: "rust", backend: this.backend, workerBackend: this.workerBackend, maxPicture: this.maxPicture, restarts: this.restarts, pictures: this.picturesPut, paused: this.paused }),
 			/** The boards a drag carries as their picture, and by how far. */
 			get carried() {
-				return { paths: new Set(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedBy };
+				// Live pages carried as their picture, and boards already drawn as pictures that the drag moves.
+				const drawn = new Set([...(JSON.parse(self.page?.carrying() ?? "[]") as string[]), ...self.carriedPaths.filter((path) => (JSON.parse(self.page?.pictured() ?? "[]") as string[]).includes(path))]);
+				return { paths: drawn, ...self.carriedBy };
 			},
 		};
 		// Made empty and given its readers first, then the drawing: each reader given lays the drawing out again.
@@ -1264,6 +1266,7 @@ export class StageEngine {
 	carry(paths: readonly string[], offset: { dx: number; dy: number }): void {
 		this.carriedBy = { dx: offset.dx, dy: offset.dy };
 		this.carriedCount = paths.length;
+		this.carriedPaths = [...paths];
 		if (!this.page) return;
 		this.page.carry(JSON.stringify(paths), offset.dx, offset.dy);
 		if (paths.length) {
@@ -1285,6 +1288,8 @@ export class StageEngine {
 	/** The preview a gesture on drawn items is showing, as sent to the engine; undefined when none. */
 	private shown: string | undefined;
 	private carriedCount = 0;
+	/** The boards the last `carry` names (`__decksEngine.carried`). */
+	private carriedPaths: string[] = [];
 	/** A drag of boards alone is showing its arrows, or has let go and waits for the drawing. */
 	private boardsOnly = false;
 	/** A drawing came since the boards were last carried a step: the one that answers their drop, if they are let go of now. */

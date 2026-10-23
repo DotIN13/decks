@@ -29,8 +29,17 @@ for (const target of TARGETS) {
 		const pictured = await page.evaluate(() => JSON.parse(window.__decksRust?.page?.pictured?.() ?? "[]").length);
 		say(`${name}: board pictures are put and drawn as pictures`, after.pictures > 0 && pictured > 0, JSON.stringify({ pictures: after.pictures, pictured, tiles: after.tiles }));
 		await shot(page, `step4-${target.slug}-webgl2.png`);
-		const draws = await canvasDraws(page);
-		say(`${name}: the WebGL 2 canvas is not blank`, draws.changed > 0.01, JSON.stringify(draws));
+		/*
+		 * Blank is nothing at all: hiding a blank canvas changes no point of the screen. How much a drawing
+		 * covers depends on how far out of the live zoom the camera went, about 1% here and less when the
+		 * machine is busy, so it is asked again for a few seconds rather than held to a share of the screen.
+		 */
+		let draws = await canvasDraws(page);
+		for (let i = 0; i < 10 && draws.changed <= 0.002; i++) {
+			await settle(page, 500);
+			draws = await canvasDraws(page);
+		}
+		say(`${name}: the WebGL 2 canvas is not blank`, draws.changed > 0.002, JSON.stringify(draws));
 		say(`${name}: no errors on the page`, errors.length === 0, errors.join(" | "));
 		await browser.close();
 	}

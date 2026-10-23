@@ -51,6 +51,8 @@ async function laggedSocket(page) {
  * the carried offset while carried). None may be back at the box it was picked up from.
  */
 async function boardStaysDropped(page, label, { picture }) {
+	// The server draws the pictures, and a busy machine takes a while: wait for one on screen before looking.
+	if (picture) await page.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
 	const candidates = await page.evaluate((picture) => {
 		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
 		return window.__decksBoards()

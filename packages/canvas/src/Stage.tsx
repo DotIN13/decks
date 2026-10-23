@@ -735,6 +735,16 @@ export function Stage(props: {
 	/** The boards whose carried picture is on screen: their pages hide where they were picked up (`BoardFrame`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.carrying = setCarriedPages;
+	/*
+	 * A board a drag carries while the sheet draws it as its picture (its page not live, or pictures
+	 * while the canvas moves): its picture goes with the drag, so its page waits unseen too, or it stayed
+	 * on screen where the drag began (a finger on a phone's board, `plain-board.tsx`, `fingerDrag`).
+	 */
+	const draggedAsPicture = createMemo<ReadonlySet<string>>(() => {
+		const paths = [...(editor.boardDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
+		const live = liveBoards();
+		return new Set(paths.filter((path) => !(live.has(path) && !picturesNow())));
+	});
 	const resolvedColours = new Map<string, string>();
 	/**
 	 * A writer's colour as the sheet can paint it. A board with no writer's colour glows in
@@ -2029,7 +2039,7 @@ export function Stage(props: {
 			}
 			visible={isVisible(board)}
 			onLive={(on: boolean) => markLive(board.path, on)}
-			carried={carriedPages().has(board.path)}
+			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
 			{...(props.onComment
 				? {
