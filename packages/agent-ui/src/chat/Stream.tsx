@@ -92,8 +92,6 @@ export function Stream(props: {
 	let top!: HTMLDivElement;
 	let foot!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
-	/** How many cards are below the fold, which is what the jump pill counts. */
-	const [behind, setBehind] = createSignal(0);
 
 	/*
 	 * Whether the tail of the column is a reply in flight.
@@ -345,9 +343,6 @@ export function Stream(props: {
 	 *
 	 * - Pinned is the foot in sight (within 40px of it), an IntersectionObserver on the empty row
 	 *   after the last card.
-	 * - Behind is how many cards lie wholly past the fold, from an IntersectionObserver on the cards:
-	 *   counted in cards because that is what the pill says, "3 newer turns" being a decision you can
-	 *   make and "412px below" not.
 	 * - Reaching back is the top in sight, within `LOAD_MORE_AT` of it, from a third on the empty row
 	 *   before the first; it is asked again each time the window grows, so a reader who stays near
 	 *   the top keeps loading.
@@ -355,16 +350,15 @@ export function Stream(props: {
 	 *   streams, a card that opens, a new one) keeps the foot in sight. Resize observations run before
 	 *   intersection ones in a frame, so the foot is back in sight before pinning is asked again.
 	 *
-	 * A MutationObserver hands the rows to the last two as they come and go.
+	 * A MutationObserver hands the rows to the last as they come and go. Away from the foot, a button
+	 * takes the reader back to the latest messages.
 	 */
 	/** Reading up from the foot: set where the column is mounted (below), and called by the window's wheel handler too. */
 	let readingUp: () => void = () => {
 		setPinned(false);
 	};
-	const below = new Set<Element>();
 	let footWatch: IntersectionObserver | undefined;
 	let topWatch: IntersectionObserver | undefined;
-	let cardWatch: IntersectionObserver | undefined;
 	let growth: ResizeObserver | undefined;
 	let rows: MutationObserver | undefined;
 	const rearmTop = () => {
@@ -389,26 +383,11 @@ export function Stream(props: {
 			if (entries.at(-1)?.isIntersecting && earlier()) showEarlier();
 		}, { root: scroller, rootMargin: `${LOAD_MORE_AT}px 0px 0px 0px` });
 		topWatch.observe(top);
-		cardWatch = new IntersectionObserver((entries) => {
-			for (const entry of entries) {
-				const past = !entry.isIntersecting && !!entry.rootBounds && entry.boundingClientRect.top >= entry.rootBounds.bottom - 4;
-				if (past) below.add(entry.target);
-				else below.delete(entry.target);
-			}
-			setBehind(below.size);
-		}, { root: scroller });
 		growth = new ResizeObserver(() => {
 			if (pinned() && shownNow()) toFootNow();
 		});
-		const watch = (element: Element) => {
-			growth?.observe(element);
-			if (element.hasAttribute("data-card")) cardWatch?.observe(element);
-		};
-		const forget = (element: Element) => {
-			growth?.unobserve(element);
-			cardWatch?.unobserve(element);
-			if (below.delete(element)) setBehind(below.size);
-		};
+		const watch = (element: Element) => growth?.observe(element);
+		const forget = (element: Element) => growth?.unobserve(element);
 		for (const element of scroller.children) watch(element);
 		rows = new MutationObserver((changes) => {
 			for (const change of changes) {
@@ -481,7 +460,6 @@ export function Stream(props: {
 	onCleanup(() => {
 		footWatch?.disconnect();
 		topWatch?.disconnect();
-		cardWatch?.disconnect();
 		growth?.disconnect();
 		rows?.disconnect();
 	});
@@ -637,15 +615,10 @@ export function Stream(props: {
 			 * that appeared *between* the last card and the status line would shorten the
 			 * scroller at the moment you scrolled, which moves the thing you were reading.
 			 */}
-			<Show when={behind() > 0}>
-				<button
-					class="stream-jump"
-					type="button"
-					aria-label={`Jump to the latest turn, ${behind()} below`}
-					onClick={toFoot}
-				>
+			<Show when={!pinned() && cards().length > 0}>
+				<button class="stream-jump" type="button" aria-label="Scroll to the latest messages" onClick={toFoot}>
 					<Icon of={ArrowDown} size={12} />
-					{behind()} newer {behind() === 1 ? "turn" : "turns"}
+					Latest messages
 				</button>
 			</Show>
 		</section>

@@ -991,7 +991,8 @@ body {
 		position: absolute;
 		z-index: 25;
 		right: 8px;
-		bottom: calc(8px + env(safe-area-inset-bottom) + var(--keyboard));
+		/* Its foot ends well inside the composer's, so the composer hides it, corners and shadow and all. */
+		bottom: calc(32px + env(safe-area-inset-bottom) + var(--keyboard));
 		left: 8px;
 		top: calc(76px + env(safe-area-inset-top));
 		border: 0;
@@ -1005,7 +1006,11 @@ body {
 	 * can always be brought up clear of the composer (`--dock-h`, the composer's measured height).
 	 */
 	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-roll {
-		padding-bottom: calc(var(--dock-h, 120px) + 16px);
+		padding-bottom: calc(var(--dock-h, 120px) - 4px);
+	}
+	/* The way back to the latest messages, above the composer rather than under it. */
+	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-jump {
+		bottom: calc(var(--dock-h, 120px) - 12px);
 	}
 	/* The handle: the bar, in a band tall enough for a thumb, dragged down to put the sheet away. */
 	.v3-sheet-handle {
