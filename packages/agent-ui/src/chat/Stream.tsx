@@ -88,6 +88,9 @@ export function Stream(props: {
 	let head: HTMLDivElement | undefined;
 	onMount(() => { if (head) props.onHead?.(head); });
 	let scroller!: HTMLDivElement;
+	/** The first and the last thing in the roll: what the observers below watch for the two ends. */
+	let top!: HTMLDivElement;
+	let foot!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
 	/** How many cards are below the fold, which is what the jump pill counts. */
 	const [behind, setBehind] = createSignal(0);
@@ -145,6 +148,7 @@ export function Stream(props: {
 			const before = scroller.scrollHeight;
 			setWindowed((size) => size + WINDOW);
 			scroller.scrollTop += scroller.scrollHeight - before;
+			rearmTop();
 			return;
 		}
 		if (fetching || !props.more) return;
@@ -158,6 +162,7 @@ export function Stream(props: {
 				// immediately hidden again by the window it landed outside of.
 				setWindowed((size) => size + added);
 				scroller.scrollTop += scroller.scrollHeight - before;
+				rearmTop();
 			})
 			.finally(() => {
 				fetching = false;
@@ -279,29 +284,6 @@ export function Stream(props: {
 		onCleanup(() => window.removeEventListener("keydown", keys));
 	});
 
-	/*
-	 * Follow the newest turn while it grows — and only while it grows: a stream that scrolls
-	 * itself while you are reading three replies back is the single most annoying thing a chat
-	 * surface does. Reading up unpins; scrolling back to the foot re-pins.
-	 *
-	 * Nothing to do for `prefers-reduced-motion` here, and that is worth saying rather than
-	 * leaving to be rediscovered: this is an assignment to `scrollTop`, which does not animate.
-	 * The pill below is the one that had to ask.
-	 */
-	createEffect(() => {
-		if (!shownNow() || !scroller) return;
-		cards().length;
-		const last = props.items.at(-1);
-		if (last?.kind === "assistant" && last.streaming) {
-			// Tracked: the text grows as it streams.
-			last.text.length;
-		}
-		if (!pinned()) return;
-		requestAnimationFrame(() => {
-			if (scroller) scroller.scrollTop = scroller.scrollHeight;
-		});
-	});
-
 	/* Opening shows the newest turn, unless it was opened *at* something. */
 	createEffect(() => {
 		if (!shownNow()) return;
@@ -353,55 +335,90 @@ export function Stream(props: {
 			 * above yanks it straight back down.
 			 */
 			element.scrollIntoView({ block: "start", behavior: "auto" });
-			measure();
 		});
 	});
 
-	/**
-	 * Where the reader is, in the two terms the column needs: pinned to the foot, and how many
-	 * cards are past it.
-	 *
-	 * Counted in cards rather than in pixels because that is what the pill says — "3 newer
-	 * turns" is a decision you can make, and "412px below" is not.
-	 */
-	const measure = () => {
-		if (!scroller) return;
-		const slack = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
-		const atFoot = slack < 40;
-		setPinned(atFoot);
-		if (atFoot) {
-			setBehind(0);
-			return;
-		}
-		const fold = scroller.scrollTop + scroller.clientHeight;
-		/*
-		 * From the newest back, stopping at the first card that ends above the fold: the cards are in
-		 * order, so a long history is not measured card by card at every scroll (a resize of the panel
-		 * holding the conversation scrolls it at every step). 4px of grace: a card whose last shadow
-		 * pixel is under the fold is not one you have missed.
-		 */
-		let count = 0;
-		for (let card = scroller.lastElementChild; card; card = card.previousElementSibling) {
-			if (!(card instanceof HTMLElement) || !card.hasAttribute("data-card")) continue;
-			if (card.offsetTop + card.offsetHeight <= fold + 4) break;
-			count++;
-		}
-		setBehind(count);
-	};
 	/*
-	 * At most once a frame while it scrolls. A scroll sends several events a frame, momentum more, and
-	 * each measure reads the layout: read per event, it made the browser lay the column out again and
-	 * again between frames, which is what made a scroll stutter.
+	 * Where the reader is, watched rather than measured: nothing runs while the column scrolls.
+	 *
+	 * - Pinned is the foot in sight (within 40px of it), an IntersectionObserver on the empty row
+	 *   after the last card.
+	 * - Behind is how many cards lie wholly past the fold, from an IntersectionObserver on the cards:
+	 *   counted in cards because that is what the pill says, "3 newer turns" being a decision you can
+	 *   make and "412px below" not.
+	 * - Reaching back is the top in sight, within `LOAD_MORE_AT` of it, from a third on the empty row
+	 *   before the first; it is asked again each time the window grows, so a reader who stays near
+	 *   the top keeps loading.
+	 * - Following is a ResizeObserver on every row: while pinned, any row that grows (a reply as it
+	 *   streams, a card that opens, a new one) keeps the foot in sight. Resize observations run before
+	 *   intersection ones in a frame, so the foot is back in sight before pinning is asked again.
+	 *
+	 * A MutationObserver hands the rows to the last two as they come and go.
 	 */
-	let measuring = 0;
-	const measureSoon = () => {
-		if (measuring) return;
-		measuring = requestAnimationFrame(() => {
-			measuring = 0;
-			measure();
+	const below = new Set<Element>();
+	let footWatch: IntersectionObserver | undefined;
+	let topWatch: IntersectionObserver | undefined;
+	let cardWatch: IntersectionObserver | undefined;
+	let growth: ResizeObserver | undefined;
+	let rows: MutationObserver | undefined;
+	const rearmTop = () => {
+		if (!topWatch || !top) return;
+		// Observed again, it reports where the top is now, even when it has not moved in or out.
+		requestAnimationFrame(() => {
+			topWatch?.unobserve(top);
+			topWatch?.observe(top);
 		});
 	};
-	onCleanup(() => cancelAnimationFrame(measuring));
+	const toFootNow = () => {
+		if (scroller) scroller.scrollTop = scroller.scrollHeight;
+	};
+	onMount(() => {
+		if (typeof IntersectionObserver === "undefined" || typeof ResizeObserver === "undefined") return;
+		footWatch = new IntersectionObserver((entries) => {
+			const seen = entries.at(-1);
+			if (seen) setPinned(seen.isIntersecting);
+		}, { root: scroller, rootMargin: "0px 0px 40px 0px" });
+		footWatch.observe(foot);
+		topWatch = new IntersectionObserver((entries) => {
+			if (entries.at(-1)?.isIntersecting && earlier()) showEarlier();
+		}, { root: scroller, rootMargin: `${LOAD_MORE_AT}px 0px 0px 0px` });
+		topWatch.observe(top);
+		cardWatch = new IntersectionObserver((entries) => {
+			for (const entry of entries) {
+				const past = !entry.isIntersecting && !!entry.rootBounds && entry.boundingClientRect.top >= entry.rootBounds.bottom - 4;
+				if (past) below.add(entry.target);
+				else below.delete(entry.target);
+			}
+			setBehind(below.size);
+		}, { root: scroller });
+		growth = new ResizeObserver(() => {
+			if (pinned() && shownNow()) toFootNow();
+		});
+		const watch = (element: Element) => {
+			growth?.observe(element);
+			if (element.hasAttribute("data-card")) cardWatch?.observe(element);
+		};
+		const forget = (element: Element) => {
+			growth?.unobserve(element);
+			cardWatch?.unobserve(element);
+			if (below.delete(element)) setBehind(below.size);
+		};
+		for (const element of scroller.children) watch(element);
+		rows = new MutationObserver((changes) => {
+			for (const change of changes) {
+				for (const node of change.addedNodes) if (node instanceof Element) watch(node);
+				for (const node of change.removedNodes) if (node instanceof Element) forget(node);
+			}
+		});
+		rows.observe(scroller, { childList: true });
+	});
+	onCleanup(() => {
+		footWatch?.disconnect();
+		topWatch?.disconnect();
+		cardWatch?.disconnect();
+		growth?.disconnect();
+		rows?.disconnect();
+	});
 
 	/** Motion the reader asked not to have. */
 	const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -460,18 +477,8 @@ export function Stream(props: {
 			<div
 				class="stream-roll"
 				ref={scroller}
-				/*
-				 * Two questions on every scroll, and they are different questions. `measure`
-				 * asks where the *end* is, which is what pins the column. This asks how near
-				 * the *top of what is rendered* the reader has come, which is a distance
-				 * rather than a visibility — an observer would announce the top once on the
-				 * way in and then say nothing while the reader kept climbing.
-				 */
-				onScroll={() => {
-					measureSoon();
-					if (scroller && scroller.scrollTop < LOAD_MORE_AT && earlier()) showEarlier();
-				}}
 			>
+				<div class="stream-edge" ref={top} aria-hidden="true" />
 				{/*
 				 * Empty, it says so. The column used to appear only once there was something in
 				 * it, which was right while it arrived on its own and wrong now that there is a
@@ -553,6 +560,7 @@ export function Stream(props: {
 						<WorkingSign state={props.state} name={props.name} agent={props.agent} />
 					</div>
 				</Show>
+				<div class="stream-edge" ref={foot} aria-hidden="true" />
 			</div>
 
 			{/*

@@ -915,7 +915,8 @@ body {
 	}
 	.v3-chat .stream[data-shown] .stream-roll {
 		flex: 1 1 auto;
-		gap: 14px;
+		--roll-gap: 14px;
+		gap: var(--roll-gap);
 		padding: 6px 16px 16px;
 	}
 	.v3-chat .stream[data-shown] .stream-card {

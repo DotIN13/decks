@@ -113,7 +113,8 @@
 		flex: 0 1 auto;
 		flex-direction: column;
 		/* The only gap in the column, and it is a click-through target for a pointer. */
-		gap: 10px;
+		--roll-gap: 10px;
+		gap: var(--roll-gap);
 		padding: var(--gutter);
 		overflow-y: auto;
 		overscroll-behavior: contain;
@@ -138,6 +139,21 @@
 	 */
 	.stream-roll > * {
 		flex: 0 0 auto;
+	}
+
+	/*
+	 * The two ends the column's observers watch (`Stream.tsx`): empty rows that take no room, the gap
+	 * beside each given back, so the column is laid out as if they were not there.
+	 */
+	.stream-roll > .stream-edge {
+		height: 0;
+		pointer-events: none;
+	}
+	.stream-roll > .stream-edge:first-child {
+		margin-bottom: calc(-1 * var(--roll-gap));
+	}
+	.stream-roll > .stream-edge:last-child {
+		margin-top: calc(-1 * var(--roll-gap));
 	}
 
 	/*
