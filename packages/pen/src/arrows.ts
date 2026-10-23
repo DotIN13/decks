@@ -40,14 +40,14 @@ export function isArrow(node: PenNode): boolean {
  * Redraw every arrow in `doc` from where its ends are now. Returns whether anything changed.
  *
  * `placed` is the layout of the document; `extra` finds anything that is not an item — a board,
- * by its path.
+ * by its path. `only`, when given, picks the arrows to redraw; the rest are left as they are.
  */
-export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined, router: ArrowRouter = routeArrow): boolean {
+export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined, router: ArrowRouter = routeArrow, only?: (arrow: PenNode) => boolean): boolean {
 	const index = indexOf(doc);
 	let changed = false;
 	const end = (name: string) => placed.get(name)?.box ?? extra?.(name);
 	for (const node of walk(doc.children)) {
-		if (!isArrow(node)) continue;
+		if (!isArrow(node) || (only && !only(node))) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
 		const shape = router(node.metadata, end, stroke);
 		if (!shape) continue;

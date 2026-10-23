@@ -9,6 +9,7 @@ import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
+import { stageMeasure } from "./stage/measure.ts";
 import type { DocEdits, DrawingWriter } from "./stage/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
@@ -314,7 +315,8 @@ export function createEditor(
 	};
 	paintScheme();
 
-	const drawing = createDrawing(first, { look, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
+	// Laid out with the stage engine's words, as the server lays its drawing out, so an edit shown ahead of it routes its arrows where the server will.
+	const drawing = createDrawing(first, { look, measure: stageMeasure, readOnly: options.readOnly === true, ...(options.onEdits ? { onEdits: options.onEdits } : {}), ...(options.document ? { host: options.document } : {}) });
 	/** What the drawing's own addresses are read against; a host that moves between canvases says so with `setDocument`. */
 	const [penBase, setPenBase] = createSignal(base);
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */

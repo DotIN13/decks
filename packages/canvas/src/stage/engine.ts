@@ -13,7 +13,7 @@
 import type { PageEngine } from "@decks/stage";
 import { baseTheme, diff, isShape, pathBounds, shapeKind, shapeOutline, shapeRadius, type Frame, type PenDocument, type PenNode, type Placed, type ThemeState } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
-import { fontFiles, isFallbackFamily, stageFontNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
+import { fontFiles, isFallbackFamily, stageFontNeeds, textNeeds, type FontFile, type FontNeed } from "../pen/font-files.ts";
 import { iconUrl, parseIcon } from "../pen/icons.ts";
 import { pictureAddress } from "../host.ts";
 import { snapMove, type Box, type Guide } from "../pen/snap.ts";
@@ -21,6 +21,7 @@ import { boundsOf } from "../pen/bounds.ts";
 import { docIndex, drawnNodes } from "../pen/doc-index.ts";
 import { BoxIndex, type Rect } from "../spatial.ts";
 import { cardReader, mathTypesetter } from "./reader.ts";
+import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
@@ -190,6 +191,34 @@ export class StageEngine {
 	private postedContent = 0;
 	/** Font files asked for and not yet given to the engines. */
 	private fontsPending = 0;
+	/** Font files settled, by key: given to the engines, or not to be had. */
+	private fontsSettled = new Set<string>();
+	/**
+	 * Words measured by the page's engine (`measure.ts`), kept as the server keeps them: by the fonts
+	 * there were (`wordsGeneration`, counted up as fonts are given), kind, width, style and words.
+	 */
+	private wordSizes = new Map<string, { w: number; h: number }>();
+	private wordsGeneration = 0;
+	/**
+	 * Words measured as the server measures them: the engine's own fonts once every file the words
+	 * need has settled, else nothing (the estimate, `measure.ts`), and the files are sent for.
+	 */
+	private readonly words: Words = (text, style, maxWidth, markdown, align) => {
+		if (!this.page) return undefined;
+		const key = JSON.stringify([this.wordsGeneration, markdown, align, Math.round(maxWidth * 10), style, text]);
+		const known = this.wordSizes.get(key);
+		if (known) return known;
+		const files = fontFiles(textNeeds(text, style, markdown));
+		if (files.some((file) => !this.fontsSettled.has(file.key))) {
+			this.fetchFonts(files);
+			return undefined;
+		}
+		const [w = 0, h = 0] = this.page.measure(text, JSON.stringify(style), maxWidth, markdown, align);
+		if (this.wordSizes.size >= 8192) this.wordSizes.delete(this.wordSizes.keys().next().value!);
+		const size = { w, h };
+		this.wordSizes.set(key, size);
+		return size;
+	};
 	/** A batch came from a worker with nothing left to paint: the next draw at rest is a sharp one (`sharpAt`). */
 	private sharpNext = false;
 	/** As `sharpNext`, for `settledAt`: the next draw at rest shows the window filled in. */
@@ -321,6 +350,7 @@ export class StageEngine {
 		// Fonts already here go to both engines now; those still coming (asked for before the engine
 		// was up, `prefetchFonts`, or by its first layout) the worker waits for before it paints.
 		this.giveFonts(this.fonts, false);
+		setStageWords(this.words);
 		this.needFonts();
 		this.post({ type: "init", doc, dark: this.scheme === "dark", backend: this.backend, lowMemory: found.lowMemory, fontsDue: this.fontsPending > 0, docDue: !this.doc, pixels: pixelsFirst() });
 		this.postFonts(this.fonts);
@@ -346,6 +376,7 @@ export class StageEngine {
 		this.dropTileQueue();
 		this.worker?.terminate();
 		this.worker = undefined;
+		setStageWords(undefined, this.words);
 		this.page?.free();
 		this.page = undefined;
 		this.picturesAsked.clear();
@@ -1456,6 +1487,7 @@ export class StageEngine {
 			}),
 		).then((loaded) => {
 			this.fontsPending -= files.length;
+			for (const file of files) this.fontsSettled.add(file.key);
 			// Kept first: an engine started (or started again) is given them from here.
 			const fonts: Font[] = loaded.filter((one) => one !== undefined).map((one) => ({ family: one.file.family, blob: one.blob, bytes: one.bytes, fallback: isFallbackFamily(one.file.family) }));
 			this.fonts.push(...fonts);
@@ -1473,6 +1505,7 @@ export class StageEngine {
 		if (!this.page || !fonts.length) return;
 		for (const { family, bytes, fallback } of fonts) if (bytes) this.page.addFont(family, bytes, fallback, true);
 		this.page.layOut();
+		this.wordsGeneration++;
 		if (!show) return;
 		this.laidOut();
 		this.draw();
@@ -1850,6 +1883,7 @@ export class StageEngine {
 		clearTimeout(this.fastTimer);
 		this.worker?.terminate();
 		this.worker = undefined;
+		setStageWords(undefined, this.words);
 		this.page?.free();
 		this.page = undefined;
 		this.hits?.replaceChildren();

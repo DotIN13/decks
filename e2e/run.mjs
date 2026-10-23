@@ -176,6 +176,8 @@ const CHECKS = [
 	{ file: "edits-wait.mjs", needsAgent: false, named: true },
 	/* The arrow keys pressed fast and held on items and boards, with the answers held back: each press drawn at once, the server at the sum. Minutes, so by name. */
 	{ file: "nudge.mjs", needsAgent: false, named: true },
+	/* An edit on a diagram of cards joined by arrows, with the answers held back: arrows it leaves alone stay put on every frame, the ones it moves move once. Minutes, so by name. */
+	{ file: "arrows-steady.mjs", needsAgent: false, named: true },
 	/* An agent's edits and a person's drag end in the drawing and the layout a fresh page has: the stage takes changes in as edits, piece by piece. */
 	{ file: "same-drawing.mjs", needsAgent: false },
 	/* A long stroke drawn as it grows is the stroke shaped whole, and its last frames cost less than shaping it whole each frame. */

@@ -158,6 +158,12 @@ export class PageEngine {
     lift(items: string): void;
     lost(): boolean;
     /**
+     * Words measured with this stage's own fonts and readers, as `TextMeasure.measure` measures them
+     * on the server: for the page to lay out an edit the person made, and route its arrows, ahead of
+     * the server's drawing, on the boxes the server will find.
+     */
+    measure(text: string, style: string, max_width: number, markdown: boolean, align: string): Float64Array;
+    /**
      * A new id for an item this session makes.
      */
     newId(): string;
@@ -449,6 +455,7 @@ export interface InitOutput {
     readonly pageengine_layoutChanges: (a: number) => [number, number];
     readonly pageengine_lift: (a: number, b: number, c: number) => void;
     readonly pageengine_lost: (a: number) => number;
+    readonly pageengine_measure: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly pageengine_new: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly pageengine_newId: (a: number) => [number, number];
     readonly pageengine_pick: (a: number, b: number, c: number, d: number) => [number, number];
@@ -513,8 +520,8 @@ export interface InitOutput {
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__104: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__105: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__106: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___web_sys_46aa44363d28b235___features__gen_Event__Event______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

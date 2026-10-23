@@ -392,3 +392,33 @@ test("edits go together as their ops in order, runs of plain updates folded into
 	together([[first], [{ op: "update", id: "a", set: { x: 2 } }]]);
 	assert.deepEqual(first.set, { x: 1 }, "the edits' own ops are not changed");
 });
+
+test("an edit routes again only the arrows it touches; the others stay as the server routed them", () => {
+	// Routed by a server that measured the card's words taller than pen's estimate does.
+	const served: PenDocument = {
+		version: "2.14",
+		children: [
+			{ type: "frame", id: "card", layout: "vertical", width: 200, x: 0, y: 0, children: [{ type: "text", id: "words", content: "Some words", width: "fill_container", textGrowth: "fixed-width" }] },
+			{ type: "rectangle", id: "box", x: 400, y: 0, width: 100, height: 60 },
+			{ type: "rectangle", id: "far", x: 400, y: 300, width: 100, height: 60 },
+			{ type: "path", id: "card-box", x: 200, y: 10, width: 200, height: 20, geometry: "M0 10 L200 10", metadata: { type: "decks.arrow", from: "card", to: "box" } },
+			{ type: "path", id: "box-far", x: 440, y: 60, width: 20, height: 240, geometry: "M10 0 L10 240", metadata: { type: "decks.arrow", from: "box", to: "far" } },
+		],
+	};
+	const sent: unknown[][] = [];
+	const drawing = createDrawing(structuredClone(served), { host: { send: (ops) => void sent.push(ops), step: () => {} } });
+	const arrow = (id: string) => drawing.doc().children.find((node) => node.id === id);
+	drawing.edit([{ op: "update", id: "far", set: { fill: "#ff0000" } }]);
+	assert.deepEqual(arrow("card-box"), served.children[3], "an edit that moves nothing leaves every arrow");
+	assert.deepEqual(arrow("box-far"), served.children[4]);
+	drawing.edit([{ op: "update", id: "far", set: { y: 400 } }]);
+	assert.deepEqual(arrow("card-box"), served.children[3], "an arrow away from what moved is left");
+	assert.notEqual(arrow("box-far")?.geometry, served.children[4]!.geometry, "the arrow to what moved follows it");
+	// Measured as the server measures: words twice the estimate's height move the card's arrow when the card moves.
+	const tall = createDrawing(structuredClone(served), { measure: (text) => ({ w: text.length * 8, h: 60 }), host: { send: () => {}, step: () => {} } });
+	tall.edit([{ op: "update", id: "card", set: { y: 5 } }]);
+	const routed = tall.doc().children.find((node) => node.id === "card-box");
+	const guessed = createDrawing(structuredClone(served), { host: { send: () => {}, step: () => {} } });
+	guessed.edit([{ op: "update", id: "card", set: { y: 5 } }]);
+	assert.notEqual(routed?.y, guessed.doc().children.find((node) => node.id === "card-box")?.y, "the card's measured height, not the estimate's, places its arrow");
+});
