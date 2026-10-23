@@ -73,7 +73,7 @@ function pointerGroups(): Group[] {
 				{ keys: "click", what: "select it" },
 				{ keys: "double-click", what: "retype its words in place" },
 				{ keys: "drag · drag the corner", what: "move it · resize it" },
-				{ keys: "arrows · shift-arrows", what: "nudge · nudge by one pixel" },
+				{ keys: "arrows · shift-arrows", what: "nudge · nudge by ten" },
 				{ keys: "⌘D", what: "duplicate it" },
 				{ keys: "[ · ]", what: "send behind · bring in front" },
 				{ keys: "⌫", what: "delete it" },

@@ -21,6 +21,8 @@ export type KeysHost = {
 	tool: () => PenTool;
 	/** Whether a board is the app's selection: its letters are the board's. */
 	boardSelected: () => boolean;
+	/** That board's path: the arrows move it too. */
+	selectedBoard?: () => string | undefined;
 	/** Step through the person's own edits, when the page can (`Stage`'s `onPenStep`). */
 	canStep: () => boolean;
 	step: (direction: "undo" | "redo") => void;
@@ -42,7 +44,7 @@ export function createKeys(editor: Editor, host: KeysHost) {
 		let ids: (() => string) | undefined;
 		const act: KeyAct = penKeyOf(
 			{ key: event.key, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey },
-			{ selection: selected, boards: editor.boardPicks(), tool: host.tool(), boardSelected: host.boardSelected(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
+			{ selection: selected, boards: editor.boardPicks(), tool: host.tool(), boardSelected: host.boardSelected(), selectedBoard: host.selectedBoard?.(), canStep: host.canStep(), scene: host.scene, nextId: () => (ids ??= host.nextIds())() },
 		);
 		if (!act.handled) return false;
 		switch (act.do) {

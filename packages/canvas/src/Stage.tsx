@@ -623,6 +623,7 @@ export function Stage(props: {
 			drawing: () => !!props.drawing,
 			tool: penTool,
 			boardSelected: () => !!props.selected,
+			selectedBoard: () => props.selected,
 			canStep: () => !!props.onPenStep,
 			step: (direction) => props.onPenStep?.(direction),
 			deleteSelected: (selected, ops) => penDeleteSelected(selected, ops),
