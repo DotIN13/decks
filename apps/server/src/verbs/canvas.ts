@@ -2,7 +2,7 @@ import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
-import { BOARD_ITEM, boardOf } from "../stage/pens.ts";
+import { BOARD_ITEM, boardOf, type ReadMore } from "../stage/pens.ts";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
@@ -352,17 +352,23 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 
 	return {
 		canvas: {
-			read: async (options?: On) => {
-				const target = targetOf(options);
+			read: async (options?: On & { of?: string; depth?: number }) => {
+				const { of, depth, ...on } = options ?? {};
+				const target = targetOf(on);
 				const pens = needPens();
+				onCanvas = target.canvas;
+				const more: ReadMore = {
+					...(of !== undefined && of !== null ? { of: idIn(target.frame !== undefined ? pens.framePen(target.frame).doc : pens.get(target.canvas).doc, of, "of") } : {}),
+					...(depth !== undefined && depth !== null ? { depth } : {}),
+				};
 				if (target.frame !== undefined) {
-					const { file, children, ...rest } = pens.readFile(target.frame) as { file: string; children: unknown[]; ref?: string; stage?: string };
+					const { file, children, ...rest } = pens.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string };
 					delete rest.ref;
 					delete rest.stage;
 					return { frame: target.frame, file, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 				}
 				const name = target.canvas;
-				const { stage: _stage, file: _file, children, ...rest } = pens.read(name);
+				const { stage: _stage, file: _file, children, ...rest } = pens.read(name, more);
 				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 			},
 			insert: async (item: ItemIn, options?: On & { at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {

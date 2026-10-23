@@ -105,8 +105,8 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'Everything on the canvas, boards included, each with its box. A board is { type: "board", board: <path>, box }; every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it.',
-		params: [onItems()],
+			'Everything on the canvas, boards included, each with its box. A board is { type: "board", board: <path>, box }; every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a board\'s path, or an id inside an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`.',
+		params: [onItems({ of: opt(str()), depth: opt(int()) })],
 		result: obj({ canvas: opt(str()), frame: opt(str()), title: opt(str()), file: opt(str()), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
 	},
 	{

@@ -152,9 +152,11 @@ export interface Verbs {
 		 * <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
 		 * `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the
 		 * item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas
-		 * placing it.
+		 * placing it. `of` (an id, a board's path, or an id inside an instance such as "card-1/label")
+		 * reads that one item and what is in it; `depth` keeps that many levels of children (0: the items
+		 * alone), and an item whose children were left out says how many in `childCount`.
 		 */
-		read(options?: { canvas?: string; frame?: string }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
+		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**
 		 * Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is
 		 * a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its

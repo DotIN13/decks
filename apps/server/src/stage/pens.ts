@@ -5,7 +5,10 @@ import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
 import { runAtOpen } from "../migrations/index.ts";
 import { movedPath } from "../migrations/2026-10-16-stages-to-canvases.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
-import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, diff } from "@decks/pen";
+import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
+
+/** What a read may ask for beyond the whole file: one item, a depth (`read.ts`). */
+export type ReadMore = Omit<ReadOptions, "theme" | "measure">;
 import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
@@ -703,11 +706,11 @@ export class StagePens {
 	}
 
 	/** What an agent reads of any .pen file: its items, each with its box in the file's own space. */
-	readFile(path: string) {
+	readFile(path: string, more: ReadMore = {}) {
 		const target = this.penFile(path);
-		if (target.stage) return { ...this.read(target.stage), file: target.shown };
+		if (target.stage) return { ...this.read(target.stage, more), file: target.shown };
 		const doc = this.loadPen(target.file, target.shown);
-		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: baseTheme(doc, "light"), measure }) };
+		return { file: target.shown, ...(target.ref ? { ref: target.ref } : {}), ...read(this.withImportedAt(dirname(target.file), doc), { theme: baseTheme(doc, "light"), measure, ...more }) };
 	}
 
 	/** The same edits as a stage takes, on any .pen file; a frame's change reaches every stage that uses it. */
@@ -1016,9 +1019,9 @@ export class StagePens {
 	}
 
 	/** What an agent reads: the file's items, each with its box on the stage. */
-	read(name: string) {
+	read(name: string, more: ReadMore = {}) {
 		const entry = this.get(name);
-		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light"), measure }) };
+		return { stage: name, file: this.fileOf(name), ...(entry.error ? { error: entry.error } : {}), ...read(this.withImported(name, entry.doc), { theme: baseTheme(entry.doc, "light"), measure, ...more }) };
 	}
 
 	private write(name: string, doc: PenDocument): PenEntry {

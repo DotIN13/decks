@@ -91,3 +91,26 @@ test("a field pen has no place for, or one Decks does not draw, is a note and ne
 		cleanup();
 	}
 });
+
+test("canvas.read of one item, by id or a board's path, and to a depth", async () => {
+	const { must, call, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "frame", name: "Panel", layout: "none", width: 300, height: 200, children: [{ type: "frame", name: "Row", layout: "none", width: 100, height: 40, children: [{ type: "text", name: "Cell", content: "x" }] }] }, { at: { x1: 0, y1: 600 } }]);
+		const panel = (await must("canvas.read", [{ of: "panel" }])).value;
+		assert.deepEqual(panel.items.map((n: { id: string }) => n.id), ["panel"]);
+		assert.equal(panel.items[0].children[0].children[0].id, "cell");
+		const board = (await must("canvas.read", [{ of: "boards/a.html" }])).value.items;
+		assert.equal(board.length, 1);
+		assert.equal(board[0].type, "board");
+		const top = (await must("canvas.read", [{ depth: 0 }])).value.items;
+		assert.deepEqual(top.map((n: { id: string; childCount?: number; children?: unknown }) => [n.id, n.childCount, n.children]), [[board[0].id, undefined, undefined], ["panel", 1, undefined]]);
+		const one = (await must("canvas.read", [{ of: "panel", depth: 1 }])).value.items[0];
+		assert.equal(one.children[0].id, "row");
+		assert.equal(one.children[0].childCount, 1);
+		const missing = await call("canvas.read", [{ of: "nope" }]);
+		assert.ok(!missing.ok && /no item "nope"/.test(missing.error ?? ""), missing.error);
+	} finally {
+		cleanup();
+	}
+});
