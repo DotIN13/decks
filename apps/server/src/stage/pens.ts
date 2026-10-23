@@ -86,6 +86,8 @@ export interface PenEntry {
  * (`canvas/src/drawing.ts`), so it never draws the drawing as it was before for the round trip.
  */
 export const penEditBy = new AsyncLocalStorage<string>();
+/** How many of a stage's recent names a drawing sent whole carries. */
+const MADE_LATELY = 64;
 
 /**
  * The agent a write to a drawing is made for, while one of its calls runs (`stage/tool.ts`): each
@@ -125,6 +127,9 @@ export class StagePens {
 	writerOf(name: string): string | undefined {
 		return this.writers.get(name);
 	}
+
+	/** The last names sent with each stage's drawings, for a drawing sent whole to one browser (`frame`). */
+	private readonly madeLately = new Map<string, string[]>();
 
 	constructor(
 		private deckPath: string,
@@ -993,7 +998,12 @@ export class StagePens {
 		return { doc: this.withImported(name, this.get(name).doc), base: `${fileUrl(this.folderOf(name))}/` };
 	}
 
-	frame(agentId: string, name: string, made = this.takeMade(name)): ServerMessage {
+	/**
+	 * A drawing sent whole to one browser (asked again, opened, a picture of the stage) says it has the
+	 * recent names and those still to be sent, and takes none: taken, they were never sent to the
+	 * other browsers, whose edits then stayed on top of the drawing for six seconds.
+	 */
+	frame(agentId: string, name: string, made = [...(this.madeLately.get(name) ?? []), ...(this.made.get(name) ?? [])]): ServerMessage {
 		const entry = this.get(name);
 		const doc = this.withImported(name, entry.doc);
 		this.sent.set(name, { rev: entry.rev, doc });
@@ -1005,6 +1015,7 @@ export class StagePens {
 	private takeMade(name: string): string[] {
 		const made = this.made.get(name) ?? [];
 		this.made.delete(name);
+		if (made.length) this.madeLately.set(name, [...(this.madeLately.get(name) ?? []), ...made].slice(-MADE_LATELY));
 		return made;
 	}
 
@@ -1021,7 +1032,7 @@ export class StagePens {
 		const entry = this.get(name);
 		const before = this.sent.get(name);
 		const made = this.takeMade(name);
-		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name, made));
+		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name, this.madeLately.get(name) ?? made));
 		const doc = this.withImported(name, entry.doc);
 		const edits = diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });

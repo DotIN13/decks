@@ -26,6 +26,8 @@ export type KeyContext = {
 	tool: PenTool;
 	/** Whether a board is selected as the page's own selection: its letters are the board's, not tools. */
 	boardSelected: boolean;
+	/** That board, which the arrows move with the rest of what is selected. */
+	selectedBoard?: string | undefined;
 	/** Whether the page can step through edits (undo, redo). */
 	canStep: boolean;
 	scene: SceneQuery;
@@ -76,11 +78,13 @@ export function penKey(press: KeyPress, context: KeyContext): KeyAct {
 		return { handled: false };
 	}
 	const nudge = NUDGES[key];
-	if ((selection.length || boards.length) && nudge && !command && !alt) {
+	// The boards picked with the drawing, and the board selected on its own (a press on it).
+	const moving = context.selectedBoard && !boards.includes(context.selectedBoard) ? [...boards, context.selectedBoard] : boards;
+	if ((selection.length || moving.length) && nudge && !command && !alt) {
 		const step = press.shift ? NUDGE_SHIFT : 1;
 		const dx = nudge[0] * step;
 		const dy = nudge[1] * step;
-		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), boards: boardMoves(context.scene.boards(), boards, dx, dy) };
+		return { handled: true, do: "nudge", ops: moveOps(context.scene, selection, dx, dy), boards: boardMoves(context.scene.boards(), moving, dx, dy) };
 	}
 	/*
 	 * The letters that arm a tool: from the app's own document only — never forwarded from a

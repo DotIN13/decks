@@ -20,13 +20,28 @@ const [pens, setPens] = createSignal<Record<string, StagePen>>({});
 
 export { pens };
 
+/**
+ * The names of the person's edits a drawing says it has (`made`), with those of the drawings before it
+ * that nobody may have read yet: the socket hands its messages over once a frame, in one batch, so the
+ * canvas reads only the last of several drawings that came together, and the names on the others were
+ * lost with them; an edit whose name was lost stayed on top of the server's drawings for six seconds,
+ * putting back where it had left things after later ones landed. The canvas hears each name once and
+ * passes over names it has heard, so the recent ones are kept rather than only the newest.
+ */
+const KEEP_MADE = 64;
+const madeSince = (known: StagePen | undefined, made: readonly string[] | undefined, stage: string): string[] | undefined => {
+	const kept = known && known.stage === stage ? [...(known.made ?? []), ...(made ?? [])].slice(-KEEP_MADE) : made ? [...made] : undefined;
+	return kept?.length ? kept : undefined;
+};
+
 export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }>): void {
 	const { type: _type, agentId, ...given } = message;
-	// The folder image fills are read against is a path on the backend, so it goes under this tab's prefix.
-	const pen = { ...given, base: rebase(given.base) };
 	const known = pens()[agentId];
-	if (known && known.rev === pen.rev && known.stage === pen.stage) return;
-	setPens({ ...pens(), [agentId]: pen });
+	if (known && known.rev === given.rev && known.stage === given.stage) return;
+	// The folder image fills are read against is a path on the backend, so it goes under this tab's prefix.
+	const made = madeSince(known, given.made, given.stage);
+	const { made: _made, ...rest } = given;
+	setPens({ ...pens(), [agentId]: { ...rest, base: rebase(given.base), ...(made ? { made } : {}) } });
 }
 
 /**
@@ -44,7 +59,7 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 	}
 	try {
 		const doc = editDocument(known.doc, message.edits);
-		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: message.made, by: message.by ?? known.by } });
+		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: madeSince(known, message.made, message.stage), by: message.by ?? known.by } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}
