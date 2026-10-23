@@ -71,7 +71,7 @@ import { baseTheme, placements } from "@decks/pen";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import { closeHistory, setInspectable } from "./state/edge.ts";
-import { canvasBox, insets, watchInsets } from "@decks/canvas/camera";
+import { canvasBox, insets, insetsMoving, watchInsets } from "@decks/canvas/camera";
 import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
@@ -389,6 +389,8 @@ export function App() {
 		   sidebar folds. A float restored against the wrong column sits 264px to the left. */
 		createEffect(() => {
 			insets();
+			// Floats are put back against the column once a resize of the panel ends, not at every step of it.
+			if (insetsMoving()) return;
 			float.restore();
 		});
 		/* How tall the composer is, as a variable: the focus view pads its foot by it so a
@@ -433,6 +435,8 @@ export function App() {
 		);
 		createEffect(() => {
 			insets();
+			// Floats are put back against the column once a resize of the panel ends, not at every step of it.
+			if (insetsMoving()) return;
 			float.restore();
 		});
 		onCleanup(() => float.dispose());

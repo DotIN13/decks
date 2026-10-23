@@ -486,7 +486,18 @@ body {
 
 	/* ---- the side panel -------------------------------------------------------------------- */
 
+	/*
+	 * The insets, fixed for everything in the panel: nothing in it reads them, and they are written on
+	 * the root (`camera/insets.ts`), so every change (each step of a resize of this panel) restyled the
+	 * whole conversation and every agent row with them. Held here, a change stops at the panel's edge.
+	 */
 	.panel-shell.v3-panel {
+		--inset-left: 0px;
+		--inset-right: 0px;
+		--inset-top: 0px;
+		--inset-bottom: 0px;
+		--band-left: 0px;
+		--band-right: 0px;
 		border: 0;
 		border-right: 1px solid var(--v3-line);
 		border-radius: 0;
@@ -884,6 +895,15 @@ body {
 	}
 	.v3-chat .stream[data-shown] .stream-head {
 		display: none;
+	}
+	/*
+	 * A turn scrolled out of sight is not laid out: a long conversation in the panel was relaid line by
+	 * line at every step of a resize of the panel, and at every change to its width. Each keeps the size
+	 * it last had, so the scroll height and the bottom it is held at do not move.
+	 */
+	.v3-chat .stream[data-shown] .stream-roll > * {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 96px;
 	}
 	.v3-chat .stream[data-shown] .stream-roll {
 		flex: 1 1 auto;

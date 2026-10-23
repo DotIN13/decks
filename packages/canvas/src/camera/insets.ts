@@ -71,6 +71,39 @@ export function canvasBox(view: { width: number; height: number }) {
  * that only watched the elements present at startup would keep measuring a panel that has
  * since left the document.
  */
+/** The inset variables as last published, and where they go while a panel is being resized. */
+let published: Record<string, string> = {};
+let narrowTo: (() => readonly HTMLElement[]) | undefined;
+/** Whether a panel is being resized (`insetsOnly` set): what follows the insets can wait for the end. */
+const [insetsMoving, setInsetsMoving] = createSignal(false);
+export { insetsMoving };
+
+/**
+ * Written on the root, so every rule can read them; or, while `insetsOnly` is set, on those elements
+ * alone. A custom property changed on the root restyles every element in the page, and a panel being
+ * dragged wider changes `--inset-left` at every step: with a long conversation in the panel that was
+ * the whole cost of the drag. Its siblings are what read the insets, so they are told directly.
+ */
+function publishInsets(values: Record<string, string>): void {
+	published = values;
+	const targets = narrowTo?.() ?? [document.documentElement];
+	for (const target of targets) for (const [name, value] of Object.entries(values)) target.style.setProperty(name, value);
+}
+
+/**
+ * Publish the inset variables on these elements rather than the root until called with nothing,
+ * which writes the root again and takes them off the elements (`panel/LeftPanel.tsx`, a resize).
+ */
+export function insetsOnly(targets: (() => readonly HTMLElement[]) | undefined): void {
+	const was = narrowTo?.() ?? [];
+	narrowTo = targets;
+	setInsetsMoving(targets !== undefined);
+	if (targets) return publishInsets(published);
+	const root = document.documentElement.style;
+	for (const [name, value] of Object.entries(published)) root.setProperty(name, value);
+	for (const element of was) for (const name of Object.keys(published)) element.style.removeProperty(name);
+}
+
 export function watchInsets(root: HTMLElement = document.body): void {
 	let sizes = new ResizeObserver(() => soon(false));
 	const tracked = new Set<Element>();
@@ -154,14 +187,15 @@ export function watchInsets(root: HTMLElement = document.body): void {
 		 * needs to *decide* something reads the signal; a rule that needs to *measure*
 		 * something reads these.
 		 */
-		const root = document.documentElement.style;
-		root.setProperty("--inset-left", `${next.left}px`);
-		root.setProperty("--inset-right", `${next.right}px`);
-		root.setProperty("--inset-top", `${next.top}px`);
-		root.setProperty("--inset-bottom", `${next.bottom}px`);
-		/* A gutter inside each cluster, so what centres here never touches one. */
-		root.setProperty("--band-left", `${bandLeft + 12}px`);
-		root.setProperty("--band-right", `${Math.max(bandLeft + 12, bandRight - 12)}px`);
+		publishInsets({
+			"--inset-left": `${next.left}px`,
+			"--inset-right": `${next.right}px`,
+			"--inset-top": `${next.top}px`,
+			"--inset-bottom": `${next.bottom}px`,
+			/* A gutter inside each cluster, so what centres here never touches one. */
+			"--band-left": `${bandLeft + 12}px`,
+			"--band-right": `${Math.max(bandLeft + 12, bandRight - 12)}px`,
+		});
 	};
 
 	const sync = () => {

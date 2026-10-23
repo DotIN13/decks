@@ -367,11 +367,18 @@ export function Stream(props: {
 			return;
 		}
 		const fold = scroller.scrollTop + scroller.clientHeight;
+		/*
+		 * From the newest back, stopping at the first card that ends above the fold: the cards are in
+		 * order, so a long history is not measured card by card at every scroll (a resize of the panel
+		 * holding the conversation scrolls it at every step). 4px of grace: a card whose last shadow
+		 * pixel is under the fold is not one you have missed.
+		 */
+		const cards = scroller.querySelectorAll<HTMLElement>("[data-card]");
 		let count = 0;
-		for (const card of scroller.querySelectorAll<HTMLElement>("[data-card]")) {
-			// 4px of grace: a card whose last shadow pixel is under the fold is not one you
-			// have missed.
-			if (card.offsetTop + card.offsetHeight > fold + 4) count++;
+		for (let i = cards.length - 1; i >= 0; i--) {
+			const card = cards[i]!;
+			if (card.offsetTop + card.offsetHeight <= fold + 4) break;
+			count++;
 		}
 		setBehind(count);
 	};

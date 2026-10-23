@@ -1,3 +1,4 @@
+import { insetsOnly } from "@decks/canvas/camera";
 import { Switcher } from "../connections/Switcher.tsx";
 import { can } from "../connections/backend.ts";
 import type { Board, DeckPen } from "@decks/protocol";
@@ -276,6 +277,10 @@ export function LeftPanel(props: {
 		// The composer and the pill glide when the sidebar folds; following a drag, a glide
 		// is a lag. Said on the root so their own stylesheets can answer it.
 		document.documentElement.dataset.panelResizing = "true";
+		// The insets go to the panel's siblings while it is dragged, not the root: each step restyled the whole conversation.
+		const shell = handle.closest<HTMLElement>(".panel-shell");
+		const beside = shell?.parentElement ? [...shell.parentElement.children].filter((one): one is HTMLElement => one !== shell && one instanceof HTMLElement) : [];
+		insetsOnly(() => beside);
 		/* However the button comes up, here or anywhere, or a move with no button held: the drag ends. */
 		let done = false;
 		const move = (moved: PointerEvent) => {
@@ -297,6 +302,7 @@ export function LeftPanel(props: {
 			}
 			setResizing(false);
 			delete document.documentElement.dataset.panelResizing;
+			insetsOnly(undefined);
 			savePanelWidth(width());
 		};
 		window.addEventListener("pointermove", move, true);
