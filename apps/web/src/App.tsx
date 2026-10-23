@@ -326,13 +326,14 @@ export function App() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }) => {
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, disabled?: () => boolean) => {
 		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
 		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
 		let sized: { w: number; h: number } | undefined;
 		const float = makeFloat(el, {
 			...(stow ? { stow: { ...stow, tabHeight } } : {}),
 			others: otherFloats(el),
+			...(disabled ? { disabled } : {}),
 			onSettled: () => {
 				for (const [other, handle] of floats) if (other !== el) handle.restore();
 			},
@@ -379,10 +380,55 @@ export function App() {
 		const dock = dockEl;
 		const handle = dock?.querySelector<HTMLElement>(".composer-box");
 		if (!dock || !handle) return;
-		const float = mountFloat(dock, "composer", handle, "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .send-button", () => {
+		const keepsOwn = "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .send-button";
+		// On a phone the composer stays at the foot: its grip opens the conversation instead (below).
+		const float = mountFloat(dock, "composer", handle, keepsOwn, () => {
 			const box = workBox();
 			return { x: box.x + box.w / 2 - dock.offsetWidth / 2, y: box.h - dock.offsetHeight - 12 };
-		}, "bottom", { tab: STOW_TAB });
+		}, "bottom", { tab: STOW_TAB }, () => phone());
+		createEffect(() => {
+			phone();
+			float.restore();
+		});
+		/*
+		 * On a phone the grip is the conversation's: a tap on it, or a drag up from it, opens the history
+		 * out of the composer (the tools give way while it is open); a tap or a drag down closes it again.
+		 * The grip is the bar's top band and the little bar in it, not the words or the buttons.
+		 */
+		const SWIPE = 24;
+		handle.addEventListener("pointerdown", (event) => {
+			if (!phone() || event.button !== 0 || (event.target instanceof Element && event.target.closest(keepsOwn))) return;
+			const start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+			let done = false;
+			const finish = () => {
+				done = true;
+				window.removeEventListener("pointermove", move, true);
+				window.removeEventListener("pointerup", up, true);
+				window.removeEventListener("pointercancel", cancel, true);
+			};
+			const move = (next: PointerEvent) => {
+				if (done || next.pointerId !== start.id) return;
+				const dy = next.clientY - start.y;
+				if (!phoneChat() && dy < -SWIPE) {
+					finish();
+					setPhoneChat(true, dock.getBoundingClientRect());
+				} else if (phoneChat() && dy > SWIPE) {
+					finish();
+					setPhoneChat(false);
+				}
+			};
+			const up = (next: PointerEvent) => {
+				if (done || next.pointerId !== start.id) return;
+				finish();
+				if (Math.hypot(next.clientX - start.x, next.clientY - start.y) > 8) return;
+				if (phoneChat()) setPhoneChat(false);
+				else setPhoneChat(true, dock.getBoundingClientRect());
+			};
+			const cancel = (next: PointerEvent) => next.pointerId === start.id && finish();
+			window.addEventListener("pointermove", move, true);
+			window.addEventListener("pointerup", up, true);
+			window.addEventListener("pointercancel", cancel, true);
+		});
 		unstowComposer = () => float.unstow();
 		/*
 		 * Two things bring it back on their own, because both are the app asking for the
@@ -776,9 +822,9 @@ export function App() {
 	/* The pill the phone's sheet opens out of, and the sheet's way out: it leaves quicker than it came. */
 	const [sheetFrom, setSheetFrom] = createSignal<DOMRect | undefined>();
 	const [sheetLeaving, setSheetLeaving] = createSignal(false);
-	const setPhoneChat = (open: boolean) => {
+	const setPhoneChat = (open: boolean, from?: DOMRect) => {
 		if (open) {
-			setSheetFrom(document.querySelector(".v3-status")?.getBoundingClientRect());
+			setSheetFrom(from ?? document.querySelector(".v3-status")?.getBoundingClientRect());
 			setSheetLeaving(false);
 			return void setPhoneChatRaw(true);
 		}
