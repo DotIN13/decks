@@ -300,10 +300,34 @@ export function makeFloat(
 		settle(home(), true, true);
 	};
 
-	const endDrag = (event: PointerEvent): void => {
+	/*
+	 * A drag is followed on the window, not only on the handle: its capture can be lost (the handle
+	 * drawn again under the pointer, the window losing focus), and a release the handle never hears
+	 * left the float stuck to the pointer. So it ends on any release or cancel of its pointer, on the
+	 * window losing focus, and on a move with no button held, wherever those happen.
+	 */
+	const onWindowMove = (event: PointerEvent): void => {
+		if (!drag || event.pointerId !== drag.pointerId) return;
+		if (event.pointerType === "mouse" && (event.buttons & 1) === 0) return endDrag(event);
+		onPointerMove(event);
+	};
+	const onWindowUp = (event: PointerEvent): void => endDrag(event);
+	const onWindowBlur = (): void => {
+		if (drag) endDrag({ pointerId: drag.pointerId, timeStamp: performance.now() });
+	};
+	const listen = (on: boolean): void => {
+		const method = on ? "addEventListener" : "removeEventListener";
+		window[method]("pointermove", onWindowMove as EventListener, true);
+		window[method]("pointerup", onWindowUp as EventListener, true);
+		window[method]("pointercancel", onWindowUp as EventListener, true);
+		window[method]("blur", onWindowBlur);
+	};
+
+	const endDrag = (event: Pick<PointerEvent, "pointerId" | "timeStamp">): void => {
 		if (!drag || event.pointerId !== drag.pointerId) return;
 		const { moved, samples } = drag;
 		drag = undefined;
+		listen(false);
 		delete el.dataset.dragging;
 		try {
 			handle.releasePointerCapture(event.pointerId);
@@ -359,9 +383,9 @@ export function makeFloat(
 		try {
 			handle.setPointerCapture(event.pointerId);
 		} catch {
-			// Some engines refuse capture for synthetic pointers; the drag still works
-			// while the pointer stays over the handle.
+			// Some engines refuse capture for synthetic pointers; the window's listeners follow it.
 		}
+		listen(true);
 		el.dataset.dragging = "true";
 		event.preventDefault();
 	};
@@ -408,8 +432,26 @@ export function makeFloat(
 		try {
 			tab.setPointerCapture(event.pointerId);
 		} catch {
-			// Without capture the drag still works while the pointer stays over the tab.
+			// The window's listeners follow it.
 		}
+		listenTab(true);
+	};
+	/* The tab's drag is followed on the window too, for the same reason as the float's (`listen`). */
+	const onTabWindowMove = (event: PointerEvent): void => {
+		if (!tabDrag || event.pointerId !== tabDrag.pointerId) return;
+		if (event.pointerType === "mouse" && (event.buttons & 1) === 0) return onTabUp(event);
+		onTabMove(event);
+	};
+	const onTabWindowUp = (event: PointerEvent): void => onTabUp(event);
+	const onTabBlur = (): void => {
+		if (tabDrag) onTabUp({ pointerId: tabDrag.pointerId });
+	};
+	const listenTab = (on: boolean): void => {
+		const method = on ? "addEventListener" : "removeEventListener";
+		window[method]("pointermove", onTabWindowMove as EventListener, true);
+		window[method]("pointerup", onTabWindowUp as EventListener, true);
+		window[method]("pointercancel", onTabWindowUp as EventListener, true);
+		window[method]("blur", onTabBlur);
 	};
 	const onTabMove = (event: PointerEvent): void => {
 		if (!tabDrag || event.pointerId !== tabDrag.pointerId || current === undefined || !stowed) return;
@@ -437,6 +479,7 @@ export function makeFloat(
 			}
 			swallowClick();
 			tabDrag = undefined;
+			listenTab(false);
 			stowed = undefined;
 			saveStowed(key, undefined, storage);
 			// Where the handle would be under the pointer; placed inside the bounds, but the drag
@@ -455,17 +498,19 @@ export function makeFloat(
 			try {
 				handle.setPointerCapture(pointerId);
 			} catch {
-				// The drag follows while the pointer is over the handle.
+				// The window's listeners follow it.
 			}
+			listen(true);
 			return;
 		}
 		const y = clamp({ x: bounds().x, y: tabDrag.startY + dy }, size(), bounds(), 12).y;
 		place({ x: current.x, y });
 	};
-	const onTabUp = (event: PointerEvent): void => {
+	const onTabUp = (event: Pick<PointerEvent, "pointerId">): void => {
 		if (!tabDrag || event.pointerId !== tabDrag.pointerId) return;
 		const { moved, tab } = tabDrag;
 		tabDrag = undefined;
+		listenTab(false);
 		delete el.dataset.dragging;
 		try {
 			tab.releasePointerCapture(event.pointerId);
@@ -494,15 +539,9 @@ export function makeFloat(
 	const onResize = (): void => restore();
 
 	handle.addEventListener("pointerdown", onPointerDown);
-	handle.addEventListener("pointermove", onPointerMove);
-	handle.addEventListener("pointerup", endDrag);
-	handle.addEventListener("pointercancel", endDrag);
 	handle.addEventListener("dblclick", onDoubleClick);
 	if (options.stow) {
 		el.addEventListener("pointerdown", onTabDown);
-		el.addEventListener("pointermove", onTabMove);
-		el.addEventListener("pointerup", onTabUp);
-		el.addEventListener("pointercancel", onTabUp);
 	}
 
 	let observer: ResizeObserver | undefined;
@@ -527,14 +566,10 @@ export function makeFloat(
 		placeAt,
 		dispose() {
 			handle.removeEventListener("pointerdown", onPointerDown);
-			handle.removeEventListener("pointermove", onPointerMove);
-			handle.removeEventListener("pointerup", endDrag);
-			handle.removeEventListener("pointercancel", endDrag);
+			listen(false);
 			handle.removeEventListener("dblclick", onDoubleClick);
 			el.removeEventListener("pointerdown", onTabDown);
-			el.removeEventListener("pointermove", onTabMove);
-			el.removeEventListener("pointerup", onTabUp);
-			el.removeEventListener("pointercancel", onTabUp);
+			listenTab(false);
 			try {
 				window.removeEventListener("resize", onResize);
 			} catch {
