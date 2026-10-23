@@ -53,6 +53,22 @@ test("a gradient turns as pen turns it, and shadows, opacity and turns are CSS's
 	assert.match(style, /box-shadow: 0px 2px 6px 0px #0003(;|$)/);
 });
 
+test("an angular gradient is a conic gradient from pen's start, its stops where the stage puts them", () => {
+	const wheel = [{ color: "#f00", position: 0 }, { color: "#ff0", position: 0.25 }, { color: "#00f", position: 1 }];
+	const page = toHtml(
+		doc([
+			{ type: "rectangle", id: "a", width: 100, height: 100, fill: { type: "gradient", gradientType: "angular", rotation: 90, center: { x: 0.25, y: 0.5 }, colors: wheel } },
+			{ type: "rectangle", id: "b", width: 200, height: 100, fill: { type: "gradient", gradientType: "angular", colors: wheel } },
+		]),
+		["a", "b"],
+		{ format: "html" },
+	);
+	// 90° counter-clockwise from up is 270deg clockwise.
+	assert.match(styleOf(page, "a"), /conic-gradient\(from 270deg at 25% 50%, #f00 0%, #ff0 25%, #00f 100%\)/);
+	// On a box twice as wide as tall, a quarter of the way round the ellipse is still the right.
+	assert.match(styleOf(page, "b"), /conic-gradient\(from 0deg at 50% 50%, #f00 0%, #ff0 25%, #00f 100%\)/);
+});
+
 test("variables are custom properties with their dark values, and an item with a theme sets its own", () => {
 	const page = toHtml(
 		doc(

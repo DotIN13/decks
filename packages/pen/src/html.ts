@@ -17,7 +17,8 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  *   places pen lays them out at, relative to themselves;
  * - text is set in its family, size, weight, line height, letter spacing and colour, on one line
  *   (`auto`), wrapping at its width (`fixed-width`), or in its box (`fixed-width-height`);
- * - fills are a colour, a linear or radial gradient, or a picture (its address as `url` gives it);
+ * - fills are a colour, a linear, radial or angular (conic) gradient, or a picture (its address as
+ *   `url` gives it);
  *   strokes are an outline over the children on the side pen strokes (inside, centred, outside),
  *   with the item's corners; outer shadows, opacity and turns are CSS's own;
  * - icons are inline SVG of the icon sets the stage draws them from, as `icons` hands them over;
@@ -119,6 +120,28 @@ const r2 = (n: number) => {
 	return Object.is(v, -0) ? "0" : String(v);
 };
 const px = (n: number) => `${r2(n)}px`;
+
+/**
+ * An angular gradient as CSS's `conic-gradient`. pen turns its start counter-clockwise from up and
+ * runs clockwise; the stage takes its angles on the ellipse of the gradient's size, CSS on a circle.
+ * Each stop is put at the circle's angle of the ellipse's, so the stops sit where the stage draws
+ * them and only the blend between two stops of a stretched gradient differs a little.
+ */
+function conic(stops: Array<{ at: number; colour: string }>, cx: number, cy: number, sw: number, sh: number, turn: number): string {
+	const start = (turn * Math.PI) / 180;
+	const [rx, ry] = [Math.max(1, sw / 2), Math.max(1, sh / 2)];
+	// The clockwise angle from up, on the page, of the ellipse's angle `e`.
+	const page = (e: number) => Math.atan2(rx * Math.sin(e), ry * Math.cos(e));
+	const from = page(-start);
+	const turnOf = (t: number) => {
+		if (t >= 1) return 1;
+		if (t <= 0) return 0;
+		const d = (page(2 * Math.PI * t - start) - from) / (2 * Math.PI);
+		return d - Math.floor(d);
+	};
+	const fromDeg = ((((from * 180) / Math.PI) % 360) + 360) % 360;
+	return `conic-gradient(from ${r2(fromDeg)}deg at ${r2(cx * 100)}% ${r2(cy * 100)}%, ${stops.map((s) => `${s.colour} ${r2(turnOf(s.at) * 100)}%`).join(", ")})`;
+}
 
 /** A variable's CSS name: `$--card` and `$card` are both `--card`. */
 export function cssName(name: string): string {
@@ -439,7 +462,7 @@ class Writer {
 				const at = (p: number) => `${r2(((span / 2 + shift + (p - 0.5) * sh) / span) * 100)}%`;
 				return { image: `linear-gradient(${r2(((-turn % 360) + 360) % 360)}deg, ${stops.map((s) => `${s.colour} ${at(s.at)}`).join(", ")})` };
 			}
-			// Radial, and angular in its place as the stage draws it.
+			if (g.gradientType === "angular") return { image: conic(stops, cx, cy, sw, sh, num(this.doc, g.rotation, theme, 0)) };
 			return { image: `radial-gradient(${px(Math.max(1, sw / 2))} ${px(Math.max(1, sh / 2))} at ${r2(cx * 100)}% ${r2(cy * 100)}%, ${stops.map((s) => `${s.colour} ${r2(s.at * 100)}%`).join(", ")})` };
 		}
 		if (fill.type === "image") {

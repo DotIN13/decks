@@ -81,13 +81,20 @@ impl Built {
 			Paint::Solid(c) => {
 				rec[4..8].copy_from_slice(&c.0);
 			}
-			Paint::Linear { from, to, stops } | Paint::Radial { center: from, radius: to, stops } => {
+			Paint::Linear { from, to, stops } | Paint::Radial { center: from, radius: to, stops } | Paint::Conic { center: from, radius: to, stops, .. } => {
 				let row = self.ramps.len().min(RAMP_H as usize - 1);
 				if self.ramps.len() < RAMP_H as usize {
 					self.ramps.push(ramp_row(stops));
 				}
-				rec[0] = if matches!(paint, Paint::Linear { .. }) { 1.0 } else { 2.0 };
+				rec[0] = match paint {
+					Paint::Linear { .. } => 1.0,
+					Paint::Radial { .. } => 2.0,
+					_ => 4.0,
+				};
 				rec[1] = row as f32;
+				if let Paint::Conic { start, .. } = paint {
+					rec[2] = *start;
+				}
 				rec[8..12].copy_from_slice(&[from.0, from.1, to.0, to.1]);
 			}
 			Paint::Image { texture: t, opacity, uv } => {

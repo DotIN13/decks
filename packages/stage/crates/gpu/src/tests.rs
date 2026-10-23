@@ -94,6 +94,26 @@ fn layers_clips_gradients_shadows_and_meshes() {
 	assert_eq!(px(&p, 200, 172, 172), [255, 128, 0, 255], "the triangle");
 }
 
+/// An angular gradient runs clockwise from straight up, and its rotation turns where it starts
+/// counter-clockwise.
+#[test]
+fn angular_gradients_go_round() {
+	let Some(mut g) = gpu() else { return };
+	let (w, h) = fixtures::draw(&mut g, "angular", &stage_text::Text::new()).unwrap();
+	let p = g.read(fixtures::OUT).unwrap();
+	save("angular", &p, w, h);
+	// The square at (10, 10) 100 wide, at 2×: its centre is at (120, 120).
+	let near = |c: [u8; 4], want: [u8; 3]| (0..3).all(|k| (c[k] as i32 - want[k] as i32).abs() < 40);
+	assert!(near(px(&p, w, 125, 40), [255, 50, 0]), "just right of up is red: {:?}", px(&p, w, 125, 40));
+	assert!(near(px(&p, w, 200, 120), [255, 255, 0]), "right is yellow: {:?}", px(&p, w, 200, 120));
+	assert!(near(px(&p, w, 120, 200), [0, 192, 0]), "down is green: {:?}", px(&p, w, 120, 200));
+	assert!(near(px(&p, w, 40, 120), [0, 64, 255]), "left is blue: {:?}", px(&p, w, 40, 120));
+	// Turned 90° counter-clockwise, about (130 + 40, 60) = (340, 120) at 2×: red starts at the left,
+	// so up is where yellow is.
+	assert!(near(px(&p, w, 340, 40), [255, 255, 0]), "turned: up is yellow: {:?}", px(&p, w, 340, 40));
+	assert!(near(px(&p, w, 300, 116), [255, 50, 0]), "turned: just above left is red: {:?}", px(&p, w, 300, 116));
+}
+
 /// The stages drawn: the two under `fixtures/`, and any more in `STAGE_FIXTURES` (a folder of
 /// `<name>/stage.pen`).
 fn stages() -> Vec<(String, String)> {

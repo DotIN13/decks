@@ -245,6 +245,7 @@ fn fade(op: Op, alpha: f32) -> Op {
 		Paint::Solid(c) => Paint::Solid(Color(c.0.map(|v| v * alpha))),
 		Paint::Linear { from, to, stops } => Paint::Linear { from, to, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
 		Paint::Radial { center, radius, stops } => Paint::Radial { center, radius, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
+		Paint::Conic { center, radius, start, stops } => Paint::Conic { center, radius, start, stops: stops.into_iter().map(|(at, c)| (at, Color(c.0.map(|v| v * alpha)))).collect() },
 		Paint::Image { texture, opacity, uv } => Paint::Image { texture, opacity: opacity * alpha, uv },
 	};
 	match op {
@@ -309,9 +310,11 @@ fn paint_of(ctx: &Context, fill: &Value, theme: &Theme, w: f64, h: f64) -> Optio
 			let cy = h * vars.num(center.and_then(|c| c.get("y")), theme, 0.5);
 			let sw = w * vars.num(size.and_then(|s| s.get("width")), theme, 1.0);
 			let sh = h * vars.num(size.and_then(|s| s.get("height")), theme, 1.0);
+			let radius = ((sw / 2.0).max(1.0) as f32, (sh / 2.0).max(1.0) as f32);
 			match object.get("gradientType").and_then(Value::as_str).unwrap_or("linear") {
-				// Angular gradients come with the gradient shaders' next step; radial stands in.
-				"radial" | "angular" => Some(Paint::Radial { center: (cx as f32, cy as f32), radius: ((sw / 2.0).max(1.0) as f32, (sh / 2.0).max(1.0) as f32), stops }),
+				"radial" => Some(Paint::Radial { center: (cx as f32, cy as f32), radius, stops }),
+				// Clockwise round the centre from straight up, started turned counter-clockwise by the rotation.
+				"angular" => Some(Paint::Conic { center: (cx as f32, cy as f32), radius, start: vars.num(object.get("rotation"), theme, 0.0).to_radians() as f32, stops }),
 				_ => {
 					// 0° points up and angles run counter-clockwise; the length is the size's height.
 					let rad = vars.num(object.get("rotation"), theme, 0.0).to_radians();

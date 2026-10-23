@@ -12,8 +12,8 @@ struct Frame {
 	_pad: u32,
 };
 
-// A paint: [kind, ramp row, opacity, 0], colour, gradient geometry, picture uv.
-// kind: 0 solid, 1 linear, 2 radial, 3 picture.
+// A paint: [kind, ramp row, opacity (a conic's start), 0], colour, gradient geometry, picture uv.
+// kind: 0 solid, 1 linear, 2 radial, 3 picture, 4 conic.
 struct PaintRec {
 	head: vec4<f32>,
 	color: vec4<f32>,
@@ -183,14 +183,18 @@ fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
 	if (kind == 0.0) {
 		return rec.color;
 	}
-	if (kind == 1.0 || kind == 2.0) {
+	if (kind == 1.0 || kind == 2.0 || kind == 4.0) {
 		var t = 0.0;
 		if (kind == 1.0) {
 			let start = rec.geo.xy;
 			let dir = rec.geo.zw - start;
 			t = dot(local - start, dir) / max(dot(dir, dir), 1e-6);
-		} else {
+		} else if (kind == 2.0) {
 			t = length((local - rec.geo.xy) / max(rec.geo.zw, vec2<f32>(1e-6)));
+		} else {
+			// Clockwise from straight up (y runs down), plus the start's turn counter-clockwise.
+			let q = (local - rec.geo.xy) / max(rec.geo.zw, vec2<f32>(1e-6));
+			t = fract((atan2(q.x, -q.y) + rec.head.z) / 6.28318531);
 		}
 		let row = (rec.head.y + 0.5) / f32(textureDimensions(ramp).y);
 		return textureSampleLevel(ramp, smooth_sampler, vec2<f32>(clamp(t, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, row), 0.0);

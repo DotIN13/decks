@@ -87,6 +87,10 @@ pub enum Paint {
 	Linear { from: (f32, f32), to: (f32, f32), stops: Vec<(f32, Color)> },
 	/// About `center`, reaching `radius` (x and y), through colour stops at 0 to 1.
 	Radial { center: (f32, f32), radius: (f32, f32), stops: Vec<(f32, Color)> },
+	/// Round `center` (an angular gradient): stops 0 to 1 run clockwise once round, from `start`
+	/// radians counter-clockwise of straight up. Angles are taken on the ellipse of `radius` (x and
+	/// y), so a wide box's gradient is stretched with it.
+	Conic { center: (f32, f32), radius: (f32, f32), start: f32, stops: Vec<(f32, Color)> },
 	/// A picture by our own texture id at an opacity. `uv` is the part of the picture across the
 	/// shape's box (0 to 1 is all of it); past the picture's edge is transparent.
 	Image { texture: u32, opacity: f32, uv: [f32; 4] },

@@ -15,7 +15,7 @@ use crate::tiles::{Grid, TILE};
 pub const OUT: u32 = 1;
 
 /// The fixtures drawn from draw lists and text alone, in order.
-pub const NAMES: [&str; 5] = ["shapes", "effects", "words", "card", "placeholder"];
+pub const NAMES: [&str; 6] = ["shapes", "effects", "words", "card", "placeholder", "angular"];
 
 /// The real stages, each a `.pen` file under `crates/gpu/fixtures/`.
 pub const STAGES: [&str; 2] = ["herobrine", "rotary"];
@@ -47,6 +47,7 @@ pub fn draw(g: &mut dyn Backend, name: &str, words: &stage_text::Text) -> Option
 		"words" => words_(g, words),
 		"card" => card(g, words),
 		"placeholder" => placeholder(g, words),
+		"angular" => Some(angular(g, words)),
 		_ => None,
 	}
 }
@@ -158,6 +159,23 @@ fn placeholder(g: &mut dyn Backend, words: &stage_text::Text) -> Option<(u32, u3
 	let writer = Writer { name: Some("Atelier".into()), color: [0.180, 0.686, 0.353, 1.0] };
 	document_by(g, &doc, words, area, 2.0, (600, 280), Color([1.0, 1.0, 1.0, 1.0]), Some(&writer));
 	Some((600, 280))
+}
+
+/// Angular gradients at 2×: round a square's centre from straight up; turned a quarter
+/// counter-clockwise and off centre in a wide rounded rectangle; and in an ellipse, half its size.
+fn angular(g: &mut dyn Backend, words: &stage_text::Text) -> (u32, u32) {
+	let wheel = serde_json::json!([
+		{"color":"#ff0000","position":0},{"color":"#ffff00","position":0.25},{"color":"#00c000","position":0.5},{"color":"#0040ff","position":0.75},{"color":"#ff0000","position":1}
+	]);
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"rectangle","id":"a","x":10,"y":10,"width":100,"height":100,"fill":{"type":"gradient","gradientType":"angular","colors":wheel}},
+		{"type":"rectangle","id":"b","x":130,"y":10,"width":160,"height":100,"cornerRadius":20,"fill":{"type":"gradient","gradientType":"angular","rotation":90,"center":{"x":0.25,"y":0.5},"colors":wheel}},
+		{"type":"ellipse","id":"c","x":310,"y":10,"width":100,"height":100,"fill":{"type":"gradient","gradientType":"angular","size":{"width":0.5,"height":0.5},"colors":[{"color":"#3b5cf6","position":0},{"color":"#3b5cf600","position":1}]}}
+	]}))
+	.expect("the fixture parses");
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 420.0, h: 120.0 };
+	document(g, &doc, words, area, 2.0, (840, 240), Color([1.0, 1.0, 1.0, 1.0]));
+	(840, 240)
 }
 
 /// A real stage (a `.pen` file's text): its drawing, not its boards (the page draws those), as

@@ -195,3 +195,14 @@ fn a_placeholder_frame_is_outlined_dashed_in_its_writers_colour_over_its_childre
 	assert_eq!(c.0, crate::painter::PLACEHOLDER_ACCENT);
 	assert_eq!(s.placeholders(), vec!["p".to_string()]);
 }
+
+#[test]
+fn an_angular_gradient_is_a_conic_paint_turned_by_its_rotation() {
+	let (_, s) = scene(json!({"children":[
+		{"type":"rectangle","id":"r","x":0,"y":0,"width":200,"height":100,"fill":{"type":"gradient","gradientType":"angular","rotation":90,"center":{"x":0.25,"y":0.5},"colors":[{"color":"#ff0000","position":0},{"color":"#0000ff","position":1}]}}
+	]}));
+	let list = paint(&s, Rect { x: 0.0, y: 0.0, w: 512.0, h: 512.0 }, 1.0);
+	let Some(Op::Shape { paint: Paint::Conic { center, radius, start, stops }, .. }) = list.ops.first() else { panic!("{:?}", list.ops) };
+	assert_eq!((*center, *radius, stops.len()), ((50.0, 50.0), (100.0, 50.0), 2));
+	assert!((start - std::f32::consts::FRAC_PI_2).abs() < 1e-6, "{start}");
+}
