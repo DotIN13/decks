@@ -1055,6 +1055,23 @@ body {
 		background: var(--v3-panel);
 		box-shadow: var(--v3-shadow);
 	}
+	/*
+	 * Where a drag of the composer can start: its top padding, and a band just above its edge that
+	 * nothing is drawn in, 18px in all, so the grip is easy to catch without the bar looking any
+	 * taller. Not over a queued message above it, which is pressed for itself.
+	 */
+	.dock .composer-box::before {
+		content: "";
+		position: absolute;
+		top: -10px;
+		left: 12px;
+		right: 12px;
+		height: 18px;
+	}
+	.dock:has(.composer-queue) .composer-box::before {
+		top: 0;
+		height: 8px;
+	}
 	.dock .dock-grip {
 		top: 4px;
 		width: 36px;
