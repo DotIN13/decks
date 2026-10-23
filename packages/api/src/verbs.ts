@@ -114,7 +114,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			'Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item\'s id or a board\'s path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame.',
+			'Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item\'s id or a board\'s path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children too; the answer has every id.',
 		params: [p("item", Item), o("options", Place)],
 		result: Item,
 	},

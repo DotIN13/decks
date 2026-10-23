@@ -1,4 +1,4 @@
-import { check, clone, ids, indexOf, newId, PenError } from "./doc.ts";
+import { check, clone, idFor, ids, indexOf, PenError } from "./doc.ts";
 import { layout, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
 import { fitShapes } from "./shapes.ts";
@@ -253,10 +253,10 @@ function isInside(node: PenNode, id: string): boolean {
 	return false;
 }
 
-/** Give an inserted item, and everything in it, an id if it has none; refuse ones already taken. */
+/** Give an inserted item, and everything in it, an id if it has none (from its name when it has one); refuse ones already taken. */
 function withIds(node: PenNode, taken: Set<string>): PenNode {
 	const visit = (item: PenNode) => {
-		if (typeof item.id !== "string" || !item.id) item.id = newId(taken);
+		if (typeof item.id !== "string" || !item.id) item.id = idFor(item.name, taken);
 		else if (item.id.includes("/")) throw new PenError(`the id "${item.id}" contains "/".`);
 		else if (taken.has(item.id)) throw new PenError(`the id "${item.id}" is already used.`);
 		taken.add(item.id);
@@ -266,10 +266,10 @@ function withIds(node: PenNode, taken: Set<string>): PenNode {
 	return node;
 }
 
-/** A copy's ids: all fresh, the root's `as` when given. */
+/** A copy's ids: all fresh (from each item's name when it has one), the root's `as` when given. */
 function freshIds(node: PenNode, taken: Set<string>, rootId: string | undefined): PenNode {
 	const visit = (item: PenNode, root: boolean) => {
-		item.id = root && rootId ? rootId : newId(taken);
+		item.id = root && rootId ? rootId : idFor(item.name, taken);
 		taken.add(item.id);
 		for (const child of item.children ?? []) visit(child, false);
 	};

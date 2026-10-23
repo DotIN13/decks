@@ -67,6 +67,32 @@ export function newId(taken: ReadonlySet<string>): string {
 	}
 }
 
+/** How long an id made from a name may be, cut at a word where it can be. */
+const NAME_ID_MAX = 40;
+
+/**
+ * An id made from an item's name: `"Pricing card"` → `pricing-card`, then `pricing-card-2`,
+ * `pricing-card-3` while one is taken, so an agent can name what it means to address later. Letters
+ * and digits of any script are kept, everything else joins words with `-`, as the server's slug does.
+ * No usable name (none, or nothing but punctuation): a fresh random id, as before.
+ */
+export function idFor(name: unknown, taken: ReadonlySet<string>): string {
+	if (typeof name !== "string") return newId(taken);
+	let base = name
+		.normalize("NFC")
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, "-")
+		.replace(/^-+|-+$/g, "");
+	if (base.length > NAME_ID_MAX) {
+		const cut = base.slice(0, NAME_ID_MAX);
+		const boundary = cut.lastIndexOf("-");
+		base = (boundary > 0 ? cut.slice(0, boundary) : cut).replace(/-+$/g, "");
+	}
+	if (!base) return newId(taken);
+	if (!taken.has(base)) return base;
+	for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+}
+
 export interface Located {
 	node: PenNode;
 	/** The parent item, or undefined at the top of the document. */
