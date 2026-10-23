@@ -227,8 +227,15 @@ export function Stream(props: {
 			if (room <= 0) return;
 			const at = scroller.scrollTop;
 			if ((event.deltaY < 0 && at <= 0) || (event.deltaY > 0 && at >= room - 1)) return;
-			event.preventDefault();
+			/*
+			 * Over the conversation itself the browser scrolls it, with the smoothing and momentum
+			 * every other scrolling box has: the event is only kept from the canvas. Setting
+			 * `scrollTop` from each event moved the history in steps. Only a wheel in one of the
+			 * gaps, which lands on the board underneath, is scrolled by hand.
+			 */
 			event.stopPropagation();
+			if (event.target instanceof Node && scroller.contains(event.target)) return;
+			event.preventDefault();
 			scroller.scrollTop = at + event.deltaY;
 		};
 		window.addEventListener("wheel", wheel, { capture: true, passive: false });

@@ -830,10 +830,11 @@ export function App() {
 		}
 		if (!phoneChat() || sheetLeaving()) return;
 		setSheetLeaving(true);
+		// As long as its slide off the screen (`v3-sheet-out`).
 		setTimeout(() => {
 			setPhoneChatRaw(false);
 			setSheetLeaving(false);
-		}, 200);
+		}, 260);
 	};
 	/** Whether the conversation is on screen: the panel's lower half, or the phone's sheet. */
 	const chatShown = () => (phone() ? phoneChat() : boardsOpen() && !chatFolded());

@@ -901,9 +901,14 @@ body {
 	 * line at every step of a resize of the panel, and at every change to its width. Each keeps the size
 	 * it last had, so the scroll height and the bottom it is held at do not move.
 	 */
-	.v3-chat .stream[data-shown] .stream-roll > * {
-		content-visibility: auto;
-		contain-intrinsic-size: auto 96px;
+	/* Only where the browser keeps the reading place as skipped turns are laid out (`overflow-anchor`),
+	   which Safari does not: there a turn coming into view at its real height moved the history under
+	   the finger. Never in the phone's sheet. */
+	@supports (overflow-anchor: auto) {
+		.v3-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
+			content-visibility: auto;
+			contain-intrinsic-size: auto 96px;
+		}
 	}
 	.v3-chat .stream[data-shown] .stream-roll {
 		flex: 1 1 auto;
@@ -2109,14 +2114,14 @@ body {
 /* ---- step 6: iPad and iPhone ---------------------------------------------------------------- */
 @layer components {
 	/* The phone's sheet leaves quicker than it came, down into the composer. */
+	/* Put away, the sheet slides all the way down off the screen, from wherever a drag left it. */
 	.v3-chat[data-sheet="true"][data-leaving="true"] {
-		animation: v3-sheet-out 200ms var(--v3-ease-in) forwards;
+		animation: v3-sheet-out 260ms var(--v3-ease-in) forwards;
 		pointer-events: none;
 	}
 	@keyframes v3-sheet-out {
 		to {
-			opacity: 0;
-			transform: translateY(30%) scale(0.94);
+			transform: translateY(calc(100% + 120px));
 		}
 	}
 	/* The phone's properties rise as a sheet. */
