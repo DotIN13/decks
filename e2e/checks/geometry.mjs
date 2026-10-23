@@ -6,7 +6,7 @@
  * at, and to the board's own file, the size another stage takes it at next, as an agent's fit
  * writes it. A double-click on empty canvas is the Note tool's click: a note there, open for typing.
  */
-import { boardPath, flyToBoard, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, flyToBoard, open, read, resetStage, say, settle, socket, stagePath, write } from "../harness.mjs";
 
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000, edit: true });
@@ -55,7 +55,7 @@ const select = async (path) => {
 	link.close();
 	await settle(page, 500);
 	await page.evaluate((wanted) => {
-		const name = wanted.replace("boards/", "");
+		const name = wanted.split("/").pop();
 		[...document.querySelectorAll(".board-row")].find((item) => item.textContent?.includes(name))?.click();
 	}, path);
 	await settle(page, 900);
@@ -109,8 +109,12 @@ const dragHandle = async (path, dx, dy) => {
 
 // --- a component board: both numbers are in the file ---------------------------------
 
+// The board's own file is the canvas's copy, and the stage shows it under that path; both read before
+// the first `select` hides the other boards.
 const component = await boardPath("risks.html");
-const componentPath = "boards/risks.html";
+const componentPath = await stagePath(page, "boards/risks.html");
+const flow = await boardPath("notes.html");
+const flowPath = await stagePath(page, "boards/notes.html");
 const wasComponent = read(component);
 const componentMeta = metaOf(wasComponent);
 say("the component board declares its own size", componentMeta !== null && componentMeta.w > 0, JSON.stringify(componentMeta));
@@ -246,8 +250,6 @@ say(
 
 // --- a board written as a document: both numbers are writable, and the height is a floor ---
 
-const flow = await boardPath("notes.html");
-const flowPath = "boards/notes.html";
 const wasFlow = read(flow);
 const flowMeta = metaOf(wasFlow);
 

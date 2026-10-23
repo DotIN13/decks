@@ -9,7 +9,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { boardPath, deckState, open, resetStage, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, open, resetStage, say, settle, socket, stagePath, write } from "../harness.mjs";
 
 const until = async (fn, ms = 10000) => {
 	const end = Date.now() + ms;
@@ -24,7 +24,7 @@ const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
 const LINK = await socket();
 const FIXTURE = "place-at-fixture.html";
-const PATH = `boards/${FIXTURE}`;
+let PATH = `boards/${FIXTURE}`;
 
 const button = (id, top, title, code) => `
 		<section class="card" data-id="${id}" data-eval="${id}" style="left: 40px; top: ${top}px; width: 560px"><h3>${title}</h3></section>
@@ -52,6 +52,8 @@ write(
 );
 await settle(page, 1200);
 await resetStage(page);
+// Placed on the canvas, the fixture is the canvas's copy (`canvases/<canvas>/boards/…`): that is the path the stage shows.
+PATH = (await until(async () => { const at = await stagePath(page, PATH); return at.startsWith("canvases/") ? at : undefined; })) ?? PATH;
 
 // The fixture alone, in front of the camera and big enough to click in (see `board-eval.mjs`).
 for (const other of await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {

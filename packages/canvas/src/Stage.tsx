@@ -464,6 +464,8 @@ export function Stage(props: {
 	 * budget is there to stop this making that case worse, not to rescue it.
 	 */
 	const LAYER_BUDGET = 48;
+	/** How many recently shown boards keep their node, with no page in it (`shownBoards`). */
+	const SHOWN_NODES = 32;
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
@@ -511,7 +513,27 @@ export function Stage(props: {
 	 * that goes as another comes for the same board never leaves it wrongly unmarked.
 	 */
 	const [liveBoards, setLiveBoards] = createSignal<ReadonlyMap<string, number>>(new Map());
-	const markLive = (path: string, on: boolean) => markLiveCount(path, on);
+	/** When each board's page last came up (`shownBoards`). */
+	const [shownAt, setShownAt] = createSignal<ReadonlyMap<string, number>>(new Map());
+	/**
+	 * The boards whose pages were shown most recently, up to `SHOWN_NODES`: they keep their node when the
+	 * camera leaves them or zooms out, with no page in it (`mounted` is off). Their pictures are what the
+	 * sheet draws there, and without the node a board that had been live did not come back as its picture
+	 * after a zoom out (`e2e/checks/drop-lands.mjs`).
+	 */
+	const shownBoards = createMemo<ReadonlySet<string>>((was) => {
+		const onCanvas = new Set(props.boards.map((board) => board.path));
+		const next = [...shownAt()]
+			.filter(([path]) => onCanvas.has(path))
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, SHOWN_NODES)
+			.map(([path]) => path);
+		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
+	});
+	const markLive = (path: string, on: boolean) => {
+		markLiveCount(path, on);
+		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
+	};
 	const markLiveCount = (path: string, on: boolean) =>
 		setLiveBoards((was) => {
 			const next = new Map(was);
@@ -1764,6 +1786,7 @@ export function Stage(props: {
 			if (at !== undefined) found.add(at);
 		};
 		for (const path of liveBoards().keys()) keep(path);
+		for (const path of shownBoards()) keep(path);
 		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
 		for (const path of editor.heldBoards()) keep(path);

@@ -93,21 +93,26 @@ say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowe
  * the conversation last opened anywhere — the agent the page has just made — so they land on
  * the stage on screen.
  */
-const two = paths.slice(0, 2);
+/*
+ * Played as the library boards (`boards/…`); the agent's canvas holds its own copies of them
+ * (`canvases/<canvas>/boards/…`), so what is on the stage is compared by file name.
+ */
+const twoNames = names.slice(0, 2);
+const two = twoNames.map((name) => `boards/${name}`);
 const link = await socket();
 if (made) link.send({ type: "agent.focus", id: made.id });
 for (const path of two) link.send({ type: "board.play", path });
 await page.waitForFunction((wanted) => document.querySelectorAll(".board-node").length === wanted, two.length, { timeout: 8000 });
-say("the stage narrows to what the agent holds", (await onCanvas()).join() === two.join(), (await onCanvas()).join(" "));
+say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
 await openPanel(page, "context");
-say("the panel's own two headings list the same two", (await mine()).join() === two.map(base).sort().join(), (await mine()).join(" "));
+say("the panel's own two headings list the same two", (await mine()).join() === twoNames.join(), (await mine()).join(" "));
 
 // The hide button on a board takes it off the stage, and the agent keeps it.
 //
 // Fitted first, on purpose: it is at a board's top-right corner, so with the camera left
 // wherever the previous check put it the button can sit off-screen or exactly where the
 // neighbouring board begins — which is a fact about the camera, not about hiding.
-const first = two[0];
+const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? two[0];
 await selectBoard(page, first);
 await pressBoardAction(page, "Hide");
 await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
@@ -116,6 +121,10 @@ say("the hide button takes a board off the stage", !(await onCanvas()).includes(
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not
  * detach it, so it moves to `Held, not shown` rather than out of the agent's context.
  */
+/* The held row follows the hide over the socket: waited for, not read the instant the board is gone. */
+await page
+	.waitForFunction((name) => [...document.querySelectorAll('.panel-section[data-kind="held"] .board-row .row-name')].some((n) => n.textContent === name), base(first), { timeout: 8000 })
+	.catch(() => {});
 const held = () => page.evaluate(() => [...document.querySelectorAll('.panel-section[data-kind="held"] .board-row .row-name')].map((n) => n.textContent));
 say("…without dropping it from the agent's context: it is held, not shown", (await held()).includes(base(first)) && (await mine()).length === 2, `held=${(await held()).join(" ")}`);
 

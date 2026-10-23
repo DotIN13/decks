@@ -1,13 +1,12 @@
 import { canvasFile } from "../stage/canvas-files.ts";
-import { boxOf, placements, baseTheme, walk, type Op } from "@decks/pen";
-import { boardOf } from "../stage/pens.ts";
+import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { serverText } from "../stage/text.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
 /** The drawing on your stage: notes, shapes, arrows and frames, in its pen.dev file. */
 export function penVerbs(ctx: VerbContext): Pick<Stage, "pen"> {
-	const { agent, service, needPens, needStage, here } = ctx;
+	const { agent, needPens, needStage, here } = ctx;
 	return {
 		/**
 		 * The stage's drawing: a native pen.dev document at `canvases/<name>/canvas.pen`.
@@ -38,28 +37,6 @@ export function penVerbs(ctx: VerbContext): Pick<Stage, "pen"> {
 					const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
 					return { ...result, ...(box ? { box } : {}) };
 				});
-				/*
-				 * A board the person resized on the canvas keeps that size in its own file too, as a resize
-				 * through `canvas.update` does: its page lays out at the width it is shown at, and the next
-				 * canvas it is placed on starts from it.
-				 */
-				if (agent.person) {
-					const byId = new Map([...walk(entry.doc.children)].map((node) => [node.id, node]));
-					for (const op of ops as readonly Op[]) {
-						if (op.op !== "update" || !op.set) continue;
-						const w = typeof op.set.width === "number" ? Math.min(4000, Math.max(320, Math.round(op.set.width))) : undefined;
-						const h = typeof op.set.height === "number" ? Math.min(8000, Math.max(200, Math.round(op.set.height))) : undefined;
-						if (w === undefined && h === undefined) continue;
-						const node = byId.get(op.id);
-						const path = node ? boardOf(node) : undefined;
-						const file = path ? service.fileBoard(path) : undefined;
-						if (!path || !file || file.fills) continue;
-						if ((w !== undefined && w !== file.w) || (h !== undefined && h !== file.h)) {
-							service.resize(path, { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
-							service.wrote(path, "you");
-						}
-					}
-				}
 				const touched = answered.filter((result) => result.box && !result.id.startsWith("board:"));
 				if (touched.length > 0) agent.drew?.(needStage(), touched.map((result) => result.id), touched.map((result) => result.box!));
 				return { rev: entry.rev, results: answered };

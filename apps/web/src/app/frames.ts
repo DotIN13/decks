@@ -23,6 +23,15 @@ import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
 import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
+
+/**
+ * The revision each board's page was loaded at, when a write since changed only the size in its tag
+ * (`board.changed … sized`): the page keeps that address, so a resize does not reload it. A change
+ * to anything else takes it away, and the page loads the new revision.
+ */
+const pageRevs = new Map<string, number>();
+/** The revision a board's page is loaded at: its own, unless only its size has changed since. */
+export const pageRev = (board: { path: string; rev: number }): number => pageRevs.get(board.path) ?? board.rev;
 import { forgetPen, receivePen, receivePenDelta, receivePenRefused } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
 import { receiveDoc } from "../board/live-doc.ts";
@@ -159,6 +168,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// bytes the live DOM already has. Merging leaves the identity alone and
 					// updates only the fields that moved.
 					const index = state.boards.findIndex((existing) => existing.path === board.path);
+					// A size-only write keeps the page's revision; a new revision of anything else lets it go. The
+					// same revision again (who wrote it, when it was read) changes nothing about the page.
+					if (message.sized && index !== -1) {
+						if (!pageRevs.has(board.path)) pageRevs.set(board.path, state.boards[index]!.rev);
+					} else if (index === -1 || board.rev !== state.boards[index]!.rev) pageRevs.delete(board.path);
 					if (index === -1) {
 						setState("boards", (boards) => [...boards, board].sort((a, b) => a.path.localeCompare(b.path)));
 					} else {

@@ -16,7 +16,7 @@ import { camera, glide, moveCamera, reducedMotion, setCamera } from "./state/cam
 import { cameraOntoPage } from "@decks/canvas/camera";
 import { flyAlong } from "./app/fly-along.ts";
 import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS } from "@decks/canvas/camera";
-import { handleFrame, type FrameHooks } from "./app/frames.ts";
+import { handleFrame, pageRev, type FrameHooks } from "./app/frames.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
@@ -1268,7 +1268,8 @@ export function App() {
 								list: stageBoards,
 								page: (path) => {
 									const board = state.boards.find((one) => one.path === path);
-									return board ? boardUrl(board) : undefined;
+									// At the revision its page was loaded at, when only its size has changed since (`pageRev`).
+									return board ? boardUrl({ path: board.path, rev: pageRev(board) }) : undefined;
 								},
 								mintBoardToken: mintBoardToken,
 								sandboxed: isSharedBoard,

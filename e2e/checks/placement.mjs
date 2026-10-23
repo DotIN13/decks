@@ -7,8 +7,8 @@
  * hundreds of thousands of pixels tall. The ＋ in the corner made a board at the bottom of that
  * column and left the camera where it was.
  *
- * So the two things asserted here are the two halves of the rule: the board arrives near what is
- * already on the canvas, and the view ends up holding it. Read off the screen rather than off the
+ * So what is asserted here is the rule: the board arrives near what is already on the canvas, and a
+ * board picked out of the rail is flown to (a board.create is not: the stage places it, no camera). Read off the screen rather than off the
  * deck state, because "can the person see it" is a question about pixels.
  */
 import { open, openPanel, resetStage, say, settle, socket } from "../harness.mjs";
@@ -93,7 +93,11 @@ await settle(page, 2500);
 
 const made = (await onScreen()).find((board) => !before.has(board.path));
 say("board.create makes a board on the canvas", made !== undefined, JSON.stringify((await onScreen()).map((b) => b.path)));
-say("…in the view, not at the bottom of the deck", made?.inView === true, JSON.stringify(made));
+/*
+ * Not asserted: that the new board is in the view. The server places it by the stage's own rule
+ * (`deck/place.ts`, which ignores every camera) and nothing flies the view to it any more, so
+ * whether it happens to be on screen is not the rule. What is: it lands beside its neighbours.
+ */
 const neighbours = (await onScreen()).filter((board) => board.path !== made?.path);
 say(
 	"…beside the boards that were already on the canvas",

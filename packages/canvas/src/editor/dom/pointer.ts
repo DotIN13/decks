@@ -578,7 +578,10 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	const onDblClick = (event: MouseEvent) => {
 		// Pressed on something else (a handle whose edit moved it away): not a double-click on what is under the pointer now.
 		// A press on the drawing's hit shapes is captured by the stage, so its click lands on the stage: the same place.
-		const sameSpot = pressedOn === event.target || (onDrawn(pressedOn) && event.target === host.element());
+		// So is a press on a size handle that the first click put over a small item: the item is still under it.
+		const sizer = (pressedOn as Element | null)?.closest?.(".pen-handle[data-handle]");
+		const overItem = !!sizer && sizer.getAttribute("data-handle") !== "radius" && event.target === host.element() && !!pickAtHere(worldAt(event), { deep: true });
+		const sameSpot = pressedOn === event.target || (onDrawn(pressedOn) && event.target === host.element()) || overItem;
 		if (!sameSpot) return;
 		if (host.editable() && !host.drawing() && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a note.

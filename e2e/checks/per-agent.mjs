@@ -71,18 +71,27 @@ const make = async (name, path, y) => {
 	link.send({ type: "agent.create", workspace: `per-agent-${name.toLowerCase()}` });
 	const id = await until(() => (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id))?.id, `${name} to exist`);
 	link.send({ type: "agent.rename", id, name });
+	/*
+	 * Played as the library board, held as the copy the agent's canvas makes of it
+	 * (`canvases/<canvas>/boards/…`): the path the stage shows is read back from the agent's own
+	 * `context.changed`, by file name, rather than assumed.
+	 */
+	let shown;
 	if (path) {
+		const file = path.split("/").pop();
 		link.send({ type: "board.play", path });
-		link.send({ type: "board.move", path, x: 0, y });
+		shown = await until(
+			() => link.received.filter((m) => m.type === "context.changed" && m.agentId === id).at(-1)?.inPlay?.find((one) => one.split("/").pop() === file),
+			`${name}'s board to be in play`,
+		);
+		link.send({ type: "board.move", path: shown, x: 0, y });
 	}
 	/* A rename is answered with the agent's identity, not a new list. */
 	await until(() => link.received.some((m) => m.type === "agent.identity" && m.id === id && m.identity?.name === name), `${name} to be called that`);
-	return id;
+	return { id, shown };
 };
-const adaBoard = paths[0];
-const boBoard = paths.at(-1);
-const A = await make("Ada", adaBoard, 0);
-const B = await make("Bo", boBoard, 3200);
+const { id: A, shown: adaBoard } = await make("Ada", paths[0], 0);
+const { id: B, shown: boBoard } = await make("Bo", paths.at(-1), 3200);
 
 /** Everything that should belong to one conversation, read in one go. */
 const look = () =>
@@ -220,7 +229,7 @@ say("and Bo's own draft was parked, not lost", (await look()).typed === "meant f
  * land nowhere. This is also the common case for a brand-new agent, which would otherwise
  * throw the camera on every `+`.
  */
-const C = await make("Cass");
+const { id: C } = await make("Cass");
 await settle(page, 300);
 const beforeEmpty = await look();
 await goTo("Cass", []);

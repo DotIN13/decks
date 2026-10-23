@@ -86,6 +86,45 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		if (event.pointerType !== "touch" && props.view.press(event)) return;
 		props.view.select();
 	};
+	/*
+	 * A finger on the board's bar or edge moves the board, and a second finger turns it into a pinch.
+	 *
+	 * The finger is not this board's alone: the stage counts it too (`claimTouch` keeps the camera from
+	 * panning with it), so a pinch that starts over a bar still zooms. The board is carried while the
+	 * finger moves (`view.dragging`, the outline and its picture with it) and moved once, on the lift.
+	 */
+	const fingerDrag = (event: PointerEvent) => {
+		if (event.button !== 0) return;
+		props.gestures.claimTouch(event.pointerId);
+		event.preventDefault();
+		props.view.select();
+		const from = { x: event.clientX, y: event.clientY };
+		const origin = { x: props.board.x, y: props.board.y };
+		const scale = props.camera.zoom || 1;
+		let at: { x: number; y: number } | undefined;
+		let over = false;
+		const move = (next: PointerEvent) => {
+			if (next.pointerId !== event.pointerId) return;
+			if (props.gestures.pinching()) return finish(true);
+			at = { x: origin.x + (next.clientX - from.x) / scale, y: origin.y + (next.clientY - from.y) / scale };
+			props.view.dragging(at);
+		};
+		const finish = (abandon = false) => {
+			if (over) return;
+			over = true;
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", end);
+			window.removeEventListener("pointercancel", end);
+			props.view.dragging(null);
+			if (!abandon && at) props.onMove(Math.round(at.x), Math.round(at.y));
+		};
+		const end = (done: PointerEvent) => done.pointerId === event.pointerId && finish();
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", end);
+		window.addEventListener("pointercancel", end);
+	};
+	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
+	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));
 	const zoom = () => props.camera.zoom;
 	const live = () => props.mounted && props.page !== undefined;
 	/*
@@ -381,13 +420,13 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		>
 			<div class="shade" aria-hidden="true" />
 			<Show when={props.visible}>
-				<div class="plain-board-bar" title={props.board.path} onPointerDown={press} onDblClick={() => props.onOpen()}>
+				<div class="plain-board-bar" title={props.board.path} onPointerDown={grip} onDblClick={() => props.onOpen()}>
 					{props.board.title}
 				</div>
 			</Show>
 			{/* The band along the edge of a board whose page takes the pointer: a press on the page is the page's, so this moves it. */}
 			<Show when={wired() && (hovered() || props.selected)}>
-				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={press} />}</For>
+				<For each={["n", "s", "w", "e"] as const}>{(side) => <div class="board-edge" data-side={side} style={edgeBand(side)} onPointerDown={grip} />}</For>
 			</Show>
 			{/* Over the selected words, at screen size whatever the zoom: a comment on them goes to the host. */}
 			<Show when={words()}>

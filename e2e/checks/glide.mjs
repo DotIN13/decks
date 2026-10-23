@@ -45,8 +45,9 @@ const watched = (press, ms) =>
 			if (press.kind === "row") {
 				[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(press.name))?.click();
 			} else {
-				const frame = document.querySelector(`.board-node[data-path="${press.path}"] iframe`);
-				frame?.contentDocument?.querySelector(`a[href="${press.href}"]`)?.click();
+				const frame = document.querySelector(`.board-node[data-path$="/${press.path}"] iframe, .board-node[data-path="${press.path}"] iframe`);
+				// The canvas copy writes its links back to the library (`../../../boards/risks.html`), so by the end of the href.
+				frame?.contentDocument?.querySelector(`a[href$="${press.href}"]`)?.click();
 			}
 			while (performance.now() - start < ms) {
 				samples.push({ t: Math.round(performance.now() - start), gliding: stage.dataset.gliding === "true", ...camera() });
@@ -106,6 +107,9 @@ for (let i = 0; i < 8; i++) {
 	await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 	await settle(page, 200);
 }
+// The zoom steps above can still be gliding; the link's glide is measured from rest.
+await page.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout: 5000 }).catch(() => {});
+await settle(page, 200);
 const viaLink = await watched({ kind: "link", path: "boards/plan.html", href: "risks.html" }, 700);
 const linkFrames = viaLink.samples.filter((sample) => sample.gliding);
 say(

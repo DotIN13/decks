@@ -59,33 +59,34 @@ const agent = {
 	 * and a ring at zero makes the wrong one, which is the one somebody would act on.
 	 */
 	/*
-	 * v3 has no hint row under the composer: the reading is a row of `⋯` on every screen, with the
-	 * button itself wearing the warning, and the row opens the numbers.
+	 * On a desktop the reading is the composer's dial (`chat/composer/ContextDial.tsx`, in
+	 * `.composer-ctx`): a ring and the percentage, which opens the numbers as a popover. `⋯` has
+	 * no context row here any more — that row is a phone's (below) — but it still wears the warning.
 	 */
-	const contextRow = () =>
+	const dial = () =>
 		page.evaluate(() => {
-			const element = [...document.querySelectorAll(".popover [data-row]")].find((row) => /context usage/i.test(row.innerText ?? ""));
-			return element ? { text: element.innerText.replace(/\s+/g, " ").trim(), ring: element.querySelectorAll(".ctx-ring").length, level: element.querySelector(".ctx-ring")?.dataset.level } : null;
+			const element = document.querySelector(".composer-ctx .dial");
+			return element ? { text: element.textContent.replace(/\s+/g, " ").trim(), ring: element.querySelectorAll(".ctx-ring").length, level: element.dataset.level } : null;
 		});
-	await page.locator('button[aria-label="More"]').first().click();
-	await settle(page, 400);
-	say("no context row before the agent has reported", (await contextRow()) === null);
-	await page.keyboard.press("Escape");
-	await settle(page, 250);
+	say("no dial before the agent has reported", (await dial()) === null, JSON.stringify(await dial()));
 
 	await feed({ type: "agent.usage", id: "A", usage: { contextTokens: 148_000, contextWindow: 200_000, cost: 1.234 } });
 	await settle(page, 500);
 	const level = await page.locator('button[aria-label="More"]').first().getAttribute("data-level");
 	say("the ⋯ button wears the warning, amber past 70%", level === "warn", String(level));
+	const reading = await dial();
+	say("the composer has the dial on a desktop", reading !== null, JSON.stringify(reading));
+	say("…a ring and the percentage, amber too", reading?.ring === 1 && /74%/.test(reading?.text ?? "") && reading?.level === "warn", JSON.stringify(reading));
 	await page.locator('button[aria-label="More"]').first().click();
 	await settle(page, 400);
-	const row = await contextRow();
-	say("`⋯` has the context row on a desktop too", row !== null, JSON.stringify(row));
-	say("…a ring, the words, and the percentage", row?.ring === 1 && /74%/.test(row?.text ?? ""), JSON.stringify(row));
-	await page.locator(".popover [data-row]").filter({ hasText: /context usage/i }).click();
+	const inMenu = await page.evaluate(() => [...document.querySelectorAll(".popover [data-row]")].some((row) => /context usage/i.test(row.innerText ?? "")));
+	say("…and `⋯` has no second copy of it", !inMenu, String(inMenu));
+	await page.keyboard.press("Escape");
+	await settle(page, 250);
+	await page.locator(".composer-ctx .dial").click();
 	await settle(page, 600);
-	const numbers = await page.evaluate(() => ({ modal: document.querySelectorAll(".usage-modal").length, percent: document.querySelector(".usage-modal .big")?.textContent }));
-	say("…and pressing it opens the numbers", numbers.modal === 1 && numbers.percent === "74%", JSON.stringify(numbers));
+	const numbers = await page.evaluate(() => ({ popover: document.querySelectorAll(".popover").length, percent: document.querySelector(".popover .big")?.textContent }));
+	say("…and pressing it opens the numbers", numbers.popover === 1 && numbers.percent === "74%", JSON.stringify(numbers));
 	await page.keyboard.press("Escape");
 	await settle(page, 300);
 
@@ -277,7 +278,7 @@ const agent = {
 			span: [Math.round(box(callout).left), Math.round(box(callout).right), innerWidth],
 		};
 	});
-	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "Focus", "New tab", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
+	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "New tab", "Comment", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
 	say("…on one row, on the screen, every item a 40px target", menu !== null && menu.rows === 1 && menu.inside && menu.heights.length === 1 && menu.heights[0] >= 40, JSON.stringify(menu));
 
 	/* One finger on the selected board's edge moves the board: a phone has no mouse to drag it by. */
@@ -287,7 +288,9 @@ const agent = {
 		for (const band of node.querySelectorAll(".board-edge")) {
 			const r = band.getBoundingClientRect();
 			const along = band.dataset.side === "n" || band.dataset.side === "s";
-			for (const f of [0.3, 0.7, 0.5]) {
+			// Many points along each band: the board's menu (`.board-callout`) and its corner handles (`.pen-handle`)
+			// sit over parts of it, and a point they cover is skipped rather than taken.
+			for (const f of [0.5, 0.3, 0.7, 0.2, 0.8, 0.4, 0.6, 0.1, 0.9, 0.15, 0.85, 0.35, 0.65, 0.45, 0.55, 0.25, 0.75]) {
 				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 5 : r.right - 5;
 				const y = along ? (band.dataset.side === "n" ? r.y + 5 : r.bottom - 5) : r.y + r.height * f;
 				if (x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {

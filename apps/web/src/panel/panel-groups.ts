@@ -139,7 +139,13 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	 * The rest of the deck, in the *deck's* order: this section is not about the canvas, and
 	 * `boards` arrives sorted by path.
 	 */
-	const rest: PanelRow[] = input.boards.filter((board) => !claimed.has(board.path) && matches(board, needle)).map((board) => ({ board, onCanvas: false, dim: false }));
+	/*
+	 * A library board a canvas holds a copy of (`canvases/<canvas>/boards/x.html` of `boards/x.html`) is
+	 * listed once, as its copy: the copy is the board people see and work on, and two rows of the same
+	 * title were the same board twice.
+	 */
+	const copied = new Set(input.boards.flatMap((board) => (/^canvases\/[^/]+\/boards\//.test(board.path) ? [`boards/${board.path.split("/").slice(3).join("/")}`] : [])));
+	const rest: PanelRow[] = input.boards.filter((board) => !claimed.has(board.path) && !copied.has(board.path) && matches(board, needle)).map((board) => ({ board, onCanvas: false, dim: false }));
 	// A pen file stands among the boards, in path order: a row whose `board` is just its path and name.
 	for (const pen of input.pens ?? []) {
 		const board = { path: pen.path, title: pen.title } as Board;

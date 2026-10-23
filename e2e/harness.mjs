@@ -294,6 +294,18 @@ export async function editMode(page, on = true) {
 }
 
 /**
+ * The canvas in v3's edit mode: outlines under the pointer, a flow board's block grips, Alt for
+ * distances (the tool column's highlighting select, key E). `editMode` puts it back in browse.
+ */
+export async function highlightMode(page) {
+	if ((await page.evaluate(() => document.querySelector(".stage")?.dataset.mode)) === "edit") return;
+	await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+	await page.keyboard.press("e");
+	await page.waitForFunction(() => document.querySelector(".stage")?.dataset.mode === "edit", null, { timeout: 4000 });
+	await page.waitForTimeout(120);
+}
+
+/**
  * Zoom in about the middle until boards are live (`data-live` on the stage), if they are not.
  *
  * Boards have pages and take the pointer only at the device's live zoom (`INTERACT_ZOOM`, 20% on
@@ -714,6 +726,13 @@ export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.t
  */
 export async function openHistory(page) {
 	if ((await page.locator("[data-shown='true']").count()) > 0) return;
+	/* v3: the conversation is the `.v3-chat` section, folded or not; its title unfolds it. */
+	if ((await page.locator(".v3-chat").count()) > 0) {
+		if ((await page.locator(".v3-chat[data-folded='true']").count()) === 0) return;
+		await page.locator(".v3-chat .v3-chat-title").first().click();
+		await page.waitForSelector(".v3-chat:not([data-folded='true'])", { timeout: 6000 });
+		return;
+	}
 	await page.locator('.pill button[title^="Conversation"]').first().click();
 	await page.waitForSelector("[data-shown='true']", { timeout: 6000 });
 }
@@ -730,8 +749,8 @@ export async function openHistory(page) {
  */
 export async function newAgent(page, kind = "pi") {
 	/*
-	 * From the `+` in the top-left pill, which opens the runtimes — the same `+` and list the
-	 * composer and the panel carry. The runtime cannot change afterwards, so picking one is
+	 * From the panel's `+` ("New agent"), which opens the runtimes — the same `+` and list the
+	 * composer carries. The runtime cannot change afterwards, so picking one is
 	 * what makes the agent. The count is of the agent list's rows, which only lists agents now.
 	 */
 	await openAgents(page);
@@ -739,7 +758,17 @@ export async function newAgent(page, kind = "pi") {
 		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
 	);
 	await page.keyboard.press("Escape");
-	await page.locator(".pill .new-agent").click();
+	/*
+	 * v3 has no top-left pill: the `+` is the "New agent" button at the foot of the side panel's
+	 * Agents tab (`.v3-new-agent`). The panel is opened and put on that tab first.
+	 */
+	await openPanel(page);
+	const agentsTab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Agents\s*$/i }).first();
+	if ((await agentsTab.count()) > 0 && (await agentsTab.getAttribute("aria-selected")) !== "true") {
+		await agentsTab.click();
+		await page.waitForTimeout(250);
+	}
+	await page.locator(".v3-new-agent, .pill .new-agent").first().click();
 	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
 	/*
 	 * Counted with the menu re-opened, because picking closes it — and counted as agent

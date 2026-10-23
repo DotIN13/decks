@@ -29,6 +29,11 @@ say("the server says which agent is focused", !!agentId);
 
 // --- an edit from the wire: a note, and an arrow from it to a board --------------------------------
 const firstBoard = deck.boards[0].path;
+/*
+ * On disk a board item's `url` and `metadata.path` are relative to the canvas folder: the canvas's
+ * copy `canvases/<canvas>/boards/x.html` is `boards/x.html` in its own file.
+ */
+const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
 const middle = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
@@ -74,9 +79,9 @@ say("its version is pen's", typeof doc.version === "string" && /^\d+\.\d+$/.test
 // --- boards are browser items in it --------------------------------------------------------------
 const boardItems = () => onDisk().children.filter((n) => n.type === "browser" && n.metadata?.type === "decks.board");
 const shownPaths = (await until(() => boardItems().length >= deck.boards.length && boardItems())) || boardItems();
-say("every board on the stage is a browser item in the file", deck.boards.every((b) => shownPaths.some((n) => n.metadata.path === b.path)), `${shownPaths.length} of ${deck.boards.length}`);
-const item = shownPaths.find((n) => n.metadata.path === firstBoard);
-say("a board item points at the board's file, relative to the stage", item?.url === `../../${firstBoard}`, item?.url);
+say("every board on the stage is a browser item in the file", deck.boards.every((b) => shownPaths.some((n) => n.metadata.path === inFolder(b.path))), `${shownPaths.length} of ${deck.boards.length}`);
+const item = shownPaths.find((n) => n.metadata.path === inFolder(firstBoard));
+say("a board item points at the board's file, relative to the stage", item?.url === inFolder(firstBoard), item?.url);
 
 // --- the arrow was routed to the board ------------------------------------------------------------
 const arrow = onDisk().children.find((n) => n.id === "e2e-arrow");
@@ -86,7 +91,7 @@ say("an arrow to a board is drawn when it is made", typeof arrow?.geometry === "
 const before = arrow?.geometry;
 link.send({ type: "board.move", path: firstBoard, x: (item?.x ?? 0) + 400, y: (item?.y ?? 0) + 300 });
 const movedItem = await until(() => {
-	const now = onDisk().children.find((n) => n.metadata?.path === firstBoard);
+	const now = onDisk().children.find((n) => n.metadata?.path === inFolder(firstBoard));
 	return now && now.x === (item?.x ?? 0) + 400 ? now : undefined;
 });
 say("a board moved on the canvas is moved in the file", !!movedItem, JSON.stringify(movedItem && { x: movedItem.x, y: movedItem.y }));
@@ -346,7 +351,7 @@ if (spot) {
 	}
 }
 // --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
-const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);
+const boardItem = onDisk().children.find((n) => n.metadata?.path === inFolder(firstBoard));
 if (boardItem) {
 	const w = Math.round((boardItem.width ?? 400) * 0.4);
 	const h = Math.round((boardItem.height ?? 300) * 0.3);

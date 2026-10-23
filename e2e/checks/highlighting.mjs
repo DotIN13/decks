@@ -21,7 +21,7 @@
  */
 import { rmSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
-import { WEB, deckState, flyToBoard, open, read, resetStage, say, settle } from "../harness.mjs";
+import { WEB, deckState, flyToBoard, open, read, resetStage, say, settle, stagePath } from "../harness.mjs";
 
 const deck = await deckState();
 const fixture = `${deck.path}/boards/highlight-fixture.html`;
@@ -185,16 +185,11 @@ try {
 	await context.close();
 
 	/*
-	 * --- the editor's half -------------------------------------------------------
+	 * --- the canvas's half --------------------------------------------------------
 	 *
-	 * The colouring changes one thing for a person, and this is where that is asserted: a `pre`
-	 * is no longer retypeable. `normaliseRun` collapses every run of whitespace in a run it
-	 * opens, which flattens a code block's indentation on screen, and a commit would write the
-	 * runtime's own `hljs-*` spans into the file. So the gesture is refused, and the two halves
-	 * of the claim are that nothing opened and nothing was written.
-	 *
-	 * The other route is asserted beside it, because a refusal that also broke the markdown
-	 * panel's source editor would pass the first assertion and be a worse bug.
+	 * A board's page is not edited from the canvas (15ef509c took the board editor out), so a
+	 * double-click on a coloured `pre` must still open nothing: no run made editable, nothing
+	 * written into the board's file, and the runtime's `hljs-*` spans left where they were.
 	 */
 	const app = await open({ width: 1440, height: 950, edit: true });
 	try {
@@ -213,45 +208,33 @@ try {
 			await app.page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 			await settle(app.page, 250);
 		}
+		// On the canvas the fixture is the canvas's own copy, and that copy is the file a write would touch.
+		const onStage = await stagePath(app.page, "boards/highlight-fixture.html");
+		const frameSelector = `.board-node[data-path="${onStage}"] iframe`;
+		const copy = `${deck.path}/${onStage}`;
 
-		/** What the app's own notice strip says, and whether anything in the frame became editable. */
+		/** Whether anything in the frame became editable, and the spans still in the written block. */
 		const state = () =>
-			app.page.evaluate(() => {
-				const win = document.querySelector('.board-node[data-path="boards/highlight-fixture.html"] iframe')?.contentWindow;
+			app.page.evaluate((selector) => {
+				const win = document.querySelector(selector)?.contentWindow;
 				const code = win?.document.querySelector('section[data-id="written"] pre code');
 				return {
 					editable: win ? [...win.document.querySelectorAll("[contenteditable]")].filter((el) => el.getAttribute("contenteditable") !== "false").length : -1,
 					spans: code ? code.querySelectorAll("span").length : -1,
-					// The source textarea is a child of the *board's* document, not the app's: it
-					// is positioned over the panel it belongs to, inside the frame.
-					source: Boolean(win?.document.querySelector(".decks-source")),
-					notices: [...document.querySelectorAll(".notice")].map((el) => (el.textContent ?? "").trim()),
 				};
-			});
+			}, frameSelector);
 
-		const before = read(fixture);
-		await app.page.frameLocator('.board-node[data-path="boards/highlight-fixture.html"] iframe').locator('section[data-id="written"] pre code').dblclick();
+		const before = read(copy);
+		await app.page.frameLocator(frameSelector).locator('section[data-id="written"] pre code').dblclick();
 		await settle(app.page, 400);
 		const refused = await state();
-		say(
-			"a double-click on a code block opens nothing and says why",
-			refused.editable === 0 && refused.notices.some((text) => /Code keeps its own spacing/i.test(text)),
-			JSON.stringify({ editable: refused.editable, notices: refused.notices }),
-		);
+		say("a double-click on a code block makes nothing editable", refused.editable === 0, JSON.stringify(refused));
 		say(
 			"…and writes nothing, and leaves the colours where the runtime put them",
-			read(fixture) === before && refused.spans > 0,
-			`${refused.spans} span(s) still in the block, file ${read(fixture) === before ? "unchanged" : "changed"}`,
+			before !== undefined && read(copy) === before && refused.spans > 0,
+			`${refused.spans} span(s) still in the block, file ${read(copy) === before ? "unchanged" : "changed"}`,
 		);
-
-		// The route that must keep working: a rendered panel is edited as its source.
-		await app.page.frameLocator('.board-node[data-path="boards/highlight-fixture.html"] iframe').locator('[data-id="fenced"]').dblclick();
-		await settle(app.page, 500);
-		const drawn = await state();
-		say("a markdown panel's code still opens its source, which is how it is edited", drawn.source, "the source editor is open");
-		await app.page.keyboard.press("Escape");
-		await settle(app.page, 300);
-		say("no page errors in the editor either", app.errors.length === 0, app.errors.slice(0, 2).join(" | "));
+		say("no page errors on the canvas either", app.errors.length === 0, app.errors.slice(0, 2).join(" | "));
 	} finally {
 		await app.browser.close();
 	}

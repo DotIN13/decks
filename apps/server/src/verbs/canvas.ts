@@ -248,6 +248,16 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							if (h !== undefined) set.height = h;
 							if (path) sized.push({ path, ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
 						}
+						/*
+						 * A board the person resized on the canvas (the app sends its new width and height as the
+						 * item's own fields) keeps that size in its file too, as a resize by `size` does.
+						 */
+						if (path && !op.size && agent.person && (typeof set.width === "number" || typeof set.height === "number")) {
+							const clamp = (value: unknown, low: number, high: number) => (typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined);
+							const w = clamp(set.width, 320, 4000);
+							const h = clamp(set.height, 200, 8000);
+							sized.push({ path, ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) });
+						}
 						const box = cornerOf(op.at);
 						pen = { op: "update", id, set, ...(box ? { box } : {}) };
 						break;

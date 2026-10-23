@@ -63,7 +63,8 @@ if (clear) {
 		await settle(page, 250);
 		await page.mouse.dblclick(clear.screen.x + 40, clear.screen.y + 40);
 		await settle(page, 900);
-		const typing = await page.evaluate(() => !!document.querySelector(".pen-text"));
+		// A markdown note opens the card editor; any other text, the plain one.
+		const typing = await page.evaluate(() => !!(document.activeElement?.closest(".pen-card-editor") || document.querySelector(".pen-text")));
 		const during = await scrolled();
 		say("a double-click opens its words for typing", typing, JSON.stringify(during));
 		say("…and the stage does not scroll to show the caret", during.top === 0 && during.left === 0, JSON.stringify(during));

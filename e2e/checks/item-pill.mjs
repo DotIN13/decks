@@ -69,19 +69,48 @@ const top = Math.min(box.y, two.y);
 say("two selected have no handles, and the pill sits 10 px above them", both.anchors === 0 && Math.abs(top - both.pill - 10) < 1.5, JSON.stringify({ ...both, top }));
 
 // A group with a board in it: one pill, over the whole group, not over the board or the items alone.
-const press = await page.evaluate(() => {
-	for (const one of window.__decksBoards()) {
-		const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
-		const r = node.getBoundingClientRect();
-		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
-			const x = r.x + r.width * fx;
-			const y = r.y + r.height * fy;
-			const at = document.elementFromPoint(x, y);
-			if (x > 60 && x < 1340 && y > 90 && y < 860 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button"))
-				return { x, y, path: node.dataset.path, rect: { x: r.x, y: r.y, right: r.right, bottom: r.bottom } };
-		}
+// On a board's picture; on a live board, on its title bar or the band along its edge (shown while the
+// pointer is over the board): a press inside its page is the page's, which picks the board but does not see Shift.
+const inView = (x, y) => x > 60 && x < 1340 && y > 90 && y < 860;
+let press;
+for (const one of await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })))) {
+	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
+	if (!one.node) {
+		// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+		const at = await page.evaluate(({ path, rect: r }) => {
+			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (x > 60 && x < 1340 && y > 90 && y < 860 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === path) return { x, y };
+			}
+		}, one);
+		if (at) press = { ...at, path: one.path, rect };
+	} else {
+		const r = one.rect;
+		const inside = [[0.5, 0.5], [0.8, 0.5], [0.5, 0.2], [0.2, 0.8]].map(([fx, fy]) => ({ x: r.x + r.width * fx, y: r.y + r.height * fy })).find((p) => inView(p.x, p.y));
+		if (!inside) continue;
+		await page.mouse.move(inside.x, inside.y);
+		await settle(page, 150);
+		const at = await page.evaluate((path) => {
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			const ok = (x, y, el) => x > 60 && x < 1340 && y > 90 && y < 860 && document.elementFromPoint(x, y) === el;
+			const bar = node?.querySelector(".plain-board-bar");
+			const b = bar?.getBoundingClientRect();
+			if (b && b.height >= 8 && ok(b.x + Math.min(b.width / 2, 40), b.y + b.height / 2, bar)) return { x: b.x + Math.min(b.width / 2, 40), y: b.y + b.height / 2 };
+			for (const band of node?.querySelectorAll(".board-edge") ?? []) {
+				const e = band.getBoundingClientRect();
+				const along = band.dataset.side === "n" || band.dataset.side === "s";
+				for (const f of [0.5, 0.3, 0.7]) {
+					const x = along ? e.x + e.width * f : e.x + e.width / 2;
+					const y = along ? e.y + e.height / 2 : e.y + e.height * f;
+					if (ok(x, y, band)) return { x, y };
+				}
+			}
+		}, one.path);
+		if (at) press = { ...at, path: one.path, rect };
 	}
-});
+	if (press) break;
+}
 say("a board is on screen to add", !!press);
 if (press) {
 	await page.keyboard.down("Shift");

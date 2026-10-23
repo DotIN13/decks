@@ -18,10 +18,10 @@
  * see nothing happen, and click its title bar instead — the same gesture meaning two things.
  *
  * What this check asserts, then, is the rule that replaced it: **a press inside a board selects
- * that board, whatever its format, in either mode** — and it does so without reloading the frame,
+ * that board, whatever its format** — and it does so without reloading the frame,
  * because a selection that redrew the page under the pointer would be worse than no selection.
  */
-import { boardPath, editMode, flyToBoard, open, resetStage, say, settle, stagePath } from "../harness.mjs";
+import { boardPath, flyToBoard, open, resetStage, say, settle, stagePath } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 await resetStage(page);
@@ -121,32 +121,10 @@ if (at && other) {
 }
 
 /*
- * In edit mode a press on a component still picks the component up — and with it the board it is
- * on, which is the other half of the same rule. The editor's own handler runs on the bubble phase
- * and the frame's on capture, so the order is: the board is selected, then the editor says what was
- * under the pointer.
+ * There was a last case here: in edit mode, picking up a component inside a board selected the
+ * board. Picking components inside a board's page from the canvas was removed on purpose, and the
+ * case with it.
  */
-await editMode(page);
-const onScreen = (await boards()).find((board) => board.inert === "false" && inside(board));
-const component = onScreen
-	? await page
-			.frameLocator(`.board-node[data-path="${onScreen.path}"] iframe`)
-			.locator("[data-id]")
-			.first()
-			.boundingBox()
-			.catch(() => null)
-	: null;
-if (onScreen && component && component.x > 250 && component.y > 115) {
-	await page.mouse.click(component.x + component.width / 2, component.y + component.height / 2);
-	await settle(page, 400);
-	say(
-		"in edit mode, picking a component up selects the board it is on",
-		(await selected()).includes(onScreen.path),
-		(await selected()).join(", ") || "nothing selected",
-	);
-} else {
-	say("a component on screen to press", false, `nothing clickable in ${onScreen?.path ?? "any board"}`);
-}
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 

@@ -424,15 +424,14 @@ try {
 	say("⌘K opens it with the cursor in the search field", /search/i.test(focused), focused);
 
 	/*
-	 * Under 1100px it is a sheet, and a sheet is not an inset.
-	 *
-	 * The camera check is the point: a fit that subtracts a surface covering the canvas
-	 * frames the boards into the sliver beside it.
+	 * Under 1100px it used to become a sheet over the canvas, declaring no inset. There is no sheet
+	 * any more: a narrow window keeps the same column beside the canvas, and so it still declares
+	 * its width — and fit, which subtracts it, must still frame the boards at a workable zoom.
 	 */
 	await page.setViewportSize({ width: 900, height: 900 });
-	say("as a sheet it is still there", (await page.locator(".panel-shell, [data-sheet='true']").count()) >= 1);
-	const none = await settled("0px");
-	say("…but it declares no inset", (await mounted()) === 0 && none === "0px", `${await mounted()} / ${none}`);
+	say("in a narrow window the panel is still there", (await page.locator(".panel-shell").count()) >= 1);
+	const narrow = await settled("320px");
+	say("…still a column beside the canvas, declaring its width", (await mounted()) === 1 && narrow === "320px", `${await mounted()} / ${narrow}`);
 	await page.keyboard.press("0");
 	await page.waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
 	say("…so fit still frames the deck at a workable zoom", (await zoom(page)) > 5, `${await zoom(page)}%`);
@@ -459,7 +458,7 @@ try {
 	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	try {
 		// A closed panel draws no rows (`LeftPanel.tsx`, `listed`), so the rows are measured with it open.
-		if (await page.locator('[aria-label="Show the boards panel"]').count()) await page.locator('[aria-label="Show the boards panel"]').first().click();
+		if (await page.locator('[aria-label="Show the side panel"]').count()) await page.locator('[aria-label="Show the side panel"]').first().click();
 		await page.waitForSelector(".panel-shell[data-open='true'] .board-act", { timeout: 6000 });
 		await page.waitForTimeout(300);
 		const rail = await page.evaluate(() => {
@@ -495,38 +494,4 @@ try {
 	}
 }
 
-/*
- * Under a finger the conversation stands on the composer: same left edge, same width, 8px of
- * air, and clear of the toolbar. It used to hang from the top of the screen at the desktop's
- * 420px, half a screen away from the bar being typed into. A phone is the narrow rule; a
- * tablet on its side is wider than 1100px, so it is the `pointer: coarse` rule and the one
- * that also has to stop the panel being dragged.
- */
-for (const device of ["iPhone 14 Pro", "iPad Pro 11 landscape"]) {
-	const { browser, page, errors } = await open({ device });
-	try {
-		await page.evaluate(() => document.querySelector('.pill button[title^="Conversation"]')?.click());
-		await page.waitForSelector(".stream[data-shown='true']", { timeout: 6000 });
-		await page.waitForTimeout(400);
-		const box = await page.evaluate(() => {
-			const r = (s) => document.querySelector(s).getBoundingClientRect();
-			const stream = r(".stream");
-			const dock = r(".dock");
-			const style = getComputedStyle(document.querySelector(".stream"));
-			return {
-				gap: Math.round(dock.top - stream.bottom),
-				left: Math.round(stream.left - dock.left),
-				width: Math.round(stream.width - dock.width),
-				top: Math.round(stream.top),
-				resize: style.resize,
-				floating: document.querySelector(".stream").hasAttribute("data-floating"),
-			};
-		});
-		say(`${device}: the conversation stands 8px above the composer`, box.gap === 8, JSON.stringify(box));
-		say(`${device}: …at the composer's left edge and width`, Math.abs(box.left) <= 1 && Math.abs(box.width) <= 1, JSON.stringify(box));
-		say(`${device}: …clear of the toolbar, and not resizable or floating`, box.top >= 64 && box.resize === "none" && !box.floating, JSON.stringify(box));
-		say(`${device}: no page errors`, errors.length === 0, errors.join(" | "));
-	} finally {
-		await browser.close();
-	}
-}
+// The conversation used to stand 8px above the composer under a finger (iPhone, iPad); that layout is gone, so its block is too.

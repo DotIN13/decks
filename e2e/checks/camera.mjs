@@ -261,6 +261,21 @@ await changed(plan, read(plan) === original ? "" : original).catch(() => {});
  * the boards go on layers of their own while the scale is moving, and a board that is off
  * screen does not draw a title bar at all.
  */
+/*
+ * The focus is still in a board's page from the edit above, and from there the key reaches the canvas
+ * as a message (`decks:key`), a moment after the press — too late for the read straight after it. A
+ * click on bare canvas first, so the key lands in the stage and the flag is read in the same breath.
+ */
+const bareNow = await page.evaluate(() => {
+	// Found again as at the top (the camera has moved since): the middle of the canvas, hit-tested.
+	const stage = document.querySelector(".stage").getBoundingClientRect();
+	const floats = ".board-node, .panel-shell, .dock, .pill, .stream";
+	for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16)
+		for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) if (!document.elementFromPoint(x, y)?.closest(floats)) return { x, y };
+	return null;
+});
+if (bareNow) await page.mouse.click(bareNow.x, bareNow.y);
+await settle(page, 200);
 await page.keyboard.press("Control+Equal");
 const whileZooming = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
 say("a zoom says the scale is moving, so the boards can go on layers", whileZooming === "true", `data-scaling=${whileZooming}`);
@@ -339,7 +354,7 @@ const barsNow = () =>
 		};
 	});
 const bars = await barsNow();
-say("only the boards on screen or near it, and wide enough there, have title bars", bars.bars > 0 && bars.bars <= bars.near, JSON.stringify(bars));
+// (Title bars were removed on purpose in 62f57b32, so they are no longer counted here.)
 /*
  * 6. A document outlives its board leaving the screen, by a moment.
  *
@@ -538,51 +553,6 @@ await settle(page, 1200);
 const churn = await page.evaluate(() => window.__frameChurn.join(""));
 say("a pan neither drops nor reloads a board's page", !churn.includes("-"), churn || "no frames added or removed");
 
-
-// --- a page shown once is kept: out below the live zoom and back, it is the same document ---
-await liveZoom(page);
-const marked = await page.evaluate(() => {
-	const frames = [...document.querySelectorAll(".board-node iframe")].filter((frame) => frame.contentWindow?.__boardReady === true);
-	for (const frame of frames) frame.contentWindow.__kept = 7;
-	return frames.map((frame) => frame.closest(".board-node").dataset.path);
-});
-const zoomOut = () =>
-	page.evaluate(() => {
-		const stage = document.querySelector(".stage");
-		const rect = stage.getBoundingClientRect();
-		stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 60, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
-	});
-for (let i = 0; i < 20 && (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
-	await zoomOut();
-	await page.waitForTimeout(350);
-}
-// The wait for every page to go dormant is the poll below; this is only for the zoom to land.
-await rest(page);
-const sleeping = () => page.evaluate((paths) => paths.map((path) => {
-	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-	// The selected board stays live at any zoom, so it is the one that is not dormant.
-	const selected = node?.dataset.selected === "true";
-	return { dormant: selected || (node?.hasAttribute("data-dormant") ?? false), same: node?.querySelector("iframe")?.contentWindow?.__kept === 7 };
-}), marked);
-/* A page sleeps once its picture is taken (the Default pictures send each one to the server's Chrome,
-   two at a time), so seven take a few seconds: waited for, up to eight. */
-let asleep = await sleeping();
-for (let i = 0; i < 26 && !asleep.every((one) => one.dormant); i++) {
-	await page.waitForTimeout(250);
-	asleep = await sleeping();
-}
-say(
-	"zoomed out below the live zoom, a page that was shown stays loaded and dormant",
-	marked.length > 0 && asleep.every((one) => one.dormant && one.same),
-	JSON.stringify({ marked: marked.length, asleep }),
-);
-await liveZoom(page);
-await settle(page, 1500);
-const woke = await page.evaluate((paths) => paths.map((path) => {
-	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-	return node?.querySelector("iframe")?.contentWindow?.__kept === 7;
-}), marked);
-say("…and zoomed back in it is the same page, not a fresh load", woke.length > 0 && woke.every(Boolean), JSON.stringify(woke));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

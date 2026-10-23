@@ -12,7 +12,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { boardEdge, deckState, editMode, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
+import { boardEdge, deckState, editMode, highlightMode, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -122,6 +122,8 @@ const drawnWhereFileSays = (id) =>
 		}, { id, want });
 	}, 4000);
 const count = (selector) => page.evaluate((s) => document.querySelectorAll(s).length, selector);
+/** A board's item on disk names it from the canvas's folder (`boards/x.html`); the stage names it from the deck. */
+const itemOf = (doc, path) => doc.children.find((n) => n.metadata?.path === path || n.metadata?.path === path.replace(/^canvases\/[^/]+\//, ""));
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
 say("the canvas is browsing", (await page.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
@@ -161,27 +163,50 @@ const movedBoth = await until(() => {
 });
 say("dragging one selected item moves the whole selection", !!movedBoth, JSON.stringify({ before: [before.a.x, before.b.x], now: [item("g-a").x, item("g-b").x] }));
 
-// A press on a board's picture, clear of anything drawn over it: the part its title bar used to be.
-const bar = await page.evaluate(() => {
-	for (const one of window.__decksBoards()) {
-			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
-			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
-		const r = node.getBoundingClientRect();
-		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
-			const x = r.x + r.width * fx;
-			const y = r.y + r.height * fy;
-			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 90 && y < 900 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button")) return { x, y, path: node.dataset.path };
-		}
+// A press on a board's picture, clear of anything drawn over it; on a live board, on the band along its
+// edge (shown while the pointer is over the board): a press inside its page is the page's, which picks
+// the board but does not see Shift.
+const inView = (x, y) => x > 320 && x < 1560 && y > 90 && y < 900;
+let bar;
+for (const one of await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })))) {
+	if (!one.node) {
+		// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
+		bar = await page.evaluate(({ path, rect: r }) => {
+			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (x > 320 && x < 1560 && y > 90 && y < 900 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === path) return { x, y, path };
+			}
+		}, one);
+	} else {
+		const r = one.rect;
+		const inside = [[0.5, 0.5], [0.8, 0.5], [0.5, 0.2], [0.8, 0.8]].map(([fx, fy]) => ({ x: r.x + r.width * fx, y: r.y + r.height * fy })).find((p) => inView(p.x, p.y));
+		if (!inside) continue;
+		await page.mouse.move(inside.x, inside.y);
+		await settle(page, 150);
+		bar = await page.evaluate((path) => {
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			for (const band of node?.querySelectorAll(".board-edge") ?? []) {
+				const b = band.getBoundingClientRect();
+				for (const f of [0.5, 0.3, 0.7]) {
+					const x = band.dataset.side === "n" || band.dataset.side === "s" ? b.x + b.width * f : b.x + b.width / 2;
+					const y = band.dataset.side === "n" || band.dataset.side === "s" ? b.y + b.height / 2 : b.y + b.height * f;
+					if (x > 320 && x < 1560 && y > 90 && y < 900 && document.elementFromPoint(x, y) === band) return { x, y, path };
+				}
+			}
+		}, one.path);
 	}
-});
+	if (bar) break;
+}
 say("a board is on screen to press", !!bar);
+// The stage shows the canvas's copy (`canvases/<c>/boards/x.html`); its item in the drawing may name the library file it came from.
+const isBoard = (n) => !!bar && (n.metadata?.path === bar.path || n.metadata?.path === bar.path.replace(/^canvases\/[^/]+\//, ""));
 if (bar) {
 	await page.keyboard.down("Shift");
 	await page.mouse.click(bar.x, bar.y);
 	await page.keyboard.up("Shift");
 	say("Shift and a press on a board adds it to the selection", (await count(".pen-selection")) === 3, String(await count(".pen-selection")));
-	const boardBefore = onDisk().children.find((n) => n.metadata?.path === bar.path);
+	const boardBefore = onDisk().children.find(isBoard);
 	await drawnWhereFileSays("g-a");
 	const a2 = await centre("g-a");
 	m = await matrix();
@@ -192,14 +217,14 @@ if (bar) {
 	await page.mouse.up();
 	await page.keyboard.up("Control");
 	const boardMoved = await until(() => {
-		const now = onDisk().children.find((n) => n.metadata?.path === bar.path);
+		const now = onDisk().children.find(isBoard);
 		return now && Math.abs(now.x - boardBefore.x - Math.round(30 / m.a)) <= 2;
 	});
-	say("…and the board moves with the items", !!boardMoved, JSON.stringify({ was: boardBefore?.x, now: onDisk().children.find((n) => n.metadata?.path === bar.path)?.x }));
+	say("…and the board moves with the items", !!boardMoved, JSON.stringify({ was: boardBefore?.x, now: onDisk().children.find(isBoard)?.x }));
 
 	// A scroll while carrying them moves the camera; what is carried stays under the cursor.
 	await drawnWhereFileSays("g-a");
-	const carried = { a: item("g-a"), b: item("g-b"), board: onDisk().children.find((n) => n.metadata?.path === bar.path) };
+	const carried = { a: item("g-a"), b: item("g-b"), board: onDisk().children.find(isBoard) };
 	const a3 = await centre("g-a");
 	const pressedAt = toWorld(await matrix(), a3.x, a3.y);
 	await page.mouse.move(a3.x, a3.y);
@@ -216,7 +241,7 @@ if (bar) {
 	const slack = 10 / m3.a;
 	const followed = await until(() => {
 		const a = item("g-a");
-		const board = onDisk().children.find((n) => n.metadata?.path === bar.path);
+		const board = onDisk().children.find(isBoard);
 		const ok = (was, now) => Math.abs(now.x - was.x - want.dx) <= slack && Math.abs(now.y - was.y - want.dy) <= slack;
 		return ok(carried.a, a) && ok(carried.board, board) ? { a: [a.x - carried.a.x, a.y - carried.a.y], board: [board.x - carried.board.x, board.y - carried.board.y] } : undefined;
 	});
@@ -509,7 +534,7 @@ let ITEM_WASH = "";
 
 // --- edit mode: items and boards outline themselves under the pointer --------------------------------
 {
-	await editMode(page, true);
+	await highlightMode(page);
 	await drawnWhereFileSays("g-a");
 	const a = await centre("g-a");
 	await page.mouse.move(a.x, a.y);
@@ -585,7 +610,7 @@ let ITEM_WASH = "";
 		await settle(page, 700);
 		const far = await handles();
 		const farLine = await outline();
-		say("…the same size on screen when zoomed out, and so is the outline", far.length === count && far.every((w) => w === 9) && nearLine === 1.5 && farLine === 1.5, JSON.stringify({ near, far, nearLine, farLine }));
+		say("…the same size on screen when zoomed out, and so is the outline", far.length === near.length && far.every((w) => w === 9) && nearLine === 1.5 && farLine === 1.5, JSON.stringify({ near, far, nearLine, farLine }));
 		await page.keyboard.press("Control+Equal");
 		await settle(page, 500);
 		await page.keyboard.press("Escape");
@@ -696,26 +721,26 @@ await page.keyboard.press("Escape");
 	say("a live board has an edge to drag by", !!chrome, JSON.stringify(chrome ?? null));
 	if (chrome) {
 		// Dragged by its edge, the board moves, and the page inside it is not pressed.
-		const start = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		const start = itemOf(onDisk(), chrome.path);
 		await page.mouse.move(chrome.x, chrome.y);
 		await page.mouse.down();
 		await page.mouse.move(chrome.x + 30, chrome.y + 10, { steps: 4 });
 		await page.mouse.move(chrome.x + 60, chrome.y + 20, { steps: 4 });
 		await page.mouse.up();
 		const moved = await until(() => {
-			const now = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+			const now = itemOf(onDisk(), chrome.path);
 			return now && start && now.x > start.x ? now : undefined;
 		});
 		say("a drag on a live board's edge moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
 		if (moved) {
 			link.send({ type: "board.move", path: chrome.path, x: start.x, y: start.y });
-			await until(() => onDisk().children.find((n) => n.metadata?.path === chrome.path)?.x === start.x);
+			await until(() => itemOf(onDisk(), chrome.path)?.x === start.x);
 			await settle(page, 500);
 			const again = await boardEdge(page, chrome.path);
 			if (again) Object.assign(chrome, again);
 		}
 		const box = await page.locator(".composer-box").boundingBox();
-		const was = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		const was = itemOf(onDisk(), chrome.path);
 		await page.mouse.move(chrome.x, chrome.y);
 		await page.mouse.down();
 		await page.mouse.move(chrome.x + 20, chrome.y + 40, { steps: 4 });
@@ -730,7 +755,7 @@ await page.keyboard.press("Escape");
 		   pill that can sit in one sentence, and they are told apart before they are read. */
 		say("a board dropped on the composer is a pill, named by its title", pill?.id === chrome.path && !!pill.label && pill.icon, JSON.stringify(pill));
 		say("…in the board colour, not the drawing's", pill?.wash !== ITEM_WASH, `${pill?.wash} against the item's ${ITEM_WASH}`);
-		const now = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		const now = itemOf(onDisk(), chrome.path);
 		say("…and the board did not move: that was a mention, not a drag", !!was && !!now && now.x === was.x && now.y === was.y, JSON.stringify({ was: [was?.x, was?.y], now: [now?.x, now?.y] }));
 	}
 }

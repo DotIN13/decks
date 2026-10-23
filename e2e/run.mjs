@@ -87,8 +87,6 @@ const CHECKS = [
 	 */
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
-	/* The "Canvas" renderer (`canvas-per-board`), an option in Settings: pictures stay drawn through a pan, pages stay clickable. */
-	{ file: "canvas-per-board.mjs", needsAgent: false },
 	/*
 	 * Where a board lands when nobody said where, and whether the camera goes with it. Beside
 	 * `camera.mjs` because the two halves are one experience: a board placed near what you have

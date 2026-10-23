@@ -4,25 +4,31 @@
  * The frame a board is drawn in has no address bar and no back button, so following a link
  * inside it replaces the board being read with whatever the link points at — one board over
  * for a sibling board, and onto a foreign site for anything else. So `lib/board.js` refuses to
- * navigate and asks the app instead, and this check is the three answers:
+ * navigate and asks the app instead, and this check is the answers:
  *
  * - a link to **another board in the deck** puts that board on the canvas, beside the one that
  *   linked to it, with both in view;
- * - a link to **somewhere else** — another site, or a file in the deck that is not a board —
- *   opens in a tab of its own;
- * - and in **edit mode** a link is part of the component under the pointer and does nothing,
- *   because a press there is how a component is dragged and a run of words is retyped.
+ * - and a link to **somewhere else** — another site, or a file in the deck that is not a board —
+ *   opens in a tab of its own.
+ *
+ * (There was a fourth, "in edit mode a link does nothing": a board's page is no longer edited from
+ * the canvas, so there is no such mode to be inert in, and that case went with it.)
  *
  * The same assertion ends every case, and it is the point of the whole feature: the board that
  * carried the link is still the board in the frame.
  */
-import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { open, resetStage, say, settle, socket, stagePath } from "../harness.mjs";
 
 const { browser, context, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
 
-const SOURCE = "boards/plan.html";
-const LINKED = "boards/risks.html";
+/*
+ * The canvas's copies (`canvases/<canvas>/boards/…`), which is what the stage shows: a board placed
+ * on a canvas is copied into the canvas's folder, and a link to the library file lands on the copy.
+ */
+const SOURCE = await stagePath(page, "boards/plan.html");
+const LINKED = await stagePath(page, "boards/risks.html");
+const fileName = (path) => path.split("/").pop();
 const FILE = "assets/sketch.svg";
 
 const link = await socket();
@@ -50,9 +56,8 @@ const focus = async (path) => {
 	for (const other of (await onCanvas()).filter((one) => one !== path)) link.send({ type: "board.hide", path: other });
 	await settle(page, 500);
 	await page.evaluate((wanted) => {
-		const name = wanted.replace("boards/", "");
-		[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(name))?.click();
-	}, path);
+		[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(wanted))?.click();
+	}, fileName(path));
 	await settle(page, 900);
 	for (let i = 0; i < 10; i++) {
 		const level = await page.evaluate(() =>
@@ -70,7 +75,8 @@ say("the fixture board is up, at its own address", at === `/api/board/${SOURCE}`
 
 // --- a link to another board -----------------------------------------------------------
 
-await frame().locator('a[href="risks.html"]').click();
+// The copy's links are rewritten to reach the library from the canvas folder, so matched by their end.
+await frame().locator('a[href$="risks.html"]').click();
 let arrived = true;
 try {
 	await page.waitForSelector(`.board-node[data-path="${LINKED}"]`, { timeout: 8000 });
@@ -85,9 +91,17 @@ say("a link to a board puts that board on the canvas", arrived && shown.includes
  * same top. Both numbers come from the *record* rather than from the link, so this fails if the
  * board arrives anywhere else.
  */
+/*
+ * The copy arrives first where the server's own rule puts it and is then moved beside the source,
+ * so the place is waited for — and then read again a second later, so a move that is undone by a
+ * later frame still fails.
+ */
+const besideOf = (a, b) => Boolean(a && b) && Math.abs(b.left - (a.left + a.w + 32)) < 2 && Math.abs(b.top - a.top) < 2;
+for (let i = 0; i < 20 && !besideOf(await nodeBox(SOURCE), await nodeBox(LINKED)); i++) await settle(page, 150);
+await settle(page, 1000);
 const source = await nodeBox(SOURCE);
 const placed = await nodeBox(LINKED);
-const beside = Boolean(source && placed) && Math.abs(placed.left - (source.left + source.w + 32)) < 2 && Math.abs(placed.top - source.top) < 2;
+const beside = besideOf(source, placed);
 say("…placed beside the board that linked to it", beside, JSON.stringify({ source, placed }));
 
 /*
@@ -161,24 +175,12 @@ say("…and neither of them moved the board", after === `/api/board/${SOURCE}`, 
  * file that is not a board at all. It is *not* opened in a tab — the frame decided it was a
  * board — so the app has to say what happened, in the one place it says anything briefly.
  */
-await frame().locator('a[href="not-written-yet.html"]').click();
+await frame().locator('a[href$="not-written-yet.html"]').click();
 await settle(page, 900);
 const notice = await page.evaluate(() => [...document.querySelectorAll(".notice")].map((one) => one.textContent).join(" | "));
-const appeared = (await onCanvas()).includes("boards/not-written-yet.html");
+const appeared = (await onCanvas()).some((path) => path.endsWith("/not-written-yet.html"));
 say("a board link the deck cannot open says so, and opens nothing", notice.includes("not-written-yet.html") && !appeared, notice || "(no notice)");
 say("…and that did not move the board either", (await where()) === `/api/board/${SOURCE}`);
-
-// --- and inert while editing ------------------------------------------------------------
-
-link.send({ type: "board.hide", path: LINKED });
-await settle(page, 600);
-await editMode(page, true);
-await frame().locator('a[href="risks.html"]').click({ force: true });
-await settle(page, 1200);
-const edited = await onCanvas();
-// Nor does the browser's own default: the board's page is still the board, not the file it links to.
-const stayed = await frame().locator("body").evaluate(() => location.pathname);
-say("in edit mode a link is part of the component, and does nothing", !edited.includes(LINKED) && stayed.endsWith("/plan.html"), `${edited.join(" ")} | page ${stayed}`);
 
 link.close();
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));

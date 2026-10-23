@@ -17,6 +17,12 @@ for (const target of TARGETS) {
 	await settle(page, 1000);
 	const before = await stats();
 	say(`${name}: the stage draws with WebGL 2 before`, before?.backend === "webgl2" && before.pictures > 0, JSON.stringify(before));
+	/*
+	 * How much of the screen the canvas covers before, which is what "draws the boards again" is
+	 * held to: a correct redraw covers about as much as the first drawing did. (A fixed share of the
+	 * screen was wrong — the fixture's boards cover about 1%, so a correct redraw scored just under it.)
+	 */
+	const drawnBefore = await canvasDraws(page);
 
 	const lost = await page.evaluate(() => {
 		const canvas = document.querySelector("canvas.stage-engine-over");
@@ -41,10 +47,17 @@ for (const target of TARGETS) {
 		.then(() => true, () => false);
 	const after = await stats();
 	say(`${name}: given back, the engine starts again on the same canvas`, back && after.backend === "webgl2", JSON.stringify(after));
-	await settle(page, 1500);
+	let draws = await canvasDraws(page);
+	for (let waited = 0; waited < 5000 && draws.changed < 0.8 * drawnBefore.changed; waited += 500) {
+		await settle(page, 500);
+		draws = await canvasDraws(page);
+	}
 	const shownAfter = await page.evaluate(() => window.__decksSheet?.shown ?? 0);
-	const draws = await canvasDraws(page);
-	say(`${name}: and draws the boards again`, shownAfter > shownBefore && draws.changed > 0.01, JSON.stringify({ frames: shownAfter - shownBefore, ...draws }));
+	say(
+		`${name}: and draws the boards again`,
+		shownAfter > shownBefore && drawnBefore.changed > 0.002 && draws.changed >= 0.8 * drawnBefore.changed,
+		JSON.stringify({ frames: shownAfter - shownBefore, before: drawnBefore.changed, ...draws }),
+	);
 	say(`${name}: no errors on the page`, errors.length === 0, errors.join(" | "));
 	await browser.close();
 }

@@ -200,7 +200,23 @@ if (first && target) {
  * arc used to be measured out to its radii, so an ellipse covered a box twice its own height,
  * reaching half a shape above and below itself: a click near the bottom of whatever sat above an
  * ellipse selected the ellipse. Two stacked ellipses and one click are the whole case.
+ *
+ * Past the right-hand edge of every board first, as stage-gestures and card-editor do: live boards
+ * cover the view the checks above leave, and a live board's page is not bare canvas.
  */
+for (let i = 0; i < 12; i++) {
+	const right = await page.evaluate(() => Math.max(-Infinity, ...(window.__decksBoards?.() ?? []).map(({ rect }) => rect.right)));
+	if (right < 360) break;
+	// Scrolled where the stage itself is under the pointer: a live board's page keeps a wheel over it.
+	const at = await page.evaluate(() => {
+		const stage = document.querySelector(".stage");
+		for (let y = 160; y < 800; y += 20) for (let x = 1300; x > 360; x -= 20) if (document.elementFromPoint(x, y) === stage) return { x, y };
+	});
+	await page.mouse.move(at?.x ?? 900, at?.y ?? 500);
+	await page.mouse.wheel(Math.min(1500, right - 340), 0);
+	await settle(page, 300);
+}
+await settle(page, 400);
 const room = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
@@ -397,7 +413,7 @@ if (diagonal) {
 
 /*
  * The board's pill, over a selected drawn item, with what makes sense for one (`BoardCallout`): zoom to
- * it, comment, duplicate, properties and delete. Its Duplicate selects the copy, and its Delete takes
+ * it, comment, duplicate and delete (Properties left the pill on purpose). Its Duplicate selects the copy, and its Delete takes
  * that copy away, leaving the first.
  */
 {
@@ -420,7 +436,7 @@ if (diagonal) {
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
 		const labels = await until(() => page.evaluate(() => [...document.querySelectorAll(".stage > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
-		say("a selected shape gets the pill: zoom, comment, duplicate, properties and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Properties", "Delete"]), JSON.stringify(labels));
+		say("a selected shape gets the pill: zoom, comment, duplicate and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Delete"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
 		await page.locator('.stage > .board-callout [aria-label="Duplicate"]').click();
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));

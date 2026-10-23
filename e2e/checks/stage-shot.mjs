@@ -18,7 +18,7 @@
  * `DECKS_E2E_SHOTS=<dir>` keeps every picture and the two canvas screenshots.
  */
 import { existsSync, writeFileSync } from "node:fs";
-import { API, deckState, open, say, settle, socket } from "../harness.mjs";
+import { API, asPerson, deckState, open, say, settle, socket } from "../harness.mjs";
 
 /** Picture pixels an edge may be off by: antialiasing and the canvas's own zoom not being exactly the picture's. */
 const NEAR = 2;
@@ -199,7 +199,7 @@ say("the canvas draws both items below zoom 1", Object.values(below1.ink).every(
 async function shot(query) {
 	const params = new URLSearchParams({ agent: agentId, scale: "1", scheme: "light", ...query });
 	const started = Date.now();
-	const response = await fetch(`${API}/api/stage-shot?${params}`);
+	const response = await fetch(`${API}/api/stage-shot?${params}`, { headers: await asPerson(API) });
 	const ms = Date.now() - started;
 	if (!response.ok) return { error: `${response.status} ${await response.text()}`, ms };
 	const box = JSON.parse(response.headers.get("x-shot-box") ?? "null");
@@ -231,8 +231,8 @@ for (const path of PATHS)
 for (const raw of CASES) {
 	const c = { ...raw, name: `${raw.name}${path.label}`, query: { ...raw.query, ...path.extra } };
 	const taken = await shot(c.query);
-	if (!path.label && nativeBuilt && !raw.boards) say(`${c.name}: drawn natively`, taken.how === "native", taken.how);
-	if (path.label) say(`${c.name}: taken in the browser`, taken.how.startsWith("chromium"), taken.how);
+	if (!path.label && nativeBuilt && !raw.boards) say(`${c.name}: drawn natively`, taken.how === "native", taken.how ?? taken.error);
+	if (path.label) say(`${c.name}: taken in the browser`, taken.how?.startsWith("chromium") ?? false, taken.how ?? taken.error);
 	if (taken.error) {
 		say(`${c.name}: the server takes the picture`, false, taken.error);
 		continue;
@@ -271,7 +271,7 @@ for (const raw of CASES) {
 	const dark = await shot({ of: TEXT, scheme: "dark" });
 	const found = dark.png ? await page.evaluate(inkOf, [dark.png.toString("base64"), { corner: { x1: 0, y1: 0, x2: 4, y2: 4 } }, INK]) : undefined;
 	const paper = found?.corner?.paper;
-	say("dark: the paper is the stage's dark paper (#101010)", !!paper && paper.every((v) => Math.abs(v - 16) <= 3), dark.error ?? `(${paper})`);
+	say("dark: the paper is the stage's dark paper (#1e1e1e)", !!paper && paper.every((v) => Math.abs(v - 30) <= 3), dark.error ?? `(${paper})`);
 }
 
 function roundBox(b) {
