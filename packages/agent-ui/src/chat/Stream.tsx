@@ -2,7 +2,7 @@ import { dayKey, formatDate, yearOf } from "@decks/ui";
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Icon } from "@decks/ui";
 import { closeHistory, historyShown } from "../edge.ts";
 import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
@@ -335,18 +335,20 @@ export function Stream(props: {
 	});
 
 	/*
-	 * Following the foot, by observers. Nothing listens to the scroll.
+	 * Following the foot.
 	 *
-	 * - Pinned is the foot in sight, or within 80px of it: an IntersectionObserver on the empty row after the last card. It
-	 *   says where the reader has put the column; it never moves it.
-	 * - Following is a ResizeObserver on every row (handed them by a MutationObserver as they come and
-	 *   go). While pinned, a row that grows (a reply streaming in, a card opening, a new card) brings
-	 *   the foot back, but only from where the column's own last follow left it, or from the very foot.
-	 *   A pinned flag is a frame behind the reader: in the frame they start to scroll up it still says
-	 *   pinned, and following on the flag alone pulled them back down, so a scroll up from the foot
-	 *   did not take. Any scroll of theirs moves the column from where the follow left it, and from
-	 *   then on nothing follows until the foot observer has them back at the foot.
-	 * - Reaching back is a third observer, on the empty row before the first card, within
+	 * - Whether to follow is one IntersectionObserver on a 1px row after the last card: the foot in
+	 *   sight, or within 48px of it. It says where the reader has put the column; it never moves it.
+	 * - Following happens when the conversation changes (a card arrives, a reply's text grows, the
+	 *   working sign comes or goes), in the same pass that draws the change, before it is painted:
+	 *   no observer of sizes, and no frame's delay for a reader's scroll to slip into.
+	 * - Only from where the column's last follow left it, or from the very foot: the observer's word is
+	 *   a frame behind the reader, and in the frame they start to scroll up it still says follow. Any
+	 *   scroll of theirs moves the column off that spot, so nothing pulls them back down.
+	 * - The browser's own scroll anchoring is off for the column (`overflow-anchor: none`,
+	 *   `stream.css`): it moved the place under content that changed, against both the follow and the
+	 *   place `showEarlier` keeps by hand.
+	 * - Reaching back is a second observer, on an empty row before the first card, within
 	 *   `LOAD_MORE_AT` of the top; asked again each time the window grows, so a reader who stays near
 	 *   the top keeps loading.
 	 */
@@ -357,10 +359,20 @@ export function Stream(props: {
 		scroller.scrollTop = scroller.scrollHeight;
 		followedTo = scroller.scrollTop;
 	};
+	createEffect(() => {
+		if (!shownNow() || !scroller) return;
+		// What changes the conversation's height: a card, a reply's words as they stream, the working sign.
+		cards();
+		const last = props.items.at(-1);
+		if (last?.kind === "assistant" && last.streaming) last.text.length;
+		signing();
+		if (!untrack(pinned)) return;
+		const untouched = followedTo !== undefined && Math.abs(scroller.scrollTop - followedTo) < 1;
+		const atFoot = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 2;
+		if (untouched || atFoot) toFootNow();
+	});
 	let footWatch: IntersectionObserver | undefined;
 	let topWatch: IntersectionObserver | undefined;
-	let growth: ResizeObserver | undefined;
-	let rows: MutationObserver | undefined;
 	const rearmTop = () => {
 		if (!topWatch || !top) return;
 		// Observed again, it reports where the top is now, even when it has not moved in or out.
@@ -370,52 +382,47 @@ export function Stream(props: {
 		});
 	};
 	onMount(() => {
-		if (typeof IntersectionObserver === "undefined" || typeof ResizeObserver === "undefined" || typeof MutationObserver === "undefined") return;
+		if (typeof IntersectionObserver === "undefined") return;
 		footWatch = new IntersectionObserver(
-			(entries) => {
-				const seen = entries.at(-1);
+			([seen]) => {
 				if (!seen) return;
 				setPinned(seen.isIntersecting);
-				// The reader brought the foot into sight: following starts from where they are.
+				// The reader brought the foot into sight: following goes on from where they are.
 				if (seen.isIntersecting) followedTo = scroller.scrollTop;
 			},
-			// Within 80px of the foot is at it: a reply streaming in fast moves the foot on while the reader
-			// scrolls down to it, and they would never quite catch it.
-			{ root: scroller, rootMargin: "0px 0px 80px 0px" },
+			{ root: scroller, rootMargin: "0px 0px 48px 0px", threshold: 0 },
 		);
 		footWatch.observe(foot);
-		topWatch = new IntersectionObserver((entries) => {
-			if (entries.at(-1)?.isIntersecting && earlier()) showEarlier();
-		}, { root: scroller, rootMargin: `${LOAD_MORE_AT}px 0px 0px 0px` });
+		topWatch = new IntersectionObserver(
+			([seen]) => {
+				if (seen?.isIntersecting && earlier()) showEarlier();
+			},
+			{ root: scroller, rootMargin: `${LOAD_MORE_AT}px 0px 0px 0px`, threshold: 0 },
+		);
 		topWatch.observe(top);
-		growth = new ResizeObserver(() => {
-			if (!pinned() || !shownNow()) return;
-			const untouched = followedTo !== undefined && Math.abs(scroller.scrollTop - followedTo) < 1;
-			const atFoot = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 2;
-			if (untouched || atFoot) toFootNow();
-		});
-		for (const element of scroller.children) growth.observe(element);
-		rows = new MutationObserver((changes) => {
-			for (const change of changes) {
-				for (const node of change.addedNodes) if (node instanceof Element) growth?.observe(node);
-				for (const node of change.removedNodes) if (node instanceof Element) growth?.unobserve(node);
-			}
-		});
-		rows.observe(scroller, { childList: true });
 	});
 	onCleanup(() => {
 		footWatch?.disconnect();
 		topWatch?.disconnect();
-		growth?.disconnect();
-		rows?.disconnect();
 	});
 
 	/** Motion the reader asked not to have. */
 	const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 	const toFoot = () => {
+		if (!scroller) return;
 		setPinned(true);
-		scroller?.scrollTo({ top: scroller.scrollHeight, behavior: still() ? "auto" : "smooth" });
+		if (still()) return toFootNow();
+		scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+		// Where the glide ends, the foot exactly, and following from there: the glide was aimed at where
+		// the foot was when it was pressed, and the conversation may have grown since.
+		const land = () => {
+			clearTimeout(timer);
+			scroller.removeEventListener("scrollend", land);
+			if (pinned()) toFootNow();
+		};
+		const timer = setTimeout(land, 900);
+		scroller.addEventListener("scrollend", land);
 	};
 
 	return (
@@ -468,6 +475,9 @@ export function Stream(props: {
 			<div
 				class="stream-roll"
 				ref={scroller}
+				role="log"
+				aria-label="Conversation history"
+				tabindex="0"
 			>
 				<div class="stream-edge" ref={top} aria-hidden="true" />
 				{/*

@@ -117,6 +117,8 @@
 		gap: var(--roll-gap);
 		padding: var(--gutter);
 		overflow-y: auto;
+		/* The column keeps its own place (`Stream.tsx`): the browser's anchoring moved it under changed content. */
+		overflow-anchor: none;
 		overscroll-behavior: contain;
 		/*
 		 * No scrollbar. The column is a stack of objects over a canvas rather than a pane, and
@@ -146,14 +148,18 @@
 	 * beside each given back, so the column is laid out as if they were not there.
 	 */
 	.stream-roll > .stream-edge {
-		height: 0;
+		height: 1px;
 		pointer-events: none;
 	}
 	.stream-roll > .stream-edge:first-child {
-		margin-bottom: calc(-1 * var(--roll-gap));
+		margin-bottom: calc(-1 * var(--roll-gap) - 1px);
 	}
 	.stream-roll > .stream-edge:last-child {
-		margin-top: calc(-1 * var(--roll-gap));
+		margin-top: calc(-1 * var(--roll-gap) - 1px);
+	}
+	/* Focusable to scroll by keys; the focus is shown only when keys took it there. */
+	.stream-roll:focus:not(:focus-visible) {
+		outline: none;
 	}
 
 	/*
