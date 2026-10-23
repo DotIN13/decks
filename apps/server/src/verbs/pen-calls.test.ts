@@ -68,3 +68,26 @@ test("an inserted item with a name is given its name as its id, and a second one
 		cleanup();
 	}
 });
+
+test("a field pen has no place for, or one Decks does not draw, is a note and never a refusal", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const single = await must("canvas.insert", [{ type: "text", name: "Title", content: "Hi", padding: 8 }, { at: { x1: 0, y1: 0 } }]);
+		assert.ok(single.notes.includes('"padding" does nothing on a text.'), single.notes.join("\n"));
+		assert.equal(single.value.padding, 8, "the field is kept");
+		const batch = await must("canvas.batch", [[
+			{ op: "insert", item: { type: "rectangle", name: "Plain", width: 10, height: 10 }, at: { x1: 0, y1: 100 } },
+			{ op: "insert", item: { type: "rectangle", name: "Glow", width: 10, height: 10, effect: { type: "background_blur", radius: 8 } }, at: { x1: 0, y1: 200 } },
+			{ op: "update", id: "title", set: { gap: 4, fill: { type: "mesh_gradient", colors: [] } } },
+			{ op: "replace", id: "plain", item: { type: "script", scriptUri: "./a.js", width: 10, height: 10 } },
+		]]);
+		const said = batch.notes.join("\n");
+		assert.match(said, /^Op 2 \(insert\): A background_blur effect on a rectangle is kept for pen\.dev, but Decks does not draw it\.$/m);
+		assert.match(said, /^Op 3 \(update\): "gap" does nothing on a text\.$/m);
+		assert.match(said, /^Op 3 \(update\): A mesh_gradient fill on a text is kept for pen\.dev/m);
+		assert.match(said, /^Op 4 \(replace\): A script is kept, but Decks does not run scripts/m);
+		assert.ok(!/Op 1/.test(said), said);
+	} finally {
+		cleanup();
+	}
+});

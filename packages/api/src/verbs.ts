@@ -171,7 +171,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			'Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev\'s own form, { op: "insert", node, box }, is taken too.',
+			'Several of the changes above in one call, applied together or not at all. Each op is the call of that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set }, { op: "delete", id }. A later op can be beside an item an earlier one made. pen.dev\'s own form, { op: "insert", node, box }, is taken too. This and insert, update and replace add a note for each field an item\'s type does not have, and each value Decks keeps for pen.dev but does not draw (shader and mesh_gradient fills, blur, background_blur, shader and inner shadow effects, script items); nothing is refused for it.',
 		params: [p("ops", arr(union(CanvasOp, PenEdit))), onItems()],
 		result: arr(Item),
 	},

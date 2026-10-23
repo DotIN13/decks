@@ -111,10 +111,14 @@ export interface PenNode {
 	children?: PenNode[];
 	layout?: "none" | "vertical" | "horizontal";
 	gap?: NumberOrVariable;
+	/** Whether a child's stroke counts in the layout. */
+	layoutIncludeStroke?: boolean;
 	padding?: NumberOrVariable | NumberOrVariable[];
 	justifyContent?: "start" | "center" | "end" | "space_between" | "space_around";
 	alignItems?: "start" | "center" | "end";
 	clip?: boolean | Variable;
+	/** A frame still being made; Decks draws it as unfinished. */
+	placeholder?: boolean;
 	slot?: false | string[];
 
 	/** Ellipses and polygons. */
@@ -145,6 +149,8 @@ export interface PenNode {
 
 	/** Browsers: a live page. */
 	url?: string;
+	/** A device preset to show the page as; left out, the page fits the box. */
+	deviceId?: string;
 	zoom?: number;
 	scrollX?: number;
 	scrollY?: number;
@@ -155,6 +161,15 @@ export interface PenNode {
 	/** Icons. */
 	library?: string;
 	icon?: string;
+	/** A variable font's weight, 100 to 700, for the libraries that have one. */
+	weight?: NumberOrVariable;
+	/** The older `icon_font` item's library and icon. */
+	iconFontFamily?: string;
+	iconFontName?: string;
+
+	/** Scripts: a JavaScript file that makes the item's children, and its inputs by name. */
+	scriptUri?: string;
+	inputs?: Record<string, string | number | boolean>;
 
 	/** Refs: an instance of a reusable item, with overrides by id path. */
 	ref?: string;

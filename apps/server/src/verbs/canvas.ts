@@ -1,6 +1,6 @@
 import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename } from "node:path";
-import { apply, ARROW, baseTheme, ids, placements, walk, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { BOARD_ITEM, boardOf } from "../stage/pens.ts";
 import { serverText } from "../stage/text.ts";
@@ -158,7 +158,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	 * Turn the caller's ops into pen's, one at a time against the document as the earlier ones left it,
 	 * so a later op can be beside an item an earlier one made. Nothing is written here.
 	 */
-	const translate = (target: Target, ops: readonly CanvasOpIn[]): { penOps: Op[]; sized: Array<{ path: string; w?: number; h?: number }>; deleted: Set<string>; placedFor: string[] } => {
+	const translate = (target: Target, ops: readonly CanvasOpIn[]): { penOps: Op[]; sized: Array<{ path: string; w?: number; h?: number }>; deleted: Set<string>; placedFor: string[]; warned: string[] } => {
 		const surface = surfaceOf(target);
 		const frame = target.frame;
 		onCanvas = target.canvas;
@@ -168,6 +168,19 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		const sized: Array<{ path: string; w?: number; h?: number }> = [];
 		const deleted = new Set<string>();
 		const placedFor: string[] = [];
+		/** What an op asked for that pen has no field for, or that Decks keeps and does not draw: said, never refused. */
+		const warned: string[] = [];
+		const typeOf = (id: string) => [...walk(doc.children)].find((one) => one.id === id)?.type;
+		const warn = (pen: Op) => {
+			const said =
+				pen.op === "insert" || pen.op === "replace"
+					? warnings(pen.node)
+					: pen.op === "update"
+						? updateWarnings(pen.id.includes("/") ? undefined : typeOf(pen.id), pen.set ?? {})
+						: [];
+			const where = ops.length > 1 ? `Op ${penOps.length + 1} (${pen.op}): ` : "";
+			for (const one of said) warned.push(`${where}${one}`);
+		};
 		if (!Array.isArray(ops) || ops.length === 0) throw new Error('A batch is a list of ops: [{ op: "insert", item: { type: "note", content: "…" } }].');
 		ops.forEach((op, index) => {
 			const where = ops.length > 1 ? `Op ${index + 1} (${op?.op ?? "?"}): ` : "";
@@ -182,6 +195,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					if (typeof given.parent === "string") given.parent = idIn(doc, given.parent, "parent");
 					if (given.node && (given.node as { type?: unknown }).type === "board") given.node = fromItem(given.node, ids(doc), frame);
 					pen = given as unknown as Op;
+					warn(pen);
 					doc = apply(doc, [pen], { theme, measure }).doc;
 					penOps.push(pen);
 					return;
@@ -265,13 +279,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					default:
 						throw new Error(`there is no op "${(op as { op?: unknown })?.op}": insert, update, replace, delete, move, copy or variables.`);
 				}
+				warn(pen);
 				doc = apply(doc, [pen], { theme, measure }).doc;
 				penOps.push(pen);
 			} catch (error) {
 				throw new Error(`${where}${error instanceof Error ? error.message : String(error)}${ops.length > 1 ? " Nothing was changed." : ""}`);
 			}
 		});
-		return { penOps, sized, deleted, placedFor };
+		return { penOps, sized, deleted, placedFor, warned };
 	};
 
 	/**
@@ -281,7 +296,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	 */
 	const change = (target: Target, ops: readonly CanvasOpIn[]): Array<Record<string, unknown>> => {
 		const pens = needPens();
-		const { penOps, sized, deleted, placedFor } = translate(target, ops);
+		const { penOps, sized, deleted, placedFor, warned } = translate(target, ops);
 		let results: ReadonlyArray<{ op: string; id: string; note?: string }>;
 		let variables: () => Record<string, unknown>;
 		let children: Record<string, unknown>[];
@@ -304,6 +319,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		}
 		notes.push(...placedFor);
 		for (const result of results) if (result.note) notes.push(result.note);
+		notes.push(...warned);
 		const byId = new Map<string, Record<string, unknown>>();
 		const index = (list: readonly Record<string, unknown>[]) => {
 			for (const node of list) {
