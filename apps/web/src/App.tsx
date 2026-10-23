@@ -606,7 +606,10 @@ export function App() {
 	const stagePen = createMemo(() => {
 		const id = state.focused;
 		const pen = id ? pens()[id] : undefined;
-		return pen ? { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}) } : undefined;
+		// Its placeholder frames are marked with the agent that last wrote it, as the canvas knows it.
+		const by = pen?.by ? state.identities[pen.by] : undefined;
+		const writer = by ? { name: by.name, color: by.color } : undefined;
+		return pen ? { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) } : undefined;
 	});
 
 	/**

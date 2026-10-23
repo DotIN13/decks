@@ -10,6 +10,7 @@ import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { serverText } from "./text.ts";
+import { penWriter } from "./pens.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { StageService, WebTarget } from "./service.ts";
 import { imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
@@ -343,7 +344,9 @@ export function createStageTool(deps: {
 			if (typeof verb !== "function") return { ok: false, error: `${name} is not a verb.`, notes: [] };
 			let answer: StageCallResult;
 			try {
-				const value = await (verb as (...given: unknown[]) => Promise<unknown>).apply(owner, [...args]);
+				const run = () => (verb as (...given: unknown[]) => Promise<unknown>).apply(owner, [...args]);
+				// What an agent draws is its own: the canvas remembers it as the last writer (`penWriter`).
+				const value = await (agent.person ? run() : penWriter.run(agent.id, run));
 				answer = { ok: true, value, notes: [] };
 			} catch (error) {
 				answer = { ok: false, error: error instanceof Error ? error.message : String(error), notes: [] };

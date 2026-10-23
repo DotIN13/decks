@@ -310,6 +310,10 @@ export class App {
 			ticket: (path) => this.tickets.make(path, HARNESS_TICKET),
 			borrow: (use) => this.thumbs.borrow(use),
 			...(process.env.DECKS_NATIVE_SHOTS === "0" ? {} : { native: this.nativeShots }),
+			writer: (stage) => {
+				const id = this.pens.writerOf(stage);
+				return id ? this.agents.get(id)?.who() : undefined;
+			},
 		});
 		this.stage.appCheck = (name) => checkApp({ borrow: (use) => this.thumbs.borrow(use), origin: apiOrigin(), deckPath: this.deck.path, name });
 		this.stage.boardPicture = async (path, scheme) => {

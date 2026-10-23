@@ -170,3 +170,28 @@ fn recording_allows_webgpus_defaults() {
 	assert_eq!(r.limits().max_picture(), 4096);
 	assert_eq!(crate::DeviceLimits { max_texture: 2048, samples: 4 }.max_picture(), 2048);
 }
+
+#[test]
+fn a_placeholder_frame_is_outlined_dashed_in_its_writers_colour_over_its_children() {
+	let (_, s) = scene(json!({"children":[
+		{"type":"frame","id":"p","x":0,"y":0,"width":200,"height":100,"layout":"none","placeholder":true,"fill":"#eee","children":[
+			{"type":"rectangle","id":"r","x":10,"y":10,"width":50,"height":50,"fill":"#f00"}
+		]},
+		{"type":"frame","id":"f","x":300,"y":0,"width":100,"height":100,"layout":"none","fill":"#eee"}
+	]}));
+	let skip = HashSet::new();
+	let writer = crate::painter::Writer { name: Some("Atelier".into()), color: [0.0, 1.0, 0.0, 1.0] };
+	let mut ctx = Context::new(&s, &skip, &no_images);
+	ctx.writer = Some(&writer);
+	let list = paint_area(&ctx, Rect { x: 0.0, y: 0.0, w: 512.0, h: 512.0 }, 1.0, Color::TRANSPARENT);
+	// The frame's fill, its child, then the dashed outline over them; the other frame has none.
+	// Without words (no text set) the name tag is left out.
+	assert_eq!(kinds(&list), vec!["shape", "shape", "mesh", "shape"]);
+	let Op::Mesh { paint: Paint::Solid(c), .. } = &list.ops[2] else { panic!() };
+	assert_eq!(c.0, [0.0, 1.0, 0.0, 1.0]);
+	// Nobody named: the accent.
+	let plain = paint(&s, Rect { x: 0.0, y: 0.0, w: 512.0, h: 512.0 }, 1.0);
+	let Op::Mesh { paint: Paint::Solid(c), .. } = &plain.ops[2] else { panic!() };
+	assert_eq!(c.0, crate::painter::PLACEHOLDER_ACCENT);
+	assert_eq!(s.placeholders(), vec!["p".to_string()]);
+}

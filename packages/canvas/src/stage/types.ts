@@ -23,6 +23,15 @@ export interface DocEdits {
 	edits: readonly import("@decks/pen").PenEdit[];
 }
 
+/**
+ * Who last wrote a drawing, as its placeholder frames (`placeholder: true`) are marked: a dashed
+ * outline in `color` (any CSS colour, a `var()` too) with `name` on a tag in the frame's corner.
+ */
+export interface DrawingWriter {
+	name?: string;
+	color: string;
+}
+
 /** A board as the stage places it: its box, whether its page is showing, and its picture. */
 export interface SceneBoard {
 	path: string;

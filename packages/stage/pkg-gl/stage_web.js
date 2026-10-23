@@ -736,7 +736,7 @@ export class PageEngine {
         }
     }
     /**
-     * What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
+     * What the stage hides, mutes or shows live, and who wrote it: `{ hidden, mute, holes, scrolls, writer? }`.
      * @param {string} view
      */
     setView(view) {

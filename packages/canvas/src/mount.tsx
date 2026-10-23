@@ -9,7 +9,7 @@ import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
-import type { DocEdits } from "./stage/types.ts";
+import type { DocEdits, DrawingWriter } from "./stage/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
@@ -242,7 +242,7 @@ export interface EditorState {
 	 * With `document`: `made`, the person's edits it is the first to have (by the names `send` was given),
 	 * and `scope`, which drawing it is (the canvas): one of another scope drops the edits on their way.
 	 */
-	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string } | undefined>;
+	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string; writer?: DrawingWriter } | undefined>;
 	/** Where the canvas opens: undefined while the host does not know yet. */
 	opening?: Accessor<{ camera?: Camera } | undefined>;
 }
@@ -409,7 +409,7 @@ export function createEditor(
 		const edits = drawing.editsTo(now);
 		if (!options.state?.pen) return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
 		const given = options.state.pen();
-		return given ? { doc: now, base: given.base, ...(edits ? { edits } : {}) } : undefined;
+		return given ? { doc: now, base: given.base, ...(edits ? { edits } : {}), ...(given.writer ? { writer: given.writer } : {}) } : undefined;
 	});
 	/*
 	 * Owned by whoever makes the editor (mountCanvas's own root, or the host's component), never by

@@ -328,6 +328,20 @@ impl Scene {
 		self.roots.iter().enumerate().find_map(|(r, root)| root.tree.items.iter().position(|it| it.id == id).map(|i| (r, i as u32)))
 	}
 
+	/// The ids of the frames marked `placeholder: true`: what is drawn again when the writer they
+	/// are marked with changes.
+	pub fn placeholders(&self) -> Vec<String> {
+		let mut out = Vec::new();
+		for root in &self.roots {
+			for (i, item) in root.tree.items.iter().enumerate() {
+				if item.kind() == "frame" && self.vars.bool(item.get("placeholder"), &root.placed[i].theme, false) {
+					out.push(item.id.clone());
+				}
+			}
+		}
+		out
+	}
+
 	/// What an item and everything in it paint on: the union of their ink boxes.
 	/// What the whole stage covers, everything drawn on it.
 	pub fn extent(&self) -> Option<Rect> {

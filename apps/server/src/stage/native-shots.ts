@@ -49,6 +49,8 @@ export interface NativeRequest {
 	format: "png" | "jpeg";
 	/** Where to write the picture. */
 	out: string;
+	/** Who last wrote the drawing, as its placeholder frames are marked; none: the accent, no name. */
+	writer?: { name?: string; color: string };
 }
 
 export type NativeOutcome = { ok: true; width: number; height: number; ms: Record<string, number> } | { ok: false; why: string };
@@ -133,6 +135,7 @@ export class NativeShots {
 			out: request.out,
 			format: request.format,
 			quality: 90,
+			...(request.writer ? { writer: request.writer } : {}),
 		};
 		try {
 			await this.start(binary);

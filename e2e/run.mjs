@@ -166,6 +166,8 @@ const CHECKS = [
 	{ file: "stage-shot.mjs", needsAgent: false },
 	/* The engine's fixtures drawn alike on all three backends, and like the native goldens. */
 	{ file: "stage-goldens.mjs", needsAgent: false },
+	/* A placeholder frame drawn unfinished: dashed in its writer's colour with its name, in the accent with none, on the canvas and in the server's pictures. */
+	{ file: "placeholder.mjs", needsAgent: false },
 	/* A dragged item is put down after its drop, back into the tiles. */
 	{ file: "drop-lands.mjs", needsAgent: false },
 	/* Every edit a person makes, with the server's answer held back: none shows the drawing as it was before it. Eight minutes, so by name. */

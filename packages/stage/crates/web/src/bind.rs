@@ -159,7 +159,14 @@ fn view_state(json: &str) -> crate::engine::ViewState {
 	let v: serde_json::Value = serde_json::from_str(json).unwrap_or_default();
 	let set = |k: &str| v.get(k).and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_owned)).collect()).unwrap_or_default();
 	let scrolls = v.get("scrolls").and_then(|s| s.as_object()).map(|m| m.iter().filter_map(|(k, x)| Some((k.clone(), x.as_f64()?))).collect()).unwrap_or_default();
-	crate::engine::ViewState { hidden: set("hidden"), mute: set("mute"), holes: set("holes"), scrolls }
+	crate::engine::ViewState { hidden: set("hidden"), mute: set("mute"), holes: set("holes"), scrolls, writer: v.get("writer").and_then(writer_of) }
+}
+
+/// `{ name?, color }`: who last wrote the drawing, as its placeholder frames are marked.
+pub(crate) fn writer_of(v: &serde_json::Value) -> Option<stage_paint::painter::Writer> {
+	let color = v.get("color").and_then(serde_json::Value::as_str).and_then(stage_scene::values::parse_color)?;
+	let name = v.get("name").and_then(serde_json::Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
+	Some(stage_paint::painter::Writer { name, color })
 }
 
 fn ids(json: &str) -> Vec<String> {
@@ -404,7 +411,7 @@ impl PageEngine {
 		Ok(serde_json::to_string(&bent).unwrap_or_else(|_| "[]".into()))
 	}
 
-	/// What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
+	/// What the stage hides, mutes or shows live, and who wrote it: `{ hidden, mute, holes, scrolls, writer? }`.
 	#[wasm_bindgen(js_name = setView)]
 	pub fn set_view(&mut self, view: &str) {
 		self.page.view = view_state(view);

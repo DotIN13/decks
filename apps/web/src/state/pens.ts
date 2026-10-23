@@ -44,7 +44,7 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 	}
 	try {
 		const doc = editDocument(known.doc, message.edits);
-		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: message.made } });
+		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: message.made, by: message.by ?? known.by } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}

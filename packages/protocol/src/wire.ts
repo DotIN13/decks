@@ -403,12 +403,12 @@ export type ServerMessage =
 	 * disk does not parse and `doc` is the last good version. `base` is the stage folder's URL,
 	 * which an image fill's relative `url` is read against.
 	 */
-	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string; /** The browsers' names for the edits this revision is the first to have (`edit` on `stage.pen.edit` and `stage.pen.step`, `x-decks-edit` on `canvas.batch`). */ made?: string[] }
+	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string; /** The browsers' names for the edits this revision is the first to have (`edit` on `stage.pen.edit` and `stage.pen.step`, `x-decks-edit` on `canvas.batch`). */ made?: string[]; /** The agent that last wrote this drawing, by id, as its placeholder frames are marked (`placeholder: true`: a dashed outline in its colour, with its name); absent when no agent has written it since the server started. */ by?: string; }
 	/**
 	 * What changed in a stage drawing from revision `from` to `rev` (`@decks/pen` `diff`): sent in place
 	 * of the whole drawing to a browser that holds `from`. One that does not asks again (`stage.pen.get`).
 	 */
-	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; /** The browsers' edits this revision is the first to have, by the names they gave them. */ made?: string[] }
+	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; /** The browsers' edits this revision is the first to have, by the names they gave them. */ made?: string[]; /** The agent that last wrote this drawing, by id, as its placeholder frames are marked (`placeholder: true`: a dashed outline in its colour, with its name); absent when no agent has written it since the server started. */ by?: string; }
 	/** A browser's named edit or step was not made (a refusal, nothing to undo): the browser stops showing it. */
 	| { type: "stage.pen.refused"; agentId: string; edit: string }
 	/**

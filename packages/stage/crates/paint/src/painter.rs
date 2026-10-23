@@ -74,11 +74,24 @@ pub struct Context<'a> {
 	pub holes: Option<&'a HashSet<String>>,
 	/// How far each card's wide tables are scrolled, by `id:index`.
 	pub scrolls: Option<&'a std::collections::HashMap<String, f64>>,
+	/// Who last wrote the drawing: the name and colour a placeholder frame is marked with.
+	pub writer: Option<&'a Writer>,
 }
+
+/// The agent that last wrote a drawing, as a placeholder frame names it (`placeholder_mark`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Writer {
+	/// No name: the outline alone, in `color`.
+	pub name: Option<String>,
+	pub color: [f32; 4],
+}
+
+/// A placeholder's colour when nobody is named: the app's accent (`--color-accent`, `#3b5cf6`).
+pub const PLACEHOLDER_ACCENT: [f32; 4] = [0.231, 0.361, 0.965, 1.0];
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None, offsets: None, mute: None, holes: None, scrolls: None }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None, offsets: None, mute: None, holes: None, scrolls: None, writer: None }
 	}
 
 	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
@@ -487,6 +500,9 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			if paper {
 				card_edge(ctx.dark, shape, transform, after);
 			}
+			if item.kind() == "frame" && vars.bool(item.get("placeholder"), theme, false) {
+				placeholder_mark(ctx, shape, transform, &m, after);
+			}
 		}
 		"ellipse" => {
 			let inner = vars.num(item.get("innerRadius"), theme, 0.0).clamp(0.0, 1.0);
@@ -576,6 +592,44 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			label(ctx, &said, &style, (8.0, 8.0), (w - 16.0).max(20.0), stage_text::Align::Left, grey, &m, ops);
 		}
 	}
+}
+
+/// The outline's width and dashes, and the name tag's inset and padding, in stage units.
+const PLACEHOLDER_LINE: f64 = 2.0;
+const PLACEHOLDER_DASH: [f64; 2] = [8.0, 6.0];
+const PLACEHOLDER_TAG_INSET: f64 = 6.0;
+const PLACEHOLDER_TAG_PAD: (f64, f64) = (6.0, 3.0);
+
+/// A frame still being made (`placeholder: true`): a dashed outline just inside its edge in the
+/// writer's colour, over what is in it, and the writer's name on a tag of that colour inside its
+/// top-left corner. Inside the box, so it is drawn on every tile the frame is drawn on; a frame too
+/// small for the tag has the outline alone.
+fn placeholder_mark(ctx: &Context, shape: Shape, transform: Affine, m: &Mat, ops: &mut Vec<Op>) {
+	let (w, h) = (shape.w as f64, shape.h as f64);
+	let colour = ctx.writer.map_or(PLACEHOLDER_ACCENT, |by| by.color);
+	let line = PLACEHOLDER_LINE.min(w / 2.0).min(h / 2.0);
+	if line <= 0.0 {
+		return;
+	}
+	let half = line / 2.0;
+	let radius = (shape.radii[0] as f64 - half).max(0.0);
+	let path = mesh::rounded_rect_path(w - line, h - line, radius);
+	let inset = transform.then(&Affine::translate(half as f32, half as f32));
+	if let Some((vertices, indices)) = mesh::stroke(&path, line as f32, lyon_tessellation::LineCap::Butt, lyon_tessellation::LineJoin::Miter, Some(&PLACEHOLDER_DASH), inset.scale_factor()) {
+		ops.push(Op::Mesh { vertices, indices, transform: inset, paint: Paint::Solid(Color::straight(colour, 1.0)) });
+	}
+	let (Some(name), Some(text)) = (ctx.writer.and_then(|by| by.name.as_deref()).map(str::trim).filter(|n| !n.is_empty()), ctx.text) else { return };
+	let style = stage_scene::layout::TextStyle { family: "Inter".into(), size: 12.0, weight: 600.0, italic: false, letter_spacing: 0.0, line_height: None };
+	let laid = text.lay(&[Span::plain(name, &style)], None, stage_text::Align::Left);
+	let (pad_x, pad_y) = PLACEHOLDER_TAG_PAD;
+	let (tag_w, tag_h) = (laid.width as f64 + pad_x * 2.0, laid.height as f64 + pad_y * 2.0);
+	let at = PLACEHOLDER_TAG_INSET;
+	if tag_w + at * 2.0 > w || tag_h + at * 2.0 > h {
+		return;
+	}
+	let tag = Shape { w: tag_w as f32, h: tag_h as f32, radii: [4.0; 4], ellipse: false };
+	ops.push(Op::Shape { shape: tag, transform: transform.then(&Affine::translate(at as f32, at as f32)), paint: Paint::Solid(Color::straight(colour, 1.0)), stroke: None });
+	draw_laid(ctx, &laid, (at + pad_x, at + pad_y), &[Color::straight([1.0, 1.0, 1.0, 1.0], 1.0)], m, ops);
 }
 
 /// A shape's outline: uniform as one op, per side as bars cut to the shape.

@@ -16,7 +16,7 @@ import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import type { DocEdits, SceneBoard } from "./stage/types.ts";
+import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
@@ -148,7 +148,7 @@ export function Stage(props: {
 	 * host has them: what made this drawing from the one it gave before, applied by the engines in
 	 * place of finding what changed (`stage/engine.ts`, `setDoc`).
 	 */
-	pen?: { doc: PenDocument; base: string; edits?: DocEdits };
+	pen?: { doc: PenDocument; base: string; edits?: DocEdits; writer?: DrawingWriter };
 	/**
 	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire, `decks.canvas.batch` for an agent). Absent
 	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
@@ -756,6 +756,15 @@ export function Stage(props: {
 		resolvedColours.set(key, value);
 		return value;
 	};
+	/*
+	 * The drawing's placeholder frames are drawn unfinished in its last writer's colour, with its name;
+	 * with no writer known, in the accent and with no name.
+	 */
+	createEffect(() => {
+		const writer = props.pen?.writer;
+		const color = resolveColour(writer?.color ?? "var(--color-accent)");
+		penLayer.setWriter(writer?.name ? { name: writer.name, color } : { color });
+	});
 	/** The boards the sheet has on screen as pictures (`layer.ts`, `pictured`). */
 	const [onSheet, setOnSheet] = createSignal<ReadonlySet<string>>(new Set());
 	const picturedNow = (paths: ReadonlySet<string>) => {

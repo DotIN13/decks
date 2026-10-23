@@ -8,14 +8,14 @@
 
 use crate::backend::{Backend, TextureKind, flush_glyphs};
 use crate::list::{Affine, Align, Clip, Color, DrawList, Op, Paint, Shape};
-use crate::painter::{Context, paint_area};
+use crate::painter::{Context, Writer, paint_area};
 use crate::tiles::{Grid, TILE};
 
 /// The texture each fixture's picture is left in.
 pub const OUT: u32 = 1;
 
 /// The fixtures drawn from draw lists and text alone, in order.
-pub const NAMES: [&str; 4] = ["shapes", "effects", "words", "card"];
+pub const NAMES: [&str; 5] = ["shapes", "effects", "words", "card", "placeholder"];
 
 /// The real stages, each a `.pen` file under `crates/gpu/fixtures/`.
 pub const STAGES: [&str; 2] = ["herobrine", "rotary"];
@@ -46,6 +46,7 @@ pub fn draw(g: &mut dyn Backend, name: &str, words: &stage_text::Text) -> Option
 		"effects" => Some(effects(g)),
 		"words" => words_(g, words),
 		"card" => card(g, words),
+		"placeholder" => placeholder(g, words),
 		_ => None,
 	}
 }
@@ -86,12 +87,19 @@ fn effects(g: &mut dyn Backend) -> (u32, u32) {
 }
 
 /// Draw `area` of a document at `scale` into [`OUT`], `w` × `h`, over `clear`.
-fn document(g: &mut dyn Backend, doc: &stage_doc::Document, words: &stage_text::Text, area: stage_scene::Rect, scale: f64, (w, h): (u32, u32), clear: Color) {
+fn document(g: &mut dyn Backend, doc: &stage_doc::Document, words: &stage_text::Text, area: stage_scene::Rect, scale: f64, size: (u32, u32), clear: Color) {
+	document_by(g, doc, words, area, scale, size, clear, None);
+}
+
+/// As [`document`], with the drawing's writer named, as its placeholder frames are marked.
+#[allow(clippy::too_many_arguments)]
+fn document_by(g: &mut dyn Backend, doc: &stage_doc::Document, words: &stage_text::Text, area: stage_scene::Rect, scale: f64, (w, h): (u32, u32), clear: Color, writer: Option<&Writer>) {
 	let scene = stage_scene::Scene::new(doc, false, words);
 	let atlas = std::cell::RefCell::new(stage_text::atlas::Atlas::new());
 	let skip = std::collections::HashSet::new();
 	let none = |_: &str| None;
-	let ctx = Context::new(&scene, &skip, &none).with_text(words, &atlas);
+	let mut ctx = Context::new(&scene, &skip, &none).with_text(words, &atlas);
+	ctx.writer = writer;
 	let list = paint_area(&ctx, area, scale, clear);
 	g.texture(OUT, TextureKind::Color, w, h, None);
 	flush_glyphs(&mut atlas.borrow_mut(), g);
@@ -131,6 +139,25 @@ fn card(g: &mut dyn Backend, words: &stage_text::Text) -> Option<(u32, u32)> {
 	let size = (800, ((h + 20.0) * 2.0) as u32);
 	document(g, &doc, words, area, 2.0, size, Color([0.96, 0.96, 0.96, 1.0]));
 	Some(size)
+}
+
+/// Two placeholder frames at 2×: one written by a named agent, its dashed outline and name tag in
+/// the agent's green over a rounded frame with a child; one too small for the tag, outline alone.
+fn placeholder(g: &mut dyn Backend, words: &stage_text::Text) -> Option<(u32, u32)> {
+	if !words.has_fonts() {
+		return None;
+	}
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"frame","id":"p","x":10,"y":10,"width":220,"height":120,"cornerRadius":12,"layout":"none","placeholder":true,"fill":"#f4f6fa","children":[
+			{"type":"rectangle","id":"r","x":20,"y":50,"width":120,"height":40,"fill":"#d0d7e2","cornerRadius":6}
+		]},
+		{"type":"frame","id":"q","x":250,"y":10,"width":40,"height":40,"layout":"none","placeholder":true}
+	]}))
+	.ok()?;
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 300.0, h: 140.0 };
+	let writer = Writer { name: Some("Atelier".into()), color: [0.180, 0.686, 0.353, 1.0] };
+	document_by(g, &doc, words, area, 2.0, (600, 280), Color([1.0, 1.0, 1.0, 1.0]), Some(&writer));
+	Some((600, 280))
 }
 
 /// A real stage (a `.pen` file's text): its drawing, not its boards (the page draws those), as

@@ -4,7 +4,7 @@
 use serde_json::{Value, json};
 use stage_doc::{Change, Document, History, Ids};
 use stage_paint::list::{Color, DrawList, Op};
-use stage_paint::painter::{Context, IconShape, LiveInk, paint_area, paint_ink};
+use stage_paint::painter::{Context, IconShape, LiveInk, Writer, paint_area, paint_ink};
 use stage_scene::geometry::Mat;
 use stage_paint::tiles::{Grid, Key, TILE, overview_scale, scale_for};
 use stage_scene::{Rect, Scene, Updated, arrows};
@@ -946,7 +946,11 @@ impl Worker {
 	/// What the stage hides, mutes or shows live changed: the tiles those items are on are painted again.
 	pub fn set_view(&mut self, next: ViewState) {
 		self.settle();
-		let changed: Vec<String> = next.differs(&self.view);
+		let mut changed: Vec<String> = next.differs(&self.view);
+		// A new writer redraws the frames its name and colour are drawn on.
+		if next.writer != self.view.writer {
+			changed.extend(self.scene.placeholders());
+		}
 		self.view = next;
 		self.version += 1;
 		for id in changed {
@@ -1685,6 +1689,8 @@ pub struct ViewState {
 	pub holes: HashSet<String>,
 	/// Wide tables' scroll, by `id:index`.
 	pub scrolls: HashMap<String, f64>,
+	/// Who last wrote the drawing, as its placeholder frames are marked; none: the accent, no name.
+	pub writer: Option<Writer>,
 }
 
 impl ViewState {
@@ -1692,6 +1698,7 @@ impl ViewState {
 		ctx.mute = Some(&self.mute);
 		ctx.holes = Some(&self.holes);
 		ctx.scrolls = Some(&self.scrolls);
+		ctx.writer = self.writer.as_ref();
 	}
 
 	/// The ids whose look changes between two states (for a scroll, `id:index`).

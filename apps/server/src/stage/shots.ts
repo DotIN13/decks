@@ -66,6 +66,8 @@ export interface ShotHost {
 	borrow: <T>(use: (browser: Browser) => Promise<T>) => Promise<T>;
 	/** The native renderer (`native-shots.ts`): the default, with Chromium when it cannot. */
 	native?: NativeShots;
+	/** Who last wrote a canvas, as its placeholder frames are marked on the canvas (`StagePens.writerOf`); none: the accent, no name. */
+	writer?: (stage: string) => { name?: string; color: string } | undefined;
 }
 
 /** The long side of the page, in CSS pixels: a whole stage is shrunk to fit it. */
@@ -133,6 +135,9 @@ export class StageShots {
 		const height = Math.max(1, Math.round(h * zoom));
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 		const named = fileFrame ? (fileFrame.stage ?? basename(request.file!).replace(/\.pen$/, "")) : stage;
+		// Placeholder frames are marked as on the canvas: in the colour and name of the canvas's last writer.
+		const writerStage = fileFrame ? fileFrame.stage : stage;
+		const writer = writerStage ? this.host.writer?.(writerStage) : undefined;
 		const target = request.to ? resolveInDeck(this.host.deck, request.to) : join(this.host.deck, ".decks", "shots", `${named}-${stamp}.${format === "jpeg" ? "jpg" : format}`);
 		mkdirSync(dirname(target), { recursive: true });
 		const shot = { file: relative(this.host.deck, target), format, width: Math.round(width * scale), height: Math.round(height * scale), box };
@@ -149,14 +154,14 @@ export class StageShots {
 			const drawn = fileFrame?.stage ? this.host.pens.drawingOf(fileFrame.stage) : fileFrame ? { doc: fileFrame.doc, base: fileFrame.base } : this.host.pens.drawingOf(stage);
 			const onStage = fileFrame?.stage ?? (fileFrame ? undefined : stage);
 			const boards = onStage ? this.host.pens.boards(onStage).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) : [];
-			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target });
+			const outcome = await native.take({ doc: drawn.doc, base: drawn.base, boards, box, scale: zoom * scale, width: shot.width, height: shot.height, scheme, format: format === "jpeg" ? "jpeg" : "png", out: target, ...(writer ? { writer } : {}) });
 			if (outcome.ok) return { ...shot, bytes: readFileSync(target), how: "native" as const };
 			notNative = outcome.why;
 		}
 
 		const drawn: Record<string, string> = fileFrame?.stage ? { stage: fileFrame.stage } : fileFrame ? { pen: request.file! } : { stage };
 		const read = drawn.pen !== undefined ? "/api/pen-file" : `/api/stage-pen/${drawn.stage}`;
-		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(this.host.ticket ? { ticket: this.host.ticket(read) } : {}) });
+		const query = new URLSearchParams({ ...drawn, x1: String(box.x1), y1: String(box.y1), x2: String(box.x2), y2: String(box.y2), scheme, ...(writer ? { writerColor: writer.color, ...(writer.name ? { writerName: writer.name } : {}) } : {}), ...(this.host.ticket ? { ticket: this.host.ticket(read) } : {}) });
 		const url = `${this.host.webOrigin()}/shot.html?${query}`;
 
 		const bytes = await this.host.borrow(async (browser) => {

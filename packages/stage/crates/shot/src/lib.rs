@@ -63,6 +63,8 @@ pub struct Request {
 	/// The stage's paper, straight RGB 0 to 1.
 	pub paper: [f32; 3],
 	pub boards: Vec<Board>,
+	/// Who last wrote the drawing, as its placeholder frames are marked, as on the page; none: the accent, no name.
+	pub writer: Option<stage_paint::painter::Writer>,
 }
 
 /// What a request could not be drawn without, for the caller to hand over.
@@ -414,6 +416,7 @@ impl Shooter {
 		let icons: HashMap<String, IconShape> = self.icons.iter().filter_map(|(k, v)| v.clone().map(|v| (k.clone(), v))).collect();
 		let mut ctx = Context::new(&laid.scene, &skip, &image).with_text(&laid.text, &self.atlas);
 		ctx.icons = Some(&icons);
+		ctx.writer = request.writer.as_ref();
 		let mut tiles = Vec::new();
 		let mut wanted: Vec<String> = Vec::new();
 		let mut painted_ms = 0.0;
@@ -533,6 +536,11 @@ pub fn request_of(v: &Value) -> Result<Request, String> {
 		height: n("height")? as u32,
 		paper: if paper.len() >= 3 { [paper[0], paper[1], paper[2]] } else { [0.945, 0.945, 0.953] },
 		boards,
+		writer: v.get("writer").and_then(|w| {
+			let color = w.get("color").and_then(Value::as_str).and_then(stage_scene::values::parse_color)?;
+			let name = w.get("name").and_then(Value::as_str).map(str::to_owned).filter(|n| !n.trim().is_empty());
+			Some(stage_paint::painter::Writer { name, color })
+		}),
 	})
 }
 

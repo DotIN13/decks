@@ -73,6 +73,10 @@ async function main(): Promise<void> {
 	engine.failed = (why) => (failed = why);
 	engine.setView(view);
 	engine.setScheme(scheme);
+	// Placeholder frames as the canvas marks them: in the canvas's last writer's colour, with its name.
+	const writerColor = query.get("writerColor");
+	const writerName = query.get("writerName");
+	engine.setWriter({ color: writerColor ?? (getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6"), ...(writerName ? { name: writerName } : {}) });
 	engine.attachCanvas(document.querySelector("canvas.over") as HTMLCanvasElement);
 	// Every board is a live frame here, so the engine leaves a hole over each and fetches no pictures.
 	engine.setBoards(boards.map((board) => ({ ...board, live: true })));

@@ -39,6 +39,8 @@ async function open() {
 		return answer;
 	};
 	return {
+		app,
+		agent,
 		call,
 		must,
 		cleanup: () => {
@@ -181,6 +183,24 @@ test("canvas.space finds room near an item or the middle, and places nothing", a
 		assert.ok(!bad.ok, "a box with no size has no room to find");
 		const missing = await call("canvas.space", [{ w: 10, h: 10 }, { near: "nope" }]);
 		assert.ok(!missing.ok && /Nothing called nope/.test(missing.error ?? ""), missing.error);
+	} finally {
+		cleanup();
+	}
+});
+
+test("a placeholder frame an agent draws names that agent as the canvas's writer, which the drawing is sent with", async () => {
+	const { app, agent, must, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "frame", name: "Hero", placeholder: true, width: 400, height: 200 }, { at: { x1: 0, y1: 0 } }]);
+		const stage = agent.stageName()!;
+		assert.equal(app.pens.writerOf(stage), agent.id);
+		const frame = app.pens.frame(agent.id, stage);
+		assert.equal(frame.type === "stage.pen" && frame.by, agent.id);
+		// A person's edit over the wire leaves the writer as it was.
+		app.pens.edit(stage, [{ op: "update", id: "hero", set: { x: 10 } }] as never);
+		assert.equal(app.pens.writerOf(stage), agent.id);
+		const [delta] = app.pens.changes([agent.id], stage);
+		assert.equal(delta?.type === "stage.pen.delta" && delta.by, agent.id);
 	} finally {
 		cleanup();
 	}

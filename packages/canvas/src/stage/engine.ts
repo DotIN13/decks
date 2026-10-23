@@ -166,7 +166,7 @@ export class StageEngine {
 	private drawnAt: { x: number; y: number; zoom: number } | undefined;
 	private boards: readonly SceneBoard[] = [];
 	private boardKey = "";
-	private viewState = { hidden: [] as string[], mute: [] as string[], holes: [] as string[], scrolls: {} as Record<string, number> };
+	private viewState: { hidden: string[]; mute: string[]; holes: string[]; scrolls: Record<string, number>; writer?: { name?: string; color: string } } = { hidden: [], mute: [], holes: [], scrolls: {} };
 	private viewKey = "";
 	private fontsAsked = new Set<string>();
 	/**
@@ -1588,6 +1588,17 @@ export class StageEngine {
 
 	holes(ids: ReadonlySet<string>): void {
 		this.viewState.holes = [...ids];
+		this.sendView();
+	}
+
+	/**
+	 * Who last wrote the drawing: its placeholder frames (`placeholder: true`) are drawn unfinished,
+	 * a dashed outline in `color` (a CSS colour the engine reads: hex, rgb() or hsl(), not a `var()`)
+	 * with `name` on a tag in their top-left corner. None: the accent, no name.
+	 */
+	setWriter(writer: { name?: string; color: string } | undefined): void {
+		if (writer) this.viewState.writer = writer.name ? { name: writer.name, color: writer.color } : { color: writer.color };
+		else delete this.viewState.writer;
 		this.sendView();
 	}
 

@@ -27,7 +27,7 @@ fn with_fonts(s: &mut Shooter) -> bool {
 }
 
 fn request(doc: &Value, area: Rect, scale: f64, boards: Vec<Board>) -> Request {
-	Request { doc: doc.to_string(), dark: false, area, scale, width: (area.w * scale).round() as u32, height: (area.h * scale).round() as u32, paper: [0.945, 0.945, 0.953], boards }
+	Request { doc: doc.to_string(), dark: false, area, scale, width: (area.w * scale).round() as u32, height: (area.h * scale).round() as u32, paper: [0.945, 0.945, 0.953], boards, writer: None }
 }
 
 fn px(p: &Picture, x: u32, y: u32) -> [u8; 4] {
@@ -144,7 +144,7 @@ fn fixture_stages_match_their_goldens() {
 		}
 		let extent = Scene::new(&doc, false, &words).roots.iter().filter(|r| r.tree.items[0].kind() != "browser").map(|r| r.extent).reduce(|a, b| a.union(&b)).unwrap();
 		let scale = (fixtures::STAGE_SIDE / extent.w.max(extent.h)).min(1.0);
-		let r = Request { doc: pen.clone(), dark: false, area: extent, scale, width: (extent.w * scale).ceil() as u32, height: (extent.h * scale).ceil() as u32, paper: [0.98, 0.98, 0.98], boards: Vec::new() };
+		let r = Request { doc: pen.clone(), dark: false, area: extent, scale, width: (extent.w * scale).ceil() as u32, height: (extent.h * scale).ceil() as u32, paper: [0.98, 0.98, 0.98], boards: Vec::new(), writer: None };
 		let p = match s.shoot(&r).unwrap() {
 			Ok(p) => p,
 			Err(needs) => {

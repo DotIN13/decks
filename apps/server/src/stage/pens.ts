@@ -87,6 +87,13 @@ export interface PenEntry {
  */
 export const penEditBy = new AsyncLocalStorage<string>();
 
+/**
+ * The agent a write to a drawing is made for, while one of its calls runs (`stage/tool.ts`): each
+ * canvas remembers the last, and its placeholder frames are drawn in that agent's colour with its
+ * name. A person's own edits leave it as it was.
+ */
+export const penWriter = new AsyncLocalStorage<string>();
+
 /** Words measured as the page measures them (`text.ts`). */
 const measure = serverText.measure;
 
@@ -111,6 +118,13 @@ export class StagePens {
 	private readonly history = new Map<string, { undo: Array<{ before: string; after: string }>; redo: Array<{ before: string; after: string }> }>();
 	/** The browsers' names for the edits written to each stage since its drawing was last sent (`penEditBy`). */
 	private readonly made = new Map<string, string[]>();
+	/** The agent that last wrote each canvas (`penWriter`), since this server started. */
+	private readonly writers = new Map<string, string>();
+
+	/** The agent that last wrote a canvas, by id: what its placeholder frames are marked with. */
+	writerOf(name: string): string | undefined {
+		return this.writers.get(name);
+	}
 
 	constructor(
 		private deckPath: string,
@@ -983,7 +997,8 @@ export class StagePens {
 		const entry = this.get(name);
 		const doc = this.withImported(name, entry.doc);
 		this.sent.set(name, { rev: entry.rev, doc });
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}) };
+		const by = this.writers.get(name);
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}), ...(by ? { by } : {}) };
 	}
 
 	/** The browsers' edits written since the drawing was last sent, taken: the next frame or delta says it has them. */
@@ -1011,7 +1026,8 @@ export class StagePens {
 		const edits = diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });
 		const base = `${fileUrl(this.folderOf(name))}/`;
-		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}) }));
+		const by = this.writers.get(name);
+		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}), ...(by ? { by } : {}) }));
 	}
 
 	/** Replace the document whole, from text that must parse. */
@@ -1040,6 +1056,8 @@ export class StagePens {
 		this.cache.set(name, entry);
 		const by = penEditBy.getStore();
 		if (by) this.made.set(name, [...(this.made.get(name) ?? []), by]);
+		const writer = penWriter.getStore();
+		if (writer) this.writers.set(name, writer);
 		this.changed(name, entry);
 		return entry;
 	}

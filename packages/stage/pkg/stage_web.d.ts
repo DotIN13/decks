@@ -227,7 +227,7 @@ export class PageEngine {
      */
     setPreview(moving: string): string;
     /**
-     * What the stage hides, mutes or shows live: `{ hidden, mute, holes, scrolls }`.
+     * What the stage hides, mutes or shows live, and who wrote it: `{ hidden, mute, holes, scrolls, writer? }`.
      */
     setView(view: string): void;
     /**
