@@ -901,14 +901,17 @@ body {
 	 * line at every step of a resize of the panel, and at every change to its width. Each keeps the size
 	 * it last had, so the scroll height and the bottom it is held at do not move.
 	 */
-	/* Only where the browser keeps the reading place as skipped turns are laid out (`overflow-anchor`),
-	   which Safari does not: there a turn coming into view at its real height moved the history under
-	   the finger. Never in the phone's sheet. */
-	@supports (overflow-anchor: auto) {
-		.v3-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
-			content-visibility: auto;
-			contain-intrinsic-size: auto 96px;
-		}
+	/*
+	 * Only while the side panel is being resized: skipped all the time, a turn coming into view was laid
+	 * out mid-scroll, at a guessed height until then, and scrolling stuttered. Each turn keeps the size it
+	 * was last drawn at all along (`contain-intrinsic-size: auto`), so skipped for a resize it holds its
+	 * place exactly.
+	 */
+	.v3-chat .stream[data-shown] .stream-roll > * {
+		contain-intrinsic-size: auto 96px;
+	}
+	:root[data-panel-resizing] .v3-chat:not([data-sheet="true"]) .stream[data-shown] .stream-roll > * {
+		content-visibility: auto;
 	}
 	.v3-chat .stream[data-shown] .stream-roll {
 		flex: 1 1 auto;

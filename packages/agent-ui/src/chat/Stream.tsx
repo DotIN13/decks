@@ -380,15 +380,28 @@ export function Stream(props: {
 		 * holding the conversation scrolls it at every step). 4px of grace: a card whose last shadow
 		 * pixel is under the fold is not one you have missed.
 		 */
-		const cards = scroller.querySelectorAll<HTMLElement>("[data-card]");
 		let count = 0;
-		for (let i = cards.length - 1; i >= 0; i--) {
-			const card = cards[i]!;
+		for (let card = scroller.lastElementChild; card; card = card.previousElementSibling) {
+			if (!(card instanceof HTMLElement) || !card.hasAttribute("data-card")) continue;
 			if (card.offsetTop + card.offsetHeight <= fold + 4) break;
 			count++;
 		}
 		setBehind(count);
 	};
+	/*
+	 * At most once a frame while it scrolls. A scroll sends several events a frame, momentum more, and
+	 * each measure reads the layout: read per event, it made the browser lay the column out again and
+	 * again between frames, which is what made a scroll stutter.
+	 */
+	let measuring = 0;
+	const measureSoon = () => {
+		if (measuring) return;
+		measuring = requestAnimationFrame(() => {
+			measuring = 0;
+			measure();
+		});
+	};
+	onCleanup(() => cancelAnimationFrame(measuring));
 
 	/** Motion the reader asked not to have. */
 	const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -455,7 +468,7 @@ export function Stream(props: {
 				 * way in and then say nothing while the reader kept climbing.
 				 */
 				onScroll={() => {
-					measure();
+					measureSoon();
 					if (scroller && scroller.scrollTop < LOAD_MORE_AT && earlier()) showEarlier();
 				}}
 			>
