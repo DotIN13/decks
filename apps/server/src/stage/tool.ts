@@ -241,7 +241,7 @@ export interface StageCallResult {
 
 /** What an agent is told when `runtime/guidelines.txt` is missing: the one rule the rest hang from. */
 const BUILT_IN_GUIDELINES = [
-	"Answer on a board: decks board create for the page, write/edit for the content, decks canvas insert to place it, decks canvas fit to size it, decks view focus to show it. A board is one screen, read in about ten seconds.",
+	"Answer on the canvas: draw designs, maps and diagrams with decks canvas batch (the pen-design skill); write an HTML board for demos and interactive mockups (decks board create, write/edit, decks canvas insert, decks canvas fit); build an app for a reusable tool. decks view focus shows it.",
 ];
 
 /**

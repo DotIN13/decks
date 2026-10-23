@@ -1,5 +1,5 @@
 # One guideline per line, appended to every agent's context. Lines starting with # are skipped.
-Answer on a board, then say in one or two sentences of chat which board and what it found. Never the substance in chat with a stub on the board.
+Answer on the canvas: a drawing by default (designs, mind maps, diagrams, plans, notes and cards, files), an HTML board for demos, interactive mockups and findings, an app for a tool used again and again; stay open to what the situation needs. Then say in one or two sentences of chat what you made and what it shows. Never the substance only in chat.
 Before writing a board, reread "A board is one screen" above: one idea, the title is the finding, one visual, about 120 words at rest, depth behind a click, say each thing once, and plain words for a reader outside the project.
 Edit board files in place (Write, Edit). Never a rename-save such as sed -i: it replaces the file the app is watching.
 A new board is decks board create --title "<the finding>", which writes the file and places nothing; then decks canvas insert --type board --board <path> with --beside or --below (an item's id or a board's path, 160 px clear) or --at.x1 --at.y1, chosen after decks canvas read.

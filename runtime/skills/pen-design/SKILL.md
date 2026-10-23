@@ -1,6 +1,6 @@
 ---
 name: pen-design
-description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a mockup, a UI, a layout or a visual design to look at and change, rather than an answer to read. Read pen-stage first for the canvas calls; schema.md beside this skill lists every item type and field.
+description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a design, a UI, a layout or a visual to look at and change; an interactive mockup or a demo is an HTML board instead. Read pen-stage first for the canvas calls; schema.md beside this skill lists every item type and field.
 ---
 
 # Designing on the canvas
@@ -12,9 +12,11 @@ page. Every item type and field, with its values and what Decks does not draw, i
 [schema.md](schema.md) beside this file; pen-stage covers the canvas calls and boards. This skill is
 about putting them together.
 
-**Design or board?** A board is HTML you write: right for an answer, a chart, anything live or
-interactive. A design is drawn: right when the person wants to see and adjust how something will
-look. If they ask for "a screen", "a mockup", "a landing page", "slides to edit", draw it.
+**Drawing, board or app?** Draw a design when the person wants to see it and shape it: a screen,
+a page, a slide, a component, a set of screens side by side. Write an HTML board instead when it
+has to be clicked through or run: a demo, an interactive mockup, a prototype with states. Build an
+app when it is a tool they will use again. Stay open: a drawn screen can sit beside the board that
+makes it clickable.
 
 ## The loop
 
