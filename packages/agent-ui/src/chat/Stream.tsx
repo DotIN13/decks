@@ -88,7 +88,7 @@ export function Stream(props: {
 	let head: HTMLDivElement | undefined;
 	onMount(() => { if (head) props.onHead?.(head); });
 	let scroller!: HTMLDivElement;
-	/** The first and the last thing in the roll: what the observers below watch for the two ends. */
+	/** Empty rows before the first card and after the last: what the observers below watch for the two ends. */
 	let top!: HTMLDivElement;
 	let foot!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
@@ -237,8 +237,6 @@ export function Stream(props: {
 			 * gaps, which lands on the board underneath, is scrolled by hand.
 			 */
 			event.stopPropagation();
-			// Kept from the conversation's own listeners too, so reading up lets go of the foot here (`reading`).
-			if (event.deltaY < 0) readingUp();
 			if (event.target instanceof Node && scroller.contains(event.target)) return;
 			event.preventDefault();
 			scroller.scrollTop = at + event.deltaY;
@@ -288,9 +286,7 @@ export function Stream(props: {
 	createEffect(() => {
 		if (!shownNow()) return;
 		setPinned(true);
-		requestAnimationFrame(() => {
-			if (scroller) scroller.scrollTop = scroller.scrollHeight;
-		});
+		requestAnimationFrame(() => toFootNow());
 	});
 
 	/**
@@ -339,23 +335,27 @@ export function Stream(props: {
 	});
 
 	/*
-	 * Where the reader is, watched rather than measured: nothing runs while the column scrolls.
+	 * Following the foot, by observers. Nothing listens to the scroll.
 	 *
-	 * - Pinned is the foot in sight (within 40px of it), an IntersectionObserver on the empty row
-	 *   after the last card.
-	 * - Reaching back is the top in sight, within `LOAD_MORE_AT` of it, from a third on the empty row
-	 *   before the first; it is asked again each time the window grows, so a reader who stays near
+	 * - Pinned is the foot in sight, or within 80px of it: an IntersectionObserver on the empty row after the last card. It
+	 *   says where the reader has put the column; it never moves it.
+	 * - Following is a ResizeObserver on every row (handed them by a MutationObserver as they come and
+	 *   go). While pinned, a row that grows (a reply streaming in, a card opening, a new card) brings
+	 *   the foot back, but only from where the column's own last follow left it, or from the very foot.
+	 *   A pinned flag is a frame behind the reader: in the frame they start to scroll up it still says
+	 *   pinned, and following on the flag alone pulled them back down, so a scroll up from the foot
+	 *   did not take. Any scroll of theirs moves the column from where the follow left it, and from
+	 *   then on nothing follows until the foot observer has them back at the foot.
+	 * - Reaching back is a third observer, on the empty row before the first card, within
+	 *   `LOAD_MORE_AT` of the top; asked again each time the window grows, so a reader who stays near
 	 *   the top keeps loading.
-	 * - Following is a ResizeObserver on every row: while pinned, any row that grows (a reply as it
-	 *   streams, a card that opens, a new one) keeps the foot in sight. Resize observations run before
-	 *   intersection ones in a frame, so the foot is back in sight before pinning is asked again.
-	 *
-	 * A MutationObserver hands the rows to the last as they come and go. Away from the foot, a button
-	 * takes the reader back to the latest messages.
 	 */
-	/** Reading up from the foot: set where the column is mounted (below), and called by the window's wheel handler too. */
-	let readingUp: () => void = () => {
-		setPinned(false);
+	/** Where the column's last scroll to the foot left it: a scroll from anywhere else is the reader's. */
+	let followedTo: number | undefined;
+	const toFootNow = () => {
+		if (!scroller) return;
+		scroller.scrollTop = scroller.scrollHeight;
+		followedTo = scroller.scrollTop;
 	};
 	let footWatch: IntersectionObserver | undefined;
 	let topWatch: IntersectionObserver | undefined;
@@ -369,93 +369,39 @@ export function Stream(props: {
 			topWatch?.observe(top);
 		});
 	};
-	const toFootNow = () => {
-		if (scroller) scroller.scrollTop = scroller.scrollHeight;
-	};
 	onMount(() => {
-		if (typeof IntersectionObserver === "undefined" || typeof ResizeObserver === "undefined") return;
-		footWatch = new IntersectionObserver((entries) => {
-			const seen = entries.at(-1);
-			if (seen) setPinned(seen.isIntersecting);
-		}, { root: scroller, rootMargin: "0px 0px 40px 0px" });
+		if (typeof IntersectionObserver === "undefined" || typeof ResizeObserver === "undefined" || typeof MutationObserver === "undefined") return;
+		footWatch = new IntersectionObserver(
+			(entries) => {
+				const seen = entries.at(-1);
+				if (!seen) return;
+				setPinned(seen.isIntersecting);
+				// The reader brought the foot into sight: following starts from where they are.
+				if (seen.isIntersecting) followedTo = scroller.scrollTop;
+			},
+			// Within 80px of the foot is at it: a reply streaming in fast moves the foot on while the reader
+			// scrolls down to it, and they would never quite catch it.
+			{ root: scroller, rootMargin: "0px 0px 80px 0px" },
+		);
 		footWatch.observe(foot);
 		topWatch = new IntersectionObserver((entries) => {
 			if (entries.at(-1)?.isIntersecting && earlier()) showEarlier();
 		}, { root: scroller, rootMargin: `${LOAD_MORE_AT}px 0px 0px 0px` });
 		topWatch.observe(top);
 		growth = new ResizeObserver(() => {
-			if (pinned() && shownNow()) toFootNow();
+			if (!pinned() || !shownNow()) return;
+			const untouched = followedTo !== undefined && Math.abs(scroller.scrollTop - followedTo) < 1;
+			const atFoot = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 2;
+			if (untouched || atFoot) toFootNow();
 		});
-		const watch = (element: Element) => growth?.observe(element);
-		const forget = (element: Element) => growth?.unobserve(element);
-		for (const element of scroller.children) watch(element);
+		for (const element of scroller.children) growth.observe(element);
 		rows = new MutationObserver((changes) => {
 			for (const change of changes) {
-				for (const node of change.addedNodes) if (node instanceof Element) watch(node);
-				for (const node of change.removedNodes) if (node instanceof Element) forget(node);
+				for (const node of change.addedNodes) if (node instanceof Element) growth?.observe(node);
+				for (const node of change.removedNodes) if (node instanceof Element) growth?.unobserve(node);
 			}
 		});
 		rows.observe(scroller, { childList: true });
-
-		/*
-		 * Reading up lets go of the foot at once, on the reader's own gesture, not once the foot has
-		 * left the view. From the foot, the first few pixels of a scroll up are still within the 40px
-		 * the foot observer counts as pinned, and a row growing meanwhile (a reply streaming in, the
-		 * working sign changing its words) pulled the column straight back down: the first scroll up
-		 * from the bottom did not take. A wheel or a key up, or a finger drawing the history down,
-		 * unpins; where the scroll comes to rest, the foot in sight pins again.
-		 */
-		let fingerY: number | undefined;
-		/*
-		 * Asked where a scroll the reader made comes to rest, and not sooner than 250ms after their
-		 * gesture: a follow scroll already under way ends the moment the wheel arrives, and taken as
-		 * the reader's it pinned the column again straight away.
-		 */
-		let readingAt = Number.NEGATIVE_INFINITY;
-		let settleTimer: ReturnType<typeof setTimeout> | undefined;
-		const settle = () => {
-			if (!scroller || pinned()) return;
-			const wait = readingAt + 250 - performance.now();
-			clearTimeout(settleTimer);
-			if (wait > 0) {
-				settleTimer = setTimeout(settle, wait);
-				return;
-			}
-			if (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 40) setPinned(true);
-		};
-		const reading = (readingUp = () => {
-			setPinned(false);
-			readingAt = performance.now();
-			// Where `scrollend` is not sent, the scroll is taken to have come to rest 250ms after the gesture.
-			if (!("onscrollend" in scroller)) settle();
-		});
-		const onWheel = (event: WheelEvent) => {
-			if (event.deltaY < 0) reading();
-		};
-		const onKey = (event: KeyboardEvent) => {
-			if (["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)) reading();
-		};
-		const onTouchStart = (event: TouchEvent) => {
-			fingerY = event.touches[0]?.clientY;
-		};
-		const onTouchMove = (event: TouchEvent) => {
-			const y = event.touches[0]?.clientY;
-			if (fingerY !== undefined && y !== undefined && y > fingerY + 2) reading();
-			fingerY = y;
-		};
-		scroller.addEventListener("wheel", onWheel, { passive: true });
-		scroller.addEventListener("keydown", onKey);
-		scroller.addEventListener("touchstart", onTouchStart, { passive: true });
-		scroller.addEventListener("touchmove", onTouchMove, { passive: true });
-		scroller.addEventListener("scrollend", settle);
-		onCleanup(() => {
-			clearTimeout(settleTimer);
-			scroller.removeEventListener("wheel", onWheel);
-			scroller.removeEventListener("keydown", onKey);
-			scroller.removeEventListener("touchstart", onTouchStart);
-			scroller.removeEventListener("touchmove", onTouchMove);
-			scroller.removeEventListener("scrollend", settle);
-		});
 	});
 	onCleanup(() => {
 		footWatch?.disconnect();
