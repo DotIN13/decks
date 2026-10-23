@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "07c25bc62219413dba6a917244413bcc22ea4f5b7fad1e9e053602a6f2ec25c0",
+	"hash": "6744f6c33bbf5765d80f12ff2a105b3a97d2efc4e27f4c998a07df0995602723",
 	"rules": 1576,
 	"sheets": 21,
 	"ties": 14,
@@ -1445,7 +1445,7 @@
 		["styles/v3.css","@layer components ▸ .app[data-phone=\"true\"] .v3-topbar.float.pill{padding-right:48px}"],
 		["styles/v3.css","@layer components ▸ .app[data-phone=\"true\"] .dock{right:8px;left:8px;width:auto;transform:none}"],
 		["styles/v3.css","@layer components ▸ .app[data-phone=\"true\"] .props-panel.panel-float{top:auto;right:0;bottom:0;left:0;width:auto;max-height:42%;border-radius:26px 26px 0 0;padding-bottom:env(safe-area-inset-bottom)}"],
-		["styles/v3.css","@layer components ▸ .app[data-phone=\"true\"] .panel-shell.v3-panel{width:min(86vw, 340px) !important;padding-top:env(safe-area-inset-top)}"],
+		["styles/v3.css","@layer components ▸ .app[data-phone=\"true\"] .panel-shell.v3-panel{width:min(74vw, 288px) !important;padding-top:env(safe-area-inset-top)}"],
 		["styles/v3.css","@layer components ▸ @media (pointer: coarse) ▸ .v3-bar.float.pill{height:52px;border-radius:20px}"],
 		["styles/v3.css","@layer components ▸ @media (pointer: coarse) ▸ .v3-icon{width:36px;height:36px}"],
 		["styles/v3.css","@layer components ▸ @media (pointer: coarse) ▸ .v3-agent-chip,.v3-canvas-chip{height:36px}"],

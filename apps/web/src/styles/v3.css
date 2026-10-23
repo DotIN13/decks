@@ -1498,8 +1498,9 @@ body {
 		border-radius: 26px 26px 0 0;
 		padding-bottom: env(safe-area-inset-bottom);
 	}
+	/* About three quarters of a phone's width, so a good strip of the canvas stays in sight beside it. */
 	.app[data-phone="true"] .panel-shell.v3-panel {
-		width: min(86vw, 340px) !important;
+		width: min(74vw, 288px) !important;
 		padding-top: env(safe-area-inset-top);
 	}
 
