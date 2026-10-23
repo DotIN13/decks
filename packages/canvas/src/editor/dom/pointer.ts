@@ -129,6 +129,18 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * canvas about would leave a new note behind at the end of it.
 	 */
 	let pannedAt = 0;
+	/**
+	 * What the last press landed on, before anything it did moved: a double-click's second press on a
+	 * handle whose edit is drawn at once (an arrow's bend put back) leaves bare canvas under the
+	 * pointer by the time `dblclick` comes, and that is not a double-click on the canvas or on what is
+	 * under it now (a note there would open for typing).
+	 */
+	let pressedOn: EventTarget | null = null;
+	const notePress = (event: PointerEvent) => {
+		pressedOn = event.target;
+	};
+	addEventListener("pointerdown", notePress, true);
+	onCleanup(() => removeEventListener("pointerdown", notePress, true));
 	let lastBareTap: BareTap | undefined;
 	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
 	let lastTap: LastTap | undefined;
@@ -564,6 +576,8 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 * typed in is one, and a double-click there picks a word).
 	 */
 	const onDblClick = (event: MouseEvent) => {
+		// Pressed on something else (a handle whose edit moved it away): not a double-click on what is under the pointer now.
+		if (pressedOn !== event.target) return;
 		if (host.editable() && !host.drawing() && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a note.
 			if (performance.now() - host.madeAt() < MADE_MS) return;
