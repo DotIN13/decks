@@ -164,6 +164,14 @@ export interface Verbs {
 		 */
 		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**
+		 * Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas
+		 * where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside).
+		 * With `near` (an id or a board's path) it starts on that item's `side` (right; or below, left,
+		 * above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the
+		 * way. Nothing is placed: give the corner to insert or move as `at`.
+		 */
+		space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; side?: "right" | "below" | "left" | "above"; margin?: number }): Promise<{ x1: number; y1: number }>;
+		/**
 		 * Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is
 		 * a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its
 		 * top-left corner; `beside` or `below` (an item's id or a board's path) puts it 160 px clear of

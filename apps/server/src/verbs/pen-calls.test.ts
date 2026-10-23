@@ -165,3 +165,23 @@ test("an item read and written back keeps none of what the read added", async ()
 		cleanup();
 	}
 });
+
+test("canvas.space finds room near an item or the middle, and places nothing", async () => {
+	const { must, call, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "board", board: "boards/a.html" }, { at: { x1: 0, y1: 0 } }]);
+		await must("canvas.insert", [{ type: "rectangle", name: "Block", width: 500, height: 500 }, { at: { x1: 1100, y1: 100 } }]);
+		const before = (await must("canvas.read")).value.items.length;
+		assert.deepEqual((await must("canvas.space", [{ w: 300, h: 200 }, { near: "boards/a.html" }])).value, { x1: 1760, y1: 0 });
+		assert.deepEqual((await must("canvas.space", [{ w: 300, h: 200 }, { near: "block", side: "below", margin: 40 }])).value, { x1: 1100, y1: 640 });
+		const free = (await must("canvas.space", [{ w: 100, h: 100 }])).value;
+		assert.equal(typeof free.x1, "number");
+		assert.equal((await must("canvas.read")).value.items.length, before);
+		const bad = await call("canvas.space", [{ w: 0, h: 10 }]);
+		assert.ok(!bad.ok, "a box with no size has no room to find");
+		const missing = await call("canvas.space", [{ w: 10, h: 10 }, { near: "nope" }]);
+		assert.ok(!missing.ok && /Nothing called nope/.test(missing.error ?? ""), missing.error);
+	} finally {
+		cleanup();
+	}
+});

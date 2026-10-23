@@ -110,6 +110,15 @@ export const VERBS: readonly Verb[] = [
 		result: obj({ canvas: opt(str()), frame: opt(str()), title: opt(str()), file: opt(str()), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
 	},
 	{
+		name: "canvas.space",
+		group: "canvas",
+		...deckRead,
+		summary:
+			'Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a board\'s path) it starts on that item\'s `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. Nothing is placed: give the corner to insert or move as `at`.',
+		params: [p("size", obj({ w: num(), h: num() })), onItems({ near: opt(str()), side: opt(lit("right", "below", "left", "above")), margin: opt(num()) })],
+		result: obj({ x1: num(), y1: num() }),
+	},
+	{
 		name: "canvas.insert",
 		group: "canvas",
 		...deckChange,

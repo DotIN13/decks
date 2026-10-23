@@ -45,6 +45,7 @@ export class DecksError extends Error {
 // <generated:verbs> scripts/gen-sdk.mjs writes this list from packages/api; do not edit it here.
 export const VERBS = [
 	["canvas.read",["options?"]],
+	["canvas.space",["size","options?"]],
 	["canvas.insert",["item","options?"]],
 	["canvas.update",["id","change","options?"]],
 	["canvas.replace",["id","item","options?"]],

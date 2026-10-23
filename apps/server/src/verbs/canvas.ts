@@ -10,6 +10,7 @@ import { fitOn } from "./boards.ts";
 import { shootOn } from "./stage.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
+import { freeSpot, type Side } from "./space.ts";
 
 /**
  * The canvas calls: everything on one canvas, boards included, read and changed as items.
@@ -373,6 +374,30 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const name = target.canvas;
 				const { stage: _stage, file: _file, children, ...rest } = pens.read(name, more);
 				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
+			},
+			space: async (size: { w: number; h: number }, options?: On & { near?: string; side?: Side; margin?: number }) => {
+				const { near, side, margin, ...on } = options ?? {};
+				const w = size?.w;
+				const h = size?.h;
+				if (typeof w !== "number" || typeof h !== "number" || !(w > 0) || !(h > 0)) throw new Error("space takes the size of what is to go there, as in decks canvas space '{\"w\":900,\"h\":600}'.");
+				if (side !== undefined && !["right", "below", "left", "above"].includes(side)) throw new Error("side is right, below, left or above.");
+				if (margin !== undefined && (typeof margin !== "number" || !(margin >= 0))) throw new Error("margin is the room to keep clear round the box, a number of pixels, 160 by default.");
+				const target = targetOf(on);
+				onCanvas = target.canvas;
+				const { doc, layout } = surfaceOf(target);
+				const placed = layout(doc);
+				// Arrows run between items, and the box round one is mostly empty canvas: they are not in the way.
+				const items = doc.children.filter((one) => one.metadata?.type !== ARROW).flatMap((one) => {
+					const box = placed.get(one.id)?.box;
+					return box ? [box] : [];
+				});
+				let from;
+				if (near !== undefined && near !== null) {
+					const id = idIn(doc, near, "near");
+					from = placed.get(id)?.box;
+					if (!from) throw new Error(`Nothing called ${near} is on this canvas to find room near: decks canvas read lists what is.`);
+				}
+				return freeSpot(items, { w, h }, { ...(from ? { near: from } : {}), ...(side ? { side } : {}), margin: margin ?? GAP }) as never;
 			},
 			insert: async (item: ItemIn, options?: On & { at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
 				const { canvas, frame, ...place } = options ?? {};

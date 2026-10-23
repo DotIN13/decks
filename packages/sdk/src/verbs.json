@@ -60,6 +60,72 @@
   ]
  },
  {
+  "name": "canvas.space",
+  "command": [
+   "canvas",
+   "space"
+  ],
+  "group": "canvas",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a board's path) it starts on that item's `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. Nothing is placed: give the corner to insert or move as `at`.",
+  "signature": "canvas.space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number })",
+  "returns": "{ x1: number; y1: number }",
+  "params": [
+   {
+    "name": "size",
+    "type": "{ w: number; h: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "w": {
+       "type": "number"
+      },
+      "h": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "w",
+      "h"
+     ],
+     "additionalProperties": false
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string; frame?: string; near?: string; side?: \"right\" | \"below\" | \"left\" | \"above\"; margin?: number }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      },
+      "frame": {
+       "type": "string"
+      },
+      "near": {
+       "type": "string"
+      },
+      "side": {
+       "enum": [
+        "right",
+        "below",
+        "left",
+        "above"
+       ]
+      },
+      "margin": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
   "name": "canvas.insert",
   "command": [
    "canvas",
