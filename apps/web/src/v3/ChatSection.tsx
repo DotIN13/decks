@@ -27,7 +27,7 @@ export function ChatSection(props: {
 	identity: Identity | undefined;
 	unread: number;
 	folded: boolean;
-	onFold: (folded: boolean) => void;
+	onFold: (folded: boolean, gone?: boolean) => void;
 	sheet?: boolean;
 	/** On a phone: the pill the sheet opens out of. The sheet uncovers its history from that shape, rather than scaling it. */
 	from?: DOMRect;
@@ -184,8 +184,25 @@ export function ChatSection(props: {
 			const last = recent[recent.length - 1]!;
 			const speed = (last.y - first.y) / Math.max(1, last.t - first.t);
 			if (done.type !== "pointercancel" && (dy > sheet.offsetHeight / 4 || (speed > 0.4 && dy > 24))) {
-				// Away from where the finger left it: the leaving animation starts at this offset.
-				props.onFold(true);
+				/*
+				 * Away as an iOS sheet goes: on from where the finger let go, at the finger's speed, easing
+				 * out off the bottom of the screen. The curve's first slope is the release speed, so the
+				 * sheet does not jolt as the finger leaves it; let go slowly past a quarter, it gathers
+				 * speed instead. Folded when it is off the screen.
+				 */
+				if (matchMedia("(prefers-reduced-motion: reduce)").matches) return props.onFold(true);
+				const off = sheet.offsetHeight + 120;
+				const remaining = Math.max(1, off - dy);
+				const fling = Math.max(0, speed);
+				const ms = Math.min(420, Math.max(180, (remaining / Math.max(fling, 0.9)) * 1.4));
+				const lift = Math.min(1, (0.25 * fling * ms) / remaining);
+				const away = sheet.animate([{ transform: `translateY(${dy}px)` }, { transform: `translateY(${off}px)` }], {
+					duration: ms,
+					easing: `cubic-bezier(0.25, ${lift.toFixed(3)}, 0.45, 1)`,
+					fill: "forwards",
+				});
+				// Already off the screen: no leaving animation of its own after this one.
+				away.onfinish = () => props.onFold(true, true);
 				return;
 			}
 			sheet.dataset.settling = "true";

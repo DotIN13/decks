@@ -822,7 +822,12 @@ export function App() {
 	/* The pill the phone's sheet opens out of, and the sheet's way out: it leaves quicker than it came. */
 	const [sheetFrom, setSheetFrom] = createSignal<DOMRect | undefined>();
 	const [sheetLeaving, setSheetLeaving] = createSignal(false);
-	const setPhoneChat = (open: boolean, from?: DOMRect) => {
+	const setPhoneChat = (open: boolean, from?: DOMRect, gone = false) => {
+		// Dragged off the screen already: it goes now, with no leaving animation after its own.
+		if (!open && gone) {
+			setSheetLeaving(false);
+			return void setPhoneChatRaw(false);
+		}
 		if (open) {
 			setSheetFrom(from ?? document.querySelector(".v3-status")?.getBoundingClientRect());
 			setSheetLeaving(false);
@@ -1680,7 +1685,7 @@ export function App() {
 						identity={state.identities[state.focused ?? ""]}
 						unread={state.focused ? (unread[state.focused] ?? 0) : 0}
 						folded={false}
-						onFold={(folded) => (folded ? setPhoneChat(false) : undefined)}
+						onFold={(folded, gone) => (folded ? setPhoneChat(false, undefined, gone) : undefined)}
 						from={sheetFrom()}
 						leaving={sheetLeaving()}
 						sheet
