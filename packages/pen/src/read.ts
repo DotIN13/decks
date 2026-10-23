@@ -1,9 +1,9 @@
 import { clone, PenError, walk } from "./doc.ts";
-import { layout, type MeasureText, type Placed } from "./layout.ts";
+import { estimateText, layout, textStyleOf, type Frame, type MeasureText, type Placed } from "./layout.ts";
 import { expand } from "./refs.ts";
 import type { Box, PenDocument, PenNode } from "./types.ts";
 import { outlineOf } from "./outline.ts";
-import { isVariable, variable, type ThemeState } from "./values.ts";
+import { bool, isVariable, variable, withTheme, type ThemeState } from "./values.ts";
 
 /**
  * A document as an agent reads it: the file's own items, each with its box on the stage.
@@ -22,6 +22,12 @@ export interface ReadItem extends PenNode {
 	childCount?: number;
 	/** A path's or shape's outline as an SVG path in its own space, when a read asks for geometry. */
 	outline?: string;
+	/**
+	 * Cut by a frame round it that clips (`clip: true`): `partly` when some of its box is outside,
+	 * `fully` when none is inside. A text whose words run past its fixed width and height is
+	 * `partly` too. Left out when nothing is cut.
+	 */
+	clipped?: "partly" | "fully";
 }
 
 export function boxOf(placed: Placed | undefined): Box | undefined {
@@ -65,10 +71,13 @@ export function read(doc: PenDocument, options: ReadOptions): { version: string;
 		if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, one]) => [key, values(one, theme)]));
 		return value;
 	};
-	/** What a read works out on one item, its own fields only: its values, its outline. */
+	const clipping = clipper(doc, placed, options);
+	/** What a read works out on one item, its own fields only: whether it is cut, its values, its outline. */
 	const workOut = (item: ReadItem, node: PenNode) => {
 		const at = placed.get(node.id);
 		const theme = at?.theme ?? options.theme;
+		const clipped = at ? clipping(at) : undefined;
+		if (clipped) item.clipped = clipped;
 		if (want.variables) for (const [key, value] of Object.entries(item)) if (!NOT_VALUES.has(key) && key !== "children" && key !== "box") item[key] = values(value, theme);
 		if (want.geometry && at) {
 			const outline = outlineOf(doc, node, at.box.w, at.box.h, theme);
@@ -138,4 +147,48 @@ function cut(item: ReadItem, depth: number): ReadItem {
 		return { ...rest, childCount: children.length } as ReadItem;
 	}
 	return { ...item, children: (item.children as ReadItem[]).map((child) => cut(child, depth - 1)) };
+}
+
+/** Half a pixel either way is rounding, not a cut. */
+const SLACK = 0.5;
+
+/** Whether an item's box is cut by the clipping frames round it, or its words by its own fixed box. */
+function clipper(doc: PenDocument, placed: Map<string, Placed>, options: ReadOptions): (at: Placed) => "partly" | "fully" | undefined {
+	const measure = options.measure ?? estimateText;
+	/** The part of the stage an item's children are seen in: its clipping ancestors' boxes overlapped; undefined is everywhere. */
+	const seen = new Map<string, Frame | null>();
+	const regionInside = (id: string | undefined): Frame | null => {
+		if (id === undefined) return null;
+		const known = seen.get(id);
+		if (known !== undefined) return known;
+		const at = placed.get(id);
+		let region = at ? regionInside(at.parent) : null;
+		if (at && at.node.type === "frame" && bool(doc, at.node.clip, withTheme(at.theme, at.node), false)) {
+			const box = at.box;
+			if (!region) region = { ...box };
+			else {
+				const x = Math.max(region.x, box.x);
+				const y = Math.max(region.y, box.y);
+				region = { x, y, w: Math.min(region.x + region.w, box.x + box.w) - x, h: Math.min(region.y + region.h, box.y + box.h) - y };
+			}
+		}
+		seen.set(id, region);
+		return region;
+	};
+	return (at) => {
+		const { x, y, w, h } = at.box;
+		const region = regionInside(at.parent);
+		if (region) {
+			const [rx2, ry2] = [region.x + region.w, region.y + region.h];
+			const none = region.w < 0 || region.h < 0 || x + w < region.x - SLACK || x > rx2 + SLACK || y + h < region.y - SLACK || y > ry2 + SLACK || (w > 0 && h > 0 && (x + w <= region.x || x >= rx2 || y + h <= region.y || y >= ry2));
+			if (none) return "fully";
+			if (x < region.x - SLACK || y < region.y - SLACK || x + w > rx2 + SLACK || y + h > ry2 + SLACK) return "partly";
+		}
+		const node = at.node;
+		if (node.type === "text" && node.textGrowth === "fixed-width-height" && typeof node.content === "string" && node.content) {
+			const words = measure(node.content, textStyleOf(doc, node, withTheme(at.theme, node)), w, node);
+			if (words.h > h + SLACK || words.w > w + SLACK) return "partly";
+		}
+		return undefined;
+	};
 }

@@ -137,3 +137,31 @@ test("canvas.read resolves variables in a theme, instances and geometry when ask
 		cleanup();
 	}
 });
+
+test("an item cut by a clipping frame reads as clipped, and the change calls answer with it too", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const view = (await must("canvas.insert", [{ type: "frame", name: "View", layout: "none", clip: true, width: 100, height: 100, children: [{ type: "rectangle", name: "Half", x: 50, y: 0, width: 100, height: 20 }, { type: "rectangle", name: "Gone", x: 200, y: 0, width: 10, height: 10 }, { type: "rectangle", name: "Whole", x: 0, y: 50, width: 10, height: 10 }] }, { at: { x1: 0, y1: 0 } }])).value;
+		assert.deepEqual(view.children.map((n: { id: string; clipped?: string }) => [n.id, n.clipped]), [["half", "partly"], ["gone", "fully"], ["whole", undefined]]);
+		assert.equal(view.clipped, undefined);
+		const read = (await must("canvas.read", [{ of: "half" }])).value.items[0];
+		assert.equal(read.clipped, "partly");
+	} finally {
+		cleanup();
+	}
+});
+
+test("an item read and written back keeps none of what the read added", async () => {
+	const { must, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "frame", name: "View", layout: "none", clip: true, width: 100, height: 100, children: [{ type: "rectangle", name: "Half", x: 50, y: 0, width: 100, height: 20 }] }, { at: { x1: 0, y1: 0 } }]);
+		const half = (await must("canvas.read", [{ of: "half", resolve: { geometry: true } }])).value.items[0];
+		assert.ok(half.clipped && half.outline && half.box);
+		const back = await must("canvas.replace", ["half", { ...half, width: 90 }]);
+		assert.ok(!back.notes.some((note: string) => /does nothing/.test(note)), back.notes.join("\n"));
+		assert.equal(back.value.outline, undefined);
+		assert.equal(back.value.clipped, "partly");
+	} finally {
+		cleanup();
+	}
+});

@@ -118,3 +118,25 @@ test("resolve geometry gives a path's or shape's outline in its own space", () =
 	assert.equal(outlineOf(doc, { type: "text", id: "t" }, 10, 10, {}), undefined);
 	assert.equal(read(themed(), { theme: {} }).children[2]!.outline, undefined);
 });
+
+test("an item cut by a clipping frame round it is clipped partly or fully, and a text overflowing its fixed box partly", () => {
+	const doc: PenDocument = {
+		...emptyDocument(),
+		children: [
+			{
+				type: "frame", id: "view", layout: "none", clip: true, width: 100, height: 100,
+				children: [
+					{ type: "rectangle", id: "in", x: 10, y: 10, width: 20, height: 20 },
+					{ type: "rectangle", id: "edge", x: 90, y: 10, width: 20, height: 20 },
+					{ type: "rectangle", id: "out", x: 150, y: 10, width: 20, height: 20 },
+					{ type: "frame", id: "inner", layout: "none", x: 80, y: 0, width: 100, height: 50, children: [{ type: "rectangle", id: "deep", x: 30, y: 0, width: 10, height: 10 }] },
+					{ type: "text", id: "long", x: 0, y: 60, width: 40, height: 10, textGrowth: "fixed-width-height", content: "far too many words for this box" },
+					{ type: "text", id: "fits", x: 0, y: 80, width: 90, height: 20, textGrowth: "fixed-width-height", content: "ok" },
+				],
+			},
+			{ type: "frame", id: "open", layout: "none", width: 10, height: 10, x: 300, children: [{ type: "rectangle", id: "spill", x: 50, y: 0, width: 10, height: 10 }] },
+		],
+	};
+	const flags = Object.fromEntries(read(doc, { theme: {} }).children.flatMap((n) => [n, ...(n.children ?? []), ...(n.children ?? []).flatMap((c) => c.children ?? [])]).map((n) => [n.id, n.clipped]));
+	assert.deepEqual(flags, { view: undefined, in: undefined, edge: "partly", out: "fully", inner: "partly", deep: "fully", long: "partly", fits: undefined, open: undefined, spill: undefined });
+});

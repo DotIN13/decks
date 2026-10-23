@@ -148,8 +148,10 @@ export interface Verbs {
 	resolve(file: string): Promise<string>;
 	canvas: {
 		/**
-		 * Everything on the canvas, boards included, each with its box. A board is { type: "board", board:
-		 * <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
+		 * Everything on the canvas, boards included, each with its box; an item cut by a frame round it
+		 * that clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside),
+		 * as does a text whose words overflow its fixed width and height. A board is { type: "board",
+		 * board: <path>, box }; every other item has pen.dev's own fields. Read it before placing anything.
 		 * `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the
 		 * item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas
 		 * placing it. `of` (an id, a board's path, or an id inside an instance such as "card-1/label")

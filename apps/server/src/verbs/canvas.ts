@@ -122,7 +122,8 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
 		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "board", board: "boards/plan.html" }.');
 		const item = raw as Record<string, unknown>;
-		const { box: _box, children: kids, ...rest } = item;
+		// What a read adds and no file keeps (`read.ts`), so an item read and written back is the item.
+		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, ...rest } = item;
 		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken, frame)) : undefined;
 		if (item.type !== "board") return { ...rest, ...(children ? { children } : {}) };
 		if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items, not boards: place the board on a canvas, beside the frame.`);
