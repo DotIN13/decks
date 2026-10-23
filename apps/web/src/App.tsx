@@ -34,7 +34,7 @@ import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseB
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
-import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
+import type { RendererChoice } from "@decks/canvas/host";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { PenBar } from "@decks/canvas/host";
 import { setPenTool } from "@decks/canvas/tools";
@@ -96,17 +96,8 @@ export function App() {
 	 * is why it is not part of the frame switch that answers it.
 	 */
 
-	/**
-	 * How boards are drawn (`lib/renderer.ts`). The choice is remembered; what runs is the
-	 * choice or `dom`, depending on whether this browser can draw an element into a canvas.
-	 */
-	const [rendererChoice, setRendererChoice] = createSignal<RendererChoice>(loadRenderer());
-	const canvasApi = canvasApiPresent();
-	const renderer = createMemo(() => effectiveRenderer(rendererChoice(), canvasApi));
-	const setRenderer = (choice: RendererChoice) => {
-		setRendererChoice(choice);
-		saveRenderer(choice);
-	};
+	/** How boards are drawn: each a live page (`dom`). The per-board canvas renderer went with the board frame. */
+	const renderer = (): RendererChoice => "dom";
 	/* What the stage is built for: a new renderer builds it again (`Show keyed` below). */
 	const stageBuild = createMemo(() => ({ renderer: renderer() }), undefined, { equals: (a, b) => a.renderer === b.renderer });
 
@@ -1115,19 +1106,41 @@ export function App() {
 	 * zooming out; text too small to read is not answerable at all.
 	 */
 	const openLinkedBoard = (path: string, from: string): boolean => {
-		const board = state.boards.find((one) => one.path === path);
-		if (!board) {
+		if (!state.boards.some((one) => one.path === path)) {
 			notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
 			return false;
 		}
-		const playing = new Set(state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
-		const source = state.boards.find((one) => one.path === from);
-		const opening = !playing.has(path);
-		if (opening && source) move(path, source.x + source.w + 32, source.y);
+		/*
+		 * A link names the library file (`../../../boards/x.html` from a canvas's copy), and the canvas
+		 * shows its own copy of it (`canvases/<canvas>/boards/x.html`): the copy is what moves, is
+		 * selected and is flown to, once the canvas has one.
+		 */
+		const rest = path.replace(/^boards\//, "");
+		const playing = () => (state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
+		const onCanvas = () => playing().find((one) => one === path || (one.startsWith("canvases/") && one.split("/").slice(2).join("/") === `boards/${rest}`));
+		const opening = !onCanvas();
+		const land = (at: string) => {
+			const board = state.boards.find((one) => one.path === at);
+			const source = state.boards.find((one) => one.path === from);
+			if (opening && source) move(at, source.x + source.w + 32, source.y);
+			setSelected(at);
+			const placed = state.boards.find((one) => one.path === at) ?? board;
+			if (placed) flyToBoards([placed], { animate: true });
+		};
+		const there = onCanvas();
+		if (there) {
+			land(there);
+			return true;
+		}
 		send({ type: "board.play", path });
-		setSelected(path);
-		// The board lands on the canvas.
-		flyToBoards([board], { animate: true });
+		// The server copies the board into the canvas; it is landed when the copy arrives.
+		const started = performance.now();
+		const wait = () => {
+			const copy = onCanvas();
+			if (copy && state.boards.some((one) => one.path === copy)) return land(copy);
+			if (performance.now() - started < 4000) setTimeout(wait, 60);
+		};
+		wait();
 		return true;
 	};
 
@@ -1272,11 +1285,9 @@ export function App() {
 								// Hide is the board's item deleted from the drawing, as the server's canvas.delete does: shown at once (`drawing.ts`).
 								shots: () => {
 									const adaptor = shotAdaptor();
-									const capture = adaptor.capture;
 									return {
 										picture: (board, look) => adaptor.picture(board, look),
 										ownPicture: adaptor.id !== "canvas",
-										...(capture ? { capture: (frame: HTMLIFrameElement, board: Board) => capture.call(adaptor, frame, board) } : {}),
 									};
 								},
 							},
@@ -1698,9 +1709,6 @@ export function App() {
 							send({ type: "web.board" });
 							setSettings(false);
 						}}
-						renderer={rendererChoice()}
-						onRenderer={setRenderer}
-						canvasApi={canvasApi}
 						onClose={() => setSettings(false)}
 					/>
 				</Show>

@@ -4,7 +4,6 @@ import FiveHour from "./FiveHour.tsx";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
-import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
 import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
 import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
@@ -75,10 +74,6 @@ export function Settings(props: {
 	onWebStop: () => void;
 	/** Put the status board on the canvas. */
 	onWebBoard: () => void;
-	/** How boards are drawn (`lib/renderer.ts`), and whether this browser can do the canvas ones. */
-	renderer: RendererChoice;
-	onRenderer: (choice: RendererChoice) => void;
-	canvasApi: boolean;
 	onClose: () => void;
 }) {
 	/*
@@ -205,7 +200,7 @@ export function Settings(props: {
 
 					<TimeSettings />
 					<VoiceSettings />
-					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
+					<BoardSettings />
 					<OtherDecks />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
@@ -493,13 +488,6 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 
 
 /**
- * Which renderer draws the boards (`lib/renderer.ts`).
- *
- * One segmented control rather than three switches, because the choice is one of three and
- * a switch is a yes or no. The note under the row is the part that matters on a browser
- * without the API: the choice is kept, and this says which renderer is actually running.
- */
-/**
  * The deck's timezone: one zone for the whole deck, kept by the server.
  *
  * Unlike every other group here it is not this browser's setting. Schedules fire in it with
@@ -635,43 +623,14 @@ function TimeSettings() {
 	);
 }
 
-function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: RendererChoice) => void; canvasApi: boolean }) {
-	const running = () => (props.canvasApi || props.renderer === "dom" ? props.renderer : "dom");
-	const note = () => {
-		const chosen = RENDERERS.find((option) => option.id === props.renderer);
-		if (!props.canvasApi && props.renderer !== "dom")
-			return "This browser cannot: boards are documents.";
-		return chosen?.note ?? "";
-	};
+/** Where a board's picture comes from when it has no live page. */
+function BoardSettings() {
 	return (
 		<section class="set-group" data-group="renderer">
 			<header>
 				<span class="set-title">Boards</span>
-				<span class="set-note">How the canvas draws boards.{props.canvasApi ? "" : " This browser has no Canvas renderer."}</span>
+				<span class="set-note">How the canvas draws boards.</span>
 			</header>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">Renderer</span>
-					<span class="row-note" data-running={running()}>{note()}</span>
-				</span>
-				<span class="segmented set-renderer" role="radiogroup" aria-label="Renderer">
-					<For each={RENDERERS}>
-						{(option) => (
-							<button
-								type="button"
-								role="radio"
-								aria-checked={props.renderer === option.id}
-								data-on={props.renderer === option.id}
-								data-moot={(option.id !== "dom" && !props.canvasApi) || undefined}
-								title={option.note}
-								onClick={() => props.onChange(option.id)}
-							>
-								{option.label}
-							</button>
-						)}
-					</For>
-				</span>
-			</div>
 			{/* Where a board's picture comes from when it has no page (`canvas/shots/adaptors.ts`). */}
 			<div class="set-row">
 				<span class="set-k">

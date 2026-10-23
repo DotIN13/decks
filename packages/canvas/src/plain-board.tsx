@@ -225,6 +225,17 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		const message = event.data as Record<string, unknown> | null;
 		if (!message || typeof message !== "object") return;
 		const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+		/*
+		 * A link on the board to another board (`board.js` asks rather than navigating): opened beside this
+		 * one by the host, which knows the deck. The path is somebody else's string, so it has to name one
+		 * path inside the deck and nothing else.
+		 */
+		if (message.decks === "board.open" && typeof message.path === "string") {
+			const parts = message.path.split("/");
+			const clean = message.path && !message.path.startsWith("~") && !/[\\\0]/.test(message.path) && !parts.some((part) => part === "" || part === "." || part === "..");
+			if (clean) props.onOpenBoard?.(message.path, props.board.path);
+			return;
+		}
 		switch (message.t) {
 			case "decks:embed-ready":
 				setGuest(true);
@@ -269,6 +280,17 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			}
 			case "decks:space":
 				props.gestures.space(message.held === true);
+				return;
+			// A press inside the page: the board is picked, as a press on it from the canvas picks it.
+			case "decks:press":
+				if (!props.selected) props.view.select();
+				return;
+			// The canvas's keys while the page has the focus (`embed-guest.js`).
+			case "decks:zoom":
+				if (message.zoom === "in" || message.zoom === "out" || message.zoom === "fit") props.gestures.zoom(message.zoom);
+				return;
+			case "decks:key":
+				if (typeof message.key === "string") props.gestures.key(message.key);
 				return;
 			case "decks:pointer": {
 				const now = { sx: num(message.sx), sy: num(message.sy) };

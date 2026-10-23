@@ -64,7 +64,8 @@ export interface NativeHost {
 }
 
 /** The stage's own paper (`--stage` in `apps/web/src/index.css`), straight RGB 0 to 1. */
-const PAPER = { light: [241 / 255, 241 / 255, 243 / 255], dark: [16 / 255, 16 / 255, 16 / 255] } as const;
+// The canvas's paper as the harness shows it (`--stage`, v3: #f5f5f5 and #1e1e1e), so a picture matches the screen.
+const PAPER = { light: [245 / 255, 245 / 255, 245 / 255], dark: [30 / 255, 30 / 255, 30 / 255] } as const;
 /** Rounds of asking: fonts, then cards, then pictures and icons, with room to spare. */
 const ROUNDS = 6;
 /** How long one answer may take before the process is thought stuck and stopped. */

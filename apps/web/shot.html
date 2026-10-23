@@ -11,16 +11,21 @@
 				margin: 0;
 				height: 100%;
 				overflow: hidden;
-				background: #f1f1f3;
+				background: #f5f5f5;
 			}
 			html[data-color-scheme="dark"],
 			html[data-color-scheme="dark"] body {
-				background: #101010;
+				background: #1e1e1e;
 			}
+			/* The harness's paper (v3's `--stage`), nearer than the canvas tokens' own, so the drawing reads it too. */
 			#stage {
+				--stage: #f5f5f5;
 				position: fixed;
 				inset: 0;
 				overflow: hidden;
+			}
+			html[data-color-scheme="dark"] #stage {
+				--stage: #1e1e1e;
 			}
 			#world {
 				position: absolute;

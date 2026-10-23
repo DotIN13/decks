@@ -46,18 +46,6 @@ export const INTERACT_ZOOM = interactZoom();
  */
 export const ONE_LIVE = isPhone();
 
-/**
- * How many board pages a device keeps loaded once they have been shown (`Stage`, `BoardFrame`'s
- * `kept`): dormant while off screen or zoomed out, so coming back is the page as it was left.
- * About 4.5 MB each, measured on 48 example boards. A phone keeps two: every phone crash on record
- * had thirteen pages alive.
- */
-export function keptPages(device = thisDevice()): number {
-	if (!device?.coarse) return 32;
-	return device.short < 600 ? 2 : 12;
-}
-export const KEPT_PAGES = keptPages();
-
 export interface Viewport {
 	width: number;
 	height: number;

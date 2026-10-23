@@ -280,6 +280,29 @@
 		post({ t: "decks:space", held: false });
 	};
 	document.addEventListener("keyup", (event) => event.code === "Space" && spaceUp(), true);
+	/*
+	 * The canvas's keys, pressed while this page has the focus (a click on a board puts it here): ⌘+ / ⌘− / ⌘0
+	 * zoom the canvas rather than the browser's page, and the bare camera and tool keys are offered to the
+	 * canvas, as they would be over it. Typing into a field keeps every key; so do keys with ⌘, Ctrl or ⌥,
+	 * which the page's own editing uses. The canvas decides what a key means (`zoom-keys.ts`, `shortcut`).
+	 */
+	const ZOOM_KEYS = { "+": "in", "=": "in", "-": "out", _: "out", 0: "fit" };
+	const ZOOM_CODES = { NumpadAdd: "in", NumpadSubtract: "out", Numpad0: "fit", Equal: "in", Minus: "out", Digit0: "fit" };
+	document.addEventListener("keydown", (event) => {
+		if (event.defaultPrevented) return;
+		if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+			const zoom = ZOOM_KEYS[event.key] ?? ZOOM_CODES[event.code];
+			if (zoom) {
+				event.preventDefault();
+				post({ t: "decks:zoom", zoom });
+			}
+			return;
+		}
+		if (event.metaKey || event.ctrlKey || event.altKey || event.code === "Space" || typing(event.target)) return;
+		post({ t: "decks:key", key: event.key });
+	});
+	// A press anywhere in the page picks the board, as a press on it from the canvas would.
+	document.addEventListener("pointerdown", (event) => event.button === 0 && post({ t: "decks:press" }), true);
 	window.addEventListener("blur", spaceUp);
 	document.addEventListener(
 		"pointerdown",

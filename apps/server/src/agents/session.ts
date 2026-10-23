@@ -879,10 +879,13 @@ export class DeckAgent {
 	setInPlay(paths: string[], options: { place?: boolean; at?: Record<string, { x: number; y: number }> } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
 		// A board shown for the first time is the most recent touch, so it leads the held list.
-		for (const path of [...wanted].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
+		const hold = (list: string[]) => {
+			for (const path of [...list].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
+		};
 		const pens = this.stage.pens;
 		const name = pens ? this.stageName(true) : undefined;
 		if (!pens || !name || !pens.has(name)) {
+			hold(wanted);
 			// No stage file: the places are this session's own, by the same rule (`deck/place.ts`).
 			const spots = joinPlaces({
 				wanted,
@@ -903,9 +906,21 @@ export class DeckAgent {
 		}
 		// A board from elsewhere is the canvas's own copy of it (`deck/layout.ts`), made now if it has none.
 		const own = wanted.map((path) => pens.ownPath(name, path));
+		/*
+		 * What is held is what is on the canvas: the copies, never the library files they came from, or
+		 * the panel lists each board twice and the agent's context names files its canvas does not show.
+		 * A library path held from before is replaced by its copy.
+		 */
+		wanted.forEach((path, index) => {
+			const copy = own[index]!;
+			if (copy !== path) this.held = this.held.filter((one) => one !== path);
+		});
+		hold(own);
+		// A place asked for a library board is the place of its copy.
+		const at = options.at ? Object.fromEntries(Object.entries(options.at).map(([path, spot]) => [own[wanted.indexOf(path)] ?? path, spot])) : undefined;
 		const leaving = this.onCanvas().filter((one) => !own.includes(one.path)).map((one) => one.path);
 		if (leaving.length) Object.assign(this.places, takeOff(pens, this.deck, name, leaving));
-		for (const path of putOn(pens, this.deck, name, own, { ...(options.at ? { at: options.at } : {}), remembered: this.places })) delete this.places[path];
+		for (const path of putOn(pens, this.deck, name, own, { ...(at ? { at } : {}), remembered: this.places })) delete this.places[path];
 		this.save();
 		this.host.arranged?.();
 		this.publishContext();

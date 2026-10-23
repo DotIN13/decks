@@ -36,24 +36,6 @@ export interface StageBoardProps {
 	 */
 	onLive?: (live: boolean) => void;
 	/**
-	 * Take a picture of the page as it is, before it is let go (`canvas/shots/adaptors.ts`). When
-	 * given, a page whose `mounted` turns off is held until the picture is taken, so the board
-	 * keeps looking the way the reader left it.
-	 */
-	capture?: (frame: HTMLIFrameElement) => Promise<void>;
-	/**
-	 * Keep the page when it stops being shown (`mounted` off): photographed, then dormant rather
-	 * than unloaded, so coming back is the page as it was left, not a fresh start. `Stage` keeps
-	 * the most recently shown pages, as many as the device can afford.
-	 */
-	kept?: boolean;
-	/** Loaded but off screen: dormant as a kept page is, until the camera rests on it (`Stage`). */
-	asleep?: boolean;
-	/** The sheet has this board's picture on screen, over the page: the page may now be hidden or let go. */
-	pictured?: boolean;
-	/** Asleep for a zoom: hidden only once `pictured`, never on the timer. */
-	covering?: boolean;
-	/**
 	 * A drag carries this board's picture (`PenLayer.carry`): the page stays where it was picked up,
 	 * hidden, until the move lands and the sheet draws the board in its new place.
 	 */

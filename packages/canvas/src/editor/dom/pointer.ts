@@ -577,7 +577,9 @@ export function createPointer(editor: Editor, host: PointerHost) {
 	 */
 	const onDblClick = (event: MouseEvent) => {
 		// Pressed on something else (a handle whose edit moved it away): not a double-click on what is under the pointer now.
-		if (pressedOn !== event.target) return;
+		// A press on the drawing's hit shapes is captured by the stage, so its click lands on the stage: the same place.
+		const sameSpot = pressedOn === event.target || (onDrawn(pressedOn) && event.target === host.element());
+		if (!sameSpot) return;
 		if (host.editable() && !host.drawing() && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a note.
 			if (performance.now() - host.madeAt() < MADE_MS) return;

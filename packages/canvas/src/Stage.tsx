@@ -2,7 +2,7 @@ import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
 import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
-import { between, boxOf, fitInto, INTERACT_ZOOM, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
+import { between, boxOf, fitInto, INTERACT_ZOOM, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
@@ -94,8 +94,6 @@ export interface StageShots {
 	picture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string;
 	/** Under the Canvas renderer, whether a live page draws its own picture (true) or hands it to the sheet. */
 	ownPicture: boolean;
-	/** A picture of a live page as it is now, taken as it is let go. Absent: only the host's pictures. */
-	capture?(frame: HTMLIFrameElement, board: Board): Promise<void>;
 }
 
 /** What a comment is about (`Stage`'s `onComment`). */
@@ -183,8 +181,7 @@ export function Stage(props: {
 	/**
 	 * Where a board's picture comes from, for the sheet that draws every board with no live page:
 	 * its address (`picture`), whether a live page draws its own picture rather than handing it to the
-	 * sheet (`ownPicture`, false for HTML-in-Canvas), and a picture taken of a live page as it is let
-	 * go (`capture`). The Decks app's are its shot adaptors (`canvas/shots/adaptors.ts`).
+	 * sheet (`ownPicture`, false for HTML-in-Canvas). The Decks app's are its shot adaptors (`canvas/shots/adaptors.ts`).
 	 */
 	shots: () => StageShots;
 	/**
@@ -467,8 +464,6 @@ export function Stage(props: {
 	 * budget is there to stop this making that case worse, not to rescue it.
 	 */
 	const LAYER_BUDGET = 48;
-	/** WebKit's engine, on a Mac or on any iPhone browser: its user agent names AppleWebKit and never Chrome/. */
-	const SLEEP_ON_ZOOM = typeof navigator !== "undefined" && /AppleWebKit/.test(navigator.userAgent) && !/Chrome\/|Android/.test(navigator.userAgent);
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
@@ -516,30 +511,7 @@ export function Stage(props: {
 	 * that goes as another comes for the same board never leaves it wrongly unmarked.
 	 */
 	const [liveBoards, setLiveBoards] = createSignal<ReadonlyMap<string, number>>(new Map());
-	/** When each board's page last came up, for keeping the most recent ones (`keptPages`). */
-	const [shownAt, setShownAt] = createSignal<ReadonlyMap<string, number>>(new Map());
-	/**
-	 * The pages kept after they stop being shown: the `KEPT_PAGES` most recently shown boards on
-	 * this canvas. The rest are let go as before. Only the DOM renderer keeps them: its page hides
-	 * under the sheet's picture, where a canvas renderer's own picture is the page.
-	 */
-	const keptPages = createMemo<ReadonlySet<string>>((was) => {
-		const onCanvas = new Set(props.boards.map((board) => board.path));
-		const next = [...shownAt()]
-			.filter(([path]) => onCanvas.has(path))
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, KEPT_PAGES)
-			.map(([path]) => path);
-		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
-	});
-	const markLive = (path: string, on: boolean) => {
-		// Counted first: a new `shownAt` can keep the board's page (`keptPages`), and its frame, put to
-		// sleep in that same update, says "off" at once. Counted after, that off found nothing to take
-		// away, the on landed after it, and the board stayed live with a sleeping page: a hole where its
-		// picture belongs, until a reload.
-		markLiveCount(path, on);
-		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
-	};
+	const markLive = (path: string, on: boolean) => markLiveCount(path, on);
 	const markLiveCount = (path: string, on: boolean) =>
 		setLiveBoards((was) => {
 			const next = new Map(was);
@@ -768,14 +740,6 @@ export function Stage(props: {
 		const color = resolveColour(writer?.color ?? "var(--color-accent)");
 		penLayer.setWriter(writer?.name ? { name: writer.name, color } : { color });
 	});
-	/** The boards the sheet has on screen as pictures (`layer.ts`, `pictured`). */
-	const [onSheet, setOnSheet] = createSignal<ReadonlySet<string>>(new Set());
-	const picturedNow = (paths: ReadonlySet<string>) => {
-		const was = untrack(onSheet);
-		if (was.size === paths.size && [...paths].every((path) => was.has(path))) return;
-		setOnSheet(paths);
-	};
-	penLayer.pictured = picturedNow;
 	penLayer.drawn = () => {
 		editor.textEditing.drawn();
 		/*
@@ -1800,8 +1764,6 @@ export function Stage(props: {
 			if (at !== undefined) found.add(at);
 		};
 		for (const path of liveBoards().keys()) keep(path);
-		// A kept page stays a node wherever the camera goes, or leaving would unload it.
-		for (const path of keptPages()) keep(path);
 		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
 		for (const path of editor.heldBoards()) keep(path);
@@ -1817,30 +1779,6 @@ export function Stage(props: {
 	/** The boards may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
 
-	/**
-	 * On screen as of the camera's last rest, with a tenth of the window to spare. A page loaded for
-	 * a board just off screen, ready for a pan, sleeps until then (`BoardFrame`, `asleep`): 48
-	 * example pages cost 80% of a core at idle shown, and nothing asleep. From the resting camera,
-	 * so a pan does not wake and sleep pages under the pointer.
-	 */
-	const restOnScreen = (board: Board) => {
-		const v = view();
-		const cam = restCamera();
-		const a = toScreen(cam, v, { x: board.x, y: board.y });
-		const b = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
-		const mx = v.width * 0.1;
-		const my = v.height * 0.1;
-		return b.x > -mx && a.x < v.width + mx && b.y > -my && a.y < v.height + my;
-	};
-	/**
-	 * WebKit (Safari, and every browser on an iPhone) puts live pages to sleep for the length of a
-	 * zoom. It ignores the layer promise that lets Chrome stretch a page's picture while the scale
-	 * moves (`[data-scaling]`, `canvas.css`), and draws every page again at every step instead: a
-	 * recorded iPhone pinch over one animated board spent 65 to 100ms a frame compositing it. Asleep,
-	 * the sheet shows the page's picture and the page stops rendering, still loaded; at rest it wakes
-	 * under the picture and takes its place, as a page panned back into view does.
-	 */
-	const sleepOnZoom = createMemo(() => SLEEP_ON_ZOOM && scaling());
 	/** The camera as of its last rest, as `restZoom` is the zoom. */
 	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
 
@@ -2064,27 +2002,11 @@ export function Stage(props: {
 			mounted={
 				/* The selected board is live at any zoom, on any device. */
 				props.selected === board.path ||
-				(ONE_LIVE
-					? centreBoard() === board.path
-					: /*
-						 * A page still kept, asleep, wakes as soon as the camera is at the live zoom and it is in
-						 * reach, mid-gesture or not: it costs nothing to start again (`keptPages`), and waiting for the
-						 * zoom to rest kept a page already loaded behind its picture for another 300 to 400 ms.
-						 * Only the DOM renderer keeps pages; under the Canvas renderer a page started mid-pan
-						 * blanked the picture it draws into.
-						 */
-						props.renderer === "dom" && keptPages().has(board.path)
-						? liveNow() && isVisible(board)
-						: liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
+				(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 			}
 			visible={isVisible(board)}
 			onLive={(on: boolean) => markLive(board.path, on)}
-			kept={props.renderer === "dom" && keptPages().has(board.path)}
-			pictured={onSheet().has(board.path)}
-			covering={sleepOnZoom()}
 			carried={carriedPages().has(board.path)}
-			asleep={props.renderer === "dom" && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
-			{...(props.shots().capture ? { capture: (frame: HTMLIFrameElement) => props.shots().capture!(frame, board) } : {})}
 			selected={props.selected === board.path}
 			{...(props.onComment
 				? {
