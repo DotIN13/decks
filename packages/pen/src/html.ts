@@ -20,7 +20,7 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  * - fills are a colour, a linear, radial or angular (conic) gradient, or a picture (its address as
  *   `url` gives it);
  *   strokes are an outline over the children on the side pen strokes (inside, centred, outside),
- *   with the item's corners; outer shadows, opacity and turns are CSS's own;
+ *   with the item's corners; shadows (inner ones inset), opacity and turns are CSS's own;
  * - icons are inline SVG of the icon sets the stage draws them from, as `icons` hands them over;
  *   paths, polygons and arcs are inline SVG of the outline the stage draws;
  * - variables are CSS custom properties, with the dark theme's values in a `prefers-color-scheme:
@@ -29,7 +29,7 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  * `format: "tailwind"` writes the same page with Tailwind classes (arbitrary values where Tailwind
  * has no name for one) and Tailwind's browser build from its CDN in place of inline styles.
  *
- * What the stage keeps but does not draw (shader fills, blurs, inner shadows, scripts) is left out
+ * What the stage keeps but does not draw (shader fills, blurs, inner shadows off boxes, scripts) is left out
  * here too. A note is its paper with its words; a markdown card's words are written as they are.
  */
 
@@ -388,7 +388,7 @@ class Writer {
 		return `<div ${attrs}${this.attr(css)}>${outline}</div>`;
 	}
 
-	/** Fills, corners and outer shadows on a box. */
+	/** Fills, corners and shadows (outer, and inner ones inset) on a box. */
 	private paint(node: PenNode, theme: ThemeState, css: Decl[], round = false): void {
 		const box = this.box(node);
 		const layers = fillsOf(node.fill)
@@ -421,9 +421,9 @@ class Writer {
 		const effects = node.effect === undefined ? [] : Array.isArray(node.effect) ? node.effect : [node.effect];
 		const out: string[] = [];
 		for (const effect of effects) {
-			if (!effect || effect.type !== "shadow" || effect.shadowType === "inner" || !bool(this.doc, effect.enabled, theme, true)) continue;
+			if (!effect || effect.type !== "shadow" || !bool(this.doc, effect.enabled, theme, true)) continue;
 			const colour = this.colour(effect.color ?? "#00000040", theme) ?? "#00000040";
-			out.push(`${px(num(this.doc, effect.offset?.x, theme, 0))} ${px(num(this.doc, effect.offset?.y, theme, 0))} ${px(num(this.doc, effect.blur, theme, 0))} ${px(num(this.doc, effect.spread, theme, 0))} ${colour}`);
+			out.push(`${effect.shadowType === "inner" ? "inset " : ""}${px(num(this.doc, effect.offset?.x, theme, 0))} ${px(num(this.doc, effect.offset?.y, theme, 0))} ${px(num(this.doc, effect.blur, theme, 0))} ${px(num(this.doc, effect.spread, theme, 0))} ${colour}`);
 		}
 		return out.length ? out.join(", ") : undefined;
 	}

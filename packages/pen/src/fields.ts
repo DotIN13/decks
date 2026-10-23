@@ -55,8 +55,20 @@ const UNDRAWN_EFFECTS = new Set(["blur", "background_blur", "shader"]);
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 
+/**
+ * Whether the stage draws an inner shadow on an item of this type with these values: on boxes and
+ * whole ellipses, not on paths, polygons, text, icons, or an ellipse cut to an arc or a ring.
+ */
+function drawsInnerShadow(type: string | undefined, values: Record<string, unknown>): boolean {
+	if (type === "frame" || type === "rectangle") return true;
+	if (type !== "ellipse") return false;
+	const inner = typeof values.innerRadius === "number" ? values.innerRadius : 0;
+	const sweep = typeof values.sweepAngle === "number" ? values.sweepAngle : 360;
+	return inner <= 0 && Math.abs(sweep) >= 360;
+}
+
 /** What is kept and not drawn among an item's own values (its fills, strokes and effects), each as a phrase. */
-function undrawn(values: Record<string, unknown>): string[] {
+function undrawn(values: Record<string, unknown>, type: string | undefined): string[] {
 	const out: string[] = [];
 	for (const field of ["fill", "stroke"] as const) {
 		let value = values[field];
@@ -73,7 +85,7 @@ function undrawn(values: Record<string, unknown>): string[] {
 		const kind = one && typeof one === "object" ? (one as { type?: unknown }).type : undefined;
 		if (typeof kind !== "string") continue;
 		if (UNDRAWN_EFFECTS.has(kind)) out.push(`${article(kind)} ${kind} effect`);
-		else if (kind === "shadow" && (one as { shadowType?: unknown }).shadowType === "inner") out.push("an inner shadow");
+		else if (kind === "shadow" && (one as { shadowType?: unknown }).shadowType === "inner" && !drawsInnerShadow(type, values)) out.push("an inner shadow");
 	}
 	return out;
 }
@@ -92,7 +104,7 @@ export function warnings(node: Partial<PenNode> & { type?: unknown }): string[] 
 		if (type && !allowed) out.push(`"${type}" is not an item type pen.dev has, so ${label ?? "it"} is kept and draws nothing: frame, group, rectangle, ellipse, polygon, path, text, note, prompt, context, icon, script, browser or ref.`);
 		if (allowed && type !== "ref") for (const key of Object.keys(item)) if (!allowed.has(key)) out.push(`"${key}" does nothing on ${on}.`);
 		if (type === "script") out.push(`${root || !label ? "A script" : `The script ${label}`} is kept, but Decks does not run scripts, so it draws nothing there.`);
-		for (const what of undrawn(item)) out.push(`${what[0]!.toUpperCase()}${what.slice(1)} on ${on} is kept for pen.dev, but Decks does not draw it.`);
+		for (const what of undrawn(item, type)) out.push(`${what[0]!.toUpperCase()}${what.slice(1)} on ${on} is kept for pen.dev, but Decks does not draw it.`);
 		if (Array.isArray(item.children)) for (const child of item.children) if (child && typeof child === "object") visit(child as Record<string, unknown>, false);
 	};
 	visit(node as Record<string, unknown>, true);
@@ -108,6 +120,6 @@ export function updateWarnings(type: string | undefined, set: Record<string, unk
 	// A null removes a field, which is never a problem.
 	if (allowed && kind !== "ref") for (const [key, value] of Object.entries(set)) if (value !== null && !allowed.has(key)) out.push(`"${key}" does nothing on ${on}.`);
 	if (kind === "script" && set.type === "script") out.push("A script is kept, but Decks does not run scripts, so it draws nothing there.");
-	for (const what of undrawn(set)) out.push(`${what[0]!.toUpperCase()}${what.slice(1)} on ${on} is kept for pen.dev, but Decks does not draw it.`);
+	for (const what of undrawn(set, kind)) out.push(`${what[0]!.toUpperCase()}${what.slice(1)} on ${on} is kept for pen.dev, but Decks does not draw it.`);
 	return out;
 }

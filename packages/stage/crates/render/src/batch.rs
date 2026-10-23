@@ -164,6 +164,10 @@ impl Built {
 					// CSS's blur radius is two of the Gaussian's sigmas.
 					b.push_shape(shape, &transform.0, [2.0, 0.0, 0.0, shape.ellipse as u8 as f32], [blur / 2.0, *spread, p, clip], None);
 				}
+				Op::InnerShadow { shape, transform, offset, color, blur, spread } => {
+					let (p, _) = b.paint(&Paint::Solid(*color));
+					b.push_shape(shape, &transform.0, [6.0, offset.0, offset.1, shape.ellipse as u8 as f32], [blur / 2.0, *spread, p, clip], None);
+				}
 				Op::Mesh { vertices, indices, transform, paint } => {
 					let (p, texture) = b.paint(paint);
 					let (mut x1, mut y1) = (0.0f32, 0.0f32);

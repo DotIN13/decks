@@ -15,7 +15,7 @@ use crate::tiles::{Grid, TILE};
 pub const OUT: u32 = 1;
 
 /// The fixtures drawn from draw lists and text alone, in order.
-pub const NAMES: [&str; 6] = ["shapes", "effects", "words", "card", "placeholder", "angular"];
+pub const NAMES: [&str; 7] = ["shapes", "effects", "words", "card", "placeholder", "angular", "inner"];
 
 /// The real stages, each a `.pen` file under `crates/gpu/fixtures/`.
 pub const STAGES: [&str; 2] = ["herobrine", "rotary"];
@@ -48,6 +48,7 @@ pub fn draw(g: &mut dyn Backend, name: &str, words: &stage_text::Text) -> Option
 		"card" => card(g, words),
 		"placeholder" => placeholder(g, words),
 		"angular" => Some(angular(g, words)),
+		"inner" => Some(inner(g, words)),
 		_ => None,
 	}
 }
@@ -176,6 +177,23 @@ fn angular(g: &mut dyn Backend, words: &stage_text::Text) -> (u32, u32) {
 	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 420.0, h: 120.0 };
 	document(g, &doc, words, area, 2.0, (840, 240), Color([1.0, 1.0, 1.0, 1.0]));
 	(840, 240)
+}
+
+/// Inner shadows at 2×: a hard one moved down in a square; a soft one drawn in by its spread in a
+/// rounded rectangle, under its child and its outline; a soft one in an ellipse, with an outer
+/// shadow too.
+fn inner(g: &mut dyn Backend, words: &stage_text::Text) -> (u32, u32) {
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"rectangle","id":"a","x":10,"y":10,"width":100,"height":100,"fill":"#ffffff","stroke":"#999999","strokeWidth":1,"effect":{"type":"shadow","shadowType":"inner","offset":{"x":0,"y":10},"blur":0,"color":"#3b5cf6"}},
+		{"type":"frame","id":"b","x":130,"y":10,"width":160,"height":100,"cornerRadius":20,"layout":"none","fill":"#f4f6fa","stroke":"#2e7d32","strokeWidth":2,"effect":[{"type":"shadow","shadowType":"inner","offset":{"x":4,"y":4},"blur":16,"spread":4,"color":"#00000099"}],"children":[
+			{"type":"rectangle","id":"c","x":0,"y":60,"width":60,"height":40,"fill":"#ffcc00"}
+		]},
+		{"type":"ellipse","id":"e","x":310,"y":10,"width":100,"height":100,"fill":"#ffffff","effect":[{"type":"shadow","offset":{"x":0,"y":4},"blur":8,"color":"#00000040"},{"type":"shadow","shadowType":"inner","offset":{"x":0,"y":-6},"blur":12,"color":"#e5393599"}]}
+	]}))
+	.expect("the fixture parses");
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 420.0, h: 130.0 };
+	document(g, &doc, words, area, 2.0, (840, 260), Color([1.0, 1.0, 1.0, 1.0]));
+	(840, 260)
 }
 
 /// A real stage (a `.pen` file's text): its drawing, not its boards (the page draws those), as

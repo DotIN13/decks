@@ -50,7 +50,8 @@ test("a gradient turns as pen turns it, and shadows, opacity and turns are CSS's
 	assert.match(style, /opacity: 0.5; transform: rotate\(-30deg\); transform-origin: 0 0/);
 	// 90° in pen points left: 270deg in CSS, whose line is the box's width here.
 	assert.match(style, /linear-gradient\(270deg, #000 0%, #fff 100%\)/);
-	assert.match(style, /box-shadow: 0px 2px 6px 0px #0003(;|$)/);
+	// The inner shadow is inset, after the outer one, as pen lists them.
+	assert.match(style, /box-shadow: 0px 2px 6px 0px #0003, inset 0px 0px 4px 0px #00000040(;|$)/);
 });
 
 test("an angular gradient is a conic gradient from pen's start, its stops where the stage puts them", () => {

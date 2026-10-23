@@ -252,6 +252,7 @@ fn fade(op: Op, alpha: f32) -> Op {
 		Op::Shape { shape, transform, paint: p, stroke } => Op::Shape { shape, transform, paint: paint(p), stroke },
 		Op::Mesh { vertices, indices, transform, paint: p } => Op::Mesh { vertices, indices, transform, paint: paint(p) },
 		Op::Shadow { shape, transform, color, blur, spread } => Op::Shadow { shape, transform, color: Color(color.0.map(|v| v * alpha)), blur, spread },
+		Op::InnerShadow { shape, transform, offset, color, blur, spread } => Op::InnerShadow { shape, transform, offset, color: Color(color.0.map(|v| v * alpha)), blur, spread },
 		Op::Glyphs { texture, quads, color, transform, colored } => Op::Glyphs { texture, quads, color: Color(color.0.map(|v| v * alpha)), transform, colored },
 		Op::Picture { texture, x, y, w, h, uv, opacity } => Op::Picture { texture, x, y, w, h, uv, opacity: opacity * alpha },
 		other => other,
@@ -346,11 +347,11 @@ fn paint_of(ctx: &Context, fill: &Value, theme: &Theme, w: f64, h: f64) -> Optio
 	}
 }
 
-/// Outer shadows: `(dx, dy, blur, spread, color)` each.
-fn shadows(vars: &Vars, item: &Item, theme: &Theme) -> Vec<(f32, f32, f32, f32, Color)> {
+/// Outer shadows, or with `inner` inner ones: `(dx, dy, blur, spread, color)` each.
+fn shadows(vars: &Vars, item: &Item, theme: &Theme, inner: bool) -> Vec<(f32, f32, f32, f32, Color)> {
 	let mut out = Vec::new();
 	for effect in fills_of(item.get("effect")) {
-		if effect.get("type").and_then(Value::as_str) != Some("shadow") || effect.get("shadowType").and_then(Value::as_str) == Some("inner") {
+		if effect.get("type").and_then(Value::as_str) != Some("shadow") || (effect.get("shadowType").and_then(Value::as_str) == Some("inner")) != inner {
 			continue;
 		}
 		if !vars.bool(effect.get("enabled"), theme, true) {
@@ -367,6 +368,14 @@ fn shadows(vars: &Vars, item: &Item, theme: &Theme) -> Vec<(f32, f32, f32, f32, 
 		));
 	}
 	out
+}
+
+/// A box's or an ellipse's inner shadows, over its fills and under its outline and children, as CSS
+/// draws an inset box-shadow. Paths, polygons, arcs and rings have none drawn yet.
+fn inner_shadows(vars: &Vars, item: &Item, theme: &Theme, shape: Shape, transform: Affine, ops: &mut Vec<Op>) {
+	for (dx, dy, blur, spread, color) in shadows(vars, item, theme, true) {
+		ops.push(Op::InnerShadow { shape, transform, offset: (dx, dy), color, blur, spread });
+	}
 }
 
 struct Stroke<'v> {
@@ -488,7 +497,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			if paper {
 				card_paper(ctx.dark, shape, transform, ops);
 			}
-			for (dx, dy, blur, spread, c) in shadows(vars, item, theme) {
+			for (dx, dy, blur, spread, c) in shadows(vars, item, theme, false) {
 				ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
 			}
 			if !sound {
@@ -498,6 +507,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 					}
 				}
 			}
+			inner_shadows(vars, item, theme, shape, transform, ops);
 			let after = if item.children.is_empty() { &mut *ops } else { &mut *closing };
 			shape_stroke(ctx, item, theme, shape, transform, after);
 			if paper {
@@ -518,7 +528,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 				return;
 			}
 			let shape = Shape { w: w as f32, h: h as f32, radii: [0.0; 4], ellipse: true };
-			for (dx, dy, blur, spread, c) in shadows(vars, item, theme) {
+			for (dx, dy, blur, spread, c) in shadows(vars, item, theme, false) {
 				ops.push(Op::Shadow { shape, transform: transform.then(&Affine::translate(dx, dy)), color: c, blur, spread });
 			}
 			for fill in fills_of(item.get("fill")) {
@@ -526,6 +536,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 					ops.push(Op::Shape { shape, transform, paint, stroke: None });
 				}
 			}
+			inner_shadows(vars, item, theme, shape, transform, ops);
 			shape_stroke(ctx, item, theme, shape, transform, ops);
 		}
 		"polygon" => {

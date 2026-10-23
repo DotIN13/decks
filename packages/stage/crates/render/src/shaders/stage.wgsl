@@ -61,7 +61,9 @@ struct Instance {
 	@location(0) xf0: vec4<f32>,   // a, b, c, d
 	@location(1) xf1: vec4<f32>,   // e, f, w, h
 	@location(2) radii: vec4<f32>,
-	@location(3) params: vec4<f32>, // mode (0 fill, 1 stroke, 2 shadow), stroke width, align (-1 in, 0 centre, 1 out), ellipse
+	// mode (0 fill, 1 stroke, 2 shadow, 3 picture, 4 and 5 glyphs, 6 inner shadow), stroke width (an
+	// inner shadow's offset x), align (-1 in, 0 centre, 1 out; its offset y), ellipse
+	@location(3) params: vec4<f32>,
 	@location(4) extra: vec4<f32>,  // shadow sigma, spread, paint, clip
 };
 
@@ -88,7 +90,7 @@ fn vs_shape(@builtin(vertex_index) v: u32, inst: Instance) -> ShapeOut {
 	let size = inst.xf1.zw;
 	// Room past the box: a pixel and a half for the soft edge, the stroke's reach, the shadow's blur.
 	var grow = 1.5 / max(scale, 1e-6);
-	if (inst.params.x >= 3.0) {
+	if (inst.params.x >= 3.0 && inst.params.x < 6.0) {
 		grow = 0.0;
 	}
 	if (inst.params.x == 1.0) {
@@ -177,6 +179,31 @@ fn shadow(p: vec2<f32>, size: vec2<f32>, sigma: f32, corner: f32) -> f32 {
 	return value;
 }
 
+// An ellipse filling `size`, blurred by `sigma`: the blur of the edge nearest `p`, which is close
+// while the blur is small beside the ellipse.
+fn blurred_ellipse(p: vec2<f32>, size: vec2<f32>, sigma: f32, scale: f32) -> f32 {
+	let d = sd_ellipse(p, size);
+	if (sigma * scale < 0.5) {
+		return cover(d * scale);
+	}
+	return 0.5 - 0.5 * erf_approx(vec2<f32>(d / (sigma * sqrt(2.0)))).x;
+}
+
+// How much of an inner shadow's lit hole (the shape moved by `offset`, drawn in by `spread`,
+// blurred by `sigma`) covers `p`: a box's is the closed-form blur above, an ellipse's the one before.
+fn inner_hole(p: vec2<f32>, size: vec2<f32>, radii: vec4<f32>, ellipse: f32, offset: vec2<f32>, spread: f32, sigma: f32, scale: f32) -> f32 {
+	let hole = max(size - vec2<f32>(spread * 2.0), vec2<f32>(0.0));
+	if (hole.x <= 0.0 || hole.y <= 0.0) {
+		return 0.0;
+	}
+	let q = p - offset - vec2<f32>(spread);
+	if (ellipse > 0.5) {
+		return blurred_ellipse(q, hole, sigma, scale);
+	}
+	let corner = clamp(radii.x - spread, 0.0, min(hole.x, hole.y) * 0.5);
+	return shadow(q, hole, max(sigma, 0.25 / max(scale, 1e-6)), corner);
+}
+
 fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
 	let rec = paint_rec(index);
 	let kind = rec.head.x;
@@ -224,7 +251,15 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 	if (mode == 2.0) {
 		let spread = in.extra.y;
 		let size = in.size + vec2<f32>(spread * 2.0);
-		coverage = shadow(in.local + vec2<f32>(spread), size, in.extra.x, max(in.radii.x, 0.0) + spread);
+		if (in.params.w > 0.5) {
+			coverage = blurred_ellipse(in.local + vec2<f32>(spread), size, in.extra.x, in.scale);
+		} else {
+			coverage = shadow(in.local + vec2<f32>(spread), size, in.extra.x, max(in.radii.x, 0.0) + spread);
+		}
+	} else if (mode == 6.0) {
+		// Inside the shape, where its lit hole does not reach.
+		let inside = cover(sd_shape(in.local, in.size, in.radii, in.params.w) * in.scale);
+		coverage = inside * (1.0 - inner_hole(in.local, in.size, in.radii, in.params.w, in.params.yz, in.extra.y, in.extra.x, in.scale));
 	} else {
 		let d = sd_shape(in.local, in.size, in.radii, in.params.w) * in.scale;
 		if (mode >= 3.0) {
@@ -245,7 +280,7 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 	if (coverage <= 0.0) {
 		discard;
 	}
-	if (mode == 2.0) {
+	if (mode == 2.0 || mode == 6.0) {
 		return paint_color(i32(in.extra.z)) * coverage;
 	}
 	if (mode == 4.0 || mode == 5.0) {

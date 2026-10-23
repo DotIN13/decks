@@ -109,6 +109,10 @@ pub enum Op {
 	Shape { shape: Shape, transform: Affine, paint: Paint, stroke: Option<(f32, Align)> },
 	/// The soft shadow of a shape, already offset; `blur` is the CSS blur radius in its own units.
 	Shadow { shape: Shape, transform: Affine, color: Color, blur: f32, spread: f32 },
+	/// The shadow inside a shape (an inner shadow), cut to it: the shape's edge, moved by `offset`
+	/// and drawn in by `spread`, blurred by `blur` (the CSS blur radius) in its own units, and the
+	/// shadow is what lies outside that edge and inside the shape.
+	InnerShadow { shape: Shape, transform: Affine, offset: (f32, f32), color: Color, blur: f32, spread: f32 },
 	/// Triangles in an item's own space, filled with one paint: paths, strokes of paths, polygons.
 	Mesh { vertices: Vec<[f32; 2]>, indices: Vec<u32>, transform: Affine, paint: Paint },
 	/// Glyphs: quads cut from a glyph texture, placed in glyph space and taken to the target by

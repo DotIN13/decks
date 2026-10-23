@@ -114,6 +114,30 @@ fn angular_gradients_go_round() {
 	assert!(near(px(&p, w, 300, 116), [255, 50, 0]), "turned: just above left is red: {:?}", px(&p, w, 300, 116));
 }
 
+/// An inner shadow lies inside its shape: moved down, it shades the top edge and not the bottom, and
+/// nothing spills outside; soft, it fades towards the middle; under a frame's child, the child is over it.
+#[test]
+fn inner_shadows_lie_inside() {
+	let Some(mut g) = gpu() else { return };
+	let (w, h) = fixtures::draw(&mut g, "inner", &stage_text::Text::new()).unwrap();
+	let p = g.read(fixtures::OUT).unwrap();
+	save("inner", &p, w, h);
+	// The square at (10, 10), 100 wide, at 2×, with a hard shadow 10 down: the top 20 px are blue.
+	assert_eq!(px(&p, w, 120, 30), [59, 92, 246, 255], "the top band");
+	assert_eq!(px(&p, w, 120, 60), [255, 255, 255, 255], "below it, the fill");
+	assert_eq!(px(&p, w, 120, 210), [255, 255, 255, 255], "the bottom edge has none");
+	assert_eq!(px(&p, w, 120, 12), [255, 255, 255, 255], "none above the square");
+	// The frame: dark at its top-left inside edge, its fill in the middle, its child over the shadow.
+	let edge = px(&p, w, 266, 120);
+	let middle = px(&p, w, 420, 120);
+	assert!(edge[0] < middle[0] - 40, "shade at the edge {edge:?}, the fill in the middle {middle:?}");
+	assert_eq!(px(&p, w, 270, 190), [255, 204, 0, 255], "the child is over the shadow");
+	// The ellipse: red inside its bottom edge (the shadow is moved up), white in its middle.
+	let low = px(&p, w, 720, 214);
+	assert!(low[0] > low[2] + 30, "red low inside the ellipse: {low:?}");
+	assert_eq!(px(&p, w, 720, 120), [255, 255, 255, 255], "white in its middle");
+}
+
 /// The stages drawn: the two under `fixtures/`, and any more in `STAGE_FIXTURES` (a folder of
 /// `<name>/stage.pen`).
 fn stages() -> Vec<(String, String)> {

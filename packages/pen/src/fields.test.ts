@@ -30,8 +30,13 @@ test("fills, effects and items Decks keeps but does not draw are said", () => {
 	assert.deepEqual(warnings({ type: "rectangle", fill: [{ type: "mesh_gradient", colors: [] }, "#fff"], effect: [{ type: "blur", radius: 4 }, { type: "shadow", shadowType: "inner" }, { type: "shadow" }] }), [
 		"A mesh_gradient fill on a rectangle is kept for pen.dev, but Decks does not draw it.",
 		"A blur effect on a rectangle is kept for pen.dev, but Decks does not draw it.",
-		"An inner shadow on a rectangle is kept for pen.dev, but Decks does not draw it.",
 	]);
+	// An inner shadow is drawn in a box and a whole ellipse, not in a path or an arc.
+	const inner = { type: "shadow", shadowType: "inner", blur: 4 };
+	assert.deepEqual(warnings({ type: "ellipse", effect: inner } as never), []);
+	assert.deepEqual(warnings({ type: "ellipse", sweepAngle: 90, effect: inner } as never), ["An inner shadow on an ellipse is kept for pen.dev, but Decks does not draw it."]);
+	assert.deepEqual(updateWarnings("path", { effect: inner }), ["An inner shadow on a path is kept for pen.dev, but Decks does not draw it."]);
+	assert.deepEqual(updateWarnings("frame", { effect: [inner] }), []);
 	assert.match(warnings({ type: "script", scriptUri: "./a.js" })[0]!, /Decks does not run scripts/);
 	assert.deepEqual(updateWarnings("text", { padding: 4, fill: { type: "shader", url: "./a.glsl" }, fontSize: null }), ['"padding" does nothing on a text.', "A shader fill on a text is kept for pen.dev, but Decks does not draw it."]);
 });

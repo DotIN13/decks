@@ -29,6 +29,7 @@ fn kinds(list: &DrawList) -> Vec<&'static str> {
 			Op::Shape { stroke: Some(_), .. } => "stroke",
 			Op::Shape { .. } => "shape",
 			Op::Shadow { .. } => "shadow",
+			Op::InnerShadow { .. } => "inner",
 			Op::Mesh { .. } => "mesh",
 			Op::Glyphs { .. } => "glyphs",
 			Op::Picture { .. } => "picture",
@@ -205,4 +206,16 @@ fn an_angular_gradient_is_a_conic_paint_turned_by_its_rotation() {
 	let Some(Op::Shape { paint: Paint::Conic { center, radius, start, stops }, .. }) = list.ops.first() else { panic!("{:?}", list.ops) };
 	assert_eq!((*center, *radius, stops.len()), ((50.0, 50.0), (100.0, 50.0), 2));
 	assert!((start - std::f32::consts::FRAC_PI_2).abs() < 1e-6, "{start}");
+}
+
+#[test]
+fn an_inner_shadow_is_drawn_over_the_fills_and_under_the_outline() {
+	let (_, s) = scene(json!({"children":[
+		{"type":"rectangle","id":"r","x":0,"y":0,"width":100,"height":50,"fill":"#fff","stroke":"#000","effect":[{"type":"shadow","shadowType":"inner","offset":{"x":1,"y":2},"blur":6,"spread":3},{"type":"shadow","blur":4}]},
+		{"type":"path","id":"p","x":200,"y":0,"width":50,"height":50,"geometry":"M0 0 L50 0 L50 50 Z","fill":"#000","effect":{"type":"shadow","shadowType":"inner","blur":4}}
+	]}));
+	let list = paint(&s, Rect { x: 0.0, y: 0.0, w: 512.0, h: 512.0 }, 1.0);
+	assert_eq!(kinds(&list), vec!["shadow", "shape", "inner", "stroke", "mesh"]);
+	let Op::InnerShadow { offset, blur, spread, .. } = &list.ops[2] else { panic!() };
+	assert_eq!((*offset, *blur, *spread), ((1.0, 2.0), 6.0, 3.0));
 }
