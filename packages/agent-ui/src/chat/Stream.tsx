@@ -441,7 +441,6 @@ export function Stream(props: {
 			class="stream"
 			ref={column}
 			data-shown={shownNow()}
-			data-pinned={pinned() ? "true" : "false"}
 			aria-label="The conversation"
 		>
 			{/*
@@ -571,12 +570,24 @@ export function Stream(props: {
 			 * that appeared *between* the last card and the status line would shorten the
 			 * scroller at the moment you scrolled, which moves the thing you were reading.
 			 */}
-			<Show when={!pinned() && cards().length > 0}>
-				<button class="stream-jump" type="button" aria-label="Scroll to the latest messages" onClick={toFoot}>
-					<Icon of={ArrowDown} size={12} />
-					Latest messages
-				</button>
-			</Show>
+			{/*
+			 * Always in the page, shown or hidden by its own attribute alone: put in and taken out as the
+			 * reader scrolled up from the foot, an element laid over the scrolling column, with the
+			 * column's own attribute changing with it, made iOS Safari stop the scroll's momentum the
+			 * moment it appeared.
+			 */}
+			<button
+				class="stream-jump"
+				type="button"
+				data-shown={!pinned() && cards().length > 0 ? "true" : "false"}
+				aria-hidden={pinned() || cards().length === 0}
+				tabindex={pinned() ? -1 : 0}
+				aria-label="Scroll to the latest messages"
+				onClick={toFoot}
+			>
+				<Icon of={ArrowDown} size={12} />
+				Latest messages
+			</button>
 		</section>
 	);
 }

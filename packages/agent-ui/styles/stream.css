@@ -777,7 +777,13 @@
 		translate: -50% 0;
 		transition:
 			background-color 120ms ease,
-			color 120ms ease;
+			color 120ms ease,
+			opacity 160ms ease;
+	}
+	/* Hidden by opacity alone, never taken out of the page or restyled otherwise (`Stream.tsx`, the momentum of a scroll on iOS). */
+	.stream-jump[data-shown="false"] {
+		opacity: 0;
+		pointer-events: none;
 	}
 
 	.stream-jump:hover {
