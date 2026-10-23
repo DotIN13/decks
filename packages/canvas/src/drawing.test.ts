@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { apply as applyOps, applyEdits, baseTheme, type PenDocument, type PenEdit } from "@decks/pen";
-import { boardsAhead, boardsOf, createDrawing, PENDING_MS } from "./drawing.ts";
+import { boardsAhead, boardsOf, createDrawing, PENDING_MS, together } from "./drawing.ts";
 
 const sample = (): PenDocument => ({
 	version: "2.14",
@@ -260,4 +260,135 @@ test("each new drawing comes with the edits that made it, for the stage, and edi
 	assert.equal(drawing.follow([{ op: "set", id: "nobody", key: "x", value: 1 }]), false, "edits that do not apply: the host sends the whole drawing");
 	drawing.set(sample());
 	assert.equal(drawing.editsTo(drawing.doc()), undefined, "a whole drawing has no edits");
+});
+
+/** A host whose `send` answers when the test says: each call's ops, name and the way to answer it. */
+function slowHost(doc: PenDocument) {
+	const calls: Array<{ ops: unknown[]; edit?: string; answer: (ok: boolean) => void }> = [];
+	const steps: Array<{ direction: string; edit?: string }> = [];
+	const d = createDrawing(doc, {
+		host: {
+			send: (ops, edit) => new Promise<boolean>((resolve) => calls.push({ ops, ...(edit ? { edit } : {}), answer: resolve })),
+			step: (direction, edit) => void steps.push({ direction, ...(edit ? { edit } : {}) }),
+		},
+	});
+	return { d, calls, steps };
+}
+const settled = async () => {
+	for (let i = 0; i < 4; i++) await Promise.resolve();
+};
+const nudge = (d: ReturnType<typeof createDrawing>, id: string, dx: number) => {
+	const node = d.doc().children.find((one) => one.id === id)!;
+	d.edit([{ op: "update", id, set: { x: (node.x as number) + dx, y: node.y } }]);
+};
+
+test("edits made while one is on its way are shown at once and go together, folded, once it is answered", async () => {
+	const { d, calls } = slowHost(sample());
+	const host0 = d.doc();
+	for (let i = 0; i < 5; i++) nudge(d, "a", 1);
+	assert.equal(d.doc().children[0]?.x, 5, "every press shown at once");
+	assert.equal(calls.length, 1, "one call on its way");
+	assert.deepEqual(calls[0]!.ops, [{ op: "update", id: "a", set: { x: 1, y: 0 } }]);
+	calls[0]!.answer(true);
+	await settled();
+	assert.equal(calls.length, 2, "the rest went once the first was answered");
+	assert.deepEqual(calls[1]!.ops, [{ op: "update", id: "a", set: { x: 5, y: 0 } }], "four presses as one update");
+	assert.equal(d.waiting(), 5);
+	// The host's drawing with the first: the rest stay on top.
+	const host1 = served(host0, calls[0]!.ops);
+	d.set(host1, undefined, [calls[0]!.edit!]);
+	assert.equal(d.doc().children[0]?.x, 5);
+	assert.equal(d.waiting(), 4);
+	nudge(d, "a", 1);
+	assert.equal(d.doc().children[0]?.x, 6);
+	const host2 = served(host1, calls[1]!.ops);
+	d.set(host2, undefined, [calls[1]!.edit!]);
+	assert.equal(d.doc().children[0]?.x, 6, "the press after them is still shown");
+	assert.equal(d.waiting(), 1);
+	calls[1]!.answer(true);
+	await settled();
+	assert.equal(calls.length, 3);
+	d.set(served(host2, calls[2]!.ops), undefined, [calls[2]!.edit!]);
+	assert.equal(d.doc().children[0]?.x, 6);
+	assert.equal(d.waiting(), 0);
+});
+
+test("a drawing that has a later edit has the earlier ones sent before it, even when their names were lost", async () => {
+	const { d, calls } = slowHost(sample());
+	const host0 = d.doc();
+	nudge(d, "a", 1);
+	calls[0]!.answer(true);
+	await settled();
+	nudge(d, "a", 1);
+	const host1 = served(host0, calls[0]!.ops);
+	const host2 = served(host1, calls[1]!.ops);
+	// Only the second's name comes (the first's drawing was passed over): the first is not kept on top.
+	d.set(host2, undefined, [calls[1]!.edit!]);
+	assert.equal(d.waiting(), 0);
+	assert.equal(d.doc(), host2);
+	// An agent moves it after: what is shown is the agent's, not an old press put back.
+	const agent = served(host2, [{ op: "update", id: "a", set: { x: 100 } }]);
+	d.set(agent);
+	assert.equal(d.doc().children[0]?.x, 100);
+});
+
+test("a refused call takes every edit that went with it off, and the next ones still go", async () => {
+	const { d, calls } = slowHost(sample());
+	nudge(d, "a", 1);
+	nudge(d, "a", 1);
+	nudge(d, "a", 1);
+	calls[0]!.answer(true);
+	await settled();
+	calls[1]!.answer(false);
+	await settled();
+	assert.equal(d.waiting(), 1, "the two sent together are gone, the first still waits for its drawing");
+	assert.equal(d.doc().children[0]?.x, 1);
+	nudge(d, "a", 1);
+	assert.equal(calls.length, 3, "nothing on its way: sent at once");
+});
+
+test("a step asked for while edits are still to go is sent after them", async () => {
+	const { d, calls, steps } = slowHost(sample());
+	nudge(d, "a", 1);
+	nudge(d, "a", 1);
+	d.step("undo");
+	assert.equal(steps.length, 0);
+	calls[0]!.answer(true);
+	await settled();
+	assert.equal(steps.length, 0, "the second edit goes first");
+	calls[1]!.answer(true);
+	await settled();
+	assert.deepEqual(steps, [{ direction: "undo" }]);
+});
+
+test("a call that never answers holds the next edits up no longer than an edit is shown ahead", (t) => {
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const { d, calls } = slowHost(sample());
+	nudge(d, "a", 1);
+	nudge(d, "a", 1);
+	assert.equal(calls.length, 1);
+	t.mock.timers.tick(PENDING_MS + 1);
+	assert.equal(calls.length, 2);
+});
+
+test("edits go together as their ops in order, runs of plain updates folded into one an item", () => {
+	assert.deepEqual(
+		together([
+			[{ op: "update", id: "a", set: { x: 1, y: 0 } }, { op: "update", id: "b", set: { x: 5 } }],
+			[{ op: "update", id: "a", set: { x: 2, y: 0 } }],
+			[{ op: "update", id: "a", set: { fill: "#fff" } }],
+		]),
+		[
+			{ op: "update", id: "a", set: { x: 2, y: 0, fill: "#fff" } },
+			{ op: "update", id: "b", set: { x: 5 } },
+		],
+	);
+	// Anything else between them keeps its place, and the updates either side of it stay apart.
+	assert.deepEqual(
+		together([[{ op: "update", id: "a", set: { x: 1 } }], [{ op: "delete", id: "b" }], [{ op: "update", id: "a", set: { x: 2 } }]]),
+		[{ op: "update", id: "a", set: { x: 1 } }, { op: "delete", id: "b" }, { op: "update", id: "a", set: { x: 2 } }],
+	);
+	const first = { op: "update", id: "a", set: { x: 1 } };
+	together([[first], [{ op: "update", id: "a", set: { x: 2 } }]]);
+	assert.deepEqual(first.set, { x: 1 }, "the edits' own ops are not changed");
 });

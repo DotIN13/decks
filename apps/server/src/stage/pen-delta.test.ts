@@ -64,3 +64,26 @@ test("an edit or a step made under a browser's name says so in the delta that ha
 		rmSync(deck, { recursive: true, force: true });
 	}
 });
+
+/** A drawing sent whole to one browser (asked again, a picture of the stage) leaves the names for the rest. */
+test("a drawing sent whole to one browser takes no names from the others' next delta, and carries the recent ones", () => {
+	const deck = mkdtempSync(join(tmpdir(), "pen-made-frame-"));
+	const pens = new StagePens(deck, () => {});
+	try {
+		const name = pens.claim("Frame test");
+		pens.edit(name, [{ op: "insert", node: { type: "rectangle", id: "a", x: 0, y: 0, width: 10, height: 10 } }] as never);
+		pens.changes(["agent"], name);
+		penEditBy.run("tab.1", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 40 } }] as never));
+		const whole = pens.frame("agent", name) as { made?: string[] };
+		assert.deepEqual(whole.made, ["tab.1"], "the one asking hears it too");
+		const [delta] = pens.changes(["agent"], name) as Array<{ type: string; made?: string[] }>;
+		assert.equal(delta!.type, "stage.pen.delta");
+		assert.deepEqual(delta!.made, ["tab.1"], "and so do the others");
+		penEditBy.run("tab.2", () => pens.edit(name, [{ op: "update", id: "a", set: { x: 41 } }] as never));
+		pens.changes(["agent"], name);
+		assert.deepEqual((pens.frame("agent", name) as { made?: string[] }).made, ["tab.1", "tab.2"], "recent names, already sent, for a browser that missed them");
+	} finally {
+		pens.close();
+		rmSync(deck, { recursive: true, force: true });
+	}
+});

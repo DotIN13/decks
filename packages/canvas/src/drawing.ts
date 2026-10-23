@@ -121,6 +121,35 @@ export function boardsAhead(list: Board[], given: PenDocument, shown: PenDocumen
 	return out;
 }
 
+/**
+ * Edits made one after another, as one list of ops: run after run of plain updates (what the arrow keys,
+ * a colour or a board's move write) folded into one update an item, each field as the last set it, and
+ * anything else kept as it was, in order.
+ */
+export function together(edits: readonly (readonly unknown[])[]): unknown[] {
+	const ops = edits.flat();
+	const out: unknown[] = [];
+	/** The updates since the last op that was not one, by item. */
+	let run = new Map<string, { op: "update"; id: string; set: Record<string, unknown> }>();
+	for (const op of ops) {
+		const update = op as { op?: unknown; id?: unknown; set?: unknown };
+		const plain = update.op === "update" && typeof update.id === "string" && update.set && typeof update.set === "object" && Object.keys(update).length === 3;
+		if (!plain) {
+			run = new Map();
+			out.push(op);
+			continue;
+		}
+		const held = run.get(update.id as string);
+		if (held) Object.assign(held.set, update.set);
+		else {
+			const one = { op: "update" as const, id: update.id as string, set: { ...(update.set as Record<string, unknown>) } };
+			run.set(one.id, one);
+			out.push(one);
+		}
+	}
+	return out;
+}
+
 export function createDrawing(text: string | PenDocument, options: DrawingOptions = {}): Drawing {
 	const look = options.look ?? (() => "light" as const);
 	const depth = options.depth ?? 200;
@@ -175,8 +204,19 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	 * The person's edits sent and not yet in a drawing the host gave, oldest first: an edit's ops, or a
 	 * step's drawing (`to`, what the step makes of `base`, the host's drawing it was taken from).
 	 */
-	type Pending = { id: string; ops?: unknown[]; to?: PenDocument; base?: PenDocument; timer: ReturnType<typeof setTimeout> };
+	type Pending = { id: string; ops?: unknown[]; to?: PenDocument; base?: PenDocument; timer?: ReturnType<typeof setTimeout>; as?: string };
 	let pending: Pending[] = [];
+	/*
+	 * One call to the host at a time, when its `send` answers: edits made while one is on its way wait
+	 * here (shown already, `as` unset) and go together as one call once it is answered, so a held arrow
+	 * key is a few calls a second rather than thirty, each made after the one before it (an edit names
+	 * where things end up, so two overtaking each other on the way would leave the earlier one's).
+	 * `as` is the name an edit went under: the first of the edits sent together.
+	 */
+	let inFlight: string | undefined;
+	let inFlightTimer: ReturnType<typeof setTimeout> | undefined;
+	/** Steps asked for while edits were still to go: sent after them, in order. */
+	let stepsAfter: Array<() => void> = [];
 	/**
 	 * The person's steps through their own edits, as the host's drawings before and after each (the
 	 * host keeps the real history; this is to show a step ahead of its answer). Only what this page
@@ -227,14 +267,61 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 	};
 	/** An edit on its way is no longer shown: made by now, refused, or given up on. */
 	const drop = (id: string) => {
-		const at = pending.findIndex((one) => one.id === id);
-		if (at < 0) return;
-		clearTimeout(pending[at]!.timer);
-		pending = pending.filter((one) => one.id !== id);
+		const gone = pending.filter((one) => one.id === id || one.as === id);
+		if (!gone.length) return;
+		for (const one of gone) clearTimeout(one.timer);
+		pending = pending.filter((one) => !gone.includes(one));
 		setWaiting(pending.length);
 		showOver(onTop(untrack(given)));
 	};
 	const wait = (id: string, ms: number) => setTimeout(() => drop(id), ms);
+	/** The edits waiting to go, sent as one call, when nothing is on its way; then any steps asked for after them. */
+	const flush = () => {
+		if (!host || inFlight) return;
+		const going = pending.filter((one) => one.ops && !one.as);
+		if (!going.length) {
+			const steps = stepsAfter;
+			stepsAfter = [];
+			for (const step of steps) step();
+			return;
+		}
+		const as = going[0]!.id;
+		for (const one of going) {
+			one.as = as;
+			// Its name is the first's now: only that one is listened for.
+			if (one.id !== as) sent.delete(one.id);
+			clearTimeout(one.timer);
+			one.timer = wait(as, PENDING_MS);
+		}
+		const answer = host.send(together(going.map((one) => one.ops!)), as);
+		if (!answer || typeof (answer as Promise<boolean>).then !== "function") return flush();
+		inFlight = as;
+		const done = () => {
+			if (inFlight !== as) return;
+			inFlight = undefined;
+			clearTimeout(inFlightTimer);
+			flush();
+		};
+		// A call that never answers holds nothing up for longer than an edit is shown ahead.
+		inFlightTimer = setTimeout(done, PENDING_MS);
+		void (answer as Promise<boolean>).then(
+			(ok) => {
+				if (!ok) drop(as);
+				else
+					for (const one of pending)
+						if (one.as === as) {
+							// Made: the drawing that has it is on its way, however long the socket takes; given up on only after a while more.
+							clearTimeout(one.timer);
+							one.timer = wait(as, PENDING_MS);
+						}
+				done();
+			},
+			() => {
+				drop(as);
+				done();
+			},
+		);
+	};
 	/** The host's drawing came: what it has of the person's edits is no longer shown on top of it. */
 	const receive = (next: PenDocument, edits: DocEdits | undefined, madeHere: readonly string[] | undefined, at: string | undefined) => {
 		const before = untrack(given);
@@ -243,6 +330,7 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			scope = at;
 			for (const one of pending) clearTimeout(one.timer);
 			pending = [];
+			stepsAfter = [];
 			setWaiting(0);
 			forgetHistory();
 		}
@@ -271,8 +359,15 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			const done = new Set(ours.map(([id]) => id));
 			// Heard once: a host that gives the same drawing again with the same names (`made` kept on it) changes nothing.
 			for (const id of done) sent.delete(id);
-			for (const one of pending) if (done.has(one.id)) clearTimeout(one.timer);
-			pending = pending.filter((one) => !done.has(one.id));
+			/*
+			 * What it has, and every edit sent before the last of those: one call goes at a time, each
+			 * answered after the host made it, so a drawing with a later one has the earlier ones too,
+			 * even where its name was not passed on.
+			 */
+			const last = pending.findLastIndex((one) => done.has(one.as ?? one.id));
+			const had = pending.filter((one, at) => done.has(one.as ?? one.id) || (at < last && one.as !== undefined && one.ops));
+			for (const one of had) clearTimeout(one.timer);
+			pending = pending.filter((one) => !had.includes(one));
 		}
 		if (!hadPending && pending.length === 0) {
 			setWaiting(0);
@@ -299,23 +394,11 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 				return true;
 			}
 			const id = nameOne({});
-			pending.push({ id, ops, timer: wait(id, PENDING_MS) });
+			pending.push({ id, ops });
 			setWaiting(pending.length);
 			// Shown at once, even when nothing changed: the stage waits for the drawing that answers its gesture.
 			show(next, { from: prev, edits: diff(prev, next) });
-			const answer = host.send(ops, id);
-			if (answer && typeof (answer as Promise<boolean>).then === "function")
-				void (answer as Promise<boolean>).then(
-					(ok) => {
-						const one = pending.find((p) => p.id === id);
-						if (!one) return;
-						if (!ok) return drop(id);
-						// Made: the drawing that has it is on its way, however long the socket takes; given up on only after a while more.
-						clearTimeout(one.timer);
-						one.timer = wait(id, PENDING_MS);
-					},
-					() => drop(id),
-				);
+			flush();
 			return true;
 		}
 		const prev = untrack(doc);
@@ -358,7 +441,9 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 				host.step(direction, id);
 				return;
 			}
-			host.step(direction);
+			// After the edits still to go, which the host's history has to have first.
+			if (inFlight || pending.some((one) => one.ops && !one.as)) stepsAfter.push(() => host.step(direction));
+			else host.step(direction);
 			return;
 		}
 		const from = direction === "undo" ? undoStack : redoStack;
