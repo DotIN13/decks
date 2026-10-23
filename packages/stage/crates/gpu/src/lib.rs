@@ -152,7 +152,7 @@ impl Gpu {
 					self.resources.msaa(&self.device, most, width, height, f, 0);
 				}
 			}
-			self.resources.lend_layers(&self.device, &self.pipelines, &[u32::MAX], width, height);
+			self.resources.lend_layers(&self.device, &self.pipelines, &[(u32::MAX, width, height)], width, height);
 			self.resources.return_layers();
 		}
 	}
@@ -292,7 +292,7 @@ impl Backend for Gpu {
 			.iter()
 			.filter_map(|op| if let Op::Glyphs { texture, .. } = op { self.textures.get(texture).map(|t| (*texture, (t.width, t.height))) } else { None })
 			.collect();
-		let built = Built::build(list, &mut self.next_layer, &sizes, width, height);
+		let built = Built::build(list, &mut self.next_layer, &sizes, width, height, self.limits.max_texture);
 		draw::run(&self.device, &self.queue, &mut self.pipelines, &mut self.resources, &self.limits, &self.textures, &built, Out { view: &view, width, height, format });
 		if let Some(frame) = frame {
 			self.queue.present(frame);

@@ -15,7 +15,7 @@ use crate::tiles::{Grid, TILE};
 pub const OUT: u32 = 1;
 
 /// The fixtures drawn from draw lists and text alone, in order.
-pub const NAMES: [&str; 7] = ["shapes", "effects", "words", "card", "placeholder", "angular", "inner"];
+pub const NAMES: [&str; 8] = ["shapes", "effects", "words", "card", "placeholder", "angular", "inner", "blur"];
 
 /// The real stages, each a `.pen` file under `crates/gpu/fixtures/`.
 pub const STAGES: [&str; 2] = ["herobrine", "rotary"];
@@ -49,6 +49,7 @@ pub fn draw(g: &mut dyn Backend, name: &str, words: &stage_text::Text) -> Option
 		"placeholder" => placeholder(g, words),
 		"angular" => Some(angular(g, words)),
 		"inner" => Some(inner(g, words)),
+		"blur" => Some(blur(g, words)),
 		_ => None,
 	}
 }
@@ -69,7 +70,7 @@ fn effects(g: &mut dyn Backend) -> (u32, u32) {
 	let mut list = DrawList::new(Color([1.0, 1.0, 1.0, 1.0]));
 	let sq = |w: f32| Shape { w, h: w, radii: [0.0; 4], ellipse: false };
 	// Two overlapping squares in a half-opaque layer: where they overlap is no darker.
-	list.push(Op::PushLayer { opacity: 0.5 });
+	list.push(Op::PushLayer { opacity: 0.5, blur: None });
 	list.push(Op::Shape { shape: sq(40.0), transform: Affine::translate(10.0, 10.0), paint: solid([0.0, 0.0, 0.0, 1.0]), stroke: None });
 	list.push(Op::Shape { shape: sq(40.0), transform: Affine::translate(30.0, 10.0), paint: solid([0.0, 0.0, 0.0, 1.0]), stroke: None });
 	list.push(Op::PopLayer);
@@ -194,6 +195,24 @@ fn inner(g: &mut dyn Backend, words: &stage_text::Text) -> (u32, u32) {
 	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 420.0, h: 130.0 };
 	document(g, &doc, words, area, 2.0, (840, 260), Color([1.0, 1.0, 1.0, 1.0]));
 	(840, 260)
+}
+
+/// Blurs at 2×: a frame and what is in it blurred a little, as one; a ring blurred a lot (drawn
+/// on a texture halved four times) and half opaque; and a sharp square beside a blurred one that
+/// overlaps it, which stays sharp.
+fn blur(g: &mut dyn Backend, words: &stage_text::Text) -> (u32, u32) {
+	let doc = stage_doc::Document::from_json(serde_json::json!({"children":[
+		{"type":"frame","id":"f","x":20,"y":20,"width":100,"height":100,"layout":"none","fill":"#3b5cf6","cornerRadius":12,"effect":{"type":"blur","radius":6},"children":[
+			{"type":"rectangle","id":"r","x":20,"y":20,"width":60,"height":60,"fill":"#ffcc00"}
+		]},
+		{"type":"ellipse","id":"e","x":150,"y":20,"width":100,"height":100,"innerRadius":0.5,"fill":"#e53935","opacity":0.5,"effect":[{"type":"blur","radius":30}]},
+		{"type":"rectangle","id":"s","x":290,"y":30,"width":60,"height":60,"fill":"#2e7d32","effect":{"type":"blur","radius":10}},
+		{"type":"rectangle","id":"t","x":320,"y":60,"width":60,"height":60,"fill":"#111111"}
+	]}))
+	.expect("the fixture parses");
+	let area = stage_scene::Rect { x: 0.0, y: 0.0, w: 400.0, h: 140.0 };
+	document(g, &doc, words, area, 2.0, (800, 280), Color([1.0, 1.0, 1.0, 1.0]));
+	(800, 280)
 }
 
 /// A real stage (a `.pen` file's text): its drawing, not its boards (the page draws those), as

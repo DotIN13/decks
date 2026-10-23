@@ -278,6 +278,8 @@ impl Scene {
 		let mut ink = Vec::with_capacity(tree.items.len());
 		let mut extent: Option<Rect> = None;
 		let mut reusable = false;
+		// How far blurs spread an item: its own, and its parents' (they blur it with them).
+		let mut spills: Vec<f64> = Vec::with_capacity(tree.items.len());
 		for (item, place) in tree.items.iter().zip(&placed) {
 			reusable |= item.get("reusable").and_then(Value::as_bool).unwrap_or(false);
 			let r = place.rect;
@@ -298,7 +300,9 @@ impl Scene {
 				None => own,
 			};
 			let b = m.bounds(r.w, r.h);
-			let reach = reach(&self.vars, item, t);
+			let spill = blur_spill(blur_radius(&self.vars, item, t)) + item.parent.map_or(0.0, |p| spills[p as usize]);
+			spills.push(spill);
+			let reach = reach(&self.vars, item, t) + spill;
 			let k = Rect { x: b.x - reach, y: b.y - reach, w: b.w + reach * 2.0, h: b.h + reach * 2.0 };
 			if place.visible {
 				extent = Some(extent.map_or(k, |e| e.union(&k)));
@@ -440,6 +444,25 @@ impl Scene {
 			_ => true,
 		}
 	}
+}
+
+/// An item's blur radius: its enabled `blur` effects' radii added up, 0 for none.
+pub fn blur_radius(vars: &Vars, item: &tree::Item, theme: &Theme) -> f64 {
+	let effects = match item.get("effect") {
+		Some(Value::Array(list)) => list.iter().collect(),
+		Some(one) => vec![one],
+		None => vec![],
+	};
+	effects
+		.into_iter()
+		.filter(|e| e.get("type").and_then(Value::as_str) == Some("blur") && vars.bool(e.get("enabled"), theme, true))
+		.map(|e| vars.num(e.get("radius"), theme, 0.0).max(0.0))
+		.sum()
+}
+
+/// How far a blur of this radius spreads what it blurs: three of its Gaussian's sigmas.
+pub fn blur_spill(radius: f64) -> f64 {
+	radius * 1.5
 }
 
 /// How far past its box an item paints: its stroke, its shadows, a card's paper shadow.

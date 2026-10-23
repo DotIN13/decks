@@ -4,7 +4,7 @@
 //! by rows, written with `write_texture`), the gradient ramps, and the layer and multisampled
 //! textures each target size needs.
 
-use crate::exec::pipelines::Pipelines;
+use crate::exec::pipelines::{FRAME_BYTES, FRAME_STRIDE, Pipelines};
 use stage_paint::TextureKind;
 use stage_render::batch::{RAMP_H, RAMP_W};
 use stage_render::{Limits, Table};
@@ -94,6 +94,7 @@ pub struct Resources {
 	sampler: wgpu::Sampler,
 	/// White, for commands that draw with no picture.
 	pub white: wgpu::BindGroup,
+	/// The passes' frame uniforms, [`FRAME_STRIDE`] apart; grown when a draw has more passes.
 	uniform: wgpu::Buffer,
 	table: Option<TableTexture>,
 	/// The frame bind group (uniform, table, ramps, sampler): made again only when the table grows.
@@ -107,7 +108,14 @@ pub struct Resources {
 	spare: HashMap<(u32, u32), Vec<Tex>>,
 	/// The layer textures of the draw under way, by the ids its passes and commands know them by.
 	pub lent: HashMap<u32, Tex>,
+	/// Sizes other than a target's (blurred layers' and their blurs'), with the draw each was last
+	/// used in: what is kept for them goes when none has used it for [`ODD_SIZES_KEPT`] draws.
+	odd: HashMap<(u32, u32), u64>,
+	draws: u64,
 }
+
+/// Draws a size no target has stays kept for after its last use.
+const ODD_SIZES_KEPT: u64 = 240;
 
 impl Resources {
 	pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines) -> Resources {
@@ -147,7 +155,7 @@ impl Resources {
 		);
 		let white_view = white_tex.create_view(&Default::default());
 		let white = device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some("white"), layout: &pipelines.picture_layout, entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&white_view) }] });
-		let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("frame"), size: 16, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+		let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("frame"), size: FRAME_STRIDE * 4, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
 		Resources {
 			ramp,
 			ramp_view,
@@ -162,12 +170,14 @@ impl Resources {
 			msaa: HashMap::new(),
 			spare: HashMap::new(),
 			lent: HashMap::new(),
+			odd: HashMap::new(),
+			draws: 0,
 		}
 	}
 
 	/// Write a draw's ramps, table, frame uniform and geometry.
 	#[allow(clippy::too_many_arguments)]
-	pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, limits: &Limits, built: &stage_render::Built, width: u32, height: u32) {
+	pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, limits: &Limits, built: &stage_render::Built) {
 		for (i, row) in built.ramps.iter().enumerate() {
 			queue.write_texture(
 				wgpu::TexelCopyTextureInfo { texture: &self.ramp, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: i as u32, z: 0 }, aspect: wgpu::TextureAspect::All },
@@ -200,7 +210,19 @@ impl Resources {
 			wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(table.row_bytes()), rows_per_image: Some(table.rows) },
 			wgpu::Extent3d { width: table.width, height: table.rows, depth_or_array_layers: 1 },
 		);
-		queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&[(width as f32).to_bits(), (height as f32).to_bits(), table.clip_base, 0]));
+		// Each pass's frame: what it draws into, and where target pixels land in it.
+		let need = FRAME_STRIDE * built.passes.len().max(1) as u64;
+		if self.uniform.size() < need {
+			self.uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("frame"), size: need.next_power_of_two(), usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+			self.frame = None;
+		}
+		let mut frames = vec![0u32; (need / 4) as usize];
+		for (i, pass) in built.passes.iter().enumerate() {
+			let v = pass.view;
+			let at = i * (FRAME_STRIDE / 4) as usize;
+			frames[at..at + 8].copy_from_slice(&[(v.width as f32).to_bits(), (v.height as f32).to_bits(), table.clip_base, 0, v.offset.0.to_bits(), v.offset.1.to_bits(), 0, 0]);
+		}
+		queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&frames));
 		self.instances.write(device, queue, bytemuck::cast_slice(&built.instances));
 		self.vertices.write(device, queue, bytemuck::cast_slice(&built.vertices));
 		self.indices.write(device, queue, bytemuck::cast_slice(&built.indices));
@@ -209,7 +231,7 @@ impl Resources {
 				label: Some("frame"),
 				layout: &pipelines.frame_layout,
 				entries: &[
-					wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() },
+					wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &self.uniform, offset: 0, size: wgpu::BufferSize::new(FRAME_BYTES) }) },
 					wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tt.view) },
 					wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&self.ramp_view) },
 					wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&self.sampler) },
@@ -244,20 +266,38 @@ impl Resources {
 			.clone()
 	}
 
-	/// Lend the draw a layer texture of this size for each of its layers. Each pass that begins a
-	/// layer clears it, so what a texture held before does not show.
-	pub fn lend_layers(&mut self, device: &wgpu::Device, pipelines: &Pipelines, ids: &[u32], width: u32, height: u32) {
-		let spare = self.spare.entry((width, height)).or_default();
-		for id in ids {
-			let tex = spare.pop().unwrap_or_else(|| Tex::new(device, &pipelines.picture_layout, TextureKind::Color, width, height));
-			self.lent.insert(*id, tex);
+	/// Lend the draw a layer texture of its size for each of its layers (`(id, width, height)`), for
+	/// a target `width` × `height`. Each pass that begins a layer clears it, so what a texture held
+	/// before does not show.
+	pub fn lend_layers(&mut self, device: &wgpu::Device, pipelines: &Pipelines, layers: &[(u32, u32, u32)], width: u32, height: u32) {
+		self.draws += 1;
+		for &(id, w, h) in layers {
+			if (w, h) != (width, height) {
+				self.odd.insert((w, h), self.draws);
+			}
+			let tex = self.spare.entry((w, h)).or_default().pop().unwrap_or_else(|| Tex::new(device, &pipelines.picture_layout, TextureKind::Color, w, h));
+			self.lent.insert(id, tex);
 		}
 	}
 
-	/// Take back the layer textures lent to the draw just submitted.
+	/// Mark a size as used by this draw (a blurred layer's multisampled texture), when no target has it.
+	pub fn used_size(&mut self, w: u32, h: u32, width: u32, height: u32) {
+		if (w, h) != (width, height) {
+			self.odd.insert((w, h), self.draws);
+		}
+	}
+
+	/// Take back the layer textures lent to the draw just submitted, and let go of what was kept
+	/// for sizes no draw has used for a while.
 	pub fn return_layers(&mut self) {
 		for (_, tex) in self.lent.drain() {
 			self.spare.entry((tex.width, tex.height)).or_default().push(tex);
+		}
+		let now = self.draws;
+		let stale: Vec<(u32, u32)> = self.odd.iter().filter(|(_, at)| now - **at > ODD_SIZES_KEPT).map(|(s, _)| *s).collect();
+		for (w, h) in stale {
+			self.odd.remove(&(w, h));
+			self.forget_size(w, h);
 		}
 	}
 

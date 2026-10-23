@@ -3,7 +3,7 @@
 //! its layer or the target; a draw without (and every draw on a device with one sample a pixel)
 //! draws straight into the layer or the target.
 
-use crate::exec::pipelines::Pipelines;
+use crate::exec::pipelines::{FRAME_STRIDE, Pipelines};
 use crate::exec::resources::{Resources, Tex};
 use stage_render::Limits;
 use stage_render::batch::{Built, Cmd};
@@ -32,8 +32,8 @@ pub fn samples_for(built: &Built, most: u32) -> u32 {
 pub fn run(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &mut Pipelines, res: &mut Resources, limits: &Limits, textures: &HashMap<u32, Tex>, built: &Built, out: Out) {
 	let (width, height) = (out.width, out.height);
 	res.lend_layers(device, pipelines, &built.layers, width, height);
-	res.upload(device, queue, pipelines, limits, built, width, height);
-	let samples = samples_for(built, pipelines.samples);
+	res.upload(device, queue, pipelines, limits, built);
+	let most = samples_for(built, pipelines.samples);
 	// Everything each pass needs, made before any pass begins.
 	let mut views = Vec::with_capacity(built.passes.len());
 	for pass in &built.passes {
@@ -41,25 +41,30 @@ pub fn run(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &mut Pipelines
 			None => (out.view.clone(), out.format),
 			Some(id) => (res.lent[&id].view.clone(), wgpu::TextureFormat::Rgba8Unorm),
 		};
+		let samples = if pass.single { 1 } else { most };
 		pipelines.prepare(device, format, samples);
-		let msaa = (samples > 1).then(|| res.msaa(device, samples, width, height, format, pass.depth));
-		views.push((resolve, msaa, format));
+		let (w, h) = (pass.view.width, pass.view.height);
+		let msaa = (samples > 1).then(|| {
+			res.used_size(w, h, width, height);
+			res.msaa(device, samples, w, h, format, pass.depth)
+		});
+		views.push((resolve, msaa, format, samples));
 	}
-	encode(device, queue, pipelines, res, textures, built, &views, samples);
+	encode(device, queue, pipelines, res, textures, built, &views);
 	res.return_layers();
 }
 
 #[allow(clippy::too_many_arguments)]
-fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res: &Resources, textures: &HashMap<u32, Tex>, built: &Built, views: &[(wgpu::TextureView, Option<wgpu::TextureView>, wgpu::TextureFormat)], samples: u32) {
+fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res: &Resources, textures: &HashMap<u32, Tex>, built: &Built, views: &[(wgpu::TextureView, Option<wgpu::TextureView>, wgpu::TextureFormat, u32)]) {
 	let frame = res.frame();
 	let picture = |t: &Option<u32>| t.and_then(|id| textures.get(&id).or_else(|| res.lent.get(&id))).map_or(&res.white, |tex| &tex.picture);
 	let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("stage draw") });
-	for (pass, (resolve, msaa, format)) in built.passes.iter().zip(views) {
+	for (index, (pass, (resolve, msaa, format, samples))) in built.passes.iter().zip(views).enumerate() {
 		let load = match pass.clear {
 			Some(c) => wgpu::LoadOp::Clear(wgpu::Color { r: c.0[0] as f64, g: c.0[1] as f64, b: c.0[2] as f64, a: c.0[3] as f64 }),
 			None => wgpu::LoadOp::Load,
 		};
-		let set = pipelines.get(*format, samples);
+		let set = pipelines.get(*format, *samples);
 		let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			label: Some("stage pass"),
 			color_attachments: &[Some(match msaa {
@@ -71,7 +76,7 @@ fn encode(device: &wgpu::Device, queue: &wgpu::Queue, pipelines: &Pipelines, res
 			occlusion_query_set: None,
 			multiview_mask: None,
 		});
-		rp.set_bind_group(0, frame, &[]);
+		rp.set_bind_group(0, frame, &[(index as u64 * FRAME_STRIDE) as u32]);
 		for cmd in &pass.cmds {
 			match cmd {
 				Cmd::Shapes { range, texture, erase } => {

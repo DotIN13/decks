@@ -6,10 +6,14 @@
 // float texture of 64-byte records, four texels each, paints from 0 and clips from `clip_base`
 // (render/src/table.rs packs it). It is a texture and not storage buffers so WebGL 2 can run it.
 
+// A pass's: the size of what it draws into, where clips start in the table, and the offset a
+// point in target pixels moves by to land there (a blurred layer reaches past the target).
 struct Frame {
 	size: vec2<f32>,
 	clip_base: u32,
 	_pad: u32,
+	offset: vec2<f32>,
+	_pad2: vec2<f32>,
 };
 
 // A paint: [kind, ramp row, opacity (a conic's start), 0], colour, gradient geometry, picture uv.
@@ -61,10 +65,11 @@ struct Instance {
 	@location(0) xf0: vec4<f32>,   // a, b, c, d
 	@location(1) xf1: vec4<f32>,   // e, f, w, h
 	@location(2) radii: vec4<f32>,
-	// mode (0 fill, 1 stroke, 2 shadow, 3 picture, 4 and 5 glyphs, 6 inner shadow), stroke width (an
-	// inner shadow's offset x), align (-1 in, 0 centre, 1 out; its offset y), ellipse
+	// mode (0 fill, 1 stroke, 2 shadow, 3 picture, 4 and 5 glyphs, 6 inner shadow, 7 a blur's pass),
+	// stroke width (an inner shadow's offset x, a blur's step across), align (-1 in, 0 centre, 1
+	// out; the offset y, the step down), ellipse
 	@location(3) params: vec4<f32>,
-	@location(4) extra: vec4<f32>,  // shadow sigma, spread, paint, clip
+	@location(4) extra: vec4<f32>,  // shadow (or blur) sigma, spread, paint, clip
 };
 
 struct ShapeOut {
@@ -78,7 +83,7 @@ struct ShapeOut {
 };
 
 fn to_clip_space(p: vec2<f32>) -> vec4<f32> {
-	let n = p / frame.size * 2.0 - 1.0;
+	let n = (p + frame.offset) / frame.size * 2.0 - 1.0;
 	return vec4<f32>(n.x, -n.y, 0.0, 1.0);
 }
 
@@ -90,7 +95,7 @@ fn vs_shape(@builtin(vertex_index) v: u32, inst: Instance) -> ShapeOut {
 	let size = inst.xf1.zw;
 	// Room past the box: a pixel and a half for the soft edge, the stroke's reach, the shadow's blur.
 	var grow = 1.5 / max(scale, 1e-6);
-	if (inst.params.x >= 3.0 && inst.params.x < 6.0) {
+	if ((inst.params.x >= 3.0 && inst.params.x < 6.0) || inst.params.x == 7.0) {
 		grow = 0.0;
 	}
 	if (inst.params.x == 1.0) {
@@ -233,20 +238,41 @@ fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
 	return textureSampleLevel(picture, smooth_sampler, clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0) * rec.head.z * inside;
 }
 
-fn clip_at(index: i32, target_pos: vec2<f32>) -> f32 {
+// How much of the pixel at `pixel` (in what the pass draws into) clip `index` keeps.
+fn clip_at(index: i32, pixel: vec2<f32>) -> f32 {
 	if (index < 0) {
 		return 1.0;
 	}
 	let c = clip_rec(index);
-	let p = vec2<f32>(c.inv0.x * target_pos.x + c.inv0.z * target_pos.y + c.inv1.x, c.inv0.y * target_pos.x + c.inv0.w * target_pos.y + c.inv1.y);
+	let t = pixel - frame.offset;
+	let p = vec2<f32>(c.inv0.x * t.x + c.inv0.z * t.y + c.inv1.x, c.inv0.y * t.x + c.inv0.w * t.y + c.inv1.y);
 	let back_scale = max(length(c.inv0.xy), 1e-6);
 	let d = sd_shape(p, c.inv1.zw, c.radii, c.flags.x);
 	return cover(d / back_scale);
 }
 
+// One pass of a blur: a Gaussian of `sigma` texels along `dir` (a texel's step in uv) over the
+// picture, at `uv`. Three sigmas each way, at most 32 texels.
+fn blur_pass(uv: vec2<f32>, dir: vec2<f32>, sigma: f32) -> vec4<f32> {
+	let s = max(sigma, 1e-3);
+	let n = min(i32(ceil(s * 3.0)), 32);
+	var sum = vec4<f32>(0.0);
+	var total = 0.0;
+	for (var i = -n; i <= n; i++) {
+		let x = f32(i);
+		let w = exp(-(x * x) / (2.0 * s * s));
+		sum += textureSampleLevel(picture, smooth_sampler, uv + dir * x, 0.0) * w;
+		total += w;
+	}
+	return sum / total;
+}
+
 @fragment
 fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 	let mode = in.params.x;
+	if (mode == 7.0) {
+		return blur_pass(in.local / max(in.size, vec2<f32>(1e-6)), in.params.yz, in.extra.x);
+	}
 	var coverage = 0.0;
 	if (mode == 2.0) {
 		let spread = in.extra.y;

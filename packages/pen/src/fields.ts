@@ -51,7 +51,7 @@ export const FIELDS: Readonly<Record<string, ReadonlySet<string>>> = Object.from
 
 /** A fill or effect type pen.dev draws and Decks keeps without drawing. */
 const UNDRAWN_FILLS = new Set(["shader", "mesh_gradient"]);
-const UNDRAWN_EFFECTS = new Set(["blur", "background_blur", "shader"]);
+const UNDRAWN_EFFECTS = new Set(["background_blur", "shader"]);
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 

@@ -17,7 +17,7 @@ use stage_scene::{Rect, Root, Scene, geometry::Mat};
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use crate::list::{Affine, Align, Clip, Color, DrawList, GlyphQuad, Op, Paint, Shape};
+use crate::list::{Affine, Align, Clip, Color, DrawList, GlyphQuad, LayerBlur, Op, Paint, Shape};
 use crate::mesh;
 use stage_text::atlas::{Atlas, COLOR_TEXTURE, MASK_TEXTURE};
 use stage_text::{Laid, Span, Text};
@@ -166,8 +166,9 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 			own_ops(ctx, root, i, &target, 1.0, &mut ops, &mut closing);
 			ops.append(&mut closing);
 			let alpha = opacity(ctx, root, i);
-			if alpha < 1.0 && ops.len() > 1 {
-				list.push(Op::PushLayer { opacity: alpha });
+			let blur = layer_blur(ctx, root, i, &target);
+			if (alpha < 1.0 && ops.len() > 1) || (blur.is_some() && !ops.is_empty()) {
+				list.push(Op::PushLayer { opacity: alpha, blur });
 				list.ops.extend(ops);
 				list.push(Op::PopLayer);
 			} else {
@@ -194,6 +195,26 @@ fn ancestors(root: &Root, i: u32) -> Vec<u32> {
 	chain
 }
 
+/// An item's blur (its `blur` effects', added up) as a layer's: its Gaussian in target pixels and
+/// what the item and everything in it paint on, there. `None` for an item with no blur.
+fn layer_blur(ctx: &Context, root: &Root, i: u32, target: &Mat) -> Option<LayerBlur> {
+	let item = &root.tree.items[i as usize];
+	let radius = stage_scene::blur_radius(&ctx.scene.vars, item, &root.placed[i as usize].theme);
+	if radius <= 0.0 {
+		return None;
+	}
+	// pen's radius, as a CSS blur radius, is two of the Gaussian's sigmas, as a shadow's blur is.
+	let sigma = (radius / 2.0) as f32 * to_affine(&target.then(&root.world[i as usize])).scale_factor();
+	let mut ink = root.ink[i as usize];
+	let mut stack = item.children.clone();
+	while let Some(c) = stack.pop() {
+		ink = ink.union(&root.ink[c as usize]);
+		stack.extend(root.tree.items[c as usize].children.iter().copied());
+	}
+	let r = target.then(&Mat::translate(ink.x, ink.y)).bounds(ink.w, ink.h);
+	Some(LayerBlur { sigma, area: [r.x as f32, r.y as f32, r.w as f32, r.h as f32] })
+}
+
 fn opacity(ctx: &Context, root: &Root, i: u32) -> f32 {
 	let item = &root.tree.items[i as usize];
 	ctx.scene.vars.num(item.get("opacity"), &root.placed[i as usize].theme, 1.0).clamp(0.0, 1.0) as f32
@@ -204,9 +225,10 @@ fn open(ctx: &Context, root: &Root, r: u32, i: u32, target: &Mat, draw: bool, st
 	let item = &root.tree.items[i as usize];
 	let theme = &root.placed[i as usize].theme;
 	let alpha = opacity(ctx, root, i);
-	let layer = alpha < 1.0;
+	let blur = layer_blur(ctx, root, i, target);
+	let layer = alpha < 1.0 || blur.is_some();
 	if layer {
-		list.push(Op::PushLayer { opacity: alpha });
+		list.push(Op::PushLayer { opacity: alpha, blur });
 	}
 	let mut closing = Vec::new();
 	if draw {

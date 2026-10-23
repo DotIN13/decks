@@ -138,6 +138,61 @@ fn inner_shadows_lie_inside() {
 	assert_eq!(px(&p, w, 720, 120), [255, 255, 255, 255], "white in its middle");
 }
 
+/// A blurred item is soft at its edges and past them, solid in its middle, and leaves what is drawn
+/// over it sharp.
+#[test]
+fn blurs_soften_an_item_and_nothing_else() {
+	let Some(mut g) = gpu() else { return };
+	let (w, h) = fixtures::draw(&mut g, "blur", &stage_text::Text::new()).unwrap();
+	let p = g.read(fixtures::OUT).unwrap();
+	save("blur", &p, w, h);
+	// The frame at (20, 20), 100 wide at 2×, blurred by 6 (a sigma of 6 pixels here): its yellow
+	// child is solid in its middle, and the frame's left edge (x = 40) is half blue.
+	assert_eq!(px(&p, w, 140, 140), [255, 204, 0, 255], "the child's middle");
+	let edge = px(&p, w, 40, 140);
+	assert!((90..=170).contains(&edge[0]) && edge[2] > 200, "half way across the edge: {edge:?}");
+	assert!(px(&p, w, 30, 140)[0] < 250, "the blur reaches past the box: {:?}", px(&p, w, 30, 140));
+	assert_eq!(px(&p, w, 10, 140), [255, 255, 255, 255], "and stops");
+	// The ring, blurred by 30: its hole is no longer white, and the blur spreads well past it.
+	let hole = px(&p, w, 400, 140);
+	assert!(hole[1] < 245, "the hole is shaded: {hole:?}");
+	assert!(px(&p, w, 400, 252)[1] < 250, "the blur reaches below the ring");
+	// The dark square is drawn after the blurred green one and stays sharp.
+	assert_eq!(px(&p, w, 700, 200), [17, 17, 17, 255], "inside the sharp square");
+	assert_eq!(px(&p, w, 641, 200)[0], 17, "its edge is sharp");
+}
+
+/// A blurred item across tiles is drawn as one: the tiles hold what lies past their edges, so
+/// stitched together they are the picture drawn whole.
+#[test]
+fn a_blur_across_tiles_has_no_seam() {
+	let Some(mut g) = gpu() else { return };
+	let pen = serde_json::json!({"version":"2.6","children":[
+		{"type":"rectangle","id":"a","x":0,"y":0,"width":900,"height":300,"fill":"#ffffff"},
+		{"type":"frame","id":"f","x":380,"y":60,"width":250,"height":180,"layout":"none","fill":"#3b5cf6","effect":{"type":"blur","radius":40},"children":[
+			{"type":"rectangle","id":"r","x":100,"y":40,"width":60,"height":100,"fill":"#ffcc00"}
+		]}
+	]})
+	.to_string();
+	let words = stage_text::Text::new();
+	let (w, h) = fixtures::draw_stage(&mut g, &pen, &words).unwrap();
+	let tiled = g.read(fixtures::OUT).unwrap();
+	// The same, drawn whole.
+	let doc = stage_doc::Document::parse(&pen).unwrap();
+	let scene = stage_scene::Scene::new(&doc, false, &words);
+	let extent = scene.roots.iter().map(|r| r.extent).reduce(|a, b| a.union(&b)).unwrap();
+	let skip = std::collections::HashSet::new();
+	let none = |_: &str| None;
+	let list = paint_area(&Context::new(&scene, &skip, &none), extent, 1.0, Color([0.98, 0.98, 0.98, 1.0]));
+	g.texture(2, TextureKind::Color, w, h, None);
+	g.draw(Target::Texture(2), &list);
+	let whole = g.read(2).unwrap();
+	save("blur-tiled", &tiled, w, h);
+	save("blur-whole", &whole, w, h);
+	let (far, most) = differ(&tiled, &whole, 3);
+	assert!(far == 0, "{far} pixels more than 3 off, by up to {most}");
+}
+
 /// The stages drawn: the two under `fixtures/`, and any more in `STAGE_FIXTURES` (a folder of
 /// `<name>/stage.pen`).
 fn stages() -> Vec<(String, String)> {
@@ -281,7 +336,7 @@ fn one_sample_draws_what_four_do() {
 		g.texture(1, TextureKind::Color, 200, 200, None);
 		let mut list = DrawList::new(Color([1.0, 1.0, 1.0, 1.0]));
 		let sq = |w: f32| Shape { w, h: w, radii: [6.0; 4], ellipse: false };
-		list.push(Op::PushLayer { opacity: 0.5 });
+		list.push(Op::PushLayer { opacity: 0.5, blur: None });
 		list.push(Op::Shape { shape: sq(40.0), transform: Affine::translate(10.3, 10.7), paint: solid([0.0, 0.0, 0.0, 1.0]), stroke: None });
 		list.push(Op::PopLayer);
 		// Turned a third of the way round: edges across the pixel grid.
@@ -296,7 +351,7 @@ fn one_sample_draws_what_four_do() {
 			list.push(Op::Mesh { vertices: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], indices: vec![0, 1, 2], transform: Affine::translate(0.0, 0.0), paint: solid([1.0, 1.0, 1.0, 0.0]) });
 		}
 		let mut next = LAYER_IDS;
-		let built = Built::build(&list, &mut next, &HashMap::new(), 200, 200);
+		let built = Built::build(&list, &mut next, &HashMap::new(), 200, 200, 8192);
 		let samples = draw::samples_for(&built, g.pipelines.samples);
 		g.draw(Target::Texture(1), &list);
 		(g.read(1).unwrap(), samples)

@@ -2,7 +2,7 @@
 //! instances and one of mesh vertices, the paints and clips they refer to, and gradient ramp rows.
 //! It knows no graphics API; an executor uploads and runs it.
 
-use stage_paint::list::{Align, Clip, Color, DrawList, Op, Paint, Shape};
+use stage_paint::list::{Align, Clip, Color, DrawList, LayerBlur, Op, Paint, Shape};
 use std::collections::HashMap;
 
 /// Gradients are cut into rows of this many colours in one texture, a row per gradient a draw.
@@ -44,6 +44,66 @@ pub struct Pass {
 	pub depth: usize,
 	pub clear: Option<Color>,
 	pub cmds: Vec<Cmd>,
+	/// What it draws into, and where target pixels land there.
+	pub view: View,
+	/// Drawn with one sample a pixel whatever the draw's are: a blur's passes, which only copy.
+	pub single: bool,
+}
+
+/// A pass's texture: its size, and the offset a point in target pixels moves by to land in it. The
+/// target's own and an unblurred layer's are the target's size with none; a blurred layer is the
+/// part of the target (and past it) its contents and their blur cover; a blur's working textures
+/// are their own size, drawn in their own pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct View {
+	pub width: u32,
+	pub height: u32,
+	pub offset: (f32, f32),
+}
+
+/// A blur's Gaussian is drawn at most this many sigmas wide in the texture it is drawn in: a wider
+/// one is drawn on a texture halved (and halved again) and stretched back, so its passes cost about
+/// the same whatever the radius.
+pub const BLUR_SIGMA: f32 = 4.0;
+/// The most a blur's texture is halved: 64 times smaller across, so a sigma of 256 pixels.
+pub const BLUR_MOST_HALVED: u32 = 64;
+/// A blurred layer's sides are a multiple of this, so a stage's few sizes of them are kept and used
+/// again rather than made for each item.
+pub const BLUR_ROUND: u32 = 128;
+
+/// A blurred layer's texture: `blur.area` (which holds the blur's reach already), cut to `parent`
+/// grown by the blur's reach (what lies further off blurs nothing onto it), its sides rounded up to
+/// [`BLUR_ROUND`] and to how often it is halved, at most `max_side`. With the times it is halved.
+pub fn blur_view(blur: &LayerBlur, parent: &View, max_side: u32) -> (View, u32) {
+	let sigma = blur.sigma.max(0.0);
+	let mut halved = 1u32;
+	while sigma / halved as f32 > BLUR_SIGMA && halved < BLUR_MOST_HALVED {
+		halved *= 2;
+	}
+	let m = (sigma * 3.0).ceil();
+	let [ax, ay, aw, ah] = blur.area;
+	let (px, py) = (-parent.offset.0, -parent.offset.1);
+	// Its corner on a multiple of the halving in target pixels, so tiles side by side (whose corners
+	// are multiples of their size) halve along the same grid and meet without a seam.
+	let snap = |v: f32| (v / halved as f32).floor() * halved as f32;
+	let x0 = snap(ax.max(px - m));
+	let y0 = snap(ay.max(py - m));
+	let x1 = (ax + aw).min(px + parent.width as f32 + m).ceil();
+	let y1 = (ay + ah).min(py + parent.height as f32 + m).ceil();
+	let unit = BLUR_ROUND.max(halved);
+	let side = |a: f32, b: f32| {
+		let want = ((b - a).max(1.0) as u32).div_ceil(unit) * unit;
+		want.min((max_side / unit).max(1) * unit)
+	};
+	(View { width: side(x0, x1), height: side(y0, y1), offset: (-x0, -y0) }, halved)
+}
+
+/// A layer open while its contents are batched.
+struct Open {
+	id: u32,
+	opacity: f32,
+	blur: Option<(f32, u32)>,
+	view: View,
 }
 
 /// What a draw list turns into before it goes to the card.
@@ -56,8 +116,8 @@ pub struct Built {
 	pub vertices: Vec<Vertex>,
 	pub indices: Vec<u32>,
 	pub passes: Vec<Pass>,
-	/// Layers this draw needs, by id.
-	pub layers: Vec<u32>,
+	/// Layers this draw needs: their ids and sizes.
+	pub layers: Vec<(u32, u32, u32)>,
 }
 
 pub fn affine_inverse(m: &[f32; 6]) -> [f32; 6] {
@@ -69,9 +129,6 @@ pub fn affine_inverse(m: &[f32; 6]) -> [f32; 6] {
 	let (ia, ib, ic, id) = (d / det, -b / det, -c / det, a / det);
 	[ia, ib, ic, id, -(ia * e + ic * f), -(ib * e + id * f)]
 }
-
-/// A layer's composite quad is marked with this transform and given the target's box at draw time.
-const WHOLE_TARGET: [f32; 6] = [f32::NAN; 6];
 
 impl Built {
 	fn paint(&mut self, paint: &Paint) -> (f32, Option<u32>) {
@@ -133,13 +190,50 @@ impl Built {
 		}
 	}
 
+	/// A new layer texture of `view`'s size, and a pass into it, cleared.
+	fn layer_pass(&mut self, next_layer: &mut u32, view: View, depth: usize, single: bool) -> u32 {
+		let id = *next_layer;
+		*next_layer = next_layer.wrapping_add(1).max(LAYER_IDS);
+		self.layers.push((id, view.width, view.height));
+		self.passes.push(Pass { layer: Some(id), depth, clear: Some(Color::TRANSPARENT), cmds: Vec::new(), view, single });
+		id
+	}
+
+	/// Blur layer `source` (`view`'s size) by `sigma` pixels, halved `halved` times first: the
+	/// texture it ends in, a `halved`-th of the size.
+	fn blur(&mut self, next_layer: &mut u32, source: u32, view: View, sigma: f32, halved: u32, depth: usize) -> u32 {
+		let (mut at, mut w, mut h) = (source, view.width, view.height);
+		let mut left = halved;
+		while left > 1 {
+			// Each pixel half the size samples the four under it, between them.
+			(w, h) = ((w / 2).max(1), (h / 2).max(1));
+			let into = View { width: w, height: h, offset: (0.0, 0.0) };
+			let next = self.layer_pass(next_layer, into, depth, true);
+			let (p, texture) = self.paint(&Paint::Image { texture: at, opacity: 1.0, uv: [0.0, 0.0, 1.0, 1.0] });
+			self.push_shape(&Shape { w: w as f32, h: h as f32, radii: [0.0; 4], ellipse: false }, &[1.0, 0.0, 0.0, 1.0, 0.0, 0.0], [3.0, 0.0, 0.0, 0.0], [0.0, 0.0, p, -1.0], texture);
+			at = next;
+			left /= 2;
+		}
+		// Across, then down: a Gaussian is the two one-dimensional ones, one after the other.
+		let small = sigma / halved as f32;
+		for dir in [(1.0 / w as f32, 0.0), (0.0, 1.0 / h as f32)] {
+			let into = View { width: w, height: h, offset: (0.0, 0.0) };
+			let next = self.layer_pass(next_layer, into, depth, true);
+			self.push_shape(&Shape { w: w as f32, h: h as f32, radii: [0.0; 4], ellipse: false }, &[1.0, 0.0, 0.0, 1.0, 0.0, 0.0], [7.0, dir.0, dir.1, 0.0], [small, 0.0, 0.0, -1.0], Some(at));
+			at = next;
+		}
+		at
+	}
+
 	/// Batch a list for a target `width` × `height` pixels. `next_layer` hands out layer texture ids;
-	/// `sizes` are the glyph textures' sizes, for their quads' uv.
-	pub fn build(list: &DrawList, next_layer: &mut u32, sizes: &HashMap<u32, (u32, u32)>, width: u32, height: u32) -> Built {
+	/// `sizes` are the glyph textures' sizes, for their quads' uv; `max_side` is the largest texture
+	/// the device makes, which a blurred layer is held to.
+	pub fn build(list: &DrawList, next_layer: &mut u32, sizes: &HashMap<u32, (u32, u32)>, width: u32, height: u32, max_side: u32) -> Built {
 		let mut b = Built::default();
-		b.passes.push(Pass { layer: None, depth: 0, clear: Some(list.clear), cmds: Vec::new() });
+		let whole = View { width, height, offset: (0.0, 0.0) };
+		b.passes.push(Pass { layer: None, depth: 0, clear: Some(list.clear), cmds: Vec::new(), view: whole, single: false });
 		let mut clips: Vec<f32> = Vec::new();
-		let mut layers: Vec<(u32, f32)> = Vec::new();
+		let mut layers: Vec<Open> = Vec::new();
 		for op in &list.ops {
 			let clip = clips.last().copied().unwrap_or(-1.0);
 			match op {
@@ -216,29 +310,32 @@ impl Built {
 				Op::PopClip => {
 					clips.pop();
 				}
-				Op::PushLayer { opacity } => {
-					let id = *next_layer;
-					*next_layer = next_layer.wrapping_add(1).max(LAYER_IDS);
-					layers.push((id, *opacity));
-					b.layers.push(id);
-					b.passes.push(Pass { layer: Some(id), depth: layers.len(), clear: Some(Color::TRANSPARENT), cmds: Vec::new() });
+				Op::PushLayer { opacity, blur } => {
+					let parent = layers.last().map_or(whole, |l| l.view);
+					let (view, blur) = match blur.filter(|bl| bl.sigma > 0.0) {
+						Some(bl) => {
+							let (view, halved) = blur_view(&bl, &parent, max_side.max(BLUR_ROUND));
+							(view, Some((bl.sigma, halved)))
+						}
+						None => (parent, None),
+					};
+					let id = b.layer_pass(next_layer, view, layers.len() + 1, false);
+					layers.push(Open { id, opacity: *opacity, blur, view });
 				}
 				Op::PopLayer => {
-					let Some((id, opacity)) = layers.pop() else { continue };
-					let parent = layers.last().map(|(l, _)| *l);
-					b.passes.push(Pass { layer: parent, depth: layers.len(), clear: None, cmds: Vec::new() });
-					// The layer laid down over its parent, across the whole target, at its opacity.
-					let (p, texture) = b.paint(&Paint::Image { texture: id, opacity, uv: [0.0, 0.0, 1.0, 1.0] });
-					b.push_shape(&Shape { w: 1.0, h: 1.0, radii: [0.0; 4], ellipse: false }, &WHOLE_TARGET, [0.0; 4], [0.0, 0.0, p, clip], texture);
+					let Some(open) = layers.pop() else { continue };
+					let depth = layers.len();
+					let shown = match open.blur {
+						Some((sigma, halved)) => b.blur(next_layer, open.id, open.view, sigma, halved, depth + 1),
+						None => open.id,
+					};
+					let parent = layers.last();
+					b.passes.push(Pass { layer: parent.map(|l| l.id), depth, clear: None, cmds: Vec::new(), view: parent.map_or(whole, |l| l.view), single: false });
+					// The layer laid down over its parent, where it lies in target pixels, at its opacity.
+					let (p, texture) = b.paint(&Paint::Image { texture: shown, opacity: open.opacity, uv: [0.0, 0.0, 1.0, 1.0] });
+					let (ox, oy) = open.view.offset;
+					b.push_shape(&Shape { w: open.view.width as f32, h: open.view.height as f32, radii: [0.0; 4], ellipse: false }, &[1.0, 0.0, 0.0, 1.0, -ox, -oy], [0.0; 4], [0.0, 0.0, p, clip], texture);
 				}
-			}
-		}
-		// The layers' composite quads take the target's whole box.
-		for inst in b.instances.iter_mut() {
-			if inst.xf0[0].is_nan() {
-				inst.xf0 = [width as f32, 0.0, 0.0, height as f32];
-				inst.xf1[0] = 0.0;
-				inst.xf1[1] = 0.0;
 			}
 		}
 		b

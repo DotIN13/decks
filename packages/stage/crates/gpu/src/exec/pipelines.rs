@@ -5,6 +5,11 @@
 use stage_render::batch::{Instance, Vertex};
 use std::collections::HashMap;
 
+/// A pass's frame uniform: its size, the clips' start, its offset (`stage.wgsl`'s `Frame`).
+pub const FRAME_BYTES: u64 = 32;
+/// Where each pass's frame uniform starts in the buffer: what every device allows an offset at.
+pub const FRAME_STRIDE: u64 = 256;
+
 /// The pipelines for one colour format and sample count.
 pub struct Set {
 	pub shape: wgpu::RenderPipeline,
@@ -35,7 +40,8 @@ impl Pipelines {
 		let frame_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 			label: Some("frame"),
 			entries: &[
-				entry(0, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }),
+				// Each pass's frame uniform, at its own offset in one buffer.
+				entry(0, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: wgpu::BufferSize::new(FRAME_BYTES) }),
 				entry(1, table),
 				entry(2, texture),
 				entry(3, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),

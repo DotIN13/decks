@@ -126,9 +126,19 @@ pub enum Op {
 	Erase { shape: Shape, transform: Affine },
 	PushClip(Clip),
 	PopClip,
-	/// What follows until the matching pop is drawn on its own and laid down at this opacity.
-	PushLayer { opacity: f32 },
+	/// What follows until the matching pop is drawn on its own and laid down at this opacity,
+	/// blurred first when `blur` says so.
+	PushLayer { opacity: f32, blur: Option<LayerBlur> },
 	PopLayer,
+}
+
+/// A layer blurred before it is laid down (an item's `blur` effect): a Gaussian of `sigma` target
+/// pixels, over what lies in `area` (x, y, w, h in target pixels, which may reach past the target):
+/// everything the layer's contents and their blur cover, so a tile has what lies past its edge.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LayerBlur {
+	pub sigma: f32,
+	pub area: [f32; 4],
 }
 
 /// One glyph: where it goes in target pixels, and the part of the glyph texture it shows, in texels.

@@ -70,6 +70,11 @@ test("an angular gradient is a conic gradient from pen's start, its stops where 
 	assert.match(styleOf(page, "b"), /conic-gradient\(from 0deg at 50% 50%, #f00 0%, #ff0 25%, #00f 100%\)/);
 });
 
+test("a blur is a CSS filter of half pen's radius, as the stage draws it", () => {
+	const page = toHtml(doc([{ type: "rectangle", id: "b", width: 10, height: 10, fill: "#000", effect: [{ type: "blur", radius: 6 }, { type: "blur", radius: 4 }, { type: "blur", radius: 9, enabled: false }] }]), ["b"], { format: "html" });
+	assert.match(styleOf(page, "b"), /filter: blur\(5px\)/);
+});
+
 test("variables are custom properties with their dark values, and an item with a theme sets its own", () => {
 	const page = toHtml(
 		doc(

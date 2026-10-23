@@ -20,7 +20,7 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  * - fills are a colour, a linear, radial or angular (conic) gradient, or a picture (its address as
  *   `url` gives it);
  *   strokes are an outline over the children on the side pen strokes (inside, centred, outside),
- *   with the item's corners; shadows (inner ones inset), opacity and turns are CSS's own;
+ *   with the item's corners; shadows (inner ones inset), blurs, opacity and turns are CSS's own;
  * - icons are inline SVG of the icon sets the stage draws them from, as `icons` hands them over;
  *   paths, polygons and arcs are inline SVG of the outline the stage draws;
  * - variables are CSS custom properties, with the dark theme's values in a `prefers-color-scheme:
@@ -29,8 +29,9 @@ import { baseTheme, bool, fillsOf, isVariable, num, paddingOf, parseColor, radii
  * `format: "tailwind"` writes the same page with Tailwind classes (arbitrary values where Tailwind
  * has no name for one) and Tailwind's browser build from its CDN in place of inline styles.
  *
- * What the stage keeps but does not draw (shader fills, blurs, inner shadows off boxes, scripts) is left out
- * here too. A note is its paper with its words; a markdown card's words are written as they are.
+ * What the stage keeps but does not draw (shader and mesh fills, background blurs, inner shadows off
+ * boxes, scripts) is left out here too. A note is its paper with its words; a markdown card's words
+ * are written as they are.
  */
 
 /** An icon's shapes, as the stage reads them (`icons.ts` in `@decks/canvas`). */
@@ -245,6 +246,9 @@ class Writer {
 		this.themeVars(node, parent, css);
 		const opacity = num(this.doc, node.opacity, theme, 1);
 		if (opacity < 1) css.push(["opacity", r2(Math.max(0, opacity))]);
+		// pen's blur radius is two of the Gaussian's sigmas, as the stage draws it; CSS's is one.
+		const blur = this.blurRadius(node, theme);
+		if (blur > 0) css.push(["filter", `blur(${px(blur / 2)})`]);
 		const turn = num(this.doc, node.rotation, theme, 0);
 		if (turn) css.push(["transform", `rotate(${r2(-turn)}deg)`], ["transform-origin", "0 0"]);
 		const flipX = bool(this.doc, node.flipX, theme, false);
@@ -415,6 +419,14 @@ class Writer {
 		if (radii.every((r) => r <= 0)) return undefined;
 		if (!Array.isArray(node.cornerRadius) && isVariable(node.cornerRadius)) return this.length(node.cornerRadius, theme);
 		return radii.every((r) => r === radii[0]) ? px(radii[0]!) : radii.map(px).join(" ");
+	}
+
+	/** An item's blur: its enabled blur effects' radii, added up. */
+	private blurRadius(node: PenNode, theme: ThemeState): number {
+		const effects = node.effect === undefined ? [] : Array.isArray(node.effect) ? node.effect : [node.effect];
+		let radius = 0;
+		for (const effect of effects) if (effect?.type === "blur" && bool(this.doc, effect.enabled, theme, true)) radius += Math.max(0, num(this.doc, effect.radius, theme, 0));
+		return radius;
 	}
 
 	private shadows(node: PenNode, theme: ThemeState): string | undefined {

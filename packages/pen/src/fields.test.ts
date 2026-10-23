@@ -29,8 +29,8 @@ test("a field a type does not have is one warning, children too, and a ref is ne
 test("fills, effects and items Decks keeps but does not draw are said", () => {
 	assert.deepEqual(warnings({ type: "rectangle", fill: [{ type: "mesh_gradient", colors: [] }, "#fff"], effect: [{ type: "blur", radius: 4 }, { type: "shadow", shadowType: "inner" }, { type: "shadow" }] }), [
 		"A mesh_gradient fill on a rectangle is kept for pen.dev, but Decks does not draw it.",
-		"A blur effect on a rectangle is kept for pen.dev, but Decks does not draw it.",
 	]);
+	assert.deepEqual(warnings({ type: "rectangle", effect: [{ type: "background_blur", radius: 4 }] }), ["A background_blur effect on a rectangle is kept for pen.dev, but Decks does not draw it."]);
 	// An inner shadow is drawn in a box and a whole ellipse, not in a path or an arc.
 	const inner = { type: "shadow", shadowType: "inner", blur: 4 };
 	assert.deepEqual(warnings({ type: "ellipse", effect: inner } as never), []);

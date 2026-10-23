@@ -219,3 +219,22 @@ fn an_inner_shadow_is_drawn_over_the_fills_and_under_the_outline() {
 	let Op::InnerShadow { offset, blur, spread, .. } = &list.ops[2] else { panic!() };
 	assert_eq!((*offset, *blur, *spread), ((1.0, 2.0), 6.0, 3.0));
 }
+
+#[test]
+fn a_blurred_item_is_a_blurred_layer_over_what_it_and_its_children_paint() {
+	let (_, s) = scene(json!({"children":[
+		{"type":"frame","id":"f","x":100,"y":100,"width":100,"height":50,"layout":"none","fill":"#fff","effect":{"type":"blur","radius":8},"children":[
+			{"type":"rectangle","id":"r","x":80,"y":0,"width":60,"height":20,"fill":"#f00"}
+		]},
+		{"type":"rectangle","id":"s","x":0,"y":0,"width":10,"height":10,"fill":"#000","effect":[{"type":"blur","radius":2},{"type":"blur","radius":2,"enabled":false}]}
+	]}));
+	let list = paint(&s, Rect { x: 0.0, y: 0.0, w: 512.0, h: 512.0 }, 2.0);
+	assert_eq!(kinds(&list), vec!["layer", "shape", "shape", "/layer", "layer", "shape", "/layer"]);
+	let Op::PushLayer { opacity, blur: Some(blur) } = &list.ops[0] else { panic!("{:?}", list.ops[0]) };
+	// A sigma of half the radius, in target pixels at 2×; the area holds the child past the frame's
+	// right edge and the blur's reach (1.5 radii) round both.
+	assert_eq!((*opacity, blur.sigma), (1.0, 8.0));
+	assert_eq!(blur.area, [176.0, 176.0, 2.0 * (240.0 - 88.0 + 12.0), 148.0]);
+	let Op::PushLayer { blur: Some(small), .. } = &list.ops[4] else { panic!() };
+	assert_eq!(small.sigma, 2.0);
+}
