@@ -131,6 +131,9 @@ instance is updated by its id path, `"card-1/label"`, and the change is kept in 
 
 ## The items
 
+To design a screen, a page or a slide, read the pen-design skill; its `schema.md` lists every
+item type and field with its values.
+
 Every item has `type` and `id`, and may have `name`, `x`, `y`, `width`, `height`, `opacity` (0–1),
 `rotation` (degrees, counter-clockwise), `enabled: false` (hidden), and `metadata` (anything pen has
 no field for: `{ type: "…", … }`).

@@ -3,7 +3,7 @@ export { check, clone, emptyDocument, idFor, ids, indexOf, newId, parse, PEN_VER
 export { expand, MISSING } from "./refs.ts";
 export { CARD, DEFAULT_FONT, DEFAULT_FONT_SIZE, estimateText, isCard, isMarkdown, isMarkdownText, layout, MARKDOWN, MEDIA, mediaOf, NOTE_PAD, NOTE_WIDTH, textStyleOf, type Frame, type MediaItem, type MeasureText, type Placed, type TextStyle } from "./layout.ts";
 export { apply, type Op, type OpResult } from "./ops.ts";
-export { FIELDS, updateWarnings, warnings } from "./fields.ts";
+export { FIELDS, UNDRAWN_EFFECTS, UNDRAWN_FILLS, updateWarnings, warnings } from "./fields.ts";
 export { applyEdits, diff, editDocument, type PenEdit } from "./diff.ts";
 export { boxOf, placements, read, type ReadItem, type ReadOptions } from "./read.ts";
 export { pathBounds } from "./geometry.ts";
