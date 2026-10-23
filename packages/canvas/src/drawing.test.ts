@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyEdits, serialize, type PenDocument, type PenEdit } from "@decks/pen";
-import { boardsOf, createDrawing } from "./drawing.ts";
+import { apply as applyOps, applyEdits, baseTheme, type PenDocument, type PenEdit } from "@decks/pen";
+import { boardsAhead, boardsOf, createDrawing, PENDING_MS } from "./drawing.ts";
 
 const sample = (): PenDocument => ({
 	version: "2.14",
@@ -85,22 +85,161 @@ test("boards are the drawing's decks.board items, and moving one moves its item"
 	assert.deepEqual([board.x, board.y, board.width, board.height], [420, -8, 640, 380]);
 });
 
-test("a drawing the host owns sends every edit and step to the host, and shows only what the host sends back", () => {
-	const sent: unknown[][] = [];
-	const steps: string[] = [];
+/** A host-owned drawing, and what it sent: each edit's ops and name, each step's direction and name. */
+function hosted(doc: PenDocument, answer?: (ops: unknown[], edit?: string) => void | Promise<boolean>) {
+	const sent: Array<{ ops: unknown[]; edit?: string }> = [];
+	const steps: Array<{ direction: string; edit?: string }> = [];
 	const heard: unknown[] = [];
-	const d = createDrawing(serialize({ version: "2.14", children: [{ id: "n1", type: "note", content: "one", x: 0, y: 0 }] } as never), {
-		host: { send: (ops) => sent.push(ops), step: (dir) => steps.push(dir) },
+	const d = createDrawing(doc, {
+		host: {
+			send: (ops, edit) => {
+				sent.push({ ops, ...(edit ? { edit } : {}) });
+				return answer?.(ops, edit);
+			},
+			step: (direction, edit) => void steps.push({ direction, ...(edit ? { edit } : {}) }),
+		},
 		onEdits: (edits) => heard.push(edits),
 	});
-	assert.equal(d.edit([{ op: "update", id: "n1", set: { content: "two" } }]), true);
-	assert.deepEqual(sent, [[{ op: "update", id: "n1", set: { content: "two" } }]]);
-	assert.equal((d.doc().children[0] as { content: string }).content, "one", "nothing changes until the host answers");
-	d.step("undo");
-	assert.deepEqual(steps, ["undo"]);
-	d.set({ version: "2.14", children: [{ id: "n1", type: "note", content: "two", x: 0, y: 0 }] } as never);
-	assert.equal((d.doc().children[0] as { content: string }).content, "two");
+	return { d, sent, steps, heard };
+}
+/** The host's drawing after its server applied these ops (a copy, as a server's frame is). */
+const served = (doc: PenDocument, ops: unknown[]) => applyOps(structuredClone(doc), ops as never, { theme: baseTheme(doc, "light") }).doc;
+const content = (doc: PenDocument, id = "a") => (doc.children.find((one) => one.id === id) as { content?: string } | undefined)?.content;
+
+test("a drawing the host owns shows the person's edit at once, sends it named, and keeps it until the host's drawing has it", () => {
+	const { d, sent, heard } = hosted(sample());
+	const host0 = d.doc();
+	assert.equal(d.edit([{ op: "update", id: "a", set: { content: "two" } }]), true);
+	assert.equal(sent.length, 1);
+	assert.ok(sent[0]!.edit, "the edit has a name");
+	assert.equal(content(d.doc()), "two", "shown before the host answers");
+	assert.equal(d.waiting(), 1);
+	assert.equal(d.given(), host0, "the host's drawing is still the one it gave");
+	assert.deepEqual(d.editsTo(d.doc())?.edits, [{ op: "set", id: "a", key: "content", value: "two" }], "the stage is given the edit");
+	// A drawing from the host that does not have it yet (another revision): the edit stays on top.
+	const other = served(host0, [{ op: "update", id: "b", set: { x: 999 } }]);
+	d.set(other);
+	assert.equal(content(d.doc()), "two");
+	assert.equal(d.doc().children[1]?.x, 999);
+	// The host's drawing that has it: shown as it is, nothing on top any more.
+	const answered = served(other, sent[0]!.ops);
+	d.set(answered, undefined, [sent[0]!.edit!]);
+	assert.equal(d.doc(), answered);
+	assert.equal(d.waiting(), 0);
 	assert.equal(heard.length, 0, "a host-owned drawing reports nothing as the person's own edits");
+});
+
+test("an agent's edit landing while the person's is on its way shows both, and the person's then lands", () => {
+	const { d, sent } = hosted(sample());
+	const host0 = d.doc();
+	d.edit([{ op: "update", id: "a", set: { x: 300, y: 200 } }]);
+	// The agent's edit reaches the server first: its drawing has the agent's note and not the person's move.
+	const agent = served(host0, [{ op: "insert", node: { type: "note", id: "c", content: "agent" }, box: { x1: 2000, y1: 0 } }]);
+	d.set(agent);
+	assert.equal(d.doc().children[0]?.x, 300, "the person's move is still shown");
+	assert.equal(content(d.doc(), "c"), "agent", "and the agent's note with it");
+	const both = served(agent, sent[0]!.ops);
+	d.set(both, undefined, [sent[0]!.edit!]);
+	assert.equal(d.doc(), both);
+	assert.equal(d.doc().children[0]?.x, 300);
+	assert.equal(content(d.doc(), "c"), "agent");
+});
+
+test("an edit the host refuses stops being shown at once, by its answer or by name", async () => {
+	let answer!: (ok: boolean) => void;
+	const { d, sent } = hosted(sample(), () => new Promise<boolean>((resolve) => (answer = resolve)));
+	const host0 = d.doc();
+	d.edit([{ op: "update", id: "a", set: { content: "refused" } }]);
+	assert.equal(content(d.doc()), "refused");
+	answer(false);
+	await Promise.resolve();
+	await Promise.resolve();
+	assert.equal(d.doc(), host0, "back to the host's drawing");
+	assert.equal(d.waiting(), 0);
+	// Refused by name (a step, or the socket's refusal).
+	d.edit([{ op: "update", id: "a", set: { content: "again" } }]);
+	d.refused(sent[1]!.edit!);
+	assert.equal(content(d.doc()), "one");
+	// One that no longer applies to the host's drawing goes: the host's to decide.
+	d.edit([{ op: "update", id: "a", set: { content: "gone" } }]);
+	d.set(served(d.given(), [{ op: "delete", id: "a" }]));
+	assert.equal(d.doc().children.find((one) => one.id === "a"), undefined);
+	assert.equal(d.waiting(), 0);
+});
+
+test("an edit the host never says it has is let go of: the host's drawing wins", (t) => {
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const { d } = hosted(sample(), () => Promise.resolve(true));
+	d.edit([{ op: "update", id: "a", set: { content: "lost" } }]);
+	t.mock.timers.tick(PENDING_MS + 1);
+	assert.equal(content(d.doc()), "one");
+	assert.equal(d.waiting(), 0);
+});
+
+test("another canvas's drawing drops every edit on its way", () => {
+	const { d } = hosted(sample());
+	d.set(sample(), undefined, undefined, "one");
+	d.edit([{ op: "insert", node: { type: "note", id: "z", content: "mine" }, box: { x1: 0, y1: 900 } }]);
+	assert.equal(content(d.doc(), "z"), "mine");
+	d.set({ version: "2.14", children: [] }, undefined, undefined, "two");
+	assert.equal(d.doc().children.length, 0);
+	assert.equal(d.waiting(), 0);
+});
+
+test("undo and redo of the person's own edit are shown at once, named, and put back when refused", () => {
+	const { d, sent, steps } = hosted(sample());
+	const host0 = d.doc();
+	d.edit([{ op: "update", id: "a", set: { x: 50 } }]);
+	const host1 = served(host0, sent[0]!.ops);
+	d.set(host1, undefined, [sent[0]!.edit!]);
+	d.step("undo");
+	assert.equal(steps.length, 1);
+	assert.ok(steps[0]!.edit, "the step has a name");
+	assert.equal(d.doc().children[0]?.x, 0, "undone before the host answers");
+	const host2 = structuredClone(host0);
+	d.set(host2, undefined, [steps[0]!.edit!]);
+	assert.equal(d.doc(), host2);
+	d.step("redo");
+	assert.equal(d.doc().children[0]?.x, 50, "redone before the host answers");
+	d.refused(steps[1]!.edit!);
+	assert.equal(d.doc(), host2, "refused: back to the host's drawing");
+	// The history went with the refusal: the next step is the host's alone, not shown ahead.
+	d.step("redo");
+	assert.equal(steps[2]!.edit, undefined);
+	assert.equal(d.doc(), host2);
+});
+
+test("the same drawing given again with the same names changes nothing", () => {
+	const { d, sent, steps } = hosted(sample());
+	d.edit([{ op: "update", id: "a", set: { x: 50 } }]);
+	const host1 = served(d.given(), sent[0]!.ops);
+	d.set(host1, undefined, [sent[0]!.edit!]);
+	d.set(host1, undefined, [sent[0]!.edit!]);
+	d.step("undo");
+	assert.equal(d.doc().children[0]?.x, 0);
+	d.set(structuredClone(sample()), undefined, [steps[0]!.edit!]);
+	d.step("undo");
+	assert.equal(steps[1]!.edit, undefined, "one edit to take back, heard once");
+});
+
+test("a step is not shown ahead when anything else changed the drawing since the person's edit", () => {
+	const { d, sent, steps } = hosted(sample());
+	d.edit([{ op: "update", id: "a", set: { x: 50 } }]);
+	const host1 = served(d.given(), sent[0]!.ops);
+	d.set(host1, undefined, [sent[0]!.edit!]);
+	d.set(served(host1, [{ op: "update", id: "b", set: { x: 1 } }]));
+	d.step("undo");
+	assert.equal(steps[0]!.edit, undefined);
+	assert.equal(d.doc().children[0]?.x, 50, "the host answers, and its answer is shown");
+});
+
+test("the host's boards are shown as the person's edits on their way leave them", () => {
+	const given = sample();
+	const shown = served(given, [{ op: "update", id: "b", set: { x: 700, y: 40 } }]);
+	const list = [{ path: "boards/plan.html", title: "Plan", x: 400, y: 10, w: 600, h: 520, rev: 3, inContext: [] }];
+	assert.deepEqual(boardsAhead(list, given, shown).map(({ x, y, w, h }) => ({ x, y, w, h })), [{ x: 700, y: 40, w: 600, h: 520 }], "moved, its raised height kept");
+	assert.deepEqual(boardsAhead(list, given, served(given, [{ op: "delete", id: "b" }])), [], "taken off");
+	assert.equal(boardsAhead(list, given, given), list);
 });
 
 test("each new drawing comes with the edits that made it, for the stage, and edits from elsewhere are followed", () => {

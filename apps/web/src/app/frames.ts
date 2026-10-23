@@ -23,7 +23,7 @@ import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
 import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
-import { forgetPen, receivePen, receivePenDelta } from "../state/pens.ts";
+import { forgetPen, receivePen, receivePenDelta, receivePenRefused } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
 import { receiveDoc } from "../board/live-doc.ts";
 
@@ -397,6 +397,10 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 
 				case "stage.pen.delta":
 					receivePenDelta(message);
+					return;
+
+				case "stage.pen.refused":
+					receivePenRefused(message);
 					return;
 
 				// What stages there are, and who is on them: the manager's whole list.

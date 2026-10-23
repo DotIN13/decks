@@ -8,7 +8,7 @@ import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { createBoardHost, type MintBoardToken } from "./board-host.ts";
-import { boardsOf, createDrawing } from "./drawing.ts";
+import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
 import type { DocEdits } from "./stage/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
@@ -122,11 +122,13 @@ export interface CanvasOptions {
 	/** Boards or items dragged onto the host's composer, to talk about them. */
 	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
 	/**
-	 * A drawing the host owns (its server): edits go to `send` as pen operations and show when the
-	 * host's answer arrives through `setDocument`; undo and redo are `step`'s. Absent: the drawing is
-	 * this page's, and `onEdits` hears every change.
+	 * A drawing the host owns (its server): edits go to `send` as pen operations, each with a name
+	 * (`edit`) the host's server sends back with the drawing that has it (`setDocument`'s `made`, or the
+	 * `made` of `state.pen`); undo and redo are `step`'s. Each edit is shown at once and kept on top of
+	 * the drawings the host gives until one has it (`drawing.ts`). `send` may answer whether the edit was
+	 * made. Absent: the drawing is this page's, and `onEdits` hears every change.
 	 */
-	document?: { send(ops: unknown[]): void; step(direction: "undo" | "redo"): void };
+	document?: { send(ops: unknown[], edit?: string): void | Promise<boolean>; step(direction: "undo" | "redo", edit?: string): void };
 	/** The board selected on the canvas, or none. */
 	onSelect?: (path: string | undefined) => void;
 	/** Comment on a board or on drawn items (the comment buttons; absent: none). */
@@ -159,15 +161,22 @@ export interface CanvasOptions {
 
 /** A mounted canvas. */
 export interface CanvasHandle {
-	/** A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no `onEdits`. */
-	setDocument(text: string | PenDocument, base?: string): void;
+	/**
+	 * A newer drawing arrived from elsewhere (another device, an agent): draw it. Not an edit, so no
+	 * `onEdits`. `made`: with `document`, the names of the person's edits it is the first to have.
+	 */
+	setDocument(text: string | PenDocument, base?: string, made?: readonly string[]): void;
 	/**
 	 * What changed in the drawing elsewhere, as edits (`@decks/pen`'s `PenEdit`s, what a host hears as
 	 * a delta): applied to the drawing shown, and by the stage's engines to theirs, so a change costs
 	 * what it touched rather than the whole drawing parsed, compared and laid out again. Not an edit,
 	 * so no `onEdits`. False when they do not apply to the drawing shown: send it whole with `setDocument`.
 	 */
-	applyEdits(edits: readonly PenEdit[], base?: string): boolean;
+	applyEdits(edits: readonly PenEdit[], base?: string, made?: readonly string[]): boolean;
+	/** With `document`: the host's server did not make the person's edit of this name (`send`'s `edit`); it stops being shown. */
+	refused(edit: string): void;
+	/** The drawing as it is shown now, the person's edits on their way included: read reactively. */
+	drawn(): PenDocument;
 	/** Move the camera there, gliding unless `ms` is 0: an agent showing the person something. */
 	glide(camera: Camera, ms?: number): void;
 	/** The drawing as it is now. */
@@ -228,8 +237,12 @@ export interface EditorState {
 	 * The drawing as the host has it (with `document`, the host owns it), and the folder its own
 	 * addresses are read against; undefined while there is none to show.
 	 */
-	/** `edits`, when the host has them: what made this drawing from the one it gave before (`DocEdits`). */
-	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits } | undefined>;
+	/**
+	 * `edits`, when the host has them: what made this drawing from the one it gave before (`DocEdits`).
+	 * With `document`: `made`, the person's edits it is the first to have (by the names `send` was given),
+	 * and `scope`, which drawing it is (the canvas): one of another scope drops the edits on their way.
+	 */
+	pen?: Accessor<{ doc: PenDocument; base: string; edits?: DocEdits; made?: readonly string[]; scope?: string } | undefined>;
 	/** Where the canvas opens: undefined while the host does not know yet. */
 	opening?: Accessor<{ camera?: Camera } | undefined>;
 }
@@ -388,7 +401,7 @@ export function createEditor(
 	// A drawing the host gives as state is the one shown; the editor's own copy follows it, for its board calls.
 	if (options.state?.pen) createComputed(() => {
 		const given = options.state!.pen!();
-		if (given) drawing.set(given.doc, given.edits);
+		if (given) drawing.set(given.doc, given.edits, given.made, given.scope);
 	});
 	// With what made the drawing from the last one, when known, so the stage's engines apply just that.
 	const pen = createMemo(() => {
@@ -416,7 +429,8 @@ export function createEditor(
 	 */
 	createComputed(() => {
 		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : boardsOf(doc());
-		setBoards(reconcile(given, { key: "path" }));
+		// The host's own list is its server's: a board the person moved, sized or took off is shown so until the server has it.
+		setBoards(reconcile(options.boards?.list && drawing.waiting() ? boardsAhead(given, drawing.given(), doc()) : given, { key: "path" }));
 	});
 	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
@@ -489,15 +503,17 @@ export function createEditor(
 	);
 
 	const handle: CanvasHandle = {
-		setDocument: (next, at) => {
+		setDocument: (next, at, made) => {
 			if (at !== undefined) setPenBase(at);
-			drawing.set(next);
+			drawing.set(next, undefined, made);
 		},
-		applyEdits: (edits, at) =>
+		applyEdits: (edits, at, made) =>
 			batch(() => {
 				if (at !== undefined) setPenBase(at);
-				return drawing.follow(edits);
+				return drawing.follow(edits, made);
 			}),
+		refused: (id) => drawing.refused(id),
+		drawn: () => doc(),
 		// The destination and the journey written together, so the stage never sees one without the other.
 		glide: (to, ms = 420) =>
 			batch(() => {

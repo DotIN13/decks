@@ -44,10 +44,22 @@ export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.p
 	}
 	try {
 		const doc = editDocument(known.doc, message.edits);
-		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits } } });
+		setPens({ ...pens(), [message.agentId]: { ...known, doc, rev: message.rev, base: rebase(message.base), error: undefined, edits: { from: known.doc, edits: message.edits }, made: message.made } });
 	} catch {
 		send({ type: "stage.pen.get", agentId: message.agentId });
 	}
+}
+
+/**
+ * Who hears that one of the person's named edits was not made (`stage.pen.refused`): the canvas showing
+ * it ahead of the answer (`canvas/src/drawing.ts`), which then shows the drawing without it.
+ */
+let refusedTo: ((agentId: string, edit: string) => void) | undefined;
+export function onPenRefused(hear: typeof refusedTo): void {
+	refusedTo = hear;
+}
+export function receivePenRefused(message: Extract<ServerMessage, { type: "stage.pen.refused" }>): void {
+	refusedTo?.(message.agentId, message.edit);
 }
 
 export function forgetPen(agentId: string): void {

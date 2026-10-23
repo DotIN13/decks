@@ -28,7 +28,7 @@ import { api } from "./connections/connection.ts";
 import { can } from "./connections/backend.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
-import { pens } from "./state/pens.ts";
+import { onPenRefused, pens } from "./state/pens.ts";
 import { optionFor } from "./chat/composer/thinking.ts";
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
@@ -71,7 +71,7 @@ import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
 import { workingWords } from "./chat/working-sign.ts";
-import { act, editDrawing, setPersonStage } from "./state/decks.ts";
+import { act, editDrawing, sendDrawingEdit, setDrawingEditor, setPersonStage } from "./state/decks.ts";
 
 /**
  * The shell: a title bar, the stage, and the panels floating over it.
@@ -606,7 +606,7 @@ export function App() {
 	const stagePen = createMemo(() => {
 		const id = state.focused;
 		const pen = id ? pens()[id] : undefined;
-		return pen ? { doc: pen.doc, base: pen.base, ...(pen.edits ? { edits: pen.edits } : {}) } : undefined;
+		return pen ? { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}) } : undefined;
 	});
 
 	/**
@@ -617,10 +617,17 @@ export function App() {
 	 */
 	const inking = createMemo(() => drawing() && mode() === "browse");
 
-	/** Undo or redo the person's own last edit to the drawing (`StagePens.step`). */
-	const penStep = (direction: "undo" | "redo") => {
+	/** Undo or redo the person's own last edit to the drawing (`StagePens.step`), as sent; `edit` names it, as an edit's name. */
+	const sendPenStep = (direction: "undo" | "redo", edit?: string) => {
 		const agentId = state.focused;
-		if (agentId) send({ type: "stage.pen.step", agentId, direction });
+		if (agentId) send({ type: "stage.pen.step", agentId, direction, ...(edit ? { edit } : {}) });
+	};
+	/** Undo or redo from a button or a key: through the canvas, which shows the step at once when it can (`drawing.ts`). */
+	const penStep = (direction: "undo" | "redo") => {
+		const handle = untrack(editorHandle);
+		if (!handle) return sendPenStep(direction);
+		if (direction === "undo") handle.undo();
+		else handle.redo();
 	};
 
 	/**
@@ -1075,11 +1082,11 @@ export function App() {
 								inking: drawing,
 							},
 							document: {
-								send: (ops) => {
+								send: (ops, edit) => {
 									const agentId = state.focused;
-									if (agentId) void editDrawing(agentId, ops);
+									return agentId ? sendDrawingEdit(agentId, ops, edit) : Promise.resolve(false);
 								},
-								step: penStep,
+								step: sendPenStep,
 							},
 							canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
 							boards: {
@@ -1100,7 +1107,7 @@ export function App() {
 								onOpenLink: openLinkedBoard,
 								news: newsGlow,
 								onRead: (path) => send({ type: "board.seen", path }),
-								onHide: (path) => void act("canvas.delete", [path]),
+								// Hide is the board's item deleted from the drawing, as the server's canvas.delete does: shown at once (`drawing.ts`).
 								shots: () => {
 									const adaptor = shotAdaptor();
 									const capture = adaptor.capture;
@@ -1124,7 +1131,12 @@ export function App() {
 								}),
 						});
 						setEditorHandle(editor.handle);
+						// Every edit to the drawing on screen goes through the canvas, which shows it at once (`state/decks.ts`).
+						setDrawingEditor({ agentId: () => state.focused, edit: (ops) => editor.handle.edit(ops) });
+						onPenRefused((_agentId, edit) => editor.handle.refused(edit));
 						onCleanup(() => {
+							setDrawingEditor(undefined);
+							onPenRefused(undefined);
 							setEditorHandle(undefined);
 							editor.dispose();
 						});
@@ -1281,7 +1293,7 @@ export function App() {
 				<Show when={!(drawing() && mode() === "browse") && stagePen()}>
 					{(pen) => (
 						<PenBar
-							doc={pen().doc}
+							doc={editorHandle()?.drawn() ?? pen().doc}
 							onEdit={(ops) => {
 								const agentId = state.focused;
 								if (agentId) void editDrawing(agentId, ops);

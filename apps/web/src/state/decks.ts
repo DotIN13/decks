@@ -52,10 +52,39 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
 }
 
 /**
- * The person's edit to the drawing on screen. Refused, the drawing is asked for again, so a preview
- * the canvas drew ahead of the answer goes away.
+ * The person's edit to the drawing on screen, sent. `edit` names it: the server sends the name back
+ * with the revision that has it (`made`), which is how the canvas, showing the edit already, knows when
+ * the drawing it is sent has it (`canvas/src/drawing.ts`). Refused, the drawing is asked for again, so
+ * an edit the canvas drew ahead of the answer goes away; the answer says whether it was made.
  */
-export async function editDrawing(agentId: string, ops: unknown[]): Promise<void> {
-	const done = await act("canvas.batch", [ops]);
+export async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {
+	let done: unknown;
+	try {
+		const connection = edit ? connect({ url: decks().address, stage: () => onScreen(), agent: () => talkingTo(), notes: () => {}, headers: { ...authHeaders(), "x-decks-edit": edit } }) : decks();
+		done = (await connection.call("canvas.batch", [ops])).value;
+	} catch (error) {
+		notice("warn", error instanceof DecksError || error instanceof Error ? error.message : String(error));
+		done = undefined;
+	}
 	if (done === undefined) send({ type: "stage.pen.get", agentId });
+	return done !== undefined;
+}
+
+/**
+ * The canvas on screen takes the person's edits itself (`setDrawingEditor`): it shows each at once and
+ * sends it. Anything else that edits the drawing (a file dropped, a pen file placed, the ink bar's
+ * delete) goes through it too, so it shows at once as well; with no canvas, it is sent as it is.
+ */
+let drawingEditor: { agentId: () => string | undefined; edit(ops: unknown[]): void } | undefined;
+export function setDrawingEditor(editor: typeof drawingEditor): void {
+	drawingEditor = editor;
+}
+
+/** The person's edit to the drawing of the chat `agentId`: through the canvas when it shows that drawing, else sent. */
+export async function editDrawing(agentId: string, ops: unknown[]): Promise<void> {
+	if (drawingEditor && drawingEditor.agentId() === agentId) {
+		drawingEditor.edit(ops);
+		return;
+	}
+	await sendDrawingEdit(agentId, ops);
 }
