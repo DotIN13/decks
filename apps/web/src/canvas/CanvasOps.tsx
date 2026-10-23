@@ -44,7 +44,7 @@ function pointerGroups(): Group[] {
 				{ keys: "pinch · ⌘-wheel", what: "zoom about the pointer" },
 				{ keys: "space-drag", what: "pan from anywhere, including over a board" },
 				{ keys: "+ · -", what: "zoom about the centre" },
-				{ keys: "0", what: "fit every board on screen" },
+				{ keys: "0", what: "fit everything on the canvas on screen" },
 				{ keys: "1", what: "fit the selected board" },
 			],
 		},

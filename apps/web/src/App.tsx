@@ -63,6 +63,7 @@ import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
 import {boxOf, fitInto, keepVisible, middleOf} from "@decks/canvas/camera";
+import { baseTheme, placements } from "@decks/pen";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import {historyShown, setInspectable} from "./state/edge.ts";
@@ -611,6 +612,23 @@ export function App() {
 		const writer = by ? { name: by.name, color: by.color } : undefined;
 		return pen ? { doc: pen.doc, base: pen.base, scope: pen.stage, ...(pen.edits ? { edits: pen.edits } : {}), ...(pen.made ? { made: pen.made } : {}), ...(writer ? { writer } : {}) } : undefined;
 	});
+	/**
+	 * Everything on the canvas in view, for framing it: its boards and every item drawn round them
+	 * (notes, shapes, arrows, ink, frames), so a canvas that is mostly drawing is framed on its drawing.
+	 */
+	const canvasBoxes = (): Array<{ x: number; y: number; w: number; h: number }> => {
+		const boxes = stageBoards().map(boxOf);
+		const doc = stagePen()?.doc;
+		if (doc) {
+			const placed = placements(doc, { theme: baseTheme(doc, scheme() === "dark" ? "dark" : "light") });
+			for (const node of doc.children ?? []) {
+				const box = placed.get(node.id)?.box;
+				if (box && box.w > 0 && box.h > 0) boxes.push({ x: box.x, y: box.y, w: box.w, h: box.h });
+			}
+		}
+		return boxes;
+	};
+
 
 	/**
 	 * Ink on the boards, which only browse mode has. A memo here rather than `a() && b()` in the
@@ -965,11 +983,11 @@ export function App() {
 			const stage = document.querySelector(".stage");
 			if (!stage) return;
 			// The boards of the conversation on screen, which are that stage's the moment it lands.
-			const boards = stageBoards();
-			if (boards.length === 0 && Date.now() - asked < 1200) return;
+			const boxes = canvasBoxes();
+			if (boxes.length === 0 && Date.now() - asked < 1200) return;
 			stopLanding();
 			const size = { width: stage.clientWidth, height: stage.clientHeight };
-			moveCamera(middleOf(boards.map(boxOf), canvasBox(size), size, camera()));
+			moveCamera(middleOf(boxes, canvasBox(size), size, camera()));
 			setSelected(undefined);
 			switchingFor(false);
 			reportCamera(camera(), state.focused);
@@ -1229,7 +1247,7 @@ export function App() {
 					 * deck can be 112 boards; the canvas is what you are looking at, and fitting
 					 * it is what "where am I" means.
 					 */
-					onFit={() => fitAll(stageBoards(), setCamera)}
+					onFit={() => fitAll(canvasBoxes(), setCamera)}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and
@@ -1679,9 +1697,9 @@ export function App() {
 	);
 }
 
-function fitAll(boards: Board[], setCamera: (camera: Camera) => void): void {
+function fitAll(boxes: Array<{ x: number; y: number; w: number; h: number }>, setCamera: (camera: Camera) => void): void {
 	const stage = document.querySelector(".stage");
-	if (!stage) return;
+	if (!stage || boxes.length === 0) return;
 	const view = { width: stage.clientWidth, height: stage.clientHeight };
-	setCamera(fitInto(boards.map(boxOf), view, canvasBox(view)));
+	setCamera(fitInto(boxes, view, canvasBox(view)));
 }

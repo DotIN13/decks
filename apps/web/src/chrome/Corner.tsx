@@ -237,8 +237,8 @@ export function Corner(props: {
 			<button
 				type="button"
 				class="icon-button"
-				title="Fit the boards on the canvas (0)"
-				aria-label="Fit the boards on the canvas"
+				title="Fit everything on the canvas (0)"
+				aria-label="Fit everything on the canvas"
 				onClick={() => props.onFit()}
 			>
 				<Icon of={Maximize} size={15} />

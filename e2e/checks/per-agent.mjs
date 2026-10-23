@@ -142,7 +142,7 @@ say("…and the chip now addresses her", /^to Ada/.test((await page.locator(".do
  * same verb and only works when the cursor is not in a field — after an open it usually is,
  * so the fit quietly did nothing and the check ran on whatever view the page loaded with.
  */
-await page.locator('[aria-label="Fit the boards on the canvas"]').click();
+await page.locator('[aria-label="Fit everything on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");

@@ -867,7 +867,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	let at = await spot();
 	// Off screen, or under the chrome: fit the canvas, as a person looking for it would.
 	if (!at) {
-		const fitButton = page.locator('button[aria-label="Fit the boards on the canvas"]').first();
+		const fitButton = page.locator('button[aria-label="Fit everything on the canvas"]').first();
 		if (await fitButton.isVisible().catch(() => false)) {
 			await fitButton.click();
 			await rest(page);
