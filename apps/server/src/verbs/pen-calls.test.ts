@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -201,6 +201,44 @@ test("a placeholder frame an agent draws names that agent as the canvas's writer
 		assert.equal(app.pens.writerOf(stage), agent.id);
 		const [delta] = app.pens.changes([agent.id], stage);
 		assert.equal(delta?.type === "stage.pen.delta" && delta.by, agent.id);
+	} finally {
+		cleanup();
+	}
+});
+
+test("canvas.export writes a frame as one HTML page in the deck, as flexbox or as Tailwind classes", async () => {
+	const { app, must, call, cleanup } = await open();
+	try {
+		await must("canvas.variables", [{ ink: { type: "color", value: [{ value: "#111111" }, { value: "#eeeeee", theme: { mode: "dark" } }] } }, { themes: { mode: ["light", "dark"] } }]);
+		await must("canvas.insert", [
+			{ type: "frame", name: "Price card", width: 300, layout: "vertical", gap: 12, padding: 20, fill: "#ffffff", cornerRadius: 12, children: [
+				{ type: "text", name: "Title", content: "Pro <plan>", fontSize: 20, fontWeight: 700, fill: "$ink" },
+				{ type: "rectangle", name: "Bar", width: "fill_container", height: 8, fill: "#3b5cf6" },
+				{ type: "path", name: "Tick", geometry: "M0 5 L4 9 L12 0", width: 12, height: 9, stroke: "#2eaf5a", strokeWidth: 2 },
+				{ type: "rectangle", name: "Photo", width: 100, height: 60, fill: { type: "image", url: "pics/sea.png", mode: "fit" } },
+			] },
+			{ at: { x1: 0, y1: 0 } },
+		]);
+		const deck = app.stage.deckPath();
+		const html = (await must("canvas.export", ["price-card", { format: "html" }])).value;
+		assert.deepEqual(html, { file: "exports/price-card.html" });
+		const page = readFileSync(join(deck, html.file), "utf8");
+		assert.match(page, /data-pen-id="price-card" style="[^"]*display: flex; flex-direction: column; gap: 12px; padding: 20px/);
+		assert.match(page, /data-pen-id="bar" style="align-self: stretch; height: 8px/);
+		assert.match(page, /Pro &lt;plan&gt;/);
+		assert.match(page, /color: var\(--ink\)/);
+		assert.match(page, /--ink: #111111;[\s\S]*prefers-color-scheme: dark[\s\S]*--ink: #eeeeee;/);
+		// A picture is read from the canvas's folder, as the page finds it from exports/.
+		assert.match(page, /url\(&quot;\.\.\/canvases\/[^/]+\/pics\/sea\.png&quot;\)[^"]*background-size: contain/);
+		assert.match(page, /<svg data-pen-id="tick"[^>]*><path d="[^"]+" fill="none" stroke="#2eaf5a" stroke-width="2"/);
+		const tailwind = (await must("canvas.export", [["price-card"], { format: "tailwind", to: "exports/tw/price.html" }])).value;
+		const tw = readFileSync(join(deck, tailwind.file), "utf8");
+		assert.match(tw, /cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser@4/);
+		assert.match(tw, /data-pen-id="price-card" class="[^"]*flex flex-col gap-\[12px\] p-\[20px\] justify-start items-start bg-\[color:#ffffff\] rounded-\[12px\]/);
+		assert.deepEqual((await must("canvas.export", ["price-card"])).value, { file: "exports/price-card.html" }, "html is the default");
+		assert.ok(!(await call("canvas.export", ["price-card", { format: "pdf" }])).ok, "a format it does not write is refused");
+		assert.ok(!(await call("canvas.export", ["nope", { format: "html" }])).ok, "an id that is not there is refused");
+		assert.ok(!(await call("canvas.export", ["price-card", { format: "html", to: "../outside.html" }])).ok, "a page outside the deck is refused");
 	} finally {
 		cleanup();
 	}

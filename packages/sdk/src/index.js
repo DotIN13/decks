@@ -57,6 +57,7 @@ export const VERBS = [
 	["canvas.fit",["board","options?"]],
 	["canvas.save",["id","frame","options?"]],
 	["canvas.screenshot",["options?"]],
+	["canvas.export",["of","options?"]],
 	["canvas.rename",["title","options?"]],
 	["canvas.file",["options?"]],
 	["board.list",[]],

@@ -235,6 +235,18 @@ export interface Verbs {
 		 */
 		screenshot(options?: { canvas?: string; of?: string | string[] | { x1?: number; y1?: number; x2?: number; y2?: number }; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark"; live?: boolean }): Promise<Screenshot>;
 		/**
+		 * The items `of` names (an id or a list, each with what is in it) as one self-contained web page in
+		 * the deck, at `to` (default `exports/<id>.html`). A frame with a layout is a flexbox (gap,
+		 * padding, justifyContent, alignItems; fill_container is flex 1 or stretch, fit_content the
+		 * content's size), a number is px, and a frame with no layout holds its children where they sit;
+		 * text keeps its font, size, weight, line height, letter spacing, colour and wrapping; fills
+		 * (colours, gradients, pictures by relative address), strokes, corners, outer shadows and opacity
+		 * are CSS; icons, paths and shapes are inline SVG; variables are CSS custom properties, with the
+		 * dark theme's values under prefers-color-scheme. `format` "html" (the default) writes inline
+		 * styles; "tailwind" the same page as Tailwind classes, with Tailwind's CDN script.
+		 */
+		export(of: string | string[], options?: { canvas?: string; frame?: string; format?: "html" | "tailwind"; to?: string }): Promise<{ file: string }>;
+		/**
 		 * What the person calls this canvas: a few words for what is on it, that a person would look for.
 		 * The folder never changes.
 		 */

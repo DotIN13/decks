@@ -211,6 +211,15 @@ export const VERBS: readonly Verb[] = [
 		result: Screenshot,
 	},
 	{
+		name: "canvas.export",
+		group: "canvas",
+		...deckChange,
+		summary:
+			'The items `of` names (an id or a list, each with what is in it) as one self-contained web page in the deck, at `to` (default `exports/<id>.html`). A frame with a layout is a flexbox (gap, padding, justifyContent, alignItems; fill_container is flex 1 or stretch, fit_content the content\'s size), a number is px, and a frame with no layout holds its children where they sit; text keeps its font, size, weight, line height, letter spacing, colour and wrapping; fills (colours, gradients, pictures by relative address), strokes, corners, outer shadows and opacity are CSS; icons, paths and shapes are inline SVG; variables are CSS custom properties, with the dark theme\'s values under prefers-color-scheme. `format` "html" (the default) writes inline styles; "tailwind" the same page as Tailwind classes, with Tailwind\'s CDN script.',
+		params: [p("of", union(str(), arr(str()))), onItems({ format: opt(lit("html", "tailwind")), to: opt(str()) })],
+		result: obj({ file: str() }),
+	},
+	{
 		name: "canvas.rename",
 		group: "canvas",
 		...deckChange,

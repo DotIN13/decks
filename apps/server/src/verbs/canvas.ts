@@ -1,5 +1,5 @@
 import { copySharedCanvas } from "../stage/copy-shared.ts";
-import { basename } from "node:path";
+import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { BOARD_ITEM, boardOf, type ReadMore } from "../stage/pens.ts";
@@ -11,6 +11,8 @@ import { shootOn } from "./stage.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 import { freeSpot, type Side } from "./space.ts";
+import { exportPage } from "./export.ts";
+import { resolveInDeck } from "../deck/roots.ts";
 
 /**
  * The canvas calls: everything on one canvas, boards included, read and changed as items.
@@ -398,6 +400,26 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					if (!from) throw new Error(`Nothing called ${near} is on this canvas to find room near: decks canvas read lists what is.`);
 				}
 				return freeSpot(items, { w, h }, { ...(from ? { near: from } : {}), ...(side ? { side } : {}), margin: margin ?? GAP }) as never;
+			},
+			export: async (of: string | string[], options?: On & { format?: "html" | "tailwind"; to?: string }) => {
+				const { format = "html", to, ...on } = options ?? {};
+				if (format !== "html" && format !== "tailwind") throw new Error('format is "html" (inline styles, the default) or "tailwind" (Tailwind classes), as in decks canvas export pricing-card \'{"format":"tailwind"}\'.');
+				const asked = Array.isArray(of) ? of : [of];
+				if (asked.length === 0 || asked.some((one) => typeof one !== "string" || !one.trim())) throw new Error("export takes what to export: an item's id, or a list of them, from decks canvas read.");
+				if (to !== undefined && (typeof to !== "string" || !to.trim())) throw new Error('to is the page\'s deck path, as in "exports/pricing.html".');
+				const target = targetOf(on);
+				onCanvas = target.canvas;
+				const pens = needPens();
+				const frame = target.frame !== undefined ? pens.framePen(target.frame) : undefined;
+				const raw = frame ? frame.doc : pens.get(target.canvas!).doc;
+				const doc = frame ? frame.imported(raw) : pens.withImported(target.canvas!, raw);
+				const itemIds = asked.map((one) => idIn(raw, one, "of"));
+				const deck = service.deckPath();
+				const page = resolveInDeck(deck, to ?? `exports/${itemIds[0]!.replace(/\//g, "-")}.html`);
+				const folder = frame ? dirname(pens.penFile(target.frame!).file) : pens.folderOf(target.canvas!);
+				const done = await exportPage({ doc, ids: itemIds, format, deck, page, folder, measure, ...(target.canvas ? { title: pens.titleOf(target.canvas) } : {}), boardOf: (node) => boardOf(node) });
+				ctx.notes.push(...done.notes);
+				return { file: done.file } as never;
 			},
 			insert: async (item: ItemIn, options?: On & { at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }) => {
 				const { canvas, frame, ...place } = options ?? {};
