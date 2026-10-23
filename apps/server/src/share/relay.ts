@@ -78,7 +78,7 @@ export class Relay {
 		 */
 		const given = bearerOf(req.headers);
 		const headers: Record<string, string> = { Authorization: `Bearer ${given?.startsWith("dk_b_") ? given : target.token}` };
-		for (const name of ["accept", "content-type", "range", "x-decks-stage", "x-decks-agent"]) {
+		for (const name of ["accept", "content-type", "range", "x-decks-stage", "x-decks-agent", "x-decks-edit"]) {
 			const value = req.headers[name];
 			if (typeof value === "string") headers[name] = value;
 		}

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { rustRouter } from "./arrows.ts";
 import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
@@ -74,6 +75,15 @@ export interface PenEntry {
 	text?: string;
 }
 
+/**
+ * The person's own name for the edit being made, when the browser gave one (`x-decks-edit` on a verb's
+ * request, `edit` on the socket's): set around the call that makes it, read when the drawing is written,
+ * and sent back with the revision that has it (`made` on `stage.pen.delta` and `stage.pen`). The browser
+ * shows its edit at once and keeps it on top of what the server sends until that revision comes
+ * (`canvas/src/drawing.ts`), so it never draws the drawing as it was before for the round trip.
+ */
+export const penEditBy = new AsyncLocalStorage<string>();
+
 /** Words measured as the page measures them (`text.ts`). */
 const measure = serverText.measure;
 
@@ -96,6 +106,8 @@ export class StagePens {
 	private framesWatchers = new Map<string, FSWatcher>();
 	private pending = new Map<string, NodeJS.Timeout>();
 	private readonly history = new Map<string, { undo: Array<{ before: string; after: string }>; redo: Array<{ before: string; after: string }> }>();
+	/** The browsers' names for the edits written to each stage since its drawing was last sent (`penEditBy`). */
+	private readonly made = new Map<string, string[]>();
 
 	constructor(
 		private deckPath: string,
@@ -963,11 +975,18 @@ export class StagePens {
 		return { doc: this.withImported(name, this.get(name).doc), base: `${fileUrl(this.folderOf(name))}/` };
 	}
 
-	frame(agentId: string, name: string): ServerMessage {
+	frame(agentId: string, name: string, made = this.takeMade(name)): ServerMessage {
 		const entry = this.get(name);
 		const doc = this.withImported(name, entry.doc);
 		this.sent.set(name, { rev: entry.rev, doc });
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc, base: `${fileUrl(this.folderOf(name))}/`, ...(entry.error ? { error: entry.error } : {}), ...(made.length ? { made } : {}) };
+	}
+
+	/** The browsers' edits written since the drawing was last sent, taken: the next frame or delta says it has them. */
+	private takeMade(name: string): string[] {
+		const made = this.made.get(name) ?? [];
+		this.made.delete(name);
+		return made;
 	}
 
 	/** The version of each stage last sent to browsers, whole or as edits: what the next edits are from. */
@@ -982,12 +1001,13 @@ export class StagePens {
 	changes(agentIds: readonly string[], name: string): ServerMessage[] {
 		const entry = this.get(name);
 		const before = this.sent.get(name);
-		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name));
+		const made = this.takeMade(name);
+		if (!before || entry.error) return agentIds.map((id) => this.frame(id, name, made));
 		const doc = this.withImported(name, entry.doc);
 		const edits = diff(before.doc, doc);
 		this.sent.set(name, { rev: entry.rev, doc });
 		const base = `${fileUrl(this.folderOf(name))}/`;
-		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base }));
+		return agentIds.map((agentId) => ({ type: "stage.pen.delta", agentId, stage: name, from: before.rev, rev: entry.rev, edits, base, ...(made.length ? { made } : {}) }));
 	}
 
 	/** Replace the document whole, from text that must parse. */
@@ -1013,6 +1033,8 @@ export class StagePens {
 		const previous = this.cache.get(name);
 		const entry = { doc, rev: (previous?.rev ?? 0) + 1, mtime: statSync(file).mtimeMs, text };
 		this.cache.set(name, entry);
+		const by = penEditBy.getStore();
+		if (by) this.made.set(name, [...(this.made.get(name) ?? []), by]);
 		this.changed(name, entry);
 		return entry;
 	}

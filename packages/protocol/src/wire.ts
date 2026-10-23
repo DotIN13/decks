@@ -154,7 +154,7 @@ export type ClientMessage =
 	 * same pen operations an agent sends through `decks.canvas.batch` (`@decks/pen`'s `Op`). Applied to
 	 * the stage the named agent has open, together or not at all.
 	 */
-	| { type: "stage.pen.edit"; agentId: string; ops: unknown[]; /** The stage on screen, whose drawing is edited; else the agent's. */ stage?: string }
+	| { type: "stage.pen.edit"; agentId: string; ops: unknown[]; /** The stage on screen, whose drawing is edited; else the agent's. */ stage?: string; /** The browser's name for this edit, sent back in `made` with the revision that has it, or in `stage.pen.refused`. */ edit?: string }
 	/** The whole drawing again: the browser missed a revision of `stage.pen.delta`. */
 	| { type: "stage.pen.get"; agentId: string }
 	/**
@@ -171,7 +171,7 @@ export type ClientMessage =
 	/** Delete a stage from the manager, with its drawing and the boards kept in its folder. */
 	| { type: "stage.delete"; name: string }
 	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
-	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo"; /** The stage on screen. */ stage?: string }
+	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo"; /** The stage on screen. */ stage?: string; /** The browser's name for this step, as `stage.pen.edit`'s `edit`. */ edit?: string }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *
@@ -403,12 +403,14 @@ export type ServerMessage =
 	 * disk does not parse and `doc` is the last good version. `base` is the stage folder's URL,
 	 * which an image fill's relative `url` is read against.
 	 */
-	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string }
+	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string; /** The browsers' names for the edits this revision is the first to have (`edit` on `stage.pen.edit` and `stage.pen.step`, `x-decks-edit` on `canvas.batch`). */ made?: string[] }
 	/**
 	 * What changed in a stage drawing from revision `from` to `rev` (`@decks/pen` `diff`): sent in place
 	 * of the whole drawing to a browser that holds `from`. One that does not asks again (`stage.pen.get`).
 	 */
-	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string }
+	| { type: "stage.pen.delta"; agentId: string; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; /** The browsers' edits this revision is the first to have, by the names they gave them. */ made?: string[] }
+	/** A browser's named edit or step was not made (a refusal, nothing to undo): the browser stops showing it. */
+	| { type: "stage.pen.refused"; agentId: string; edit: string }
 	/**
 	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
 	 *

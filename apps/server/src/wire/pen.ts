@@ -2,6 +2,7 @@ import type { Op } from "@decks/pen";
 import { deleteStage, titleCanvas } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
 import { asPerson } from "../verbs/person.ts";
+import { penEditBy } from "../stage/pens.ts";
 
 /**
  * The person's edits to a stage drawing (`stage/pens.ts`).
@@ -14,11 +15,15 @@ import { asPerson } from "../verbs/person.ts";
 export const pen = {
 	"stage.pen.edit": (message, reply, wire) => {
 		const asked = { agent: message.agentId, ...(message.stage ? { stage: message.stage } : {}) };
-		void asPerson({ agents: wire.agents, pens: wire.stage.pens }, asked, "pen.edit", [message.ops as Op[]], reply).then((ok) => {
+		const edit = typeof message.edit === "string" && message.edit ? message.edit.slice(0, 80) : undefined;
+		const run = () => asPerson({ agents: wire.agents, pens: wire.stage.pens }, asked, "pen.edit", [message.ops as Op[]], reply);
+		void (edit ? penEditBy.run(edit, run) : run()).then((ok) => {
+			if (ok) return;
+			if (edit) reply({ type: "stage.pen.refused", agentId: message.agentId, edit });
 			// Send the drawing back as it is, so a preview the browser drew for the failed edit goes away.
 			const agent = wire.agents.get(message.agentId);
 			const name = agent?.stageName();
-			if (!ok && agent && name && wire.stage.pens) reply(wire.stage.pens.frame(agent.id, name));
+			if (agent && name && wire.stage.pens) reply(wire.stage.pens.frame(agent.id, name));
 		});
 	},
 	/** The whole drawing again, for a browser that missed a revision of the edits. */
@@ -90,9 +95,14 @@ export const pen = {
 		if (!agent || !pens) return;
 		const name = message.stage && pens.has(message.stage) ? message.stage : agent.stageName(false);
 		if (!name) return;
+		const edit = typeof message.edit === "string" && message.edit ? message.edit.slice(0, 80) : undefined;
 		try {
-			pens.step(name, message.direction === "redo" ? "redo" : "undo");
+			const step = () => pens.step(name, message.direction === "redo" ? "redo" : "undo");
+			if (edit) penEditBy.run(edit, step);
+			else step();
 		} catch (error) {
+			// A browser that showed the step ahead of the answer stops showing it.
+			if (edit) reply({ type: "stage.pen.refused", agentId: message.agentId, edit });
 			reply({ type: "notice", level: "info", text: (error as Error).message });
 		}
 	},

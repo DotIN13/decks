@@ -5,6 +5,7 @@ import { callerTool, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
 import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
+import { penEditBy } from "../stage/pens.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
 /**
@@ -21,7 +22,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * The person, in a Decks tab or a terminal, and a paired front end acting for them (Studio) call
  * through the person's tool; they may say what they are acting on, as parameters and not as who
  * they are: `X-Decks-Stage`, the canvas on screen, and `X-Decks-Agent`, the agent they are talking
- * to. An agent's token calls as that agent, an app's as that app, and a board's as that board: a
+ * to; `X-Decks-Edit` names an edit to the drawing, which comes back in the `made` of the revision
+ * that has it. An agent's token calls as that agent, an app's as that app, and a board's as that board: a
  * board's page is handed its own token by the page that framed it (`@decks/canvas/internal/board-host.ts`),
  * and that is the only way a call is a board's. Naming a board in a header makes nobody that board.
  */
@@ -91,7 +93,9 @@ export function verbRoutes(app: App): express.Router {
 			res.status(caller.status).json({ ok: false, error: caller.error, notes: [] });
 			return;
 		}
-		const answer = await caller.tool.call(name, args, caller.on ?? {});
+		const call = () => caller.tool.call(name, args, caller.on ?? {});
+		// The person's name for an edit to the drawing, sent back with the revision that has it (`StagePens`, `penEditBy`).
+		const answer = caller.edit ? await penEditBy.run(caller.edit, call) : await call();
 		if (caller.announce) caller.announce(name, answer);
 		res.status(answer.ok ? 200 : 422).json(answer satisfies VerbAnswer);
 	});
@@ -99,7 +103,7 @@ export function verbRoutes(app: App): express.Router {
 	return router;
 }
 
-type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string } } | { error: string; status: number };
+type Caller = { tool: StageTool; announce?: (verb: string, answer: StageCallResult) => void; on?: { stage?: string }; /** The person's name for the edit this call makes (`X-Decks-Edit`). */ edit?: string } | { error: string; status: number };
 
 /** The stage tool a request acts through: the token's principal's (`auth/principal.ts`). */
 export async function callerOf(app: App, req: Pick<Request, "headers"> & { principal?: Principal }, allowedOnce: Set<string>): Promise<Caller> {
@@ -114,8 +118,9 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 			// The person, clicking in the browser: the canvas on screen and the agent they are talking to.
 			const stage = header("x-decks-stage");
 			const to = header("x-decks-agent");
+			const edit = header("x-decks-edit")?.slice(0, 80);
 			const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { ...(stage ? { stage } : {}), ...(to ? { agent: to } : {}) });
-			return { tool: agent.personTool(), on: { ...(stage ? { stage } : {}) } };
+			return { tool: agent.personTool(), on: { ...(stage ? { stage } : {}) }, ...(edit ? { edit } : {}) };
 		}
 		case "agent": {
 			const agent = app.agents.get(principal.id);
