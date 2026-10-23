@@ -1056,21 +1056,23 @@ body {
 		box-shadow: var(--v3-shadow);
 	}
 	/*
-	 * Where a drag of the composer can start: its top padding, and a band just above its edge that
-	 * nothing is drawn in, 24px in all, so the grip is easy to catch without the bar looking any
-	 * taller. Not over a queued message above it, which is pressed for itself.
+	 * Where a drag of the composer can start: a band from 10px above its edge to 16px below it, so
+	 * the grip is easy to catch without the bar looking any taller. The text starts 10px down, so a
+	 * press on the first few pixels of its top line takes the bar, not the words. Not over a queued
+	 * message above it, which is pressed for itself.
 	 */
 	.dock .composer-box::before {
 		content: "";
 		position: absolute;
-		top: -16px;
+		z-index: 2;
+		top: -10px;
 		left: 12px;
 		right: 12px;
-		height: 24px;
+		height: 26px;
 	}
 	.dock:has(.composer-queue) .composer-box::before {
 		top: 0;
-		height: 8px;
+		height: 16px;
 	}
 	.dock .dock-grip {
 		top: 4px;
