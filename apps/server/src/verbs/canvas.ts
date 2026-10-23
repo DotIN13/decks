@@ -352,14 +352,16 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 
 	return {
 		canvas: {
-			read: async (options?: On & { of?: string; depth?: number }) => {
-				const { of, depth, ...on } = options ?? {};
+			read: async (options?: On & { of?: string; depth?: number; resolve?: ReadMore["resolve"]; theme?: Record<string, string> }) => {
+				const { of, depth, resolve, theme, ...on } = options ?? {};
 				const target = targetOf(on);
 				const pens = needPens();
 				onCanvas = target.canvas;
 				const more: ReadMore = {
 					...(of !== undefined && of !== null ? { of: idIn(target.frame !== undefined ? pens.framePen(target.frame).doc : pens.get(target.canvas).doc, of, "of") } : {}),
 					...(depth !== undefined && depth !== null ? { depth } : {}),
+					...(resolve ? { resolve } : {}),
+					...(theme ? { theme } : {}),
 				};
 				if (target.frame !== undefined) {
 					const { file, children, ...rest } = pens.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string };

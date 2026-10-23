@@ -7,6 +7,7 @@ export { FIELDS, updateWarnings, warnings } from "./fields.ts";
 export { applyEdits, diff, editDocument, type PenEdit } from "./diff.ts";
 export { boxOf, placements, read, type ReadItem, type ReadOptions } from "./read.ts";
 export { pathBounds } from "./geometry.ts";
+export { outlineOf } from "./outline.ts";
 export * from "./values.ts";
 export { ARROW, ARROW_SIDES, bendsArrow, bentArrows, arrowBend, arrowEnd, arrowEndAt, arrowMiddle, arrowEndItem, arrowEndSide, arrowLabel, arrowPoints, arrowRoute, arrowShape, arrowStyle, isArrow, isPointEnd, moveArrowEnds, reroute, routeArrow, sidedRoute, sidePoint, type ArrowHeads, type ArrowRouter, type ArrowRoute, type ArrowSide, type ArrowStyle } from "./arrows.ts";
 export { fitShapes, isShape, makeLabel, makeShape, maxRadius, roundedGeometry, SHAPE, SHAPE_GROUPS, SHAPES, shapeKind, shapeLabel, shapeOutline, shapeRadius, type ShapeGroup, type ShapeKind } from "./shapes.ts";

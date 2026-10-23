@@ -114,3 +114,26 @@ test("canvas.read of one item, by id or a board's path, and to a depth", async (
 		cleanup();
 	}
 });
+
+test("canvas.read resolves variables in a theme, instances and geometry when asked, and reads as written otherwise", async () => {
+	const { must, cleanup } = await open();
+	try {
+		await must("canvas.variables", [{ ink: { type: "color", value: [{ value: "#111111" }, { value: "#eeeeee", theme: { mode: "dark" } }] } }, { themes: { mode: ["light", "dark"] } }]);
+		await must("canvas.batch", [[
+			{ op: "insert", item: { type: "frame", name: "Card", reusable: true, layout: "vertical", fill: "$ink", children: [{ type: "text", name: "Label", content: "Card" }] }, at: { x1: 0, y1: 0 } },
+			{ op: "insert", item: { type: "ref", id: "c1", ref: "card", descendants: { label: { content: "First" } } }, at: { x1: 400, y1: 0 } },
+			{ op: "insert", item: { type: "ellipse", name: "Dot", width: 20, height: 10 }, at: { x1: 0, y1: 400 } },
+		]]);
+		const items = (opts: object) => must("canvas.read", [opts]).then((a) => a.value.items as Array<Record<string, any>>);
+		assert.equal((await items({}))[0]!.fill, "$ink");
+		assert.equal((await items({ of: "card", resolve: { variables: true } }))[0]!.fill, "#111111");
+		assert.equal((await items({ of: "card", resolve: { variables: true }, theme: { mode: "dark" } }))[0]!.fill, "#eeeeee");
+		const c1 = (await items({ of: "c1", resolve: { instances: true } }))[0]!;
+		assert.equal(c1.ref, "card");
+		assert.deepEqual(c1.children.map((n: { id: string; content: string }) => [n.id, n.content]), [["c1/label", "First"]]);
+		assert.equal((await items({ of: "c1" }))[0]!.type, "ref");
+		assert.equal((await items({ of: "dot", resolve: { geometry: true } }))[0]!.outline, "M20 5 A10 5 0 0 1 0 5 A10 5 0 0 1 20 5 Z");
+	} finally {
+		cleanup();
+	}
+});

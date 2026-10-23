@@ -23,6 +23,21 @@ export function baseTheme(doc: PenDocument, mode: "light" | "dark"): ThemeState 
 	return state;
 }
 
+/**
+ * The theme a reader asks for, `{ mode: "dark" }`, laid over the document's base light theme. An
+ * axis and its value are matched to the document's own without minding case, so `mode: "dark"`
+ * finds `Mode: ["Light", "Dark"]`; an axis the document does not have is kept as given.
+ */
+export function themeFrom(doc: PenDocument, given: Record<string, unknown> | undefined): ThemeState {
+	const state = baseTheme(doc, "light");
+	for (const [axis, value] of Object.entries(given ?? {})) {
+		if (typeof value !== "string") continue;
+		const own = Object.keys(doc.themes ?? {}).find((name) => name.toLowerCase() === axis.toLowerCase()) ?? axis;
+		state[own] = (doc.themes?.[own] ?? []).find((one) => one.toLowerCase() === value.toLowerCase()) ?? value;
+	}
+	return state;
+}
+
 export function withTheme(theme: ThemeState, node: PenNode): ThemeState {
 	return node.theme && typeof node.theme === "object" ? { ...theme, ...node.theme } : theme;
 }

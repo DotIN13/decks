@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, emptyDocument, idFor, read, type PenDocument } from "./index.ts";
+import { apply, emptyDocument, idFor, outlineOf, read, themeFrom, type PenDocument } from "./index.ts";
 
 /**
  * The calls borrowed from pen.dev's drawing API, as the pen package answers them: ids from names,
@@ -68,4 +68,53 @@ test("depth keeps that many levels of children and counts the rest", () => {
 	assert.equal(one.children![0]!.childCount, 1);
 	assert.equal(one.children![0]!.children, undefined);
 	assert.throws(() => read(nested(), { ...light, depth: -1 }), /depth is a whole number/);
+});
+
+const themed = (): PenDocument => ({
+	...emptyDocument(),
+	themes: { Mode: ["Light", "Dark"] },
+	variables: { ink: { type: "color", value: [{ value: "#111111" }, { value: "#eeeeee", theme: { Mode: "Dark" } }] }, pad: { type: "number", value: 12 } },
+	children: [
+		{ type: "frame", id: "card", reusable: true, layout: "vertical", padding: "$pad", fill: "$ink", children: [{ type: "text", id: "label", content: "Card", fill: "$ink" }] },
+		{ type: "ref", id: "c1", ref: "card", x: 300, descendants: { label: { content: "First" } } },
+		{ type: "rectangle", id: "r", width: 40, height: 20, cornerRadius: 5, fill: [{ type: "color", color: "$ink" }, "$nope"] },
+	],
+});
+
+test("resolve variables puts each $name's value in, in the light theme or the one asked for", () => {
+	assert.deepEqual(themeFrom(themed(), { mode: "dark" }), { Mode: "Dark" });
+	const light = read(themed(), { theme: themeFrom(themed(), undefined), resolve: { variables: true } }).children;
+	assert.equal(light[0]!.fill, "#111111");
+	assert.equal(light[0]!.padding, 12);
+	assert.equal(light[0]!.children![0]!.fill, "#111111");
+	assert.deepEqual(light[2]!.fill, [{ type: "color", color: "#111111" }, "$nope"]);
+	const dark = read(themed(), { theme: themeFrom(themed(), { mode: "dark" }), resolve: { variables: true } }).children;
+	assert.equal(dark[0]!.fill, "#eeeeee");
+	const asWritten = read(themed(), { theme: {} }).children;
+	assert.equal(asWritten[0]!.fill, "$ink");
+});
+
+test("resolve instances reads a ref as its copy, overrides applied, its items as ref/child", () => {
+	const [, c1] = read(themed(), { theme: {}, resolve: { instances: true } }).children;
+	assert.equal(c1!.type, "frame");
+	assert.equal(c1!.ref, "card");
+	assert.equal(c1!.reusable, undefined);
+	assert.deepEqual(c1!.children!.map((n) => [n.id, n.content]), [["c1/label", "First"]]);
+	assert.ok(c1!.children![0]!.box);
+	assert.equal(c1!.inside, undefined);
+	const plain = read(themed(), { theme: {} }).children[1]!;
+	assert.equal(plain.type, "ref");
+	assert.equal(plain.inside![0]!.id, "c1/label");
+});
+
+test("resolve geometry gives a path's or shape's outline in its own space", () => {
+	const r = read(themed(), { theme: {}, resolve: { geometry: true } }).children[2]!;
+	assert.equal(r.outline, "M5 0 L35 0 A5 5 0 0 1 40 5 L40 15 A5 5 0 0 1 35 20 L5 20 A5 5 0 0 1 0 15 L0 5 A5 5 0 0 1 5 0 Z");
+	const doc = emptyDocument();
+	assert.equal(outlineOf(doc, { type: "path", id: "p", geometry: "M10 10 l10 0 v10 z" }, 100, 50, {}), "M0 0 L100 0 L100 50 Z");
+	assert.equal(outlineOf(doc, { type: "path", id: "p", geometry: "M0 0 H4", viewBox: [0, 0, 4, 4] }, 8, 8, {}), "M0 0 L8 0");
+	assert.equal(outlineOf(doc, { type: "polygon", id: "g", polygonCount: 4 }, 10, 10, {}), "M5 0 L10 5 L5 10 L0 5 Z");
+	assert.match(outlineOf(doc, { type: "ellipse", id: "e" }, 10, 10, {})!, /^M10 5 A5 5 0 0 1 0 5 A5 5 0 0 1 10 5 Z$/);
+	assert.equal(outlineOf(doc, { type: "text", id: "t" }, 10, 10, {}), undefined);
+	assert.equal(read(themed(), { theme: {} }).children[2]!.outline, undefined);
 });

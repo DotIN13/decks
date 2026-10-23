@@ -154,9 +154,13 @@ export interface Verbs {
 		 * item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas
 		 * placing it. `of` (an id, a board's path, or an id inside an instance such as "card-1/label")
 		 * reads that one item and what is in it; `depth` keeps that many levels of children (0: the items
-		 * alone), and an item whose children were left out says how many in `childCount`.
+		 * alone), and an item whose children were left out says how many in `childCount`. `resolve` works
+		 * values out instead of reading them as written, each off by default: `variables` puts each $name's
+		 * value in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its
+		 * expanded copy, overrides applied, its items under `children` with ids "ref/child"; `geometry`
+		 * adds a path's or shape's `outline`, an SVG path in its own space (0,0 its top-left corner).
 		 */
-		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
+		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**
 		 * Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is
 		 * a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its
