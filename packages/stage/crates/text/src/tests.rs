@@ -78,3 +78,24 @@ fn a_picture_lays_out_again_only_the_cards_that_show_it() {
 	// Laid out with it, the card asks for it again: a new size lays it out again.
 	assert!(t.picture("gate.png", 400.0, 100.0));
 }
+
+#[test]
+fn line_spacing_is_a_multiple_of_the_texts_own_size() {
+	let Some(t) = with_fonts() else { return };
+	let words = "one two three four five six seven eight nine ten eleven twelve";
+	let gap = |laid: &Laid| laid.lines[1].0 - laid.lines[0].0;
+	// lineHeight 1.45 on 14 px words: lines 20.3 px apart, not 1.45 of parley's own 16 px.
+	let spaced = TextStyle { line_height: Some(1.45), ..style(14.0) };
+	let laid = t.lay(&[Span::plain(words, &spaced)], Some(80.0), Align::Left);
+	assert!(laid.lines.len() >= 3, "{}", laid.lines.len());
+	assert!((gap(&laid) - 20.3).abs() < 0.01, "{}", gap(&laid));
+	assert!((laid.height - 20.3 * laid.lines.len() as f32).abs() < 0.05, "{}", laid.height);
+	// No lineHeight: 12 px words take their font's own line, smaller than 16 px words'.
+	let small = t.lay(&[Span::plain(words, &style(12.0))], Some(80.0), Align::Left);
+	let big = t.lay(&[Span::plain(words, &style(16.0))], Some(80.0), Align::Left);
+	let (s, b) = (gap(&small), gap(&big));
+	assert!((s / b - 0.75).abs() < 0.01, "{s} {b}");
+	// Mixed sizes: the tallest span on a line still sets that line.
+	let mixed = t.lay(&[Span::plain("small ", &spaced), Span::plain("big", &TextStyle { size: 28.0, ..spaced.clone() })], None, Align::Left);
+	assert!((mixed.lines[0].1 - 28.0 * 1.45).abs() < 0.05, "{}", mixed.lines[0].1);
+}

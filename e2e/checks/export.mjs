@@ -11,12 +11,9 @@
  * The two are compared pixel by pixel: the share of pixels off by more than `FAR` in any channel, and
  * the mean difference, must stay under `MOST_FAR` and `MOST_MEAN`.
  *
- * The words are 16 px and up: the stage engine spaces the lines of smaller words as if they were
- * 16 px (its paragraph's own line box is set at parley's default size, `stage-text` `lay_words`),
- * where pen and the browser space them by their own size, and that would be measured here instead.
- * At 16 px it still adds about a pixel a line (24.2 for 23.2 at a line height of 1.45), so the card
- * on the canvas is a few pixels taller and what is below the paragraph sits that much lower: that
- * shift is most of the difference left, and the size is held to within 3 px for it.
+ * The paragraph and the button's words are 14 px, with the paragraph's lines 1.45 of that apart
+ * (20.3 px), as pen and the browser space them: the stage engine spaces each line by the text's own
+ * size, so the card on the canvas is the page's height to within a pixel.
  *
  * `DECKS_E2E_SHOTS=<dir>` keeps the pictures and a picture of where they differ.
  */
@@ -57,10 +54,10 @@ const card = {
 			{ type: "icon", id: "export-zap", library: "lucide", icon: "zap", width: 20, height: 20, fill: "#b45309" },
 			{ type: "text", id: "export-title", content: "Pro plan", fontSize: 22, fontWeight: 700, fill: "#14141a" },
 		] },
-		{ type: "text", id: "export-body", content: "Everything in Starter, with unlimited canvases and the agents that work on them.", textGrowth: "fixed-width", width: 272, fontSize: 16, lineHeight: 1.45, fill: "#55555f" },
+		{ type: "text", id: "export-body", content: "Everything in Starter, with unlimited canvases and the agents that work on them.", textGrowth: "fixed-width", width: 272, fontSize: 14, lineHeight: 1.45, fill: "#55555f" },
 		{ type: "rectangle", id: "export-band", width: "fill_container", height: 48, cornerRadius: 10, fill: { type: "gradient", gradientType: "linear", rotation: 0, colors: [{ color: "#c7d2fe", position: 0 }, { color: "#3b5cf6", position: 1 }] } },
 		{ type: "frame", id: "export-button", width: "fill_container", layout: "horizontal", padding: [12, 16], justifyContent: "center", fill: "#3b5cf6", cornerRadius: 10, children: [
-			{ type: "text", id: "export-cta", content: "Start free trial", fontSize: 16, fontWeight: 600, fill: "#ffffff" },
+			{ type: "text", id: "export-cta", content: "Start free trial", fontSize: 14, fontWeight: 600, fill: "#ffffff" },
 		] },
 	],
 };
@@ -142,7 +139,7 @@ for (const format of ["html", "tailwind"]) {
 		return { x: r.x, y: r.y, w: r.width, h: r.height };
 	}, ID);
 	const want = { w: box.x2 - box.x1, h: box.y2 - box.y1 };
-	say(`the ${format} page's card is the canvas's size`, Math.abs(rect.w - want.w) <= 1 && Math.abs(rect.h - want.h) <= 3, `page ${rect.w}×${rect.h}, canvas ${want.w}×${want.h}`);
+	say(`the ${format} page's card is the canvas's size`, Math.abs(rect.w - want.w) <= 1 && Math.abs(rect.h - want.h) <= 1, `page ${rect.w}×${rect.h}, canvas ${want.w}×${want.h}`);
 	// The card and its shadow's reach round it, from both pictures.
 	const M = 12;
 	const pagePng = await tab.screenshot({ type: "png", clip: { x: Math.round(rect.x) - M, y: Math.round(rect.y) - M, width: Math.round(want.w) + 2 * M, height: Math.round(want.h) + 2 * M } });

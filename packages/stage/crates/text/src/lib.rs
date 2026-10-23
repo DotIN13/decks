@@ -280,6 +280,10 @@ impl Text {
 		let mut lcx = self.lcx.borrow_mut();
 		let mut builder = lcx.ranged_builder(&mut fcx, &text, 1.0, false);
 		if let Some(style) = spans.first().map(|s| s.style) {
+			// The paragraph's own size is the first span's, not parley's 16 px: a line is never
+			// shorter than its paragraph's, and lineHeight is a multiple of the text's own size.
+			builder.push_default(StyleProperty::FontSize(style.size as f32));
+			builder.push_default(StyleProperty::FontFamily(FontFamily::List(Cow::Owned(self.chain(&style.family)))));
 			builder.push_default(StyleProperty::LineHeight(match style.line_height {
 				Some(m) => LineHeight::FontSizeRelative(m as f32),
 				None => LineHeight::MetricsRelative(1.0),
