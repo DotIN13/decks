@@ -325,7 +325,22 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 		await page.evaluate(() => {
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();
-			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
+			/*
+			 * Toward the biggest board on screen, not the stage's centre: where the stage fills the
+			 * screen (a phone) the centre can fall between boards, and zooming in there leaves every
+			 * board off screen with no page to wait for.
+			 */
+			const seen = (r) => Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) * Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
+			const rects = (window.__decksBoards?.() ?? []).map((one) => one.rect);
+			const cx = rect.left + rect.width / 2;
+			const cy = rect.top + rect.height / 2;
+			// The centre when it is on a board already, so a desktop lands where it always has.
+			const centred = rects.some((r) => cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom);
+			const best = centred ? undefined : rects.filter((r) => seen(r) > 0).sort((a, b) => seen(b) - seen(a))[0];
+			// The middle of the part of it that is on screen.
+			const x = best ? (Math.max(best.left, rect.left) + Math.min(best.right, rect.right)) / 2 : cx;
+			const y = best ? (Math.max(best.top, rect.top) + Math.min(best.bottom, rect.bottom)) / 2 : cy;
+			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: x, clientY: y, bubbles: true, cancelable: true }));
 		});
 	}
 	return false;

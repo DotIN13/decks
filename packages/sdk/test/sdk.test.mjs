@@ -13,6 +13,9 @@ import { connect, DecksError, VERBS } from "../src/index.js";
 const run = promisify(execFile);
 const BIN = fileURLToPath(new URL("../bin/decks", import.meta.url));
 const MCP = fileURLToPath(new URL("../mcp/server.mjs", import.meta.url));
+/** The verb table the SDK and the MCP server are generated from: the counts below come from it, not from a number typed here. */
+const TABLE = JSON.parse(readFileSync(new URL("../src/verbs.json", import.meta.url), "utf8"));
+const CURRENT = TABLE.filter((verb) => !verb.alias);
 
 /** A stand-in for Decks' /api/v1: records each call and answers from a small table of verbs. */
 async function fakeDecks() {
@@ -58,7 +61,7 @@ async function fakeDecks() {
 }
 
 test("the SDK has every verb in the table, groups nested", () => {
-	assert.equal(VERBS.length, 99, "71 calls and 28 old names");
+	assert.deepEqual(VERBS.map(([name]) => name), TABLE.map((verb) => verb.name), `${CURRENT.length} calls and ${TABLE.length - CURRENT.length} old names, as in the table`);
 	const decks = connect({ url: "http://127.0.0.1:1", token: "dk_a_x" });
 	assert.equal(typeof decks.canvas.insert, "function");
 	assert.equal(typeof decks.agent.send, "function");
@@ -220,7 +223,7 @@ test("the MCP server lists each verb as a tool and calls it", async () => {
 		child.kill();
 		const [init, list, call] = output.trim().split("\n").map((line) => JSON.parse(line));
 		assert.equal(init.result.protocolVersion, "2025-06-18");
-		assert.equal(list.result.tools.length, 71, "the new calls only");
+		assert.equal(list.result.tools.length, CURRENT.length, "the new calls only");
 		assert.ok(list.result.tools.some((tool) => tool.name === "decks_canvas_insert"));
 		assert.ok(!list.result.tools.some((tool) => tool.name === "decks_pen_edit"), "old names are not listed");
 		const insert = list.result.tools.find((tool) => tool.name === "decks_canvas_insert");

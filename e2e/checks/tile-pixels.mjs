@@ -122,12 +122,13 @@ for (const target of TARGETS) {
 		const steady = await first.compare(first.pictures[i], again.pictures[i], boards);
 		/*
 		 * Chromium draws one faint seam (a line a pixel wide where two tiles meet) one of two ways, a
-		 * level or two apart, as it happens on each visit, tiles as pictures both times as well: in
-		 * Chromium, steady and the same are each within two levels on under 0.05% of the pixels.
-		 * WebKit, the engine the bytes are for, must match exactly.
+		 * few levels apart, as it happens on each visit, tiles as pictures both times as well: in
+		 * Chromium, steady and the same are each within four levels on under 0.05% of the pixels (four
+		 * was seen eight steps out, on 284 of 1.26 million). WebKit, the engine the bytes are for, must
+		 * match exactly.
 		 */
 		const webkit = target.open.engine === "webkit";
-		const near = (d) => d.differ === 0 || (!webkit && d.most <= 2 && d.differ < d.pixels * 0.0005);
+		const near = (d) => d.differ === 0 || (!webkit && d.most <= 4 && d.differ < d.pixels * 0.0005);
 		say(`${name}, ${views[i]}: two picture pages agree (the screenshot is steady)`, near(steady), JSON.stringify(steady));
 		const same = [await first.compare(first.pictures[i], bytes.pictures[i], boards), await again.compare(again.pictures[i], bytes.pictures[i], boards)];
 		say(`${name}, ${views[i]}: tiles as bytes draw the same pixels as tiles as pictures`, same.some((d) => d.differ === 0) || same.every(near), JSON.stringify(same));
