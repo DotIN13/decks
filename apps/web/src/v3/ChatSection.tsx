@@ -136,9 +136,69 @@ export function ChatSection(props: {
 		const inset = `inset(${Math.max(0, from.top - to.top)}px ${Math.max(0, to.right - from.right)}px ${Math.max(0, to.bottom - from.bottom)}px ${Math.max(0, from.left - to.left)}px round 17px)`;
 		section.animate([{ clipPath: inset }, { clipPath: "inset(0 0 0 0 round 26px)" }], { duration: 340, easing: "cubic-bezier(.2,.8,.2,1)" });
 	});
+	/*
+	 * The sheet is put away as an iOS sheet is: its handle or its head dragged down carries it with
+	 * the finger, and let go past a quarter of its height, or flicked down, it goes; short of that
+	 * it springs back. A drag never also presses what it started on (the title, the chevron).
+	 */
+	const startSheetDrag = (event: PointerEvent) => {
+		if (!props.sheet || !section || event.button !== 0) return;
+		const target = event.target instanceof Element ? event.target : null;
+		if (!target?.closest(".v3-sheet-handle, .v3-chat-head")) return;
+		const sheet = section;
+		const start = { y: event.clientY, t: event.timeStamp };
+		// The recent moves, for how fast it was going over the last 80 ms when let go.
+		const recent: Array<{ y: number; t: number }> = [{ y: event.clientY, t: event.timeStamp }];
+		let dy = 0;
+		let moved = false;
+		const move = (next: PointerEvent) => {
+			if (next.pointerId !== event.pointerId) return;
+			dy = Math.max(0, next.clientY - start.y);
+			if (!moved && Math.abs(next.clientY - start.y) < 6) return;
+			if (!moved) {
+				moved = true;
+				sheet.dataset.dragged = "true";
+				delete sheet.dataset.settling;
+			}
+			// Pulled up past where it rests, it gives a little, as a sheet does.
+			const up = Math.min(0, next.clientY - start.y);
+			sheet.style.transform = `translateY(${dy > 0 ? dy : up / 6}px)`;
+			recent.push({ y: next.clientY, t: next.timeStamp });
+			while (recent.length > 2 && next.timeStamp - recent[0]!.t > 80) recent.shift();
+		};
+		const end = (done: PointerEvent) => {
+			if (done.pointerId !== event.pointerId) return;
+			window.removeEventListener("pointermove", move, true);
+			window.removeEventListener("pointerup", end, true);
+			window.removeEventListener("pointercancel", end, true);
+			if (!moved) return;
+			// The press that dragged is not also a click on the title or the chevron.
+			const swallow = (click: Event) => {
+				click.stopPropagation();
+				click.preventDefault();
+			};
+			sheet.addEventListener("click", swallow, { capture: true, once: true });
+			setTimeout(() => sheet.removeEventListener("click", swallow, { capture: true }), 0);
+			delete sheet.dataset.dragged;
+			const first = recent[0]!;
+			const last = recent[recent.length - 1]!;
+			const speed = (last.y - first.y) / Math.max(1, last.t - first.t);
+			if (done.type !== "pointercancel" && (dy > sheet.offsetHeight / 4 || (speed > 0.4 && dy > 24))) {
+				// Away from where the finger left it: the leaving animation starts at this offset.
+				props.onFold(true);
+				return;
+			}
+			sheet.dataset.settling = "true";
+			sheet.style.transform = "";
+			setTimeout(() => delete sheet.dataset.settling, 300);
+		};
+		window.addEventListener("pointermove", move, true);
+		window.addEventListener("pointerup", end, true);
+		window.addEventListener("pointercancel", end, true);
+	};
 	const name = () => props.identity?.name ?? props.chat?.name ?? "No agent";
 	return (
-		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} aria-label="The conversation">
+		<section ref={section} class="v3-chat" data-leaving={props.leaving ? "true" : undefined} data-folded={props.folded ? "true" : undefined} data-sheet={props.sheet ? "true" : undefined} aria-label="The conversation" onPointerDown={startSheetDrag}>
 			<Show when={props.sheet}>
 				<span class="v3-sheet-handle" aria-hidden="true" />
 			</Show>

@@ -991,7 +991,16 @@ body {
 		box-shadow: var(--v3-shadow);
 		overflow: hidden;
 	}
+	/*
+	 * The composer stands over the sheet's foot, so the history scrolls on past it: the newest turn
+	 * can always be brought up clear of the composer (`--dock-h`, the composer's measured height).
+	 */
+	.v3-chat[data-sheet="true"] .stream[data-shown] .stream-roll {
+		padding-bottom: calc(var(--dock-h, 120px) + 16px);
+	}
+	/* The handle: the bar, in a band tall enough for a thumb, dragged down to put the sheet away. */
 	.v3-sheet-handle {
+		position: relative;
 		width: 36px;
 		height: 4px;
 		flex: none;
@@ -999,6 +1008,21 @@ body {
 		border-radius: 2px;
 		background: var(--v3-fg3);
 		opacity: 0.55;
+		touch-action: none;
+	}
+	.v3-sheet-handle::before {
+		content: "";
+		position: absolute;
+		inset: -8px -120px -10px;
+	}
+	.v3-chat[data-sheet="true"] .v3-chat-head {
+		touch-action: none;
+	}
+	.v3-chat[data-sheet="true"][data-dragged="true"] {
+		transition: none;
+	}
+	.v3-chat[data-sheet="true"][data-settling="true"] {
+		transition: transform 260ms var(--v3-spring);
 	}
 	.app[data-phone="true"]:has(.v3-chat[data-sheet="true"]) .dock {
 		z-index: 26;
