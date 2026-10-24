@@ -1759,6 +1759,22 @@ export function Stage(props: {
 	};
 
 	/**
+	 * The camera as the boards see it: the camera itself, except that a pan at one zoom only reaches
+	 * the boards once it has gone an eighth of the window since they last saw it. Nothing a board
+	 * shows changes with a pan (the world's transform moves its page), but every mounted board read
+	 * the camera, so each pan step re-ran every board's effects and `isVisible`: with 48 board pages
+	 * on a canvas, 4.5 of the 5.5 ms a pan frame cost the page. Which boards have nodes reaches a
+	 * whole window past the screen, so an eighth late is still a long way ahead of the screen.
+	 */
+	const boardCamera = createMemo<Camera>(() => props.camera, props.camera, {
+		equals: (a, b) => {
+			// `__decksExactBoardCamera = true` hands the boards every camera, for measuring.
+			if ((globalThis as { __decksExactBoardCamera?: boolean }).__decksExactBoardCamera) return false;
+			const v = untrack(view);
+			return a.zoom === b.zoom && Math.abs(a.x - b.x) * a.zoom < v.width / 8 && Math.abs(a.y - b.y) * a.zoom < v.height / 8;
+		},
+	});
+	/**
 	 * Which boards are on screen, or within a viewport of it.
 	 *
 	 * A board off screen is a document not loaded — three of them is nothing, but a
@@ -1768,8 +1784,9 @@ export function Stage(props: {
 	const isVisible = (board: Board) => {
 		const v = view();
 		if (v.width === 0) return false;
-		const topLeft = toScreen(props.camera, v, { x: board.x, y: board.y });
-		const bottomRight = toScreen(props.camera, v, { x: board.x + board.w, y: board.y + board.h });
+		const cam = boardCamera();
+		const topLeft = toScreen(cam, v, { x: board.x, y: board.y });
+		const bottomRight = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
 		const margin = { x: v.width, y: v.height };
 		return (
 			bottomRight.x > -margin.x &&
@@ -1818,8 +1835,9 @@ export function Stage(props: {
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
 	const reach = () => {
 		const v = view();
-		const corner = toWorld(props.camera, v, { x: -v.width, y: -v.height });
-		return { x: corner.x, y: corner.y, w: (3 * v.width) / props.camera.zoom, h: (3 * v.height) / props.camera.zoom };
+		const cam = boardCamera();
+		const corner = toWorld(cam, v, { x: -v.width, y: -v.height });
+		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
 	/**
 	 * The boards whose page the admission still holds (`createAdmission`, made further down, which
@@ -2082,7 +2100,7 @@ export function Stage(props: {
 			scaling={scaling()}
 			moving={moving()}
 			pictures={pictures}
-			camera={props.camera}
+			camera={boardCamera()}
 			mounted={
 				/* The selected board is live at any zoom, on any device. */
 				props.selected === board.path ||
