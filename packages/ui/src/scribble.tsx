@@ -82,19 +82,14 @@ export function ScribbleCatch(props: {
 	/** The catcher has had the cursor since it last ended: only then is there writing to end. */
 	let writing = false;
 
-	/*
-	 * Writing over: the catcher goes, always, and `onEnd` runs if there was writing to end. It used to
-	 * stay when nothing had been written yet, so with the field focused and no pencil stroke made, every
-	 * finger landed on it and was swallowed: the canvas would not pan or pinch.
-	 */
 	const end = () => {
-		const was = writing;
+		if (!writing) return;
 		writing = false;
 		batch(() => {
 			setCatching(false);
 			setTargetFocused(false);
 		});
-		if (was) props.onEnd?.();
+		props.onEnd?.();
 	};
 
 	onMount(() => {
