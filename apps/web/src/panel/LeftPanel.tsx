@@ -1,11 +1,11 @@
 import { insetsOnly } from "@decks/canvas/camera";
 import { Switcher } from "../connections/Switcher.tsx";
 import { can } from "../connections/backend.ts";
-import type { Board, DeckPen } from "@decks/protocol";
+import type { Board, DeckPen, StageRow } from "@decks/protocol";
 import AppWindow from "lucide-solid/icons/app-window";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
-import FileText from "lucide-solid/icons/file-text";
+import Layers from "lucide-solid/icons/layers";
 import Folder from "lucide-solid/icons/folder";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
@@ -15,8 +15,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
-import { BoardRow } from "./BoardRow.tsx";
-import { basename as basenameOf, keepRows, panelSections, type PanelSection } from "./panel-groups.ts";
+import { CanvasTree } from "./CanvasTree.tsx";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
@@ -86,8 +85,8 @@ export type PanelTab = "agents" | "boards" | "apps";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TABS: PanelTab[] = ["agents", "boards", "apps"];
-const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Boards", apps: "Apps" };
-const PANEL_TAB_ICON = { agents: Sparkles, boards: FileText, apps: AppWindow };
+const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Canvases", apps: "Apps" };
+const PANEL_TAB_ICON = { agents: Sparkles, boards: Layers, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type PanelApp = { name: string; title: string; status: string; board: string };
@@ -165,6 +164,14 @@ export function LeftPanel(props: {
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/** Rename an agent, from the edit window its row opens. */
 	onAgentRename?: (id: string, name: string) => void;
+
+	// --- the Canvases tab --------------------------------------------------------------
+	/** Every canvas in the deck, as the stage manager lists them: the tree's middle level. */
+	stages?: StageRow[];
+	/** The canvas the panel is showing (its folder name): marked "Here". */
+	here?: string;
+	/** Move to a canvas: its row's Open button, or a double-click. */
+	onOpenCanvas?: (name: string) => void;
 
 	// --- the Apps tab -----------------------------------------------------------------
 	/** The deck's apps; asked for when the tab opens. */
@@ -449,19 +456,6 @@ export function LeftPanel(props: {
 
 	const type = (next: string) => setQuery(next);
 
-	const sections = createMemo<PanelSection[]>((previous) =>
-		keepRows(
-			previous,
-			panelSections({
-				boards: props.boards,
-				kept: props.kept,
-				inPlay: props.inPlay,
-				query: query(),
-				pens: props.pens ?? [],
-			}),
-		),
-		[],
-	);
 
 	/*
 	 * How many rows are drawn, across the sections in order.
@@ -507,7 +501,7 @@ export function LeftPanel(props: {
 		onCleanup(() => clearTimeout(timer));
 	});
 	/** The sections of the list that is showing — boards, or agents. */
-	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : sections());
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : []);
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
@@ -684,7 +678,7 @@ export function LeftPanel(props: {
 							ref={field}
 							type="text"
 							spellcheck={false}
-							placeholder={tab() === "agents" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`}
+							placeholder={tab() === "agents" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.stages?.length ?? 0} canvases and ${props.boards.length} boards`}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
@@ -847,77 +841,24 @@ export function LeftPanel(props: {
 					</Show>
 
 					<Show when={tab() === "boards"}>
-					<For each={sections()}>
-							{(section, index) => (
-								<div
-									class="panel-section"
-									/* So a stylesheet or a check can name *which* section without reading its
-									   label — "is this the focused agent's own list, or somebody else's" is the
-									   question the whole panel turns on. */
-									data-kind={section.kind}
-								>
-									{/*
-										The section label: a 20px line *inside* the list's rhythm, not a
-										32px bar above it. Sentence case at 11.5px/500 — `.meta` in
-										`styles/chrome.css` is that decision, made once.
-									*/}
-									{/* `.count` is the right-hand column the rows' dots and bins also stand in —
-									    see `panel.css`. One column down the right edge, whatever is in it. */}
-									<div class="panel-meta meta">
-										<span class="truncate">{section.label}</span>
-										<span class="flex-1" />
-										<span class="count tabular-nums">{section.rows.length}</span>
-									</div>
-									<For each={section.rows.slice(0, allowance(index()))}>
-										{(row) => (
-											<Show
-												when={row.pen}
-												fallback={
-													<BoardRow
-														board={row.board}
-														current={props.current === row.board.path}
-														dim={row.dim}
-														onCanvas={row.onCanvas}
-														{...(props.news?.[row.board.path] ? { news: props.news[row.board.path] } : {})}
-														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
-														{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
-														onPick={() => props.onPick(row.board)}
-													/>
-												}
-											>
-												{(pen) => (
-													/* A .pen file among the boards: not a page, so a press places it on the stage as a ref. Named by its file, as a board's row is. */
-													<div class="board-act">
-														<button class="board-row" type="button" data-row data-pen={pen().path} title={`${pen().title}, ${pen().path}: place it on the canvas`} onClick={() => props.onPlacePen?.(pen())}>
-															<span class="board-thumb" aria-hidden="true" />
-															<span class="row-name">{basenameOf(pen().path)}</span>
-														</button>
-													</div>
-												)}
-											</Show>
-										)}
-									</For>
-								</div>
-							)}
-					</For>
-
-					{/*
-						An empty list is a real state and the commonest one on a fresh deck, so it
-						says which empty it is. A panel that is blank for a good reason still looks
-						broken if it does not give the reason.
-
-						There is one of these now where there were two — a deck with no boards in it,
-						and a search that matched none of them. The third case the tabs needed, "this
-						agent holds nothing", is not an empty state at all any more: the list carries
-						on into the deck below it.
-					*/}
-					<Show when={sections().length === 0}>
-						<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
-							{props.boards.length === 0
-								? "This deck has no boards yet. Ask for one."
-								: `Nothing in the deck matches “${query().trim()}”.`}
-						</p>
-					</Show>
+						<CanvasTree
+							stages={props.stages ?? []}
+							boards={props.boards}
+							identities={props.identities ?? {}}
+							{...(props.here ? { here: props.here } : {})}
+							query={query()}
+							{...(props.current ? { current: props.current } : {})}
+							{...(props.inPlay ? { inPlay: props.inPlay } : {})}
+							{...(props.news ? { news: props.news } : {})}
+							folded={folded()}
+							onToggleFolder={toggleFolder}
+							onPick={props.onPick}
+							{...(props.onOpenCanvas ? { onOpen: props.onOpenCanvas } : {})}
+							{...(props.onDelete ? { onDelete: props.onDelete } : {})}
+							{...(props.onHide ? { onHide: props.onHide } : {})}
+							{...(props.pens ? { pens: props.pens } : {})}
+							{...(props.onPlacePen ? { onPlacePen: props.onPlacePen } : {})}
+						/>
 					</Show>
 					<Show when={tab() === "apps"}>
 						<div class="row-list v3-apps">

@@ -1037,6 +1037,14 @@ export function App() {
 		if (on) switchingTimer = setTimeout(() => setSwitchingCanvas(false), 4000);
 	};
 
+	/** Move the conversation to a canvas: the stage manager's pick, and the panel's Open. The camera follows when the server says the agent is there (the canvas effect below). */
+	const openCanvas = (name: string) => {
+		const agentId = state.focused;
+		if (!agentId || stageOf(agentId)?.name === name) return;
+		switchingFor(true);
+		void act("agent.update", [{ canvas: name }], agentId);
+	};
+
 	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
 	const [stagesOpen, setStagesOpen] = createSignal(false);
 	/**
@@ -1427,13 +1435,7 @@ export function App() {
 					here={stageOf(state.focused)?.name}
 					open={stagesOpen()}
 					onClose={() => void setStagesOpen(false)}
-					onPick={(name) => {
-						const agentId = state.focused;
-						if (!agentId || stageOf(agentId)?.name === name) return;
-						// The camera follows when the server says the agent is there (the canvas effect above).
-						switchingFor(true);
-						void act("agent.update", [{ canvas: name }], agentId);
-					}}
+					onPick={openCanvas}
 					onNew={(title) => {
 						const agentId = state.focused;
 						if (!agentId) return;
@@ -1575,6 +1577,9 @@ export function App() {
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
 					news={newsGlow()}
 					boards={state.boards}
+					stages={stages()}
+					{...(stageOf(state.focused) ? { here: stageOf(state.focused)!.name } : {})}
+					onOpenCanvas={openCanvas}
 					pens={state.deck?.pens ?? []}
 					onPlacePen={(pen) => {
 						// A pen file goes on the stage as a ref, its corner at the middle of the view, as an agent places one.
