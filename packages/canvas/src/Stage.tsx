@@ -318,15 +318,12 @@ export function Stage(props: {
 	 */
 	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
 	/**
-	 * The board whose page stays up while the camera moves: the selected one, when it is a document or
-	 * an app. Someone working in one pans and zooms to follow their work, and a picture there is not the
-	 * page they were typing in, or no picture at all (`live-placeholder.ts`).
+	 * The board whose page stays up while the camera moves: the selected one, of any kind. Someone
+	 * working in a board pans and zooms to follow their work, and a picture there is not the page they
+	 * were in: its scroll, its open tab and its typing are not in it, and a document or an app has no
+	 * picture at all (`live-placeholder.ts`).
 	 */
-	const keptLive = createMemo(() => {
-		const path = props.selected;
-		const board = path ? props.boards.find((one) => one.path === path) : undefined;
-		return board && hasPlaceholder(board) ? board.path : undefined;
-	});
+	const keptLive = createMemo(() => props.selected);
 	/** Whether a board whose page is live is drawn as its page now, rather than as its picture. */
 	const pageNow = (path: string) => !picturesNow() || keptLive() === path;
 	const [spaceHeld, setSpaceHeld] = createSignal(false);

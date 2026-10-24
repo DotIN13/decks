@@ -4,7 +4,6 @@ import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
 import { measureFrame } from "./extent.ts";
-import { hasPlaceholder } from "./live-placeholder.ts";
 import { scheme } from "./lib/theme.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
 
@@ -409,8 +408,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			class="board-node plain-board"
 			data-path={props.board.path}
 			data-selected={props.selected}
-			// A selected document or app keeps its page while the camera moves (`keptLive` in `Stage.tsx`).
-			data-kept-live={props.selected && hasPlaceholder(props.board) ? "" : undefined}
+			// The selected board keeps its page while the camera moves (`keptLive` in `Stage.tsx`).
+			data-kept-live={props.selected ? "" : undefined}
 			data-inert={inert() || !live()}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}

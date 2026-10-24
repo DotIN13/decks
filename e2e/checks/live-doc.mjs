@@ -13,7 +13,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, flyToBoard, liveZoom, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { deckState, flyToBoard, liveZoom, open, resetStage, say, selectBoard, settle, socket, stagePath } from "../harness.mjs";
 
 const until = async (test, ms = 10000) => {
 	const deadline = Date.now() + ms;
@@ -151,5 +151,28 @@ if (found) {
 	}
 	say("not selected, it moves as a card with an icon and its name", !!rect && unselected && during && spread > 40, JSON.stringify({ unselected, during, spread }));
 }
+
+/* Any board, selected, keeps its page through a move: an ordinary one as well as a document. */
+const plan = await stagePath(page, "boards/plan.html");
+await flyToBoard(page, plan);
+await liveZoom(page);
+await selectBoard(page, plan);
+await settle(page, 500);
+const planFrame = `iframe[data-path="${plan}"]`;
+const planBox = await page.locator(planFrame).boundingBox();
+const kept = [];
+if (planBox) {
+	// A pinch (a wheel with Control): over a page a plain wheel scrolls the page, not the camera.
+	await page.mouse.move(planBox.x + planBox.width / 2, planBox.y + planBox.height / 2);
+	await page.keyboard.down("Control");
+	for (let i = 0; i < 6; i++) {
+		await page.mouse.wheel(0, 20);
+		await page.waitForTimeout(30);
+		kept.push(await page.evaluate((n) => ({ pictures: document.querySelector(".stage")?.dataset.pictures === "true", shown: getComputedStyle(document.querySelector(n)).visibility !== "hidden" }), planFrame));
+	}
+	await page.keyboard.up("Control");
+}
+const movingPlan = kept.filter((one) => one.pictures);
+say("any board, selected, keeps its page while the camera moves", movingPlan.length > 0 && movingPlan.every((one) => one.shown), JSON.stringify(kept));
 
 await browser.close();
