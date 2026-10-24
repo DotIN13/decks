@@ -738,7 +738,6 @@ export function LeftPanel(props: {
 								<span class="v3-lp-deck">
 									<Switcher />
 								</span>
-								<span class="v3-lp-sep" aria-hidden="true">·</span>
 								<span class="truncate">{headWords()}</span>
 							</div>
 						</div>

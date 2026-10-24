@@ -2575,12 +2575,9 @@ body {
 		display: flex;
 		min-width: 0;
 		align-items: center;
-		gap: 6px;
+		gap: 8px;
 		color: var(--v3-fg2);
 		font-size: 11.5px;
-	}
-	.v3-lp-sep {
-		color: var(--v3-fg3);
 	}
 	/* The deck's switcher, said in the status line's own size: its name and a small chevron. */
 	.v3-lp-deck {
