@@ -282,6 +282,19 @@ export function App() {
 	 * window keeps them on screen. Neither is an inset: a float over the canvas does not move
 	 * what is centred on the canvas, which is the rule `camera/insets.ts` keeps.
 	 */
+	/* The pencil is the hand in use from its first press until a finger or a mouse presses: the page is
+	   then unselectable (`shell.css`), so a stroke never becomes a text selection. Set in the capture
+	   phase, before Safari starts a selection from the same press. */
+	onMount(() => {
+		const press = (event: PointerEvent) => {
+			const pen = event.pointerType === "pen";
+			if (pen === document.documentElement.hasAttribute("data-pen")) return;
+			document.documentElement.toggleAttribute("data-pen", pen);
+			if (pen) getSelection()?.removeAllRanges();
+		};
+		window.addEventListener("pointerdown", press, true);
+		onCleanup(() => window.removeEventListener("pointerdown", press, true));
+	});
 	let dockEl: HTMLDivElement | undefined;
 	/** How much of a put-away composer still shows: the tab that brings it back. */
 	const STOW_TAB = 36;
