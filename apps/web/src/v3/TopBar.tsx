@@ -2,6 +2,8 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
+import PanelLeft from "lucide-solid/icons/panel-left";
+import { DecksLineMark } from "../panel/DecksLineMark.tsx";
 import Plus from "lucide-solid/icons/plus";
 import { Show } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
@@ -36,6 +38,8 @@ export function TopBar(props: {
 	onCopy?: () => void;
 	/** The phone's bar: full width, the canvas at the right end. */
 	phone?: boolean;
+	/** On a desktop the deck lives in the panel's head, so folded the bar brings back only the panel. */
+	desktop?: boolean;
 }) {
 	const active = () => props.chats.find((chat) => chat.id === props.focused);
 	const name = () => {
@@ -46,12 +50,26 @@ export function TopBar(props: {
 	return (
 		<div class="v3-bar v3-topbar float pill" data-inset="top" data-phone={props.phone ? "true" : undefined}>
 			<Show when={!props.panelOpen}>
-				<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
-					<Icon of={PanelLeftOpen} size={17} />
-				</button>
-				<span class="v3-deck">
-					<Switcher />
-				</span>
+				<Show
+					when={props.desktop}
+					fallback={
+						<>
+							<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+								<Icon of={PanelLeftOpen} size={17} />
+							</button>
+							<span class="v3-deck">
+								<Switcher />
+							</span>
+						</>
+					}
+				>
+					{/* The panel folded on a desktop: Decks' mark and the panel icon, one button that brings it back on its last tab. */}
+					<button type="button" class="v3-unfold-mark" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+						<DecksLineMark size={18} />
+						<Icon of={PanelLeft} size={16} />
+					</button>
+					<span class="v3-sep" aria-hidden="true" />
+				</Show>
 			</Show>
 			<AgentMenu
 				chats={props.chats}

@@ -2478,108 +2478,6 @@ body {
 
 }
 
-/* ---- Studio's editor rail: the panel's tabs as labelled icons at the window's edge --------- */
-@layer components {
-	.v3-rail {
-		position: fixed;
-		z-index: 11;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		display: flex;
-		width: 56px;
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-		padding: 12px 0;
-		border-right: 1px solid var(--v3-line);
-		background: var(--v3-panel);
-	}
-	/* Studio's rail: Decks' mark on top, then each tab an icon in a 32px square over a small label. */
-	.v3-rail {
-		gap: 6px;
-		padding: 10px 0 12px;
-	}
-	.v3-rail-logo {
-		display: grid;
-		width: 36px;
-		height: 36px;
-		margin-bottom: 8px;
-		place-items: center;
-		border: 0;
-		border-radius: 8px;
-		background: none;
-		color: var(--v3-fg);
-		cursor: pointer;
-		transition:
-			background 120ms var(--v3-ease),
-			transform 120ms var(--v3-ease);
-	}
-	.v3-rail-logo:hover {
-		background: var(--v3-bg3);
-	}
-	.v3-rail-logo:active {
-		transform: scale(0.94);
-	}
-	.v3-rail-tab {
-		display: grid;
-		width: 52px;
-		justify-items: center;
-		gap: 2px;
-		padding: 2px 0;
-		border: 0;
-		background: none;
-		color: var(--v3-fg2);
-		cursor: pointer;
-		font: inherit;
-		font-size: 11px;
-		line-height: 1.2;
-	}
-	.v3-rail-box {
-		display: grid;
-		width: 32px;
-		height: 32px;
-		place-items: center;
-		border-radius: 7px;
-		transition:
-			background 140ms var(--v3-ease),
-			color 140ms var(--v3-ease);
-	}
-	.v3-rail-tab:hover {
-		color: var(--v3-fg);
-	}
-	.v3-rail-tab:hover .v3-rail-box {
-		background: var(--v3-bg2);
-	}
-	.v3-rail-tab[data-on="true"] {
-		color: var(--v3-fg);
-		font-weight: 500;
-	}
-	.v3-rail-tab[data-on="true"] .v3-rail-box {
-		background: var(--v3-accent-soft);
-		color: var(--v3-accent);
-	}
-	.v3-rail-tab:focus-visible {
-		outline: none;
-	}
-	.v3-rail-tab:focus-visible .v3-rail-box,
-	.v3-rail-logo:focus-visible {
-		box-shadow: 0 0 0 2px var(--v3-accent);
-		outline: none;
-	}
-	.v3-rail-rule {
-		width: 24px;
-		height: 1px;
-		background: var(--v3-line);
-	}
-	/* Beside the rail the panel needs no tab strip: its head goes straight to the search. */
-	.v3-panel[data-rail="true"] .v3-nav[hidden] {
-		display: none;
-	}
-	.app[data-presenting="true"] .v3-rail {
-		display: none !important;
-	}
-}
 
 /* ---- the Recent and Canvas tabs ------------------------------------------------------------ */
 @layer components {
@@ -2692,12 +2590,12 @@ body {
 		font-size: 11px;
 		font-weight: 400;
 	}
-	.v3-panel[data-rail="true"] .v3-search-wrap {
-		padding-top: 10px;
+	.v3-panel[data-desktop="true"] .v3-search-wrap {
+		padding-top: 8px;
 		padding-bottom: 6px;
 	}
 	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
-	.v3-panel[data-rail="true"] .v3-search {
+	.v3-panel[data-desktop="true"] .v3-search {
 		height: 30px;
 		gap: 7px;
 		padding: 0 6px 0 9px;
@@ -2707,16 +2605,16 @@ body {
 			background 150ms var(--v3-ease),
 			box-shadow 150ms var(--v3-ease);
 	}
-	.v3-panel[data-rail="true"] .v3-search:focus-within {
+	.v3-panel[data-desktop="true"] .v3-search:focus-within {
 		background: var(--v3-panel);
 		box-shadow:
 			inset 0 0 0 1px var(--v3-accent),
 			0 0 0 3px var(--v3-accent-soft);
 	}
-	.v3-panel[data-rail="true"] .v3-search input {
+	.v3-panel[data-desktop="true"] .v3-search input {
 		font-size: 12.5px;
 	}
-	.v3-panel[data-rail="true"] .v3-search .v3-kbd {
+	.v3-panel[data-desktop="true"] .v3-search .v3-kbd {
 		height: auto;
 		padding: 1px 5px;
 		border-color: var(--v3-line);
@@ -2889,5 +2787,130 @@ body {
 	 */
 	.v3-chat[data-folded="true"] .stream-jump {
 		display: none;
+	}
+}
+
+/* ---- the sidebar without a rail: the mark in the head, the tabs over the search ------------- */
+@layer components {
+	.v3-lp-row {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 6px;
+	}
+	.v3-lp-mark {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		place-items: center;
+		color: var(--v3-fg);
+	}
+	.v3-lp-row .v3-lp-title {
+		min-width: 0;
+		margin: -2px 0;
+	}
+	.v3-lp-icon {
+		display: grid;
+		width: 24px;
+		height: 24px;
+		flex: none;
+		place-items: center;
+		border: 0;
+		border-radius: 5px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+	}
+	.v3-lp-icon:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-lp-icon:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: -1px;
+	}
+
+	/* Four tab buttons: icons, and the open one a pill holding its icon and word. */
+	.v3-tabs {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 4px;
+		padding: 10px 12px 0;
+	}
+	.v3-tabs-tab {
+		display: flex;
+		min-width: 30px;
+		height: 30px;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 0 7px;
+		border: 0;
+		border-radius: 7px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 600;
+		transition:
+			background 140ms var(--v3-ease),
+			color 140ms var(--v3-ease);
+	}
+	.v3-tabs-tab:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-tabs-tab[data-on="true"] {
+		padding: 0 10px 0 8px;
+		background: var(--v3-accent-soft);
+		color: var(--v3-accent);
+	}
+	.v3-tabs-tab[data-on="true"] > span {
+		animation: v3-tab-word 180ms var(--v3-ease);
+	}
+	@keyframes v3-tab-word {
+		from {
+			opacity: 0;
+		}
+	}
+	.v3-tabs-tab:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: -2px;
+	}
+
+	/* Folded on a desktop: the top bar starts with one button, the mark and the panel icon. */
+	.v3-unfold-mark {
+		display: flex;
+		height: 32px;
+		flex: none;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--v3-fg);
+		cursor: pointer;
+	}
+	.v3-unfold-mark > svg:last-child {
+		color: var(--v3-fg2);
+	}
+	.v3-unfold-mark:hover {
+		background: var(--v3-bg2);
+	}
+	.v3-unfold-mark:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: -2px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.v3-tabs-tab,
+		.v3-tabs-tab[data-on="true"] > span {
+			transition: none;
+			animation: none;
+		}
 	}
 }

@@ -8,7 +8,10 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Circle from "lucide-solid/icons/circle";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
+import Bot from "lucide-solid/icons/bot";
 import Clock from "lucide-solid/icons/clock";
+import LayoutGrid from "lucide-solid/icons/layout-grid";
+import PanelLeft from "lucide-solid/icons/panel-left";
 import Play from "lucide-solid/icons/play";
 import FileText from "lucide-solid/icons/file-text";
 import MoveUpRight from "lucide-solid/icons/move-up-right";
@@ -22,7 +25,6 @@ import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import SettingsIcon from "lucide-solid/icons/settings";
-import Sparkles from "lucide-solid/icons/sparkles";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
@@ -34,6 +36,7 @@ import { AgentRow } from "../agents/AgentRow.tsx";
 import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
 import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentSection } from "../agents/agent-sections.ts";
+import { DecksLineMark } from "./DecksLineMark.tsx";
 import { canvasItems, type CanvasItem, type ItemKind } from "./canvas-items.ts";
 import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 
@@ -96,13 +99,10 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
-/** The rail's width, as Studio's editor draws it; the panel opens to its right. */
-const RAIL_WIDTH = 56;
-
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
 const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
-const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
+const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Bot, apps: LayoutGrid };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type PanelApp = { name: string; title: string; status: string; board: string };
@@ -182,11 +182,11 @@ export function LeftPanel(props: {
 	onAgentRename?: (id: string, name: string) => void;
 
 	/**
-	 * Studio's editor rail: the tabs as a 56px column of labelled icons at the window's edge, with
-	 * Settings at its foot. It stays when the panel folds, so the tabs are always one press away.
-	 * Left out on a phone, where the panel is a sheet and its own tab strip is the way in.
+	 * The desktop layout, drawn on the Decks Studio canvas ("tt-sidebar-redesign"): the head holds
+	 * Decks' mark, the canvas, Settings and Hide, and a row of tab buttons sits under it, above the
+	 * search. Left out on a phone, where the panel is a sheet with its own tab strip.
 	 */
-	rail?: boolean;
+	desktop?: boolean;
 	onSettings?: () => void;
 
 	// --- the Canvas tab ---------------------------------------------------------------
@@ -645,53 +645,6 @@ export function LeftPanel(props: {
 
 	return (
 		<>
-			<Show when={props.rail}>
-				<nav class="v3-rail" data-inset="left" aria-label="Side panel">
-					{/* Decks' mark, drawn as Studio draws it: it opens and folds the panel, as ⌘\ does. */}
-					<button
-						type="button"
-						class="v3-rail-logo"
-						data-tip={props.open ? "Hide the side panel" : "Show the side panel"}
-						data-key="⌘\"
-						aria-label={props.open ? "Hide the side panel" : "Show the side panel"}
-						aria-expanded={props.open}
-						onClick={() => props.onOpenChange(!props.open)}
-					>
-						<RailMark />
-					</button>
-					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
-						{(name) => (
-							<button
-								type="button"
-								class="v3-rail-tab"
-								data-on={props.open && tab() === name ? "true" : undefined}
-								aria-pressed={props.open && tab() === name}
-								title={props.open && tab() === name ? `Hide ${PANEL_TAB_LABEL[name]}` : PANEL_TAB_LABEL[name]}
-								onClick={() => {
-									if (props.open && tab() === name) return props.onOpenChange(false);
-									goTab(name);
-									if (!props.open) props.onOpenChange(true);
-								}}
-							>
-								<span class="v3-rail-box">
-									<Icon of={PANEL_TAB_ICON[name]} size={20} />
-								</span>
-								<span>{PANEL_TAB_LABEL[name]}</span>
-							</button>
-						)}
-					</For>
-					<span class="flex-1" />
-					<Show when={props.onSettings}>
-						<span class="v3-rail-rule" aria-hidden="true" />
-						<button type="button" class="v3-rail-tab" title="Settings" onClick={() => props.onSettings?.()}>
-							<span class="v3-rail-box">
-								<Icon of={SettingsIcon} size={20} />
-							</span>
-							<span>Settings</span>
-						</button>
-					</Show>
-				</nav>
-			</Show>
 			<aside
 				/*
 				 * `data-inset` only while it is open: the attribute is the only thing telling the
@@ -706,9 +659,9 @@ export function LeftPanel(props: {
 				 * A stationary column, not a card: it runs the full height of the window at the
 				 * left edge, with the deck mark on top, and never moves while the middle slides.
 				 */
-				style={{ width: `${width()}px`, ...(props.rail ? { left: `${RAIL_WIDTH}px` } : {}) }}
+				style={{ width: `${width()}px` }}
 				data-resizing={resizing() ? "true" : undefined}
-				data-rail={props.rail ? "true" : undefined}
+				data-desktop={props.desktop ? "true" : undefined}
 				class="panel-shell v3-panel fixed z-10 top-0 bottom-0 left-0 flex max-w-[86vw] flex-col"
 			>
 				{/* The right edge, as something to take hold of. A separator in the ARIA
@@ -740,7 +693,7 @@ export function LeftPanel(props: {
 					button that folds the panel away. Folded, the top bar carries both (`v3/TopBar.tsx`).
 				*/}
 				<Show
-					when={props.rail}
+					when={props.desktop}
 					fallback={
 						<div class="v3-panel-head">
 							<div class="panel-mark">
@@ -755,10 +708,24 @@ export function LeftPanel(props: {
 				>
 					{/* Studio's panel head: the canvas, which opens the canvas manager, and under it the deck (its switcher) and what the tab holds. */}
 					<div class="v3-lp-head">
-						<button type="button" class="v3-lp-title" data-tip="Canvases" disabled={!props.onCanvases} onClick={() => props.onCanvases?.()}>
-							<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
-							<Icon of={ChevronDown} size={14} class="flex-none" />
-						</button>
+						<div class="v3-lp-row">
+							<span class="v3-lp-mark" aria-hidden="true">
+								<DecksLineMark />
+							</span>
+							<button type="button" class="v3-lp-title" data-tip="Canvases" disabled={!props.onCanvases} onClick={() => props.onCanvases?.()}>
+								<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
+								<Icon of={ChevronDown} size={14} class="flex-none" />
+							</button>
+							<span class="flex-1" />
+							<Show when={props.onSettings}>
+								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
+									<Icon of={SettingsIcon} size={16} />
+								</button>
+							</Show>
+							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+								<Icon of={PanelLeft} size={16} />
+							</button>
+						</div>
 						<div class="v3-lp-status">
 							<span class="v3-lp-deck">
 								<Switcher />
@@ -768,8 +735,45 @@ export function LeftPanel(props: {
 						</div>
 					</div>
 				</Show>
+				{/*
+					The tabs, under the head and over the search: icons, and the open one a pill that names
+					itself. The list below swaps by tab and the search filters the open one, as before.
+				*/}
+				<Show when={props.desktop}>
+					<div class="v3-tabs" role="tablist" aria-label="Panel">
+						<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
+							{(name, index) => (
+								<button
+									type="button"
+									role="tab"
+									id={`${ids}-tab-${name}`}
+									class="v3-tabs-tab"
+									data-on={tab() === name ? "true" : undefined}
+									aria-selected={tab() === name}
+									aria-controls={`${ids}-list`}
+									tabindex={tab() === name ? 0 : -1}
+									title={PANEL_TAB_LABEL[name]}
+									onClick={() => goTab(name)}
+									onKeyDown={(event) => {
+										if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+										event.preventDefault();
+										const shown = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+										const next = shown[(index() + (event.key === "ArrowRight" ? 1 : -1) + shown.length) % shown.length];
+										next?.click();
+										next?.focus();
+									}}
+								>
+									<Icon of={PANEL_TAB_ICON[name]} size={16} />
+									<Show when={tab() === name}>
+										<span>{PANEL_TAB_LABEL[name]}</span>
+									</Show>
+								</button>
+							)}
+						</For>
+					</div>
+				</Show>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.rail}>
+				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.desktop}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
 					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
@@ -1104,16 +1108,6 @@ export function LeftPanel(props: {
 	);
 }
 
-/** Decks' mark as Studio's rail draws it: three boards of unequal size, in a thin line. */
-function RailMark() {
-	return (
-		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-			<rect x="2.5" y="3.5" width="11" height="9.5" rx="2" />
-			<rect x="15.5" y="3.5" width="6" height="17" rx="2" />
-			<rect x="2.5" y="15.5" width="11" height="5" rx="2" />
-		</svg>
-	);
-}
 
 /** An app's tile colour, picked from its name so it stays the same everywhere. */
 const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4d7c0f", "#9333ea"];

@@ -1430,8 +1430,9 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<TopBar
-					/* Beside the rail the top bar never carries the panel's button or the deck: the rail's logo and the panel head do. */
-					panelOpen={!phone()}
+					/* On a desktop the deck is in the panel's head; folded, the top bar holds only the button that brings the panel back. */
+					panelOpen={boardsOpen() && !phone()}
+					desktop={!phone()}
 					onTogglePanel={() => showBoards(!boardsOpen())}
 					chats={state.chats}
 					identities={state.identities}
@@ -1614,7 +1615,7 @@ export function App() {
 						editorHandle()?.select(ids);
 						setPenSelected(ids);
 					}}
-					rail={!phone()}
+					desktop={!phone()}
 					onSettings={() => {
 						setSettings(true);
 						send({ type: "claude.accounts", limits: true });
