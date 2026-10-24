@@ -11,6 +11,7 @@
  * Also the openers a double-click or a double tap reaches for that are not words: a file's chip.
  */
 import { indexOf, isCard, isMarkdown, makeLabel, shapeLabel, type Op, type PenDocument, type PenNode } from "@decks/pen";
+import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
 import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { setPenTyping } from "../../state/pen-tools.ts";
 import { cardChildren, cardEdits, cardMarkdown, CARD_GAP, CARD_PAD, CARD_RADIUS, heldLabels } from "../../pen/card-frame.ts";
@@ -398,7 +399,10 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							onCancel={cancel}
 						/>
 					);
+				let area: HTMLTextAreaElement | undefined;
 				return (
+					<>
+					<ScribbleCatch target={() => area} onEnd={() => area && props.text.commit(area.value)} />
 					<textarea
 						class="pen-text"
 						data-grows={look.grows}
@@ -422,14 +426,19 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							"box-shadow": `0 0 0 ${1.5 / props.zoom}px var(--color-accent)`,
 						}}
 						value={open.value}
-						ref={(area) =>
+						ref={(el) => {
+							area = el;
 							requestAnimationFrame(() => {
-								area.focus();
-								area.select();
-							})
-						}
+								el.focus();
+								el.select();
+							});
+						}}
 						onInput={(event) => props.text.preview(open.id, event.currentTarget.value)}
-						onBlur={(event) => props.text.commit(event.currentTarget.value)}
+						onBlur={(event) => {
+							// The pencil writing over the canvas (`ScribbleCatch`): committed when it is done, not now.
+							if (isScribbleCatch(event.relatedTarget)) return;
+							props.text.commit(event.currentTarget.value);
+						}}
 						onKeyDown={(event) => {
 							if (event.key === "Escape") {
 								event.preventDefault();
@@ -440,6 +449,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							}
 						}}
 					/>
+					</>
 				);
 			}}
 		</Show>

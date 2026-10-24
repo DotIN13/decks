@@ -1,4 +1,5 @@
 import { For, onCleanup, onMount, type JSX } from "solid-js";
+import { isScribbleCatch, ScribbleCatch } from "@decks/ui";
 import Baseline from "lucide-solid/icons/baseline";
 import Bold from "lucide-solid/icons/bold";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -1216,10 +1217,21 @@ export function CardEditor(props: CardEditorProps) {
 	}
 	function onFocusOut(event: FocusEvent) {
 		if (event.relatedTarget instanceof Node && wrap.contains(event.relatedTarget)) return;
+		// The pencil writing over the canvas (`ScribbleCatch`): the card stays open until it is done.
+		if (isScribbleCatch(event.relatedTarget)) return;
 		// A press on the style bar or a piece keeps the focus where it was.
 		setTimeout(() => {
-			if (!done && !wrap.contains(document.activeElement)) commit();
+			if (!done && !wrap.contains(document.activeElement) && !isScribbleCatch(document.activeElement)) commit();
 		}, 0);
+	}
+	/** Handwritten words, at the end of the card's last line, as typing them there would put them. */
+	function appendWords(text: string) {
+		// The last line with words: the editor keeps an empty paragraph at the foot, which is not where writing goes on.
+		const blocks = [...ed.children].filter((one) => (one as HTMLElement).getAttribute("contenteditable") !== "false");
+		let end: Node = [...blocks].reverse().find((one) => (one.textContent ?? "").trim() !== "") ?? blocks[0] ?? ed;
+		while (end.lastChild && end.lastChild.nodeType === 1 && (end.lastChild as HTMLElement).getAttribute("contenteditable") !== "false") end = end.lastChild;
+		(end as Element).append(document.createTextNode(text));
+		changed();
 	}
 
 	onMount(() => {
@@ -1355,6 +1367,7 @@ export function CardEditor(props: CardEditorProps) {
 			// A press in the card is the card's: not the start of a pan or a tap on the canvas behind it.
 			onPointerDown={(event) => event.stopPropagation()}
 		>
+			<ScribbleCatch target={() => ed} append={appendWords} context={() => (ed?.innerText ?? "").replace(/\s+$/, "")} onEnd={commit} />
 			<div
 				ref={ed}
 				class="pce-body"

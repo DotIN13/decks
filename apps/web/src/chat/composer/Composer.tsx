@@ -9,7 +9,7 @@ import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
-import { ScribbleCatch } from "./ScribbleCatch.tsx";
+import { ScribbleCatch } from "@decks/ui";
 import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../board/file-drop.ts";
@@ -165,7 +165,7 @@ export function Composer(props: {
 	const [nodes, setNodes] = createSignal<Draft>([]);
 	const text = createMemo(() => draftText(nodes()));
 	let field: DraftFieldApi | undefined;
-	/** The whole stack, where the field is found for the pencil's catcher (`ScribbleCatch.tsx`). */
+	/** The whole stack, where the field is found for the pencil's catcher (`@decks/ui` `ScribbleCatch`). */
 	let stack: HTMLElement | undefined;
 	/** Replace what the field holds, for a change nobody typed. */
 	const put = (draft: Draft) => {
@@ -514,7 +514,7 @@ export function Composer(props: {
 		 * comment used to justify keeping it all target the elements this rewrite deletes.
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5" ref={(el) => (stack = el)}>
-			<ScribbleCatch field={() => stack?.querySelector<HTMLElement>("[data-slot='composer-input']") ?? undefined} insert={(text) => field?.appendWords(text)} focusField={() => field?.focus()} />
+			<ScribbleCatch target={() => stack?.querySelector<HTMLElement>("[data-slot='composer-input']") ?? undefined} append={(text) => field?.appendWords(text)} />
 			<Show when={atOpen()}>
 				<MentionMenu
 					matches={atMatches()}
