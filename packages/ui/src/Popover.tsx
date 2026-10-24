@@ -54,6 +54,8 @@ export function Popover(props: {
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>();
 	/** Which side of its trigger the card landed on, so a stylesheet can grow it out of that edge. */
 	const [side, setSide] = createSignal<"above" | "below" | "beside">("below");
+	/** The most the card may be tall where it is placed, when it is taller than the room there. */
+	const [ceiling, setCeiling] = createSignal<number>();
 	let trigger: HTMLElement | undefined;
 	let card: HTMLDivElement | undefined;
 
@@ -89,7 +91,12 @@ export function Popover(props: {
 		const t = trigger.getBoundingClientRect();
 		const bar = (pill ?? trigger).getBoundingClientRect();
 		const along = (group ?? trigger).getBoundingClientRect();
-		const c = card.getBoundingClientRect();
+		/*
+		 * The card's own size, not its box on screen: it opens with a grow animation, and a box read
+		 * mid-grow is a few percent short, which put a tall menu's foot over its button and a wide one
+		 * past the screen's edge. The full height even when a ceiling below has cut it short.
+		 */
+		const c = { width: card.offsetWidth, height: Math.max(card.offsetHeight, card.scrollHeight + 2) };
 		const placement = props.placement ?? "top-start";
 		if (placement === "right-start") {
 			/*
@@ -121,16 +128,26 @@ export function Popover(props: {
 		if (placement.endsWith("-end")) left = (pill ? bar : t).right - c.width;
 		else if (placement.endsWith("-start")) left = along.left;
 		else left = t.left + t.width / 2 - c.width / 2;
+		const width = Math.min(c.width, window.innerWidth - MARGIN * 2);
+		left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - width - MARGIN));
 
-		let top = above ? bar.top - c.height - GUTTER : bar.bottom + GUTTER;
+		/*
+		 * The side asked for when the whole card fits there; else the side with more room, the card cut
+		 * to that room and scrolling. A menu always ends GUTTER from its bar, so every menu off the same
+		 * bar starts at the same height whatever its length.
+		 */
+		const roomAbove = bar.top - GUTTER - MARGIN;
+		const roomBelow = window.innerHeight - bar.bottom - GUTTER - MARGIN;
+		let up = above;
+		if (above && c.height > roomAbove && roomBelow > roomAbove) up = false;
+		if (!above && c.height > roomBelow && roomAbove > roomBelow) up = true;
+		const room = Math.max(0, up ? roomAbove : roomBelow);
+		const height = Math.min(c.height, room);
+		let top = up ? bar.top - GUTTER - height : bar.bottom + GUTTER;
+		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - height - MARGIN));
+		setCeiling(c.height > room ? room : undefined);
 
-		left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
-		// If it does not fit on the side asked for, take the other one before giving up.
-		if (above && top < MARGIN) top = bar.bottom + GUTTER;
-		else if (!above && top + c.height > window.innerHeight - MARGIN) top = bar.top - c.height - GUTTER;
-		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
-
-		setSide(top + c.height <= t.top + 1 ? "above" : "below");
+		setSide(top + height <= t.top + 1 ? "above" : "below");
 		setAt({ left, top });
 	};
 
@@ -270,6 +287,8 @@ export function Popover(props: {
 						left: `${at()?.left ?? 0}px`,
 						top: `${at()?.top ?? 0}px`,
 						visibility: at() ? "visible" : "hidden",
+						"max-width": `calc(100vw - ${MARGIN * 2}px)`,
+						...(ceiling() !== undefined ? { "max-height": `${ceiling()}px` } : {}),
 					}}
 				>
 					{props.children}
