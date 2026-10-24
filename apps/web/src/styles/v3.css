@@ -29,8 +29,9 @@ body {
 	--v3-tab-on: var(--v3-accent-soft);
 	--v3-tab-on-fg: var(--v3-fg);
 	--v3-tab-on-icon: var(--v3-accent);
-	--v3-row-on: var(--v3-accent-soft);
-	--v3-row-on-icon: var(--v3-accent);
+	/* A chosen row is grey, a step under the hover's; only the open tab is blue. */
+	--v3-row-on: #e9e9e9;
+	--v3-row-on-icon: var(--v3-fg);
 	--v3-ink: #1e1e1e;
 	--v3-ink-fg: #ffffff;
 	--v3-ink-key: #ffffff80;
@@ -2842,4 +2843,349 @@ body {
 		outline-offset: -1px;
 	}
 
+}
+
+/* ---- menus, as the redesign draws them ("Menus and dialogs redesign" on the Decks Studio canvas) ----
+   White, a hairline and a soft shadow, 10px corners, 30px rows, labels in sentence case, and the
+   current choice a grey wash with no tick. Every `.popover` in the app takes it. */
+@layer components {
+	body .popover {
+		padding: 6px;
+		border: 1px solid var(--v3-line);
+		border-radius: 10px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+	}
+	[data-color-scheme="dark"] body .popover {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .popover [data-row]:hover,
+	body .popover [data-row]:focus-visible {
+		background: var(--v3-bg2);
+	}
+	body .popover [data-row][data-current="true"],
+	body .popover .row-act:has(> [data-row][data-current="true"]) {
+		background: var(--v3-row-on);
+	}
+	body .popover [data-row][data-flat="true"] {
+		min-height: 30px;
+		gap: 9px;
+		border-radius: 6px;
+	}
+	body .popover [data-row] > .row-icon {
+		color: var(--v3-fg2);
+	}
+	body .popover [data-row][data-current="true"] > .row-icon {
+		color: var(--v3-row-on-icon);
+	}
+	/* A section's label in a menu: sentence case, quiet, a line inside the list's rhythm. */
+	.menu-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+	}
+	.menu-rule {
+		height: 1px;
+		margin: 5px 2px;
+		background: var(--v3-line);
+	}
+	body .popover .group {
+		padding: 8px 8px 4px;
+		color: var(--v3-fg2);
+		font-size: 11.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+	body .popover .rule {
+		height: 1px;
+		margin: 5px 2px;
+		background: var(--v3-line);
+	}
+	/* The find field at a menu's top: the panel search's field, a step smaller, not focused on open. */
+	.menu-find {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		margin: 2px 2px 4px;
+		padding: 0 8px 0 9px;
+		border-radius: 6px;
+	}
+	.menu-find input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: var(--v3-fg);
+		font: inherit;
+		font-size: 12.5px;
+		outline: none;
+	}
+	/* The thinking scale as drawn: a grey track and a raised white thumb on the level, not a blue fill. */
+	body .popover .segmented[data-scale="true"] {
+		padding: 2px;
+		gap: 1px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+		box-shadow: none;
+	}
+	body .popover .segmented[data-scale="true"] > button {
+		height: 24px;
+		border-radius: 5px;
+		font-size: 11.5px;
+	}
+	body .popover .segmented[data-scale="true"] > button:hover {
+		background: transparent;
+		color: var(--v3-fg);
+	}
+	body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: var(--v3-panel);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+		color: var(--v3-fg);
+		font-weight: 500;
+	}
+	[data-color-scheme="dark"] body .popover .segmented[data-scale="true"] > button[data-on="true"] {
+		background: #4a4a4a;
+	}
+	/* The deck switcher's own deck: a card at the top, the others listed under it. */
+	body .popover .row-act[data-here="true"] {
+		margin-bottom: 2px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+	}
+	body .popover .row-act[data-here="true"] .row-label {
+		font-weight: 600;
+	}
+	/* A row that removes something: red, its hover a red wash. */
+	body .popover [data-row].menu-danger:not([disabled]) {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]) > .row-icon {
+		color: var(--v3-danger, #dc2626);
+	}
+	body .popover [data-row].menu-danger:not([disabled]):hover {
+		background: color-mix(in srgb, var(--v3-danger, #dc2626) 10%, transparent);
+	}
+	/* A runtime's mark in a small tile, as the New agent menu draws it. */
+	.menu-tile {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		place-items: center;
+		border-radius: 5px;
+		background: var(--v3-bg3);
+	}
+	[disabled] > .menu-tile {
+		background: var(--v3-bg2);
+	}
+	.menu-note {
+		margin-left: auto;
+		padding-left: 10px;
+		color: var(--v3-fg3);
+		font-size: 11.5px;
+		white-space: nowrap;
+	}
+}
+
+/* ---- the confirm dialog, as drawn ----------------------------------------------------------- */
+@layer components {
+	.confirm-dlg {
+		width: min(380px, calc(100vw - 32px));
+		overflow: hidden;
+		border-radius: 14px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 24px 60px rgb(0 0 0 / 25%),
+			0 0 0 1px var(--v3-line);
+		color: var(--v3-fg);
+	}
+	.confirm-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 16px 14px 10px 18px;
+	}
+	.confirm-icon {
+		display: grid;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		place-items: center;
+		border-radius: 7px;
+		background: color-mix(in srgb, var(--v3-danger) 12%, transparent);
+		color: var(--v3-danger);
+	}
+	.confirm-title {
+		font-size: 15px;
+		font-weight: 600;
+	}
+	.confirm-x {
+		display: grid;
+		width: 26px;
+		height: 26px;
+		place-items: center;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+	}
+	.confirm-x:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.confirm-body {
+		padding: 0 18px 16px;
+		color: var(--v3-fg2);
+		font-size: 13px;
+		line-height: 1.45;
+		white-space: pre-wrap;
+	}
+	.confirm-foot {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 12px 18px;
+		border-top: 1px solid var(--v3-line);
+	}
+	.confirm-foot .btn[data-danger="true"] {
+		border-color: transparent;
+		background: var(--v3-danger);
+		color: #fff;
+	}
+}
+
+/* ---- the canvas manager, as drawn: a plain head, find and order in one row, one blue button ---- */
+@layer components {
+	body .stage-box {
+		width: min(94vw, 900px);
+		border-radius: 14px;
+		background: var(--v3-panel);
+	}
+	body .stage-head {
+		gap: 12px;
+		padding: 16px 20px 14px;
+		border-bottom: 0;
+	}
+	body .stage-title {
+		font-size: 15px;
+		font-weight: 600;
+		letter-spacing: 0;
+	}
+	body .stage-new {
+		height: 30px;
+		border-radius: 7px;
+		background: var(--v3-accent);
+		color: #fff;
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.stage-tools {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	body .stage-search {
+		height: 30px;
+		flex: 1;
+		gap: 7px;
+		padding: 0 9px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--v3-bg2);
+	}
+	body .stage-search:focus-within {
+		background: var(--v3-panel);
+		box-shadow:
+			inset 0 0 0 1px var(--v3-accent),
+			0 0 0 3px color-mix(in srgb, var(--v3-accent) 18%, transparent);
+	}
+	body .stage-search > input {
+		font-size: 12.5px;
+	}
+	body .stage-sort {
+		padding: 2px;
+		gap: 1px;
+		border-radius: 7px;
+		background: var(--v3-bg2);
+		box-shadow: none;
+	}
+	body .stage-sort > button {
+		height: 26px;
+		padding: 0 10px;
+		border-radius: 5px;
+		font-size: 12px;
+	}
+	body .stage-sort > button:hover {
+		background: transparent;
+	}
+	body .stage-sort > button[data-on="true"] {
+		background: var(--v3-panel);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+		font-weight: 500;
+	}
+	[data-color-scheme="dark"] body .stage-sort > button[data-on="true"] {
+		background: #4a4a4a;
+	}
+	body .stage-card[data-here] .stage-open {
+		border-color: var(--v3-accent);
+		box-shadow: 0 0 0 1px var(--v3-accent);
+	}
+}
+
+/* ---- the canvas switcher: a small picture, the name, its faces and its age ------------------- */
+@layer components {
+	body .popover [data-row].switcher-canvas {
+		min-height: 38px;
+		gap: 10px;
+	}
+	.switcher-thumb {
+		display: block;
+		width: 34px;
+		height: 24px;
+		flex: none;
+		overflow: hidden;
+		border-radius: 4px;
+		background: var(--v3-bg2);
+		box-shadow: inset 0 0 0 1px var(--v3-line);
+	}
+	.switcher-thumb > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.switcher-faces {
+		display: flex;
+		flex: none;
+	}
+	.switcher-face {
+		display: grid;
+		width: 18px;
+		height: 18px;
+		margin-left: -4px;
+		place-items: center;
+		border-radius: 50%;
+		box-shadow: 0 0 0 2px var(--v3-panel);
+		color: #fff;
+		font-size: 9px;
+		font-weight: 600;
+	}
+	body .popover [data-row].switcher-canvas .menu-note {
+		min-width: 24px;
+		padding-left: 4px;
+		text-align: right;
+	}
 }

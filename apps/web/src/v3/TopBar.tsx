@@ -3,7 +3,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
 import Plus from "lucide-solid/icons/plus";
-import { Show } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
 import { Icon } from "../ui/icons.tsx";
@@ -36,6 +36,8 @@ export function TopBar(props: {
 	onCopy?: () => void;
 	/** The phone's bar: full width, the canvas at the right end. */
 	phone?: boolean;
+	/** The canvas switcher around the canvas chip; left out, the chip opens the canvas manager. */
+	canvasMenu?: (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element) => JSX.Element;
 	/** On a desktop the deck lives in the panel's head, so folded the bar brings back only the panel. */
 	desktop?: boolean;
 }) {
@@ -105,20 +107,27 @@ export function TopBar(props: {
 				<Show when={props.phone}>
 					<span class="flex-1" />
 				</Show>
-				<button
-					type="button"
-					class="v3-canvas-chip"
-					data-open={props.stagesOpen ? "true" : undefined}
-					aria-haspopup="dialog"
-					aria-expanded={props.stagesOpen ?? false}
-					data-tip="Canvases"
-					aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
-					onClick={() => props.onStages?.()}
-				>
-					<Icon of={Layers} size={16} />
-					<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
-					<Icon of={ChevronDown} size={13} class="v3-chev" />
-				</button>
+				{(() => {
+					const chip = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
+						<button
+							type="button"
+							class="v3-canvas-chip"
+							ref={popover?.ref}
+							data-open={(popover ? popover.open : props.stagesOpen) ? "true" : undefined}
+							aria-haspopup={popover ? "menu" : "dialog"}
+							aria-expanded={popover ? popover.open : (props.stagesOpen ?? false)}
+							data-tip="Canvases"
+							aria-label={props.stage ? `Canvases, currently ${props.stage}` : "Canvases, this chat is on none"}
+							onClick={() => (popover ? popover.toggle() : props.onStages?.())}
+						>
+							<Icon of={Layers} size={16} />
+							<span class="v3-canvas-name">{props.stage ?? "No canvas"}</span>
+							<Icon of={ChevronDown} size={13} class="v3-chev" />
+						</button>
+					);
+					/* The switcher where it is given (a desktop); the canvas manager straight away otherwise. */
+					return props.canvasMenu ? props.canvasMenu((popover) => chip(popover)) : chip();
+				})()}
 				<Show when={props.viewOnly}>
 					{(owner) => (
 						<button type="button" class="v3-viewonly" title={`Shared with you to view by ${owner()}: it follows their copy. Make your own copy to change it.`} onClick={() => props.onCopy?.()}>

@@ -76,7 +76,6 @@ export function StageManager(props: {
 	createEffect(() => {
 		if (!props.open) return;
 		setQuery("");
-		queueMicrotask(() => field?.focus());
 	});
 
 	/*
@@ -98,9 +97,6 @@ export function StageManager(props: {
 					// Closed again before it ever showed: there is no fade to wait for.
 					if (props.open) {
 						setShown(true);
-						// Again, now the field is certainly in the page: the microtask above can run
-						// before the panel has mounted, and then Escape has nowhere to go.
-						field?.focus();
 					} else setMounted(false);
 				}),
 			);
@@ -145,8 +141,10 @@ export function StageManager(props: {
 
 	/* The canvas you are on first, then the rest by when they last changed: the one you want is
 	   almost always one you were just in. A search leaves only what matches (`searchStages`). */
+	const [sort, setSort] = createSignal<"recent" | "az">("recent");
 	const ordered = createMemo(() => {
 		const list = rows().filter((one) => one.hit);
+		if (sort() === "az") return list.sort((a, b) => a.stage.title.localeCompare(b.stage.title));
 		const at = (one: StageRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
 		return list.sort((a, b) => at(b.stage) - at(a.stage) || a.stage.title.localeCompare(b.stage.title));
 	});
@@ -184,7 +182,6 @@ export function StageManager(props: {
 						<div class="stage-title-row">
 							<h2 class="stage-title">
 								Canvases
-								<span class="stage-count tabular-nums">{searching() ? `${found()} of ${offered().length}` : offered().length}</span>
 							</h2>
 							<Show
 								when={naming()}
@@ -225,13 +222,14 @@ export function StageManager(props: {
 								</form>
 							</Show>
 						</div>
+						<div class="stage-tools">
 						<label class="stage-search">
 							<Icon of={Search} class="flex-none text-faint" size={15} />
 							<input
 								ref={field}
 								type="text"
 								spellcheck={false}
-								placeholder={`Search ${offered().length} canvas${offered().length === 1 ? "" : "es"}`}
+								placeholder="Find a canvas"
 								title="Matches a canvas's name, the words on its boards and notes, and who is on it"
 								value={query()}
 								onInput={(event) => setQuery(event.currentTarget.value)}
@@ -252,6 +250,15 @@ export function StageManager(props: {
 								<kbd class="stage-kbd">↵</kbd>
 							</Show>
 						</label>
+						<div class="segmented stage-sort" role="radiogroup" aria-label="Order">
+							<button type="button" role="radio" aria-checked={sort() === "recent"} data-on={sort() === "recent"} onClick={() => setSort("recent")}>
+								Recent
+							</button>
+							<button type="button" role="radio" aria-checked={sort() === "az"} data-on={sort() === "az"} onClick={() => setSort("az")}>
+								A–Z
+							</button>
+						</div>
+						</div>
 					</div>
 
 					<div class="stage-wall">
@@ -274,10 +281,6 @@ export function StageManager(props: {
 						</Show>
 					</div>
 
-					<div class="stage-keys" aria-hidden="true">
-						<span><kbd class="stage-kbd">↵</kbd> open the first match</span>
-						<span><kbd class="stage-kbd">esc</kbd> close</span>
-					</div>
 				</div>
 			</div>
 		</Show>
@@ -377,7 +380,7 @@ function StageCard(props: {
 					/>
 				</Show>
 				<Show when={here()}>
-					<span class="stage-current">Current</span>
+					<span class="sr-only">Current</span>
 				</Show>
 			</button>
 			<span class="stage-acts" data-confirming={confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>

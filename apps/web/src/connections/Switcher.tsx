@@ -276,9 +276,14 @@ export function Switcher(props: { label?: string } = {}) {
 					}
 				>
 					<div class="row-list" role="menu">
-						<For each={connections()}>
-							{(one) => (
-								<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined}>
+						{/* This deck first, as a card; the others under their own label (the drawing's "Deck switcher"). */}
+						<For each={[...connections()].sort((a, b) => Number(b.id === current()?.id) - Number(a.id === current()?.id))}>
+							{(one, index) => (
+								<>
+								<Show when={index() === 1}>
+									<div class="menu-label">Other decks</div>
+								</Show>
+								<div class="row-act" data-on={one.id === current()?.id ? "true" : undefined} data-here={one.id === current()?.id ? "true" : undefined}>
 									<Show
 										when={editing() === one.id}
 										fallback={
@@ -331,6 +336,7 @@ export function Switcher(props: { label?: string } = {}) {
 										</label>
 									</Show>
 								</div>
+								</>
 							)}
 						</For>
 					</div>

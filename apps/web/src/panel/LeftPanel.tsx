@@ -178,6 +178,8 @@ export function LeftPanel(props: {
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/** Rename an agent, from the edit window its row opens. */
 	onAgentRename?: (id: string, name: string) => void;
+	/** Stop the turn an agent is running (the row menu's Stop its turn). */
+	onAbortAgent?: (id: string) => void;
 
 	/**
 	 * The desktop layout, drawn on the Decks Studio canvas ("tt-sidebar-redesign"): the head holds
@@ -198,6 +200,8 @@ export function LeftPanel(props: {
 	onPickArrows?: (ids: string[]) => void;
 	/** The head's canvas title, pressed: the canvas manager. */
 	onCanvases?: () => void;
+	/** The canvas switcher around the head's canvas title (`canvas/CanvasSwitcher.tsx`). */
+	canvasMenu?: (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element) => JSX.Element;
 
 	// --- the Apps tab -----------------------------------------------------------------
 	/** The deck's apps; asked for when the tab opens. */
@@ -710,10 +714,26 @@ export function LeftPanel(props: {
 							<DecksLineMark size={17} />
 						</span>
 						<div class="v3-lp-text">
-							<button type="button" class="v3-lp-title" data-tip="Canvases" disabled={!props.onCanvases} onClick={() => props.onCanvases?.()}>
-								<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
-								<Icon of={ChevronDown} size={13} class="flex-none" />
-							</button>
+							{(() => {
+								const title = (popover?: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => (
+									<button
+										type="button"
+										class="v3-lp-title"
+										ref={popover?.ref}
+										data-tip="Canvases"
+										aria-haspopup="menu"
+										aria-expanded={popover?.open ?? false}
+										data-open={popover?.open ? "true" : undefined}
+										disabled={!props.canvasMenu && !props.onCanvases}
+										onClick={() => (popover ? popover.toggle() : props.onCanvases?.())}
+									>
+										<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
+										<Icon of={ChevronDown} size={13} class="flex-none" />
+									</button>
+								);
+								/* The canvas switcher where it is given; the canvas manager straight away otherwise. */
+								return props.canvasMenu ? props.canvasMenu((popover) => title(popover)) : title();
+							})()}
 							<div class="v3-lp-status">
 								<span class="v3-lp-deck">
 									<Switcher />
@@ -910,6 +930,7 @@ export function LeftPanel(props: {
 												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												taken={(name) => nameTaken(name, row.chat.id)}
+												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
 												lines={lines()}
 												size={22}
 												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
@@ -954,6 +975,7 @@ export function LeftPanel(props: {
 												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												taken={(name) => nameTaken(name, row.chat.id)}
+												{...(props.onAbortAgent ? { onAbort: () => props.onAbortAgent?.(row.chat.id) } : {})}
 												lines={lines()}
 												size={26}
 												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}

@@ -4,6 +4,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
+import Search from "lucide-solid/icons/search";
 import Brush from "lucide-solid/icons/brush";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import X from "lucide-solid/icons/x";
@@ -109,10 +110,12 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 				>
 					{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 					    `flex-1` label, and has. */}
-					<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-					<span class="row-label flex-1">New {runtime.label} agent</span>
+					<span class="menu-tile" aria-hidden="true">
+						<AgentMark class="flex-none" agent={runtime.kind} size={13} />
+					</span>
+					<span class="row-label flex-1">{runtime.label}</span>
 					<Show when={!runtime.available}>
-						<span class="flex-none text-note text-faint">not installed</span>
+						<span class="menu-note">not installed</span>
 					</Show>
 				</button>
 			)}
@@ -313,7 +316,14 @@ export function AgentMenu(props: {
 	 * sentence rather than a bare number: the panel is the surface that scrolls, and this is
 	 * the only place that says so.
 	 */
-	const listed = () => dropdownFaces(agentList(props.chats, props.unread, props.focused));
+	/* What the find field asks for: a name or a workspace. While it holds words every match is listed. */
+	const [find, setFind] = createSignal("");
+	const found = () => {
+		const q = find().trim().toLowerCase();
+		if (!q) return props.chats;
+		return props.chats.filter((chat) => `${props.identities[chat.id]?.name ?? chat.name}\n${props.identities[chat.id]?.workspace ?? ""}`.toLowerCase().includes(q));
+	};
+	const listed = () => (find().trim() ? { shown: agentList(found(), props.unread, props.focused), more: 0 } : dropdownFaces(agentList(props.chats, props.unread, props.focused)));
 	/**
 	 * The same rows, cut into workspace runs — and nothing at all when nobody has one.
 	 *
@@ -328,12 +338,22 @@ export function AgentMenu(props: {
 		<Popover
 			placement={props.placement ?? "bottom-start"}
 			label={props.label ?? "Agents"}
-			class="w-[264px]"
+			class="w-[280px]"
+			onOpenChange={(open) => {
+				if (!open) setFind("");
+			}}
 			trigger={(api) => {
 				dismiss = () => api.open && api.toggle();
 				return props.trigger(api);
 			}}
 		>
+			<label class="field menu-find">
+				<Icon of={Search} size={13} class="shrink-0 text-faint" />
+				<input type="text" placeholder="Find an agent" aria-label="Find an agent" value={find()} onInput={(event) => setFind(event.currentTarget.value)} />
+			</label>
+			<Show when={find().trim() && found().length === 0}>
+				<p class="m-0 px-2 py-2 text-note text-faint">No agent matches that</p>
+			</Show>
 			<For each={runs()}>
 				{(run) => (
 					<>

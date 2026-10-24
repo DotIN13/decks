@@ -57,10 +57,14 @@ export function AgentEdit(props: {
 	onTags: (tags: string[]) => void;
 	onWorkspace: (workspace: string | null) => void;
 	onClose: () => void;
+	/** The field the window opens on: the name (the default), the workspace or the tags. */
+	start?: "name" | "workspace" | "tags";
 }) {
 	const [name, setName] = createSignal(props.name);
 	const [draft, setDraft] = createSignal("");
 	let nameField: HTMLInputElement | undefined;
+	let tagField: HTMLInputElement | undefined;
+	let root: HTMLDivElement | undefined;
 
 	/* The field follows the agent rather than owning it: the agent names itself too, and a
 	   refused rename comes back as the identity the server kept. */
@@ -97,7 +101,11 @@ export function AgentEdit(props: {
 		window.addEventListener("keydown", onKey, true);
 		onCleanup(() => window.removeEventListener("keydown", onKey, true));
 		// The name is what most visits here are for, so the cursor starts in it.
-		requestAnimationFrame(() => nameField?.select());
+		requestAnimationFrame(() => {
+			if (props.start === "tags") return tagField?.focus();
+			if (props.start === "workspace") return root?.querySelector<HTMLElement>(".agent-edit-row:nth-child(2) button")?.focus();
+			nameField?.select();
+		});
 	});
 
 	const commitName = () => {
@@ -119,13 +127,14 @@ export function AgentEdit(props: {
 	 * and two places deciding what a tag may be is how they come to disagree.
 	 */
 	const add = () => {
+		const have = new Set(props.userTags.map((tag) => tag.toLowerCase()));
 		const wanted = draft()
 			.split(",")
 			.map((part) => part.trim())
-			.filter(Boolean);
-		if (wanted.length === 0) return;
+			.filter((part) => part && !have.has(part.toLowerCase()) && (have.add(part.toLowerCase()), true));
 		setDraft("");
-		props.onTags([...props.userTags, ...wanted]);
+		if (wanted.length === 0) return;
+		props.onTags([...props.userTags, ...wanted].slice(0, MAX_TAGS));
 	};
 
 	return (
@@ -136,6 +145,7 @@ export function AgentEdit(props: {
 		 */
 		<div
 			class="picker-backdrop"
+			ref={root}
 			onPointerDown={(event) => {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
@@ -202,10 +212,16 @@ export function AgentEdit(props: {
 										type="text"
 										spellcheck={false}
 										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
+										ref={tagField}
 										placeholder="Add a tag"
 										aria-label="Add a tag"
 										value={draft()}
-										onInput={(event) => setDraft(event.currentTarget.value)}
+										onInput={(event) => {
+											setDraft(event.currentTarget.value);
+											// A comma ends a tag, as Enter does: "deploy, status" is two.
+											if (event.currentTarget.value.includes(",")) add();
+										}}
+										onBlur={() => draft().trim() && add()}
 										onKeyDown={(event) => {
 											if (event.key === "Enter") {
 												event.preventDefault();

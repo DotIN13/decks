@@ -11,6 +11,8 @@ export interface Question {
 	body: string;
 	yes: string;
 	no: string;
+	/** The answer removes something: the button is red, and the dialog says so with a bin. Left out, a yes that starts Delete, Remove or Forget is one. */
+	danger?: boolean;
 	answer: (yes: boolean) => void;
 }
 

@@ -5,7 +5,7 @@ import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
-import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
+import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
 import { createFileDrops } from "./app/files.ts";
@@ -67,6 +67,7 @@ import { installTooltips } from "./v3/tooltip.ts";
 import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
+import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import type { CanvasItem } from "./panel/canvas-items.ts";
 import {boxOf, fitInto, keepVisible, middleOf} from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
@@ -1046,6 +1047,19 @@ export function App() {
 		void act("agent.update", [{ canvas: name }], agentId);
 	};
 
+	/** The canvas switcher around a trigger: the panel head's title and the top bar's canvas chip both use it. */
+	const canvasMenu = (trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element, placement: "bottom-start" | "bottom-end" = "bottom-start") => (
+		<CanvasSwitcher
+			stages={stages()}
+			here={stageOf(state.focused)?.name}
+			scheme={scheme()}
+			placement={placement}
+			onPick={(name) => openCanvas(name)}
+			onNew={() => newCanvas()}
+			onAll={() => void setStagesOpen(true)}
+			trigger={trigger}
+		/>
+	);
 	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
 	const [stagesOpen, setStagesOpen] = createSignal(false);
 	/**
@@ -1446,6 +1460,7 @@ export function App() {
 					onNewCanvas={newCanvas}
 					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.title } : {})}
 					{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
+					{...(!phone() && stages().length > 0 ? { canvasMenu: (trigger: Parameters<typeof canvasMenu>[0]) => canvasMenu(trigger) } : {})}
 					{...(viewOnlyStage() ? { viewOnly: viewOnlyStage()!.shared!.owner, onCopy: () => copyShared(viewOnlyStage()!.name) } : {})}
 				/>
 
@@ -1610,6 +1625,7 @@ export function App() {
 					selectedItems={penSelected()}
 					onPickItem={pickItem}
 					onCanvases={() => void setStagesOpen((was) => !was)}
+					{...(stages().length > 0 ? { canvasMenu: (trigger: Parameters<typeof canvasMenu>[0]) => canvasMenu(trigger) } : {})}
 					onRunApp={(app) => void act("apps.run", [app.name]).then(() => loadApps())}
 					onPickArrows={(ids) => {
 						editorHandle()?.select(ids);
@@ -1657,6 +1673,7 @@ export function App() {
 					   agent declares one and you can move it, and whoever wrote last is where it is. */
 					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
 					onAgentRename={(id, name) => send({ type: "agent.rename", id, name })}
+					onAbortAgent={(id) => send({ type: "agent.abort", id })}
 					onPick={(board) => playAndFrame(board.path)}
 					/*
 					 * Delete the file. The row asks twice before this is called (`BoardRow.tsx`).

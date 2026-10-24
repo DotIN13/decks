@@ -1,6 +1,5 @@
 import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
 import FiveHour from "../../settings/FiveHour.tsx";
-import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
@@ -23,6 +22,12 @@ import { levelsFor, nearestLevel, optionFor } from "./thinking.ts";
  * the list it filters — a deck with three providers signed in offers a few dozen models,
  * and `gpt-4` exists under three of them.
  */
+/** A maker's id as people write it: anthropic is Anthropic, openai is OpenAI. */
+const MAKERS: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google", deepseek: "DeepSeek", openrouter: "OpenRouter", xai: "xAI", mistral: "Mistral", groq: "Groq" };
+function makerName(id: string): string {
+	return MAKERS[id.toLowerCase()] ?? (id ? id[0]!.toUpperCase() + id.slice(1) : id);
+}
+
 export function ModelPicker(props: {
 	model: AgentModel | undefined;
 	models: ModelOption[];
@@ -79,6 +84,8 @@ export function ModelPicker(props: {
 		dismiss?.();
 	};
 
+	/** The makers in the list, in the order their first model appears, each capitalised as a label. */
+	const makers = () => [...new Set(matches().map((option) => option.provider))];
 	return (
 		<Popover
 			placement="top"
@@ -195,7 +202,7 @@ export function ModelPicker(props: {
 					 * opens this deliberately can ask for the cursor back the day it exists.
 					 */
 					type="text"
-					placeholder="Search models"
+					placeholder="Find a model"
 					aria-label="Search models"
 					value={filter()}
 					onInput={(event) => setFilter(event.currentTarget.value)}
@@ -232,35 +239,28 @@ export function ModelPicker(props: {
 			{/* `px-1.5`: the rows stand in from the card's edge as the search field and the subscription rows do. */}
 			<div class="max-h-[min(33vh,300px)] overflow-y-auto px-1.5">
 				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">No model matches that</p>}>
-					<For each={matches()}>
-						{(option) => (
-							<button
-								data-row
-								data-flat="true"
-								data-current={isCurrent(option)}
-								type="button"
-								role="menuitemradio"
-								aria-checked={isCurrent(option)}
-								onClick={() => pick(option)}
-							>
-								{/*
-									Always drawn, and bounded rather than conditional.
-
-									It was briefly hidden when only one provider was signed in, on the grounds
-									that twenty-three copies of the same word disambiguate nothing. But which
-									provider a turn is billed to is not only interesting when there is a choice
-									— it is the kind of fact you check *because* you cannot remember, and a
-									chip that comes and goes with the shape of the list is one you cannot rely
-									on being there. So the cost is paid where it was actually incurred: the
-									pill is capped in `dock.css`, so a long provider name cannot go on eating
-									the row the names need.
-								*/}
-								<span class="preview" title={option.provider}>{option.provider}</span>
-								<span class="min-w-0 flex-1 truncate">{option.label}</span>
-								<Show when={isCurrent(option)}>
-									<Icon of={Check} size={13} class="shrink-0 text-accent" />
-								</Show>
-							</button>
+					{/* By maker, each under its own label: the maker is said once, not on every row. */}
+					<For each={makers()}>
+						{(maker) => (
+							<>
+								<div class="menu-label">{makerName(maker)}</div>
+								<For each={matches().filter((option) => option.provider === maker)}>
+									{(option) => (
+										<button
+											data-row
+											data-flat="true"
+											data-current={isCurrent(option)}
+											type="button"
+											role="menuitemradio"
+											aria-checked={isCurrent(option)}
+											title={`${option.provider}/${option.label}`}
+											onClick={() => pick(option)}
+										>
+											<span class="min-w-0 flex-1 truncate">{option.label}</span>
+										</button>
+									)}
+								</For>
+							</>
 						)}
 					</For>
 				</Show>
@@ -278,7 +278,7 @@ export function ModelPicker(props: {
 					evenly divided, read left to right.
 				*/}
 				<div class="px-1.5 py-1">
-					<span class="meta">Thinking</span>
+					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>Thinking</span>
 					<div class="segmented mt-1 w-full" data-scale="true">
 						<For each={levels()}>
 							{(level) => (
@@ -310,7 +310,7 @@ export function ModelPicker(props: {
 			<Show when={(props.accounts?.length ?? 0) > 1 && props.onAccount}>
 				<div class="rule" />
 				<div class="px-1.5 py-1">
-					<span class="meta">Subscription</span>
+					<span class="menu-label" style={{ padding: "4px 2px 4px" }}>Account</span>
 					<div class="mt-1">
 						<For each={props.accounts ?? []}>
 							{(account) => (
@@ -331,11 +331,6 @@ export function ModelPicker(props: {
 									disabled={!account.signedIn}
 									onClick={() => props.onAccount?.(account.id)}
 								>
-									<span class="row-icon">
-										<Show when={props.account === account.id}>
-											<Icon of={Check} size={13} />
-										</Show>
-									</span>
 									<span class="row-label flex-1 truncate">{account.email ?? account.id}</span>
 									<Show when={!account.signedIn} fallback={<FiveHour reading={account.fiveHour} />}>
 										<span class="meta flex-none text-micro">signed out</span>

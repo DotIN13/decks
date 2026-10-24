@@ -1,10 +1,16 @@
 import type { Identity } from "@decks/protocol";
-import SquarePen from "lucide-solid/icons/square-pen";
-import X from "lucide-solid/icons/x";
+import Ellipsis from "lucide-solid/icons/ellipsis";
+import Folder from "lucide-solid/icons/folder";
+import MessageCircle from "lucide-solid/icons/message-circle";
+import Pencil from "lucide-solid/icons/pencil";
+import Square from "lucide-solid/icons/square";
+import Tags from "lucide-solid/icons/tags";
+import Trash2 from "lucide-solid/icons/trash-2";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { Portal } from "solid-js/web";
 import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon } from "../ui/icons.tsx";
+import { Popover } from "../ui/Popover.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { closeWords, rowWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
@@ -66,6 +72,8 @@ export function AgentRow(props: {
 	workspaces?: string[];
 	/** Whether another agent already answers to a name, for the window's red line. */
 	taken?: (name: string) => boolean;
+	/** Stop the turn it is running: the menu's Stop its turn. */
+	onAbort?: () => void;
 	/** One line (name, runtime, time) or two (and what it is doing); the panel's square switches them. */
 	lines: 1 | 2;
 	/** The face's size, when the list wants it other than the one or two lines say. */
@@ -77,6 +85,18 @@ export function AgentRow(props: {
 	const name = () => props.identity?.name ?? chat().name;
 	/** Whether this row's edit window is open. One per row, and only the open one is drawn. */
 	const [editing, setEditing] = createSignal(false);
+	/** Which field the edit window opens on, from the menu's Rename, Move or Edit tags. */
+	const [editStart, setEditStart] = createSignal<"name" | "workspace" | "tags">("name");
+	const edit = (field: "name" | "workspace" | "tags") => {
+		setEditStart(field);
+		setEditing(true);
+	};
+	let dismissMenu: (() => void) | undefined;
+	/** A pick in the menu: close it first, then act. */
+	const menu = (run: () => void) => {
+		dismissMenu?.();
+		run();
+	};
 	/** Whether this row is the one being dragged to another heading, so it can fade while it is. */
 	const [dragging, setDragging] = createSignal(false);
 	/** Off the row, where `agent-sections.ts` put it — one source for one fact, like the tags. */
@@ -282,25 +302,69 @@ export function AgentRow(props: {
 			<Show when={props.onTags}>
 				{(onTags) => (
 					<>
-						<button
-							class="agent-tagbtn"
-							type="button"
-							data-on={editing() || undefined}
-							title={`Edit ${name()}`}
-							aria-label={`Edit ${name()}: name, workspace and tags`}
-							onClick={(event) => {
-								event.stopPropagation();
-								setEditing(true);
+						{/*
+							The agent's menu, as Studio's agent rows have it: talk to it, rename, move, tag,
+							stop its turn, remove it. Rename, Move and Edit tags open the edit window on
+							their own field. Not a `[data-row]`, for the reason the × was not: the arrows
+							rove the list's rows, and a second stop per row would double every journey.
+						*/}
+						<Popover
+							placement="right-start"
+							label={`${name()}'s menu`}
+							class="w-[240px]"
+							trigger={(api) => {
+								dismissMenu = () => api.open && api.toggle();
+								return (
+									<button
+										class="agent-tagbtn agent-more"
+										type="button"
+										ref={api.ref}
+										data-on={api.open || editing() || undefined}
+										aria-haspopup="menu"
+										aria-expanded={api.open}
+										title={`${name()}: more`}
+										aria-label={`More for ${name()}`}
+										onClick={(event) => {
+											event.stopPropagation();
+											api.toggle();
+										}}
+									>
+										<Icon of={Ellipsis} size={14} />
+									</button>
+								);
 							}}
 						>
-							{/*
-								A pen, at the × beside it: 13px, the same stroke, the same 20px slot.
-								It was a `+`, which said *add one more* — right for a row of chips you
-								are appending to, wrong for the only control on a row that opens a
-								thing you edit.
-							*/}
-							<Icon of={SquarePen} size={13} />
-						</button>
+							<div class="menu-label">{name()}</div>
+							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => props.onFocus())}>
+								<Icon of={MessageCircle} size={15} class="row-icon" />
+								<span class="row-label">Talk to it here</span>
+							</button>
+							<div class="rule" aria-hidden="true" />
+							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("name"))}>
+								<Icon of={Pencil} size={15} class="row-icon" />
+								<span class="row-label">Rename…</span>
+							</button>
+							<Show when={props.onWorkspace}>
+								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("workspace"))}>
+									<Icon of={Folder} size={15} class="row-icon" />
+									<span class="row-label">Move to workspace…</span>
+									<Show when={workspace()}>{(here) => <span class="menu-note">{here()}</span>}</Show>
+								</button>
+							</Show>
+							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("tags"))}>
+								<Icon of={Tags} size={15} class="row-icon" />
+								<span class="row-label">Edit tags…</span>
+							</button>
+							<div class="rule" aria-hidden="true" />
+							<button type="button" role="menuitem" data-row data-flat="true" disabled={!busy() || !props.onAbort} title={busy() ? undefined : "Nothing is running"} onClick={() => menu(() => props.onAbort?.())}>
+								<Icon of={Square} size={15} class="row-icon" />
+								<span class="row-label">Stop its turn</span>
+							</button>
+							<button type="button" role="menuitem" data-row data-flat="true" class="menu-danger" disabled={!close()} title={close() ? undefined : "It is mid-turn: stop it first"} onClick={() => menu(() => props.onClose())}>
+								<Icon of={Trash2} size={15} class="row-icon" />
+								<span class="row-label">Remove agent</span>
+							</button>
+						</Popover>
 						<Show when={editing()}>
 							<Portal>
 								<AgentEdit
@@ -310,6 +374,7 @@ export function AgentRow(props: {
 									{...(props.taken ? { taken: props.taken } : {})}
 									{...(workspace() ? { workspace: workspace() } : {})}
 									workspaces={props.workspaces ?? []}
+									start={editStart()}
 									onRename={(next) => props.onRename?.(next)}
 									onTags={onTags()}
 									onWorkspace={(next) => props.onWorkspace?.(next)}
@@ -321,28 +386,6 @@ export function AgentRow(props: {
 				)}
 			</Show>
 
-			{/*
-				**Absent, rather than disabled, on an agent that cannot be closed.** The registry
-				refuses anything mid-turn and the row already says "running tools…" — a control
-				that cannot be pressed is worth drawing when its absence would be a mystery, and
-				this is not a mystery.
-			*/}
-			<Show when={close()}>
-				{(words) => (
-					<button
-						class="close"
-						type="button"
-						title={words()}
-						aria-label={`Close ${name()}`}
-						onClick={(event) => {
-							event.stopPropagation();
-							props.onClose();
-						}}
-					>
-						<Icon of={X} size={13} />
-					</button>
-				)}
-			</Show>
 		</div>
 	);
 }

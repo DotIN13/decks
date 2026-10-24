@@ -1,5 +1,4 @@
 import type { AgentMode } from "@decks/protocol";
-import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ClipboardList from "lucide-solid/icons/clipboard-list";
 import Shield from "lucide-solid/icons/shield";
@@ -27,19 +26,19 @@ import { Popover } from "../../ui/Popover.tsx";
 const MODES: Array<{ mode: AgentMode; label: string; icon: LucideIcon; note: string }> = [
 	{
 		mode: "manual",
-		label: "ask first",
+		label: "Ask first",
 		icon: Shield,
 		note: "Ask before anything it judges worth asking about.",
 	},
 	{
 		mode: "acceptEdits",
-		label: "edit freely",
+		label: "Edit freely",
 		icon: SquarePen,
 		note: "Stop asking about board edits. Commands still ask.",
 	},
 	{
 		mode: "plan",
-		label: "plan only",
+		label: "Plan only",
 		icon: ClipboardList,
 		note: "Change nothing at all: read, think, and propose a plan to approve.",
 	},
@@ -51,7 +50,7 @@ const MODES: Array<{ mode: AgentMode; label: string; icon: LucideIcon; note: str
 		 * is tell you which chip you are looking at.
 		 */
 		mode: "auto",
-		label: "auto",
+		label: "Auto",
 		icon: Zap,
 		note: "Stop asking altogether and decide for itself.",
 	},
@@ -94,7 +93,7 @@ export function ModeMenu(props: {
 		<Show when={available().length > 1}>
 			<Popover
 				placement="top-start"
-				class="w-[min(320px,calc(100vw-16px))]"
+				class="w-[min(220px,calc(100vw-16px))]"
 				label="How much this agent asks before acting"
 				trigger={(api) => {
 					dismiss = () => {
@@ -143,10 +142,13 @@ export function ModeMenu(props: {
 					);
 				}}
 			>
+				<div class="menu-label">When it may act</div>
 				<For each={available()}>
 					{(entry) => (
 						<button
 							data-row
+							data-flat="true"
+							title={entry.note}
 							data-current={entry.mode === props.mode}
 							type="button"
 							role="menuitemradio"
@@ -156,14 +158,9 @@ export function ModeMenu(props: {
 								dismiss?.();
 							}}
 						>
-							<Icon of={entry.icon} size={14} class="row-icon" />
-							<span class="row-label">
-								{entry.label}
-								<Show when={entry.mode === props.mode}>
-									<Icon of={Check} size={11} class="text-accent" />
-								</Show>
-							</span>
-							<span class="row-note">{entry.note}</span>
+							<Icon of={entry.icon} size={15} class="row-icon" />
+							{/* The name alone, as the menus are drawn: the choice is its wash, not a tick, and the note is the button's tooltip. */}
+							<span class="row-label">{entry.label}</span>
 						</button>
 					)}
 				</For>
