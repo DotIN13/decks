@@ -25,6 +25,12 @@ body {
 	--v3-fg3: #b0b0b0;
 	--v3-accent: #2563eb;
 	--v3-accent-soft: #eaf1fe;
+	/* The open tab and the chosen row: the pale blue wash in light (the dark ones are below). */
+	--v3-tab-on: var(--v3-accent-soft);
+	--v3-tab-on-fg: var(--v3-fg);
+	--v3-tab-on-icon: var(--v3-accent);
+	--v3-row-on: var(--v3-accent-soft);
+	--v3-row-on-icon: var(--v3-accent);
 	--v3-ink: #1e1e1e;
 	--v3-ink-fg: #ffffff;
 	--v3-ink-key: #ffffff80;
@@ -65,6 +71,16 @@ body {
 	--v3-fg3: #6f6f6f;
 	--v3-accent: #3b82f6;
 	--v3-accent-soft: #1d2b45;
+	/*
+	 * In dark the navy wash read as a smudge. The open tab is a clear blue, light enough to read
+	 * as blue on the dark panel, with pale-blue words; a chosen row is a quiet lifted grey, so blue
+	 * marks only which tab you are on. (Board "Five dark-mode highlights…", the 3 + 4 column.)
+	 */
+	--v3-tab-on: rgb(59 130 246 / 22%);
+	--v3-tab-on-fg: #d6e5ff;
+	--v3-tab-on-icon: #8ab4ff;
+	--v3-row-on: #3a3a3a;
+	--v3-row-on-icon: var(--v3-fg);
 	--v3-ink: #f0f0f0;
 	--v3-ink-fg: #1e1e1e;
 	--v3-ink-key: #00000080;
@@ -561,12 +577,12 @@ body {
 		background: var(--v3-bg2);
 	}
 	.v3-nav-tab[data-on="true"] {
-		background: var(--v3-accent-soft);
-		color: var(--v3-fg);
+		background: var(--v3-tab-on);
+		color: var(--v3-tab-on-fg);
 		font-weight: 500;
 	}
 	.v3-nav-tab[data-on="true"] > svg {
-		color: var(--v3-accent);
+		color: var(--v3-tab-on-icon);
 	}
 	.v3-search-wrap {
 		display: flex;
@@ -693,7 +709,7 @@ body {
 	}
 	.v3-panel .agent-list .agent-row[data-current="true"],
 	.v3-panel .agent-list .agent-row[data-current="true"]:hover {
-		background: var(--v3-accent-soft);
+		background: var(--v3-row-on);
 	}
 	.v3-panel .agent-list .row-label {
 		color: var(--v3-fg);
@@ -1732,7 +1748,7 @@ body {
 		left: 0;
 		height: 30px;
 		border-radius: 8px;
-		background: var(--v3-accent-soft);
+		background: var(--v3-tab-on);
 		pointer-events: none;
 		transition:
 			transform 280ms var(--v3-spring),
@@ -2482,14 +2498,14 @@ body {
 		outline: none;
 	}
 	.v3-item[data-on="true"] {
-		background: var(--v3-accent-soft);
+		background: var(--v3-row-on);
 	}
 	.v3-item-icon {
 		flex: none;
 		color: var(--v3-fg2);
 	}
 	.v3-item[data-on="true"] .v3-item-icon {
-		color: var(--v3-accent);
+		color: var(--v3-row-on-icon);
 	}
 	.v3-item-name {
 		min-width: 0;
