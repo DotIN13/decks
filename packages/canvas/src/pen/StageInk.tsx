@@ -124,16 +124,33 @@ export function StageInk(props: {
 	};
 	/*
 	 * In the file is not yet on the sheet: the sheet's worker paints the tiles it falls in after the
-	 * drawing arrives, so the glass keeps its copy a moment longer, where both show as one.
+	 * drawing arrives, so the glass keeps its copy until the engine says a frame painted after the
+	 * drawing went to it is on screen (`mark`, `shows`), the handoff the text editor's ghost makes too.
+	 * A fixed 250ms was short on an iPad, where the tiles took longer: for a moment neither copy showed,
+	 * and the stroke flickered. The mark is taken a frame after the strokes change, once the drawing has
+	 * gone to the engine; the five seconds `hold` set are still the limit.
 	 */
-	const SHEET_CATCHES_UP_MS = 250;
+	const handedOver = new Set<string>();
+	const handOver = (id: string) => {
+		if (handedOver.has(id)) return;
+		handedOver.add(id);
+		requestAnimationFrame(() => {
+			const mark = props.layer.mark();
+			const wait = () => {
+				if (!waiting.has(id)) return void handedOver.delete(id);
+				if (!props.layer.shows(mark)) return void requestAnimationFrame(wait);
+				// The frame that shows it is up: the next one draws without the glass's copy.
+				requestAnimationFrame(() => {
+					handedOver.delete(id);
+					settle(id);
+				});
+			};
+			wait();
+		});
+	};
 	createEffect(() => {
 		const drawn = new Set(props.strokes().map((stroke) => stroke.id));
-		for (const [id, held] of waiting) {
-			if (!drawn.has(id)) continue;
-			clearTimeout(held.timer);
-			held.timer = setTimeout(() => settle(id), SHEET_CATCHES_UP_MS);
-		}
+		for (const id of waiting.keys()) if (drawn.has(id)) handOver(id);
 	});
 
 	type Gesture =
