@@ -11,7 +11,6 @@ import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import Clock from "lucide-solid/icons/clock";
 import Sparkles from "lucide-solid/icons/sparkles";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
-import PanelLeft from "lucide-solid/icons/panel-left";
 import Play from "lucide-solid/icons/play";
 import FileText from "lucide-solid/icons/file-text";
 import MoveUpRight from "lucide-solid/icons/move-up-right";
@@ -723,7 +722,7 @@ export function LeftPanel(props: {
 								</button>
 							</Show>
 							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
-								<Icon of={PanelLeft} size={16} />
+								<Icon of={PanelLeftClose} size={16} />
 							</button>
 						</div>
 						<div class="v3-lp-status">

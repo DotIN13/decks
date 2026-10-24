@@ -2,8 +2,6 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
-import PanelLeft from "lucide-solid/icons/panel-left";
-import { DecksLineMark } from "../panel/DecksLineMark.tsx";
 import Plus from "lucide-solid/icons/plus";
 import { Show } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
@@ -63,12 +61,10 @@ export function TopBar(props: {
 						</>
 					}
 				>
-					{/* The panel folded on a desktop: Decks' mark and the panel icon, one button that brings it back on its last tab. */}
-					<button type="button" class="v3-unfold-mark" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
-						<DecksLineMark size={18} />
-						<Icon of={PanelLeft} size={16} />
+					{/* The panel folded on a desktop: one drawer-open button that brings it back on its last tab. */}
+					<button type="button" class="v3-icon v3-unfold" data-tip="Show the side panel" data-key="⌘\" aria-label="Show the side panel" onClick={() => props.onTogglePanel()}>
+						<Icon of={PanelLeftOpen} size={17} />
 					</button>
-					<span class="v3-sep" aria-hidden="true" />
 				</Show>
 			</Show>
 			<AgentMenu

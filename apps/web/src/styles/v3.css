@@ -2882,30 +2882,6 @@ body {
 		outline-offset: -2px;
 	}
 
-	/* Folded on a desktop: the top bar starts with one button, the mark and the panel icon. */
-	.v3-unfold-mark {
-		display: flex;
-		height: 32px;
-		flex: none;
-		align-items: center;
-		gap: 6px;
-		padding: 0 8px;
-		border: 0;
-		border-radius: 8px;
-		background: none;
-		color: var(--v3-fg);
-		cursor: pointer;
-	}
-	.v3-unfold-mark > svg:last-child {
-		color: var(--v3-fg2);
-	}
-	.v3-unfold-mark:hover {
-		background: var(--v3-bg2);
-	}
-	.v3-unfold-mark:focus-visible {
-		outline: 2px solid var(--v3-accent);
-		outline-offset: -2px;
-	}
 	@media (prefers-reduced-motion: reduce) {
 		.v3-tabs-tab,
 		.v3-tabs-tab[data-on="true"] > span {
