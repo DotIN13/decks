@@ -2358,7 +2358,8 @@ body {
 	/* The line between the list and the conversation, as something to take hold of. */
 	.v3-chat-resize {
 		position: absolute;
-		z-index: 2;
+		/* Over the list's last rows (their tags) and the conversation's scroller. */
+		z-index: 20;
 		top: -4px;
 		right: 0;
 		left: 0;
@@ -3345,5 +3346,55 @@ body {
 @layer components {
 	body .picker-backdrop {
 		z-index: 35;
+	}
+}
+
+/* ---- the two splitters under a finger -----------------------------------------------------
+   An 8px strip shown only on hover is a mouse's handle: a finger cannot see it and seldom lands on
+   it. On a touchscreen the side panel's edge takes 30px (mostly inside the panel, so the canvas's
+   tools beside it keep theirs) and the conversation's top a 22px band across its middle, each with a
+   small grip. */
+@layer components {
+	@media (pointer: coarse) {
+		.panel-resize {
+			right: -10px;
+			width: 30px;
+		}
+		.panel-resize::after {
+			top: 50%;
+			bottom: auto;
+			left: 18px;
+			width: 4px;
+			height: 40px;
+			border-radius: 2px;
+			background: var(--v3-line2, #d9d9d9);
+			opacity: 1;
+			transform: translateY(-50%);
+		}
+		.panel-shell[data-resizing="true"] .panel-resize::after {
+			background: var(--v3-accent);
+		}
+		/* Inside the conversation's top (its box clips what stands above it), across the middle, clear of
+		   its name on the left and its fold on the right. */
+		.v3-chat-resize {
+			top: 0;
+			right: 30%;
+			left: 30%;
+			height: 22px;
+		}
+		.v3-chat-resize::after {
+			top: 6px;
+			right: auto;
+			left: 50%;
+			width: 40px;
+			height: 4px;
+			border-radius: 2px;
+			background: var(--v3-line2, #d9d9d9);
+			opacity: 1;
+			transform: translateX(-50%);
+		}
+		.panel-shell[data-chat-resizing] .v3-chat-resize::after {
+			background: var(--v3-accent);
+		}
 	}
 }

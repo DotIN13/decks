@@ -92,7 +92,8 @@ export function ChatSection(props: {
 		if (p) p.dataset.chatResizing = "true";
 		let done = false;
 		const move = (m: PointerEvent) => {
-			if (m.buttons === 0) return end();
+			// A mouse moved with no button held has been let go of somewhere; a finger or a pen ends on its own pointerup.
+			if (m.pointerType === "mouse" && m.buttons === 0) return end();
 			applyHeight(bottom - m.clientY);
 		};
 		const end = () => {

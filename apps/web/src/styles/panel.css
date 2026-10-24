@@ -64,7 +64,8 @@
 	 */
 	.panel-resize {
 		position: absolute;
-		z-index: 1;
+		/* Over the conversation's scroller, which filled the lower half of this edge and took the drag as a scroll. */
+		z-index: 20;
 		top: 0;
 		right: -4px;
 		bottom: 0;

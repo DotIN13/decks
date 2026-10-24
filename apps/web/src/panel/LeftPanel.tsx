@@ -325,7 +325,8 @@ export function LeftPanel(props: {
 		/* However the button comes up, here or anywhere, or a move with no button held: the drag ends. */
 		let done = false;
 		const move = (moved: PointerEvent) => {
-			if (moved.buttons === 0) return end();
+			// A mouse moved with no button held has been let go of somewhere; a finger or a pen ends on its own pointerup.
+			if (moved.pointerType === "mouse" && moved.buttons === 0) return end();
 			resizeTo(from + moved.clientX - start);
 		};
 		const end = () => {
