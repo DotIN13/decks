@@ -849,16 +849,6 @@ body {
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.v3-chat-new {
-		padding: 0 4px;
-		border: 0;
-		background: none;
-		color: var(--v3-accent);
-		cursor: pointer;
-		font: inherit;
-		font-size: 12px;
-		font-weight: 500;
-	}
 	.v3-chat-body {
 		display: flex;
 		min-height: 0;
@@ -2078,22 +2068,28 @@ body {
 	.v3-chat[data-folded="true"] {
 		flex-grow: 0.00001;
 	}
+	/*
+	 * Folded, the head alone: never squeezed under it by a long list above, and the body, held at the
+	 * bottom, hidden once the fold has run, so its latest message never shows under the head when the
+	 * section comes to rest a little taller than it.
+	 */
+	.v3-chat[data-folded="true"] {
+		min-height: 44px;
+	}
 	.v3-chat[data-folded="true"] .v3-chat-body {
 		display: flex;
+		visibility: hidden;
+		transition: visibility 0s linear 260ms;
 	}
 	.v3-chat-head .v3-icon svg {
 		transition: transform 220ms var(--v3-ease);
-	}
-	.v3-chat-new {
-		animation: v3-arrive 220ms var(--v3-ease);
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.v3-folder-body,
 		.v3-chat {
 			transition: none;
 		}
-		.v3-panel .panel-list > *,
-		.v3-chat-new {
+		.v3-panel .panel-list > * {
 			animation: none;
 		}
 	}

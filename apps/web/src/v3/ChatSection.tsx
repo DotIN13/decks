@@ -241,11 +241,6 @@ export function ChatSection(props: {
 					<Show when={props.chat && stateWords(props.chat.state, name())}>{(words) => <span class="v3-chat-state">{words()}</span>}</Show>
 				</button>
 				<span class="flex-1" />
-				<Show when={props.folded && props.unread > 0}>
-					<button type="button" class="v3-chat-new" onClick={() => props.onFold(false)}>
-						{props.unread} new
-					</button>
-				</Show>
 				<button
 					type="button"
 					class="v3-icon"
