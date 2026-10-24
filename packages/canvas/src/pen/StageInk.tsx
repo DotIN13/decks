@@ -12,8 +12,6 @@ export const STAGE_INK = "stage";
 
 /** A touch this soon after the pencil leaves the glass is the hand that held it. */
 const PALM_AFTER_MS = 500;
-/** A touch this wide, in CSS pixels, once a pencil has been seen, is the heel of a hand, not a finger. */
-const PALM_SIZE = 70;
 
 /**
  * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
@@ -27,12 +25,12 @@ const PALM_SIZE = 70;
  * the lasso's loop and the box round what the lasso took.
  *
  * **Which pointer draws.** A pen, with its pressure, and a mouse. A finger draws only on a device
- * that has not shown a pencil this session (a phone, an iPad without one), and a second finger ends
- * its stroke; once a pencil has been seen, a finger is the canvas's and goes on up to the stage, one
- * finger to pan, two to pan and pinch. A palm is ignored
- * as far as it can be while the pencil is in use: any touch while the pencil is on the glass or has
- * just left it (`PALM_AFTER_MS`), and any touch as big as a hand's heel once a pencil has been seen
- * (`PALM_SIZE`), does nothing at all, neither drawing nor moving the canvas.
+ * that has never shown a pencil (a phone, an iPad without one; remembered, `state/ink.ts`), and a
+ * second finger ends its stroke; once a pencil has been seen, a finger is the canvas's and goes on up
+ * to the stage, one finger to pan, two to pan and pinch. A palm is ignored as far as it can be while
+ * the pencil is in use: any touch while the pencil is on the glass or has just left it
+ * (`PALM_AFTER_MS`) does nothing at all, neither drawing nor moving the canvas. iPadOS turns away a
+ * resting palm by itself.
  */
 export function StageInk(props: {
 	camera: Camera;
@@ -346,10 +344,13 @@ export function StageInk(props: {
 	let penDown = false;
 	let penUpAt = Number.NEGATIVE_INFINITY;
 	const palms = new Set<number>();
-	const palm = (event: PointerEvent) => {
-		if (penDown || performance.now() - penUpAt < PALM_AFTER_MS) return true;
-		return penSeen() && Math.max(event.width, event.height) >= PALM_SIZE;
-	};
+	/*
+	 * A palm is a touch while the pencil is on the glass or has only just left it. Not a wide touch: a
+	 * finger on an iPad reports a contact 70px across often enough that a pan or a pinch with the draw
+	 * tool on was taken for a palm and did nothing, and iPadOS turns a resting palm away by itself while
+	 * the Pencil is in use.
+	 */
+	const palm = (_event: PointerEvent) => penDown || performance.now() - penUpAt < PALM_AFTER_MS;
 	const onDown = (event: PointerEvent) => {
 		if (event.pointerType === "touch") {
 			// A palm while the pencil is in use: nothing, not even a pan.

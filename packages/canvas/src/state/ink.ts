@@ -18,12 +18,23 @@ const [inkColor, setInkColor] = createSignal<InkColor>("ink");
 /** One of three widths, by index, so the pen and the marker each keep a sensible set. */
 const [inkWidth, setInkWidth] = createSignal(1);
 /**
- * A stylus has touched the glass in this session.
+ * A stylus has touched this device's glass, now or before: remembered, under the key the pencil's
+ * handwriting catcher keeps too (`@decks/ui` `scribble.tsx`), so a reload does not hand fingers back
+ * the drawing until the pencil next touches the canvas.
  *
  * From then on a finger moves the canvas and only the pencil draws, which is what a tablet's
  * own notes app does: the hand that holds the pencil rests on the screen.
  */
-const [penSeen, setPenSeen] = createSignal(false);
+const PENCIL_KEY = "decks.pencil";
+const [penSeen, setPenSeenSignal] = createSignal(typeof localStorage !== "undefined" && localStorage.getItem(PENCIL_KEY) === "1");
+const setPenSeen = (seen: boolean) => {
+	setPenSeenSignal(seen);
+	try {
+		if (seen) localStorage.setItem(PENCIL_KEY, "1");
+	} catch {
+		/* private mode: known again at the next stroke */
+	}
+};
 
 export { drawing, setDrawing, inkTool, setInkTool, inkColor, setInkColor, inkWidth, setInkWidth, penSeen, setPenSeen };
 
