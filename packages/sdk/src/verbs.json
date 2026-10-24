@@ -2930,6 +2930,28 @@
   ]
  },
  {
+  "name": "apps.delete",
+  "command": [
+   "apps",
+   "delete"
+  ],
+  "group": "apps",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and delete its boards. The folder can be moved back by hand.",
+  "signature": "apps.delete(name: string)",
+  "returns": "{ deleted: string; trash: string; boards: string[] }",
+  "params": [
+   {
+    "name": "name",
+    "type": "string",
+    "schema": {
+     "type": "string"
+    }
+   }
+  ]
+ },
+ {
   "name": "apps.logs",
   "command": [
    "apps",

@@ -79,6 +79,7 @@ import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
 import { workingWords } from "./chat/working-sign.ts";
+import { ask } from "./state/confirm.ts";
 import { act, editDrawing, sendDrawingEdit, setDrawingEditor, setPersonStage } from "./state/decks.ts";
 
 /**
@@ -1626,7 +1627,6 @@ export function App() {
 					onPickItem={pickItem}
 					onCanvases={() => void setStagesOpen((was) => !was)}
 					{...(stages().length > 0 ? { canvasMenu: (trigger: Parameters<typeof canvasMenu>[0]) => canvasMenu(trigger) } : {})}
-					onRunApp={(app) => void act("apps.run", [app.name]).then(() => loadApps())}
 					onPickArrows={(ids) => {
 						editorHandle()?.select(ids);
 						setPenSelected(ids);
@@ -1688,7 +1688,33 @@ export function App() {
 					onHide={(board) => void act("canvas.delete", [board.path])}
 					apps={apps()}
 					onAppsOpen={loadApps}
-					onPickApp={(app) => playAndFrame(app.board)}
+					onApp={async (app, action) => {
+						const running = app.status === "running" || app.status === "asleep";
+						/* Its board, made now if the app's folder was written by hand and has none yet. */
+						const show = async () => {
+							const own = `boards/apps/${app.name}.html`;
+							const here = stageBoards().find((one) => one.path === own || one.path.endsWith(`/${own}`));
+							if (here) return frameWhenPlaced(here.path);
+							const made = (await act<string>("apps.board", [app.name])) ?? app.board;
+							const placed = await act<{ board?: string }>("canvas.insert", [{ type: "board", board: made }]);
+							frameWhenPlaced(placed?.board ?? made);
+						};
+						if (action === "show") return show();
+						if (action === "run-show") {
+							if (!running) await act("apps.run", [app.name]);
+							loadApps();
+							return show();
+						}
+						if (action === "delete") {
+							const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and its boards are deleted.`, yes: "Delete", no: "Cancel" });
+							if (!yes) return;
+							await act("apps.delete", [app.name]);
+							return loadApps();
+						}
+						await act(action === "start" ? "apps.run" : action === "stop" ? "apps.stop" : "apps.restart", [app.name]);
+						loadApps();
+					}}
+					onAppLogs={(app) => act<string[]>("apps.logs", [app.name, { tail: 80 }])}
 					chat={
 						<Show when={!phone()}>
 					<ChatSection

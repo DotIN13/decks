@@ -401,6 +401,11 @@ export interface Verbs {
 		stop(name: string): Promise<{ stopped: boolean }>;
 		/** Stop and start again after a code change. Its board reloads by itself. */
 		restart(name: string): Promise<AppOutcome>;
+		/**
+		 * Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and delete its
+		 * boards. The folder can be moved back by hand.
+		 */
+		delete(name: string): Promise<{ deleted: string; trash: string; boards: string[] }>;
 		/** Its recent output. */
 		logs(name: string, options?: { tail?: number }): Promise<string[]>;
 		/**

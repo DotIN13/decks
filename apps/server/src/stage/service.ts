@@ -34,6 +34,8 @@ export interface StageHost {
 	newAppBoard(name: string, title: string): string;
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Board;
+	/** Delete a board's file, keeping its last revision, and tell everyone; the refusal's words, if it is refused. */
+	deleteBoard?(path: string): string | undefined;
 	/** What the canvas last measured of this board, if what it measured was this revision. */
 	extent(path: string, rev: number, at?: number): { w: number; h: number; page?: number } | undefined;
 	/** Wait for a measurement of this revision — every frame takes one when it loads. */
@@ -270,6 +272,19 @@ export class StageService {
 	/** The board that shows an app (`apps/service.ts`). */
 	appBoard(name: string, title: string): string {
 		return this.host.newAppBoard(name, title);
+	}
+
+	/** Delete every board that shows an app, in the library and in each canvas's own folder; the paths deleted. */
+	deleteAppBoards(name: string): string[] {
+		const own = new RegExp(`(^|/)boards/apps/${name.replace(/[^a-z0-9-]/g, "")}\\.html$`);
+		const gone: string[] = [];
+		for (const board of this.deck.boards) {
+			if (!own.test(board.path) || !this.host.deleteBoard) continue;
+			const refused = this.host.deleteBoard(board.path);
+			if (refused) throw new Error(refused);
+			gone.push(board.path);
+		}
+		return gone;
 	}
 
 	/** A new blank board — the shell, so the agent writes only the content. */

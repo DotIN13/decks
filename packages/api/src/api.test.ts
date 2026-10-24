@@ -11,11 +11,11 @@ test("the table has every call of the redesign, each named once, and the old nam
 		"board.list", "board.create", "board.get", "board.canvases", "board.url", "frame.create", "file.url",
 		"agent.me", "agent.update", "here", "agent.claim", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create",
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
-		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.logs", "apps.check",
+		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
 		"web.status", "web.pairing", "web.repair", "web.board", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
 		"ports", "now", "pair.code", "studio.connect", "studio.status", "studio.disconnect",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 74);
+	assert.equal(VERBS.length, 75);
 	assert.ok(VERBS.every((verb) => !verb.alias), "no new call is an alias");
 	assert.ok(ALIASES.every((verb) => verb.alias && !names.has(verb.name)), "every old name says its new call and is not a new name");
 });

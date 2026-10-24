@@ -405,6 +405,14 @@ export const VERBS: readonly Verb[] = [
 	{ name: "apps.run", group: "apps", ...outsideChange, summary: "Start it, waiting up to 15 s.", params: [p("name", str())], result: AppOutcome },
 	{ name: "apps.stop", group: "apps", ...outsideChange, summary: "Stop it.", params: [p("name", str())], result: obj({ stopped: bool() }) },
 	{ name: "apps.restart", group: "apps", ...outsideChange, summary: "Stop and start again after a code change. Its board reloads by itself.", params: [p("name", str())], result: AppOutcome },
+	{
+		name: "apps.delete",
+		group: "apps",
+		...deckChange,
+		summary: "Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and delete its boards. The folder can be moved back by hand.",
+		params: [p("name", str())],
+		result: obj({ deleted: str(), trash: str(), boards: arr(str()) }),
+	},
 	{ name: "apps.logs", group: "apps", ...outsideRead, summary: "Its recent output.", params: [p("name", str()), o("options", obj({ tail: opt(int()) }))], result: arr(str()) },
 	{
 		name: "apps.check",

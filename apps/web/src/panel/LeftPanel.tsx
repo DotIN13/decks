@@ -7,10 +7,8 @@ import AppWindow from "lucide-solid/icons/app-window";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Circle from "lucide-solid/icons/circle";
-import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import Clock from "lucide-solid/icons/clock";
 import Sparkles from "lucide-solid/icons/sparkles";
-import Play from "lucide-solid/icons/play";
 import FileText from "lucide-solid/icons/file-text";
 import MoveUpRight from "lucide-solid/icons/move-up-right";
 import PenLine from "lucide-solid/icons/pen-line";
@@ -103,7 +101,8 @@ const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: Stic
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
-export type PanelApp = { name: string; title: string; status: string; board: string };
+export type { PanelApp } from "./AppRow.tsx";
+import { AppLogs, AppRow, type AppAction, type PanelApp } from "./AppRow.tsx";
 
 export function LeftPanel(props: {
 	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
@@ -207,10 +206,10 @@ export function LeftPanel(props: {
 	/** The deck's apps; asked for when the tab opens. */
 	apps?: PanelApp[];
 	onAppsOpen?: () => void;
-	/** Put an app's board on the canvas and go to it. */
-	onPickApp?: (app: PanelApp) => void;
-	/** Start an app that is stopped (`apps.run`). */
-	onRunApp?: (app: PanelApp) => void;
+	/** Show, start, stop, restart or delete an app (`panel/AppRow.tsx`); its promise ends the row's wait. */
+	onApp?: (app: PanelApp, action: AppAction) => Promise<unknown> | void;
+	/** An app's recent output, for its Logs panel. */
+	onAppLogs?: (app: PanelApp) => Promise<string[] | undefined>;
 
 	/** The conversation, under the list: the v3 panel's lower half (`v3/ChatSection.tsx`). */
 	chat?: JSX.Element;
@@ -252,6 +251,9 @@ export function LeftPanel(props: {
 		return { left: side.left, right: side.right, width: side.width, top: row.top, bottom: row.bottom, height: row.height };
 	};
 	const [query, setQuery] = createSignal("");
+	/** The app picked in the Apps tab, and the one whose logs are open. */
+	const [pickedApp, setPickedApp] = createSignal<string>();
+	const [logsOf, setLogsOf] = createSignal<PanelApp>();
 	/* Agents first, as v3 opens; the tab last shown is remembered on this device. */
 	const [tab, setTabRaw] = createSignal<PanelTab>(readTab());
 	const setTab = (next: PanelTab) => {
@@ -1019,53 +1021,26 @@ export function LeftPanel(props: {
 						</div>
 					</Show>
 					<Show when={tab() === "apps"}>
+						{/* The "Apps tab redesigned" mockup: rows 12px in like the search, no heading (the head counts them). */}
 						<div class="panel-section v3-apps" data-kind="apps">
-							<Show when={apps().length > 0}>
-								<div class="v3-sec">
-									<span>Apps in this deck</span>
-									<span class="flex-1" />
-									<span class="v3-sec-n tabular-nums">{apps().length}</span>
-								</div>
-							</Show>
 							<For each={apps()}>
-								{(app) => {
-									const running = () => app.status === "running" || app.status === "asleep";
-									const starting = () => ["installing", "building", "starting"].includes(app.status);
-									return (
-										<div class="v3-app-row" data-status={app.status}>
-											<button type="button" class="v3-app-main" data-row title={`${app.title}: put its board on the canvas`} onClick={() => props.onPickApp?.(app)}>
-												<span class="v3-app-tile" style={{ background: tileColour(app.name) }} aria-hidden="true">
-													<Icon of={AppWindow} size={15} />
-												</span>
-												<span class="v3-app-text">
-													<span class="v3-app-name truncate">{app.title}</span>
-													<span class="v3-app-state" data-state={running() ? "on" : starting() ? "busy" : "off"}>
-														<i aria-hidden="true" />
-														<span class="truncate">
-															{statusWord(app.status)} · apps/{app.name}
-														</span>
-													</span>
-												</span>
-											</button>
-											<Show when={running() || app.status === "stopped" || app.status === "broken"}>
-												<button
-													type="button"
-													class="v3-app-go"
-													aria-label={running() ? `Open ${app.title}` : `Run ${app.title}`}
-													onClick={() => (running() ? props.onPickApp?.(app) : props.onRunApp?.(app))}
-												>
-													{running() ? "Open" : "Run"}
-													<Icon of={running() ? ArrowUpRight : Play} size={12} />
-												</button>
-											</Show>
-										</div>
-									);
-								}}
+								{(app) => (
+									<AppRow
+										app={app}
+										picked={pickedApp() === app.name}
+										onPick={() => setPickedApp(app.name)}
+										onAct={(action) => props.onApp?.(app, action)}
+										onLogs={() => setLogsOf(app)}
+									/>
+								)}
 							</For>
 							<Show when={apps().length === 0}>
 								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
 									{props.apps === undefined ? "Looking for apps…" : query().trim() ? `No app matches “${query().trim()}”.` : "This deck has no apps yet. Ask an agent for one."}
 								</p>
+							</Show>
+							<Show when={logsOf()}>
+								{(app) => <AppLogs title={app().title} read={() => props.onAppLogs?.(app()) ?? Promise.resolve(undefined)} onClose={() => setLogsOf(undefined)} />}
 							</Show>
 						</div>
 					</Show>
@@ -1091,19 +1066,6 @@ export function LeftPanel(props: {
 	);
 }
 
-
-/** An app's tile colour, picked from its name so it stays the same everywhere. */
-const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4d7c0f", "#9333ea"];
-function tileColour(name: string): string {
-	let h = 0;
-	for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-	return TILES[h % TILES.length] ?? TILES[0]!;
-}
-
-/** An app's state in a word, as the row says it. */
-function statusWord(status: string): string {
-	return { running: "Running", asleep: "Asleep", stopped: "Stopped", broken: "Broken", installing: "Installing…", building: "Building…", starting: "Starting…" }[status] ?? status;
-}
 
 const FOLDED_KEY = "decks.foldedWorkspaces";
 const TAB_KEY = "decks.panelTab";

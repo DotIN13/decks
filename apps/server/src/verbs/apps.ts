@@ -1,4 +1,5 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { cloneRepo, initRepo, isRepo, nameFromUrl, repoState, type RepoState } from "../apps/repo.ts";
 import { STARTER_KIND, STARTERS, writeStarter, type Starter } from "../apps/starters.ts";
 import type { AppKind } from "../apps/service.ts";
@@ -148,6 +149,22 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					const text = known(name);
 					service_().stop(text);
 					return service_().run(text);
+				},
+				/**
+				 * Delete an app, from the person's ⋯ menu or an agent: stop it, move its folder to the deck's
+				 * trash rather than erase it (a whole app is too much to lose to one press), and delete the
+				 * boards that show it, which would only show an app that is not there.
+				 */
+				delete: async (name: string) => {
+					agentOnly("delete");
+					const apps = service_();
+					const text = known(name);
+					apps.stop(text);
+					const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+					const trash = join(".decks", "trash", "apps", `${text}-${stamp}`);
+					mkdirSync(join(service.deckPath(), ".decks", "trash", "apps"), { recursive: true });
+					renameSync(apps.folder(text), join(service.deckPath(), trash));
+					return { deleted: text, trash: trash.split("\\").join("/"), boards: service.deleteAppBoards(text) };
 				},
 				logs: async (name: string, options?: { tail?: number }) => service_().log(known(name), options?.tail ?? 80),
 				/** The app opened in the server's own browser: errors, failed requests and a picture, as `decks.canvas.fit` is for a board. */

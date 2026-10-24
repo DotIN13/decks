@@ -90,6 +90,7 @@ type WebTarget = string | { ref: string } | { name: string; nth?: number };
 - `decks apps run` · `decks.apps.run(name: string): AppOutcome`. Start it, waiting up to 15 s.
 - `decks apps stop` · `decks.apps.stop(name: string): { stopped: boolean }`. Stop it.
 - `decks apps restart` · `decks.apps.restart(name: string): AppOutcome`. Stop and start again after a code change. Its board reloads by itself.
+- `decks apps delete` · `decks.apps.delete(name: string): { deleted: string; trash: string; boards: string[] }`. Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and delete its boards. The folder can be moved back by hand.
 - `decks apps logs` · `decks.apps.logs(name: string, options?: { tail?: number }): string[]`. Its recent output.
 - `decks apps check` · `decks.apps.check(name: string): { verdict: string; url?: string; title?: string; errors: string[]; failed?: string[]; words?: number; file?: string }`. Open it in the server's browser and say what is wrong: what fit is to a board. Read `verdict`; `file` is a picture.
 

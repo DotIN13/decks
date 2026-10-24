@@ -196,6 +196,13 @@ export class App {
 			newBoard: (options) => this.boards.newBoard(options),
 			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
+			deleteBoard: (path) => {
+				let refused: string | undefined;
+				this.boards.deleteBoard(path, (message) => {
+					if (message.type === "notice") refused = message.text;
+				});
+				return refused;
+			},
 			extent: (path, rev, at) => this.boards.extent(path, rev, at),
 			awaitExtent: (path, rev, ms, at) => this.boards.awaitExtent(path, rev, ms, at),
 			reading: (path, rev) => this.boards.reading(path, rev),
