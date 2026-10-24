@@ -293,6 +293,23 @@ export function App() {
 	 * parked on the left stood still when the sidebar folded and then moved when it opened.
 	 */
 	let workRect: { width: number; height: number } | undefined;
+	/*
+	 * What the foot of the screen keeps for itself: the home indicator's strip
+	 * (`env(safe-area-inset-bottom)`, 25px on an iPad in Safari) and the keyboard while it is up. The
+	 * stylesheet rests the composer 12px above both, so the floats' box stops above them too:
+	 * measured from the screen's own edge, home was 25px below where the composer rests, a drop near
+	 * it landed low and then jumped, and a drop at the foot went under the home indicator.
+	 */
+	let footProbe: HTMLDivElement | undefined;
+	const footInset = () => {
+		if (!footProbe) {
+			footProbe = document.createElement("div");
+			footProbe.setAttribute("aria-hidden", "true");
+			footProbe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px))";
+			document.body.appendChild(footProbe);
+		}
+		return parseFloat(getComputedStyle(footProbe).paddingBottom) || 0;
+	};
 	const workBox = () => {
 		/* While the side panel is dragged the column's own box does not change, only its insets: the
 		   box measured before is used, so a step reads nothing from a layout the drag has just dirtied. */
@@ -301,7 +318,7 @@ export function App() {
 			workRect = { width: rect?.width ?? window.innerWidth, height: rect?.height ?? window.innerHeight };
 		}
 		const { left, right } = insets();
-		return { x: left, y: 0, w: workRect.width - left - right, h: workRect.height };
+		return { x: left, y: 0, w: workRect.width - left - right, h: workRect.height - footInset() };
 	};
 	/*
 	 * What a float must not land on: the other floats, as they stand now, in `workBox`'s frame.
@@ -369,7 +386,9 @@ export function App() {
 				if (pin === "bottom") {
 					el.style.top = "";
 					// The height last measured: a step of a panel's resize places it without reading the layout.
-					el.style.bottom = `${workBox().h - (p.y + (sized?.h ?? el.offsetHeight))}px`;
+					// From the column's own foot, not the box's: the box stops above the home indicator, the CSS `bottom` does not.
+					const full = workRect?.height ?? workBox().h + footInset();
+					el.style.bottom = `${full - (p.y + (sized?.h ?? el.offsetHeight))}px`;
 				} else {
 					el.style.bottom = "";
 					el.style.top = `${p.y}px`;
