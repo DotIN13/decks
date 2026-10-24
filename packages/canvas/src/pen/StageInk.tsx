@@ -10,6 +10,11 @@ import { scheme } from "../lib/theme.ts";
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
 export const STAGE_INK = "stage";
 
+/** A touch this soon after the pencil leaves the glass is the hand that held it. */
+const PALM_AFTER_MS = 500;
+/** A touch this wide, in CSS pixels, once a pencil has been seen, is the heel of a hand, not a finger. */
+const PALM_SIZE = 70;
+
 /**
  * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
  *
@@ -21,9 +26,11 @@ export const STAGE_INK = "stage";
  * samples a frame (Safari gives no coalesced events). The glass also takes the pointer, and shows
  * the lasso's loop and the box round what the lasso took.
  *
- * **Which pointer draws.** A pen always does, with its pressure. A mouse does. A finger does until
- * a pen has been seen in this session; from then on a finger is the canvas's, and goes on up to the
- * stage to pan and pinch, because the hand holding a pencil rests on the glass.
+ * **Which pointer draws.** A pen, with its pressure, and a mouse. A finger never does: it is the
+ * canvas's, and goes on up to the stage, one finger to pan, two to pan and pinch. A palm is ignored
+ * as far as it can be while the pencil is in use: any touch while the pencil is on the glass or has
+ * just left it (`PALM_AFTER_MS`), and any touch as big as a hand's heel once a pencil has been seen
+ * (`PALM_SIZE`), does nothing at all, neither drawing nor moving the canvas.
  */
 export function StageInk(props: {
 	camera: Camera;
@@ -286,6 +293,8 @@ export function StageInk(props: {
 		if (at && Math.hypot(event.clientX - at.x, event.clientY - at.y) > 12) tapSpoiled = true;
 	};
 	const fingerUp = (event: PointerEvent) => {
+		// A palm lifted wherever it was: forgotten, whether or not the glass heard it.
+		if (palms.has(event.pointerId)) queueMicrotask(() => palms.delete(event.pointerId));
 		if (!fingers.delete(event.pointerId) || fingers.size > 0) return;
 		if (event.type === "pointercancel" || tapSpoiled || tapMost < 2 || performance.now() - tapStarted > 400) return;
 		props.onStep?.(tapMost === 2 ? "undo" : "redo");
@@ -331,18 +340,34 @@ export function StageInk(props: {
 			}),
 		);
 
+	/** Whether the pencil is on the glass, when it last left it, and the touches taken for a palm. */
+	let penDown = false;
+	let penUpAt = Number.NEGATIVE_INFINITY;
+	const palms = new Set<number>();
+	const palm = (event: PointerEvent) => {
+		if (penDown || performance.now() - penUpAt < PALM_AFTER_MS) return true;
+		return penSeen() && Math.max(event.width, event.height) >= PALM_SIZE;
+	};
 	const onDown = (event: PointerEvent) => {
-		if (event.pointerType === "touch") fingerDown(event);
-		if (event.pointerType === "pen") setPenSeen(true);
-		// A finger, once a pencil is about: the canvas's, so it goes on up to the stage untouched.
-		if (event.pointerType === "touch" && penSeen()) return;
-		if (event.pointerType === "mouse" && event.button !== 0) return;
-		event.stopPropagation();
-		if (gesture) {
-			// A second finger is half of a pinch, and the first one's stroke is over.
-			if (event.pointerType === "touch") cancel();
+		if (event.pointerType === "touch") {
+			// A palm while the pencil is in use: nothing, not even a pan.
+			if (palm(event)) {
+				palms.add(event.pointerId);
+				event.preventDefault();
+				event.stopPropagation();
+				return;
+			}
+			// A finger is the canvas's: it goes on up to the stage, one to pan, two to pan and pinch.
+			fingerDown(event);
 			return;
 		}
+		if (event.pointerType === "pen") {
+			setPenSeen(true);
+			penDown = true;
+		}
+		if (event.pointerType === "mouse" && event.button !== 0) return;
+		event.stopPropagation();
+		if (gesture) return;
 		event.preventDefault();
 		try {
 			(event.currentTarget as Element).setPointerCapture(event.pointerId);
@@ -377,6 +402,11 @@ export function StageInk(props: {
 	};
 
 	const onMove = (event: PointerEvent) => {
+		// A palm's moves go nowhere, the canvas included.
+		if (palms.has(event.pointerId)) {
+			event.stopPropagation();
+			return;
+		}
 		if (!gesture || gesture.pointer !== event.pointerId) return;
 		event.stopPropagation();
 		// A pencil reports faster than the screen draws; the samples in between are the line's shape.
@@ -446,6 +476,14 @@ export function StageInk(props: {
 	};
 
 	const onUp = (event: PointerEvent) => {
+		if (event.pointerType === "pen" && event.type !== "lostpointercapture") {
+			penDown = false;
+			penUpAt = performance.now();
+		}
+		if (palms.delete(event.pointerId)) {
+			event.stopPropagation();
+			return;
+		}
 		if (!gesture || gesture.pointer !== event.pointerId) return;
 		event.stopPropagation();
 		const done = gesture;
@@ -520,6 +558,8 @@ export function StageInk(props: {
 			onPointerMove={onMove}
 			onPointerUp={onUp}
 			onPointerCancel={onUp}
+			// The capture taken away mid-stroke (the browser's, not the pen's lift): the stroke ends there.
+			onLostPointerCapture={onUp}
 			// A long press with a pencil or a finger is not a request for the browser's menu.
 			onContextMenu={(event) => event.preventDefault()}
 		>
