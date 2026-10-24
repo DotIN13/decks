@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, Show, untrack, type JSX } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { portalLayer } from "./portal.ts";
 
@@ -33,8 +33,6 @@ export type Placement = "top-start" | "top" | "top-end" | "bottom-start" | "bott
 const GUTTER = 6;
 /** Never closer than this to a window edge. */
 const MARGIN = 8;
-/** How long a closing card takes to fade, as Studio's menus do. */
-const LEAVE_MS = 80;
 
 export function Popover(props: {
 	/** The button. Given `open` so it can draw itself pressed. */
@@ -56,34 +54,6 @@ export function Popover(props: {
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>();
 	/** Which side of its trigger the card landed on, so a stylesheet can grow it out of that edge. */
 	const [side, setSide] = createSignal<"above" | "below" | "beside">("below");
-	/*
-	 * Where the card grows from: the point of it nearest the trigger, so it opens out of the button
-	 * as Studio's menus do (Kobalte's transform origin), rather than out of its own middle.
-	 */
-	const [origin, setOrigin] = createSignal("top left");
-	/*
-	 * Mounted for a beat after it closes, so it can fade out (80ms) rather than vanish. `open` is
-	 * still the truth for everything else: dismissal, focus, the trigger's state.
-	 */
-	const [mounted, setMounted] = createSignal(false);
-	const [leaving, setLeaving] = createSignal(false);
-	let leave: ReturnType<typeof setTimeout> | undefined;
-	createEffect(() => {
-		if (open()) {
-			clearTimeout(leave);
-			setLeaving(false);
-			setMounted(true);
-			return;
-		}
-		if (!untrack(mounted)) return;
-		setLeaving(true);
-		leave = setTimeout(() => {
-			setMounted(false);
-			setLeaving(false);
-			setAt(undefined);
-		}, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : LEAVE_MS);
-	});
-	onCleanup(() => clearTimeout(leave));
 	let trigger: HTMLElement | undefined;
 	let card: HTMLDivElement | undefined;
 
@@ -142,7 +112,6 @@ export function Popover(props: {
 			left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
 			top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
 			setSide("beside");
-			setOrigin(`${left >= menu.right ? "left" : "right"} ${Math.round(Math.min(Math.max(0, t.top + t.height / 2 - top), c.height))}px`);
 			setAt({ left, top });
 			return;
 		}
@@ -162,12 +131,14 @@ export function Popover(props: {
 		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
 
 		setSide(top + c.height <= t.top + 1 ? "above" : "below");
-		setOrigin(`${Math.round(Math.min(Math.max(0, t.left + t.width / 2 - left), c.width))}px ${top + c.height <= t.top + 1 ? "bottom" : "top"}`);
 		setAt({ left, top });
 	};
 
 	createEffect(() => {
-		if (!open()) return;
+		if (!open()) {
+			setAt(undefined);
+			return;
+		}
 		// Two frames: one for the card to exist, one for fonts to have settled its height.
 		/*
 		 * And again whenever the card changes size: a row that fills in after it opens (the board
@@ -269,7 +240,7 @@ export function Popover(props: {
 				toggle: () => change(!open()),
 				ref: (el) => (trigger = el),
 			})}
-			<Show when={mounted()}>
+			<Show when={open()}>
 				{/*
 				 * Into the body, and this is not tidiness — it is the difference between the
 				 * card appearing under its trigger and appearing 478px away.
@@ -292,7 +263,6 @@ export function Popover(props: {
 					data-sub={sub() ? "" : undefined}
 					data-placed={at() ? "" : undefined}
 					data-side={side()}
-					data-leaving={leaving() ? "" : undefined}
 					role="menu"
 					aria-label={props.label}
 					/* Hidden until placed, so it never flashes at 0,0 on the way to its corner. */
@@ -300,7 +270,6 @@ export function Popover(props: {
 						left: `${at()?.left ?? 0}px`,
 						top: `${at()?.top ?? 0}px`,
 						visibility: at() ? "visible" : "hidden",
-						"transform-origin": origin(),
 					}}
 				>
 					{props.children}

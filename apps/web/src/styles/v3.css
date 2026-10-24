@@ -1791,27 +1791,20 @@ body {
 	.v3-menu-row {
 		transition: none;
 	}
-	/*
-	 * Studio's menu motion: a 120ms fade and a 2% grow out of the trigger (the card's own
-	 * `transform-origin`, set by `Popover` from where it opened), and a quicker 80ms fade out.
-	 */
 	.popover[data-placed] {
-		animation: v3-pop 120ms cubic-bezier(0.2, 0.7, 0.2, 1);
+		animation: v3-pop 170ms var(--v3-ease);
+		transform-origin: top center;
 	}
-	.popover[data-placed][data-leaving] {
-		animation: v3-pop-out 80ms ease-in forwards;
-		pointer-events: none;
+	.popover[data-placed][data-side="above"] {
+		transform-origin: bottom center;
+	}
+	.popover[data-placed][data-side="beside"] {
+		transform-origin: left top;
 	}
 	@keyframes v3-pop {
 		from {
 			opacity: 0;
-			transform: scale(0.98);
-		}
-	}
-	@keyframes v3-pop-out {
-		to {
-			opacity: 0;
-			transform: scale(0.98);
+			transform: scale(0.96);
 		}
 	}
 
