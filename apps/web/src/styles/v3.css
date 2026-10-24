@@ -3352,27 +3352,24 @@ body {
 /* ---- the two splitters under a finger -----------------------------------------------------
    An 8px strip shown only on hover is a mouse's handle: a finger cannot see it and seldom lands on
    it. On a touchscreen the side panel's edge takes 30px (mostly inside the panel, so the canvas's
-   tools beside it keep theirs) and the conversation's top a 22px band across its middle, each with a
-   small grip. */
+   tools beside it keep theirs), unmarked, and the conversation's top a 22px band across its middle
+   with a small grip. */
 @layer components {
 	@media (pointer: coarse) {
 		.panel-resize {
 			right: -10px;
 			width: 30px;
 		}
+		/* No grip on the panel's edge: the edge is the handle; its line shows only while it is dragged. */
 		.panel-resize::after {
-			top: 50%;
-			bottom: auto;
 			left: 18px;
-			width: 4px;
-			height: 40px;
-			border-radius: 2px;
-			background: var(--v3-line2, #d9d9d9);
-			opacity: 1;
-			transform: translateY(-50%);
+		}
+		/* A tap leaves :hover behind on a touchscreen; the line is for the drag alone. */
+		.panel-resize:hover::after {
+			opacity: 0;
 		}
 		.panel-shell[data-resizing="true"] .panel-resize::after {
-			background: var(--v3-accent);
+			opacity: 1;
 		}
 		/* Inside the conversation's top (its box clips what stands above it), across the middle, clear of
 		   its name on the left and its fold on the right. */
