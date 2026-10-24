@@ -2396,12 +2396,26 @@ body {
 		min-width: 0;
 		flex: 0 1 auto;
 	}
-	@container v3-panel (max-width: 290px) {
+	/* Narrower than four tabs with icons: the icons go and every tab keeps its word (270px in all). */
+	@container v3-panel (max-width: 351px) {
 		.v3-nav-tab > svg {
 			display: none;
 		}
+	}
+	@container v3-panel (max-width: 299px) {
 		.v3-search .v3-kbd {
 			display: none;
+		}
+		.v3-lp-head {
+			gap: 8px;
+			padding-left: 12px;
+		}
+		.v3-lp-mark {
+			width: 28px;
+			height: 28px;
+		}
+		.v3-panel[data-desktop="true"] .v3-nav-tab {
+			padding: 0 8px;
 		}
 	}
 	@container v3-panel (max-width: 220px) {
@@ -2489,11 +2503,33 @@ body {
 
 /* ---- the panel beside the rail, as Studio's editor draws it --------------------------------- */
 @layer components {
-	/* The head: the canvas, and under it the deck and what the tab holds. */
+	/*
+	 * The head (the mock-up "The sidebar top, polished"): Decks' mark as a tile, beside it the canvas
+	 * and under that the deck and what the tab holds, then Settings and Hide; its line under it.
+	 */
 	.v3-lp-head {
+		display: flex;
 		flex: none;
-		padding: 18px 14px 16px 18px;
+		align-items: center;
+		gap: 10px;
+		padding: 14px 10px 12px 14px;
 		border-bottom: 1px solid var(--v3-line);
+	}
+	.v3-lp-text {
+		display: grid;
+		min-width: 0;
+		flex: 1;
+		gap: 2px;
+		/* One column no wider than the head allows, so a long title shortens instead of pushing the buttons. */
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.v3-lp-title > .truncate {
+		min-width: 0;
+	}
+	.v3-lp-buttons {
+		display: flex;
+		flex: none;
+		gap: 2px;
 	}
 	.v3-lp-title {
 		display: inline-flex;
@@ -2508,8 +2544,9 @@ body {
 		color: var(--v3-fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 13px;
+		font-size: 13.5px;
 		font-weight: 600;
+		justify-self: start;
 	}
 	.v3-lp-title:hover:not(:disabled) {
 		background: var(--v3-bg2);
@@ -2522,9 +2559,8 @@ body {
 		min-width: 0;
 		align-items: center;
 		gap: 6px;
-		margin-top: 3px;
 		color: var(--v3-fg2);
-		font-size: 11px;
+		font-size: 11.5px;
 	}
 	.v3-lp-sep {
 		color: var(--v3-fg3);
@@ -2540,23 +2576,26 @@ body {
 		margin: 0 -4px;
 		padding: 0 4px;
 		border-radius: 4px;
-		font-size: 11px;
+		font-size: 11.5px;
 	}
 	.v3-lp-deck .switcher .panel-mark-glyph {
 		display: none;
 	}
 	.v3-lp-deck .switcher-name {
 		color: var(--v3-fg2);
-		font-size: 11px;
+		font-size: 11.5px;
 		font-weight: 400;
 	}
-	/* The live tab strip, 16px under the head's line (a margin: its sliding mark is placed from the top). */
+	/* The live tab strip, 10px under the head's line (a margin: its sliding mark is placed from the top). */
 	.v3-panel[data-desktop="true"] .v3-nav {
-		margin-top: 16px;
-		padding: 0 12px;
+		margin-top: 10px;
+		padding: 0 10px;
 	}
 	.v3-panel[data-desktop="true"] .v3-search-wrap {
-		padding: 14px 14px 14px;
+		padding: 10px 12px 8px;
+	}
+	.v3-panel[data-desktop="true"] .panel-list > .panel-section:first-child > .v3-sec:first-child {
+		padding-top: 6px;
 	}
 	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
 	.v3-panel[data-desktop="true"] .v3-search {
@@ -2756,28 +2795,20 @@ body {
 
 /* ---- the sidebar without a rail: the mark in the head, the tabs over the search ------------- */
 @layer components {
-	.v3-lp-row {
-		display: flex;
-		min-width: 0;
-		align-items: center;
-		gap: 6px;
-	}
 	.v3-lp-mark {
-		display: grid;
-		width: 22px;
-		height: 22px;
-		flex: none;
-		place-items: center;
-		color: var(--v3-fg);
-	}
-	.v3-lp-row .v3-lp-title {
-		min-width: 0;
-		margin: -2px 0;
-	}
-	.v3-lp-icon {
 		display: grid;
 		width: 32px;
 		height: 32px;
+		flex: none;
+		place-items: center;
+		border-radius: 8px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-lp-icon {
+		display: grid;
+		width: 28px;
+		height: 28px;
 		flex: none;
 		place-items: center;
 		border: 0;
@@ -2789,9 +2820,6 @@ body {
 	.v3-lp-icon:hover {
 		background: var(--v3-bg2);
 		color: var(--v3-fg);
-	}
-	.v3-lp-icon + .v3-lp-icon {
-		margin-left: 2px;
 	}
 	.v3-lp-icon:focus-visible {
 		outline: 2px solid var(--v3-accent);

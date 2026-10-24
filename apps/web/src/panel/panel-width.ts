@@ -10,8 +10,8 @@
 
 /** The width it has always had, and the one a double-click on the handle puts back. */
 export const PANEL_WIDTH = 360;
-/** Under this a board's name is three letters and an ellipsis. */
-export const PANEL_MIN = 200;
+/** Under this the four tabs no longer fit with their words (270px with the strip's padding). */
+export const PANEL_MIN = 260;
 export const PANEL_MAX = 560;
 export const PANEL_WIDTH_KEY = "decks.panel-width";
 

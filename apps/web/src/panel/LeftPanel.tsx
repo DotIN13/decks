@@ -706,30 +706,31 @@ export function LeftPanel(props: {
 				>
 					{/* Studio's panel head: the canvas, which opens the canvas manager, and under it the deck (its switcher) and what the tab holds. */}
 					<div class="v3-lp-head">
-						<div class="v3-lp-row">
-							<span class="v3-lp-mark" aria-hidden="true">
-								<DecksLineMark />
-							</span>
+						<span class="v3-lp-mark" aria-hidden="true">
+							<DecksLineMark size={17} />
+						</span>
+						<div class="v3-lp-text">
 							<button type="button" class="v3-lp-title" data-tip="Canvases" disabled={!props.onCanvases} onClick={() => props.onCanvases?.()}>
 								<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
-								<Icon of={ChevronDown} size={14} class="flex-none" />
+								<Icon of={ChevronDown} size={13} class="flex-none" />
 							</button>
-							<span class="flex-1" />
+							<div class="v3-lp-status">
+								<span class="v3-lp-deck">
+									<Switcher />
+								</span>
+								<span class="v3-lp-sep" aria-hidden="true">·</span>
+								<span class="truncate">{headWords()}</span>
+							</div>
+						</div>
+						<div class="v3-lp-buttons">
 							<Show when={props.onSettings}>
 								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
-									<Icon of={SettingsIcon} size={19} />
+									<Icon of={SettingsIcon} size={16} />
 								</button>
 							</Show>
 							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
-								<Icon of={PanelLeftClose} size={19} />
+								<Icon of={PanelLeftClose} size={16} />
 							</button>
-						</div>
-						<div class="v3-lp-status">
-							<span class="v3-lp-deck">
-								<Switcher />
-							</span>
-							<span class="v3-lp-sep" aria-hidden="true">·</span>
-							<span class="truncate">{headWords()}</span>
 						</div>
 					</div>
 				</Show>
