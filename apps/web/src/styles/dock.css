@@ -664,7 +664,9 @@
 	 * the document.
 	 */
 	z-index: var(--z-chrome);
-	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	/* 12px off the foot, or just clear of the home indicator where the screen keeps a strip for it
+	   (25px on an iPad), rather than 12px above that strip, which left the bar floating high. */
+	bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--keyboard));
 	/* Centred on the canvas column, not on the window — see the note below. */
 	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
 	/* It slides when a panel opens. Fast enough not to be a wait, slow enough to read as

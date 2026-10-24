@@ -301,7 +301,7 @@ body {
 
 	.v3-zoom.float.pill {
 		right: 12px;
-		bottom: calc(12px + env(safe-area-inset-bottom));
+		bottom: max(12px, env(safe-area-inset-bottom));
 		height: 40px;
 		gap: 2px;
 		padding: 0 4px;

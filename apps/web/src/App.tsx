@@ -294,9 +294,10 @@ export function App() {
 	 */
 	let workRect: { width: number; height: number } | undefined;
 	/*
-	 * What the foot of the screen keeps for itself: the home indicator's strip
-	 * (`env(safe-area-inset-bottom)`, 25px on an iPad in Safari) and the keyboard while it is up. The
-	 * stylesheet rests the composer 12px above both, so the floats' box stops above them too:
+	 * What the foot of the screen keeps for itself: as much of the home indicator's strip
+	 * (`env(safe-area-inset-bottom)`, 25px on an iPad in Safari) as the composer's 12px does not already
+	 * clear, and the keyboard while it is up. The stylesheet rests the composer there, so the floats'
+	 * box stops there too:
 	 * measured from the screen's own edge, home was 25px below where the composer rests, a drop near
 	 * it landed low and then jumped, and a drop at the foot went under the home indicator.
 	 */
@@ -305,7 +306,7 @@ export function App() {
 		if (!footProbe) {
 			footProbe = document.createElement("div");
 			footProbe.setAttribute("aria-hidden", "true");
-			footProbe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px))";
+			footProbe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) - 12px + var(--keyboard, 0px))";
 			document.body.appendChild(footProbe);
 		}
 		return parseFloat(getComputedStyle(footProbe).paddingBottom) || 0;

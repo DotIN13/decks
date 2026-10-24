@@ -61,7 +61,7 @@
 		z-index: var(--z-conversation);
 		top: calc(64px - var(--gutter));
 		right: calc(12px - var(--gutter));
-		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + env(safe-area-inset-bottom));
+		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + max(12px, env(safe-area-inset-bottom)) - 12px);
 		display: flex;
 		box-sizing: border-box;
 		width: calc(320px + 2 * var(--gutter));
