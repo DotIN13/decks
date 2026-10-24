@@ -998,12 +998,23 @@ export async function pressBoardAction(page, label) {
 		return false;
 	}
 	/*
-	 * The pill sits only over the board's top edge or under its bottom one, so a board filling the
-	 * screen has none showing: `1` frames the selected board, which is what Fit does, and leaves the
-	 * pill room for anything else.
+	 * The pill sits only over the board's top edge or under its bottom one and stays there, so with a
+	 * board filling the screen it is off it, or under the composer: `1` frames the selected board, which
+	 * is what Fit does, and brings the pill into the open for anything else.
 	 */
-	const hidden = () => page.locator(".stage > .board-callout[data-hidden]").count();
-	if ((await page.locator(".stage > .board-callout").count()) && (await hidden())) {
+	const outOfReach = () =>
+		page.evaluate(() => {
+			const pill = document.querySelector(".stage > .board-callout");
+			if (!pill) return false;
+			if (pill.hasAttribute("data-hidden")) return true;
+			const r = pill.getBoundingClientRect();
+			const x = r.x + r.width / 2;
+			const y = r.y + r.height / 2;
+			if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return true;
+			const hit = document.elementFromPoint(x, y);
+			return !hit || !pill.contains(hit);
+		});
+	if (await outOfReach()) {
 		await page.keyboard.press("1");
 		if (labels.includes("Fit")) return true;
 		await rest(page);

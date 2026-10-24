@@ -1,5 +1,5 @@
 import type { Board, Camera } from "@decks/protocol";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { toScreen, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { canvasHost } from "./host.ts";
@@ -21,7 +21,7 @@ const GAP = 10;
  * shows over selected text, on every device. Selecting a board — a click or a tap on it — shows it:
  * the actions the bar had, with the bar's own icons, on the comment popup's card, so it follows the theme. It sits over the board's top
  * edge or under its bottom one, never on the board, taking the one clear of other boards and items
- * and on the screen, and hides while the camera or the board moves.
+ * and on the screen, and stays there as the camera moves (hidden while it does).
  *
  * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
@@ -66,28 +66,32 @@ export function BoardCallout(props: {
 	});
 	/* The pill's own height, measured: it goes above the board only if it fits there whole. */
 	const [tall, setTall] = createSignal(40);
-	const place = () => {
-		const { box: board, camera, view } = props;
-		// The room the chrome leaves: the pill never sits under a toolbar, a panel or the composer.
+	/** Where the selection's top and bottom middles are on screen, with the camera as it is now. */
+	const edges = () => {
+		const { box, camera, view } = props;
+		return {
+			top: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y }),
+			bottom: toScreen(camera, view, { x: box.x + box.w / 2, y: box.y + box.h }),
+		};
+	};
+	/*
+	 * Which edge the pill is on, chosen when the selection appears and again only when what it is on
+	 * moves or changes size: never as the camera moves, so a pan carries the pill with its edge, off
+	 * the screen with it, rather than sending it looking for room. Of the two edges, the one whose
+	 * slot is on screen, clear of floating chrome and covering no other board or item; else the one
+	 * covering less of them. With neither on screen when it was chosen (the camera on its way to the
+	 * selection), it is chosen again once the camera has stopped.
+	 */
+	const choose = (): { below: boolean; sure: boolean } => {
+		const { camera, view } = props;
 		const room = canvasBox(view);
-		const top = toScreen(camera, view, { x: board.x + board.w / 2, y: board.y });
-		const bottom = toScreen(camera, view, { x: board.x + board.w / 2, y: board.y + board.h });
-		// The board's middle, on screen, is where the arrow points; the menu is centred on it unless that would cut it off.
-		// Too narrow for it (a phone, with its chrome): the whole window, which it fits.
-		const fits = room.width - 16 >= width();
-		const left = fits ? room.x + 8 : 4;
-		const right = fits ? room.x + room.width - 8 : view.width - 4;
-		const aim = Math.min(right - 12, Math.max(left + 12, top.x));
+		const { top, bottom } = edges();
+		const x = top.x;
 		const half = width() / 2;
-		const x = half > 0 && right - left > width() ? Math.min(right - half, Math.max(left + half, aim)) : aim;
-		const arrow = half > 0 ? Math.min(width() - 18, Math.max(18, aim - (x - half))) : undefined;
 		const gap = props.gap ?? GAP;
-		/*
-		 * Whether chrome floating over the canvas (the composer, a toolbar, a float) is where a slot would
-		 * be: the room above leaves out only what is docked, and a pill under the composer cannot be pressed.
-		 */
+		const stage = element?.parentElement?.getBoundingClientRect();
+		// Chrome floating over the canvas (the composer, a toolbar, a float): the room leaves out only what is docked.
 		const underChrome = (slot: { from: number; to: number }) => {
-			const stage = element?.parentElement?.getBoundingClientRect();
 			if (!stage || typeof document === "undefined") return false;
 			const y = stage.top + (slot.from + slot.to) / 2;
 			return [x - half + 8, x, x + half - 8].some((at) => {
@@ -95,33 +99,44 @@ export function BoardCallout(props: {
 				return !!hit && !hit.closest(".stage");
 			});
 		};
-		/*
-		 * Two slots only, over the top edge and under the bottom one: the pill never sits on what it is
-		 * for. Of the two, the one inside the room that covers no other board or item; else the one
-		 * inside the room that covers less of them; and with neither edge in the room (a board filling
-		 * the screen) there is no pill until the camera leaves it some.
-		 */
 		const slots = [
-			{ y: top.y - gap, from: top.y - gap - tall(), to: top.y - gap, below: false },
-			{ y: bottom.y + gap, from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
+			{ from: top.y - gap - tall(), to: top.y - gap, below: false },
+			{ from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
 		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
-		if (!slots.length) return { x, y: top.y - gap, below: false, arrow, out: true };
+		if (!slots.length) return { below: false, sure: false };
 		const others = props.obstacles?.() ?? [];
 		const covered = (slot: { from: number; to: number }) => {
-			const x1 = x - half;
-			const x2 = x + half;
 			let area = 0;
 			for (const other of others) {
 				const a = toScreen(camera, view, { x: other.x, y: other.y });
 				const b = toScreen(camera, view, { x: other.x + other.w, y: other.y + other.h });
-				const w = Math.min(x2, b.x) - Math.max(x1, a.x);
+				const w = Math.min(x + half, b.x) - Math.max(x - half, a.x);
 				const h = Math.min(slot.to, b.y) - Math.max(slot.from, a.y);
 				if (w > 0 && h > 0) area += w * h;
 			}
 			return area;
 		};
 		const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
-		return { x, y: best.slot.y, below: best.slot.below, arrow, out: false };
+		return { below: best.slot.below, sure: true };
+	};
+	const [side, setSide] = createSignal<{ below: boolean; sure: boolean }>({ below: false, sure: false });
+	createEffect(
+		on([() => props.box.x, () => props.box.y, () => props.box.w, () => props.box.h, width, tall], () => setSide(untrack(choose))),
+	);
+	createEffect(
+		on(
+			() => props.hidden,
+			(hidden) => {
+				if (!hidden && !untrack(side).sure) setSide(untrack(choose));
+			},
+		),
+	);
+	const place = () => {
+		const { top, bottom } = edges();
+		const gap = props.gap ?? GAP;
+		const below = side().below;
+		// Centred on what it is for, wherever that is: its arrow points at the middle.
+		return { x: top.x, y: below ? bottom.y + gap : top.y - gap, below, arrow: width() > 0 ? width() / 2 : undefined };
 	};
 	const stop = (event: Event) => event.stopPropagation();
 	return (
@@ -131,7 +146,7 @@ export function BoardCallout(props: {
 			role="menu"
 			aria-label={props.label}
 			data-below={place().below ? "true" : undefined}
-			data-hidden={props.hidden || place().out ? "true" : undefined}
+			data-hidden={props.hidden ? "true" : undefined}
 			style={{ left: `${place().x}px`, top: `${place().y}px`, ...(place().arrow !== undefined ? { "--arrow": `${place().arrow}px` } : {}) }}
 			onPointerDown={stop}
 			onClick={stop}

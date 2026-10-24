@@ -154,6 +154,26 @@ say(
 	JSON.stringify({ under, roof, box }),
 );
 
+/*
+ * Panned away, the pill keeps its edge: it goes with the box, still under it and centred on it, not
+ * pushed back onto the screen or over to the other edge.
+ */
+if (under) {
+	await page.mouse.move(1000, 700);
+	for (let i = 0; i < 8; i++) {
+		await page.mouse.wheel(90, 0);
+		await page.waitForTimeout(30);
+	}
+	await settle(page, 700);
+	const moved = await page.evaluate(() => window.__decksPenBox?.("pill-box"));
+	const after = await page.evaluate(() => {
+		const r = document.querySelector(".stage > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+		return r && { x: r.x, y: r.y, width: r.width };
+	});
+	const centred = moved && after && Math.abs(after.x + after.width / 2 - (moved.x + moved.width / 2)) < 2;
+	say("panned away, the pill stays under the box and centred on it", !!moved && moved.x < box.x - 200 && centred && after.y >= moved.y + moved.height, JSON.stringify({ moved, after }));
+}
+
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 link.close?.();
 await browser.close();
