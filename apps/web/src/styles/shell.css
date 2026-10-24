@@ -421,3 +421,24 @@
 	}
 }
 }
+
+/*
+ * The app's chrome and canvas are not text to select. A pencil on an iPad presses and drags
+ * everywhere, and Safari took every stroke that began on a label or the canvas as a text selection,
+ * reaching across the bars and the whole canvas. Prefixed as well: Safari 18 ignores the bare
+ * property, which is why the rules here that set only `user-select` never held there. What is typed
+ * into stays selectable, and a board is its own page with its own rules.
+ */
+@layer components {
+	/* The page, not only `.app`: menus and dialogs open in a layer beside it. */
+	body {
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+	body :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+		-webkit-user-select: text;
+		user-select: text;
+		-webkit-touch-callout: default;
+	}
+}
