@@ -49,6 +49,7 @@ import "./app/canvas-host.ts";
 import { createEditor, isSharedBoard, type CanvasHandle } from "@decks/canvas";
 import { boardUrl } from "./lib/api.ts";
 import { mintBoardToken } from "./board/board-token.ts";
+import { attachLiveDoc } from "./board/live-doc.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -1335,6 +1336,8 @@ export function App() {
 									return board ? boardUrl({ path: board.path, rev: pageRev(board) }) : undefined;
 								},
 								mintBoardToken: mintBoardToken,
+								// A document board talks to the server through the app's socket (`board/live-doc.ts`).
+								attach: attachLiveDoc,
 								sandboxed: isSharedBoard,
 								mayStart: boardsMayStart,
 								switching: switchingCanvas,

@@ -58,6 +58,8 @@ function withStorage(address: string | undefined, key: string): string | undefin
 export interface PlainBoardExtras {
 	page?: string | undefined;
 	boardHost?: BoardHost | undefined;
+	/** The host's own wiring for this board's frame, when it is not sandboxed; returns its undo. */
+	attach?: ((frame: HTMLIFrameElement) => () => void) | undefined;
 	sandboxed?: { key: () => string } | undefined;
 	/** Raised by the host when the board's file changed where its page comes from: the page loads again. */
 	reload?: number | undefined;
@@ -455,6 +457,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 							// a friend's board, sandboxed, has none, and its storage is kept here (`board-storage.ts`).
 							const detach = props.sandboxed ? attachBoardStorage(element, props.sandboxed.key, sandboxKeeper) : props.boardHost?.attach(element, { path: () => props.board.path, page: src, ...(props.stage ? { stage: props.stage } : {}) });
 							if (detach) onCleanup(detach);
+							if (!props.sandboxed && props.attach) onCleanup(props.attach(element));
 						}}
 						class="plain-board-page"
 						src={props.sandboxed ? withStorage(src(), props.sandboxed.key()) : src()}

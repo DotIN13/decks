@@ -18,8 +18,8 @@ const frames = new Set<HTMLIFrameElement>();
 
 /** Carry a frame's document messages to the server; answers what stops it. */
 export function attachLiveDoc(frame: HTMLIFrameElement): () => void {
-	const view = frame.ownerDocument.defaultView;
-	if (!view) return () => {};
+	// The frame may not be in the page yet (Solid builds it in a template's document, which has no window): this page's, then.
+	const view = frame.ownerDocument.defaultView ?? window;
 	const listener = (event: MessageEvent) => {
 		if (event.source !== frame.contentWindow) return;
 		const data = event.data as { decks?: unknown; message?: { type?: unknown } } | null;
@@ -41,6 +41,6 @@ export function receiveDoc(message: DocServerMessage): void {
 			frames.delete(frame);
 			continue;
 		}
-		frame.contentWindow?.postMessage({ decks: "doc", message }, frame.ownerDocument.location.origin);
+		frame.contentWindow?.postMessage({ decks: "doc", message }, location.origin);
 	}
 }

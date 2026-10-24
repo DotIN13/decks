@@ -74,6 +74,7 @@ const CHECKS = [
 	 * else opens in a tab, and neither of them navigates the frame the board is drawn in.
 	 */
 	{ file: "board-links.mjs", needsAgent: false },
+	{ file: "live-doc.mjs", needsAgent: false },
 	/*
 	 * A board's own code, run by pressing something on it. The one path where a click is not the
 	 * permission: the board carries the words, the server reads them out of the file, and the

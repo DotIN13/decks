@@ -49,6 +49,11 @@ export interface CanvasOptions {
 		 */
 		mintBoardToken?: MintBoardToken;
 		/**
+		 * The host's own wiring for each board's frame (one of its own boards, not a friend's), such as the
+		 * Decks app carrying a document board's messages to its server (`board/live-doc.ts`). Returns its undo.
+		 */
+		attach?(frame: HTMLIFrameElement): () => void;
+		/**
 		 * Whether a board is a friend's, on a canvas shared with the person (`board-storage.ts`): its frame
 		 * is sandboxed with no token, and its `localStorage` is kept by this page under `storageKey`.
 		 */
@@ -474,7 +479,7 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={moveBoard}
-			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
+			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.boards?.attach ? { attach: options.boards.attach } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
 			shots={
 			options.boards?.shots ??
 			(() => ({
