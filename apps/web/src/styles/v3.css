@@ -2881,6 +2881,27 @@ body {
 	body .popover [data-row] > .row-icon {
 		color: var(--v3-fg2);
 	}
+	/* On a one-line row the icon sits on the words' middle: the 1px nudge is for two-line rows only. */
+	body .popover [data-row][data-flat="true"] > .row-icon,
+	body .popover [data-row]:not(:has(> .row-note)) > .row-icon {
+		align-self: center;
+		padding-top: 0;
+	}
+	body .popover [data-row]:not(:has(> .row-note)) {
+		align-items: center;
+	}
+	body .popover [data-row] > svg:first-child {
+		align-self: center;
+	}
+	body .popover [data-row][data-flat="true"] > .row-label {
+		min-width: 0;
+		line-height: 18px;
+		white-space: nowrap;
+	}
+	/* A menu never scrolls sideways: a long word truncates in its row instead. */
+	body .popover {
+		overflow-x: hidden;
+	}
 	body .popover [data-row][data-current="true"] > .row-icon {
 		color: var(--v3-row-on-icon);
 	}

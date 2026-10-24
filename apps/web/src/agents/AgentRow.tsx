@@ -346,8 +346,7 @@ export function AgentRow(props: {
 							<Show when={props.onWorkspace}>
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("workspace"))}>
 									<Icon of={Folder} size={15} class="row-icon" />
-									<span class="row-label">Move to workspace…</span>
-									<Show when={workspace()}>{(here) => <span class="menu-note">{here()}</span>}</Show>
+									<span class="row-label">Move to…</span>
 								</button>
 							</Show>
 							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => edit("tags"))}>
