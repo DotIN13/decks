@@ -1,10 +1,19 @@
 import { insetsOnly } from "@decks/canvas/camera";
 import { Switcher } from "../connections/Switcher.tsx";
 import { can } from "../connections/backend.ts";
-import type { Board, DeckPen, StageRow } from "@decks/protocol";
+import type { Board, DeckPen } from "@decks/protocol";
+import type { PenDocument } from "@decks/pen";
 import AppWindow from "lucide-solid/icons/app-window";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
+import Circle from "lucide-solid/icons/circle";
+import Clock from "lucide-solid/icons/clock";
+import FileText from "lucide-solid/icons/file-text";
+import MoveUpRight from "lucide-solid/icons/move-up-right";
+import PenLine from "lucide-solid/icons/pen-line";
+import Square from "lucide-solid/icons/square";
+import StickyNote from "lucide-solid/icons/sticky-note";
+import Type from "lucide-solid/icons/type";
 import Layers from "lucide-solid/icons/layers";
 import Folder from "lucide-solid/icons/folder";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
@@ -16,14 +25,14 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
-import { CanvasTree } from "./CanvasTree.tsx";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
 import { AgentRow } from "../agents/AgentRow.tsx";
 import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
-import { agentSections, type AgentSection } from "../agents/agent-sections.ts";
+import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentSection } from "../agents/agent-sections.ts";
+import { canvasItems, type CanvasItem, type ItemKind } from "./canvas-items.ts";
 import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 
 /**
@@ -82,15 +91,16 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * Two genuinely different collections, which is what makes a strip defensible here — see the
  * note on the `chats` prop.
  */
-export type PanelTab = "agents" | "boards" | "apps";
+export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 /** The rail's width, as Studio's editor draws it; the panel opens to its right. */
 const RAIL_WIDTH = 56;
 
-const PANEL_TABS: PanelTab[] = ["agents", "boards", "apps"];
-const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Canvases", apps: "Apps" };
-const PANEL_TAB_ICON = { agents: Sparkles, boards: Layers, apps: AppWindow };
+const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
+const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
+const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
+const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type PanelApp = { name: string; title: string; status: string; board: string };
@@ -177,13 +187,15 @@ export function LeftPanel(props: {
 	rail?: boolean;
 	onSettings?: () => void;
 
-	// --- the Canvases tab --------------------------------------------------------------
-	/** Every canvas in the deck, as the stage manager lists them: the tree's middle level. */
-	stages?: StageRow[];
-	/** The canvas the panel is showing (its folder name): marked "Here". */
-	here?: string;
-	/** Move to a canvas: its row's Open button, or a double-click. */
-	onOpenCanvas?: (name: string) => void;
+	// --- the Canvas tab ---------------------------------------------------------------
+	/** The drawing on screen: the tab lists its top-level items. */
+	canvasDoc?: PenDocument;
+	canvasTitle?: string;
+	/** The drawn items selected on the canvas, by id. */
+	selectedItems?: string[];
+	/** A row pressed: select that item and bring it into view. */
+	onPickItem?: (item: CanvasItem) => void;
+	onPickArrows?: (ids: string[]) => void;
 
 	// --- the Apps tab -----------------------------------------------------------------
 	/** The deck's apps; asked for when the tab opens. */
@@ -225,7 +237,7 @@ export function LeftPanel(props: {
 		const chat = (props.chats ?? []).find((one) => one.id === over.id);
 		return chat ? { chat, at: over.at } : previous;
 	});
-	const cardShown = () => tab() === "agents" && lines() === 1 && hovered() !== undefined;
+	const cardShown = () => (tab() === "agents" || tab() === "recent") && lines() === 1 && hovered() !== undefined;
 	/* Beside the panel and level with the row: the row's height, the panel's sides, so the card clears the panel's edge. */
 	const besideRow = (row: DOMRect, element: Element | null) => {
 		const side = element?.getBoundingClientRect() ?? row;
@@ -420,6 +432,11 @@ export function LeftPanel(props: {
 	 */
 	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
+	const [recentList, setRecentList] = createStore<AgentListRow[]>(recentAgents(agentInput()));
+	createEffect(() => setRecentList(reconcile(recentAgents(agentInput()), { key: "id" })));
+	/* The Canvas tab's rows: the drawing on screen, as Studio's editor lists its layers. */
+	const items = createMemo(() => canvasItems(props.canvasDoc, query()));
+	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
 
 	/* Every name on the deck but the agent's own: what the edit window checks a new name against
 	   before the server does, so the refusal is a red line under the field rather than a notice. */
@@ -513,7 +530,7 @@ export function LeftPanel(props: {
 		onCleanup(() => clearTimeout(timer));
 	});
 	/** The sections of the list that is showing — boards, or agents. */
-	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : []);
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : tab() === "recent" ? [{ rows: recentList }] : []);
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
@@ -600,7 +617,7 @@ export function LeftPanel(props: {
 		<>
 			<Show when={props.rail}>
 				<nav class="v3-rail" data-inset="left" aria-label="Side panel">
-					<For each={PANEL_TABS.filter((name) => name !== "agents" || (props.chats && can("agents")))}>
+					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
 							<button
 								type="button"
@@ -687,7 +704,7 @@ export function LeftPanel(props: {
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
 				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.rail}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
-					<For each={PANEL_TABS.filter((name) => name !== "agents" || (props.chats && can("agents")))}>
+					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
 							<button
 								type="button"
@@ -721,7 +738,7 @@ export function LeftPanel(props: {
 							ref={field}
 							type="text"
 							spellcheck={false}
-							placeholder={tab() === "agents" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.stages?.length ?? 0} canvases and ${props.boards.length} boards`}
+							placeholder={tab() === "agents" || tab() === "recent" ? "Search agents and tags" : tab() === "apps" ? "Search apps" : `Search ${props.canvasTitle ?? "this canvas"}`}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
@@ -883,24 +900,67 @@ export function LeftPanel(props: {
 						</Show>
 					</Show>
 
-					<Show when={tab() === "boards"}>
-						<CanvasTree
-							stages={props.stages ?? []}
-							boards={props.boards}
-							{...(props.here ? { here: props.here } : {})}
-							query={query()}
-							{...(props.current ? { current: props.current } : {})}
-							{...(props.inPlay ? { inPlay: props.inPlay } : {})}
-							{...(props.news ? { news: props.news } : {})}
-							folded={folded()}
-							onToggleFolder={toggleFolder}
-							onPick={props.onPick}
-							{...(props.onOpenCanvas ? { onOpen: props.onOpenCanvas } : {})}
-							{...(props.onDelete ? { onDelete: props.onDelete } : {})}
-							{...(props.onHide ? { onHide: props.onHide } : {})}
-							{...(props.pens ? { pens: props.pens } : {})}
-							{...(props.onPlacePen ? { onPlacePen: props.onPlacePen } : {})}
-						/>
+					<Show when={tab() === "recent"}>
+						<div class="panel-section" data-kind="recent">
+							<div class="row-list agent-list" data-lines={lines()}>
+								<For each={recentList}>
+									{(row) => (
+											<AgentRow
+												row={row}
+												identity={props.identities?.[row.chat.id]}
+												onFocus={() => props.onFocusAgent?.(row.chat.id)}
+												onClose={() => props.onCloseAgent?.(row.chat.id)}
+												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
+												workspaces={workspaceNames()}
+												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
+												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
+												taken={(name) => nameTaken(name, row.chat.id)}
+												lines={lines()}
+												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
+											/>
+									)}
+								</For>
+							</div>
+						</div>
+						<Show when={recentList.length === 0}>
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{agentCount() === 0 ? "No agents yet." : `No agent matches “${query().trim()}”.`}</p>
+						</Show>
+					</Show>
+
+					<Show when={tab() === "canvas"}>
+						<div class="panel-section v3-items" data-kind="canvas">
+							<div class="panel-meta meta">
+								<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
+								<span class="flex-1" />
+								<span class="count tabular-nums">{items().items.length + (items().arrows.length ? 1 : 0)}</span>
+							</div>
+							<For each={items().items}>
+								{(item) => (
+									<button
+										type="button"
+										class="v3-item"
+										data-row
+										data-kind={item.kind}
+										data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
+										title={item.label}
+										onClick={() => props.onPickItem?.(item)}
+									>
+										<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
+										<span class="v3-item-name truncate">{item.label}</span>
+									</button>
+								)}
+							</For>
+							<Show when={items().arrows.length > 0}>
+								<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
+									<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
+									<span class="v3-item-name truncate">Arrows</span>
+									<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
+								</button>
+							</Show>
+							<Show when={items().items.length === 0 && items().arrows.length === 0}>
+								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? `Nothing on this canvas matches “${query().trim()}”.` : "Nothing on this canvas yet."}</p>
+							</Show>
+						</div>
 					</Show>
 					<Show when={tab() === "apps"}>
 						<div class="row-list v3-apps">
@@ -953,7 +1013,7 @@ const TAB_KEY = "decks.panelTab";
 function readTab(): PanelTab {
 	try {
 		const saved = localStorage.getItem(TAB_KEY);
-		return saved === "boards" || saved === "apps" ? saved : "agents";
+		return saved === "recent" || saved === "canvas" || saved === "agents" || saved === "apps" ? saved : "recent";
 	} catch {
 		return "agents";
 	}

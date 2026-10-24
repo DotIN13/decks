@@ -67,6 +67,7 @@ import { installTooltips } from "./v3/tooltip.ts";
 import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
+import type { CanvasItem } from "./panel/canvas-items.ts";
 import {boxOf, fitInto, keepVisible, middleOf} from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
 import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "@decks/canvas/camera";
@@ -1220,6 +1221,30 @@ export function App() {
 
 	/** The editor on screen (`createEditor`), for what this app asks of it from outside: a board's page loaded again. */
 	const [editorHandle, setEditorHandle] = createSignal<CanvasHandle>();
+	/** The drawn items selected on the canvas, for the panel's Canvas tab. */
+	const [penSelected, setPenSelected] = createSignal<string[]>([]);
+	/**
+	 * A row of the Canvas tab: a board plays and is framed as from any list; a drawn item is selected
+	 * and brought to the middle of the canvas, framed whole when it would not fit at this zoom.
+	 */
+	const pickItem = (item: CanvasItem) => {
+		if (item.board) {
+			const name = stageOf(state.focused)?.name;
+			const path = state.boards.find((one) => one.path === item.board || (name && one.path === `canvases/${name}/${item.board}`))?.path;
+			if (path) return playAndFrame(path);
+		}
+		untrack(editorHandle)?.select([item.id]);
+		setPenSelected([item.id]);
+		const stage = document.querySelector(".stage");
+		if (!stage || item.box.w <= 0) return;
+		const view = { width: stage.clientWidth, height: stage.clientHeight };
+		const region = canvasBox(view);
+		const fitted = fitInto([item.box], view, region);
+		const zoom = Math.min(fitted.zoom, camera().zoom);
+		const cx = item.box.x + item.box.w / 2;
+		const cy = item.box.y + item.box.h / 2;
+		moveCamera({ zoom, x: cx - (region.x + region.width / 2 - view.width / 2) / zoom, y: cy - (region.y + region.height / 2 - view.height / 2) / zoom }, { animate: true });
+	};
 	// The app's scheme, to the editor at each switch: it draws ink, cards and board pages in it.
 	createEffect(() => {
 		const dark = scheme() === "dark";
@@ -1316,6 +1341,7 @@ export function App() {
 							dark: untrack(scheme) === "dark",
 							renderer: current.renderer,
 							toolbar: false,
+							onSelection: (ids) => setPenSelected([...ids]),
 							state: {
 								pen: stagePen,
 								opening: () => (state.focused ? { camera: openingCamera() } : undefined),
@@ -1577,9 +1603,14 @@ export function App() {
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
 					news={newsGlow()}
 					boards={state.boards}
-					stages={stages()}
-					{...(stageOf(state.focused) ? { here: stageOf(state.focused)!.name } : {})}
-					onOpenCanvas={openCanvas}
+					{...(stagePen()?.doc ? { canvasDoc: stagePen()!.doc } : {})}
+					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
+					selectedItems={penSelected()}
+					onPickItem={pickItem}
+					onPickArrows={(ids) => {
+						editorHandle()?.select(ids);
+						setPenSelected(ids);
+					}}
 					rail={!phone()}
 					onSettings={() => {
 						setSettings(true);

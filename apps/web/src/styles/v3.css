@@ -2437,7 +2437,7 @@ body {
 	}
 }
 
-/* ---- the panel's tabs as one segmented switch, and the Canvases tree ------------------------ */
+/* ---- the panel's tabs as one segmented switch (the phone's sheet) ------------------------ */
 @layer components {
 	/* A track the width of the panel, the three tabs sharing it, and a raised thumb that slides
 	   under the one showing (`placeNavMark` in `LeftPanel.tsx`). */
@@ -2476,187 +2476,6 @@ body {
 		color: var(--v3-fg);
 	}
 
-	/* A canvas: a row that folds open onto its boards, with Open in place of its count on hover. */
-	.v3-tree {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-	.v3-canvas-row {
-		position: relative;
-		display: flex;
-		align-items: center;
-		border-radius: 8px;
-	}
-	.v3-canvas-row:hover {
-		background: var(--v3-bg2);
-	}
-	.v3-canvas-toggle {
-		display: flex;
-		height: 30px;
-		min-width: 0;
-		flex: 1;
-		align-items: center;
-		gap: 6px;
-		padding: 0 8px 0 4px;
-		border: 0;
-		border-radius: 8px;
-		background: none;
-		color: var(--v3-fg);
-		cursor: pointer;
-		font: inherit;
-		font-size: 13px;
-		text-align: left;
-	}
-	.v3-canvas-toggle:focus-visible {
-		outline: 2px solid var(--v3-accent);
-		outline-offset: -2px;
-	}
-	.v3-twist {
-		display: grid;
-		width: 14px;
-		height: 14px;
-		flex: none;
-		place-items: center;
-		color: var(--v3-fg3);
-		transition: transform 200ms var(--v3-ease);
-	}
-	.v3-tree-canvas[data-open="true"] > .v3-canvas-row .v3-twist {
-		transform: rotate(90deg);
-	}
-	.v3-canvas-icon {
-		flex: none;
-		color: var(--v3-fg2);
-	}
-	.v3-canvas-row[data-here="true"] .v3-canvas-icon {
-		color: var(--v3-accent);
-	}
-	.v3-canvas-name {
-		min-width: 0;
-	}
-	.v3-canvas-row[data-here="true"] .v3-canvas-name {
-		font-weight: 600;
-	}
-	.v3-here {
-		flex: none;
-		padding: 1px 6px;
-		border-radius: 5px;
-		background: var(--v3-accent-soft);
-		color: var(--v3-accent);
-		font-size: 11px;
-		font-weight: 500;
-	}
-	.v3-canvas-rest {
-		display: flex;
-		flex: none;
-		align-items: center;
-		gap: 6px;
-		margin-left: auto;
-	}
-	.v3-faces {
-		display: flex;
-		padding-left: 5px;
-	}
-	.v3-face {
-		display: grid;
-		width: 18px;
-		height: 18px;
-		margin-left: -5px;
-		place-items: center;
-		border-radius: 50%;
-		box-shadow: 0 0 0 2px var(--v3-panel);
-		color: #fff;
-		font-size: 9.5px;
-		font-weight: 600;
-	}
-	.v3-canvas-row:hover .v3-face {
-		box-shadow: 0 0 0 2px var(--v3-bg2);
-	}
-	.v3-canvas-count {
-		min-width: 16px;
-		color: var(--v3-fg3);
-		font-size: 11.5px;
-		text-align: right;
-	}
-	.v3-canvas-open {
-		position: absolute;
-		top: 50%;
-		right: 6px;
-		display: flex;
-		height: 22px;
-		align-items: center;
-		gap: 3px;
-		padding: 0 7px 0 9px;
-		border: 0;
-		border-radius: 6px;
-		background: var(--v3-accent);
-		box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
-		color: #fff;
-		cursor: pointer;
-		font: inherit;
-		font-size: 12px;
-		font-weight: 500;
-		opacity: 0;
-		pointer-events: none;
-		transform: translateY(-50%) scale(0.96);
-		transition:
-			opacity 120ms var(--v3-ease),
-			transform 160ms var(--v3-ease);
-	}
-	.v3-canvas-open:hover {
-		filter: brightness(1.08);
-	}
-	.v3-canvas-open:focus-visible {
-		outline: 2px solid var(--v3-accent);
-		outline-offset: 2px;
-	}
-	.v3-canvas-row:is(:hover, :focus-within) > .v3-canvas-open {
-		opacity: 1;
-		pointer-events: auto;
-		transform: translateY(-50%);
-	}
-	.v3-canvas-row:has(> .v3-canvas-open):is(:hover, :focus-within) .v3-canvas-rest {
-		visibility: hidden;
-	}
-	/* No hover on a touch screen: Open is always there, where the count was. */
-	@media (hover: none) {
-		.v3-canvas-open {
-			opacity: 1;
-			pointer-events: auto;
-			transform: translateY(-50%);
-		}
-		.v3-canvas-row:has(> .v3-canvas-open) .v3-canvas-count {
-			visibility: hidden;
-		}
-	}
-	.v3-canvas-boards {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		padding: 1px 0 3px 22px;
-	}
-	.v3-tree-more {
-		height: 28px;
-		padding: 0 8px;
-		border: 0;
-		border-radius: 8px;
-		background: none;
-		color: var(--v3-fg2);
-		cursor: pointer;
-		font: inherit;
-		font-size: 12.5px;
-		text-align: left;
-	}
-	.v3-tree-more:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
-	}
-	.v3-tree-empty {
-		margin: 0;
-		padding: 5px 8px;
-		color: var(--v3-fg3);
-		font-size: 12.5px;
-	}
 }
 
 /* ---- Studio's editor rail: the panel's tabs as labelled icons at the window's edge --------- */
@@ -2714,5 +2533,53 @@ body {
 	}
 	.app[data-presenting="true"] .v3-rail {
 		display: none !important;
+	}
+}
+
+/* ---- the Recent and Canvas tabs ------------------------------------------------------------ */
+@layer components {
+	/* Recent is one list with no folders above it, so its rows start at the panel's edge. */
+	.v3-panel .panel-section[data-kind="recent"] .agent-list .agent-row > button[data-row] {
+		padding-left: 10px;
+	}
+	/* The Canvas tab: the drawing's items, one row each, as Studio's editor lists its layers. */
+	.v3-item {
+		display: flex;
+		width: 100%;
+		height: 28px;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--v3-fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 13px;
+		text-align: left;
+	}
+	.v3-item:hover,
+	.v3-item:focus-visible {
+		background: var(--v3-bg2);
+		outline: none;
+	}
+	.v3-item[data-on="true"] {
+		background: var(--v3-accent-soft);
+	}
+	.v3-item-icon {
+		flex: none;
+		color: var(--v3-fg2);
+	}
+	.v3-item[data-on="true"] .v3-item-icon {
+		color: var(--v3-accent);
+	}
+	.v3-item-name {
+		min-width: 0;
+		flex: 1;
+	}
+	.v3-item-n {
+		color: var(--v3-fg3);
+		font-size: 11.5px;
 	}
 }

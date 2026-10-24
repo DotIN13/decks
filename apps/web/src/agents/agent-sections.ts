@@ -197,3 +197,14 @@ function sectionNote(rows: AgentRow[]): string | undefined {
 	if (working > 0) return `${working} working`;
 	return undefined;
 }
+
+/**
+ * The Recent tab: every agent the query lets through in one list, the one most lately at work
+ * first, with no workspace folders. Only the first `limit`: the Agents tab has the rest.
+ */
+export function recentAgents(input: AgentListInput, limit = 12): AgentRow[] {
+	return agentSections(input)
+		.flatMap((one) => one.rows)
+		.sort(byRecency)
+		.slice(0, limit);
+}
