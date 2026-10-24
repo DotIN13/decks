@@ -1838,6 +1838,7 @@ export function App() {
 							send({ type: "web.board" });
 							setSettings(false);
 						}}
+						phone={phone()}
 						onClose={() => setSettings(false)}
 					/>
 				</Show>

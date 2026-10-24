@@ -1,89 +1,91 @@
-import { STT_MODELS, type ClaudeAccount, type WebStatus } from "@decks/protocol";
+import { STT_MODELS, type ClaudeAccount, type PairedRow, type WebStatus } from "@decks/protocol";
 import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../chat/composer/voice.ts";
-import FiveHour from "./FiveHour.tsx";
+import Bell from "lucide-solid/icons/bell";
+import Cloud from "lucide-solid/icons/cloud";
+import Globe from "lucide-solid/icons/globe";
+import Mic from "lucide-solid/icons/mic";
+import Plug from "lucide-solid/icons/plug";
 import Plus from "lucide-solid/icons/plus";
+import Puzzle from "lucide-solid/icons/puzzle";
+import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
+import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
+import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
 import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
 import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
+import { usageLevel } from "../lib/context-usage.ts";
 import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
 import { can, pairing } from "../connections/backend.ts";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
 import type { AlertPrefs } from "../alerts/policy.ts";
 
+/** The six sections, in the order the left of the window lists them. */
+const SECTIONS = [
+	{ id: "general", label: "General", icon: SlidersHorizontal },
+	{ id: "notifications", label: "Notifications", icon: Bell },
+	{ id: "accounts", label: "Accounts", icon: User },
+	{ id: "voice", label: "Voice", icon: Mic },
+	{ id: "connections", label: "Connections", icon: Plug },
+	{ id: "chrome", label: "Chrome", icon: Puzzle },
+] as const;
+type Section = (typeof SECTIONS)[number]["id"];
+
+/** The section open last, kept on this device: Settings opens where you left it. */
+const KEY = "decks.settings.section";
+const saved = (): Section => {
+	try {
+		const one = localStorage.getItem(KEY);
+		return SECTIONS.some((section) => section.id === one) ? (one as Section) : "notifications";
+	} catch {
+		return "notifications";
+	}
+};
+
 /**
- * The Claude subscriptions this install can use.
+ * Settings, one section at a time, as the "Settings redesign" drawing has it.
  *
- * A subscription has a rate limit, and reaching it stops the work — so somebody with two
- * accounts wants a way to carry on on the other one. Several can be signed in at once, and
- * **which one a conversation spends is chosen in that conversation's model picker**
- * (`claude/accounts.ts`). Nothing switches by itself, and there is no order to set: this
- * panel is where accounts are added and removed, and that is all it is.
+ * On a computer and an iPad it is a window: the six sections on a grey left, the open one on the
+ * right under its name and a ×. On a phone it is the app's bottom sheet, as the properties sheet
+ * is: Settings and a blue Done, then the sections as the sidebar's tabs, scrolling sideways, over
+ * the same rows. The rows are one vocabulary (`.sw-row`: words on the left, one control on the
+ * right) and only the narrow width stacks a row's control under its words.
  *
- * **The switch is seamless.** The CLI re-reads its credentials per request and every session
- * is pointed at a symlink, so moving that link changes which subscription the *next turn*
- * spends — no session restart, no interrupted conversation.
- *
- * A modal rather than a panel: this is a thing you open, do, and close. It borrows the picker's backdrop — open, read, dismiss is one set
- * of rules about how a press outside dismisses it.
- *
- * ### What a row can be
- *
- * **Signed out** is a row with no token behind it — the CLI's own login after a
- * `claude auth logout`, or an account whose credentials were revoked. It cannot be switched
- * to, and it says so rather than being hidden: an account you added and cannot use is a fact
- * worth showing, and hiding it would leave the list disagreeing with what you remember doing.
- *
- * **Default for new** is where a conversation starts if nobody chooses. One row at most, and
- * it is the server's answer rather than this panel's rule — there is no list to walk any
- * more, so it is the CLI's own login unless that has no token.
+ * A modal: opened, used, closed. A press that *begins* on the backdrop closes it, for the reason
+ * `FilePicker` gives: the tap that opened it lands a `click` here afterwards.
  */
 export function Settings(props: {
 	/** What the app may interrupt you with (`alerts/AlertSettings.tsx`). */
 	prefs: AlertPrefs;
 	onPrefs: (prefs: AlertPrefs) => void;
-	/**
-	 * The install's Claude subscriptions — the set of them, and nothing about who is using
-	 * them.
-	 *
-	 * This panel adds accounts and removes them. Choosing which one answers is done in a
-	 * conversation's own model picker, because that is what the choice is about.
-	 */
+	/** The install's Claude subscriptions; a conversation picks one in its model picker. */
 	accounts: ClaudeAccount[];
-	/**
-	 * Where a conversation starts when nobody has chosen, from the server (`defaultId`).
-	 *
-	 * Sent rather than worked out here. The rule used to be duplicated in the browser so
-	 * that the arrows could be seen to do something — there are no arrows now, and one
-	 * implementation of a rule is the right number.
-	 */
+	/** Where a conversation starts when nobody has chosen, from the server. */
 	active: string;
 	onAdd: () => void;
 	onForget: (id: string) => void;
-	/**
-	 * The user's own Chrome, shared with the deck through the Decks extension
-	 * (`server/browser/bridge.ts`). The code is what the extension is paired with; the address
-	 * is this page's own origin, because that is the address the browser reached Decks at.
-	 */
+	/** The user's own Chrome, shared through the Decks extension (`server/browser/bridge.ts`). */
 	web?: { status: WebStatus; code?: string };
-	/** A fresh pairing code. The extension has to be paired again. */
 	onWebRepair: () => void;
-	/** Let go of the shared tab. */
 	onWebStop: () => void;
-	/** Put the status board on the canvas. */
 	onWebBoard: () => void;
+	/** The phone's layout: a bottom sheet with tabs instead of a window. */
+	phone?: boolean;
 	onClose: () => void;
 }) {
-	/*
-	 * Escape closes it, from anywhere.
-	 *
-	 * On the window rather than on the card: a `keydown` handler on a div only fires while
-	 * focus is inside it, and this modal has nothing that takes focus on open — so the key did
-	 * nothing at all unless you had first clicked a row. The browse modal gets away with the
-	 * same arrangement because its search field is focused as it appears.
-	 */
+	const [section, setSection] = createSignal<Section>(saved());
+	const open = (id: Section) => {
+		setSection(id);
+		try {
+			localStorage.setItem(KEY, id);
+		} catch {
+			/* private mode: it opens on Notifications next time */
+		}
+	};
+	const label = () => SECTIONS.find((one) => one.id === section())!.label;
+
 	onMount(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -94,460 +96,141 @@ export function Settings(props: {
 		onCleanup(() => window.removeEventListener("keydown", onKey));
 	});
 
+	const body = () => (
+		<div class="sw-body">
+			<Switch>
+				<Match when={section() === "general"}>
+					<TimeSettings />
+					<BoardSettings />
+				</Match>
+				<Match when={section() === "notifications"}>
+					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
+				</Match>
+				<Match when={section() === "accounts"}>
+					<Accounts accounts={props.accounts} active={props.active} onAdd={props.onAdd} onForget={props.onForget} />
+				</Match>
+				<Match when={section() === "voice"}>
+					<VoiceSettings />
+				</Match>
+				<Match when={section() === "connections"}>
+					<Connections />
+				</Match>
+				<Match when={section() === "chrome"}>
+					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
+				</Match>
+			</Switch>
+		</div>
+	);
+
+	/* The phone's tabs: the open one carries the sidebar's mark and scrolls into the middle. */
+	let tabs: HTMLDivElement | undefined;
+	const [mark, setMark] = createSignal<{ left: number; width: number }>();
+	createEffect(
+		on([section, () => props.phone], () => {
+			if (!props.phone) return;
+			queueMicrotask(() => {
+				const one = tabs?.querySelector<HTMLElement>(`[data-section="${section()}"]`);
+				if (!tabs || !one) return;
+				setMark({ left: one.offsetLeft, width: one.offsetWidth });
+				tabs.scrollTo({ left: Math.max(0, one.offsetLeft - (tabs.clientWidth - one.offsetWidth) / 2), behavior: "smooth" });
+			});
+		}),
+	);
+
 	return (
-		/*
-		 * Dismissed by a press that *begins* on the backdrop, for the reason `FilePicker`
-		 * documents at length: the tap that opened this produces a `click` at the same
-		 * coordinates afterwards, and a modal that closes itself on the way in is worse than
-		 * one that will not close at all.
-		 */
 		<div
-			class="picker-backdrop"
+			class="picker-backdrop sw-backdrop"
+			data-layout={props.phone ? "sheet" : "window"}
 			onPointerDown={(event) => {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
 		>
-			<div
-				class="panel-float settings static flex max-h-[84%] w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden p-0"
-				role="dialog"
-				aria-label="Settings"
-				// Every explanation is one line (`settings.css`); one cut short shows all its words on hover.
-				onPointerOver={(event) => {
-					const note = (event.target as Element | null)?.closest?.(".set-note, .row-note") as HTMLElement | null;
-					if (note) note.title = note.scrollWidth > note.clientWidth ? (note.textContent ?? "").trim() : "";
-				}}
-			>
-				{/*
-					A title, not a section label.
-					
-					The header used to say "Claude accounts" in the 10px `.label` the panels use for a
-					heading *inside* a list — which was right when the modal was one list and wrong the
-					moment it was two. A window has a name at the size of a name, and the groups below
-					carry the section headings now.
-				*/}
-				<header class="set-head">
-					<span class="set-head-title">Settings</span>
-					<span class="flex-1" />
-					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
-						<Icon of={X} size={15} />
-					</button>
-				</header>
-
-				{/*
-					Grouped rows on a recessed ground, which is the shape every settings screen worth
-					copying has converged on — and it is this app's own shape too: a `--panel` surface
-					standing on `--bg-deep` is what a float is against the canvas.
-
-					Notifications first, accounts second, and the order is not alphabetical: this is the
-					part somebody opens the modal to change, and accounts is the part they set up once.
-				*/}
-				<div class="set-body">
-					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
-
-					<section class="set-group" data-group="accounts">
-						<header>
-							<span class="set-title">Claude accounts</span>
-							{/*
-								The group's own state, where a footer note used to be. A sentence about
-								accounts belongs to the accounts group rather than to the window, which is
-								what made it look like a status line for the whole modal.
-							*/}
-							{/*
-								What this list is *for*, now that it does not switch anything.
-
-								Choosing which subscription answers is done per conversation, in the model
-								picker — so all that is left here is the set of accounts and their order,
-								and the note says both of the things the order decides. A settings panel
-								that also carried a machine-wide switch was offering a control that moved
-								nobody: every open conversation keeps its own account.
-							*/}
-							<span class="set-note">
-								{props.accounts.length === 1
-									? "Add another to switch to when this one runs out."
-									: "Each conversation picks one in its own model picker."}
-							</span>
-						</header>
-
-						{/* `rowlist`, so each account is the same row as a described choice anywhere else in
-						    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
-						    `.row-label`/`.row-note` type scale. */}
-						<div class="row-list set-rows">
-							<For each={props.accounts}>
-								{(account) => (
-									<Row
-										account={account}
-										next={props.active === account.id && account.signedIn}
-										onForget={() => props.onForget(account.id)}
-									/>
+			<Show
+				when={props.phone}
+				fallback={
+					<div class="settings sw-win" role="dialog" aria-label="Settings">
+						<nav class="sw-nav" aria-label="Sections">
+							<span class="sw-nav-title">Settings</span>
+							<For each={SECTIONS}>
+								{(one) => (
+									<button type="button" data-section={one.id} data-on={section() === one.id} aria-current={section() === one.id ? "page" : undefined} onClick={() => open(one.id)}>
+										<Icon of={one.icon} size={15} />
+										{one.label}
+									</button>
 								)}
 							</For>
+						</nav>
+						<div class="sw-pane">
+							<header class="sw-head">
+								<span class="sw-title">{label()}</span>
+								<span class="flex-1" />
+								<button class="sw-x" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+									<Icon of={X} size={16} />
+								</button>
+							</header>
+							{body()}
 						</div>
-
-						{/*
-							Inside the group rather than in a window footer, because signing in is a thing
-							you do *to this list*. The footer it left behind held one button and one
-							sentence, both about accounts, on a bar that spanned a modal which is mostly
-							not about accounts.
-
-							Signing in adds an account rather than replacing one: the CLI writes its
-							credentials wherever it is pointed, so each login gets a directory of its own.
-						*/}
-						<button class="set-add" type="button" onClick={props.onAdd}>
-							<Icon of={Plus} size={14} />
-							Add an account
+					</div>
+				}
+			>
+				<div class="settings sw-sheet" role="dialog" aria-label="Settings">
+					<header class="sw-head">
+						<span class="sw-title">Settings</span>
+						<span class="flex-1" />
+						<button class="sw-done" type="button" onClick={props.onClose}>
+							Done
 						</button>
-					</section>
-
-					<TimeSettings />
-					<VoiceSettings />
-					<BoardSettings />
-					<OtherDecks />
-					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
+					</header>
+					<div class="sw-tabs" role="tablist" ref={tabs}>
+						<Show when={mark()}>{(at) => <span class="sw-tab-mark" style={{ left: `${at().left}px`, width: `${at().width}px` }} />}</Show>
+						<For each={SECTIONS}>
+							{(one) => (
+								<button type="button" role="tab" data-section={one.id} data-on={section() === one.id} aria-selected={section() === one.id} onClick={() => open(one.id)}>
+									<Icon of={one.icon} size={15} />
+									{one.label}
+								</button>
+							)}
+						</For>
+					</div>
+					{body()}
 				</div>
-			</div>
-		</div>
-	);
-}
-
-function Row(props: {
-	account: ClaudeAccount;
-	/** Whether a conversation that has not chosen would start here. */
-	next: boolean;
-	onForget: () => void;
-}) {
-	/** What to call it: the email, or something honest when the CLI has not said. */
-	const name = () => props.account.email ?? (props.account.isDefault ? "Claude Code's own login" : "an account with no name yet");
-	/**
-	 * Why this row has no ×, said on the row.
-	 *
-	 * "Claude Code's own login" used to be a *fallback* for the name — so it only ever
-	 * appeared when the CLI reported no email, which is the one case where the row is already
-	 * unmistakable. With an email to show, the row read as an ordinary account that happened
-	 * to have no delete button, and the missing button looked arbitrary. It is the one fact
-	 * about this row a person needs: these credentials are the CLI's, and
-	 * `claude auth logout` is where they are given up.
-	 */
-	const whose = () => (props.account.isDefault && props.account.email ? "Claude Code's own login" : undefined);
-	/**
-	 * The row's tooltip: what pressing it does, and — on the CLI's own row — why there is
-	 * nothing to press to remove it.
-	 *
-	 * A sentence rather than a second control, because the honest answer is a shell command
-	 * this app should not be running on your behalf: it would sign you out of `claude`
-	 * everywhere on the machine, from a panel that looks like it is about Decks.
-	 */
-	const title = () => {
-		const act = props.account.signedIn
-			? `${name()} — choose it for a conversation in its model picker`
-			: props.account.isDefault
-				? "Claude Code is signed out. Sign in with claude auth login"
-				: "Signed out. Add it again to use it";
-		return props.account.isDefault
-			? `${act}. These are Claude Code's own credentials, so Decks cannot remove them: claude auth logout gives them up.`
-			: act;
-	};
-
-	return (
-		/*
-		 * The wrapper draws the row and the × sits inside it, because a button inside a button
-		 * is invalid markup. That arrangement is `.row-act` in `chrome.css` now — the agent
-		 * dropdown wanted the same thing, and this file's version of it was the reason the
-		 * wash, the reveal and the 22px slot had to be argued twice. What is left on
-		 * `.account-row` is only what is true of *accounts*: the accent tint on the default
-		 * row, and the fact that its row is disabled without being dimmed.
-		 */
-		<div class="account-row row-act" data-current={props.next}>
-			{/*
-				A `div`, not a `button`. Pressing a row used to switch the whole machine to it;
-				there is nothing to press now, and a row that still looked pressable would be
-				the same lie in a quieter form. The one control that remains — the × — is a
-				button of its own inside it.
-			*/}
-			<div class="min-w-0 flex-1" data-row title={title()}>
-				<span class="row-label w-full items-baseline">
-					<span class="truncate">{name()}</span>
-					<Show when={props.account.plan}>{(plan) => <span class="meta flex-none">{plan()}</span>}</Show>
-				</span>
-				<span class="row-note flex w-full items-baseline gap-1.5">
-					{/* Before the organisation, and dimmer: what the row *is* comes before what the
-					    account belongs to, and neither should out-shout the email above them. */}
-					<Show when={whose()}>{(said) => <span class="flex-none text-faint">{said()}</span>}</Show>
-					{/* Only between two things: the app's separator everywhere else, and without it two
-					    greys sit 6px apart and read as one run of words. */}
-					<Show when={whose() && props.account.orgName}>
-						<span class="flex-none text-faint">·</span>
-					</Show>
-					<Show when={props.account.orgName}>
-						{(org) => <span class="truncate text-muted">{org()}</span>}
-					</Show>
-					<span class="flex-1" />
-					{/*
-						**One status, not a pile of them.** An early draft drew each condition
-						independently and produced rows reading "default for new · signed out", which
-						is two claims that cannot both be acted on.
-
-						So they are ranked, worst first. Signed out beats everything, because a row
-						with no token cannot be used whatever else is true of it. "Default for new" is
-						a plan, and a row that cannot be used has something truer to say. There is no
-						"active": which subscription is answering is a property of a conversation, and
-						it is said in that conversation's model picker.
-
-						There used to be a third state — "limited · back at 14:20", a remembered rate
-						limit. It is gone with the automatic switching that needed it: nothing
-						re-checked it, so a row could sit marked spent long after its window had
-						lifted. A limit is now said in the conversation that hit it, at the moment it
-						happens, which is the only place the claim is known to be true.
-					*/}
-					<Switch>
-						<Match when={!props.account.signedIn}>
-							<span class="state flex-none text-faint">signed out</span>
-						</Match>
-						<Match when={props.next}>
-							<span class="state flex-none text-accent">default for new</span>
-						</Match>
-					</Switch>
-					{/* How much of the 5-hour window is used, beside the status: the reason to pick one. */}
-					<Show when={props.account.signedIn}>
-						<FiveHour reading={props.account.fiveHour} />
-					</Show>
-				</span>
-			</div>
-
-			{/*
-				The CLI's own login has no × — those credentials are not Decks' to delete, and
-				`claude auth logout` is where they are given up.
-			*/}
-			<Show when={!props.account.isDefault}>
-				<button
-					class="close"
-					type="button"
-					title={`Forget ${name()} and remove its credentials from this machine`}
-					aria-label={`Forget ${name()}`}
-					onClick={(event) => {
-						event.stopPropagation();
-						props.onForget();
-					}}
-				>
-					<Icon of={X} size={13} />
-				</button>
 			</Show>
 		</div>
 	);
 }
 
-/**
- * Other Decks front ends using this server (`server/src/share/pairing.ts`).
- *
- * A code is never made here: only `decks pair code` in a shell on this machine makes one, so reaching
- * this page is not enough to let another Decks in. Each front end that paired is a row, with a way to
- * take its token back. Only on a backend that can share: a canvas opened from a file has no one to let in.
- */
-function OtherDecks() {
-	const ago = (at: number) => {
-		const minutes = Math.round((Date.now() - at) / 60_000);
-		if (minutes < 2) return "just now";
-		if (minutes < 120) return `${minutes} min ago`;
-		const hours = Math.round(minutes / 60);
-		return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
-	};
+/** A plain button in a row. */
+function Btn(props: { children: JSX.Element; onClick: () => void; tone?: "danger"; title?: string; disabled?: boolean }) {
 	return (
-		<Show when={can("share")}>
-			<section class="set-group" data-group="other-decks">
-				<header>
-					<span class="set-title">Other Decks</span>
-					<span class="set-note">Another Decks connects by its address; over the internet, with a code.</span>
-				</header>
-				<div class="row-list set-rows">
-					<div class="row-act" data-row-static>
-						<div class="min-w-0 flex-1" data-row>
-							<span class="row-label w-full items-baseline">
-								<span class="truncate">Pairing code</span>
-							</span>
-							<span class="row-note flex w-full items-baseline gap-1.5">
-								<span class="truncate text-muted">
-									Made only on this machine: run <span class="font-mono">decks pair code</span> in a shell there
-								</span>
-							</span>
-						</div>
-					</div>
-					<For each={pairing().paired}>
-						{(row) => (
-							<div class="row-act" data-row-static>
-								<div class="min-w-0 flex-1" data-row>
-									<span class="row-label w-full items-baseline">
-										<span class="truncate">{row.label}</span>
-									</span>
-									<span class="row-note flex w-full items-baseline gap-1.5">
-										<span class="truncate font-mono text-muted">{row.origin || "unknown site"}</span>
-										<span class="flex-none text-faint">{row.last ? `used ${ago(row.last)}` : `paired ${ago(row.at)}`}</span>
-									</span>
-								</div>
-								<button class="set-mini" type="button" title="It will have to pair again with a new code" onClick={() => send({ type: "pair.revoke", id: row.id })}>
-									Revoke
-								</button>
-							</div>
-						)}
-					</For>
-				</div>
-			</section>
-		</Show>
+		<button class="sw-btn" type="button" data-tone={props.tone} title={props.title} disabled={props.disabled} onClick={props.onClick}>
+			{props.children}
+		</button>
 	);
 }
 
-/**
- * The shared Chrome: what to paste into the extension, and what is shared right now.
- *
- * Last, because it is set up once. The address is `location.origin` rather than anything
- * the server knows — the server sees loopback behind a proxy, and the one address that is
- * certainly right is the one this page was loaded from.
- */
-function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepair: () => void; onStop: () => void; onBoard: () => void }) {
-	const [copied, setCopied] = createSignal<"address" | "code" | undefined>(undefined);
-	const copy = async (what: "address" | "code", text: string) => {
+/** Copy some words, and say so on the button for a moment. */
+function useCopy() {
+	const [copied, setCopied] = createSignal<string>();
+	const copy = async (what: string, text: string) => {
 		try {
 			await navigator.clipboard.writeText(text);
 			setCopied(what);
 			setTimeout(() => setCopied(undefined), 1500);
 		} catch {
-			/* no clipboard on this origin; the text is on screen to select */
+			/* no clipboard on this origin; the words are on screen to select */
 		}
 	};
-	const status = () => props.web?.status;
-	const note = () => {
-		const now = status();
-		if (!now) return "Waiting for the server.";
-		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Submitting asks you first.`;
-		if (now.paired) return "Paired. Press the Decks button on a tab to share it.";
-		return "Install the extension, then paste the two lines below into it.";
-	};
-	return (
-		<section class="set-group" data-group="web">
-			<header>
-				<span class="set-title">Your Chrome</span>
-				<span class="set-note">{note()}</span>
-			</header>
-			<div class="row-list set-rows">
-				<div class="row-act" data-row-static>
-					<div class="min-w-0 flex-1" data-row>
-						<span class="row-label w-full items-baseline">
-							<span class="truncate">Decks address</span>
-						</span>
-						<span class="row-note flex w-full items-baseline gap-1.5">
-							<span class="truncate font-mono text-muted">{location.origin}</span>
-						</span>
-					</div>
-					<button class="set-mini" type="button" onClick={() => void copy("address", location.origin)}>
-						{copied() === "address" ? "Copied" : "Copy"}
-					</button>
-				</div>
-				<div class="row-act" data-row-static>
-					<div class="min-w-0 flex-1" data-row>
-						<span class="row-label w-full items-baseline">
-							<span class="truncate">Pairing code</span>
-						</span>
-						<span class="row-note flex w-full items-baseline gap-1.5">
-							<span class="truncate font-mono text-muted">{props.web?.code ?? "…"}</span>
-						</span>
-					</div>
-					<button class="set-mini" type="button" disabled={!props.web?.code} onClick={() => props.web?.code && void copy("code", props.web.code)}>
-						{copied() === "code" ? "Copied" : "Copy"}
-					</button>
-					<button class="set-mini" type="button" title="Mint a fresh code; the extension has to be paired again" onClick={props.onRepair}>
-						New code
-					</button>
-				</div>
-				<For each={status()?.tabs ?? []}>
-					{(tab) => (
-						<div class="row-act" data-row-static>
-							<div class="min-w-0 flex-1" data-row>
-								<span class="row-label w-full items-baseline">
-									<span class="truncate">{tab.title || "(untitled)"}</span>
-									<span class="state flex-none text-accent">shared</span>
-								</span>
-								<span class="row-note flex w-full items-baseline gap-1.5">
-									<span class="truncate font-mono text-muted">{tab.url}</span>
-								</span>
-							</div>
-						</div>
-					)}
-				</For>
-			</div>
-			<div class="flex gap-2">
-				<button class="set-add" type="button" onClick={props.onBoard}>
-					Show the status board
-				</button>
-				<Show when={status()?.connected}>
-					<button class="set-add" type="button" onClick={props.onStop}>
-						Stop sharing
-					</button>
-				</Show>
-			</div>
-		</section>
-	);
+	return { copied, copy };
 }
 
+/* ---------------------------------------------------------------------------------------- */
+/* General                                                                                    */
 
 /**
- * The deck's timezone: one zone for the whole deck, kept by the server.
- *
- * Unlike every other group here it is not this browser's setting. Schedules fire in it with
- * no browser open, agents are told it, and the app draws its times in it, so it is read from
- * the server's `settings` frame and changed with a message, and every open browser follows.
- *
- * Nothing is guessed. Until a zone is chosen the server is on its machine's clock, which on a
- * hosted box is UTC, and the group says so beside this browser's own zone with one button to
- * take it: a zone chosen silently would move the person's schedules without telling them.
+ * The deck's timezone: one zone for the whole deck, kept by the server, so schedules fire in it
+ * with no browser open. Nothing is guessed: until one is chosen the server is on its machine's
+ * clock, and the row says so with one button to take this browser's zone.
  */
-/**
- * The composer's mic (`chat/composer/voice.ts`): which recogniser this browser uses, the language the
- * browser's own listens for, and the model the server's uses, which is the deck's and every browser's.
- */
-function VoiceSettings() {
-	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
-	const recogniserNote = () => RECOGNISERS.find((one) => one.id === recogniser())?.note ?? "";
-	return (
-		<section class="set-group" data-group="voice">
-			<header>
-				<span class="set-title">Voice</span>
-				<span class="set-note">The mic in the composer, or Ctrl+M. Nothing is sent until you send it.</span>
-			</header>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">Recogniser</span>
-					<span class="row-note">{recogniserNote()}</span>
-				</span>
-				<span class="segmented set-recogniser" role="radiogroup" aria-label="Recogniser">
-					<For each={RECOGNISERS}>
-						{(option) => (
-							<button type="button" role="radio" aria-checked={recogniser() === option.id} data-on={recogniser() === option.id} title={option.note} onClick={() => setRecogniser(option.id)}>
-								{option.label}
-							</button>
-						)}
-					</For>
-				</span>
-			</div>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">The server's model</span>
-					<span class="row-note">{state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key: set OPENAI_API_KEY on the server."}</span>
-				</span>
-				<select class="field set-select" aria-label="The server's speech model" value={model()} onChange={(event) => send({ type: "settings.set", sttModel: event.currentTarget.value === STT_MODELS[0]!.id ? null : event.currentTarget.value })}>
-					<For each={STT_MODELS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
-				</select>
-			</div>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">The browser's language</span>
-					<span class="row-note">What the browser's recogniser listens for.</span>
-				</span>
-				<select class="field set-select" aria-label="The browser's speech language" value={voiceLang()} onChange={(event) => setVoiceLang(event.currentTarget.value)}>
-					<For each={VOICE_LANGS}>{(option) => <option value={option.id}>{option.label}</option>}</For>
-				</select>
-			</div>
-		</section>
-	);
-}
-
 function TimeSettings() {
 	const chosen = () => state.settings.timezone;
 	const mine = browserZone();
@@ -571,82 +254,275 @@ function TimeSettings() {
 	};
 	const inForce = () => chosen() ?? state.machineZone;
 	return (
-		<section class="set-group" data-group="time">
-			<header>
-				<span class="set-title">Time</span>
-				<span class="set-note">One timezone for the deck: schedules, agents and every clock.</span>
-			</header>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">{chosen() ? chosen() : `Not set: the server's own clock, ${state.machineZone || "unknown"}`}</span>
-					<span class="row-note" data-zone-now>
-						It is {clockTime(tick(), inForce() || undefined)} there now.
+		<SetGroup label="Time" group="time">
+			<SetRow
+				title="Timezone"
+				sub={
+					<span data-zone-now>
+						{chosen() ? `Set to ${chosen()}.` : `Not set: the server's own clock, ${state.machineZone || "unknown"}.`} It is {clockTime(tick(), inForce() || undefined)} there.
 					</span>
-				</span>
-				<Show when={chosen() !== mine}>
-					<button type="button" class="action-button" data-primary={!chosen() || undefined} onClick={() => set(mine)}>
-						Use {mine}
-					</button>
+				}
+			>
+				<Show when={chosen()} fallback={<Btn onClick={() => set(mine)}>Use {mine}</Btn>}>
+					<Btn title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
+						Use the server's
+					</Btn>
 				</Show>
-			</div>
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">Another timezone</span>
-					<span class="row-note">An IANA name, such as Asia/Shanghai.</span>
-				</span>
-				<span class="set-zone">
-					<input
-						class="field"
-						list="set-zones"
-						placeholder="Search timezones"
-						aria-label="Timezone"
-						value={draft()}
-						onInput={(event) => setDraft(event.currentTarget.value.trim())}
-						onKeyDown={(event) => {
-							if (event.key === "Enter" && known(draft())) set(draft());
-						}}
-					/>
-					<datalist id="set-zones">
-						<For each={zones()}>{(zone) => <option value={zone} />}</For>
-					</datalist>
-					<button type="button" class="action-button" disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
-						Set
-					</button>
-					<Show when={chosen()}>
-						<button type="button" class="action-button" title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
-							Clear
-						</button>
-					</Show>
-				</span>
-			</div>
-		</section>
+			</SetRow>
+			<SetRow title="Another timezone" sub="An IANA name, such as Asia/Shanghai.">
+				<input
+					class="sw-field"
+					list="set-zones"
+					placeholder="Asia/Shanghai"
+					aria-label="Timezone"
+					value={draft()}
+					onInput={(event) => setDraft(event.currentTarget.value.trim())}
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && known(draft())) set(draft());
+					}}
+				/>
+				<datalist id="set-zones">
+					<For each={zones()}>{(zone) => <option value={zone} />}</For>
+				</datalist>
+				<Btn disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
+					Set
+				</Btn>
+			</SetRow>
+		</SetGroup>
 	);
 }
 
-/** Where a board's picture comes from when it has no live page. */
+/** Where a board's picture comes from when it has no live page (`canvas/shots/adaptors.ts`). */
 function BoardSettings() {
 	return (
-		<section class="set-group" data-group="renderer">
-			<header>
-				<span class="set-title">Boards</span>
-				<span class="set-note">How the canvas draws boards.</span>
-			</header>
-			{/* Where a board's picture comes from when it has no page (`canvas/shots/adaptors.ts`). */}
-			<div class="set-row">
-				<span class="set-k">
-					<span class="row-label">Pictures</span>
-					<span class="row-note">{SHOT_ADAPTORS.find((one) => one.id === shotAdaptorId())?.note}</span>
+		<SetGroup label="Boards" group="renderer">
+			<SetRow title="Pictures" sub={SHOT_ADAPTORS.find((one) => one.id === shotAdaptorId())?.note}>
+				<SetSegments label="Pictures" options={SHOT_ADAPTORS} value={shotAdaptorId()} onPick={chooseShotAdaptor} />
+			</SetRow>
+		</SetGroup>
+	);
+}
+
+/* ---------------------------------------------------------------------------------------- */
+/* Accounts                                                                                   */
+
+/**
+ * The Claude subscriptions: each with its plan, whose it is, and how much of its 5-hour window is
+ * used, as a bar. Which one answers is chosen per conversation in its model picker; this list adds
+ * and removes them. The CLI's own login has no Remove: those credentials are `claude auth logout`'s.
+ */
+function Accounts(props: { accounts: ClaudeAccount[]; active: string; onAdd: () => void; onForget: (id: string) => void }) {
+	return (
+		<SetGroup label="Claude" group="accounts" foot="Each conversation picks its account in the model menu.">
+			<For each={props.accounts}>{(account) => <AccountRow account={account} next={props.active === account.id && account.signedIn} onForget={() => props.onForget(account.id)} />}</For>
+			<button class="sw-add" type="button" onClick={props.onAdd}>
+				<Icon of={Plus} size={15} />
+				Add an account
+			</button>
+		</SetGroup>
+	);
+}
+
+function AccountRow(props: { account: ClaudeAccount; next: boolean; onForget: () => void }) {
+	const name = () => props.account.email ?? (props.account.isDefault ? "Claude Code's own login" : "An account with no name yet");
+	const who = () => [props.account.isDefault && props.account.email ? "Claude Code's own login" : undefined, props.account.orgName].filter(Boolean).join(" · ");
+	const used = () => props.account.fiveHour && Math.min(100, props.account.fiveHour.percent);
+	const level = () => (used() === undefined ? undefined : used()! >= 100 ? "high" : usageLevel(used()!));
+	return (
+		<SetRow
+			lead={<span class="sw-face">{name().slice(0, 1).toUpperCase()}</span>}
+			title={
+				<span class="sw-account" data-out={!props.account.signedIn || undefined}>
+					<span class="truncate">{name()}</span>
+					<Show when={props.account.plan}>{(plan) => <span class="sw-plan">{plan()}</span>}</Show>
 				</span>
-				<span class="segmented set-pictures" role="radiogroup" aria-label="Pictures">
-					<For each={SHOT_ADAPTORS}>
-						{(option) => (
-							<button type="button" role="radio" aria-checked={shotAdaptorId() === option.id} data-on={shotAdaptorId() === option.id} title={option.note} onClick={() => chooseShotAdaptor(option.id)}>
-								{option.label}
-							</button>
+			}
+			sub={
+				<>
+					<Show when={who()}>
+						<span class="sw-who">{who()}</span>
+					</Show>
+					<Show when={props.account.signedIn && used() !== undefined}>
+						<span class="sw-usage" data-level={level()}>
+							<i style={{ width: `${used()}%` }} />
+						</span>
+					</Show>
+				</>
+			}
+		>
+			<Switch>
+				<Match when={!props.account.signedIn}>
+					<span class="sw-state">Signed out</span>
+				</Match>
+				<Match when={used() !== undefined}>
+					<span class="sw-state" data-level={level()}>
+						{used()}% of 5 h used
+					</span>
+				</Match>
+				<Match when={props.next}>
+					<span class="sw-state" data-tone="accent">
+						Default for new
+					</span>
+				</Match>
+			</Switch>
+			<Show when={!props.account.isDefault}>
+				<Btn tone="danger" title={`Forget ${name()} and remove its credentials from this machine`} onClick={props.onForget}>
+					Remove
+				</Btn>
+			</Show>
+		</SetRow>
+	);
+}
+
+/* ---------------------------------------------------------------------------------------- */
+/* Voice                                                                                      */
+
+/** The composer's mic (`chat/composer/voice.ts`): the recogniser, the server's model, the browser's language. */
+function VoiceSettings() {
+	const model = () => state.settings.sttModel ?? STT_MODELS[0]!.id;
+	return (
+		<>
+			<SetGroup label="Voice" group="voice" foot="The mic in the composer, or Ctrl+M. Nothing is sent until you send it.">
+				<SetRow title="Recogniser" sub={RECOGNISERS.find((one) => one.id === recogniser())?.note}>
+					<SetSegments label="Recogniser" options={RECOGNISERS} value={recogniser()} onPick={setRecogniser} />
+				</SetRow>
+				<Show when={recogniser() !== "browser"}>
+					<SetRow title="The server's model" sub={state.sttKey ? STT_MODELS.find((one) => one.id === model())?.note : "No key yet: set OPENAI_API_KEY on the server."}>
+						<SetSelect label="The server's speech model" options={STT_MODELS} value={model()} onPick={(id) => send({ type: "settings.set", sttModel: id === STT_MODELS[0]!.id ? null : id })} />
+					</SetRow>
+				</Show>
+				<Show when={recogniser() !== "server"}>
+					<SetRow title="Language" sub="What the browser's recogniser listens for.">
+						<SetSelect label="The browser's speech language" options={VOICE_LANGS} value={voiceLang()} onPick={setVoiceLang} />
+					</SetRow>
+				</Show>
+			</SetGroup>
+		</>
+	);
+}
+
+/* ---------------------------------------------------------------------------------------- */
+/* Connections                                                                                */
+
+/** How long ago, in the row's words. */
+const ago = (at: number) => {
+	const minutes = Math.round((Date.now() - at) / 60_000);
+	if (minutes < 2) return "just now";
+	if (minutes < 120) return `${minutes} min ago`;
+	const hours = Math.round(minutes / 60);
+	return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
+};
+
+/** The paired front ends, one row per name and site: 44 sessions from one Studio are one row. */
+export function foldPaired(rows: PairedRow[]): { label: string; origin: string; ids: string[]; last: number }[] {
+	const out = new Map<string, { label: string; origin: string; ids: string[]; last: number }>();
+	for (const row of rows) {
+		const key = `${row.label}\u0000${row.origin}`;
+		const one = out.get(key) ?? { label: row.label, origin: row.origin, ids: [], last: 0 };
+		one.ids.push(row.id);
+		one.last = Math.max(one.last, row.last ?? row.at);
+		out.set(key, one);
+	}
+	return [...out.values()].sort((a, b) => b.last - a.last);
+}
+
+/**
+ * Who reaches this deck: its own address, and every other Decks signed in with a token. A code is
+ * never made here (`decks pair code`, on this machine). Revoke takes every token of the row back.
+ */
+function Connections() {
+	const { copied, copy } = useCopy();
+	return (
+		<>
+			<SetGroup label="This deck" group="this-deck">
+				<SetRow title="Address" sub={<span class="sw-mono">{location.origin}</span>}>
+					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
+				</SetRow>
+				<SetRow
+					title="Pairing code"
+					sub={
+						<>
+							Made only on this machine: run <span class="sw-mono">decks pair code</span> there.
+						</>
+					}
+				/>
+			</SetGroup>
+			<Show when={can("share")}>
+				<SetGroup label="Signed in here" group="other-decks">
+					<For each={foldPaired(pairing().paired)} fallback={<SetRow title="Nothing else is signed in" />}>
+						{(row) => (
+							<SetRow
+								lead={<span class="sw-mark">{/studio/i.test(row.label) ? <Icon of={Cloud} size={14} /> : <Icon of={Globe} size={14} />}</span>}
+								title={
+									<span class="truncate">
+										{row.label}
+										{row.ids.length > 1 ? ` · ${row.ids.length} sessions` : ""}
+									</span>
+								}
+								sub={<span class="truncate">{`${row.origin || "unknown site"} · used ${ago(row.last)}`}</span>}
+							>
+								<Btn tone="danger" title="It will have to pair again with a new code" onClick={() => row.ids.forEach((id) => send({ type: "pair.revoke", id }))}>
+									{row.ids.length > 1 ? "Revoke all" : "Revoke"}
+								</Btn>
+							</SetRow>
 						)}
 					</For>
-				</span>
-			</div>
-		</section>
+				</SetGroup>
+			</Show>
+		</>
+	);
+}
+
+/* ---------------------------------------------------------------------------------------- */
+/* Chrome                                                                                     */
+
+/**
+ * The shared Chrome: whether the extension is paired and what it shares, then what to paste into
+ * it. The address is `location.origin`: the server sees loopback behind a proxy, and the address
+ * this page was loaded from is the one certainly right.
+ */
+function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepair: () => void; onStop: () => void; onBoard: () => void }) {
+	const { copied, copy } = useCopy();
+	const status = () => props.web?.status;
+	const note = () => {
+		const now = status();
+		if (!now) return "Waiting for the server.";
+		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Submitting asks you first.`;
+		if (now.paired) return "Paired. Press the Decks button on a tab to share it.";
+		return "Not paired. Paste the address and code below into the extension.";
+	};
+	return (
+		<>
+			<SetGroup label="Your Chrome" group="web">
+				<SetRow
+					title="The Decks extension"
+					sub={
+						<span class="sw-status" data-on={status()?.paired || status()?.connected || undefined}>
+							<i />
+							{note()}
+						</span>
+					}
+				>
+					<Show when={status()?.connected}>
+						<Btn onClick={props.onStop}>Stop sharing</Btn>
+					</Show>
+					<Btn onClick={props.onBoard}>Status board</Btn>
+				</SetRow>
+				<For each={status()?.tabs ?? []}>{(tab) => <SetRow title={<span class="truncate">{tab.title || "(untitled)"}</span>} sub={<span class="sw-mono truncate">{tab.url}</span>} />}</For>
+			</SetGroup>
+			<SetGroup label="To pair a Chrome" group="pair-chrome">
+				<SetRow title="Decks address" sub={<span class="sw-mono">{location.origin}</span>}>
+					<Btn onClick={() => void copy("address", location.origin)}>{copied() === "address" ? "Copied" : "Copy"}</Btn>
+				</SetRow>
+				<SetRow title="Pairing code" sub={<span class="sw-mono">{props.web?.code ?? "…"}</span>}>
+					<Btn disabled={!props.web?.code} onClick={() => props.web?.code && void copy("code", props.web.code)}>
+						{copied() === "code" ? "Copied" : "Copy"}
+					</Btn>
+					<Btn title="Mint a fresh code; the extension has to be paired again" onClick={props.onRepair}>
+						New code
+					</Btn>
+				</SetRow>
+			</SetGroup>
+		</>
 	);
 }

@@ -1,45 +1,27 @@
-import Bell from "lucide-solid/icons/bell";
+import BellOff from "lucide-solid/icons/bell-off";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { createSignal, For, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
+import { SetGroup, SetRow, SetSegments } from "../settings/rows.tsx";
 import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs } from "./policy.ts";
 import { availability, request, type Availability } from "./notify.ts";
 import { play, SILENT, SOUND_FAMILIES, soundName, type SoundChoice } from "./sound.ts";
 
 /**
- * Notifications, as two groups of rows.
+ * Notifications, as the "Settings redesign" draws it: one table of the three moments, each with
+ * its sound and its banner side by side under two headings, then Volume, then a line when the
+ * browser will not show banners at all.
  *
- * ### What this replaced, and why it had to go
+ * The two groups this replaced (Sounds, then Desktop banners) printed every moment twice. A
+ * moment is one thing with two answers, so it is one row; the headings say what the two
+ * controls are once, and on a phone, where the columns would eat the sentence, each moment's
+ * sound and switch sit under its name with the switch labelled.
  *
- * The first version was a three-column grid — the event on the left, a sound picker and a
- * banner switch on the right, with a header row naming the two columns. It measured correctly
- * and it read like a spreadsheet, and the header was load-bearing in a way that should have
- * been the warning: a control that needs a column heading to say what it does is a control in
- * the wrong place. Widen the modal and the heading drifts from the switch; put it on a phone
- * and the two columns eat the sentence.
- *
- * So the axis is flipped. **One group per thing the app can do** — play a sound, raise a
- * banner — and inside each, one row per event with exactly one control on it. No heading is
- * needed to say what a switch means when every switch in the group means the same thing, and
- * the group says it once in its own title.
- *
- * The cost is the three event names appearing twice. That is the trade every grouped settings
- * screen makes, and it buys the thing that matters here: a row you can read left to right and
- * be finished. The sentences are printed once, in Sounds, because they describe the *event*
- * rather than the sound — repeating them under Banners would be the spreadsheet again with
- * extra words.
- *
- * ### The rest of it
- *
- * **Volume is the last row of Sounds**, four named stops rather than a slider: this app has a
- * segmented control and no slider, and nobody tunes a notification volume — they turn it down
- * once. `Off` silences all three without forgetting which cue each of them had.
- *
- * **Everything previews.** Picking a cue plays it; so does changing the volume. A sound you
- * cannot hear before committing to it is a sound you set once and then resent — and with
- * forty-five of them, all named things like `nope-07`, the preview is the only way anyone
- * could possibly choose.
+ * **Volume** is four named stops rather than a slider; `Off` silences all three without
+ * forgetting which cue each had. **Everything previews**: picking a cue plays it, and so does
+ * changing the volume, because with forty-five cues named `nope-07` listening is the only way
+ * anyone could choose.
  */
 
 /** The stops, loudest last. Linear on `audio.volume`, which is what an `<audio>` element takes. */
@@ -78,75 +60,50 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 
 	return (
 		<>
-			<section class="set-group" data-group="sounds">
-				<header>
-					<span class="set-title">Sounds</span>
-					<span class="set-note">Played whether or not you are looking.</span>
-				</header>
-
-				<For each={ALERT_KINDS}>
-					{(kind) => (
-						<div class="set-row">
-							<span class="set-k">
-								<span class="row-label">{ALERT_LABELS[kind].label}</span>
-								<span class="row-note">{ALERT_LABELS[kind].note}</span>
-							</span>
-							<SoundPicker id={props.prefs.sound[kind]} label={ALERT_LABELS[kind].label} onPick={(next) => setSound(kind, next)} />
-						</div>
-					)}
-				</For>
-
-				<div class="set-row">
-					<span class="set-k">
-						<span class="row-label">Volume</span>
-						<span class="row-note">Off silences all three and keeps the choices.</span>
-					</span>
-					<span class="segmented set-vol">
-						<For each={VOLUMES}>
-							{(stop) => (
-								<button type="button" data-on={props.prefs.volume === stop.value} onClick={() => setVolume(stop.value)}>
-									{stop.label}
-								</button>
-							)}
-						</For>
-					</span>
+			{/* One table: each moment once, its sound and its banner side by side under their two headings.
+			    On a phone the heads go and each moment's sound and switch sit under its name. */}
+			<section class="sw-group sw-moments" data-group="notifications">
+				<div class="sw-cols sw-cols-head" aria-hidden="true">
+					<span>When</span>
+					<span>Sound</span>
+					<span>Banner</span>
+				</div>
+				<div class="sw-rows">
+					<For each={ALERT_KINDS}>
+						{(kind) => (
+							<div class="sw-cols sw-moment">
+								<span class="sw-name" title={ALERT_LABELS[kind].note}>
+									{ALERT_LABELS[kind].label}
+								</span>
+								<SoundPicker id={props.prefs.sound[kind]} label={ALERT_LABELS[kind].label} onPick={(next) => setSound(kind, next)} />
+								<span class="sw-banner">
+									<span class="sw-banner-word">Banner</span>
+									<button
+										class="sw-switch"
+										type="button"
+										role="switch"
+										aria-checked={props.prefs.notify[kind]}
+										aria-label={`Show a banner when ${ALERT_LABELS[kind].label.toLowerCase()}`}
+										data-on={props.prefs.notify[kind]}
+										/* Dim when the browser will refuse it anyway, but still pressable, so the
+										   setting survives moving to an origin where it works. */
+										data-moot={permission() !== "ready" || undefined}
+										onClick={() => setNotify(kind, !props.prefs.notify[kind])}
+									/>
+								</span>
+							</div>
+						)}
+					</For>
 				</div>
 			</section>
 
-			<section class="set-group" data-group="banners">
-				<header>
-					<span class="set-title">Desktop banners</span>
-					<span class="set-note">Only when this window is in the background.</span>
-				</header>
+			<SetGroup group="volume">
+				<SetRow title="Volume" sub={props.prefs.volume === 0 ? "Off silences all three and keeps the choices." : undefined}>
+					<SetSegments label="Volume" options={VOLUMES.map((stop) => ({ id: stop.value, label: stop.label }))} value={props.prefs.volume} onPick={setVolume} />
+				</SetRow>
+			</SetGroup>
 
-				<PermissionLine state={permission()} onAsk={() => void request().then(setPermission)} />
-
-				<For each={ALERT_KINDS}>
-					{(kind) => (
-						<div class="set-row">
-							{/* The sentence is in Sounds and not repeated here: it describes the event, and
-							    the event is the same one. */}
-							<span class="set-k">
-								<span class="row-label">{ALERT_LABELS[kind].label}</span>
-							</span>
-							<button
-								class="switch"
-								type="button"
-								role="switch"
-								aria-checked={props.prefs.notify[kind]}
-								aria-label={`Show a banner when ${ALERT_LABELS[kind].label.toLowerCase()}`}
-								data-on={props.prefs.notify[kind]}
-								/* Off, visibly, when the browser will refuse it anyway — but still pressable,
-								   so the setting survives moving to an origin where it works. */
-								data-moot={permission() !== "ready" || undefined}
-								onClick={() => setNotify(kind, !props.prefs.notify[kind])}
-							>
-								<i />
-							</button>
-						</div>
-					)}
-				</For>
-			</section>
+			<PermissionLine state={permission()} onAsk={() => void request().then(setPermission)} />
 		</>
 	);
 }
@@ -163,7 +120,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: SoundChoice) => void }) {
 	return (
 		<Popover
-			placement="bottom-end"
+			placement="bottom-start"
 			class="set-sounds"
 			label={`Sound for when ${props.label.toLowerCase()}`}
 			/*
@@ -176,9 +133,9 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			 * arriving late is only a problem when it is announcing something.
 			 */
 			trigger={(api) => (
-				<button class="chip-button set-cue" type="button" ref={api.ref} data-on={api.open || undefined} onClick={api.toggle}>
+				<button class="sw-sel" type="button" ref={api.ref} aria-expanded={api.open} onClick={api.toggle}>
 					<span class="truncate">{soundName(props.id)}</span>
-					<Icon of={ChevronDown} size={12} />
+					<Icon of={ChevronDown} size={14} />
 				</button>
 			)}
 		>
@@ -236,16 +193,16 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 function PermissionLine(props: { state: Availability; onAsk: () => void }) {
 	return (
 		<Show when={props.state !== "ready"}>
-			<div class="set-strip" data-tone={props.state === "ask" ? "ask" : "warn"}>
-				<Icon of={Bell} size={13} />
+			<div class="sw-strip" data-tone={props.state === "ask" ? "ask" : "warn"}>
+				<Icon of={BellOff} size={14} />
 				<Show when={props.state === "ask"}>
 					<span class="flex-1">The browser has not been asked for permission yet.</span>
-					<button class="btn" type="button" onClick={props.onAsk}>
+					<button class="sw-btn" type="button" onClick={props.onAsk}>
 						Allow
 					</button>
 				</Show>
 				<Show when={props.state === "denied"}>
-					<span class="flex-1">This browser is blocking banners for this site. Its own site settings are the only way back.</span>
+					<span class="flex-1">This browser blocks banners for this site; turn them on in its site settings.</span>
 				</Show>
 				<Show when={props.state === "insecure"}>
 					<span class="flex-1">
