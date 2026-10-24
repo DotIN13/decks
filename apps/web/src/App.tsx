@@ -1580,6 +1580,11 @@ export function App() {
 					stages={stages()}
 					{...(stageOf(state.focused) ? { here: stageOf(state.focused)!.name } : {})}
 					onOpenCanvas={openCanvas}
+					rail={!phone()}
+					onSettings={() => {
+						setSettings(true);
+						send({ type: "claude.accounts", limits: true });
+					}}
 					pens={state.deck?.pens ?? []}
 					onPlacePen={(pen) => {
 						// A pen file goes on the stage as a ref, its corner at the middle of the view, as an agent places one.

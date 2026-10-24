@@ -2658,3 +2658,61 @@ body {
 		font-size: 12.5px;
 	}
 }
+
+/* ---- Studio's editor rail: the panel's tabs as labelled icons at the window's edge --------- */
+@layer components {
+	.v3-rail {
+		position: fixed;
+		z-index: 11;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		display: flex;
+		width: 56px;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		padding: 12px 0;
+		border-right: 1px solid var(--v3-line);
+		background: var(--v3-panel);
+	}
+	.v3-rail-tab {
+		display: flex;
+		width: 48px;
+		flex-direction: column;
+		align-items: center;
+		gap: 3px;
+		padding: 7px 0 5px;
+		border: 0;
+		border-radius: 10px;
+		background: none;
+		color: var(--v3-fg2);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		line-height: 1.2;
+		transition:
+			background 120ms var(--v3-ease),
+			color 120ms var(--v3-ease);
+	}
+	.v3-rail-tab:hover {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	.v3-rail-tab[data-on="true"] {
+		background: var(--v3-accent-soft);
+		color: var(--v3-accent);
+		font-weight: 500;
+	}
+	.v3-rail-tab:focus-visible {
+		outline: 2px solid var(--v3-accent);
+		outline-offset: -2px;
+	}
+	/* Beside the rail the panel needs no tab strip: its head goes straight to the search. */
+	.v3-panel[data-rail="true"] .v3-nav[hidden] {
+		display: none;
+	}
+	.app[data-presenting="true"] .v3-rail {
+		display: none !important;
+	}
+}

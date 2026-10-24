@@ -10,6 +10,7 @@ import Folder from "lucide-solid/icons/folder";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
+import SettingsIcon from "lucide-solid/icons/settings";
 import Sparkles from "lucide-solid/icons/sparkles";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
@@ -84,6 +85,9 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 export type PanelTab = "agents" | "boards" | "apps";
 
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
+/** The rail's width, as Studio's editor draws it; the panel opens to its right. */
+const RAIL_WIDTH = 56;
+
 const PANEL_TABS: PanelTab[] = ["agents", "boards", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { agents: "Agents", boards: "Canvases", apps: "Apps" };
 const PANEL_TAB_ICON = { agents: Sparkles, boards: Layers, apps: AppWindow };
@@ -164,6 +168,14 @@ export function LeftPanel(props: {
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/** Rename an agent, from the edit window its row opens. */
 	onAgentRename?: (id: string, name: string) => void;
+
+	/**
+	 * Studio's editor rail: the tabs as a 56px column of labelled icons at the window's edge, with
+	 * Settings at its foot. It stays when the panel folds, so the tabs are always one press away.
+	 * Left out on a phone, where the panel is a sheet and its own tab strip is the way in.
+	 */
+	rail?: boolean;
+	onSettings?: () => void;
 
 	// --- the Canvases tab --------------------------------------------------------------
 	/** Every canvas in the deck, as the stage manager lists them: the tree's middle level. */
@@ -586,6 +598,36 @@ export function LeftPanel(props: {
 
 	return (
 		<>
+			<Show when={props.rail}>
+				<nav class="v3-rail" data-inset="left" aria-label="Side panel">
+					<For each={PANEL_TABS.filter((name) => name !== "agents" || (props.chats && can("agents")))}>
+						{(name) => (
+							<button
+								type="button"
+								class="v3-rail-tab"
+								data-on={props.open && tab() === name ? "true" : undefined}
+								aria-pressed={props.open && tab() === name}
+								title={props.open && tab() === name ? `Hide ${PANEL_TAB_LABEL[name]}` : PANEL_TAB_LABEL[name]}
+								onClick={() => {
+									if (props.open && tab() === name) return props.onOpenChange(false);
+									goTab(name);
+									if (!props.open) props.onOpenChange(true);
+								}}
+							>
+								<Icon of={PANEL_TAB_ICON[name]} size={20} />
+								<span>{PANEL_TAB_LABEL[name]}</span>
+							</button>
+						)}
+					</For>
+					<span class="flex-1" />
+					<Show when={props.onSettings}>
+						<button type="button" class="v3-rail-tab" title="Settings" onClick={() => props.onSettings?.()}>
+							<Icon of={SettingsIcon} size={20} />
+							<span>Settings</span>
+						</button>
+					</Show>
+				</nav>
+			</Show>
 			<aside
 				/*
 				 * `data-inset` only while it is open: the attribute is the only thing telling the
@@ -600,8 +642,9 @@ export function LeftPanel(props: {
 				 * A stationary column, not a card: it runs the full height of the window at the
 				 * left edge, with the deck mark on top, and never moves while the middle slides.
 				 */
-				style={{ width: `${width()}px` }}
+				style={{ width: `${width()}px`, ...(props.rail ? { left: `${RAIL_WIDTH}px` } : {}) }}
 				data-resizing={resizing() ? "true" : undefined}
+				data-rail={props.rail ? "true" : undefined}
 				class="panel-shell v3-panel fixed z-10 top-0 bottom-0 left-0 flex max-w-[86vw] flex-col"
 			>
 				{/* The right edge, as something to take hold of. A separator in the ARIA
@@ -642,7 +685,7 @@ export function LeftPanel(props: {
 					</button>
 				</div>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
+				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.rail}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
 					<For each={PANEL_TABS.filter((name) => name !== "agents" || (props.chats && can("agents")))}>
 						{(name) => (
