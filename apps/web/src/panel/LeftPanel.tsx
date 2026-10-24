@@ -7,7 +7,9 @@ import AppWindow from "lucide-solid/icons/app-window";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Circle from "lucide-solid/icons/circle";
+import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import Clock from "lucide-solid/icons/clock";
+import Play from "lucide-solid/icons/play";
 import FileText from "lucide-solid/icons/file-text";
 import MoveUpRight from "lucide-solid/icons/move-up-right";
 import PenLine from "lucide-solid/icons/pen-line";
@@ -196,6 +198,8 @@ export function LeftPanel(props: {
 	/** A row pressed: select that item and bring it into view. */
 	onPickItem?: (item: CanvasItem) => void;
 	onPickArrows?: (ids: string[]) => void;
+	/** The head's canvas title, pressed: the canvas manager. */
+	onCanvases?: () => void;
 
 	// --- the Apps tab -----------------------------------------------------------------
 	/** The deck's apps; asked for when the tab opens. */
@@ -203,6 +207,8 @@ export function LeftPanel(props: {
 	onAppsOpen?: () => void;
 	/** Put an app's board on the canvas and go to it. */
 	onPickApp?: (app: PanelApp) => void;
+	/** Start an app that is stopped (`apps.run`). */
+	onRunApp?: (app: PanelApp) => void;
 
 	/** The conversation, under the list: the v3 panel's lower half (`v3/ChatSection.tsx`). */
 	chat?: JSX.Element;
@@ -437,6 +443,30 @@ export function LeftPanel(props: {
 	/* The Canvas tab's rows: the drawing on screen, as Studio's editor lists its layers. */
 	const items = createMemo(() => canvasItems(props.canvasDoc, query()));
 	const selectedItems = createMemo(() => new Set(props.selectedItems ?? []));
+	const boardItems = () => items().items.filter((item) => item.board !== undefined);
+	const drawnItems = () => items().items.filter((item) => item.board === undefined);
+	const itemRow = (item: CanvasItem) => (
+		<button
+			type="button"
+			class="v3-item"
+			data-row
+			data-kind={item.kind}
+			data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
+			title={item.label}
+			onClick={() => props.onPickItem?.(item)}
+		>
+			<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
+			<span class="v3-item-name truncate">{item.label}</span>
+		</button>
+	);
+	/** The head's second line: what the tab holds. */
+	const headWords = () => {
+		const t = tab();
+		if (t === "canvas") return `${items().items.length} item${items().items.length === 1 ? "" : "s"}`;
+		if (t === "apps") return props.apps === undefined ? "apps" : `${props.apps.length} app${props.apps.length === 1 ? "" : "s"}`;
+		const n = agentCount();
+		return `${n} agent${n === 1 ? "" : "s"}`;
+	};
 
 	/* Every name on the deck but the agent's own: what the edit window checks a new name against
 	   before the server does, so the refusal is a red line under the field rather than a notice. */
@@ -617,6 +647,18 @@ export function LeftPanel(props: {
 		<>
 			<Show when={props.rail}>
 				<nav class="v3-rail" data-inset="left" aria-label="Side panel">
+					{/* Decks' mark, drawn as Studio draws it: it opens and folds the panel, as ⌘\ does. */}
+					<button
+						type="button"
+						class="v3-rail-logo"
+						data-tip={props.open ? "Hide the side panel" : "Show the side panel"}
+						data-key="⌘\"
+						aria-label={props.open ? "Hide the side panel" : "Show the side panel"}
+						aria-expanded={props.open}
+						onClick={() => props.onOpenChange(!props.open)}
+					>
+						<RailMark />
+					</button>
 					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
 							<button
@@ -631,15 +673,20 @@ export function LeftPanel(props: {
 									if (!props.open) props.onOpenChange(true);
 								}}
 							>
-								<Icon of={PANEL_TAB_ICON[name]} size={20} />
+								<span class="v3-rail-box">
+									<Icon of={PANEL_TAB_ICON[name]} size={20} />
+								</span>
 								<span>{PANEL_TAB_LABEL[name]}</span>
 							</button>
 						)}
 					</For>
 					<span class="flex-1" />
 					<Show when={props.onSettings}>
+						<span class="v3-rail-rule" aria-hidden="true" />
 						<button type="button" class="v3-rail-tab" title="Settings" onClick={() => props.onSettings?.()}>
-							<Icon of={SettingsIcon} size={20} />
+							<span class="v3-rail-box">
+								<Icon of={SettingsIcon} size={20} />
+							</span>
 							<span>Settings</span>
 						</button>
 					</Show>
@@ -692,15 +739,35 @@ export function LeftPanel(props: {
 					The head: the deck's mark and name (the switcher, `connections/Switcher.tsx`), and the
 					button that folds the panel away. Folded, the top bar carries both (`v3/TopBar.tsx`).
 				*/}
-				<div class="v3-panel-head">
-					<div class="panel-mark">
-						<Switcher />
+				<Show
+					when={props.rail}
+					fallback={
+						<div class="v3-panel-head">
+							<div class="panel-mark">
+								<Switcher />
+							</div>
+							<span class="flex-1" />
+							<button type="button" class="v3-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
+								<Icon of={PanelLeftClose} size={17} />
+							</button>
+						</div>
+					}
+				>
+					{/* Studio's panel head: the canvas, which opens the canvas manager, and under it the deck (its switcher) and what the tab holds. */}
+					<div class="v3-lp-head">
+						<button type="button" class="v3-lp-title" data-tip="Canvases" disabled={!props.onCanvases} onClick={() => props.onCanvases?.()}>
+							<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
+							<Icon of={ChevronDown} size={14} class="flex-none" />
+						</button>
+						<div class="v3-lp-status">
+							<span class="v3-lp-deck">
+								<Switcher />
+							</span>
+							<span class="v3-lp-sep" aria-hidden="true">·</span>
+							<span class="truncate">{headWords()}</span>
+						</div>
 					</div>
-					<span class="flex-1" />
-					<button type="button" class="v3-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
-						<Icon of={PanelLeftClose} size={17} />
-					</button>
-				</div>
+				</Show>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
 				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.rail}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
@@ -878,6 +945,7 @@ export function LeftPanel(props: {
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												taken={(name) => nameTaken(name, row.chat.id)}
 												lines={lines()}
+												size={22}
 												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
 											/>
 										)}
@@ -902,6 +970,11 @@ export function LeftPanel(props: {
 
 					<Show when={tab() === "recent"}>
 						<div class="panel-section" data-kind="recent">
+							<Show when={recentList.length > 0}>
+								<div class="v3-sec">
+									<span>Recent</span>
+								</div>
+							</Show>
 							<div class="row-list agent-list" data-lines={lines()}>
 								<For each={recentList}>
 									{(row) => (
@@ -916,6 +989,7 @@ export function LeftPanel(props: {
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												taken={(name) => nameTaken(name, row.chat.id)}
 												lines={lines()}
+												size={26}
 												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
 											/>
 									)}
@@ -929,33 +1003,28 @@ export function LeftPanel(props: {
 
 					<Show when={tab() === "canvas"}>
 						<div class="panel-section v3-items" data-kind="canvas">
-							<div class="panel-meta meta">
-								<span class="truncate">{props.canvasTitle ?? "No canvas"}</span>
-								<span class="flex-1" />
-								<span class="count tabular-nums">{items().items.length + (items().arrows.length ? 1 : 0)}</span>
-							</div>
-							<For each={items().items}>
-								{(item) => (
-									<button
-										type="button"
-										class="v3-item"
-										data-row
-										data-kind={item.kind}
-										data-on={selectedItems().has(item.id) || (item.board !== undefined && props.current !== undefined && props.current.endsWith(item.board)) ? "true" : undefined}
-										title={item.label}
-										onClick={() => props.onPickItem?.(item)}
-									>
-										<Icon of={ITEM_ICON[item.kind]} size={14} class="v3-item-icon" />
-										<span class="v3-item-name truncate">{item.label}</span>
+							<Show when={boardItems().length > 0}>
+								<div class="v3-sec">
+									<span>Boards</span>
+									<span class="flex-1" />
+									<span class="v3-sec-n tabular-nums">{boardItems().length}</span>
+								</div>
+								<For each={boardItems()}>{(item) => itemRow(item)}</For>
+							</Show>
+							<Show when={drawnItems().length > 0 || items().arrows.length > 0}>
+								<div class="v3-sec">
+									<span>Drawing</span>
+									<span class="flex-1" />
+									<span class="v3-sec-n tabular-nums">{drawnItems().length}</span>
+								</div>
+								<For each={drawnItems()}>{(item) => itemRow(item)}</For>
+								<Show when={items().arrows.length > 0}>
+									<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
+										<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
+										<span class="v3-item-name truncate">Arrows</span>
+										<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
 									</button>
-								)}
-							</For>
-							<Show when={items().arrows.length > 0}>
-								<button type="button" class="v3-item" data-row onClick={() => props.onPickArrows?.(items().arrows)}>
-									<Icon of={MoveUpRight} size={14} class="v3-item-icon" />
-									<span class="v3-item-name truncate">Arrows</span>
-									<span class="v3-item-n tabular-nums">{items().arrows.length}</span>
-								</button>
+								</Show>
 							</Show>
 							<Show when={items().items.length === 0 && items().arrows.length === 0}>
 								<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">{query().trim() ? `Nothing on this canvas matches “${query().trim()}”.` : "Nothing on this canvas yet."}</p>
@@ -963,19 +1032,48 @@ export function LeftPanel(props: {
 						</div>
 					</Show>
 					<Show when={tab() === "apps"}>
-						<div class="row-list v3-apps">
+						<div class="panel-section v3-apps" data-kind="apps">
+							<Show when={apps().length > 0}>
+								<div class="v3-sec">
+									<span>Apps in this deck</span>
+									<span class="flex-1" />
+									<span class="v3-sec-n tabular-nums">{apps().length}</span>
+								</div>
+							</Show>
 							<For each={apps()}>
-								{(app) => (
-									<button type="button" class="v3-app-row" data-row title={`${app.title}: put its board on the canvas`} onClick={() => props.onPickApp?.(app)}>
-										<span class="v3-app-icon" aria-hidden="true">
-											<Icon of={AppWindow} size={15} />
-										</span>
-										<span class="v3-app-name truncate">{app.title}</span>
-										<span class="v3-app-state" data-status={app.status}>
-											{app.status}
-										</span>
-									</button>
-								)}
+								{(app) => {
+									const running = () => app.status === "running" || app.status === "asleep";
+									const starting = () => ["installing", "building", "starting"].includes(app.status);
+									return (
+										<div class="v3-app-row" data-status={app.status}>
+											<button type="button" class="v3-app-main" data-row title={`${app.title}: put its board on the canvas`} onClick={() => props.onPickApp?.(app)}>
+												<span class="v3-app-tile" style={{ background: tileColour(app.name) }} aria-hidden="true">
+													<Icon of={AppWindow} size={15} />
+												</span>
+												<span class="v3-app-text">
+													<span class="v3-app-name truncate">{app.title}</span>
+													<span class="v3-app-state" data-state={running() ? "on" : starting() ? "busy" : "off"}>
+														<i aria-hidden="true" />
+														<span class="truncate">
+															{statusWord(app.status)} · apps/{app.name}
+														</span>
+													</span>
+												</span>
+											</button>
+											<Show when={running() || app.status === "stopped" || app.status === "broken"}>
+												<button
+													type="button"
+													class="v3-app-go"
+													aria-label={running() ? `Open ${app.title}` : `Run ${app.title}`}
+													onClick={() => (running() ? props.onPickApp?.(app) : props.onRunApp?.(app))}
+												>
+													{running() ? "Open" : "Run"}
+													<Icon of={running() ? ArrowUpRight : Play} size={12} />
+												</button>
+											</Show>
+										</div>
+									);
+								}}
 							</For>
 							<Show when={apps().length === 0}>
 								<p class="m-0 px-2 py-2 text-ui leading-normal text-faint">
@@ -1004,6 +1102,30 @@ export function LeftPanel(props: {
 			</aside>
 		</>
 	);
+}
+
+/** Decks' mark as Studio's rail draws it: three boards of unequal size, in a thin line. */
+function RailMark() {
+	return (
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<rect x="2.5" y="3.5" width="11" height="9.5" rx="2" />
+			<rect x="15.5" y="3.5" width="6" height="17" rx="2" />
+			<rect x="2.5" y="15.5" width="11" height="5" rx="2" />
+		</svg>
+	);
+}
+
+/** An app's tile colour, picked from its name so it stays the same everywhere. */
+const TILES = ["#2563eb", "#0ea5e9", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4d7c0f", "#9333ea"];
+function tileColour(name: string): string {
+	let h = 0;
+	for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+	return TILES[h % TILES.length] ?? TILES[0]!;
+}
+
+/** An app's state in a word, as the row says it. */
+function statusWord(status: string): string {
+	return { running: "Running", asleep: "Asleep", stopped: "Stopped", broken: "Broken", installing: "Installing…", building: "Building…", starting: "Starting…" }[status] ?? status;
 }
 
 const FOLDED_KEY = "decks.foldedWorkspaces";

@@ -68,6 +68,8 @@ export function AgentRow(props: {
 	taken?: (name: string) => boolean;
 	/** One line (name, runtime, time) or two (and what it is doing); the panel's square switches them. */
 	lines: 1 | 2;
+	/** The face's size, when the list wants it other than the one or two lines say. */
+	size?: number;
 	/** The pointer or focus arrived on the row (its box) or left it (`undefined`), for the hover card. */
 	onHover?: (at: DOMRect | undefined) => void;
 }) {
@@ -209,7 +211,7 @@ export function AgentRow(props: {
 					it the avatar and the name stacked instead of sitting side by side.
 				*/}
 				<span class="row-icon">
-					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={props.lines === 1 ? 20 : 24} ring={1.5} />
+					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={props.size ?? (props.lines === 1 ? 20 : 24)} ring={1.5} />
 				</span>
 
 				<span class="agent-body">

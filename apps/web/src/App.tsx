@@ -1430,7 +1430,8 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<TopBar
-					panelOpen={boardsOpen() && !phone()}
+					/* Beside the rail the top bar never carries the panel's button or the deck: the rail's logo and the panel head do. */
+					panelOpen={!phone()}
 					onTogglePanel={() => showBoards(!boardsOpen())}
 					chats={state.chats}
 					identities={state.identities}
@@ -1607,6 +1608,8 @@ export function App() {
 					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
 					selectedItems={penSelected()}
 					onPickItem={pickItem}
+					onCanvases={() => void setStagesOpen((was) => !was)}
+					onRunApp={(app) => void act("apps.run", [app.name]).then(() => loadApps())}
 					onPickArrows={(ids) => {
 						editorHandle()?.select(ids);
 						setPenSelected(ids);
