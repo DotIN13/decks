@@ -1,3 +1,4 @@
+import { hasPlaceholder, placeholderPicture } from "./live-placeholder.ts";
 import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
@@ -316,6 +317,18 @@ export function Stage(props: {
 	 * animation, which pictures would have stilled, is already held still there (`plain-board.tsx`).
 	 */
 	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
+	/**
+	 * The board whose page stays up while the camera moves: the selected one, when it is a document or
+	 * an app. Someone working in one pans and zooms to follow their work, and a picture there is not the
+	 * page they were typing in, or no picture at all (`live-placeholder.ts`).
+	 */
+	const keptLive = createMemo(() => {
+		const path = props.selected;
+		const board = path ? props.boards.find((one) => one.path === path) : undefined;
+		return board && hasPlaceholder(board) ? board.path : undefined;
+	});
+	/** Whether a board whose page is live is drawn as its page now, rather than as its picture. */
+	const pageNow = (path: string) => !picturesNow() || keptLive() === path;
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 	/** A press pans: Space is held, or the host's hand tool is on (`state/pen-tools.ts`). */
 	const grabbing = () => spaceHeld() || handTool();
@@ -721,10 +734,11 @@ export function Stage(props: {
 						h: sized?.h ?? board.h,
 						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
 						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
-						live: (own && props.shots().ownPicture) || (live.has(board.path) && !picturesNow()),
+						live: (own && props.shots().ownPicture) || (live.has(board.path) && pageNow(board.path)),
 						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
-						picture: props.shots().picture(board, look),
+						// A document or an app has no picture worth drawing: a card with its icon and name instead.
+						picture: hasPlaceholder(board) ? placeholderPicture(board, look) : props.shots().picture(board, look),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !paged(board) } : {}),
 					};
 				}),
@@ -743,7 +757,7 @@ export function Stage(props: {
 	const draggedAsPicture = createMemo<ReadonlySet<string>>(() => {
 		const paths = [...(editor.boardDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
 		const live = liveBoards();
-		return new Set(paths.filter((path) => !(live.has(path) && !picturesNow())));
+		return new Set(paths.filter((path) => !(live.has(path) && pageNow(path))));
 	});
 	const resolvedColours = new Map<string, string>();
 	/**

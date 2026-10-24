@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "495832aa546aa82490bb732279dbb7cf9dcfda00ff72c8d73225652418e9be54",
+	"hash": "1e5d92cec32da6211fc958ff2c68b221a4adcdb615df254d7f038482c1513420",
 	"rules": 1589,
 	"sheets": 21,
 	"ties": 14,
@@ -877,7 +877,7 @@
 		["packages/canvas/styles/canvas.css","@layer components ▸ .board-node .placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-family:var(--font-mono);font-size:var(--type-ui)}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-previewing=\"true\"] .board-node > .shade{outline-color:var(--color-warn)}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .stage[data-previewing=\"true\"] .board-node > .surface > iframe{pointer-events:none}"],
-		["packages/canvas/styles/canvas.css",".stage[data-pictures=\"true\"] .board-node iframe{visibility:hidden}"],
+		["packages/canvas/styles/canvas.css",".stage[data-pictures=\"true\"] .board-node:not([data-kept-live]) iframe{visibility:hidden}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .plain-board-comment{position:absolute;z-index:5;padding:5px 10px;border:0;border-radius:8px;background:var(--fg);color:var(--bg);font:500 12px/1.2 var(--font-sans);white-space:nowrap;box-shadow:var(--shadow);cursor:pointer}"],
 		["packages/canvas/styles/canvas.css","@layer components ▸ .plain-board-bar{position:absolute;left:0;bottom:100%;max-width:100%;padding:0 2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;color:var(--muted);cursor:grab;user-select:none}"],
 		["styles/stages.css","@layer components ▸ .stage-manager{position:fixed;inset:0;z-index:var(--z-popup);display:grid;place-items:center;box-sizing:border-box;padding:32px;background:rgb(10 10 12 / 34%);-webkit-backdrop-filter:blur(6px) saturate(115%);backdrop-filter:blur(6px) saturate(115%);opacity:0;pointer-events:none;transition:opacity 140ms ease}"],

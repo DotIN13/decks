@@ -1882,7 +1882,7 @@
 }
 }
 /* Boards as pictures while the camera moves (`picturesWhileMoving`): the pages are kept but not painted, and the sheet shows each picture. */
-.stage[data-pictures="true"] .board-node iframe {
+.stage[data-pictures="true"] .board-node:not([data-kept-live]) iframe {
 	visibility: hidden;
 }
 

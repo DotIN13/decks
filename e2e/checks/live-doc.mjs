@@ -91,6 +91,65 @@ if (found) {
 		const followed = await until(async () => (await board.locator("body").innerText().catch(() => "")).includes("Changed on disk"), 10000);
 		say("the file changed on disk shows in the board", followed);
 	}
+
+	/*
+	 * Selected, a document keeps its page while the camera moves: the other boards turn to pictures for
+	 * the move, and a document's picture is not the page being typed in.
+	 */
+	await page.locator(".v3-zoom-value").first().waitFor({ timeout: 3000 }).catch(() => {});
+	const box = await page.locator(node).first().boundingBox();
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	const seen = [];
+	for (let i = 0; i < 6; i++) {
+		await page.mouse.wheel(0, 40);
+		await page.waitForTimeout(30);
+		seen.push(await page.evaluate((n) => {
+			const frame = document.querySelector(n);
+			return { pictures: document.querySelector(".stage")?.dataset.pictures === "true", shown: !!frame && getComputedStyle(frame).visibility !== "hidden" };
+		}, node));
+	}
+	const moving = seen.filter((one) => one.pictures);
+	say("selected, its page stays up while the camera moves", moving.length > 0 && moving.every((one) => one.shown), JSON.stringify(seen));
+	await settle(page, 600);
+
+	/*
+	 * Not selected, it is drawn as a card with its icon and name while the camera moves, where the other
+	 * boards are drawn as their pictures: a picture of a document is its page before the file came, and
+	 * a fresh deck has none. Read as pixels: the card's middle has the icon and the name in it, where an
+	 * empty picture is one flat colour.
+	 */
+	for (let i = 0; i < 3; i++) await page.keyboard.press("Control+Minus");
+	await settle(page, 900);
+	await page.mouse.click(1250, 700);
+	await settle(page, 600);
+	const unselected = await page.evaluate((n) => document.querySelector(n)?.closest(".board-node")?.dataset.selected !== "true", node);
+	const rect = await page.evaluate((wanted) => window.__decksBoards?.().find((one) => one.path === wanted)?.rect, path);
+	let spread = 0;
+	let during = false;
+	if (rect) {
+		await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+		await page.mouse.wheel(0, 30);
+		await page.waitForTimeout(40);
+		await page.mouse.wheel(0, 1);
+		during = await page.evaluate(() => document.querySelector(".stage")?.dataset.pictures === "true");
+		const now = await page.evaluate((wanted) => window.__decksBoards?.().find((one) => one.path === wanted)?.rect, path);
+		const shot = await page.screenshot({ clip: { x: now.x + now.width * 0.3, y: now.y + now.height * 0.3, width: Math.max(8, now.width * 0.4), height: Math.max(8, now.height * 0.4) } });
+		spread = await page.evaluate(async (b64) => {
+			const img = new Image();
+			img.src = `data:image/png;base64,${b64}`;
+			await img.decode();
+			const c = document.createElement("canvas");
+			c.width = img.width; c.height = img.height;
+			const g = c.getContext("2d");
+			g.drawImage(img, 0, 0);
+			const d = g.getImageData(0, 0, c.width, c.height).data;
+			let lo = 255, hi = 0;
+			for (let i = 0; i < d.length; i += 4) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+			return hi - lo;
+		}, shot.toString("base64"));
+		await page.screenshot({ path: "/tmp/livedoc-move.png" });
+	}
+	say("not selected, it moves as a card with an icon and its name", !!rect && unselected && during && spread > 40, JSON.stringify({ unselected, during, spread }));
 }
 
 await browser.close();
