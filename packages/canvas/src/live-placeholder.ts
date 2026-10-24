@@ -20,6 +20,9 @@ const ICONS: Record<string, string[]> = {
 	app: ["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z", "M10 4v4", "M2 8h20", "M6 4v4"],
 };
 
+/** A document's card is on the document page's own ground, `--b-bg` in the board's theme (`board-host/lib/theme.css`). */
+const DOC_GROUND = { light: "#ffffff", dark: "#161616" };
+
 const COLOURS = {
 	light: { ground: "#f5f5f5", icon: "#9a9a9a", text: "#555555", faint: "#8a8a8a" },
 	dark: { ground: "#1e1e1e", icon: "#7a7a7a", text: "#c8c8c8", faint: "#8a8a8a" },
@@ -54,7 +57,7 @@ export function placeholderPicture(board: Pick<Board, "live" | "title" | "path" 
 	if (!g) return "";
 	g.scale(scale, scale);
 	const c = COLOURS[scheme];
-	g.fillStyle = c.ground;
+	g.fillStyle = kind === "doc" ? DOC_GROUND[scheme] : c.ground;
 	g.fillRect(0, 0, w, h);
 	// Sized to the board, so the icon reads at any zoom without the card looking empty.
 	const icon = Math.round(Math.min(96, Math.max(32, Math.min(w, h) * 0.12)));
