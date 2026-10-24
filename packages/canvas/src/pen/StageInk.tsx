@@ -26,8 +26,10 @@ const PALM_SIZE = 70;
  * samples a frame (Safari gives no coalesced events). The glass also takes the pointer, and shows
  * the lasso's loop and the box round what the lasso took.
  *
- * **Which pointer draws.** A pen, with its pressure, and a mouse. A finger never does: it is the
- * canvas's, and goes on up to the stage, one finger to pan, two to pan and pinch. A palm is ignored
+ * **Which pointer draws.** A pen, with its pressure, and a mouse. A finger draws only on a device
+ * that has not shown a pencil this session (a phone, an iPad without one), and a second finger ends
+ * its stroke; once a pencil has been seen, a finger is the canvas's and goes on up to the stage, one
+ * finger to pan, two to pan and pinch. A palm is ignored
  * as far as it can be while the pencil is in use: any touch while the pencil is on the glass or has
  * just left it (`PALM_AFTER_MS`), and any touch as big as a hand's heel once a pencil has been seen
  * (`PALM_SIZE`), does nothing at all, neither drawing nor moving the canvas.
@@ -357,9 +359,14 @@ export function StageInk(props: {
 				event.stopPropagation();
 				return;
 			}
-			// A finger is the canvas's: it goes on up to the stage, one to pan, two to pan and pinch.
 			fingerDown(event);
-			return;
+			// With a pencil about, a finger is the canvas's: it goes on up to the stage, one to pan, two to pan and pinch.
+			if (penSeen()) return;
+			// Without one, a finger draws, and a second finger is half of a pinch: the first one's stroke is over.
+			if (gesture) {
+				cancel();
+				return;
+			}
 		}
 		if (event.pointerType === "pen") {
 			setPenSeen(true);
