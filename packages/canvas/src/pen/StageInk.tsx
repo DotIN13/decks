@@ -1,6 +1,6 @@
 import { hitStroke, inkBounds, inkPaint, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../state/ink.ts";
 import { inkItem } from "./ink.ts";
 import type { StageEngine } from "../stage/engine.ts";
@@ -566,6 +566,31 @@ export function StageInk(props: {
 		}
 	};
 
+	/*
+	 * The pencil's touches are this sheet's alone. Safari on an iPad keeps a pencil press that comes
+	 * hard after a stroke for its own gestures (Scribble's handwriting, a double tap) and never hands
+	 * the page its pointerdown: the next stroke did nothing. Cancelling the browser's default for the
+	 * stylus's touch events, which pointer events cannot do, keeps every press a stroke. Fingers are
+	 * left alone: they pan and pinch.
+	 */
+	let sheet: SVGSVGElement | undefined;
+	onMount(() => {
+		if (!sheet) return;
+		const own = (event: TouchEvent) => {
+			for (const touch of Array.from(event.changedTouches)) {
+				if ((touch as Touch & { touchType?: string }).touchType === "stylus") {
+					if (event.cancelable) event.preventDefault();
+					return;
+				}
+			}
+		};
+		const options = { passive: false } as const;
+		for (const type of ["touchstart", "touchmove", "touchend"] as const) sheet.addEventListener(type, own, options);
+		onCleanup(() => {
+			for (const type of ["touchstart", "touchmove", "touchend"] as const) sheet?.removeEventListener(type, own);
+		});
+	});
+
 	onCleanup(() => {
 		cancel();
 		setInkSelection(undefined);
@@ -575,6 +600,7 @@ export function StageInk(props: {
 
 	return (
 		<svg
+			ref={sheet}
 			class="stage-ink"
 			data-tool={inkTool()}
 			width={props.view.width}
