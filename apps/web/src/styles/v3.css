@@ -3268,3 +3268,13 @@ body {
 		color: #fff;
 	}
 }
+
+/* ---- a dialog covers the floating tools ------------------------------------------------------
+   The tools, the zoom and the other floats sit at --z-float (30), over the canvas; a dialog's
+   backdrop sat at --z-backdrop (20), under them, so the tool column stayed lit over Settings and the
+   agent's details. Over every float now, and still under a menu (40), which a dialog's own pickers open. */
+@layer components {
+	body .picker-backdrop {
+		z-index: 35;
+	}
+}
