@@ -186,7 +186,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * `engine: "webkit"` is Safari's engine, for what only a phone's browser does (no WebGPU, WebGL 2
 	 * in a worker): `backends.mjs`. It takes none of Chromium's flags.
 	 */
-	const browser = engine === "webkit" ? await webkit.launch() : await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu] });
+	const browser = engine === "webkit" ? await webkit.launch() : await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement", ...gpu, ...(process.env.DECKS_E2E_CHROME_ARGS ? process.env.DECKS_E2E_CHROME_ARGS.split(" ") : [])] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
 	// `dpr` is a retina screen without a phone attached to it: a canvas renderer can be right

@@ -202,6 +202,8 @@ const CHECKS = [
 	{ file: "view-calls.mjs", needsAgent: false },
 	/* Measures, not a check: the stage's costs on a 2,000-item canvas (`node scripts/render-perf.mjs`). Run only when named. */
 	{ file: "render-perf.mjs", needsAgent: false, named: true },
+	/* Measures: panning a canvas heavy with live boards and drawing (`node scripts/pan-heavy.mjs`). Run only when named. */
+	{ file: "pan-heavy.mjs", needsAgent: false, named: true },
 	/* Pictures of words at rest at a few zooms, for judging text sharpness by eye (`TEXT_SHOTS_DIR`). Run only when named. */
 	{ file: "text-shots.mjs", needsAgent: false, named: true },
 	{ file: "agent-rows.mjs", needsAgent: true },

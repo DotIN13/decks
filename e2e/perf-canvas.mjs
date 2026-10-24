@@ -78,9 +78,10 @@ export function perfCanvas({ items = 2000, boards = 100 } = {}) {
 		const oy = (Math.floor(c / GRID) - GRID / 2) * CELL.h;
 		if (c < boards) {
 			const name = `perf-${String(c).padStart(3, "0")}.html`;
-			const path = `canvases/${PERF_CANVAS}/boards/${name}`;
+			// Relative to the canvas's own folder, as a standalone canvas names its boards.
+			const path = `boards/${name}`;
 			files.push({ name, html: board(c) });
-			children.push({ type: "browser", id: `pb${c}`, name: `Perf board ${c}`, url: `../../${path}`, width: 600, height: 400, metadata: { type: "decks.board", path }, x: ox + 40, y: oy + 40 });
+			children.push({ type: "browser", id: `pb${c}`, name: `Perf board ${c}`, url: path, width: 600, height: 400, metadata: { type: "decks.board", path }, x: ox + 40, y: oy + 40 });
 		}
 		const ids = [];
 		const add = (node) => {
