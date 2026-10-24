@@ -2880,3 +2880,14 @@ body {
 		outline-offset: 2.5px;
 	}
 }
+
+/* ---- a folded conversation has no "latest messages" to jump to ------------------------------ */
+@layer components {
+	/*
+	 * Folded, the stream is a box with no height, so it never reads as scrolled to the end and its
+	 * jump button stayed up over the fold. Nothing of the stream shows while it is folded.
+	 */
+	.v3-chat[data-folded="true"] .stream-jump {
+		display: none;
+	}
+}
