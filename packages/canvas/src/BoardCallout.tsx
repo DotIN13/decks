@@ -20,8 +20,8 @@ const GAP = 10;
  * A board's title bar, now that boards have none: a small pill over the selected board, as a phone
  * shows over selected text, on every device. Selecting a board — a click or a tap on it — shows it:
  * the actions the bar had, with the bar's own icons, on the comment popup's card, so it follows the theme. It sits over the board's top
- * edge, or under the board when that edge is off the screen or under the toolbars, and hides while
- * the camera or the board moves.
+ * edge or under its bottom one, never on the board, taking the one clear of other boards and items
+ * and on the screen, and hides while the camera or the board moves.
  *
  * The same pill sits over drawn items — a shape, a card, a frame, or several — with what makes sense
  * for them: zoom to it, comment, duplicate, properties and delete. Without `board`, the board's own
@@ -49,6 +49,8 @@ export function BoardCallout(props: {
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
 	gap?: number;
+	/** The other boards and items on the canvas, in its coordinates: the pill takes the slot that covers none of them. */
+	obstacles?: () => ReadonlyArray<{ x: number; y: number; w: number; h: number }>;
 }) {
 	/* The menu's own width, measured, so it is kept on the screen whole and its arrow still points at the board. */
 	const [width, setWidth] = createSignal(0);
@@ -80,10 +82,46 @@ export function BoardCallout(props: {
 		const x = half > 0 && right - left > width() ? Math.min(right - half, Math.max(left + half, aim)) : aim;
 		const arrow = half > 0 ? Math.min(width() - 18, Math.max(18, aim - (x - half))) : undefined;
 		const gap = props.gap ?? GAP;
-		if (top.y - gap - tall() >= room.y + 4) return { x, y: top.y - gap, below: false, arrow };
-		if (bottom.y + gap + tall() <= room.y + room.height - 4) return { x, y: bottom.y + gap, below: true, arrow };
-		// Both edges out of the room: the board fills it, so the pill sits at the top of what is free.
-		return { x, y: room.y + 10, below: true, arrow };
+		/*
+		 * Whether chrome floating over the canvas (the composer, a toolbar, a float) is where a slot would
+		 * be: the room above leaves out only what is docked, and a pill under the composer cannot be pressed.
+		 */
+		const underChrome = (slot: { from: number; to: number }) => {
+			const stage = element?.parentElement?.getBoundingClientRect();
+			if (!stage || typeof document === "undefined") return false;
+			const y = stage.top + (slot.from + slot.to) / 2;
+			return [x - half + 8, x, x + half - 8].some((at) => {
+				const hit = document.elementFromPoint(stage.left + at, y);
+				return !!hit && !hit.closest(".stage");
+			});
+		};
+		/*
+		 * Two slots only, over the top edge and under the bottom one: the pill never sits on what it is
+		 * for. Of the two, the one inside the room that covers no other board or item; else the one
+		 * inside the room that covers less of them; and with neither edge in the room (a board filling
+		 * the screen) there is no pill until the camera leaves it some.
+		 */
+		const slots = [
+			{ y: top.y - gap, from: top.y - gap - tall(), to: top.y - gap, below: false },
+			{ y: bottom.y + gap, from: bottom.y + gap, to: bottom.y + gap + tall(), below: true },
+		].filter((slot) => slot.from >= room.y + 4 && slot.to <= room.y + room.height - 4 && !underChrome(slot));
+		if (!slots.length) return { x, y: top.y - gap, below: false, arrow, out: true };
+		const others = props.obstacles?.() ?? [];
+		const covered = (slot: { from: number; to: number }) => {
+			const x1 = x - half;
+			const x2 = x + half;
+			let area = 0;
+			for (const other of others) {
+				const a = toScreen(camera, view, { x: other.x, y: other.y });
+				const b = toScreen(camera, view, { x: other.x + other.w, y: other.y + other.h });
+				const w = Math.min(x2, b.x) - Math.max(x1, a.x);
+				const h = Math.min(slot.to, b.y) - Math.max(slot.from, a.y);
+				if (w > 0 && h > 0) area += w * h;
+			}
+			return area;
+		};
+		const best = slots.map((slot) => ({ slot, area: covered(slot) })).reduce((p, q) => (q.area < p.area ? q : p));
+		return { x, y: best.slot.y, below: best.slot.below, arrow, out: false };
 	};
 	const stop = (event: Event) => event.stopPropagation();
 	return (
@@ -93,7 +131,7 @@ export function BoardCallout(props: {
 			role="menu"
 			aria-label={props.label}
 			data-below={place().below ? "true" : undefined}
-			data-hidden={props.hidden ? "true" : undefined}
+			data-hidden={props.hidden || place().out ? "true" : undefined}
 			style={{ left: `${place().x}px`, top: `${place().y}px`, ...(place().arrow !== undefined ? { "--arrow": `${place().arrow}px` } : {}) }}
 			onPointerDown={stop}
 			onClick={stop}

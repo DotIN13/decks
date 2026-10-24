@@ -997,6 +997,17 @@ export async function pressBoardAction(page, label) {
 		if (await bar().count()) return bar().click().then(() => true);
 		return false;
 	}
+	/*
+	 * The pill sits only over the board's top edge or under its bottom one, so a board filling the
+	 * screen has none showing: `1` frames the selected board, which is what Fit does, and leaves the
+	 * pill room for anything else.
+	 */
+	const hidden = () => page.locator(".stage > .board-callout[data-hidden]").count();
+	if ((await page.locator(".stage > .board-callout").count()) && (await hidden())) {
+		await page.keyboard.press("1");
+		if (labels.includes("Fit")) return true;
+		await rest(page);
+	}
 	const pill = page.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
 	if ((await pill.count()) === 0) return false;
 	return pill.click().then(() => true);

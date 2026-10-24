@@ -922,6 +922,23 @@ export function Stage(props: {
 	 */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
 
+	/**
+	 * What the pill should not sit on (`BoardCallout`): every board and drawn item but those touching the
+	 * box it is for, which are the selection itself, what is in it and what holds it.
+	 */
+	const pillObstacles = (box: { x: number; y: number; w: number; h: number }) => {
+		const touches = (o: { x: number; y: number; w: number; h: number }) => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y;
+		const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+		for (const board of props.boards) {
+			const b = boxOf(board);
+			if (!touches(b)) out.push(b);
+		}
+		for (const [id, placed] of penLayer.placed) {
+			const b = penLayer.bounds.get(id) ?? placed.box;
+			if (b.w > 0 && b.h > 0 && !touches(b)) out.push(b);
+		}
+		return out;
+	};
 	/** For the browser checks: where a drawn item is on screen, since most have no click shape to measure. */
 	(globalThis as { __decksPenBox?: (id: string) => DOMRect | undefined }).__decksPenBox = (id) => {
 		const placed = penLayer.placed.get(id);
@@ -2312,6 +2329,7 @@ export function Stage(props: {
 					<BoardCallout
 						board={board}
 						box={boxOf(board)}
+						obstacles={() => pillObstacles(boxOf(board))}
 						label={`${board.title}: board actions`}
 						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
 						camera={props.camera}
@@ -2339,6 +2357,7 @@ export function Stage(props: {
 				{(items) => (
 					<BoardCallout
 						box={items().box}
+						obstacles={() => pillObstacles(items().box)}
 						label={`${items().name}: actions`}
 						gap={penAnchors() ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : undefined}
 						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || editor.drag().dx !== 0 || editor.drag().dy !== 0 || !!editor.resize()}

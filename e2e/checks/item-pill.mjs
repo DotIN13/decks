@@ -133,6 +133,27 @@ if (press) {
 	);
 }
 
+/*
+ * Two slots only, over the top edge and under the bottom one, and the one that covers nothing else:
+ * with an item just above the box, the pill goes under it, on neither the box nor the item above.
+ */
+link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "pill-roof", fill: "#7a7a7a" }, box: { x1: spot.x - 40 / spot.zoom, y1: spot.y - 70 / spot.zoom, x2: spot.x + w + 40 / spot.zoom, y2: spot.y - 20 / spot.zoom } }] });
+const roof = await until(() => page.evaluate(() => window.__decksPenBox?.("pill-roof")));
+await page.keyboard.press("Escape");
+await settle(page, 300);
+await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+await settle(page, 400);
+const under = await page.evaluate(() => {
+	const r = document.querySelector(".stage > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+	return r && { x: r.x, y: r.y, right: r.right, bottom: r.bottom };
+});
+const hits = (a, b) => a && b && a.x < b.x + b.width && a.right > b.x && a.y < b.y + b.height && a.bottom > b.y;
+say(
+	"with an item just above, the pill goes under the box, on neither",
+	!!under && !!roof && under.y >= box.y + box.height && !hits(under, roof) && !hits(under, box),
+	JSON.stringify({ under, roof, box }),
+);
+
 say("no errors on the page", errors.length === 0, errors.join(" | "));
 link.close?.();
 await browser.close();
