@@ -514,7 +514,7 @@ export function Composer(props: {
 		 * comment used to justify keeping it all target the elements this rewrite deletes.
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5" ref={(el) => (stack = el)}>
-			<ScribbleCatch field={() => stack?.querySelector<HTMLElement>("[data-slot='composer-input']") ?? undefined} insert={(text) => field?.insertText(text)} focusField={() => field?.focus()} />
+			<ScribbleCatch field={() => stack?.querySelector<HTMLElement>("[data-slot='composer-input']") ?? undefined} insert={(text) => field?.appendWords(text)} focusField={() => field?.focus()} />
 			<Show when={atOpen()}>
 				<MentionMenu
 					matches={atMatches()}

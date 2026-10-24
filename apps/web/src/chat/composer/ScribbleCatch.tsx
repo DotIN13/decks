@@ -52,19 +52,31 @@ export function ScribbleCatch(props: { field: () => HTMLElement | undefined; ins
 		});
 	});
 
-	/** Whatever Scribble put in the catcher, moved into the composer. */
+	/*
+	 * The catcher holds the composer's words as well as the new ones, and only what is new moves.
+	 * Emptied after every word, as it first was, it gave Scribble no sentence to continue, so every
+	 * word was the first of one and came in capitalised.
+	 */
+	let sent = "";
+	const seed = (el: HTMLTextAreaElement) => {
+		catcher = el;
+		sent = (props.field()?.textContent ?? "").replace(/\u00a0/g, " ");
+		el.value = sent;
+	};
+	/** What Scribble added after what the catcher already held, moved into the composer. */
 	const pass = () => {
-		if (!catcher || !catcher.value) return;
-		const text = catcher.value;
-		catcher.value = "";
-		props.insert(text);
+		if (!catcher) return;
+		const now = catcher.value;
+		// An edit to earlier words (a scratch-out) is the catcher's only: the composer keeps its own.
+		if (now.startsWith(sent) && now.length > sent.length) props.insert(now.slice(sent.length));
+		sent = now;
 	};
 
 	return (
 		<Show when={pencil() && (fieldFocused() || catching())}>
 			<Portal mount={document.querySelector(".work") ?? document.body}>
 				<textarea
-					ref={catcher}
+					ref={seed}
 					class="scribble-catch"
 					aria-label="Write here with the pencil; the words go into the message"
 					autocapitalize="sentences"

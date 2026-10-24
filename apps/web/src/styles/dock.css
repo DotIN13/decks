@@ -729,7 +729,10 @@
 		background: transparent;
 		color: transparent;
 		caret-color: transparent;
+		/* 16px so Safari does not zoom on focus; lines 1px tall, so the composer's words it holds as context
+		   stay in a strip along the top under the top bar, and writing anywhere below lands after them. */
 		font-size: 16px;
+		line-height: 1px;
 		-webkit-user-select: text;
 		user-select: text;
 		touch-action: none;

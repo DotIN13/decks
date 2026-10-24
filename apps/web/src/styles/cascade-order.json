@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "c5dcf4981a5aad7b74b547976e75f81569f580bf7d2890583f7e4ff76714848b",
+	"hash": "e9846932c0bd94cb8373bb33933610952ae8fe5367ca0575475d285c00458023",
 	"rules": 1828,
 	"sheets": 21,
 	"ties": 23,
@@ -521,7 +521,7 @@
 		["styles/dock.css","@layer components ▸ .switch[data-on=\"true\"] > i{margin-left:11px}"],
 		["styles/dock.css","@layer components ▸ .dock{position:absolute;z-index:var(--z-chrome);bottom:calc(12px + var(--keyboard) + env(safe-area-inset-bottom));left:calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);transition:left 160ms ease;display:flex;width:min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));flex-direction:column;align-items:stretch;gap:8px;transform:translateX(-50%);pointer-events:none}"],
 		["styles/dock.css","@layer components ▸ .dock > *{pointer-events:auto}"],
-		["styles/dock.css","@layer components ▸ .scribble-catch{position:absolute;z-index:8;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;outline:0;resize:none;background:transparent;color:transparent;caret-color:transparent;font-size:16px;-webkit-user-select:text;user-select:text;touch-action:none}"],
+		["styles/dock.css","@layer components ▸ .scribble-catch{position:absolute;z-index:8;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;outline:0;resize:none;background:transparent;color:transparent;caret-color:transparent;font-size:16px;line-height:1px;-webkit-user-select:text;user-select:text;touch-action:none}"],
 		["styles/usage.css","@layer components ▸ .usage-modal .usage-pad{display:flex;flex-direction:column;gap:10px;padding:10px 12px 12px;box-shadow:inset 0 1px 0 0 var(--line)}"],
 		["styles/usage.css","@layer components ▸ .usage-modal .usage-headline{display:flex;align-items:baseline;gap:6px}"],
 		["styles/usage.css","@layer components ▸ .usage-modal .usage-note{margin:0;color:var(--faint);font-size:var(--type-note);font-variant-numeric:tabular-nums}"],

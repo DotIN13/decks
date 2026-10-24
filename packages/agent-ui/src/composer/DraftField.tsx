@@ -48,6 +48,8 @@ export interface DraftFieldApi {
 	append(node: DraftNode): void;
 	/** Put plain words where the caret is, spaced from their neighbours: a dropped file's `@path`. */
 	insertText(text: string): void;
+	/** Add words at the end exactly as given, spaces and all: handwriting, which spaces its own words. */
+	appendWords(text: string): void;
 	/** Redraw the pills' hover words, after what they describe has changed. */
 	retitle(): void;
 	focus(): void;
@@ -276,6 +278,10 @@ export function DraftField(props: DraftFieldProps) {
 			const text = draftText(current);
 			const spaced: Draft = text === "" || text.endsWith(" ") ? current : [...current, { type: "text", text: " " }];
 			api.set(normalize([...spaced, node, { type: "text", text: " " }]));
+		},
+		appendWords(text) {
+			if (!el || !text) return;
+			api.set(normalize([...readDraft(el), { type: "text", text }]));
 		},
 		insertText(text) {
 			if (!el) return;
