@@ -2498,7 +2498,7 @@ body {
 		flex: 1;
 		align-items: center;
 		gap: 6px;
-		padding: 0 8px 0 16px;
+		padding: 0 8px 0 4px;
 		border: 0;
 		border-radius: 8px;
 		background: none;
@@ -2633,7 +2633,7 @@ body {
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		padding: 1px 0 3px 30px;
+		padding: 1px 0 3px 22px;
 	}
 	.v3-tree-more {
 		height: 28px;

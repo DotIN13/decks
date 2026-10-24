@@ -844,7 +844,6 @@ export function LeftPanel(props: {
 						<CanvasTree
 							stages={props.stages ?? []}
 							boards={props.boards}
-							identities={props.identities ?? {}}
 							{...(props.here ? { here: props.here } : {})}
 							query={query()}
 							{...(props.current ? { current: props.current } : {})}
