@@ -470,6 +470,31 @@ export function App() {
 			if (insetsMoving()) return float.follow();
 			float.restore();
 		});
+		/*
+		 * The top bar's room beside the one on the right, `--topright-w`, so a narrow column (an iPad
+		 * upright with the panel open) never has the two overlap; with little room, `data-tight-top`
+		 * drops the agent's kind so its name and the canvas's keep theirs.
+		 */
+		const fitChrome = () => {
+			const right = document.querySelector<HTMLElement>(".v3-topright")?.offsetWidth ?? 0;
+			document.documentElement.style.setProperty("--topright-w", `${right}px`);
+			document.querySelector(".app")?.toggleAttribute("data-tight-top", workBox().w - 32 - right < 340);
+		};
+		createEffect(() => {
+			insets();
+			viewWidth();
+			if (insetsMoving()) return;
+			fitChrome();
+			float.restore();
+		});
+		if (typeof ResizeObserver !== "undefined") {
+			const right = new ResizeObserver(() => fitChrome());
+			queueMicrotask(() => {
+				const bar = document.querySelector(".v3-topright");
+				if (bar) right.observe(bar);
+			});
+			onCleanup(() => right.disconnect());
+		}
 		/* How tall the composer is, as a variable: the focus view pads its foot by it so a
 		   page scrolls clear of the bar. Measured, because the bar grows with its text. */
 		if (typeof ResizeObserver !== "undefined") {

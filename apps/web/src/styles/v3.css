@@ -178,6 +178,8 @@ body {
 		top: 12px;
 		left: calc(var(--inset-left, 0px) + 12px);
 		width: max-content;
+		/* Never under the bar on the right (`--topright-w`, measured): the canvas's name gives way first. */
+		max-width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 32px - var(--topright-w, 0px));
 		transition: left 160ms ease;
 	}
 	.v3-unfold {
@@ -240,7 +242,20 @@ body {
 	.v3-canvas-chip > svg:first-child {
 		color: var(--v3-fg2);
 	}
+	/* Squeezed, the canvas chip gives way and its name ends in an ellipsis; the agent and the icons keep their size. */
+	.v3-topbar.float.pill > * {
+		flex: none;
+	}
+	.v3-topbar.float.pill > .v3-canvas-chip {
+		min-width: 0;
+		flex: 0 1 auto;
+	}
+	/* Tight, the bar drops the agent's kind and its +, which the canvas menu also has (New canvas). */
+	.app[data-tight-top] .v3-topbar :is(.v3-agent-kind, .v3-canvas-chip ~ .v3-icon) {
+		display: none;
+	}
 	.v3-canvas-name {
+		min-width: 0;
 		max-width: 180px;
 		overflow: hidden;
 		font-size: 13px;
@@ -300,6 +315,8 @@ body {
 	/* ---- the zoom bar ---------------------------------------------------------------------- */
 
 	.v3-zoom.float.pill {
+		/* Under the composer (the dock, 10) where a narrow column makes them meet, over the canvas. */
+		z-index: 9;
 		right: 12px;
 		bottom: max(12px, env(safe-area-inset-bottom));
 		height: 40px;
@@ -2167,15 +2184,7 @@ body {
 			transform: translateY(100%);
 		}
 	}
-	/* A narrow screen that is not a phone (an iPad upright) gives the zoom bar's corner to the composer. */
-	@media (max-width: 900px) {
-		.app:not([data-phone="true"]) .v3-zoom {
-			display: none;
-		}
-		.app:not([data-phone="true"]) .dock {
-			width: min(620px, calc(100% - var(--inset-left, 0px) - 120px));
-		}
-	}
+	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.v3-zoom`). */
 	/* The phone's tool row carries the same marker as the column. */
 	.v3-tools[data-row="true"] .v3-tool-mark {
 		border-radius: 12px;

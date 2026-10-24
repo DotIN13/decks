@@ -184,6 +184,30 @@
 	.dock-row .chip-button {
 		flex: 0 1 auto;
 		min-width: 0;
+		/* What it cannot fit is cut at its edge, never drawn over its neighbours. */
+		overflow: hidden;
+	}
+	/* A narrow composer (an iPad upright beside the panel) drops the thinking level beside the model's name. */
+	.composer-box {
+		container: composer / inline-size;
+	}
+	@container composer (max-width: 440px) {
+		/* The face says who it goes to, the ring how full the context is: their words go first. */
+		.dock-row :is(.chip-sub, .dock-to-name, .lucide-chevron-down) {
+			display: none;
+		}
+		/* `!important` against the row's Tailwind `gap-1.5` and the chips' utilities, which outrank any component rule. */
+		.dock .dock-row :is(.chip-button, .dock-to-chip) {
+			padding-inline: 5px !important;
+		}
+		.dock .dock-row {
+			gap: 2px !important;
+		}
+		/* Over v3's `.dock .composer-ctx .dial`, which sets its type. */
+		.dock .dock-row .composer-ctx .dial {
+			gap: 0;
+			font-size: 0;
+		}
 	}
 
 	.dock-row .chip-button > span {
