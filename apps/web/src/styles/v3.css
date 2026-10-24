@@ -2184,7 +2184,11 @@ body {
 			transform: translateY(100%);
 		}
 	}
-	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.v3-zoom`). */
+	/* A narrow column (an iPad upright) keeps the zoom bar, under the composer where the two meet (`.v3-zoom`),
+	   and gives the composer its whole width less 12px a side (`data-narrow-dock`, `fitChrome` in App.tsx). */
+	.app[data-narrow-dock]:not([data-phone="true"]) .dock {
+		width: calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 24px);
+	}
 	/* The phone's tool row carries the same marker as the column. */
 	.v3-tools[data-row="true"] .v3-tool-mark {
 		border-radius: 12px;

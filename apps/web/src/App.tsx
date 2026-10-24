@@ -478,7 +478,10 @@ export function App() {
 		const fitChrome = () => {
 			const right = document.querySelector<HTMLElement>(".v3-topright")?.offsetWidth ?? 0;
 			document.documentElement.style.setProperty("--topright-w", `${right}px`);
-			document.querySelector(".app")?.toggleAttribute("data-tight-top", workBox().w - 32 - right < 340);
+			const column = workBox().w;
+			document.querySelector(".app")?.toggleAttribute("data-tight-top", column - 32 - right < 340);
+			// Short of width, the composer takes the column's whole width less its margins, rather than 64px less.
+			document.querySelector(".app")?.toggleAttribute("data-narrow-dock", column < 640);
 		};
 		createEffect(() => {
 			insets();
