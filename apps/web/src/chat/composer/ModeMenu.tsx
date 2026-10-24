@@ -142,7 +142,6 @@ export function ModeMenu(props: {
 					);
 				}}
 			>
-				<div class="menu-label">When it may act</div>
 				<For each={available()}>
 					{(entry) => (
 						<button

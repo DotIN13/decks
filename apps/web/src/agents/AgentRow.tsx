@@ -334,7 +334,6 @@ export function AgentRow(props: {
 								);
 							}}
 						>
-							<div class="menu-label">{name()}</div>
 							<button type="button" role="menuitem" data-row data-flat="true" onClick={() => menu(() => props.onFocus())}>
 								<Icon of={MessageCircle} size={15} class="row-icon" />
 								<span class="row-label">Talk to it here</span>

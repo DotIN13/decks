@@ -62,6 +62,17 @@ export function AgentEdit(props: {
 }) {
 	const [name, setName] = createSignal(props.name);
 	const [draft, setDraft] = createSignal("");
+	/*
+	 * The tags as you are editing them. The server echoes each change back, but not before the next
+	 * keystroke can land: read from `props.userTags`, a second tag typed straight after the first
+	 * saved the list without the first. Kept here and followed from the server when it answers.
+	 */
+	const [mine, setMine] = createSignal<string[]>(props.userTags);
+	createEffect(() => setMine(props.userTags));
+	const setTags = (next: string[]) => {
+		setMine(next);
+		props.onTags(next);
+	};
 	let nameField: HTMLInputElement | undefined;
 	let tagField: HTMLInputElement | undefined;
 	let root: HTMLDivElement | undefined;
@@ -127,14 +138,14 @@ export function AgentEdit(props: {
 	 * and two places deciding what a tag may be is how they come to disagree.
 	 */
 	const add = () => {
-		const have = new Set(props.userTags.map((tag) => tag.toLowerCase()));
+		const have = new Set(mine().map((tag) => tag.toLowerCase()));
 		const wanted = draft()
 			.split(",")
 			.map((part) => part.trim())
 			.filter((part) => part && !have.has(part.toLowerCase()) && (have.add(part.toLowerCase()), true));
 		setDraft("");
 		if (wanted.length === 0) return;
-		props.onTags([...props.userTags, ...wanted].slice(0, MAX_TAGS));
+		setTags([...mine(), ...wanted].slice(0, MAX_TAGS));
 	};
 
 	return (
@@ -205,15 +216,31 @@ export function AgentEdit(props: {
 					<div class="agent-edit-row agent-edit-tags">
 						<span class="agent-edit-k">Tags</span>
 						<div class="agent-edit-v">
-							{/* The field first, level with its label like the two above; what you have added lists under it. */}
-							<Show when={props.userTags.length < MAX_TAGS}>
-								<label class="field h-8 flex-none gap-1.5 rounded-md">
+							{/* The tags inside their own field, as drawn: chips, then the words you are typing. A click anywhere in it is a click on the typing. */}
+							<div class="field agent-edit-chips" onClick={(event) => event.target === event.currentTarget && tagField?.focus()}>
+								<For each={mine()}>
+									{(tag) => (
+										<span class="tag" data-mine="true">
+											{tag}
+											<button
+												type="button"
+												class="tag-x"
+												title={`Remove ${tag}`}
+												aria-label={`Remove ${tag}`}
+												onClick={() => setTags(mine().filter((other) => other !== tag))}
+											>
+												<Icon of={X} size={9} />
+											</button>
+										</span>
+									)}
+								</For>
+								<Show when={mine().length < MAX_TAGS}>
 									<input
 										type="text"
 										spellcheck={false}
-										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
+										class="min-w-[80px] flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 										ref={tagField}
-										placeholder="Add a tag"
+										placeholder={mine().length ? "" : "Add a tag"}
 										aria-label="Add a tag"
 										value={draft()}
 										onInput={(event) => {
@@ -227,38 +254,21 @@ export function AgentEdit(props: {
 												event.preventDefault();
 												add();
 											}
-											// Backspace on an empty field takes the last one off, which is what
-											// every tag field does and what a hand reaches for unprompted.
-											if (event.key === "Backspace" && !draft() && props.userTags.length > 0) {
+											if (event.key === "Backspace" && !draft() && mine().length > 0) {
 												event.preventDefault();
-												props.onTags(props.userTags.slice(0, -1));
+												setTags(mine().slice(0, -1));
 											}
 										}}
 									/>
-								</label>
-							</Show>
-							<Show when={props.userTags.length > 0}>
-								<div class="tags">
-									<For each={props.userTags}>
-										{(tag) => (
-											<span class="tag" data-mine="true">
-												{tag}
-												<button
-													type="button"
-													class="tag-x"
-													title={`Remove ${tag}`}
-													aria-label={`Remove ${tag}`}
-													onClick={() => props.onTags(props.userTags.filter((other) => other !== tag))}
-												>
-													<Icon of={X} size={9} />
-												</button>
-											</span>
-										)}
-									</For>
-								</div>
-							</Show>
+								</Show>
+							</div>
 						</div>
 					</div>
+				</div>
+				<div class="agent-edit-foot">
+					<button class="btn" type="button" data-primary="true" onClick={props.onClose}>
+						Done
+					</button>
 				</div>
 			</div>
 		</div>

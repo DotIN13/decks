@@ -3189,3 +3189,61 @@ body {
 		text-align: right;
 	}
 }
+
+/* ---- the agent's details, as drawn: each label over its field, the tags inside theirs, Done at the foot ---- */
+@layer components {
+	body .agent-edit {
+		gap: 12px;
+		padding: 2px 18px 16px;
+	}
+	body .agent-edit-row,
+	body .agent-edit-row.agent-edit-tags {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+		min-height: 0;
+		padding: 0;
+	}
+	body .agent-edit-k,
+	body .agent-edit-row.agent-edit-tags > .agent-edit-k {
+		width: auto;
+		color: var(--v3-fg2);
+		font-size: 12px;
+		font-weight: 500;
+		line-height: 1.3;
+	}
+	body .agent-edit-v > .field,
+	body .agent-edit-pick {
+		height: 32px;
+		border-radius: 6px;
+	}
+	.agent-edit-chips {
+		display: flex;
+		min-height: 34px;
+		height: auto !important;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 5px;
+		box-sizing: border-box;
+		padding: 5px 6px;
+		border-radius: 6px;
+		cursor: text;
+	}
+	.agent-edit-chips .tag {
+		height: 22px;
+		padding: 0 3px 0 8px;
+		border-radius: 5px;
+		font-size: 12px;
+	}
+	.agent-edit-foot {
+		display: flex;
+		justify-content: flex-end;
+		padding: 12px 18px;
+		border-top: 1px solid var(--v3-line);
+	}
+	.agent-edit-foot .btn[data-primary="true"] {
+		border-color: transparent;
+		background: var(--v3-accent);
+		color: #fff;
+	}
+}
