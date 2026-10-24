@@ -69,11 +69,12 @@
 	}
 	if (foreignParent) void needScript("embed-guest.js").catch(() => {});
 	/*
-	 * Words selected here, said to the page framing this one when it is another origin: it cannot read
-	 * this document's selection, and offers a comment on them (Decks Studio). Where they are is in this
-	 * page's pixels; an empty quote says the selection went.
+	 * Words selected here, said to the page framing this one, which offers a comment on them: Decks
+	 * Studio, which cannot read this document's selection, and the Decks app, which no longer reaches
+	 * into the page to read it. Where they are is in this page's pixels; an empty quote says the
+	 * selection went.
 	 */
-	if (foreignParent) {
+	if (window.parent !== window) {
 		let said = "";
 		let soon = 0;
 		const report = () => {

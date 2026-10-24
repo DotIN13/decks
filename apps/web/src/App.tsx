@@ -1338,6 +1338,11 @@ export function App() {
 								mintBoardToken: mintBoardToken,
 								// A document board talks to the server through the app's socket (`board/live-doc.ts`).
 								attach: attachLiveDoc,
+								// Words with a comment waiting to go with the next message stay marked in their board's page.
+								marks: (path) =>
+									waitingComments(state.focused)
+										.filter((note) => note.board === path && note.quote)
+										.map((note) => ({ id: note.id, quote: note.quote, ...(note.component ? { component: note.component } : {}) })),
 								sandboxed: isSharedBoard,
 								mayStart: boardsMayStart,
 								switching: switchingCanvas,

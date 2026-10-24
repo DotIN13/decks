@@ -75,6 +75,7 @@ const CHECKS = [
 	 */
 	{ file: "board-links.mjs", needsAgent: false },
 	{ file: "live-doc.mjs", needsAgent: false },
+	{ file: "board-comment.mjs", needsAgent: false },
 	/*
 	 * A board's own code, run by pressing something on it. The one path where a click is not the
 	 * permission: the board carries the words, the server reads them out of the file, and the
