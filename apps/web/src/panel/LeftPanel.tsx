@@ -10,7 +10,6 @@ import Circle from "lucide-solid/icons/circle";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import Clock from "lucide-solid/icons/clock";
 import Sparkles from "lucide-solid/icons/sparkles";
-import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Play from "lucide-solid/icons/play";
 import FileText from "lucide-solid/icons/file-text";
 import MoveUpRight from "lucide-solid/icons/move-up-right";
@@ -101,7 +100,7 @@ export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
 const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
-const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: LayoutGrid };
+const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type PanelApp = { name: string; title: string; status: string; board: string };
@@ -718,11 +717,11 @@ export function LeftPanel(props: {
 							<span class="flex-1" />
 							<Show when={props.onSettings}>
 								<button type="button" class="v3-lp-icon" data-tip="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
-									<Icon of={SettingsIcon} size={16} />
+									<Icon of={SettingsIcon} size={19} />
 								</button>
 							</Show>
 							<button type="button" class="v3-lp-icon" data-tip="Hide the side panel" data-key="⌘\" aria-label="Hide the side panel" onClick={() => props.onOpenChange(false)}>
-								<Icon of={PanelLeftClose} size={16} />
+								<Icon of={PanelLeftClose} size={19} />
 							</button>
 						</div>
 						<div class="v3-lp-status">
@@ -734,45 +733,8 @@ export function LeftPanel(props: {
 						</div>
 					</div>
 				</Show>
-				{/*
-					The tabs, under the head and over the search: icons, and the open one a pill that names
-					itself. The list below swaps by tab and the search filters the open one, as before.
-				*/}
-				<Show when={props.desktop}>
-					<div class="v3-tabs" role="tablist" aria-label="Panel">
-						<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
-							{(name, index) => (
-								<button
-									type="button"
-									role="tab"
-									id={`${ids}-tab-${name}`}
-									class="v3-tabs-tab"
-									data-on={tab() === name ? "true" : undefined}
-									aria-selected={tab() === name}
-									aria-controls={`${ids}-list`}
-									tabindex={tab() === name ? 0 : -1}
-									title={PANEL_TAB_LABEL[name]}
-									onClick={() => goTab(name)}
-									onKeyDown={(event) => {
-										if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-										event.preventDefault();
-										const shown = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
-										const next = shown[(index() + (event.key === "ArrowRight" ? 1 : -1) + shown.length) % shown.length];
-										next?.click();
-										next?.focus();
-									}}
-								>
-									<Icon of={PANEL_TAB_ICON[name]} size={16} />
-									<Show when={tab() === name}>
-										<span>{PANEL_TAB_LABEL[name]}</span>
-									</Show>
-								</button>
-							)}
-						</For>
-					</div>
-				</Show>
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
-				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav} hidden={props.desktop}>
+				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
 					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (

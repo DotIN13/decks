@@ -2437,46 +2437,6 @@ body {
 	}
 }
 
-/* ---- the panel's tabs as one segmented switch (the phone's sheet) ------------------------ */
-@layer components {
-	/* A track the width of the panel, the three tabs sharing it, and a raised thumb that slides
-	   under the one showing (`placeNavMark` in `LeftPanel.tsx`). */
-	.v3-nav {
-		display: grid;
-		grid-auto-columns: 1fr;
-		grid-auto-flow: column;
-		gap: 0;
-		margin: 0 12px 10px;
-		padding: 3px;
-		border-radius: 10px;
-		background: var(--v3-bg2);
-	}
-	.v3-nav-mark {
-		top: 3px;
-		height: 28px;
-		border-radius: 7px;
-		background: var(--v3-panel);
-		box-shadow:
-			0 1px 2px rgb(0 0 0 / 12%),
-			0 0 0 0.5px rgb(0 0 0 / 6%);
-	}
-	[data-color-scheme="dark"] .v3-nav-mark {
-		background: #4a4a4a;
-		box-shadow: 0 1px 2px rgb(0 0 0 / 40%);
-	}
-	.v3-nav-tab {
-		height: 28px;
-		justify-content: center;
-		gap: 6px;
-		padding: 0 6px;
-		border-radius: 7px;
-		font-weight: 500;
-	}
-	.v3-nav-tab[data-on="true"] {
-		color: var(--v3-fg);
-	}
-
-}
 
 
 /* ---- the Recent and Canvas tabs ------------------------------------------------------------ */
@@ -2532,7 +2492,7 @@ body {
 	/* The head: the canvas, and under it the deck and what the tab holds. */
 	.v3-lp-head {
 		flex: none;
-		padding: 12px 10px 10px 14px;
+		padding: 18px 14px 16px 18px;
 		border-bottom: 1px solid var(--v3-line);
 	}
 	.v3-lp-title {
@@ -2590,16 +2550,20 @@ body {
 		font-size: 11px;
 		font-weight: 400;
 	}
+	/* The live tab strip, 16px under the head's line (a margin: its sliding mark is placed from the top). */
+	.v3-panel[data-desktop="true"] .v3-nav {
+		margin-top: 16px;
+		padding: 0 12px;
+	}
 	.v3-panel[data-desktop="true"] .v3-search-wrap {
-		padding-top: 8px;
-		padding-bottom: 6px;
+		padding: 14px 14px 14px;
 	}
 	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
 	.v3-panel[data-desktop="true"] .v3-search {
-		height: 30px;
-		gap: 7px;
-		padding: 0 6px 0 9px;
-		border-radius: 6px;
+		height: 32px;
+		gap: 8px;
+		padding: 0 6px 0 10px;
+		border-radius: 8px;
 		box-shadow: inset 0 0 0 1px transparent;
 		transition:
 			background 150ms var(--v3-ease),
@@ -2812,12 +2776,12 @@ body {
 	}
 	.v3-lp-icon {
 		display: grid;
-		width: 24px;
-		height: 24px;
+		width: 32px;
+		height: 32px;
 		flex: none;
 		place-items: center;
 		border: 0;
-		border-radius: 5px;
+		border-radius: 7px;
 		background: none;
 		color: var(--v3-fg2);
 		cursor: pointer;
@@ -2826,67 +2790,12 @@ body {
 		background: var(--v3-bg2);
 		color: var(--v3-fg);
 	}
+	.v3-lp-icon + .v3-lp-icon {
+		margin-left: 2px;
+	}
 	.v3-lp-icon:focus-visible {
 		outline: 2px solid var(--v3-accent);
 		outline-offset: -1px;
 	}
 
-	/* Four tab buttons: icons, and the open one a pill holding its icon and word. */
-	.v3-tabs {
-		display: flex;
-		flex: none;
-		align-items: center;
-		gap: 4px;
-		padding: 10px 12px 0;
-	}
-	.v3-tabs-tab {
-		display: flex;
-		min-width: 30px;
-		height: 30px;
-		flex: none;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		padding: 0 7px;
-		border: 0;
-		border-radius: 7px;
-		background: none;
-		color: var(--v3-fg2);
-		cursor: pointer;
-		font: inherit;
-		font-size: 12.5px;
-		font-weight: 600;
-		transition:
-			background 140ms var(--v3-ease),
-			color 140ms var(--v3-ease);
-	}
-	.v3-tabs-tab:hover {
-		background: var(--v3-bg2);
-		color: var(--v3-fg);
-	}
-	.v3-tabs-tab[data-on="true"] {
-		padding: 0 10px 0 8px;
-		background: var(--v3-accent-soft);
-		color: var(--v3-accent);
-	}
-	.v3-tabs-tab[data-on="true"] > span {
-		animation: v3-tab-word 180ms var(--v3-ease);
-	}
-	@keyframes v3-tab-word {
-		from {
-			opacity: 0;
-		}
-	}
-	.v3-tabs-tab:focus-visible {
-		outline: 2px solid var(--v3-accent);
-		outline-offset: -2px;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.v3-tabs-tab,
-		.v3-tabs-tab[data-on="true"] > span {
-			transition: none;
-			animation: none;
-		}
-	}
 }

@@ -9,7 +9,7 @@
  */
 
 /** The width it has always had, and the one a double-click on the handle puts back. */
-export const PANEL_WIDTH = 320;
+export const PANEL_WIDTH = 360;
 /** Under this a board's name is three letters and an ellipsis. */
 export const PANEL_MIN = 200;
 export const PANEL_MAX = 560;
