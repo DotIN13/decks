@@ -800,7 +800,7 @@ export function LeftPanel(props: {
 				</div>
 				<div class="v3-search-wrap">
 					<label class="v3-search">
-						<Icon of={Search} class="flex-none" size={15} />
+						<Icon of={Search} class="flex-none" size={14} />
 						<input
 							ref={field}
 							type="text"

@@ -2696,6 +2696,35 @@ body {
 		padding-top: 10px;
 		padding-bottom: 6px;
 	}
+	/* The search field as the drawing has it: 30px, a 6px corner, the key hint a hairline box. */
+	.v3-panel[data-rail="true"] .v3-search {
+		height: 30px;
+		gap: 7px;
+		padding: 0 6px 0 9px;
+		border-radius: 6px;
+		box-shadow: inset 0 0 0 1px transparent;
+		transition:
+			background 150ms var(--v3-ease),
+			box-shadow 150ms var(--v3-ease);
+	}
+	.v3-panel[data-rail="true"] .v3-search:focus-within {
+		background: var(--v3-panel);
+		box-shadow:
+			inset 0 0 0 1px var(--v3-accent),
+			0 0 0 3px var(--v3-accent-soft);
+	}
+	.v3-panel[data-rail="true"] .v3-search input {
+		font-size: 12.5px;
+	}
+	.v3-panel[data-rail="true"] .v3-search .v3-kbd {
+		height: auto;
+		padding: 1px 5px;
+		border-color: var(--v3-line);
+		font-size: 10.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		line-height: 1.3;
+	}
 
 	/* A section's heading in a list, with its count at the right. */
 	.v3-sec {
