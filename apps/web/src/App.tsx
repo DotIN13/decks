@@ -49,7 +49,7 @@ import "./app/canvas-host.ts";
 import { createEditor, isSharedBoard, type CanvasHandle } from "@decks/canvas";
 import { boardUrl } from "./lib/api.ts";
 import { mintBoardToken } from "./board/board-token.ts";
-import { attachLiveDoc } from "./board/live-doc.ts";
+import { attachBoardFrame } from "./board/frame-hooks.ts";
 import { shotAdaptor } from "./canvas/shots/adaptors.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -1336,13 +1336,8 @@ export function App() {
 									return board ? boardUrl({ path: board.path, rev: pageRev(board) }) : undefined;
 								},
 								mintBoardToken: mintBoardToken,
-								// A document board talks to the server through the app's socket (`board/live-doc.ts`).
-								attach: attachLiveDoc,
-								// Words with a comment waiting to go with the next message stay marked in their board's page.
-								marks: (path) =>
-									waitingComments(state.focused)
-										.filter((note) => note.board === path && note.quote)
-										.map((note) => ({ id: note.id, quote: note.quote, ...(note.component ? { component: note.component } : {}) })),
+								// A document board's socket, and comments on words selected in a board (`board/frame-hooks.ts`).
+								attach: attachBoardFrame,
 								sandboxed: isSharedBoard,
 								mayStart: boardsMayStart,
 								switching: switchingCanvas,

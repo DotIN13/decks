@@ -1,9 +1,9 @@
 /**
  * A comment on words selected in a board.
  *
- * Words selected in a board's page offer a Comment button over them (`board.js` says what is
- * selected, `plain-board.tsx` draws the button); pressing it opens the popup, and a kept comment
- * goes over the input bar for the next message, with its words left marked in the page.
+ * Words selected in a board's page offer a comment by them (`markup/comment-select.ts`, listening
+ * inside the page as Decks always has): a small button that opens the box, and a kept comment goes
+ * over the input bar for the next message, with its words left marked in the page.
  */
 import { flyToBoard, liveZoom, open, resetStage, say, settle, stagePath } from "../harness.mjs";
 
@@ -30,19 +30,21 @@ const words = board.locator("p, li, h1, h2").first();
 await words.waitFor({ timeout: 10000 });
 // Selected the way a reader does: a double-click on a word.
 await words.dblclick({ position: { x: 14, y: 10 } });
-const button = page.locator(".plain-board-comment");
-const offered = await until(() => button.isVisible().catch(() => false));
-say("selected words in a board offer a Comment button", offered);
+const popup = page.locator(".comment-popup");
+const offered = await until(() => popup.isVisible().catch(() => false));
+say("selected words in a board offer a comment over them", offered);
 
 if (offered) {
-	await button.click();
-	const popup = page.locator(".comment-popup");
-	const opened = await until(() => popup.isVisible().catch(() => false));
+	// Closed, it is one small button by the words; pressing it opens the box.
+	const start = popup.locator(".comment-start");
+	if (await start.isVisible().catch(() => false)) await start.click();
+	const field = popup.locator(".comment-field");
+	const opened = await until(() => field.isVisible().catch(() => false));
 	const quote = opened ? await popup.locator(".comment-quote").innerText().catch(() => "") : "";
-	say("pressing it opens the popup on those words", opened && quote.trim().length > 0, quote);
+	say("pressing it opens the box on those words", opened && quote.trim().length > 0, quote);
 
 	if (opened) {
-		await popup.locator(".comment-field").fill("A note on these words");
+		await field.fill("A note on these words");
 		await page.keyboard.press("Enter");
 		const kept = await until(async () => !(await popup.isVisible().catch(() => false)) && (await page.locator(".dock").innerText().catch(() => "")).includes(quote.trim().slice(0, 12)));
 		say("kept, it goes over the input bar with the next message", kept);
