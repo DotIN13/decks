@@ -8,8 +8,8 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Circle from "lucide-solid/icons/circle";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
-import Bot from "lucide-solid/icons/bot";
 import Clock from "lucide-solid/icons/clock";
+import Sparkles from "lucide-solid/icons/sparkles";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Play from "lucide-solid/icons/play";
@@ -102,7 +102,7 @@ export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
 const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
-const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Bot, apps: LayoutGrid };
+const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: LayoutGrid };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
 export type PanelApp = { name: string; title: string; status: string; board: string };
