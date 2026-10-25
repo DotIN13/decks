@@ -22,6 +22,7 @@ import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, isInk, strokeOf } from "./pen/ink.ts";
+import { inkSelection, setInkSelection } from "./state/ink.ts";
 import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
@@ -1103,6 +1104,19 @@ export function Stage(props: {
 	 * among them: the box round all of it, and what to call it. Not while one is typed into (its
 	 * editor has its own toolbar) or drawn with the pen.
 	 */
+	/*
+	 * What the draw tool's lasso holds (`inkSelection`): the same pill as a selection's, so its strokes can
+	 * go to the agent as the select tool's can (Make a drawing, Make a board, Ask), and be fitted or deleted.
+	 */
+	const lassoItems = createMemo(() => {
+		if (!props.drawing || !props.onInk || !props.inkAgent) return undefined;
+		const held = inkSelection();
+		const boxes = (held?.ids ?? []).map((id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box).filter((b): b is NonNullable<typeof b> => !!b);
+		if (!held || boxes.length === 0) return undefined;
+		const x = Math.min(...boxes.map((b) => b.x));
+		const y = Math.min(...boxes.map((b) => b.y));
+		return { ids: [...held.ids], box: { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y } };
+	});
 	const calloutItems = createMemo(() => {
 		if ((props.selected && !groupPicked()) || props.drawing || !props.onPenEdit || editor.text()) return undefined;
 		const all = penOutlines().filter((one) => one.id);
@@ -2405,6 +2419,29 @@ export function Stage(props: {
 									...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: items().ids }, anchor) } : {}),
 								}
 							: {})}
+					/>
+				)}
+			</Show>
+			<Show when={lassoItems()}>
+				{(held) => (
+					<BoardCallout
+						box={held().box}
+						obstacles={() => pillObstacles(held().box)}
+						label={`${held().ids.length} strokes: actions`}
+						hidden={moving() || panning() || scaling() || gliding()}
+						camera={props.camera}
+						view={view()}
+						onOpen={() => pushCamera(frame([held().box]))}
+						ink={{
+							agent: props.inkAgent ?? "the agent",
+							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
+							onBoard: () => props.onInk?.({ action: "board", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
+							onAsk: (anchor: DOMRect) => props.onInk?.({ action: "ask", ids: held().ids, canvas: props.stageName ?? "", box: held().box, anchor }),
+						}}
+						onDelete={() => {
+							penEdit(held().ids.map((id) => ({ op: "delete", id })));
+							setInkSelection(undefined);
+						}}
 					/>
 				)}
 			</Show>
