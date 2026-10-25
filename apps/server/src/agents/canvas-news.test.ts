@@ -50,6 +50,10 @@ test("a long list stops at eight lines and says how many more", () => {
 	assert.equal(lines[9], " and 4 more changes");
 });
 
+test("an empty note is called empty, not quoted", () => {
+	assert.deepEqual(news(doc([]), doc([note("e", "")]), [{ rev: 2, by: { kind: "person" }, ids: ["e"] }]).slice(1, -1), [" you added an empty note (e)"]);
+});
+
 test("nothing changed by anyone is nothing to say", () => {
 	assert.deepEqual(news(doc([note("a", "x")]), doc([note("a", "x")]), []), []);
 });

@@ -59,7 +59,7 @@ export function label(node: PenNode): string {
 	}
 	const words = typeof (node as { content?: unknown }).content === "string" ? ((node as { content: string }).content).replace(/\s+/g, " ").trim() : "";
 	const short = (s: string) => (s.length > 40 ? `${s.slice(0, 39)}…` : s);
-	if (node.type === "note") return `the note "${short(words)}" (${node.id})`;
+	if (node.type === "note") return words ? `the note "${short(words)}" (${node.id})` : `an empty note (${node.id})`;
 	if (node.type === "text") return words ? `the text "${short(words)}" (${node.id})` : `a text (${node.id})`;
 	const name = typeof node.name === "string" && node.name.trim() ? `"${short(node.name.trim())}" ` : "";
 	const kind = node.type === "ref" ? "component" : node.type;
