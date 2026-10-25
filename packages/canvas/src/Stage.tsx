@@ -1106,7 +1106,7 @@ export function Stage(props: {
 	 */
 	/*
 	 * What the draw tool's lasso holds (`inkSelection`): the same pill as a selection's, so its strokes can
-	 * go to the agent as the select tool's can (Make a drawing, Make a board, Ask), and be fitted or deleted.
+	 * go to the agent as the select tool's can (Make a drawing, Make a board, Send), and be commented on, duplicated or deleted.
 	 */
 	const lassoItems = createMemo(() => {
 		if (!props.drawing || !props.onInk || !props.inkAgent) return undefined;
@@ -2438,6 +2438,25 @@ export function Stage(props: {
 							onBoard: () => props.onInk?.({ action: "board", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 						}}
+						// The rest of a selection's pill, acting on the lasso's strokes instead of the editor's pick.
+						{...(props.onComment
+							? {
+									onComment: () =>
+										props.onComment?.({
+											path: stagePenPath() ?? "the canvas",
+											items: held().ids,
+											quote: "",
+											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
+											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+										}),
+								}
+							: {})}
+						onDuplicate={() => {
+							const { ops, made } = duplicateOps(scene, held().ids, freshIds());
+							penEdit(ops);
+							if (made.length) setInkSelection({ path: inkSelection()?.path ?? "stage", ids: made });
+						}}
+						{...(props.onPillMore ? { onMore: (anchor: DOMRect) => props.onPillMore?.({ ids: held().ids }, anchor) } : {})}
 						onDelete={() => {
 							penEdit(held().ids.map((id) => ({ op: "delete", id })));
 							setInkSelection(undefined);
