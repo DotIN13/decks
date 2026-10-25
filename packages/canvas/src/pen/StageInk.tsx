@@ -76,6 +76,18 @@ export function StageInk(props: {
 		if (reshape) live = liveOf(reshape);
 		reshape = undefined;
 		const want = [...[...waiting.values()].map((held) => held.ink), ...(live ? [live] : [])];
+		/*
+		 * Drawn by the engine, the painter that draws the saved stroke: as SVG it came out lighter than
+		 * the engine's 4× multisampled tiles draw the same outline, and the stroke thickened as the copy
+		 * came off. Once a frame, so it holds the frame rate (60 fps on an iPad mini, as the SVG did); the
+		 * SVG is kept behind `__inkOnSvg`.
+		 */
+		if (!(globalThis as { __inkOnSvg?: boolean }).__inkOnSvg) {
+			props.layer.ink(want);
+			for (const [, path] of shown) path.el.remove();
+			shown.clear();
+			return;
+		}
 		const keep = new Set(want.map((ink) => ink.id));
 		for (const [id, path] of shown) {
 			if (keep.has(id)) continue;
@@ -596,6 +608,8 @@ export function StageInk(props: {
 		setInkSelection(undefined);
 		for (const id of [...waiting.keys()]) settle(id);
 		cancelAnimationFrame(frame);
+		// The engine's copies go with the sheet.
+		props.layer.ink([]);
 	});
 
 	return (
