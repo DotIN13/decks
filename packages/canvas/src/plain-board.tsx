@@ -408,8 +408,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			class="board-node plain-board"
 			data-path={props.board.path}
 			data-selected={props.selected}
-			// The selected board and every document keep their page while the camera moves (`pageNow` in `Stage.tsx`).
-			data-kept-live={props.selected || props.board.live === "doc" ? "" : undefined}
+			// The selected board keeps its page while the camera moves (`keptLive` in `Stage.tsx`).
+			data-kept-live={props.selected ? "" : undefined}
 			data-inert={inert() || !live()}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}

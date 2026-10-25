@@ -334,14 +334,8 @@ export function Stage(props: {
 	 * picture at all (`live-placeholder.ts`).
 	 */
 	const keptLive = createMemo(() => props.selected);
-	/**
-	 * Documents keep their page while the camera moves too: a document has no picture, only a card
-	 * with its icon (`live-placeholder.ts`), so a pan or a zoom over one swapped the words for a grey
-	 * card until the camera stopped. Below the live zoom they are their card, as every board is.
-	 */
-	const docPaths = createMemo<ReadonlySet<string>>(() => new Set(props.boards.filter((board) => board.live === "doc").map((board) => board.path)));
 	/** Whether a board whose page is live is drawn as its page now, rather than as its picture. */
-	const pageNow = (path: string) => !picturesNow() || keptLive() === path || docPaths().has(path);
+	const pageNow = (path: string) => !picturesNow() || keptLive() === path;
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 	/** A press pans: Space is held, or the host's hand tool is on (`state/pen-tools.ts`). */
 	const grabbing = () => spaceHeld() || handTool();
