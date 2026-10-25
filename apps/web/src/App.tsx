@@ -10,7 +10,6 @@ import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
 import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
-import { InkAsk } from "./canvas/InkAsk.tsx";
 import type { InkRequest } from "@decks/canvas";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import { createAlerts } from "./app/alerts.ts";
@@ -955,8 +954,7 @@ export function App() {
 	 * strokes by id, their canvas and where they are, and what to make of them. The strokes are hidden
 	 * rather than deleted (`enabled: false`), so what was drawn is kept in the file.
 	 */
-	const [inkAsking, setInkAsking] = createSignal<InkRequest>();
-	const askAboutInk = (request: InkRequest, question?: string) => {
+	const askAboutInk = (request: InkRequest) => {
 		const agentId = state.focused;
 		if (!agentId || request.ids.length === 0) return;
 		const n = request.ids.length;
@@ -968,7 +966,7 @@ export function App() {
 				? `Make this a drawing I can edit: a shape for each outline, the handwritten words as text, and arrows joined to the shapes they connect, in the same place and at the same size. ${keep}`
 				: request.action === "board"
 					? `Make this a board, placed where the strokes are and about their size. ${keep}`
-					: (question ?? "What is this?");
+					: "Read what is written or drawn there and act on it. If it is an instruction, carry it out; if it is a question, answer it; if it is a sketch or notes, say in a line what you read and what you would make of it.";
 		send({ type: "agent.prompt", id: agentId, text: `${where}\n${asked}` });
 	};
 	const loadApps = () =>
@@ -1493,8 +1491,8 @@ export function App() {
 							},
 							onViewport: () => reportCameraSoon(camera()),
 							onComment: (comment) => setCommenting({ ...comment, open: true }),
-							// Ink selected: the pill hands it to the agent on screen, or opens the question's field.
-							onInk: (request) => (request.action === "ask" ? setInkAsking(request) : askAboutInk(request)),
+							// Ink selected: the pill hands it to the agent on screen.
+							onInk: (request) => askAboutInk(request),
 							inkAgent: () => (state.focused ? (state.identities[state.focused]?.name ?? "the agent") : undefined),
 							onSelectTool: () => setPenTool("select"),
 							onRefer: (pills) =>
@@ -1936,17 +1934,6 @@ export function App() {
 					/>
 				</Show>
 
-				<Show when={inkAsking()}>
-					{(request) => (
-						<InkAsk
-							agent={state.identities[state.focused ?? ""]?.name ?? "the agent"}
-							count={request().ids.length}
-							anchor={request().anchor ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0)}
-							onAsk={(question) => askAboutInk(request(), question)}
-							onClose={() => setInkAsking(undefined)}
-						/>
-					)}
-				</Show>
 				<Show when={settings()}>
 					<Settings
 						prefs={prefs()}

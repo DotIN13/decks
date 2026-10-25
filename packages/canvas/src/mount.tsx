@@ -154,7 +154,7 @@ export interface CanvasOptions {
 	/** The host's own menu on the pill (its ⋯): for a board by its path, or for drawn items by their ids. Absent: no ⋯. */
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/**
-	 * Ink selected, and the pill's Make a drawing, Make a board or Ask pressed (`Stage`'s `onInk`): the host
+	 * Ink selected, and the pill's Make a drawing, Make a board or Send pressed (`Stage`'s `onInk`): the host
 	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;

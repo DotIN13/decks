@@ -14,7 +14,7 @@ import Scan from "lucide-solid/icons/scan";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import Shapes from "lucide-solid/icons/shapes";
 import LayoutTemplate from "lucide-solid/icons/layout-template";
-import Sparkles from "lucide-solid/icons/sparkles";
+import Send from "lucide-solid/icons/send";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
@@ -49,10 +49,10 @@ export function BoardCallout(props: {
 	/** The host's own menu for what the pill is on, opened under this button (its box on screen). */
 	onMore?: (anchor: DOMRect) => void;
 	/**
-	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or ask about
-	 * it (the field opens under `anchor`, the pill's box on screen). First in the pill, in words.
+	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or send it as it
+	 * is, for the agent to read and act on (a command written by hand is carried out). First, in words.
 	 */
-	ink?: { agent: string; onDrawing: () => void; onBoard: () => void; onAsk: (anchor: DOMRect) => void };
+	ink?: { agent: string; onDrawing: () => void; onBoard: () => void; onSend: () => void };
 	/** Out of sight while something moves. */
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
@@ -170,9 +170,9 @@ export function BoardCallout(props: {
 							<Icon of={LayoutTemplate} size={15} />
 							Make a board
 						</button>
-						<button type="button" role="menuitem" class="callout-word callout-ask" onClick={() => ink().onAsk(element!.getBoundingClientRect())}>
-							<Icon of={Sparkles} size={15} />
-							Ask {ink().agent}…
+						<button type="button" role="menuitem" class="callout-word callout-ask" title={`${ink().agent} reads it and acts on it: what you wrote there is what it does`} onClick={() => ink().onSend()}>
+							<Icon of={Send} size={15} />
+							Send to {ink().agent}
 						</button>
 						<span class="callout-rule" aria-hidden="true" />
 					</>

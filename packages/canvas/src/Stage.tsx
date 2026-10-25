@@ -110,7 +110,7 @@ export interface StageComment {
 }
 
 /** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */
-export type InkRequest = { action: "drawing" | "board" | "ask"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number }; anchor?: DOMRect };
+export type InkRequest = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
 export function Stage(props: {
 	/**
@@ -204,7 +204,7 @@ export function Stage(props: {
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
 	/**
 	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a board of it,
-	 * or ask about it, the question's field opening under `anchor`. Without both, the pill has no such actions.
+	 * or send it as it is, to be read and acted on. Without both, the pill has no such actions.
 	 */
 	onInk?: (request: InkRequest) => void;
 	inkAgent?: string;
@@ -2409,7 +2409,7 @@ export function Stage(props: {
 													agent: props.inkAgent,
 													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
 													onBoard: () => props.onInk?.({ action: "board", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
-													onAsk: (anchor: DOMRect) => props.onInk?.({ action: "ask", ids: items().ids, canvas: props.stageName ?? "", box: items().box, anchor }),
+													onSend: () => props.onInk?.({ action: "send", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
 												},
 											}
 										: {}),
@@ -2436,7 +2436,7 @@ export function Stage(props: {
 							agent: props.inkAgent ?? "the agent",
 							onDrawing: () => props.onInk?.({ action: "drawing", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 							onBoard: () => props.onInk?.({ action: "board", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
-							onAsk: (anchor: DOMRect) => props.onInk?.({ action: "ask", ids: held().ids, canvas: props.stageName ?? "", box: held().box, anchor }),
+							onSend: () => props.onInk?.({ action: "send", ids: held().ids, canvas: props.stageName ?? "", box: held().box }),
 						}}
 						onDelete={() => {
 							penEdit(held().ids.map((id) => ({ op: "delete", id })));
