@@ -11,7 +11,7 @@ export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
 export { PlainBoard } from "./plain-board.tsx";
 export { createBoardHost, type BoardHost, type MintBoardToken } from "./board-host.ts";
 export { boardStorageKey, isSharedBoard, sharedFolderOf, SHARED_SANDBOX } from "./board-storage.ts";
-export { Stage, type StageComment, type StageShots } from "./Stage.tsx";
+export { Stage, type InkRequest, type StageComment, type StageShots } from "./Stage.tsx";
 export type { StageBoardProps } from "./board-slot.ts";
 export type { FrameGestureHost } from "./frame-host.ts";
 export type { PenEdit, PenDocument } from "@decks/pen";

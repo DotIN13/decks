@@ -10,6 +10,8 @@ import { createStore, reconcile } from "solid-js/store";
 import { shownHeight } from "./board/extent.ts";
 import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
+import { InkAsk } from "./canvas/InkAsk.tsx";
+import type { InkRequest } from "@decks/canvas";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import { createAlerts } from "./app/alerts.ts";
 import { camera, glide, moveCamera, reducedMotion, setCamera } from "./state/camera.ts";
@@ -948,6 +950,27 @@ export function App() {
 	});
 	/** The deck's apps, for the panel's Apps tab: asked for each time the tab opens. */
 	const [apps, setApps] = createSignal<PanelApp[] | undefined>();
+	/*
+	 * Ink handed to the agent from the selection's pill (`BoardCallout`'s `ink`): a message naming the
+	 * strokes by id, their canvas and where they are, and what to make of them. The strokes are hidden
+	 * rather than deleted (`enabled: false`), so what was drawn is kept in the file.
+	 */
+	const [inkAsking, setInkAsking] = createSignal<InkRequest>();
+	const askAboutInk = (request: InkRequest, question?: string) => {
+		const agentId = state.focused;
+		if (!agentId || request.ids.length === 0) return;
+		const n = request.ids.length;
+		const b = request.box;
+		const where = `[${n} ink ${n === 1 ? "stroke" : "strokes"} on the canvas ${request.canvas}, at x ${Math.round(b.x)} y ${Math.round(b.y)}, ${Math.round(b.w)} × ${Math.round(b.h)}: ${request.ids.join(", ")}]`;
+		const keep = "Then hide the strokes, setting enabled to false on each, so they are kept in the file but not shown.";
+		const asked =
+			request.action === "drawing"
+				? `Make this a drawing I can edit: a shape for each outline, the handwritten words as text, and arrows joined to the shapes they connect, in the same place and at the same size. ${keep}`
+				: request.action === "board"
+					? `Make this a board, placed where the strokes are and about their size. ${keep}`
+					: (question ?? "What is this?");
+		send({ type: "agent.prompt", id: agentId, text: `${where}\n${asked}` });
+	};
 	const loadApps = () =>
 		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
 			if (list) setApps(list.map((app) => ({ name: app.name, title: app.title || app.name, status: app.status, board: app.board })));
@@ -1470,6 +1493,9 @@ export function App() {
 							},
 							onViewport: () => reportCameraSoon(camera()),
 							onComment: (comment) => setCommenting({ ...comment, open: true }),
+							// Ink selected: the pill hands it to the agent on screen, or opens the question's field.
+							onInk: (request) => (request.action === "ask" ? setInkAsking(request) : askAboutInk(request)),
+							inkAgent: () => (state.focused ? (state.identities[state.focused]?.name ?? "the agent") : undefined),
 							onSelectTool: () => setPenTool("select"),
 							onRefer: (pills) =>
 								setDraft({
@@ -1910,6 +1936,17 @@ export function App() {
 					/>
 				</Show>
 
+				<Show when={inkAsking()}>
+					{(request) => (
+						<InkAsk
+							agent={state.identities[state.focused ?? ""]?.name ?? "the agent"}
+							count={request().ids.length}
+							anchor={request().anchor ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0)}
+							onAsk={(question) => askAboutInk(request(), question)}
+							onClose={() => setInkAsking(undefined)}
+						/>
+					)}
+				</Show>
 				<Show when={settings()}>
 					<Settings
 						prefs={prefs()}

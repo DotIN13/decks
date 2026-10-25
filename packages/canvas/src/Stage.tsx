@@ -21,7 +21,7 @@ import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
-import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
+import { inkVariableEdit, isInk, strokeOf } from "./pen/ink.ts";
 import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
@@ -107,6 +107,9 @@ export interface StageComment {
 	items?: string[];
 	anchor: () => DOMRect | undefined;
 }
+
+/** What the pill's ink actions ask for (`onInk`): the strokes, their canvas and where they are. */
+export type InkRequest = { action: "drawing" | "board" | "ask"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number }; anchor?: DOMRect };
 
 export function Stage(props: {
 	/**
@@ -198,6 +201,12 @@ export function Stage(props: {
 	onHide?: (path: string) => void;
 	/** The host's own menu for what a pill is on: a board by its path, or drawn items by their ids. */
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
+	/**
+	 * Ink selected, handed to the agent on screen (`inkAgent`): redraw it as a drawing, make a board of it,
+	 * or ask about it, the question's field opening under `anchor`. Without both, the pill has no such actions.
+	 */
+	onInk?: (request: InkRequest) => void;
+	inkAgent?: string;
 	/** Delete a board: off the canvas and its file gone (the board pill's Delete). */
 	onDeleteBoard?: (path: string) => void;
 	/** The stage being shown, by folder name: a drawing act is drawn only on its own stage. */
@@ -2378,6 +2387,16 @@ export function Stage(props: {
 														title: items().name,
 														anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
 													}),
+											}
+										: {}),
+									...(props.onInk && props.inkAgent && items().ids.every((id) => { const node = penNode(id); return !!node && isInk(node); })
+										? {
+												ink: {
+													agent: props.inkAgent,
+													onDrawing: () => props.onInk?.({ action: "drawing", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
+													onBoard: () => props.onInk?.({ action: "board", ids: items().ids, canvas: props.stageName ?? "", box: items().box }),
+													onAsk: (anchor: DOMRect) => props.onInk?.({ action: "ask", ids: items().ids, canvas: props.stageName ?? "", box: items().box, anchor }),
+												},
 											}
 										: {}),
 									onDuplicate: () => penDuplicate(),

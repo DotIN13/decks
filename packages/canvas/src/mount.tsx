@@ -16,7 +16,7 @@ import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./pen/PenBar.tsx";
 import { PlainBoard } from "./plain-board.tsx";
-import { Stage, type StageComment } from "./Stage.tsx";
+import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
@@ -153,6 +153,12 @@ export interface CanvasOptions {
 	onDeleteBoard?: (path: string) => boolean | void | Promise<boolean | void>;
 	/** The host's own menu on the pill (its ⋯): for a board by its path, or for drawn items by their ids. Absent: no ⋯. */
 	onPillMore?: (on: { path?: string; ids?: string[] }, anchor: DOMRect) => void;
+	/**
+	 * Ink selected, and the pill's Make a drawing, Make a board or Ask pressed (`Stage`'s `onInk`): the host
+	 * hands it to `inkAgent`, the agent on screen, by name; without either, the pill has no such actions.
+	 */
+	onInk?: (request: InkRequest) => void;
+	inkAgent?: () => string | undefined;
 	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
 	onProperties?: () => void;
 	/** How boards are drawn: each a live page (`dom`, the default), or each into its own canvas where the browser can (`canvas-per-board`). */
@@ -488,6 +494,8 @@ export function createEditor(
 			}))
 			}
 			{...commenting}
+			{...(options.onInk ? { onInk: options.onInk } : {})}
+			inkAgent={options.inkAgent?.()}
 		/>
 	);
 	const surface = () => stageView();

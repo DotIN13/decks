@@ -832,6 +832,33 @@
 	margin: 0 2px;
 	background: var(--line-strong);
 }
+	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
+	.stage > .board-callout > .callout-word {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 6px;
+	height: var(--control, 28px);
+	padding: 0 9px;
+	border: 0;
+	border-radius: var(--control-radius, 8px);
+	background: none;
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	white-space: nowrap;
+}
+	.stage > .board-callout > .callout-word > svg {
+	color: var(--muted);
+}
+	.stage > .board-callout > .callout-word:hover {
+	background: var(--fill);
+}
+	.stage > .board-callout > .callout-ask > svg {
+	color: var(--color-accent);
+}
 	/* Delete, on drawn items: the one action that cannot be put back with Show. */
 	.stage > .board-callout > .icon-button.callout-danger {
 	color: var(--color-danger);

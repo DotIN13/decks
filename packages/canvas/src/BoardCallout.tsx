@@ -12,6 +12,9 @@ import X from "lucide-solid/icons/x";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
 import Scan from "lucide-solid/icons/scan";
 import Ellipsis from "lucide-solid/icons/ellipsis";
+import Shapes from "lucide-solid/icons/shapes";
+import LayoutTemplate from "lucide-solid/icons/layout-template";
+import Sparkles from "lucide-solid/icons/sparkles";
 
 /** The gap between the pill and the board's edge, in screen pixels. */
 const GAP = 10;
@@ -45,6 +48,11 @@ export function BoardCallout(props: {
 	onDelete?: () => void;
 	/** The host's own menu for what the pill is on, opened under this button (its box on screen). */
 	onMore?: (anchor: DOMRect) => void;
+	/**
+	 * Ink selected, and an agent to hand it to: redraw it as a drawing, make a board of it, or ask about
+	 * it (the field opens under `anchor`, the pill's box on screen). First in the pill, in words.
+	 */
+	ink?: { agent: string; onDrawing: () => void; onBoard: () => void; onAsk: (anchor: DOMRect) => void };
 	/** Out of sight while something moves. */
 	hidden?: boolean;
 	/** The gap to the edge, in screen pixels, when something sits there the pill must leave clear (an item's arrow handles). */
@@ -151,6 +159,25 @@ export function BoardCallout(props: {
 			onPointerDown={stop}
 			onClick={stop}
 		>
+			<Show when={props.ink}>
+				{(ink) => (
+					<>
+						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} redraws it as shapes, words and arrows you can edit`} onClick={() => ink().onDrawing()}>
+							<Icon of={Shapes} size={15} />
+							Make a drawing
+						</button>
+						<button type="button" role="menuitem" class="callout-word" title={`${ink().agent} builds a board from it, in its place`} onClick={() => ink().onBoard()}>
+							<Icon of={LayoutTemplate} size={15} />
+							Make a board
+						</button>
+						<button type="button" role="menuitem" class="callout-word callout-ask" onClick={() => ink().onAsk(element!.getBoundingClientRect())}>
+							<Icon of={Sparkles} size={15} />
+							Ask {ink().agent}…
+						</button>
+						<span class="callout-rule" aria-hidden="true" />
+					</>
+				)}
+			</Show>
 			<button type="button" role="menuitem" class="icon-button" aria-label={props.board ? "Fit" : "Zoom to it"} title={props.board ? "Fit the board to the screen" : "Zoom to it"} onClick={() => props.onOpen()}>
 				<Icon of={Scan} size={16} />
 			</button>
