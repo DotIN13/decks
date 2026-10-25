@@ -1828,36 +1828,6 @@ export function Stage(props: {
 	 * loaded again as the zoom came back.
 	 */
 	let heldPages: () => readonly string[] = () => [];
-	/**
-	 * Documents keep their page below the live zoom: a document has no picture, only a card with its
-	 * icon (`live-placeholder.ts`), so zooming out past `INTERACT_ZOOM` turned the words someone was
-	 * reading into a grey card. At rest below it, the documents on screen stay pages, the nearest the
-	 * middle first and at most `DOCS_KEPT` of them (one on a phone), so a far zoom over a deck of
-	 * documents is still a few pages and not dozens. Worked out from the camera's last rest, so a
-	 * gesture never starts or drops one; while the camera moves they are their card, as every page is.
-	 */
-	/** The camera as of its last rest, as `restZoom` is the zoom. */
-	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
-	const DOCS_KEPT = ONE_LIVE ? 1 : 4;
-	const docsKept = createMemo<ReadonlySet<string>>((was) => {
-		const cam = restCamera();
-		const v = view();
-		const next =
-			cam.zoom >= INTERACT_ZOOM || v.width === 0
-				? []
-				: props.boards
-						.filter((board) => board.live === "doc")
-						.map((board) => {
-							const a = toScreen(cam, v, { x: board.x, y: board.y });
-							const b = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
-							return { path: board.path, on: b.x > 0 && a.x < v.width && b.y > 0 && a.y < v.height, d: Math.hypot((a.x + b.x) / 2 - v.width / 2, (a.y + b.y) / 2 - v.height / 2) };
-						})
-						.filter((one) => one.on)
-						.sort((p, q) => p.d - q.d)
-						.slice(0, DOCS_KEPT)
-						.map((one) => one.path);
-		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
-	});
 	const rendered = createMemo<readonly Board[]>((was) => {
 		const boards = props.boards;
 		if (view().width === 0) return was ?? [];
@@ -1880,7 +1850,6 @@ export function Stage(props: {
 		for (const path of shownBoards()) keep(path);
 		if (props.renderer === "dom" && liveZoom()) for (const path of heldPages()) keep(path);
 		keep(props.selected);
-		for (const path of docsKept()) keep(path);
 		for (const path of editor.heldBoards()) keep(path);
 		const next = [...found]
 			.sort((a, b) => a - b)
@@ -1894,6 +1863,8 @@ export function Stage(props: {
 	/** The boards may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
 
+	/** The camera as of its last rest, as `restZoom` is the zoom. */
+	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
 
 	/*
 	 * SVGs shown live on the canvas (`liveFileItem`), each as an image. Each is an element in the boards' layer, under the sheet, which draws a hole
@@ -2115,7 +2086,6 @@ export function Stage(props: {
 			mounted={
 				/* The selected board is live at any zoom, on any device. */
 				props.selected === board.path ||
-				docsKept().has(board.path) ||
 				(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 			}
 			visible={isVisible(board)}
