@@ -3395,3 +3395,74 @@ body {
 		}
 	}
 }
+
+/* ---- the comment popup (`markup/CommentPopup.tsx`), in the menus' look ----
+   The same card as a menu: a hairline, the soft shadow and 12px corners; the field a grey well
+   with no border of its own, and buttons with the menus' 7px corners. */
+@layer components {
+	body .comment-popup {
+		border: 1px solid var(--v3-line);
+		border-radius: 12px;
+		background: var(--v3-panel);
+		box-shadow:
+			0 8px 28px rgb(0 0 0 / 12%),
+			0 0 0 0.5px rgb(0 0 0 / 6%);
+		color: var(--v3-fg);
+		font-size: 13px;
+		animation: v3-arrive 160ms var(--v3-ease);
+	}
+	[data-color-scheme="dark"] body .comment-popup {
+		box-shadow:
+			0 10px 32px rgb(0 0 0 / 50%),
+			0 0 0 0.5px rgb(255 255 255 / 6%);
+	}
+	body .comment-popup[data-open="true"] {
+		gap: 10px;
+		padding: 12px;
+	}
+	body .comment-popup .comment-start,
+	body .comment-popup .comment-act {
+		height: 28px;
+		padding: 0 10px;
+		border-radius: 7px;
+		font-size: 13px;
+	}
+	body .comment-popup .comment-start:hover,
+	body .comment-popup .comment-act:hover:not(:disabled) {
+		background: var(--v3-bg2);
+	}
+	body .comment-popup .comment-act {
+		border-color: var(--v3-line2);
+	}
+	body .comment-popup .comment-act[data-primary="true"] {
+		border-color: var(--v3-fg);
+		background: var(--v3-fg);
+		color: var(--v3-panel);
+	}
+	body .comment-popup .comment-quote {
+		padding: 1px 0 1px 10px;
+		border-left-width: 3px;
+		border-radius: 1px;
+		color: var(--v3-fg2);
+	}
+	body .comment-popup .comment-field {
+		min-height: 72px;
+		padding: 9px 11px;
+		border: 1px solid transparent;
+		border-radius: 9px;
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+		font-size: 14px;
+		resize: none;
+	}
+	body .comment-popup .comment-field::placeholder {
+		color: var(--v3-fg3);
+	}
+	body .comment-popup .comment-field:focus {
+		border-color: var(--v3-accent);
+		background: var(--v3-panel);
+	}
+	body .comment-popup .comment-acts .icon-button {
+		border-radius: 7px;
+	}
+}
