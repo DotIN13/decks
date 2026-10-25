@@ -32,8 +32,7 @@ export function isInk(node: PenNode): boolean {
 	return node.type === "path" && node.metadata?.type === INK;
 }
 
-/** To a ten-thousandth: far below a pixel or a pressure step, only the float32 noise a pen reports past that goes. */
-const exact = (n: number) => Math.round(n * 10000) / 10000;
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /** A stroke drawn on the stage, as the pen item that keeps it. `points` are in stage pixels. */
 export function inkItem(stroke: Omit<InkStroke, "id">, id: string): PenNode {
@@ -52,8 +51,8 @@ export function inkItem(stroke: Omit<InkStroke, "id">, id: string): PenNode {
 	const y = Math.floor(minY - pad);
 	const width = Math.ceil(maxX + pad) - x;
 	const height = Math.ceil(maxY + pad) - y;
-	// Kept as drawn, in the item's own box: rounding them to a tenth of a pixel and a hundredth of pressure moved the saved stroke off the one drawn.
-	const local = stroke.points.map((n, i) => (i % 3 === 0 ? exact(n - x) : i % 3 === 1 ? exact(n - y) : exact(n)));
+	// Positions to a tenth of a pixel and pressure to a hundredth: a pen reports float32 noise past that.
+	const local = stroke.points.map((n, i) => (i % 3 === 0 ? round1(n - x) : i % 3 === 1 ? round1(n - y) : Math.round(n * 100) / 100));
 	const shape = strokeShape({ id, ...stroke, points: local });
 	const paint = PAINT[stroke.color];
 	return {

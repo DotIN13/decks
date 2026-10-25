@@ -1,4 +1,4 @@
-import { hitStroke, inkBounds, inkPaint, inkShaper, lassoPick, strokeShape, type InkStroke } from "@decks/board-kit";
+import { hitStroke, inkBounds, inkPaint, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../state/ink.ts";
@@ -539,8 +539,7 @@ export function StageInk(props: {
 		}
 		switch (done.kind) {
 			case "draw": {
-				// Every sample kept: thinned, the saved outline was not the one drawn (`simplify` stays for whoever wants it).
-				const points = done.points;
+				const points = simplify(done.points);
 				const colour = done.stroke.color === "ink" ? props.colourEdit() : undefined;
 				props.onEdit([...(colour ? [colour] : []), { op: "insert", node: inkItem({ ...done.stroke, points }, done.id ?? props.newId()) }]);
 				return;
