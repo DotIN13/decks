@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { Author, ChangeRecord } from "../agents/canvas-news.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { rustRouter } from "./arrows.ts";
 import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
@@ -86,6 +87,8 @@ export interface PenEntry {
  * (`canvas/src/drawing.ts`), so it never draws the drawing as it was before for the round trip.
  */
 export const penEditBy = new AsyncLocalStorage<string>();
+/** How many writes of each canvas are kept for the agents' notes (`changesSince`). */
+const CHANGE_LOG = 400;
 /** How many of a stage's recent names a drawing sent whole carries. */
 const MADE_LATELY = 64;
 
@@ -122,6 +125,42 @@ export class StagePens {
 	private readonly made = new Map<string, string[]>();
 	/** The agent that last wrote each canvas (`penWriter`), since this server started. */
 	private readonly writers = new Map<string, string>();
+
+	/**
+	 * Each canvas's recent writes, who made them and the items they touched (`agents/canvas-news.ts`): what
+	 * an agent is told changed since its last message, and by whom. And the canvases each agent wrote since
+	 * it last asked, so it hears about those as well as its home canvas.
+	 */
+	private readonly changeLogs = new Map<string, ChangeRecord[]>();
+	private readonly writtenBy = new Map<string, Set<string>>();
+
+	/** A write of a canvas, kept for whoever is told about it next. */
+	private record(name: string, before: PenDocument | undefined, after: PenDocument, rev: number, by: Author): void {
+		// A canvas's first write is from nothing.
+		const ids = [...new Set(diff(before ?? emptyDocument(), after).flatMap((edit) => ("id" in edit ? [edit.id] : [])))];
+		if (ids.length === 0) return;
+		const log = this.changeLogs.get(name) ?? [];
+		log.push({ rev, by, ids });
+		if (log.length > CHANGE_LOG) log.splice(0, log.length - CHANGE_LOG);
+		this.changeLogs.set(name, log);
+		if (by.kind === "agent") {
+			const set = this.writtenBy.get(by.id) ?? new Set<string>();
+			set.add(name);
+			this.writtenBy.set(by.id, set);
+		}
+	}
+
+	/** The writes of a canvas after revision `rev`, oldest first. */
+	changesSince(name: string, rev: number): ChangeRecord[] {
+		return (this.changeLogs.get(name) ?? []).filter((record) => record.rev > rev);
+	}
+
+	/** The canvases this agent wrote since it last asked. */
+	takeWritten(agentId: string): string[] {
+		const set = this.writtenBy.get(agentId);
+		this.writtenBy.delete(agentId);
+		return set ? [...set] : [];
+	}
 
 	/** The agent that last wrote a canvas, by id: what its placeholder frames are marked with. */
 	writerOf(name: string): string | undefined {
@@ -1065,6 +1104,9 @@ export class StagePens {
 		const previous = this.cache.get(name);
 		const entry = { doc, rev: (previous?.rev ?? 0) + 1, mtime: statSync(file).mtimeMs, text };
 		this.cache.set(name, entry);
+		// An agent's call says so (`penWriter`); any other write here is the person's, from a page.
+		const author = penWriter.getStore();
+		this.record(name, previous?.doc, doc, entry.rev, author ? { kind: "agent", id: author } : { kind: "person" });
 		const by = penEditBy.getStore();
 		if (by) this.made.set(name, [...(this.made.get(name) ?? []), by]);
 		const writer = penWriter.getStore();
@@ -1089,7 +1131,11 @@ export class StagePens {
 					this.pending.delete(name);
 					const before = this.cache.get(name);
 					const after = this.get(name);
-					if (after !== before || after.rev !== before?.rev) this.changed(name, after);
+					if (after !== before || after.rev !== before?.rev) {
+						// Written straight to the file: pen.dev, an agent's own tools, the sync from Studio.
+						if (!after.error) this.record(name, before?.doc, after.doc, after.rev, { kind: "file" });
+						this.changed(name, after);
+					}
 					this.settle(name);
 				}, 80),
 			);

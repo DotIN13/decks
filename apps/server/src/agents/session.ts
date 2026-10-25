@@ -22,6 +22,8 @@ import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
 import { canvasNameReminder } from "../stage/canvas-name.ts";
+import type { PenDocument } from "@decks/pen";
+import { canvasNews } from "./canvas-news.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 
 /**
@@ -211,6 +213,33 @@ export class DeckAgent {
 	 * rides along with whatever the user says next rather than waking the agent up.
 	 */
 	private pending: string[] = [];
+	/**
+	 * Each canvas as it was at this agent's last message: what the next one is compared with, so it is
+	 * told what others changed there since (`agents/canvas-news.ts`). Its home canvas, the ones it wrote,
+	 * and any it was told about before.
+	 */
+	private seen = new Map<string, { rev: number; doc: PenDocument }>();
+	/** The notes `prompt()` puts first, and takes them: each call compares with the one before. */
+	canvasNotes(): string[] {
+		const pens = this.stage.pens;
+		if (!pens) return [];
+		const names = new Set([...(this.stageFolder ? [this.stageFolder] : []), ...pens.takeWritten(this.id), ...this.seen.keys()]);
+		const agents = this.host.agents();
+		const nameOf = (id: string) => agents.find((one) => one.id === id)?.name ?? "another agent";
+		const lines: string[] = [];
+		for (const name of names) {
+			if (!pens.has(name)) {
+				this.seen.delete(name);
+				continue;
+			}
+			const entry = pens.get(name);
+			if (entry.error) continue;
+			const before = this.seen.get(name);
+			if (before && before.rev !== entry.rev) lines.push(...canvasNews(pens.titleOf(name), name, before.doc, entry.doc, pens.changesSince(name, before.rev), this.id, nameOf));
+			this.seen.set(name, { rev: entry.rev, doc: entry.doc });
+		}
+		return lines;
+	}
 	/**
 	 * Work another agent handed over, waiting for this one to be quiet.
 	 *
@@ -1322,11 +1351,16 @@ export class DeckAgent {
 		 * the agent should know the board moved *before* it reads what to do about it.
 		 */
 		const nudges = this.pending.splice(0);
+		const slash = text.trimStart().startsWith("/");
+		/*
+		 * What others changed on its canvases since its last message, before what it is asked now: every
+		 * way in comes through here, a message typed, queued, sent into a running turn or handed over.
+		 */
+		if (!slash) nudges.push(...this.canvasNotes());
 		/*
 		 * And who it has not said it is, until it has (`agents/identity-reminder.ts`). Never on a
 		 * slash command, which every runtime reads as an exact line.
 		 */
-		const slash = text.trimStart().startsWith("/");
 		const unsaid = slash ? undefined : identityReminder(this.identity);
 		if (unsaid) nudges.push(unsaid);
 		// The canvas's name, while it has none of its own or has outgrown it (`stage/canvas-name.ts`).
