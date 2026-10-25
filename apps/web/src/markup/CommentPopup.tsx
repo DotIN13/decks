@@ -1,8 +1,7 @@
 import CornerDownLeft from "lucide-solid/icons/corner-down-left";
 import ListPlus from "lucide-solid/icons/list-plus";
 import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
-import ArrowUp from "lucide-solid/icons/arrow-up";
-import MessageSquare from "lucide-solid/icons/message-square";
+import Send from "lucide-solid/icons/send";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { setCommentDirty, type CommentTarget } from "../state/comments.ts";
@@ -117,58 +116,50 @@ export function CommentPopup(props: {
 						{props.target.quote}
 					</div>
 				</Show>
-				{/* One line that grows, as the question for an agent about a sketch is (`canvas/InkAsk.tsx`): the
-				    arrow sends it now, the chip under it keeps it for the next message. */}
-				<label class="comment-row">
-					<Icon of={MessageSquare} size={15} />
-					<textarea
-						ref={field}
-						class="comment-field"
-						rows={1}
-						placeholder="Comment on this…"
-						value={text()}
-						onInput={(event) => {
-							setText(event.currentTarget.value);
-							setCommentDirty(event.currentTarget.value.trim() !== "");
-							// Grows with what is written, to five lines, then scrolls.
-							event.currentTarget.style.height = "auto";
-							event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 110)}px`;
-							queueMicrotask(place);
-						}}
-						onKeyDown={(event) => {
-							event.stopPropagation();
-							if (event.key === "Escape") {
-								event.preventDefault();
-								props.onClose();
-							} else if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-								event.preventDefault();
-								if (event.metaKey || event.ctrlKey) sendNow();
-								else keep();
-							}
-						}}
-					/>
-					<button
-						type="button"
-						class="comment-go"
-						disabled={text().trim() === "" || !props.canSend}
-						aria-label="Send now"
-						title={props.canSend ? "Send it to the agent now, as a message of its own (⌘Enter)" : "Pick an agent first"}
-						onClick={sendNow}
-					>
-						<Icon of={ArrowUp} size={15} />
+				<textarea
+					ref={field}
+					class="comment-field"
+					rows={3}
+					placeholder="What do you want to say about this?"
+					value={text()}
+					onInput={(event) => {
+						setText(event.currentTarget.value);
+						setCommentDirty(event.currentTarget.value.trim() !== "");
+					}}
+					onKeyDown={(event) => {
+						event.stopPropagation();
+						if (event.key === "Escape") {
+							event.preventDefault();
+							props.onClose();
+						} else if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+							event.preventDefault();
+							if (event.metaKey || event.ctrlKey) sendNow();
+							else keep();
+						}
+					}}
+				/>
+				<div class="comment-acts">
+					<button type="button" class="icon-button [--control:24px]" title="Close (Escape)" aria-label="Close" onClick={props.onClose}>
+						<Icon of={X} size={14} />
 					</button>
-				</label>
-				<div class="comment-options">
-					<button type="button" class="comment-chip" disabled={text().trim() === ""} title="Keep it over the input bar and send it with your next message (Enter)" onClick={keep}>
+					<span class="flex-1" />
+					<button type="button" class="comment-act" disabled={text().trim() === ""} title="Keep it over the input bar and send it with your next message (Enter)" onClick={keep}>
 						<Icon of={ListPlus} size={14} />
-						With my next message
+						<span>With next message</span>
 						<kbd>
 							<Icon of={CornerDownLeft} size={11} />
 						</kbd>
 					</button>
-					<span class="flex-1" />
-					<button type="button" class="comment-close" title="Close (Escape)" aria-label="Close" onClick={props.onClose}>
-						<Icon of={X} size={14} />
+					<button
+						type="button"
+						class="comment-act"
+						data-primary="true"
+						disabled={text().trim() === "" || !props.canSend}
+						title={props.canSend ? "Send it to the agent now, as a message of its own (⌘Enter)" : "Pick an agent first"}
+						onClick={sendNow}
+					>
+						<Icon of={Send} size={14} />
+						<span>Send now</span>
 					</button>
 				</div>
 			</Show>
