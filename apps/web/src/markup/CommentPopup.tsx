@@ -63,16 +63,23 @@ export function CommentPopup(props: {
 	onMount(() => {
 		if (open()) queueMicrotask(() => field?.focus());
 		window.addEventListener("resize", place);
-		// A press anywhere else in the app puts it away, unless there is something typed to lose.
+		// A press anywhere else puts it away, typed or not: in the app, or inside a board's page, which
+		// the app hears of only as its own window losing focus to the board's frame.
 		const away = (event: PointerEvent) => {
-			if (box?.contains(event.target as Node)) return;
-			if (text().trim() === "") props.onClose();
+			if (!box?.contains(event.target as Node)) props.onClose();
 		};
+		// The frame is the active element only once the blur is over.
+		const intoFrame = () =>
+			setTimeout(() => {
+				if (open() && document.activeElement instanceof HTMLIFrameElement) props.onClose();
+			});
 		window.addEventListener("pointerdown", away, true);
+		window.addEventListener("blur", intoFrame);
 		onCleanup(() => {
 			setCommentDirty(false);
 			window.removeEventListener("resize", place);
 			window.removeEventListener("pointerdown", away, true);
+			window.removeEventListener("blur", intoFrame);
 		});
 	});
 
