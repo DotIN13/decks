@@ -63,9 +63,8 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 	};
 
 	return {
-		// A view kept before canvases were part of the key is the agent's alone: it is used for
-		// whichever canvas asks first, until that canvas has a view of its own.
-		of: (agentId, stage) => read()[keyOf(agentId, stage)] ?? read()[agentId],
+		// Only the key asked for: a view kept before canvases were part of the key no longer stands in for every canvas.
+		of: (agentId, stage) => read()[keyOf(agentId, stage)],
 		keep: (agentId, stage, view) => {
 			const views = read();
 			views[keyOf(agentId, stage)] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };

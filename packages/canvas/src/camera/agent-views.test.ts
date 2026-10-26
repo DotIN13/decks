@@ -65,11 +65,11 @@ test("a keep is a copy, so the camera moving on does not rewrite history", () =>
 test("a value that is not a view is no view, and does not take the others with it", () => {
 	const store = fake({
 		"decks.views:/decks/one": JSON.stringify({
-			broken: { camera: { x: "1", y: 2, zoom: 1 } },
-			nan: { camera: { x: Number.NaN, y: 0, zoom: 1 } },
-			flat: { camera: { x: 0, y: 0, zoom: 0 } },
-			"not-an-object": 7,
-			ada: { camera: { x: 4, y: 5, zoom: 2 } },
+			"broken@main": { camera: { x: "1", y: 2, zoom: 1 } },
+			"nan@main": { camera: { x: Number.NaN, y: 0, zoom: 1 } },
+			"flat@main": { camera: { x: 0, y: 0, zoom: 0 } },
+			"not-an-object@main": 7,
+			"ada@main": { camera: { x: 4, y: 5, zoom: 2 } },
 		}),
 	});
 	const views = createAgentViews("/decks/one", store);
@@ -114,11 +114,10 @@ test("one agent has a view per canvas, and one canvas's view is not another's", 
 	assert.deepEqual(createAgentViews("/decks/one", store).of("ada", "sketches"), other, "retain keeps every canvas of a living agent");
 });
 
-test("a view kept before canvases were in the key is used once, then replaced", () => {
+test("a view kept before canvases were in the key answers for no canvas", () => {
 	const store = fake();
 	store.setItem("decks.views:/decks/one", JSON.stringify({ ada: view }));
 	const views = createAgentViews("/decks/one", store);
-	assert.deepEqual(views.of("ada", "main"), view, "the old view answers for the canvas that asks first");
-	views.keep("ada", "main", { camera: { x: 0, y: 0, zoom: 1 } });
-	assert.equal(views.of("ada", "sketches"), undefined, "and is gone once the agent has a view of its own");
+	assert.equal(views.of("ada", "main"), undefined, "it would stand in for every canvas, which is how one agent got another's camera");
+	assert.deepEqual(views.of("ada", undefined), view, "a host keyed by scope alone, as Studio is, still reads it");
 });
