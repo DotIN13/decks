@@ -234,8 +234,8 @@ fn real_stages_draw() {
 	}
 }
 
-/// The fixtures' fonts from `packages/stage/fonts/`, where they have been fetched (they are not
-/// committed): without them, the fixtures with words are skipped.
+/// The fixtures' fonts from `packages/stage/fonts/`, fetched by `npm run fonts -w packages/stage` (they
+/// are not committed): without them, the fixtures with words are skipped.
 fn fonts() -> stage_text::Text {
 	let mut t = stage_text::Text::new();
 	for (family, file, fallback) in fixtures::FONTS {
@@ -544,7 +544,7 @@ fn fixtures_match_their_goldens() {
 	for (device, g) in [("full", &mut full), ("webgl2", &mut small)] {
 		for name in fixtures::NAMES {
 			let Some((w, h)) = fixtures::draw(g, name, &words) else {
-				eprintln!("{name}: skipped, no fonts in packages/stage/fonts");
+				eprintln!("{name}: skipped, no fonts in packages/stage/fonts (npm run fonts -w packages/stage)");
 				continue;
 			};
 			golden(name, device, &g.read(fixtures::OUT).unwrap(), w, h);

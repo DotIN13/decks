@@ -674,9 +674,13 @@ export function createPointer(editor: Editor, host: PointerHost) {
 				if (!act.carry || !dragBoard(act.path, event, element)) selectBoard(act.path);
 				return;
 			case "touch":
-				if (act.picture) selectBoard(act.picture);
+				// The touch first: it clears the selection for a finger on bare stage, which a board's picture lies on,
+				// so selecting the board before it was undone by the same press.
 				host.beginTouch(event);
-				if (act.picture) return;
+				if (act.picture) {
+					selectBoard(act.picture);
+					return;
+				}
 				if (act.then === "drawing") touchOnDrawing(event);
 				else if (act.then === "deselect") tapToDeselect(event);
 				return;

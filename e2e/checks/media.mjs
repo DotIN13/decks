@@ -57,16 +57,21 @@ await editMode(page, true);
  * Somewhere empty to put them, in stage coordinates. A film over a board would still draw, but a
  * press on it is a press on the board's page, and the point here is to press the item.
  */
-const spot = await page.evaluate(() => {
-	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
-	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
-	for (let y = 160; y < 760; y += 40) {
-		for (let x = 360; x < 1200; x += 40) {
-			if (empty(x, y) && empty(x + 320, y) && empty(x, y + 300) && empty(x + 320, y + 300)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+// Asked until it answers: on a busy machine the canvas is still landing, or its pages still loading over the bare canvas, at the first look.
+const spot = await page
+	.waitForFunction(() => {
+		const stage = document.querySelector(".stage");
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		for (let y = 160; y < 760; y += 40) {
+			for (let x = 360; x < 1200; x += 40) {
+				if (empty(x, y) && empty(x + 320, y) && empty(x, y + 300) && empty(x + 320, y + 300)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+			}
 		}
-	}
-});
+		return null;
+	}, null, { timeout: 8000, polling: 200 })
+	.then((handle) => handle.jsonValue())
+	.catch(() => undefined);
 say("the canvas has room for them", !!spot);
 
 if (spot) {

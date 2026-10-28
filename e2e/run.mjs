@@ -149,6 +149,8 @@ const CHECKS = [
 	{ file: "zoom-out-pictures.mjs", needsAgent: false },
 	/* Six board pages at most on a computer and one on an iPad or a phone, none below the live zoom (`device.ts`). */
 	{ file: "live-budget.mjs", needsAgent: false },
+	/* A page opens on its boards at once, not after the arrival's 3 s cap. */
+	{ file: "opening-lands.mjs", needsAgent: false },
 	/* Zoomed in for a moment and out again, no board is left to a page that went to sleep: each shows its picture. */
 	{ file: "live-pictures.mjs", needsAgent: false },
 	/*

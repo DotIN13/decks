@@ -429,6 +429,12 @@ export function Stage(props: {
 		};
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
+		// A kept finger lets go when it lifts, wherever it was kept: one left behind would hold every later touch from scrolling.
+		const letGo = (event: PointerEvent) => keptTouches.delete(event.pointerId);
+		for (const kind of ["pointerup", "pointercancel"] as const) window.addEventListener(kind, letGo, true);
+		onCleanup(() => {
+			for (const kind of ["pointerup", "pointercancel"] as const) window.removeEventListener(kind, letGo, true);
+		});
 		/*
 		 * Two fingers on the canvas are one pinch, and the canvas's own (`touch`, `pinchCamera`): it zooms
 		 * about the fingers and pans with them. So while two are down the browser does not scroll with
@@ -1569,7 +1575,11 @@ export function Stage(props: {
 	const gestures: FrameGestureHost = {
 		wheel: (gesture) => wheel(gesture),
 		touch: (phase, finger) => touch(phase, finger),
-		claimTouch: (id) => claimed.add(id),
+		// A finger a board took (its bar or edge carries the board): the camera does not pan with it, and nor does the stage's native scroll.
+		claimTouch: (id) => {
+			claimed.add(id);
+			keptTouches.add(id);
+		},
 		pinching: () => touches.count() > 1,
 		pan: (dx, dy) => pushCamera(pan(ctl.now(), dx, dy)),
 		space: (held) => setSpaceHeld(held),

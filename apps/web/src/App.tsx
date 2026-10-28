@@ -1131,7 +1131,10 @@ export function App() {
 		arriving = undefined;
 	};
 	onCleanup(stopArriving);
+	/** A landing has happened since the page opened: until then there is no earlier canvas whose deck frame could be mistaken for this one's. */
+	let landedOnce = false;
 	const settle = (to: CameraOwner, next: Camera, chosen?: string) => {
+		landedOnce = true;
 		stopArriving();
 		moveCamera(next);
 		setSelected(chosen);
@@ -1143,15 +1146,47 @@ export function App() {
 		stopArriving();
 		const view = views().of(to.scope, to.canvas);
 		if (view) return settle(to, view.camera, view.selected);
-		const deckAt = untrack(deckSeen);
+		/*
+		 * A switch waits for a deck frame sent after it began: the one on hand may still be the canvas
+		 * being left. The page's first landing has no canvas being left, and its deck frame usually came
+		 * before it began, so it took any frame at all: waiting for a later one held every page's opening
+		 * on the 3 s cap, the camera at the origin over nothing until it ran out.
+		 */
+		const deckAt = landedOnce ? untrack(deckSeen) : 0;
 		const asked = Date.now();
 		const timer = setInterval(() => {
 			// Called off by the next arrival; this is only a canvas changing under it without one.
 			if (state.focused !== to.scope || stageOf(to.scope)?.name !== to.canvas) return stopArriving();
-			const ready = (!to.canvas || stagePen()?.scope === to.canvas) && deckSeen() > deckAt;
+			// The first landing also waits for the canvas's boards themselves: the deck frame on hand may not have put them in play yet, and a landing on the drawing alone framed the wrong place.
+			const ready = (!to.canvas || stagePen()?.scope === to.canvas) && deckSeen() > deckAt && (landedOnce || stageBoards().length > 0);
 			if (!ready && Date.now() - asked < 3000) return;
+			const first = !landedOnce;
 			const size = { width: window.innerWidth, height: window.innerHeight };
 			settle(to, landingCamera({ view: undefined, boxes: canvasBoxes(), viewport: size, region: canvasBox(size) }));
+			if (first && canvasBoxes().length === 0) landLate(to);
+		}, 100);
+		arriving = { ...to, stop: () => clearInterval(timer) };
+	};
+	/**
+	 * The page's first landing ran out of time before its canvas's boards came (a slow server, a
+	 * busy machine) and landed on nothing: when they come, it lands on them, unless the person has
+	 * moved the camera since. Left alone, the page sat at the empty origin until they went looking.
+	 */
+	const landLate = (to: CameraOwner) => {
+		const landed = untrack(camera);
+		const moved = () => {
+			const now = untrack(camera);
+			return Math.abs(now.x - landed.x) > 0.5 || Math.abs(now.y - landed.y) > 0.5 || Math.abs(now.zoom - landed.zoom) > 1e-4;
+		};
+		const asked = Date.now();
+		const timer = setInterval(() => {
+			if (state.focused !== to.scope || stageOf(to.scope)?.name !== to.canvas || moved() || Date.now() - asked > 30000) return stopArriving();
+			if (canvasBoxes().length === 0) return;
+			stopArriving();
+			const size = { width: window.innerWidth, height: window.innerHeight };
+			const next = landingCamera({ view: undefined, boxes: canvasBoxes(), viewport: size, region: canvasBox(size) });
+			moveCamera(next);
+			reportCamera(next, to.scope);
 		}, 100);
 		arriving = { ...to, stop: () => clearInterval(timer) };
 	};

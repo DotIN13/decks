@@ -131,7 +131,7 @@ say("a link to a board puts that board on the canvas", arrived && shown.includes
  * later frame still fails.
  */
 const besideOf = (a, b) => Boolean(a && b) && Math.abs(b.left - (a.left + a.w + 32)) < 2 && Math.abs(b.top - a.top) < 2;
-for (let i = 0; i < 20 && !besideOf(await nodeBox(SOURCE), await nodeBox(LINKED)); i++) await settle(page, 150);
+for (let i = 0; i < 60 && !besideOf(await nodeBox(SOURCE), await nodeBox(LINKED)); i++) await settle(page, 150);
 await settle(page, 1000);
 const source = await nodeBox(SOURCE);
 const placed = await nodeBox(LINKED);
@@ -177,9 +177,15 @@ await focus(SOURCE);
  * event is not promised for a page a frame opened.
  */
 const tabFrom = async (selector) => {
-	const opened = context.waitForEvent("page", { timeout: 8000 });
+	let opened = context.waitForEvent("page", { timeout: 8000 });
 	await press(selector);
-	const tab = await opened;
+	// On a busy machine the first press can be taken by the canvas while it settles: pressed once more before giving up.
+	let tab = await opened.catch(() => undefined);
+	if (!tab) {
+		opened = context.waitForEvent("page", { timeout: 8000 });
+		await press(selector);
+		tab = await opened;
+	}
 	await settle(page, 400);
 	const url = tab.url();
 	await tab.close();

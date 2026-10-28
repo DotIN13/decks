@@ -239,7 +239,8 @@ const MEASURE = `(() => {
 	body.style.minHeight = "0";
 	// A child's margin collapsing through a plain block body is counted, as the canvas counts it.
 	if (getComputedStyle(body).display === "block") body.style.display = "flow-root";
-	const page = body.scrollHeight;
+	// And the body's own margins (8 px on a page without board.css): the body's margin box, as the canvas takes it.
+	const page = Math.max(body.scrollHeight, body.getBoundingClientRect().bottom + scrollY + (parseFloat(getComputedStyle(body).marginBottom) || 0));
 	body.style.height = held;
 	body.style.minHeight = floor;
 	body.style.display = display;

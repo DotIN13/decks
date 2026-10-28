@@ -53,6 +53,13 @@ body.board {
  */
 html:has(> body.board) {
 	scrollbar-width: none;
+	/*
+	 * And nothing to scroll by hand either: in the beat before the canvas has the page's height, a page
+	 * taller than its frame scrolled under a wheel or a finger instead of the canvas panning. Unscrollable,
+	 * the page hands the scroll on to the canvas. A board's own scrolling parts (a document, a wide table)
+	 * scroll as before.
+	 */
+	overflow: hidden;
 }
 
 /* Two backgrounds a board may ask for in its meta (`"bg": "grid"` or `"dots"`); plain is the default. */

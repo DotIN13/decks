@@ -62,16 +62,21 @@ say("the stage has a file to draw in", existsSync(file), file);
 
 await editMode(page, true);
 
-const spot = await page.evaluate(() => {
-	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
-	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
-	for (let y = 170; y < 780; y += 40) {
-		for (let x = 380; x < 1300; x += 40) {
-			if (empty(x, y) && empty(x + 560, y) && empty(x, y + 340) && empty(x + 560, y + 340)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+// Asked until it answers: on a busy machine the canvas is still landing, or its pages still loading over the bare canvas, at the first look.
+const spot = await page
+	.waitForFunction(() => {
+		const stage = document.querySelector(".stage");
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		for (let y = 170; y < 780; y += 40) {
+			for (let x = 380; x < 1300; x += 40) {
+				if (empty(x, y) && empty(x + 560, y) && empty(x, y + 340) && empty(x + 560, y + 340)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+			}
 		}
-	}
-});
+		return null;
+	}, null, { timeout: 8000, polling: 200 })
+	.then((handle) => handle.jsonValue())
+	.catch(() => undefined);
 say("the canvas has room for a frame and a note beside it", !!spot);
 
 if (spot) {

@@ -81,8 +81,9 @@ await page.locator(".stage-new-form button[type=submit]").click();
  * to be inside is that one — a quick there-and-back, which is what a person does when they switch
  * to the wrong canvas.
  */
-await settle(page, 250);
-const onB = await pillStage();
+// As soon as the pill says B: on a busy machine the switch itself can take longer than the quick 250 ms this was.
+let onB = await pillStage();
+for (const deadline = Date.now() + 4000; onB === onA && Date.now() < deadline; onB = await pillStage()) await settle(page, 100);
 say("a new, empty canvas opens as B", onB !== onA, JSON.stringify({ onA, onB }));
 
 // Back to A at once — inside the window the poller is still waiting in.

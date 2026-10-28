@@ -329,7 +329,7 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
 			// Live is decided when the camera rests; the pages start a moment later. Wait for one.
 			await page
-				.waitForFunction(() => [...document.querySelectorAll(".board-node iframe")].some((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 15000 })
+				.waitForFunction(() => [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")].some((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 15000 })
 				.catch(() => {});
 			return true;
 		}
@@ -362,21 +362,23 @@ export async function ready(page, { timeout = 30000 } = {}) {
 	/*
 	 * Below the device's live zoom a board is its picture on the stage's sheet and none has a
 	 * document (`Stage.tsx`, `data-live`) and no node either: ready is the sheet having drawn them.
+	 * At it and above, ready is every page showing having said so; a page kept hidden for going back
+	 * (`live-set.ts`, `data-hidden-page`) never shows. Which of the two is asked again at every poll:
+	 * a page opens at 100% and lands at its canvas's zoom moments later, often below the live zoom,
+	 * and a wait that decided "pages" at the first look waited out its time for pages that had gone.
 	 */
 	await page.waitForSelector(".stage", { timeout });
-	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true")) {
-		// The Rust engine has no sheet: ready is its first frame drawn.
-		await page.waitForFunction(() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksEngine?.stats?.().engine === "rust" && (globalThis.__decksSheet?.shown ?? 0) > 0), null, { timeout });
-		return;
-	}
-	await page.waitForSelector(".board-node iframe", { timeout });
 	await page.waitForFunction(
 		() => {
-			const frames = [...document.querySelectorAll(".board-node iframe")];
+			if (document.querySelector(".stage")?.dataset.live !== "true") {
+				// The Rust engine has no sheet: ready is its first frame drawn.
+				return document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksEngine?.stats?.().engine === "rust" && (globalThis.__decksSheet?.shown ?? 0) > 0);
+			}
+			const frames = [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")];
 			return frames.length > 0 && frames.every((frame) => frame.contentWindow?.__boardReady === true);
 		},
 		null,
-		{ timeout },
+		{ timeout, polling: 100 },
 	);
 }
 
@@ -415,7 +417,7 @@ export async function rest(page, { start = 300, timeout = 6000 } = {}) {
 	await page.waitForFunction(moving, false, { timeout, polling: "raf" });
 	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
 		await page
-			.waitForFunction(() => [...document.querySelectorAll(".board-node iframe")].every((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 5000 })
+			.waitForFunction(() => [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")].every((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 5000 })
 			.catch(() => {});
 	}
 	await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));

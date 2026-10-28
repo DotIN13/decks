@@ -244,17 +244,18 @@ const agent = {
  * menu over it (`canvas/BoardCallout.tsx`).
  */
 {
-	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
+	// The fixture laid out before the page opens, so the page lands on it (it lands at once now, not 3 s later).
 	await resetStage();
+	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	await settle(page, 1400);
 	const bars = await page.evaluate(() => document.querySelectorAll(".bar-layer .chrome").length);
 	say("a touchscreen draws no title bars", bars === 0, `${bars} bars`);
 	const target = await page.evaluate(() => {
 		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
 		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
-		const found = [...document.querySelectorAll(".board-node")]
-			.map((node) => {
-				const r = node.getBoundingClientRect();
+		// The stage's boards, pictures among them: a phone has one live page at most (`device.ts`), and a tap on a picture selects it as on a page.
+		const found = (globalThis.__decksBoards?.() ?? [])
+			.map(({ rect: r }) => {
 				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
 				return { x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
 			})
@@ -300,6 +301,8 @@ const agent = {
 	);
 
 	/* One finger on the selected board's edge moves the board: a phone has no mouse to drag it by. */
+	// The board's menu glides to its slot over the board's edge: the point is chosen once it has come to rest.
+	await settle(page, 800);
 	const edge = await page.evaluate(() => {
 		const node = document.querySelector('.board-node[data-selected="true"]');
 		if (!node) return null;
@@ -311,7 +314,10 @@ const agent = {
 			for (const f of [0.5, 0.3, 0.7, 0.2, 0.8, 0.4, 0.6, 0.1, 0.9, 0.15, 0.85, 0.35, 0.65, 0.45, 0.55, 0.25, 0.75]) {
 				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 5 : r.right - 5;
 				const y = along ? (band.dataset.side === "n" ? r.y + 5 : r.bottom - 5) : r.y + r.height * f;
-				if (x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
+				// Clear of the menu by more than a fingertip: a touch snaps to the nearest button within its reach (touch adjustment).
+				const menu = document.querySelector(".board-callout")?.getBoundingClientRect();
+				const nearMenu = menu && x > menu.left - 12 && x < menu.right + 12 && y > menu.top - 12 && y < menu.bottom + 12;
+				if (!nearMenu && x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
 					// Where the board is on the canvas, not on screen: a pan would move it on screen too.
 					const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 					return { x, y, path: node.dataset.path, left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), zoom, band: Math.round(along ? r.height : r.width) };

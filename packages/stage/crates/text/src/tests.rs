@@ -1,7 +1,7 @@
 use super::*;
 use stage_scene::layout::TextStyle;
 
-/// The fonts fetched into `packages/stage/fonts` (see its README line in `fonts/.gitignore`).
+/// The fonts fetched into `packages/stage/fonts` by `npm run fonts -w packages/stage` (`fetch-fonts.mjs`).
 pub fn with_fonts() -> Option<Text> {
 	let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts");
 	let read = |f: &str| std::fs::read(format!("{dir}/{f}")).ok();

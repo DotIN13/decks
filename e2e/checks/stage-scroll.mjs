@@ -28,18 +28,25 @@ const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);
 
-const clear = await page.evaluate(() => {
-	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
-	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
-	for (let y = 140; y < window.innerHeight - 160; y += 30) {
-		for (let x = 320; x < window.innerWidth - 320; x += 30) {
-			// Room for the press and a little around it; the card itself may hang over anything below.
-			if ([0, 60].every((dy) => [0, 90].every((dx) => empty(x + dx, y + dy)))) return { screen: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, window: window.innerHeight };
+// Asked until it answers, with the camera at rest: on a busy machine the canvas is still landing at the first look.
+const clear = await page
+	.waitForFunction(() => {
+		if (document.querySelector(".stage")?.dataset.gliding === "true") return null;
+		const stage = document.querySelector(".stage");
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
+		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		for (let y = 140; y < window.innerHeight - 160; y += 30) {
+			for (let x = 320; x < window.innerWidth - 320; x += 30) {
+				// Room for the press and a little around it; the card itself may hang over anything below.
+				if ([0, 60].every((dy) => [0, 90].every((dx) => empty(x + dx, y + dy)))) return { screen: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, window: window.innerHeight };
+			}
 		}
-	}
-});
-say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen));
+		return null;
+	}, null, { timeout: 8000, polling: 200 })
+	.then((handle) => handle.jsonValue())
+	.catch(() => undefined);
+const why = clear ? "" : await page.evaluate(() => JSON.stringify({ cam: globalThis.__decksCameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live, at: [[400, 200], [600, 400], [800, 500]].map(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}.${[...e.classList].join(".")}` : null; }) }));
+say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen) + why);
 
 const scrolled = () => page.evaluate(() => {
 	const stage = document.querySelector(".stage");

@@ -11,6 +11,9 @@ import { fileURLToPath } from "node:url";
 import { say } from "../harness.mjs";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "../../apps/web");
+// The fonts the fixtures set words in, fetched when missing (`packages/stage/fetch-fonts.mjs`): without them the fixtures with words are not drawn at all.
+const fonts = spawnSync(process.execPath, ["fetch-fonts.mjs"], { cwd: join(web, "../../packages/stage"), encoding: "utf8", timeout: 120000 });
+say("the fixtures' fonts are here", fonts.status === 0, `${fonts.stdout ?? ""}${fonts.stderr ?? ""}`.trim().split("\n").at(-1));
 const run = spawnSync(process.execPath, ["--import", "tsx", "scripts/stage-backends.ts"], { cwd: web, encoding: "utf8", timeout: 120000 });
 const out = `${run.stdout ?? ""}${run.stderr ?? ""}`;
 const lines = out.split("\n");

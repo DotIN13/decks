@@ -10,6 +10,7 @@
 	},
 	"types": "./pkg/stage_web.d.ts",
 	"scripts": {
-		"build:wasm": "bash build-web.sh"
+		"build:wasm": "bash build-web.sh",
+		"fonts": "node fetch-fonts.mjs"
 	}
 }

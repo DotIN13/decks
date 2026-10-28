@@ -128,8 +128,12 @@ export function documentHeight(doc: Document): number | undefined {
 	 * 48 px short, and its page scrolled by that much under a wheel meant to pan the canvas. As its
 	 * own formatting context the body keeps those margins inside it, at the same total height.
 	 */
-	if (doc.defaultView?.getComputedStyle(body).display === "block") body.style.display = "flow-root";
-	const measured = body.scrollHeight;
+	const view = doc.defaultView;
+	if (view?.getComputedStyle(body).display === "block") body.style.display = "flow-root";
+	// And the body's own margins, which a page without `board.css` keeps (8 px): the page is as tall as the body's margin box.
+	const box = body.getBoundingClientRect?.();
+	const below = Number.parseFloat(view?.getComputedStyle(body).marginBottom ?? "0") || 0;
+	const measured = Math.max(body.scrollHeight, box ? box.bottom + (view?.scrollY ?? 0) + below : 0);
 	body.style.height = held;
 	body.style.minHeight = floor;
 	body.style.display = display;

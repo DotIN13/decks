@@ -1,5 +1,5 @@
 /** The camera, the embeds, and a file changed on disk reaching the frame. */
-import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, write, rest } from "../harness.mjs";
+import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, still, write, rest } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -82,6 +82,8 @@ say(
 	`clicked ${JSON.stringify(bare)}`,
 );
 await page.keyboard.press("0");
+// The fit glides, and on a busy machine the glide outlasts a fixed wait.
+await still(page);
 await settle(page, 400);
 const fitted = await page.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();

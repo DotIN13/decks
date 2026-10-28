@@ -1139,6 +1139,8 @@
 	border-radius: 2px;
 	background: var(--panel);
 	box-shadow: inset 0 0 0 1.5px var(--color-accent);
+	/* A finger on a handle resizes: the stage's native scroll (`touch-action: pan-x pan-y`) must not take it and cancel the press. */
+	touch-action: none;
 }
 	/* A resize handle answers a press 15 screen pixels across, whatever its drawn size (`--hit`, `editor/core/overlay.ts`, `hitReach`). */
 	.world > .pen-handle[data-handle]:not([data-handle="radius"])::before {
@@ -1985,5 +1987,7 @@
 		color: var(--muted);
 		cursor: grab;
 		user-select: none;
+		/* A finger on the bar carries the board, as its edge does: never a native scroll of the stage. */
+		touch-action: none;
 	}
 }

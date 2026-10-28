@@ -86,7 +86,7 @@ fn what_the_box_needs_is_asked_for_and_kept_once_handed_over() {
 	let Some(mut s) = shooter() else { return };
 	// Without the font files (`packages/stage/fonts/`, not in git) words are only estimated, and a card is never read.
 	if !with_fonts(&mut s) {
-		eprintln!("skipped: no fonts in packages/stage/fonts");
+		eprintln!("skipped: no fonts in packages/stage/fonts (npm run fonts -w packages/stage)");
 		return;
 	}
 	let doc = json!({ "version": "2.14", "children": [
@@ -131,7 +131,7 @@ fn read_png(path: &str) -> Option<(Vec<u8>, u32, u32)> {
 fn fixture_stages_match_their_goldens() {
 	let Some(mut s) = shooter() else { return };
 	if !with_fonts(&mut s) {
-		eprintln!("skipped: no fonts in packages/stage/fonts");
+		eprintln!("skipped: no fonts in packages/stage/fonts (npm run fonts -w packages/stage)");
 		return;
 	}
 	s.own_reader = true;
