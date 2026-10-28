@@ -797,7 +797,7 @@ export function Stage(props: {
 		);
 	});
 	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
-	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, props.camera.zoom));
+	const penHandles = createMemo(() => itemHandles(penOutlines(), scene, ctl.zoom()));
 	/**
 	 * A card is as tall as the markdown in it (`@decks/pen`, `textSize`), the way it is when one is
 	 * made. So it is sized by its width alone: the two side handles, and no height written to the
@@ -819,7 +819,7 @@ export function Stage(props: {
 		setPenBoxes(boxes);
 	});
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
-	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: props.camera.zoom }));
+	const boardHandles = createMemo(() => boardHandlesOf(penOutlines(), { resizable: !!props.onResize, carrying: !!editor.boardDrag() || !!editor.ownDrag(), boards: scene.boards(), zoom: ctl.zoom() }));
 
 	/*
 	 * A colour being dragged in the properties panel, drawn on the sheet before it is saved
@@ -1469,22 +1469,8 @@ export function Stage(props: {
 		element.addEventListener("pointermove", move);
 	};
 
-	/**
-	 * The camera as the boards see it: the camera itself, except that a pan at one zoom only reaches
-	 * the boards once it has gone an eighth of the window since they last saw it. Nothing a board
-	 * shows changes with a pan (the world's transform moves its page), but every mounted board read
-	 * the camera, so each pan step re-ran every board's effects and `isVisible`: with 48 board pages
-	 * on a canvas, 4.5 of the 5.5 ms a pan frame cost the page. Which boards have nodes reaches a
-	 * whole window past the screen, so an eighth late is still a long way ahead of the screen.
-	 */
-	const boardCamera = createMemo<Camera>(() => props.camera, props.camera, {
-		equals: (a, b) => {
-			// `__decksExactBoardCamera = true` hands the boards every camera, for measuring.
-			if ((globalThis as { __decksExactBoardCamera?: boolean }).__decksExactBoardCamera) return false;
-			const v = untrack(view);
-			return a.zoom === b.zoom && Math.abs(a.x - b.x) * a.zoom < v.width / 8 && Math.abs(a.y - b.y) * a.zoom < v.height / 8;
-		},
-	});
+	/** The camera boards and their bookkeeping see: the settled one (`camera/controller.ts`). */
+	const boardCamera = ctl.settled;
 	/**
 	 * Which boards are on screen, or within a viewport of it.
 	 *
@@ -1524,7 +1510,7 @@ export function Stage(props: {
 	 * changes when the camera stops, never partway through a pinch, where a board crossing the line
 	 * would have its page torn down or started mid-gesture.
 	 */
-	const restZoom = createMemo<number>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera.zoom));
+	const restZoom = createMemo<number>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : ctl.zoom()));
 	/**
 	 * Boards are live: the camera rested at this device's live zoom or above (`INTERACT_ZOOM`, 20%
 	 * on a desktop), the same zoom at which a page takes the pointer. Below it a board is its picture
@@ -1540,7 +1526,7 @@ export function Stage(props: {
 	 * counting as at 103%, and the page froze for six seconds. One answer for the stage, so a board
 	 * re-runs only when it flips.
 	 */
-	const liveNow = createMemo(() => props.camera.zoom >= INTERACT_ZOOM);
+	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
 	const boardIndex = createMemo(() => new BoxIndex(props.boards));
 	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
@@ -1742,8 +1728,8 @@ export function Stage(props: {
 		live: liveNow,
 		onScreen: (board) => {
 			const v = view();
-			const a = toScreen(props.camera, v, { x: board.x, y: board.y });
-			const b = toScreen(props.camera, v, { x: board.x + board.w, y: board.y + board.h });
+			const a = toScreen(ctl.settled(), v, { x: board.x, y: board.y });
+			const b = toScreen(ctl.settled(), v, { x: board.x + board.w, y: board.y + board.h });
 			return b.x > 0 && a.x < v.width && b.y > 0 && a.y < v.height;
 		},
 		ready: (board) => untrack(liveBoards).has(board.path),
@@ -2020,7 +2006,7 @@ export function Stage(props: {
 				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
 				<OverlayLayer
 					overlay={overlay}
-					zoom={props.camera.zoom}
+					zoom={ctl.zoom()}
 					sizing={(path) => sizingPaths().has(path)}
 					onGrip={editor.onGrip}
 					onAnchor={editor.insert.fromAnchor}
@@ -2068,7 +2054,7 @@ export function Stage(props: {
 						}}
 					</Show>
 				</OverlayLayer>
-				<TextEditor text={editor.textEditing} zoom={props.camera.zoom} />
+				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
 			</div>
 			<InsertMenu menu={editor.insert} />
 			{/*
@@ -2084,7 +2070,7 @@ export function Stage(props: {
 						obstacles={() => pillObstacles(boxOf(board))}
 						label={`${board.title}: board actions`}
 						hidden={moving() || panning() || scaling() || gliding() || editor.carrying()}
-						camera={props.camera}
+						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([boxOf(board)]))}
 						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
@@ -2113,7 +2099,7 @@ export function Stage(props: {
 						label={`${items().name}: actions`}
 						gap={penAnchors() ? ANCHOR_OUT + ANCHOR_PX / 2 + 6 : undefined}
 						hidden={pressHeld() || moving() || panning() || scaling() || gliding() || editor.drag().dx !== 0 || editor.drag().dy !== 0 || !!editor.resize()}
-						camera={props.camera}
+						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([items().box]))}
 						// What acts on drawn items: a group of boards alone has only Open.
@@ -2158,7 +2144,7 @@ export function Stage(props: {
 						obstacles={() => pillObstacles(held().box)}
 						label={`${held().ids.length} strokes: actions`}
 						hidden={moving() || panning() || scaling() || gliding()}
-						camera={props.camera}
+						camera={ctl.settled()}
 						view={view()}
 						onOpen={() => pushCamera(frame([held().box]))}
 						ink={{

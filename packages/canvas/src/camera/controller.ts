@@ -1,5 +1,5 @@
 import type { Camera } from "@decks/protocol";
-import { createEffect, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";
 import { coastStep } from "../touch.ts";
 import { springCurve } from "../lib/spring.ts";
@@ -351,9 +351,49 @@ export function createCameraController(host: CameraHost) {
 		push(pan(localCamera, -gesture.deltaX, -gesture.deltaY));
 	};
 
+	/**
+	 * The camera's zoom alone. What depends on the zoom only (handle sizes, the live zoom, a text
+	 * editor's scale) reads this, and so hears nothing of a pan: the camera itself is a new object
+	 * every frame, and reading `camera.zoom` off it re-ran each of them on every frame of a pan.
+	 */
+	const zoom = createMemo(() => host.asked().camera.zoom);
+
+	/**
+	 * The camera as everything that is not glued to the screen should see it: the camera itself,
+	 * except that a pan at one zoom reaches it only once it has gone an eighth of the window since it
+	 * last did, and exactly once the camera has stopped. Nothing a board shows changes with a pan (the
+	 * world's transform moves its page), and what is decided from the camera (which boards are near
+	 * the screen, which may load a page, where a pill goes) looks a whole window past the screen or
+	 * waits for a rest anyway: so each pan step reaches none of it. A zoom reaches it at once.
+	 *
+	 * `__decksExactBoardCamera = true` hands every camera through, for measuring.
+	 */
+	const settled = createMemo<Camera>(
+		() => {
+			// Read so that coming to rest is heard, and the settled camera becomes the exact one then.
+			moving();
+			gliding();
+			panning();
+			return host.asked().camera;
+		},
+		untrack(() => host.asked().camera),
+		{
+			equals: (was, next) => {
+				if (was === next) return true;
+				if (was.zoom !== next.zoom) return false;
+				const still = !untrack(moving) && !untrack(gliding) && !untrack(panning);
+				if (still || (globalThis as { __decksExactBoardCamera?: boolean }).__decksExactBoardCamera) return was.x === next.x && was.y === next.y;
+				const v = untrack(host.view);
+				return Math.abs(was.x - next.x) * was.zoom < v.width / 8 && Math.abs(was.y - next.y) * was.zoom < v.height / 8;
+			},
+		},
+	);
+
 	return {
 		/** The camera as of the last step, exactly: what a gesture or a point on the screen needs. */
 		now: () => localCamera,
+		zoom,
+		settled,
 		/** When the camera last moved, read by `board-admission.ts`. */
 		lastMoved: () => lastMoved,
 		moving,
