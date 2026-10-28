@@ -3467,13 +3467,14 @@ body {
 	}
 }
 
-/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top of the canvas column, never under the pointer's way. */
+/* The frame-rate meter (`perf/fps.tsx`, Settings › Boards): a card at the top right of the canvas, under the bar there, out of the pointer's way. */
 @layer components {
 	.fps-meter {
 		position: fixed;
 		z-index: var(--z-float);
-		top: calc(env(safe-area-inset-top, 0px) + 68px);
-		left: calc(var(--inset-left, 0px) + (100vw - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+		/* The top-right bar is 12px from the top and right and 44px tall (`.v3-topright`): 8px under it, its right edge in line. */
+		top: calc(env(safe-area-inset-top, 0px) + 64px);
+		right: calc(var(--inset-right, 0px) + 12px);
 		width: 260px;
 		padding: 8px 10px 8px;
 		border: 1px solid var(--v3-line);
@@ -3484,7 +3485,6 @@ body {
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
 		pointer-events: none;
-		transform: translateX(-50%);
 	}
 	.fps-head {
 		display: flex;

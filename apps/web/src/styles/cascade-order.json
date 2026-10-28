@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "6c7b68d80e030edf0e54faad36e0f19349a22cf28e6e8d7827b2c587671d5c06",
+	"hash": "49ddc32d9743267268ee052b7fac268bcc3653579d69740fd81449fa2a1a1b34",
 	"rules": 1873,
 	"sheets": 21,
 	"ties": 23,
@@ -1885,7 +1885,7 @@
 		["styles/v3.css","@layer components ▸ body .comment-popup .comment-field::placeholder{color:var(--v3-fg3)}"],
 		["styles/v3.css","@layer components ▸ body .comment-popup .comment-field:focus{border-color:var(--v3-accent);background:var(--v3-panel)}"],
 		["styles/v3.css","@layer components ▸ body .comment-popup .comment-acts .icon-button{border-radius:7px}"],
-		["styles/v3.css","@layer components ▸ .fps-meter{position:fixed;z-index:var(--z-float);top:calc(env(safe-area-inset-top, 0px) + 68px);left:calc(var(--inset-left, 0px) + (100vw - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);width:260px;padding:8px 10px 8px;border:1px solid var(--v3-line);border-radius:12px;background:var(--v3-panel);box-shadow:var(--v3-shadow);color:var(--v3-fg);font-size:12px;font-variant-numeric:tabular-nums;pointer-events:none;transform:translateX(-50%)}"],
+		["styles/v3.css","@layer components ▸ .fps-meter{position:fixed;z-index:var(--z-float);top:calc(env(safe-area-inset-top, 0px) + 64px);right:calc(var(--inset-right, 0px) + 12px);width:260px;padding:8px 10px 8px;border:1px solid var(--v3-line);border-radius:12px;background:var(--v3-panel);box-shadow:var(--v3-shadow);color:var(--v3-fg);font-size:12px;font-variant-numeric:tabular-nums;pointer-events:none}"],
 		["styles/v3.css","@layer components ▸ .fps-head{display:flex;align-items:baseline;gap:4px}"],
 		["styles/v3.css","@layer components ▸ .fps-n{font-size:20px;font-weight:650}"],
 		["styles/v3.css","@layer components ▸ .fps-meter[data-level=\"good\"] .fps-n{color:#2ea043}"],
