@@ -3,15 +3,16 @@ import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
 import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
-import { between, boxOf, fitInto, INTERACT_ZOOM, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
+import { boxOf, fitInto, INTERACT_ZOOM, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
+import { createCameraController } from "./camera/controller.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import { zoomKey } from "./zoom-keys.ts";
-import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
+import { coastStart, createTouches, type Finger, type TouchStep } from "./touch.ts";
 import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
@@ -30,7 +31,6 @@ import { firstLine } from "./pen/look.ts";
 import { isLiveFile } from "./pen/card-frame.ts";
 import { parseMarkdown } from "./pen/markdown.ts";
 import { untilReleased } from "./held.ts";
-import { springCurve } from "./lib/spring.ts";
 import { StageEngine } from "./stage/engine.ts";
 import {
 	ANCHOR_OUT,
@@ -244,83 +244,29 @@ export function Stage(props: {
 	const Frame = untrack(() => props.frame);
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
-	let localCamera = props.camera;
 	/** The camera moved: a press in hand runs its last step again (`editor/dom/pointer.ts`, `follow`). */
 	const cameraChanged = () => editor.cameraMoved();
-	/** When the camera last moved, read by `board-admission.ts`. */
-	let lastMoved = 0;
-	let rafId: number | undefined;
-	let pendingCamera: Camera | undefined;
-	/*
-	 * One glide at a time, and this is its identity.
-	 *
-	 * Anything that moves the camera itself — a wheel, a pinch, a drag, a key, an op — bumps the
-	 * token, and the loop below stops the moment its token is not the current one. A camera the
-	 * person is holding must never be argued with, and this counter is the whole of the mechanism
-	 * that guarantees it.
-	 */
-	let glideToken = 0;
-	let glideRaf: number | undefined;
-	let lastGlideToken = -1;
-	/**
-	 * A glide the app has asked for and this file has not started yet.
-	 *
-	 * The camera signal and the glide request arrive in the same batch, and the boards are
-	 * rendered from that batch **before** the effect below gets to start the loop — so for one
-	 * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
-	 * that the new camera brings into view would begin parsing its document exactly then, at
-	 * the top of the flight. This closes that window: the request itself counts as movement.
-	 */
-	const glidePending = () => props.glide !== undefined && props.glide.token !== lastGlideToken;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	/**
-	 * A pan *gesture* is in flight — a finger down, a drag on bare canvas, space and a drag.
-	 *
-	 * The cursor's own state, and only that (`index.css`: `cursor: grabbing`). It is set on the
-	 * press and cleared on the release, so it is true *before* the camera has moved and false the
-	 * instant the hand stops. Nothing else reads it: the camera's own state is not something this
-	 * signal can answer, because a wheel scroll pans the camera and presses nothing.
+	 * The camera: where it is, whether it is moving, and the one place that moves it (`camera/controller.ts`).
+	 * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
+	 * camera to follow.
 	 */
-	const [panning, setPanning] = createSignal(false);
-	/**
-	 * Whether the camera's *scale* is changing right now, as opposed to its position.
-	 *
-	 * The two are not the same kind of work, and the difference is the whole reason this
-	 * signal exists. Moving the world is a transform the compositor already holds pictures
-	 * for, so a pan costs almost nothing however many boards are on the canvas. Scaling it
-	 * asks every board's document to be drawn again at a size it has never been drawn at —
-	 * and a board is an iframe, which is a whole document to redraw. Measured on twelve
-	 * boards at 4× CPU throttle: 69ms of work per finger movement while panning, 134ms
-	 * while pinching, and the gap grows with the number of boards in view.
-	 *
-	 * So while the scale is moving, the boards are put on layers of their own
-	 * (`index.css`), which lets the compositor stretch the picture it already has instead
-	 * of the main thread drawing a new one: 134ms → 56ms, with nothing to see at rest
-	 * (measured: 0.2% of pixels differ, at the edges of letters). It is switched off again
-	 * a moment after the gesture stops, because a layer is a texture held in memory and a
-	 * canvas of them is not free.
-	 */
-	const [scaling, setScaling] = createSignal(false);
-	let scaleSettle: ReturnType<typeof setTimeout> | undefined;
-	/**
-	 * Whether the camera is moving at all — a pan as well as a zoom.
-	 *
-	 * `scaling` answers "is the picture the wrong size"; this answers "is the picture in
-	 * motion", and the canvas renderers need the second one too. A pan repaints the page, so
-	 * Chrome reports every drawable element as changed on every step, and a renderer that
-	 * reads a `paint` event as "this document changed" redraws every board on every step of
-	 * a pan for nothing. Same tail as the scale settle, for the same reason.
-	 */
-	const [moving, setMoving] = createSignal(false);
-	let moveSettle: ReturnType<typeof setTimeout> | undefined;
-	/**
-	 * Whether the camera is gliding right now — for the checks, not for the drawing.
-	 *
-	 * `data-panning` and `data-scaling` are the other two halves of "the camera is moving and this
-	 * is what kind of work that is"; this is the third case, a move the app made on the reader's
-	 * behalf, and a check has no other way to wait for it to arrive without sleeping.
-	 */
-	const [gliding, setGliding] = createSignal(false);
+	const ctl = createCameraController({
+		view,
+		place: (cam) => {
+			worldEl.style.transform = `translate(${view().width / 2}px, ${view().height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
+			// The drawing moves in the same call as the boards, so the two can never be a frame apart.
+			penLayer.setCamera(cam);
+		},
+		moved: () => cameraChanged(),
+		publish: (cam) => props.setCamera(cam),
+		asked: () => ({ camera: props.camera, glide: props.glide }),
+		flush: () => penLayer.flush(),
+	});
+	const { glidePending } = ctl;
+	// The camera's motion, as the controller tracks it (`camera/controller.ts`).
+	const { moving, scaling, gliding, panning, setPanning } = ctl;
 	/*
 	 * Boards as pictures for the length of a camera move (`picturesWhileMoving`). Not for a stroke:
 	 * on an iPad the pages coming back at the lift held one frame for 0.7 s, and a board's own
@@ -418,7 +364,7 @@ export function Stage(props: {
 			const zoom = zoomKey(event);
 			if (zoom) {
 				if (zoom === "fit") pushCamera(frame(props.boards.map(boxOf)));
-				else pushCamera(zoomAbout(localCamera, view(), centre(), zoom === "in" ? 1.2 : 1 / 1.2));
+				else pushCamera(zoomAbout(ctl.now(), view(), centre(), zoom === "in" ? 1.2 : 1 / 1.2));
 				event.preventDefault();
 				return;
 			}
@@ -581,11 +527,11 @@ export function Stage(props: {
 		engine: tsSeam(penLayer),
 		mode: () => props.mode,
 		tool: penTool,
-		zoom: () => localCamera.zoom,
+		zoom: () => ctl.now().zoom,
 		view: () => {
 			const v = view();
-			const a = toWorld(localCamera, v, { x: 0, y: 0 });
-			const b = toWorld(localCamera, v, { x: v.width, y: v.height });
+			const a = toWorld(ctl.now(), v, { x: 0, y: 0 });
+			const b = toWorld(ctl.now(), v, { x: v.width, y: v.height });
 			return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
 		},
 		nextIds: () => freshIds(),
@@ -593,7 +539,7 @@ export function Stage(props: {
 		onPenEdit: (ops) => penEdit(ops),
 		effects: {
 			element: () => element,
-			toScreen: (point) => toScreen(localCamera, view(), point),
+			toScreen: (point) => toScreen(ctl.now(), view(), point),
 			box: (id) => penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box,
 			cutFromCarried: (rect) => penLayer.cutFromCarried(rect),
 			showCarriedLayer: (on) => penLayer.showCarriedLayer(on),
@@ -955,8 +901,8 @@ export function Stage(props: {
 		const placed = penLayer.placed.get(id);
 		if (!placed || !element) return undefined;
 		const box = penLayer.bounds.get(id) ?? placed.box;
-		const a = toScreen(localCamera, view(), { x: box.x, y: box.y });
-		const b = toScreen(localCamera, view(), { x: box.x + box.w, y: box.y + box.h });
+		const a = toScreen(ctl.now(), view(), { x: box.x, y: box.y });
+		const b = toScreen(ctl.now(), view(), { x: box.x + box.w, y: box.y + box.h });
 		const r = element.getBoundingClientRect();
 		return new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y);
 	};
@@ -972,8 +918,8 @@ export function Stage(props: {
 		const nodes = renderedPaths();
 		return props.boards
 			.map((board) => {
-				const a = toScreen(localCamera, view(), { x: board.x, y: board.y });
-				const b = toScreen(localCamera, view(), { x: board.x + board.w, y: board.y + board.h });
+				const a = toScreen(ctl.now(), view(), { x: board.x, y: board.y });
+				const b = toScreen(ctl.now(), view(), { x: board.x + board.w, y: board.y + board.h });
 				return { path: board.path, node: nodes.has(board.path), rect: new DOMRect(r.left + a.x, r.top + a.y, b.x - a.x, b.y - a.y) };
 			});
 	};
@@ -990,7 +936,7 @@ export function Stage(props: {
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
-	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(localCamera, view(), stagePoint(event as PointerEvent));
+	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(ctl.now(), view(), stagePoint(event as PointerEvent));
 	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
 	/** Ids for several new items at once, none the same as another, as any on the stage, or as `also`. */
 	const freshIds = (...also: string[]) => idMaker([...(props.pen ? penIds(props.pen.doc) : []), ...also]);
@@ -1003,7 +949,7 @@ export function Stage(props: {
 	 */
 	(globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt = (x, y) => {
 		if (!element) return undefined;
-		const at = toWorld(localCamera, view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
+		const at = toWorld(ctl.now(), view(), stagePoint({ clientX: x, clientY: y } as MouseEvent));
 		const id = frameUnder(at, []);
 		const card = id ? penNode(id) : undefined;
 		if (!id || !card || !isCard(card)) return undefined;
@@ -1147,217 +1093,8 @@ export function Stage(props: {
 	});
 
 
-	/** The camera and window the world was last placed for (`writeTransform`). */
-	let written: { cam: Camera; width: number; height: number } | undefined;
-	const writeTransform = (cam: Camera) => {
-		const v = view();
-		written = { cam, width: v.width, height: v.height };
-		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
-		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
-		penLayer.setCamera(cam);
-	};
-
-	/**
-	 * Say the scale is moving, and arrange to notice when it stops.
-	 *
-	 * The tail matters: a pinch delivers its steps as separate events with nothing to mark
-	 * the end of the *scaling* in particular, and dropping the layers between two frames of
-	 * one gesture would pay for them twice. 300ms is longer than any gap inside a gesture
-	 * and shorter than anyone would notice holding.
-	 */
-	const nowMoving = () => {
-		if (!moving()) setMoving(true);
-		clearTimeout(moveSettle);
-		moveSettle = setTimeout(() => setMoving(false), 160);
-	};
-	onCleanup(() => clearTimeout(moveSettle));
-	const nowScaling = () => {
-		if (!scaling()) setScaling(true);
-		clearTimeout(scaleSettle);
-		scaleSettle = setTimeout(() => setScaling(false), 300);
-	};
-	onCleanup(() => clearTimeout(scaleSettle));
-
-	/**
-	 * The camera has stopped and nothing more is coming: the moving and scaling states end now, not
-	 * after their tails. When the last finger lifts from a pinch there is no next step to wait for,
-	 * and the tails (160 and 300 ms) were that much more of tiles painted at the moving scale before
-	 * the sharp ones were asked for (on an iPad mini, sharp about 620 ms after the lift). A wheel or
-	 * a trackpad's pinch has no lift, so it keeps the tails. `__decksPinchTail = true` keeps them after
-	 * a pinch too, for measuring.
-	 */
-	const stoppedMoving = () => {
-		clearTimeout(moveSettle);
-		clearTimeout(scaleSettle);
-		if (moving()) setMoving(false);
-		if (scaling()) setScaling(false);
-	};
-
-
-
-	/**
-	 * Move the camera now: the body `pushCamera` has always been, given the name it deserves.
-	 *
-	 * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
-	 * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
-	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp
-	 * board admission reads, and the camera signal going up once per frame, so the zoom readout
-	 * ticks and `camera()` is never a lie about where the view is going.
-	 */
-	const writeCamera = (cam: Camera) => {
-		if (cam.zoom !== localCamera.zoom) nowScaling();
-		if (cam.x !== localCamera.x || cam.y !== localCamera.y || cam.zoom !== localCamera.zoom) nowMoving();
-		lastMoved = performance.now();
-		localCamera = cam;
-		writeTransform(cam);
-		cameraChanged();
-		pendingCamera = cam;
-		if (rafId === undefined) {
-			rafId = requestAnimationFrame(() => {
-				rafId = undefined;
-				props.setCamera(pendingCamera!);
-				pendingCamera = undefined;
-			});
-		}
-	};
-
-	/*
-	 * The coast after a thrown one-finger pan (`coastStep`, `touch.ts`). Its own frame, not a
-	 * glide's: a glide is the app moving the camera somewhere, and a finger landing must stop
-	 * a coast without also stopping that. Anything else that moves the camera stops it too,
-	 * because every one of those goes through `cancelGlide`.
-	 */
-	let coastRaf: number | undefined;
-	const cancelCoast = () => {
-		if (coastRaf === undefined) return;
-		cancelAnimationFrame(coastRaf);
-		coastRaf = undefined;
-	};
-	const coast = (start: { vx: number; vy: number }) => {
-		cancelCoast();
-		let v = start;
-		let last = performance.now();
-		const frame = () => {
-			const now = performance.now();
-			const step = coastStep(v, now - last);
-			last = now;
-			v = step.v;
-			writeCamera(pan(localCamera, step.dx, step.dy));
-			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
-			penLayer.flush();
-			if (Math.hypot(v.vx, v.vy) < 0.01) {
-				coastRaf = undefined;
-				return;
-			}
-			coastRaf = requestAnimationFrame(frame);
-		};
-		coastRaf = requestAnimationFrame(frame);
-	};
-
-	const cancelGlide = () => {
-		cancelCoast();
-		glideToken++;
-		if (glideRaf !== undefined) {
-			cancelAnimationFrame(glideRaf);
-			glideRaf = undefined;
-		}
-		setGliding(false);
-	};
-
-	/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
-	const pushCamera = (cam: Camera) => {
-		cancelGlide();
-		writeCamera(cam);
-	};
-
-	/**
-	 * Arrive at `to` over `ms`, from wherever the camera is *now*.
-	 *
-	 * From the pixels rather than from the previous target, so two moves in a row read as a change
-	 * of mind rather than as the view travelling backwards to a place it never went. The last frame
-	 * writes `to` itself, not `between(from, to, 1)` — see the note on `between` about what `a +
-	 * (b - a) * 1` does to a fit.
-	 */
-	const glideTo = (to: Camera, ms: number) => {
-		const from = localCamera;
-		if (from.x === to.x && from.y === to.y && from.zoom === to.zoom) {
-			writeCamera(to);
-			return;
-		}
-		const mine = ++glideToken;
-		const at = performance.now();
-		setGliding(true);
-		/*
-		 * `performance.now()`, not the timestamp `requestAnimationFrame` hands the callback.
-		 *
-		 * They are different clocks, and `at` above is a `performance.now()`. The frame's own
-		 * timestamp is when the frame *started*, which is routinely **before** the moment the press
-		 * that started this glide was handled — a press arrives during a frame. So `now - at` came out
-		 * negative on the first frame, the number was clamped to zero, and the move spent its first
-		 * frames re-drawing where it already was: on a loaded machine that cost 20% of the travel,
-		 * measured — the camera sat at the start for 50ms and then finished late. It was invisible in
-		 * a frame-by-frame assertion, which is happy to see *some* intermediate value, and obvious in
-		 * a chart of the curve the samples were supposed to be on.
-		 */
-		// iOS's spring, no bounce: away at once, settling into place (`app/spring.ts`).
-		const curve = springCurve(ms);
-		const step = () => {
-			if (mine !== glideToken) return;
-			const t = Math.min(1, (performance.now() - at) / ms);
-			writeCamera(t >= 1 ? to : between(from, to, curve(t)));
-			// In an animation frame already: the drawing is drawn now, in this frame with the world, not at the next.
-			penLayer.flush();
-			if (t >= 1) {
-				glideRaf = undefined;
-				setGliding(false);
-				return;
-			}
-			glideRaf = requestAnimationFrame(step);
-		};
-		glideRaf = requestAnimationFrame(step);
-	};
-
-	/*
-	 * Sync from external camera changes (a fit, an op, the opening view, a glide the app asked for)
-	 * and from viewport resizes.
-	 *
-	 * `localCamera` is what the pixels say, and it is deliberately **not** reactive: the test below
-	 * is "has somebody else moved the camera", and a glide's own frames write both it and the signal
-	 * the app holds. An effect that cancelled on every incoming change would therefore cancel the
-	 * glide with it — so a change that matches the pixels is one of ours, and not news.
-	 */
-	createEffect(() => {
-		const target = props.camera;
-		const asked = props.glide;
-		view(); // a resize re-frames without moving the camera
-		const moved = target.x !== localCamera.x || target.y !== localCamera.y || target.zoom !== localCamera.zoom;
-		const fresh = asked !== undefined && asked.token !== lastGlideToken;
-		if (fresh) lastGlideToken = asked.token;
-		if (fresh && moved && asked.ms > 0) {
-			glideTo(target, asked.ms);
-			return;
-		}
-		if (moved) {
-			cancelGlide();
-			localCamera = target;
-		}
-		/*
-		 * Our own frame coming back (`writeCamera` put it on screen and then told the app) is already
-		 * drawn: placing it again drew nothing new but posted the camera to the worker and looked for
-		 * board pictures a second time each frame. A resize still re-frames.
-		 */
-		const v = view();
-		const w = written;
-		const same = !moved && w !== undefined && w.cam.x === target.x && w.cam.y === target.y && w.cam.zoom === target.zoom && w.width === v.width && w.height === v.height;
-		if (!same) writeTransform(target);
-		if (moved) cameraChanged();
-	});
-
-	onCleanup(() => {
-		if (rafId !== undefined) cancelAnimationFrame(rafId);
-		if (glideRaf !== undefined) cancelAnimationFrame(glideRaf);
-		cancelCoast();
-	});
+	// Moving the camera: the controller's (`camera/controller.ts`).
+	const { push: pushCamera, write: writeCamera, glideTo, cancelGlide, coast, cancelCoast, stopped: stoppedMoving } = ctl;
 
 	/**
 	 * The camera shortcuts, in one place.
@@ -1391,10 +1128,10 @@ export function Stage(props: {
 			}
 			case "+":
 			case "=":
-				pushCamera(zoomAbout(localCamera, view(), centre(), 1.2));
+				pushCamera(zoomAbout(ctl.now(), view(), centre(), 1.2));
 				return true;
 			case "-":
-				pushCamera(zoomAbout(localCamera, view(), centre(), 1 / 1.2));
+				pushCamera(zoomAbout(ctl.now(), view(), centre(), 1 / 1.2));
 				return true;
 			default:
 				return false;
@@ -1418,35 +1155,8 @@ export function Stage(props: {
 	 * `frame-gestures.ts`, because a wheel event inside an iframe never reaches this
 	 * document at all. Positions arrive already in stage coordinates.
 	 */
-	/**
-	 * Scroll units per e-fold of zoom: smaller zooms faster (see `wheel`). A trackpad pinch, which
-	 * Chrome reports as `ctrlKey` without ⌘, has its own; every other zoom (⌘ with a wheel, a mouse
-	 * that scrolls in small steps) keeps the one it had.
-	 */
-	const PINCH_TRAVEL = 64;
-	const WHEEL_TRAVEL = 80;
-	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean; pinch?: boolean }) => {
-		const travel = gesture.pinch ? PINCH_TRAVEL : WHEEL_TRAVEL;
-		if (gesture.zooming) {
-			/*
-			 * A pinch arrives as a stream of small deltas and a ⌘-wheel notch as one
-			 * delta of 100 or more, so the exponential is clamped: without it, the
-			 * pinch is right and one notch of the wheel jumps 2.7x.
-			 *
-			 * The divisor is how far a finger has to travel for a given zoom, and it is the
-			 * pinch's alone: a wheel notch is past the clamp at any of these numbers, so
-			 * changing it moves the trackpad and leaves the mouse where it was. It has been
-			 * turned five times, each time because a Mac trackpad felt slow — 300 barely doubled
-			 * the zoom across a whole pinch, 200 was still short, 120 (about 3.8×) a little short,
-			 * 100 (about 5×) still slow, 80 (about 7.4×) asked to be faster, 60 (about 14×) a little
-			 * too fast. At 64 that pinch is about 12× (`PINCH_TRAVEL`).
-			 */
-			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / travel)));
-			pushCamera(zoomAbout(localCamera, view(), { x: gesture.x, y: gesture.y }, factor));
-			return;
-		}
-		pushCamera(pan(localCamera, -gesture.deltaX, -gesture.deltaY));
-	};
+	/** A wheel or a trackpad's pinch, already in stage coordinates (`camera/controller.ts`). */
+	const wheel = ctl.wheel;
 
 	const onWheel = (event: WheelEvent) => {
 		event.preventDefault();
@@ -1456,7 +1166,7 @@ export function Stage(props: {
 		 */
 		if (!event.ctrlKey && !event.metaKey && props.pen && !props.drawing) {
 			const sideways = event.shiftKey && event.deltaX === 0 ? event.deltaY : Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : 0;
-			if (sideways !== 0 && penLayer.scrollBy(worldAt(event), sideways / localCamera.zoom)) return;
+			if (sideways !== 0 && penLayer.scrollBy(worldAt(event), sideways / ctl.now().zoom)) return;
 		}
 		const at = local(event);
 		// `ctrlKey` is a trackpad pinch, not a key anybody pressed; `metaKey` is the
@@ -1549,13 +1259,13 @@ export function Stage(props: {
 			if (!pinched && halfWhilePinching()) penLayer.setPinching(true);
 			pinched = true;
 			claimed.clear();
-			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
+			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
 			return step;
 		}
 		if (step.kind === "pan") {
 			if (claimed.has(finger.id)) noCoast = true;
 			else {
-				pushCamera(pan(localCamera, step.dx, step.dy));
+				pushCamera(pan(ctl.now(), step.dx, step.dy));
 				trailAt = { x: trailAt.x + step.dx, y: trailAt.y + step.dy };
 				trail.push({ ...trailAt, t: performance.now() });
 				if (trail.length > 8) trail.shift();
@@ -1666,21 +1376,21 @@ export function Stage(props: {
 		touch: (phase, finger) => touch(phase, finger),
 		claimTouch: (id) => claimed.add(id),
 		pinching: () => touches.count() > 1,
-		pan: (dx, dy) => pushCamera(pan(localCamera, dx, dy)),
+		pan: (dx, dy) => pushCamera(pan(ctl.now(), dx, dy)),
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => grabbing(),
-		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
+		interactive: () => ctl.now().zoom >= INTERACT_ZOOM,
 		/*
 		 * Where a world point is on the stage right now, from the camera the gestures are
-		 * moving — `localCamera`, which is written synchronously in the same handler that
+		 * moving — `ctl.now()`, which is written synchronously in the same handler that
 		 * moves the world, so a frame asking mid-gesture gets the camera its event was
 		 * dispatched against. This is what lets a board frame convert a finger without
 		 * measuring itself: `getBoundingClientRect` on a frame is a forced layout of the
 		 * whole stage, and a pinch had two of them per step.
 		 */
 		screenOf: (world) => {
-			const at = toScreen(localCamera, view(), world);
-			return { x: at.x, y: at.y, scale: localCamera.zoom };
+			const at = toScreen(ctl.now(), view(), world);
+			return { x: at.x, y: at.y, scale: ctl.now().zoom };
 		},
 		key: (name) => shortcut(name),
 		/*
@@ -1690,7 +1400,7 @@ export function Stage(props: {
 		 */
 		zoom: (direction) => {
 			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
-			else pushCamera(zoomAbout(localCamera, view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
+			else pushCamera(zoomAbout(ctl.now(), view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
 		},
 	};
 
@@ -1745,7 +1455,7 @@ export function Stage(props: {
 
 		let last = { x: event.clientX, y: event.clientY };
 		const move = (moveEvent: PointerEvent) => {
-			pushCamera(pan(localCamera, moveEvent.clientX - last.x, moveEvent.clientY - last.y));
+			pushCamera(pan(ctl.now(), moveEvent.clientX - last.x, moveEvent.clientY - last.y));
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
 			editor.panned();
 		};
@@ -1990,7 +1700,7 @@ export function Stage(props: {
 	 * (`board-admission.ts`).
 	 *
 	 * It is handed `isVisible` rather than owning it, because the render body asks the same
-	 * question — and `lastMoved` as a getter, because the gestures write it synchronously in
+	 * question — and `ctl.lastMoved()` as a getter, because the gestures write it synchronously in
 	 * their own handler while this reads it from a timer.
 	 */
 	/*
@@ -2037,7 +1747,7 @@ export function Stage(props: {
 			return b.x > 0 && a.x < v.width && b.y > 0 && a.y < v.height;
 		},
 		ready: (board) => untrack(liveBoards).has(board.path),
-		lastMoved: () => lastMoved,
+		lastMoved: () => ctl.lastMoved(),
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,
 		onStarted: () => {
@@ -2487,7 +2197,7 @@ export function Stage(props: {
 				<StageInk
 					camera={props.camera}
 					view={view()}
-					toStage={(event) => toWorld(localCamera, view(), stagePoint(event))}
+					toStage={(event) => toWorld(ctl.now(), view(), stagePoint(event))}
 					strokes={inkStrokes}
 					layer={penLayer}
 					onEdit={(ops) => penEdit(ops)}
