@@ -20,8 +20,10 @@ import { springCurve } from "../lib/spring.ts";
 export interface CameraHost {
 	/** The stage's size on screen. */
 	view: Accessor<Viewport>;
-	/** Put the world and the drawing at this camera: the one write to the page a camera step makes. */
+	/** Put the world and the drawing at this camera: the one write to the page a camera step makes (for the stage, its scroll). */
 	place(camera: Camera): void;
+	/** The browser has scrolled the world to this camera already: tell the drawing, and nothing else. */
+	follow(camera: Camera): void;
 	/** The camera moved: a press in hand runs its last step again (`editor/dom/pointer.ts`, `follow`). */
 	moved(): void;
 	/** The host's camera signal, set once a frame. */
@@ -227,6 +229,32 @@ export function createCameraController(host: CameraHost) {
 		setGliding(false);
 	};
 
+	/**
+	 * The browser scrolled the stage (a trackpad, a wheel, a finger), and the world is already where
+	 * this camera puts it: the camera follows, the drawing is told, and the camera is published once
+	 * a frame, as for any other step, with no transform written. A hand on the canvas wins over a
+	 * glide, as it does for every gesture.
+	 */
+	const scrolled = (cam: Camera) => {
+		if (cam.x === localCamera.x && cam.y === localCamera.y && cam.zoom === localCamera.zoom) return;
+		cancelGlide();
+		nowMoving();
+		lastMoved = performance.now();
+		localCamera = cam;
+		const v = host.view();
+		written = { cam, width: v.width, height: v.height };
+		host.follow(cam);
+		host.moved();
+		pendingCamera = cam;
+		if (rafId === undefined) {
+			rafId = requestAnimationFrame(() => {
+				rafId = undefined;
+				host.publish(pendingCamera!);
+				pendingCamera = undefined;
+			});
+		}
+	};
+
 	/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
 	const push = (cam: Camera) => {
 		cancelGlide();
@@ -406,6 +434,7 @@ export function createCameraController(host: CameraHost) {
 		push,
 		glideTo,
 		cancelGlide,
+		scrolled,
 		coast,
 		cancelCoast,
 		stopped,

@@ -25,7 +25,7 @@ await editMode(page, true);
 
 // An empty place in the middle of the screen, in stage units, with room above it for the pill.
 const spot = await page.evaluate(() => {
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { x: (560 - m.e) / m.a, y: (420 - m.f) / m.a, zoom: m.a };
 });
 const w = 200 / spot.zoom;
@@ -35,11 +35,11 @@ const box = await until(() => page.evaluate(() => window.__decksPenBox?.("pill-b
 say("the box is on screen", !!box, JSON.stringify(box));
 
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-await until(() => page.locator(".stage > .board-callout:not([data-hidden])").count());
+await until(() => page.locator(".stage-fixed > .board-callout:not([data-hidden])").count());
 // The pill fades in from 4 px lower: measure it at rest.
 await settle(page, 300);
 const anchor = await until(() => page.locator('.pen-anchor[data-side="top"]').boundingBox());
-const pill = await until(() => page.locator(".stage > .board-callout:not([data-hidden])").boundingBox());
+const pill = await until(() => page.locator(".stage-fixed > .board-callout:not([data-hidden])").boundingBox());
 say("a selected box shows its top arrow handle and the pill", !!anchor && !!pill, JSON.stringify({ anchor, pill }));
 const clear = anchor && pill ? anchor.y - (pill.y + pill.height) : NaN;
 say("the pill sits above the handle, 6 px clear of it", Math.abs(clear - 6) < 1.5, `${clear.toFixed?.(1)} px`);
@@ -64,7 +64,7 @@ await page.keyboard.down("Shift");
 await page.mouse.click(two.x + two.width / 2, two.y + two.height / 2);
 await page.keyboard.up("Shift");
 await settle(page, 400);
-const both = await page.evaluate(() => ({ anchors: document.querySelectorAll(".pen-anchor").length, pill: document.querySelector(".stage > .board-callout:not([data-hidden])")?.getBoundingClientRect().bottom }));
+const both = await page.evaluate(() => ({ anchors: document.querySelectorAll(".pen-anchor").length, pill: document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect().bottom }));
 const top = Math.min(box.y, two.y);
 say("two selected have no handles, and the pill sits 10 px above them", both.anchors === 0 && Math.abs(top - both.pill - 10) < 1.5, JSON.stringify({ ...both, top }));
 
@@ -118,7 +118,7 @@ if (press) {
 	await page.keyboard.up("Shift");
 	await settle(page, 400);
 	const group = await page.evaluate(() => {
-		const pills = [...document.querySelectorAll(".stage > .board-callout:not([data-hidden])")];
+		const pills = [...document.querySelectorAll(".stage-fixed > .board-callout:not([data-hidden])")];
 		const r = pills[0]?.getBoundingClientRect();
 		return { pills: pills.length, label: pills[0]?.getAttribute("aria-label") ?? pills[0]?.querySelector("[aria-label]")?.getAttribute("aria-label"), bottom: r?.bottom, middle: r && (r.left + r.right) / 2 };
 	});
@@ -144,7 +144,7 @@ await settle(page, 300);
 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 await settle(page, 400);
 const under = await page.evaluate(() => {
-	const r = document.querySelector(".stage > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+	const r = document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect();
 	return r && { x: r.x, y: r.y, right: r.right, bottom: r.bottom };
 });
 const hits = (a, b) => a && b && a.x < b.x + b.width && a.right > b.x && a.y < b.y + b.height && a.bottom > b.y;
@@ -167,7 +167,7 @@ if (under) {
 	await settle(page, 700);
 	const moved = await page.evaluate(() => window.__decksPenBox?.("pill-box"));
 	const after = await page.evaluate(() => {
-		const r = document.querySelector(".stage > .board-callout:not([data-hidden])")?.getBoundingClientRect();
+		const r = document.querySelector(".stage-fixed > .board-callout:not([data-hidden])")?.getBoundingClientRect();
 		return r && { x: r.x, y: r.y, width: r.width };
 	});
 	const centred = moved && after && Math.abs(after.x + after.width / 2 - (moved.x + moved.width / 2)) < 2;

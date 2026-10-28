@@ -64,7 +64,7 @@ await editMode(page, true);
 
 const spot = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 780; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
@@ -198,7 +198,7 @@ if (spot) {
 	await page.click('.v3-menu-row:has-text("Frame")');
 	const room = await page.evaluate(() => {
 		const stage = document.querySelector(".stage");
-		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 		for (let y = 200; y < 680; y += 40) for (let x = 420; x < 1150; x += 40) if (empty(x, y) && empty(x + 240, y + 200) && empty(x + 420, y + 60)) return { at: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a } };
 	});

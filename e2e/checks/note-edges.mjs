@@ -69,7 +69,7 @@ for (const run of RUNS) {
 	if (!noteId) {
 		// One note, on empty paper in the first page's view (no board under it), on a stage the later pages open too.
 		const at = await page.evaluate(() => {
-			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(document.querySelector(".world")?.style.transform ?? "");
+			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
 			if (!m) return null;
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();

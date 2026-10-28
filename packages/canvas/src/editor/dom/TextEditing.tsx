@@ -429,7 +429,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 						ref={(el) => {
 							area = el;
 							requestAnimationFrame(() => {
-								el.focus();
+								el.focus({ preventScroll: true });
 								el.select();
 							});
 						}}
@@ -440,6 +440,25 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							props.text.commit(event.currentTarget.value);
 						}}
 						onKeyDown={(event) => {
+							/*
+							 * Home and End move the caret to the line's start and end. On a Mac they scroll the
+							 * nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`), so a
+							 * note's words were left selected and the next key typed over them.
+							 */
+							if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+								event.preventDefault();
+								const el = event.currentTarget;
+								const at = el.selectionDirection === "backward" ? el.selectionStart : el.selectionEnd;
+								const to = event.key === "Home" ? el.value.lastIndexOf("\n", at - 1) + 1 : (() => {
+									const end = el.value.indexOf("\n", at);
+									return end === -1 ? el.value.length : end;
+								})();
+								if (event.shiftKey) {
+									const anchor = el.selectionDirection === "backward" ? el.selectionEnd : el.selectionStart;
+									el.setSelectionRange(Math.min(anchor, to), Math.max(anchor, to), to < anchor ? "backward" : "forward");
+								} else el.setSelectionRange(to, to);
+								return;
+							}
 							if (event.key === "Escape") {
 								event.preventDefault();
 								cancel();

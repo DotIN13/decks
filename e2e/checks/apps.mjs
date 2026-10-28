@@ -77,7 +77,7 @@ if (found) {
 	 * The canvas pans and zooms over the app, as over any board: the app's own page passes the wheel
 	 * on (`lib/live-app.js`), where it used to keep it and the canvas stood still under the pointer.
 	 */
-	const camera = () => page.evaluate(() => { const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform); return { x: m.e, y: m.f, zoom: m.a }; });
+	const camera = () => page.evaluate(() => { const m = new DOMMatrix(globalThis.__decksCameraTransform()); return { x: m.e, y: m.f, zoom: m.a }; });
 	const area = await page.locator('iframe[data-path="boards/apps/e2e-counter.html"]').boundingBox();
 	await page.mouse.move(area.x + area.width / 2, area.y + area.height * 0.7);
 	const before = await camera();

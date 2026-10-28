@@ -67,7 +67,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);
 // Near life size, so the card is big enough to press into; the zoom keys step by a fifth.
 const matrix = () => page.evaluate(() => {
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
 for (let i = 0; i < 30; i++) {

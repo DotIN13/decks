@@ -40,7 +40,7 @@ const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
 
 // Near life size, and off to the side of the boards, so the card has the screen to itself.
 const matrix = () => page.evaluate(() => {
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
 for (let i = 0; i < 30; i++) {

@@ -32,7 +32,7 @@ const agentId = await until(() => link.last("agents")?.focused);
 say("the server says which agent is focused", !!agentId);
 
 const matrix = () => page.evaluate(() => {
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { e: m.e, f: m.f, a: m.a };
 });
 const toWorld = (m, x, y) => ({ x: Math.round((x - m.e) / m.a), y: Math.round((y - m.f) / m.a) });
@@ -600,7 +600,7 @@ let ITEM_WASH = "";
 		const handles = () => page.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-board="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
 		const outline = () => page.evaluate(() => {
 			const box = document.querySelector('.pen-selection[data-board="true"]');
-			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			const m = new DOMMatrix(globalThis.__decksCameraTransform());
 			return box ? Math.round(Number.parseFloat(getComputedStyle(box).boxShadow.split(" ").at(-1)) * m.a * 10) / 10 : 0;
 		});
 		const near = await until(() => handles().then((h) => (h.length === 8 ? h : undefined)), 3000);

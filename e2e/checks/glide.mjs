@@ -34,7 +34,7 @@ const watched = (press, ms) =>
 		async ({ press, ms }) => {
 			const camera = () => {
 				const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-					document.querySelector(".world").style.transform,
+					globalThis.__decksCameraTransform(),
 				);
 				return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 			};
@@ -123,7 +123,7 @@ say(
 const stolen = await page.evaluate(async () => {
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			document.querySelector(".world").style.transform,
+			globalThis.__decksCameraTransform(),
 		);
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	};

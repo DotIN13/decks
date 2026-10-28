@@ -30,7 +30,7 @@ await rest(page, { start: 0 });
 await page.waitForFunction(() => window.__decksRust?.page && (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 });
 await settle(page, 1500);
 
-const zoomNow = () => page.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform).a);
+const zoomNow = () => page.evaluate(() => new DOMMatrix(globalThis.__decksCameraTransform()).a);
 const zoomTo = async (target, x, y, step, gap) => {
 	await page.mouse.move(x, y);
 	for (let i = 0; i < 200; i++) {

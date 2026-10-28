@@ -17,7 +17,7 @@ const anchor = await page.evaluate(async () => {
 	const cursor = { x: 420, y: 300 };
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			document.querySelector(".world").style.transform,
+			globalThis.__decksCameraTransform(),
 		);
 		return { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
 	};
@@ -113,7 +113,7 @@ say("0 fits every board on screen", fitted.inside && fitted.count === expected, 
  * labelled `+` is `=` unshifted, so a handler matching `"+"` never fired.
  */
 const zoomOf = () =>
-	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.querySelector(".world").style.transform)?.[1] ?? 0));
+	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksCameraTransform())?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
 await page.keyboard.press("Control+Equal");
@@ -440,7 +440,7 @@ say("a live board frame is under the cursor to be dragged on", grab !== null, JS
 const cameraAt = () =>
 	page.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			document.querySelector(".world").style.transform,
+			globalThis.__decksCameraTransform(),
 		);
 		return m ? { x: -Number(m[4]), y: -Number(m[5]), zoom: Number(m[3]) } : null;
 	});
@@ -506,7 +506,7 @@ say(
 await page.keyboard.press("0");
 await rest(page);
 const surface = await page.locator(".board-node .surface").first().boundingBox();
-const camNow = () => page.evaluate(() => getComputedStyle(document.querySelector(".world")).transform);
+const camNow = () => page.evaluate(() => globalThis.__decksCameraTransform());
 const stuck = [];
 for (let d = -1; d <= 3; d += 0.5) {
 	for (const [side, x, y] of [["left", surface.x + d, surface.y + surface.height / 2], ["top", surface.x + surface.width / 2, surface.y + d]]) {

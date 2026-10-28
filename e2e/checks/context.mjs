@@ -261,7 +261,7 @@ const agent = {
 			.sort((a, b) => b.area - a.area)[0];
 		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2 } : null;
 	});
-	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
+	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
 	if (target) await page.touchscreen.tap(target.x, target.y);
 	await settle(page, 900);
 	const tapped = await page.evaluate(() => document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null);
@@ -295,7 +295,7 @@ const agent = {
 				const y = along ? (band.dataset.side === "n" ? r.y + 5 : r.bottom - 5) : r.y + r.height * f;
 				if (x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
 					// Where the board is on the canvas, not on screen: a pan would move it on screen too.
-					const zoom = Number(document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+					const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 					return { x, y, path: node.dataset.path, left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), zoom, band: Math.round(along ? r.height : r.width) };
 				}
 			}
@@ -321,7 +321,7 @@ const agent = {
 			const element = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
 			const node = element.getBoundingClientRect();
 			const outline = document.querySelector('.pen-selection[data-board="true"]')?.getBoundingClientRect();
-			const zoom = Number(document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+			const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
 			const carried = document.querySelector(".stage-carried:not([hidden])")?.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
 			// With the C++ engine, the picture is the engine's, moved by the drag's offset (`engine-stage.ts`, `carry`).
 			const engine = globalThis.__decksEngine?.carried;

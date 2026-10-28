@@ -6,6 +6,7 @@ import { For, Show, createEffect, createSelector, type Component, createMemo, cr
 import { boxOf, fitInto, INTERACT_ZOOM, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { createCameraController } from "./camera/controller.ts";
+import { cameraFor, nearEdge, scrollFor, worldTransform, type Origin } from "./camera/scroll-area.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
@@ -252,19 +253,67 @@ export function Stage(props: {
 	 * The stage hands it the window, how to place the world and the drawing at a camera, and its host's
 	 * camera to follow.
 	 */
+	/*
+	 * The stage scrolls (`camera/scroll-area.ts`): the camera's position is the stage's scroll, and the
+	 * world is placed in the scrolled content at `origin`, scaled by the zoom. A pan is the browser
+	 * scrolling, which moves the world on its compositor; a step of ours (a zoom, a key, a glide, a
+	 * drag) sets the scroll and, when the zoom or the origin changed, the world's transform.
+	 */
+	let origin: Origin = { x: props.camera.x, y: props.camera.y };
+	/** The origin and zoom the world's transform was last written for. */
+	let worldFor: { x: number; y: number; zoom: number } | undefined;
+	/** The scroll this file last set, so the scroll event that answers it is not taken for the person's. */
+	let ownScroll: { left: number; top: number } | undefined;
+	const placeWorld = (zoom: number, force = false) => {
+		if (!force && worldFor && worldFor.x === origin.x && worldFor.y === origin.y && worldFor.zoom === zoom) return;
+		worldFor = { x: origin.x, y: origin.y, zoom };
+		worldEl.style.transform = worldTransform(origin, zoom);
+	};
+	const placeScroll = (cam: Camera) => {
+		if (!element || view().width === 0) return;
+		const to = scrollFor(cam, origin, view());
+		ownScroll = to;
+		element.scrollTo(to.left, to.top);
+	};
 	const ctl = createCameraController({
 		view,
 		place: (cam) => {
-			worldEl.style.transform = `translate(${view().width / 2}px, ${view().height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
+			placeWorld(cam.zoom);
+			placeScroll(cam);
 			// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 			penLayer.setCamera(cam);
 		},
+		follow: (cam) => penLayer.setCamera(cam),
 		moved: () => cameraChanged(),
 		publish: (cam) => props.setCamera(cam),
 		asked: () => ({ camera: props.camera, glide: props.glide }),
 		flush: () => penLayer.flush(),
 	});
 	const { glidePending } = ctl;
+	/*
+	 * For the browser checks: the camera as the world's transform said it before the stage scrolled
+	 * (`translate(half the window) scale(zoom) translate(−camera)`), which they read and parse; the
+	 * world's own transform now holds only the origin and the zoom (`camera/scroll-area.ts`).
+	 */
+	(globalThis as { __decksCameraTransform?: () => string }).__decksCameraTransform = () => {
+		const c = ctl.now();
+		const v = view();
+		return `translate(${v.width / 2}px, ${v.height / 2}px) scale(${c.zoom}) translate(${-c.x}px, ${-c.y}px)`;
+	};
+	/*
+	 * Back to the middle of the scroll area once the camera rests near an edge of it: the origin moves
+	 * to the camera and the scroll to the middle in one task, so nothing on screen moves.
+	 */
+	createEffect(
+		on(ctl.moving, (moving) => {
+			if (moving || !element || view().width === 0) return;
+			if (!nearEdge({ left: element.scrollLeft, top: element.scrollTop }, view())) return;
+			const cam = ctl.now();
+			origin = { x: cam.x, y: cam.y };
+			placeWorld(cam.zoom, true);
+			placeScroll(cam);
+		}, { defer: true }),
+	);
 	// The camera's motion, as the controller tracks it (`camera/controller.ts`).
 	const { moving, scaling, gliding, panning, setPanning } = ctl;
 	/*
@@ -331,6 +380,33 @@ export function Stage(props: {
 		};
 		window.addEventListener("wheel", pinchOver, { capture: true, passive: false });
 		onCleanup(() => window.removeEventListener("wheel", pinchOver, { capture: true }));
+		/*
+		 * The stage scrolled: the browser has moved the world already, and the camera follows. A scroll
+		 * this file set (`placeScroll`) comes back here too, and is not the person's.
+		 */
+		const onScroll = () => {
+			const at = { left: element.scrollLeft, top: element.scrollTop };
+			const own = ownScroll;
+			if (own && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1) return;
+			ownScroll = undefined;
+			ctl.scrolled(cameraFor(at, origin, ctl.now().zoom, view()));
+		};
+		element.addEventListener("scroll", onScroll, { passive: true });
+		onCleanup(() => element.removeEventListener("scroll", onScroll));
+		/*
+		 * The keys a scroll area scrolls by (Space, the arrows, Page Up and Down, Home and End) are the
+		 * canvas's own when the focus is on it (a nudge, a pan, a tool): the stage does not scroll for
+		 * them. Typing in a card or a field keeps them.
+		 */
+		const scrollKeys = new Set([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"]);
+		const holdScrollKeys = (event: KeyboardEvent) => {
+			if (!scrollKeys.has(event.key)) return;
+			const target = event.target as HTMLElement | null;
+			if (target?.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+			event.preventDefault();
+		};
+		element.addEventListener("keydown", holdScrollKeys);
+		onCleanup(() => element.removeEventListener("keydown", holdScrollKeys));
 		const measure = () => {
 			const viewport = { width: element.clientWidth, height: element.clientHeight };
 			setView(viewport);
@@ -1159,15 +1235,25 @@ export function Stage(props: {
 	const wheel = ctl.wheel;
 
 	const onWheel = (event: WheelEvent) => {
-		event.preventDefault();
+		const zooming = event.ctrlKey || event.metaKey;
 		/*
 		 * A sideways scroll over a card's wide table scrolls the table, as it would in a page; Shift and
-		 * a wheel is sideways too. Everything else, over a table or not, moves the camera.
+		 * a wheel is sideways too.
 		 */
-		if (!event.ctrlKey && !event.metaKey && props.pen && !props.drawing) {
+		if (!zooming && props.pen && !props.drawing) {
 			const sideways = event.shiftKey && event.deltaX === 0 ? event.deltaY : Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : 0;
-			if (sideways !== 0 && penLayer.scrollBy(worldAt(event), sideways / ctl.now().zoom)) return;
+			if (sideways !== 0 && penLayer.scrollBy(worldAt(event), sideways / ctl.now().zoom)) {
+				event.preventDefault();
+				return;
+			}
 		}
+		/*
+		 * Everything else that is not a zoom is the browser's: the stage scrolls, on the compositor, and
+		 * the camera follows from the scroll event (`onScroll`). Not cancelled, so Chrome lets the rest of
+		 * the gesture's events through without waiting for this one.
+		 */
+		if (!zooming) return;
+		event.preventDefault();
 		const at = local(event);
 		// `ctrlKey` is a trackpad pinch, not a key anybody pressed; `metaKey` is the
 		// deliberate mouse-wheel zoom. Everything else is a two-finger scroll.
@@ -1947,14 +2033,8 @@ export function Stage(props: {
 			onDblClick={editor.onDblClick}
 			style={{ cursor: grabbing() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
-			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
-			<Show when={engineNotice()}>
-				{(notice) => (
-					<div class="stage-notice" role="alert">
-						{notice()}
-					</div>
-				)}
-			</Show>
+			{/* The scrolled content: the world in it, and over it the stage's own chrome held to the window (`camera/scroll-area.ts`). */}
+			<div class="stage-content">
 			<div class="world" data-sizing={sizingPaths().size > 0 ? "true" : undefined} ref={worldEl}>
 				{/*
 				 * A place for every board on the canvas, in file order, filled while it is within reach.
@@ -2062,6 +2142,15 @@ export function Stage(props: {
 				</OverlayLayer>
 				<TextEditor text={editor.textEditing} zoom={ctl.zoom()} />
 			</div>
+			<div class="stage-fixed" style={{ width: `${view().width}px`, height: `${view().height}px` }}>
+			{/* The stage engine could not start (`penLayer.failed`): why, over the stage, where the drawing would be. */}
+			<Show when={engineNotice()}>
+				{(notice) => (
+					<div class="stage-notice" role="alert">
+						{notice()}
+					</div>
+				)}
+			</Show>
 			<InsertMenu menu={editor.insert} />
 			{/*
 				Boards have no title bars: the selected board's name and actions are a pill over it
@@ -2090,7 +2179,7 @@ export function Stage(props: {
 											quote: "",
 											title: board.title,
 											// Under the pill, which follows the board as the camera moves.
-											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
 										}),
 								}
 							: {})}
@@ -2120,7 +2209,7 @@ export function Stage(props: {
 														items: items().ids,
 														quote: items().words,
 														title: items().name,
-														anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+														anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
 													}),
 											}
 										: {}),
@@ -2168,7 +2257,7 @@ export function Stage(props: {
 											items: held().ids,
 											quote: "",
 											title: `${held().ids.length} ${held().ids.length === 1 ? "stroke" : "strokes"}`,
-											anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+											anchor: () => document.querySelector(".stage-fixed > .board-callout")?.getBoundingClientRect(),
 										}),
 								}
 							: {})}
@@ -2199,6 +2288,8 @@ export function Stage(props: {
 					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
 				/>
 			</Show>
+			</div>
+			</div>
 		</div>
 	);
 }

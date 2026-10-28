@@ -219,7 +219,7 @@ for (let i = 0; i < 12; i++) {
 await settle(page, 400);
 const room = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 800; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
@@ -292,7 +292,7 @@ if (arrowDrawn) {
  */
 const diagonal = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 170; y < 700; y += 40) {
 		for (let x = 380; x < 1300; x += 40) {
@@ -345,7 +345,7 @@ if (diagonal) {
 			document.body.append(svg);
 			const at = path.getPointAtLength(path.getTotalLength() / 2);
 			svg.remove();
-			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			const m = new DOMMatrix(globalThis.__decksCameraTransform());
 			const box = globalThis.__decksPenBox?.("slash");
 			return { x: box.x + at.x * m.a, y: box.y + at.y * m.a };
 		}, { geometry });
@@ -362,7 +362,7 @@ if (diagonal) {
 		 */
 		const normal = () => page.evaluate((one) => {
 			const box = globalThis.__decksPenBox?.("slash");
-			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			const m = new DOMMatrix(globalThis.__decksCameraTransform());
 			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 			// The line alone: the geometry's later subpaths are the head.
@@ -398,7 +398,7 @@ if (diagonal) {
 		for (let i = 0; i < 40; i++) {
 			await page.mouse.wheel(0, -120);
 			await page.waitForTimeout(40);
-			const zoom = await page.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform).a);
+			const zoom = await page.evaluate(() => new DOMMatrix(globalThis.__decksCameraTransform()).a);
 			if (zoom >= far.zoom * 4) break;
 		}
 		await page.keyboard.up("Control");
@@ -422,7 +422,7 @@ if (diagonal) {
 	// A fresh shape where the screen is, so what this selects does not depend on where the checks above left the camera.
 	const at = await page.evaluate(() => {
 		const stage = document.querySelector(".stage").getBoundingClientRect();
-		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const sx = stage.left + stage.width * 0.45, sy = stage.top + stage.height * 0.4;
 		return { x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d, zoom: m.a };
 	});
@@ -435,16 +435,16 @@ if (diagonal) {
 	say("a shape is on screen to select", !!middle, JSON.stringify(middle));
 	if (middle) {
 		await page.mouse.click(middle.x, middle.y);
-		const labels = await until(() => page.evaluate(() => [...document.querySelectorAll(".stage > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
+		const labels = await until(() => page.evaluate(() => [...document.querySelectorAll(".stage-fixed > .board-callout:not([data-hidden]) [aria-label]")].map((one) => one.getAttribute("aria-label"))).then((all) => (all.length ? all : undefined)));
 		say("a selected shape gets the pill: zoom, comment, duplicate and delete", JSON.stringify(labels) === JSON.stringify(["Zoom to it", "Comment", "Duplicate", "Delete"]), JSON.stringify(labels));
 		const before = onDisk().children.length;
-		await page.locator('.stage > .board-callout [aria-label="Duplicate"]').click();
+		await page.locator('.stage-fixed > .board-callout [aria-label="Duplicate"]').click();
 		const copy = await until(() => (onDisk().children.length === before + 1 ? onDisk().children.at(-1) : undefined));
 		say("…its Duplicate makes a copy", !!copy, `${before} -> ${onDisk().children.length}`);
 		// The copy is selected once the drawing has it: the outline moves onto it.
 		await until(() => page.evaluate((id) => { const r = globalThis.__decksPenBox?.(id); const sel = document.querySelector(".pen-selection")?.getBoundingClientRect(); return r && sel && Math.abs(sel.left - r.left) < 6 && Math.abs(sel.top - r.top) < 6 ? true : undefined; }, copy?.id));
 		await settle(page, 300);
-		await page.locator('.stage > .board-callout:not([data-hidden]) [aria-label="Delete"]').click();
+		await page.locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Delete"]').click();
 		const gone = await until(() => (onDisk().children.length === before ? true : undefined));
 		say("…and its Delete takes the copy away and leaves the first", !!gone && onDisk().children.some((n) => n.id === target?.id) && !onDisk().children.some((n) => n.id === copy?.id), `${onDisk().children.length}`);
 	}
@@ -460,7 +460,7 @@ if (diagonal) {
 	await settle(page, 300);
 	const at = await page.evaluate(() => {
 		const stage = document.querySelector(".stage").getBoundingClientRect();
-		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const toStage = (sx, sy) => ({ x: (sx - stage.left - m.e) / m.a, y: (sy - stage.top - m.f) / m.d });
 		return { a: toStage(stage.left + stage.width * 0.3, stage.top + stage.height * 0.3), b: toStage(stage.left + stage.width * 0.6, stage.top + stage.height * 0.55), zoom: m.a };
 	});

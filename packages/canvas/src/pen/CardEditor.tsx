@@ -1007,7 +1007,7 @@ export function CardEditor(props: CardEditorProps) {
 		if (!raw || raw.tagName !== "DIV" || raw.parentElement !== ed) return;
 		const box = h("pre", { class: "pce-rawedit", contenteditable: "true", "data-sep": raw.dataset.sep ?? "\n\n" }, raw.dataset.raw ?? "");
 		raw.replaceWith(box);
-		box.focus();
+		box.focus({ preventScroll: true });
 		changed();
 	}
 
@@ -1321,7 +1321,7 @@ export function CardEditor(props: CardEditorProps) {
 			if (frame !== undefined) cancelAnimationFrame(frame);
 		});
 		requestAnimationFrame(() => {
-			ed.focus();
+			ed.focus({ preventScroll: true });
 			// A double-click in a gap: a new line there, empty until something is typed in it.
 			if (props.insertAt !== undefined) {
 				const line = h("p");

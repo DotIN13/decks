@@ -37,7 +37,7 @@
 	 * capsule. 22px around buttons of 16px, a 6px inset apart, so the two curves stay concentric.
 	 */
 	@media (pointer: coarse) {
-		:is(.float.pill, .pen-tools, .stage > .board-callout, .notices, .popover) {
+		:is(.float.pill, .pen-tools, .stage-fixed > .board-callout, .notices, .popover) {
 			--radius-panel: 22px;
 			--control-radius: 16px;
 		}

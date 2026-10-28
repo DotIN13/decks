@@ -1,12 +1,12 @@
 /**
- * The stage cannot be scrolled, whatever the browser would like to scroll it for.
+ * Opening a card for typing does not move the canvas, whatever the browser would like to scroll for.
  *
- * Opening a card for typing puts the caret at the end of its words. A box with `overflow: hidden`
- * has no scrollbars but is still a scroll container, and the browser scrolls the nearest one it can
- * to show a focused caret — so a card taller than the window slid the whole stage up by the card's
- * own height and nothing put it back: every board and every drawn item off screen while the camera
- * said they were in front of you. `overflow: clip` cannot scroll at all, which is the truth of this
- * surface, since the camera is what moves the canvas.
+ * Opening a card for typing puts the caret at the end of its words, and the browser scrolls the
+ * nearest scroll area it can to show a focused caret. The stage is one now: its scroll is the
+ * camera's position (`camera/scroll-area.ts`). Once, with the stage unable to scroll and the camera
+ * not knowing, a card taller than the window slid the whole stage up for good; now such a scroll
+ * would move the camera instead. Either way the canvas must stay where it was: the editors take the
+ * caret without scrolling (`focus({ preventScroll: true })`), and this holds them to it.
  *
  * Needs no model: a card goes in over the wire, and the rest is one double-click.
  */
@@ -30,7 +30,7 @@ await editMode(page, true);
 
 const clear = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 140; y < window.innerHeight - 160; y += 30) {
 		for (let x = 320; x < window.innerWidth - 320; x += 30) {
@@ -61,17 +61,18 @@ if (clear) {
 	if (card) {
 		await page.mouse.click(clear.screen.x + 40, clear.screen.y + 40);
 		await settle(page, 250);
+		const before = await scrolled();
 		await page.mouse.dblclick(clear.screen.x + 40, clear.screen.y + 40);
 		await settle(page, 900);
 		// A markdown note opens the card editor; any other text, the plain one.
 		const typing = await page.evaluate(() => !!(document.activeElement?.closest(".pen-card-editor") || document.querySelector(".pen-text")));
 		const during = await scrolled();
 		say("a double-click opens its words for typing", typing, JSON.stringify(during));
-		say("…and the stage does not scroll to show the caret", during.top === 0 && during.left === 0, JSON.stringify(during));
+		say("…and the stage does not scroll to show the caret", during.top === before.top && during.left === before.left, JSON.stringify({ before, during }));
 		await page.keyboard.press("Escape");
 		await settle(page, 600);
 		const after = await scrolled();
-		say("…nor is it left scrolled once the editor closes", after.top === 0 && after.left === 0, JSON.stringify(after));
+		say("…nor is it left scrolled once the editor closes", after.top === before.top && after.left === before.left, JSON.stringify({ before, after }));
 	}
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "tall" }] });
 	await settle(page, 300);

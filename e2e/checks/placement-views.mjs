@@ -32,12 +32,12 @@ say("A's stage has a newest board", !!newest, JSON.stringify(newest));
 
 // A note drawn by hand in the first-choice slot: right of the newest board, top edges level.
 const slot = { x: newest.x + newest.w + 160 + 20, y: newest.y + 20 };
-const toScreen = () => page.evaluate(({ x, y }) => { const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform); return { x: x * m.a + m.e, y: y * m.a + m.f }; }, slot);
+const toScreen = () => page.evaluate(({ x, y }) => { const m = new DOMMatrix(globalThis.__decksCameraTransform()); return { x: x * m.a + m.e, y: y * m.a + m.f }; }, slot);
 const first = await toScreen();
 await page.mouse.move(800, 500);
 await page.mouse.wheel(first.x - 800, first.y - 500);
 await settle(page, 600);
-const screen = await page.evaluate(({ x, y }) => { const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform); return { x: x * m.a + m.e, y: y * m.a + m.f, zoom: m.a }; }, slot);
+const screen = await page.evaluate(({ x, y }) => { const m = new DOMMatrix(globalThis.__decksCameraTransform()); return { x: x * m.a + m.e, y: y * m.a + m.f, zoom: m.a }; }, slot);
 const onPage = screen.x > 300 && screen.x < 1450 && screen.y > 120 && screen.y < 950;
 say("the first-choice slot is on screen to draw in", onPage, JSON.stringify(screen));
 const hadIds = new Set(doc().children.map((n) => n.id));
@@ -73,7 +73,7 @@ say("a second window is on another agent", !!agentB && agentB !== agentA, `${age
 await page.mouse.move(800, 500);
 for (let i = 0; i < 25; i++) await page.mouse.wheel(3000, 3000);
 await settle(page, 800);
-const camA = await page.evaluate(() => { const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform); return { x: (750 - m.e) / m.a, y: (500 - m.f) / m.a }; });
+const camA = await page.evaluate(() => { const m = new DOMMatrix(globalThis.__decksCameraTransform()); return { x: (750 - m.e) / m.a, y: (500 - m.f) / m.a }; });
 say("A's own view is far from its boards", Math.hypot(camA.x - newest.x, camA.y - newest.y) > 20000, JSON.stringify(camA));
 
 say("the note is still there when the board is asked for", doc().children.some((n) => n.id === note?.id));

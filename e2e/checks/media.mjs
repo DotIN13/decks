@@ -59,7 +59,7 @@ await editMode(page, true);
  */
 const spot = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 160; y < 760; y += 40) {
 		for (let x = 360; x < 1200; x += 40) {

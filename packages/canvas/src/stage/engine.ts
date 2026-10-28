@@ -142,6 +142,9 @@ type RootLaid = { base: number; items: Array<[string, number]>; cards: RootCard[
  * The stage's drawing for `Stage.tsx`, with the same calls the CanvasKit sheet had (`canvas/pen/layer.ts`)
  * so the stage chooses between the two by one setting while this one is proved.
  */
+/** How much of the window the sheet reaches past it on each side (`drawRect`): room for a scroll before it is drawn again. */
+const SHEET_MARGIN = 0.25;
+
 export class StageEngine {
 	private page: PageEngine | undefined;
 	private worker: Worker | undefined;
@@ -791,6 +794,7 @@ export class StageEngine {
 	}
 
 	setView(view: { width: number; height: number }): void {
+		this.sheet = undefined;
 		this.view = view;
 		this.fitCanvases();
 		this.sendCamera();
@@ -807,8 +811,9 @@ export class StageEngine {
 	 */
 	private fitCanvases(): void {
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		const cssW = this.view.width;
-		const cssH = this.view.height;
+		// The sheet: the window and a margin round it (`drawRect`).
+		const cssW = Math.round(this.view.width * (1 + 2 * SHEET_MARGIN));
+		const cssH = Math.round(this.view.height * (1 + 2 * SHEET_MARGIN));
 		const w = Math.max(1, Math.round(cssW * dpr));
 		const h = Math.max(1, Math.round(cssH * dpr));
 		if (w === this.size.w && h === this.size.h) return;
@@ -823,10 +828,35 @@ export class StageEngine {
 		}
 	}
 
-	/** The stage rectangle the canvas covers at the camera now: the window's. */
+	/**
+	 * The stage rectangle the canvas covers: the sheet, the window and `SHEET_MARGIN` of it on each
+	 * side, placed round the camera and left there while the window stays inside it.
+	 *
+	 * The stage scrolls (`camera/scroll-area.ts`): a pan is the browser moving the world, and this
+	 * canvas with it, on its compositor. So the canvas is not drawn again for each step of a pan, which
+	 * would put our code back in every frame; it is drawn round the camera once, with room on each
+	 * side, and again only when the window reaches its edge (`setCamera`), the zoom changes, or the
+	 * camera rests (`setMoving`), where it is centred again.
+	 */
 	private drawRect(): { x: number; y: number; zoom: number; width: number; height: number } {
-		const { x, y } = this.corner();
-		return { x, y, zoom: this.camera.zoom, width: this.view.width, height: this.view.height };
+		const width = Math.round(this.view.width * (1 + 2 * SHEET_MARGIN));
+		const height = Math.round(this.view.height * (1 + 2 * SHEET_MARGIN));
+		if (!this.sheet || this.sheet.zoom !== this.camera.zoom) {
+			const zoom = this.camera.zoom;
+			this.sheet = { x: this.camera.x - width / 2 / zoom, y: this.camera.y - height / 2 / zoom, zoom };
+		}
+		return { x: this.sheet.x, y: this.sheet.y, zoom: this.sheet.zoom, width, height };
+	}
+	/** Where the sheet is (`drawRect`); undefined to place it round the camera at the next draw. */
+	private sheet: { x: number; y: number; zoom: number } | undefined;
+	/** Whether the window, at the camera now, is still inside the sheet. */
+	private windowInSheet(): boolean {
+		const at = this.sheet;
+		if (!at || at.zoom !== this.camera.zoom || !this.view.width) return false;
+		const w = Math.round(this.view.width * (1 + 2 * SHEET_MARGIN)) / at.zoom;
+		const h = Math.round(this.view.height * (1 + 2 * SHEET_MARGIN)) / at.zoom;
+		const c = this.corner();
+		return c.x >= at.x && c.y >= at.y && c.x + this.view.width / at.zoom <= at.x + w && c.y + this.view.height / at.zoom <= at.y + h;
 	}
 
 	/**
@@ -873,9 +903,15 @@ export class StageEngine {
 				this.fastZoom = false;
 				this.sendCamera();
 			}, FAST_HOLD_MS);
-		this.draw();
-		this.sendCamera();
-		this.wantBoardPictures();
+		// A pan inside the sheet: the browser has scrolled it with the world, and there is nothing to draw (`drawRect`).
+		if (this.windowInSheet()) {
+			this.wantBoardPictures();
+		} else {
+			this.sheet = undefined;
+			this.draw();
+			this.sendCamera();
+			this.wantBoardPictures();
+		}
 		if (camera.zoom !== this.sharperZoom) {
 			this.sharperZoom = camera.zoom;
 			this.sharperSoon();
@@ -897,6 +933,8 @@ export class StageEngine {
 			this.fastZoom = false;
 			clearTimeout(this.fastTimer);
 		}
+		// At rest, the sheet is placed round the camera again, with its margin on every side.
+		if (!moving) this.sheet = undefined;
 		this.sendCamera();
 		if (!moving) {
 			this.wantBoardPictures();

@@ -1004,7 +1004,7 @@ export async function pressBoardAction(page, label) {
 	 */
 	const outOfReach = () =>
 		page.evaluate(() => {
-			const pill = document.querySelector(".stage > .board-callout");
+			const pill = document.querySelector(".stage-fixed > .board-callout");
 			if (!pill) return false;
 			if (pill.hasAttribute("data-hidden")) return true;
 			const r = pill.getBoundingClientRect();

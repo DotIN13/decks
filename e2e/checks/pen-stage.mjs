@@ -37,7 +37,7 @@ const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
 const middle = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 140; y < 820; y += 30) {
 		for (let x = 320; x < 1500; x += 30) {
@@ -133,7 +133,7 @@ await editMode(page, true);
 // Bring the note into view: the camera looks at it through the stage's own transform.
 const note = onDisk().children.find((n) => n.id === "e2e-note");
 const screen = await page.evaluate(({ x, y }) => {
-	const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { x: m.e + x * m.a, y: m.f + y * m.a, zoom: m.a };
 }, { x: note.x + 4 / 0.2, y: note.y + 4 / 0.2 });
 const inView = screen.x > 280 && screen.x < 1580 && screen.y > 80 && screen.y < 900;
@@ -261,7 +261,7 @@ if (spot) {
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
 	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
-	const quiet = await page.addStyleTag({ content: ".stage > .board-callout { display: none !important }" });
+	const quiet = await page.addStyleTag({ content: ".stage-fixed > .board-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
@@ -365,7 +365,7 @@ if (boardItem) {
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
 	const at = await page.evaluate(({ x, y }) => {
-		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
 	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
 	const under = () => page.evaluate(({ x, y }) => {

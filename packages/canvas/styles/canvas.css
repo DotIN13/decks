@@ -221,7 +221,7 @@
 	 * accessibility tree; and the rule here is belt to that brace for the pointer, because a
 	 * hidden surface that can still be clicked is the bug this shape has to be careful about.
 	 */
-	.stage[data-focus="true"] > .world {
+	.stage[data-focus="true"] .world {
 		visibility: hidden;
 		pointer-events: none;
 	}
@@ -277,15 +277,48 @@
 	position: absolute;
 	inset: 0;
 	/*
-	 * `clip`, not `hidden`: a hidden box has no scrollbars but is still a scroll container, and the
-	 * browser scrolls the nearest one it can to show a focused caret. Opening a card taller than the
-	 * window for typing therefore slid the whole stage up by the card's height, and nothing put it
-	 * back — every board and every drawn item was off screen while the camera said it was not. A
-	 * clipped box cannot scroll at all, which is the truth here: the camera moves the canvas.
+	 * The stage scrolls, and its scroll is the camera's position (`camera/scroll-area.ts`): a pan is
+	 * the browser scrolling it on its compositor, with no frame of ours in the way. It used to be
+	 * `clip`, which cannot scroll, because the browser scrolls a scroll container to show a focused
+	 * caret and the camera did not know: a card opened for typing slid the stage up for good. Now
+	 * such a scroll is a scroll like any other, and the camera follows it (`Stage.tsx`, `onScroll`).
+	 * No bars, no rubber band, and no swipe back a page at an edge.
 	 */
-	overflow: clip;
+	overflow: scroll;
+	scrollbar-width: none;
+	overscroll-behavior: none;
 	background: var(--stage);
-	touch-action: none;
+	/* Fingers pan the stage natively; a pinch is ours (Safari's gesture events), and nothing zooms the page. */
+	touch-action: pan-x pan-y;
+}
+	.stage::-webkit-scrollbar {
+	display: none;
+}
+	/* What scrolls: room to scroll in, the world placed in it, and the stage's own chrome held to the window. */
+	.stage-content {
+	position: relative;
+	width: 200000px;
+	height: 200000px;
+	/* Room, not a target: a press on bare canvas lands on the stage itself, as it always has. */
+	pointer-events: none;
+}
+	.stage-content > .world {
+	pointer-events: auto;
+}
+	/*
+	 * The stage's chrome over the canvas (pills, the insert menu, the ink sheet, a notice), in the
+	 * window's coordinates as before: held to the window while the content scrolls under it. Only
+	 * what is in it takes the pointer.
+	 */
+	.stage-fixed {
+	position: sticky;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+}
+	.stage-fixed > * {
+	pointer-events: auto;
 }
 	.stage[data-panning="true"] {
 	cursor: grabbing;
@@ -654,7 +687,7 @@
 	 * every action the touch screens' pill has, shown while the board or its bar is under the pointer
 	 * or the board is selected; at rest the title and the path have the whole bar.
 	 */
-	.stage > .bar-layer {
+	.stage-fixed > .bar-layer {
 	position: absolute;
 	inset: 0;
 	/* Never scrolled to show a bar's button past the edge, as `hidden` would be. */
@@ -662,12 +695,12 @@
 	pointer-events: none;
 }
 	/* Moved by the camera as one (`Stage.writeTransform`); each bar sits on it at its board's corner times the zoom. */
-	.stage > .bar-layer > .bar-track {
+	.stage-fixed > .bar-layer > .bar-track {
 	position: absolute;
 	top: 0;
 	left: 0;
 }
-	.stage > .bar-layer[data-hidden="true"] {
+	.stage-fixed > .bar-layer[data-hidden="true"] {
 	display: none;
 }
 	/*
@@ -675,7 +708,7 @@
 	 * buttons, which show as they do above it (on hover, or for the selected board), until the bar is
 	 * too narrow to hold them (`data-tight`). There is never a ⋯ to hold them instead.
 	 */
-	.stage > .bar-layer[data-low="true"] .chrome :is(.title, .file) {
+	.stage-fixed > .bar-layer[data-low="true"] .chrome :is(.title, .file) {
 	display: none;
 }
 	/* Narrower on screen than its buttons need (`Stage.positionBar`): no buttons, only the title if it is shown. */
@@ -687,12 +720,12 @@
 	 * and fades back in where the board lands, as the touch screens' pill does (`.board-callout`).
 	 * Hidden, not removed, so a drag that began on a bar keeps the element holding its pointer.
 	 */
-	.stage > .bar-layer[data-moving="true"] .chrome {
+	.stage-fixed > .bar-layer[data-moving="true"] .chrome {
 	visibility: hidden;
 	opacity: 0;
 	transition: none;
 }
-	.stage > .bar-layer:not([data-moving="true"]) .chrome {
+	.stage-fixed > .bar-layer:not([data-moving="true"]) .chrome {
 	transition: opacity 90ms ease-out;
 }
 	.bar-layer .chrome {
@@ -792,7 +825,7 @@
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
 	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
 	 */
-	.stage > .board-callout {
+	.stage-fixed > .board-callout {
 	position: absolute;
 	z-index: 6;
 	display: flex;
@@ -809,31 +842,31 @@
 	pointer-events: auto;
 	animation: board-callout-in 90ms ease-out;
 }
-	.stage > .board-callout[data-below="true"] {
+	.stage-fixed > .board-callout[data-below="true"] {
 	transform: translate(-50%, 0);
 	animation-name: board-callout-in-below;
 }
 	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
-	.stage > .board-callout:not([data-hidden]) {
+	.stage-fixed > .board-callout:not([data-hidden]) {
 	transition: opacity 90ms ease-out;
 }
-	.stage > .board-callout[data-hidden] {
+	.stage-fixed > .board-callout[data-hidden] {
 	visibility: hidden;
 	opacity: 0;
 }
-	.stage > .board-callout > a.icon-button {
+	.stage-fixed > .board-callout > a.icon-button {
 	color: var(--muted);
 	text-decoration: none;
 }
 	/* A hairline before Hide: the one action that takes the board away. */
-	.stage > .board-callout > .callout-rule {
+	.stage-fixed > .board-callout > .callout-rule {
 	width: 1px;
 	height: 16px;
 	margin: 0 2px;
 	background: var(--line-strong);
 }
 	/* Ink's own actions, first and in words (`BoardCallout`'s `ink`): what an agent can make of a sketch. */
-	.stage > .board-callout > .callout-word {
+	.stage-fixed > .board-callout > .callout-word {
 	display: flex;
 	flex: none;
 	align-items: center;
@@ -850,17 +883,17 @@
 	font-weight: 500;
 	white-space: nowrap;
 }
-	.stage > .board-callout > .callout-word > svg {
+	.stage-fixed > .board-callout > .callout-word > svg {
 	color: var(--muted);
 }
-	.stage > .board-callout > .callout-word:hover {
+	.stage-fixed > .board-callout > .callout-word:hover {
 	background: var(--fill);
 }
-	.stage > .board-callout > .callout-ask > svg {
+	.stage-fixed > .board-callout > .callout-ask > svg {
 	color: var(--color-accent);
 }
 	/* Delete, on drawn items: the one action that cannot be put back with Show. */
-	.stage > .board-callout > .icon-button.callout-danger {
+	.stage-fixed > .board-callout > .icon-button.callout-danger {
 	color: var(--color-danger);
 }
 	@keyframes board-callout-in {

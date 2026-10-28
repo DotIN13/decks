@@ -240,7 +240,7 @@ async function run(engine, { all }) {
 	const properties = () => page.locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {
-		const button = page.locator(`.stage > .board-callout:not([data-hidden]) [aria-label="${label}"]`).first();
+		const button = page.locator(`.stage-fixed > .board-callout:not([data-hidden]) [aria-label="${label}"]`).first();
 		await button.waitFor({ timeout: 3000 });
 		const r = await button.boundingBox();
 		await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -297,10 +297,10 @@ async function run(engine, { all }) {
 				setup: async () => {
 					const grip = await boardEdge(page, board.path);
 					await page.mouse.click(grip.x, grip.y);
-					await page.locator('.stage > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
+					await page.locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
 				},
 				commit: async (arm) => {
-					const r = await page.locator('.stage > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					const r = await page.locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 					await arm();
 					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
