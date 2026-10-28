@@ -103,7 +103,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		props.view.select();
 		const from = { x: event.clientX, y: event.clientY };
 		const origin = { x: props.board.x, y: props.board.y };
-		const scale = props.camera.zoom || 1;
+		const scale = props.zoom || 1;
 		let at: { x: number; y: number } | undefined;
 		let over = false;
 		const move = (next: PointerEvent) => {
@@ -128,7 +128,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	};
 	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
 	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));
-	const zoom = () => props.camera.zoom;
+	const zoom = () => props.zoom;
 	// Asked by every effect and attribute of the board: worked out once per change, not once per asker.
 	const live = createMemo(() => props.mounted && props.page !== undefined);
 	/*

@@ -1,5 +1,5 @@
 import type { Board } from "@decks/protocol";
-import { createSignal, onCleanup } from "solid-js";
+import { createMemo, createSelector, createSignal, onCleanup } from "solid-js";
 
 /**
  * Which boards have a document, and when one is taken away again.
@@ -167,12 +167,12 @@ export function createAdmission(host: AdmissionHost): Admission {
 		 */
 		if (!live.has(board.path)) {
 			// Off screen with no document: it waits its turn again when it comes back.
-			admitted.delete(board.path);
+			unadmit(board.path);
 			return false;
 		}
-		// Counting only boards still on the canvas: one taken off it has no frame to keep.
-		const onCanvas = new Set(host.boards().map((one) => one.path));
-		for (const path of live) if (!onCanvas.has(path)) live.delete(path);
+		// Counting only boards still on the canvas: one taken off it has no frame to keep. The set is made once per change of the boards, not once per board asked about.
+		const here = onCanvas();
+		for (const path of live) if (!here.has(path)) live.delete(path);
 		if (live.size <= KEEP_ALL) return true;
 		const gone = now - seen;
 		const still = now - host.lastMoved();
@@ -186,7 +186,7 @@ export function createAdmission(host: AdmissionHost): Admission {
 			return true;
 		}
 		live.delete(board.path);
-		admitted.delete(board.path);
+		unadmit(board.path);
 		return false;
 	};
 
@@ -207,7 +207,22 @@ export function createAdmission(host: AdmissionHost): Admission {
 	 * each batch after an idle moment, nearest the middle of the screen first.
 	 */
 	const admitted = new Set<string>();
-	const [admittedVersion, setAdmittedVersion] = createSignal(0);
+	/**
+	 * What has been admitted, as a new set each time boards are let in, read per board through
+	 * `isAdmitted`: a board hears only about its own admission, where a version every board read
+	 * re-ran all of them for each group of three let in.
+	 */
+	const [admittedNow, setAdmittedNow] = createSignal<ReadonlySet<string>>(new Set());
+	const isAdmitted = createSelector(admittedNow, (path: string, paths) => paths.has(path));
+	/**
+	 * Take a board out of `admitted`, and say so: a board let go and let in again must be told both
+	 * times, or the selector sees it admitted before and after and never wakes it.
+	 */
+	const unadmit = (path: string) => {
+		if (admitted.delete(path)) setAdmittedNow(new Set(admitted));
+	};
+	/** The paths of the boards on the canvas, once per change of them. */
+	const onCanvas = createMemo(() => new Set(host.boards().map((one) => one.path)));
 	let started = false;
 	let pumping = false;
 	let stopped = false;
@@ -259,14 +274,15 @@ export function createAdmission(host: AdmissionHost): Admission {
 		};
 		waiting.sort((a, b) => distance(a) - distance(b));
 		for (const board of waiting.slice(0, BATCH)) admitted.add(board.path);
-		setAdmittedVersion((n) => n + 1);
+		setAdmittedNow(new Set(admitted));
 		pump();
 	};
 
 	return {
 		isMounted,
 		mayHaveDocument: (board) => {
-			void admittedVersion();
+			// Heard through the selector, which is told of every board let in or let go.
+			isAdmitted(board.path);
 			if (admitted.has(board.path)) return true;
 			// Asked about one that is waiting: make sure somebody is letting boards in.
 			pump();
@@ -287,6 +303,7 @@ export function createAdmission(host: AdmissionHost): Admission {
 		forget: () => {
 			live.clear();
 			admitted.clear();
+			setAdmittedNow(new Set<string>());
 		},
 	};
 }

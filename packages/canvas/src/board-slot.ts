@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Board } from "@decks/protocol";
 import type { BoardView } from "./editor/index.ts";
 import type { FrameGestureHost } from "./frame-host.ts";
 import type { RendererChoice } from "./lib/renderer.ts";
@@ -15,7 +15,11 @@ import type { PictureHost } from "./picture.ts";
  */
 export interface StageBoardProps {
 	board: Board;
-	camera: Camera;
+	/**
+	 * The camera's zoom, which is all a board needs of the camera: a pan never reaches a board (the world's
+	 * one transform moves its page), so it is not handed one, and its code runs only when the zoom changes.
+	 */
+	zoom: number;
 	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
 	mounted: boolean;
 	/** Whether the board is on screen or within a viewport of it. */

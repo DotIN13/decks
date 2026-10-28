@@ -2,7 +2,7 @@ import { hasPlaceholder, placeholderPicture } from "./live-placeholder.ts";
 import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
-import { For, Show, createEffect, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, createEffect, createSelector, type Component, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import { boxOf, fitInto, INTERACT_ZOOM, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { createCameraController } from "./camera/controller.ts";
@@ -1478,20 +1478,24 @@ export function Stage(props: {
 	 * deck of forty each pulling pdf.js is a browser on its knees. The margin is
 	 * one viewport, so panning reaches a board that is already rendered.
 	 */
-	const isVisible = (board: Board) => {
-		const v = view();
-		if (v.width === 0) return false;
-		const cam = boardCamera();
-		const topLeft = toScreen(cam, v, { x: board.x, y: board.y });
-		const bottomRight = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
-		const margin = { x: v.width, y: v.height };
-		return (
-			bottomRight.x > -margin.x &&
-			topLeft.x < v.width + margin.x &&
-			bottomRight.y > -margin.y &&
-			topLeft.y < v.height + margin.y
-		);
-	};
+	/**
+	 * The boards within a window of the screen, by path, from the R-tree, as of the settled camera. A
+	 * new set only when a board enters or leaves it, so what reads it through `isNear` hears only
+	 * about its own board, and a pan that keeps the same boards near reaches none of them.
+	 */
+	const nearPaths = createMemo<ReadonlySet<string>>(
+		() => {
+			if (view().width === 0) return new Set();
+			const boards = props.boards;
+			return new Set(boardIndex().search(reach()).map((at) => boards[at]!.path));
+		},
+		new Set(),
+		{ equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)) },
+	);
+	/** Whether a board is in `nearPaths`: each board is told only when its own answer changes. */
+	const isNear = createSelector(nearPaths, (path: string, near) => near.has(path));
+	/** On screen, or within a window of it: the R-tree's answer, not each board's own arithmetic. */
+	const isVisible = (board: Board) => isNear(board.path);
 
 	/**
 	 * The boards that exist on the page at all: the ones `isVisible` would say yes to, found through a
@@ -1575,6 +1579,8 @@ export function Stage(props: {
 
 	/** `rendered`, as a set to look a board up in. */
 	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
+	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
+	const isRendered = createSelector(renderedPaths, (path: string, paths) => paths.has(path));
 	/** The boards may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
 
@@ -1797,13 +1803,13 @@ export function Stage(props: {
 			scaling={scaling()}
 			moving={moving()}
 			pictures={pictures}
-			camera={boardCamera()}
+			zoom={ctl.zoom()}
 			mounted={
 				/* The selected board is live at any zoom, on any device. */
 				props.selected === board.path ||
 				(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board, liveNow()))
 			}
-			visible={isVisible(board)}
+			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
@@ -1963,7 +1969,7 @@ export function Stage(props: {
 				<For each={props.boards} fallback={null}>
 					{(board) => (
 						<div class="board-slot">
-							<Show when={renderedPaths().has(board.path)}>{boardNode(board)}</Show>
+							<Show when={isRendered(board.path)}>{boardNode(board)}</Show>
 						</div>
 					)}
 				</For>
