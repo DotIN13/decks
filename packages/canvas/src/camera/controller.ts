@@ -38,7 +38,7 @@ export type CameraController = ReturnType<typeof createCameraController>;
 
 export function createCameraController(host: CameraHost) {
 	let localCamera = untrack(() => host.asked().camera);
-	/** When the camera last moved, read by `board-admission.ts`. */
+	/** When the camera last moved. */
 	let lastMoved = 0;
 	let rafId: number | undefined;
 	let pendingCamera: Camera | undefined;
@@ -165,8 +165,8 @@ export function createCameraController(host: CameraHost) {
 	 *
 	 * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
 	 * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
-	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp
-	 * board admission reads, and the camera signal going up once per frame, so the zoom readout
+	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp,
+	 * and the camera signal going up once per frame, so the zoom readout
 	 * ticks and `camera()` is never a lie about where the view is going.
 	 */
 	const write = (cam: Camera) => {
@@ -422,7 +422,7 @@ export function createCameraController(host: CameraHost) {
 		now: () => localCamera,
 		zoom,
 		settled,
-		/** When the camera last moved, read by `board-admission.ts`. */
+		/** When the camera last moved. */
 		lastMoved: () => lastMoved,
 		moving,
 		scaling,

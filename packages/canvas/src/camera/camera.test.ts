@@ -266,8 +266,8 @@ test("an empty stage leaves the camera where it is, at the same arriving zoom", 
 	assert.equal(kept.zoom, STAGE_ZOOM);
 });
 
-test("boards come alive at 20% on every device", () => {
-	assert.equal(interactZoom({ coarse: false, short: 900 }), 0.2);
-	assert.equal(interactZoom({ coarse: true, short: 390 }), 0.2);
-	assert.equal(interactZoom({ coarse: true, short: 820 }), 0.2);
+test("boards come alive at 50% on every device", () => {
+	assert.equal(interactZoom({ coarse: false, short: 900 }), 0.5);
+	assert.equal(interactZoom({ coarse: true, short: 390 }), 0.5);
+	assert.equal(interactZoom({ coarse: true, short: 820 }), 0.5);
 });

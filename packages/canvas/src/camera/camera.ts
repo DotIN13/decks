@@ -21,15 +21,14 @@ export function isPhone(device = thisDevice()): boolean {
 }
 
 /** The live zoom, on every device. */
-const LIVE_ZOOM = 0.2;
+const LIVE_ZOOM = 0.5;
 
 /**
  * The zoom at which boards come alive: from here up a board has its page, and the page takes
  * the pointer; below it a board is its picture on the sheet, and dragging across it pans.
  *
- * 20% on every device. A phone and a tablet used to wait for a regular board to nearly fit the
- * screen's width (37% on a phone), which kept a board a picture long after it was readable; a
- * phone is still held to one live page at a time (`ONE_LIVE`), which is what keeps it alive.
+ * 50% on every device, and the one rule: below it every board is its picture, at it and above
+ * every board in reach is its page, whatever the camera is doing and whichever board is selected.
  *
  * `device` is for a test, and kept so a device can differ again without changing the callers.
  */
@@ -39,12 +38,6 @@ export function interactZoom(_device?: { coarse: boolean; short: number }): numb
 
 /** This device's live zoom (`interactZoom`). */
 export const INTERACT_ZOOM = interactZoom();
-
-/**
- * Only one board is live at a time on a phone: the one nearest the middle of the screen
- * (`Stage`). A tablet and a desktop have every board in reach live.
- */
-export const ONE_LIVE = isPhone();
 
 export interface Viewport {
 	width: number;

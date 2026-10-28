@@ -163,8 +163,6 @@ export interface CanvasOptions {
 	onProperties?: () => void;
 	/** How boards are drawn: each a live page (`dom`, the default), or each into its own canvas where the browser can (`canvas-per-board`). */
 	renderer?: RendererChoice;
-	/** Boards as pictures while the camera moves (`Stage`'s `picturesWhileMoving`): on unless set false, since a pan then moves flat pictures instead of repainting pages. */
-	picturesWhileMoving?: boolean;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
@@ -451,7 +449,6 @@ export function createEditor(
 		<Stage
 			mode={mode()}
 			renderer={options.renderer ?? "dom"}
-			picturesWhileMoving={options.picturesWhileMoving !== false}
 			boardsMayStart={options.boards?.mayStart ? options.boards.mayStart() : true}
 			switching={options.boards?.switching?.() ?? false}
 			{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}

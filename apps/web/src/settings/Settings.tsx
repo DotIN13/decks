@@ -1,4 +1,4 @@
-import { choosePicturesWhileMoving, chooseShowFps, picturesWhileMoving, showFps } from "../perf/fps.tsx";
+import { chooseShowFps, showFps } from "../perf/fps.tsx";
 import { STT_MODELS, type ClaudeAccount, type PairedRow, type WebStatus } from "@decks/protocol";
 import { RECOGNISERS, recogniser, setRecogniser, setVoiceLang, VOICE_LANGS, voiceLang } from "../chat/composer/voice.ts";
 import Bell from "lucide-solid/icons/bell";
@@ -293,15 +293,12 @@ function TimeSettings() {
 	);
 }
 
-/** Where a board's picture comes from when it has no live page (`canvas/shots/adaptors.ts`), whether boards are pictures while the camera moves, and the frame-rate meter (`perf/fps.tsx`). */
+/** Where a board's picture comes from when it has no live page (`canvas/shots/adaptors.ts`), and the frame-rate meter (`perf/fps.tsx`). */
 function BoardSettings() {
 	return (
 		<SetGroup label="Boards" group="renderer">
 			<SetRow title="Pictures" sub={SHOT_ADAPTORS.find((one) => one.id === shotAdaptorId())?.note}>
 				<SetSegments label="Pictures" options={SHOT_ADAPTORS} value={shotAdaptorId()} onPick={chooseShotAdaptor} />
-			</SetRow>
-			<SetRow title="Pictures while moving" sub="Boards turn into their pictures during a pan or a zoom. Off, their pages stay up, which is slower with many boards.">
-				<button class="sw-switch" type="button" role="switch" aria-label="Pictures while moving" aria-checked={picturesWhileMoving()} data-on={picturesWhileMoving()} onClick={() => choosePicturesWhileMoving(!picturesWhileMoving())} />
 			</SetRow>
 			<SetRow title="Frame rate" sub="A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.">
 				<button class="sw-switch" type="button" role="switch" aria-label="Show the frame rate" aria-checked={showFps()} data-on={showFps()} onClick={() => chooseShowFps(!showFps())} />

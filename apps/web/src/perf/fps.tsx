@@ -18,19 +18,6 @@ export function chooseShowFps(on: boolean): void {
 	else localStorage.removeItem(FPS_KEY);
 }
 
-/**
- * Boards as pictures while the camera moves (the default), or their pages kept up through it. Read
- * by the stage at the start of each move (`decks.noPictures`), so a change applies from the next one.
- */
-const NO_PICTURES_KEY = "decks.noPictures";
-const [picturesWhileMoving, setPicturesWhileMoving] = createSignal(!read(NO_PICTURES_KEY));
-export { picturesWhileMoving };
-export function choosePicturesWhileMoving(on: boolean): void {
-	setPicturesWhileMoving(on);
-	if (on) localStorage.removeItem(NO_PICTURES_KEY);
-	else localStorage.setItem(NO_PICTURES_KEY, "1");
-}
-
 /** How many frames the plot keeps: about four seconds at 120 Hz. */
 const KEEP = 480;
 /** The plot's height stands for this many ms a frame; slower frames are drawn at the top. */
@@ -123,9 +110,6 @@ export function FpsMeter() {
 			<div class="fps-head">
 				<span class="fps-n">{shown().fps}</span>
 				<span class="fps-u">fps</span>
-				<Show when={!picturesWhileMoving()}>
-					<span class="fps-tag">pages live</span>
-				</Show>
 			</div>
 			<canvas class="fps-plot" ref={canvas} aria-label="Time each frame took over the last four seconds" />
 			<div class="fps-d">
