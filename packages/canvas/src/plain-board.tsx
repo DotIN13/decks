@@ -30,6 +30,21 @@ function withoutTicket(address: string): string {
 }
 
 /**
+ * A page's address with the canvas's scheme in it (`decks-theme`, read by `board.js` before the page
+ * paints), or without it when no scheme is given, for comparing two addresses of one page.
+ */
+function withTheme(address: string, theme?: "light" | "dark"): string {
+	try {
+		const url = new URL(address, location.href);
+		if (theme) url.searchParams.set("decks-theme", theme);
+		else url.searchParams.delete("decks-theme");
+		return address.startsWith("http") ? url.toString() : url.pathname + url.search + url.hash;
+	} catch {
+		return address;
+	}
+}
+
+/**
  * A board as a host with no board editor draws it: its page in a frame while the stage lets it
  * have one, and nothing otherwise, since the stage's sheet draws every board without a page as
  * its picture (`StageShots.picture`).
@@ -140,8 +155,9 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	 */
 	const src = createMemo<string | undefined>((given) => {
 		if (!live()) return undefined;
-		const next = props.page;
-		return given !== undefined && next !== undefined && withoutTicket(given) === withoutTicket(next) ? given : next;
+		// The canvas's scheme as the page is made (`board.js`, `decks-theme`): it starts in it, and a later change is said by message, not by loading it again.
+		const next = props.page === undefined ? undefined : withTheme(props.page, untrack(scheme));
+		return given !== undefined && next !== undefined && withoutTicket(withTheme(given)) === withoutTicket(withTheme(next)) ? given : next;
 	});
 	/*
 	 * Below the live zoom a board is a tile to pan across and to pick up by its body, selected or not.
@@ -186,7 +202,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			root = undefined;
 		}
 		if (root) {
-			if (root.dataset.themeChosen !== "true" && !(root.dataset.theme && root.dataset.deckPainted !== "true")) {
+			// Only a change: a page started in the scheme from its address (`decks-theme`), and writing it again restyles the whole page.
+			if (root.dataset.theme !== theme && root.dataset.themeChosen !== "true" && !(root.dataset.theme && root.dataset.deckPainted !== "true")) {
 				root.dataset.theme = theme;
 				root.dataset.deckPainted = "true";
 			}

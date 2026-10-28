@@ -538,6 +538,19 @@
 	}
 
 	/*
+	 * The canvas's scheme, from the page's own address (`decks-theme`, `plain-board.tsx`): read before
+	 * the page first paints, so it starts in it and nothing restyles it once it has loaded. A board
+	 * whose author chose its theme in its `<meta>` keeps it.
+	 */
+	{
+		const asked = new URLSearchParams(location.search).get("decks-theme");
+		if ((asked === "light" || asked === "dark") && document.documentElement.dataset.themeChosen !== "true") {
+			document.documentElement.dataset.theme = asked;
+			document.documentElement.dataset.deckPainted = "true";
+		}
+	}
+
+	/*
 	 * The canvas's scheme, for a page it cannot reach into (another address, a sandbox): the canvas
 	 * says it at each load and change (`plain-board.tsx`, `decks:theme`). A board whose author chose
 	 * its theme in its `<meta>` keeps it.
