@@ -275,7 +275,7 @@ export function Stage(props: {
 		element.scrollTo(to.left, to.top);
 	};
 	/**
-	 * While a pinch is under way, the scroll it began at (read once, `onGestureStart`): the view then
+	 * While a pinch is under way, the scroll it began at (read once, at its first step in `touch`): the view then
 	 * changes by the world's origin alone, and the scroll is left where it is. Setting it at each step
 	 * made Safari lay out and scroll the whole area, a third of a pinch's script time on an iPad mini.
 	 */
@@ -414,51 +414,60 @@ export function Stage(props: {
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
 		/*
-		 * A pinch on an iPad (and a trackpad in Safari) comes as Safari's gesture events, with the scale
-		 * since it began: cancelled, so the page does not zoom, and turned into the canvas's zoom about
-		 * the gesture's middle. The fingers' pan around it is the browser's.
+		 * Two fingers on the canvas are one pinch, and the canvas's own (`touch`, `pinchCamera`): it zooms
+		 * about the fingers and pans with them. So while two are down the browser does not scroll with
+		 * them too, and Safari's gesture events, which describe the same fingers, only stop the page
+		 * zooming. Both used to zoom the camera, each by the whole spread: on an iPad a pinch of 2.5
+		 * times zoomed 6.4. A trackpad pinch in Safari, with no finger down, is still the gesture events'.
+		 * The listener that holds the scroll is only there while two fingers are, so one finger's scroll
+		 * never waits for the page.
 		 */
-		/*
-		 * A pinch's steps, one a frame: Safari sends about two gesture events a frame, and each one moved
-		 * the camera. The latest is kept and applied at the next frame; where the stage is on the page is
-		 * read once, when the pinch starts.
+		const holdScroll = (event: TouchEvent) => {
+			if (event.touches.length >= 2) event.preventDefault();
+		};
+		let holding = false;
+		const twoFingers = (event: TouchEvent) => {
+			const two = event.touches.length >= 2;
+			if (two === holding) return;
+			holding = two;
+			if (two) element.addEventListener("touchmove", holdScroll, { passive: false });
+			else element.removeEventListener("touchmove", holdScroll);
+		};
+		for (const kind of ["touchstart", "touchend", "touchcancel"] as const) element.addEventListener(kind, twoFingers, { passive: true });
+		onCleanup(() => {
+			for (const kind of ["touchstart", "touchend", "touchcancel"] as const) element.removeEventListener(kind, twoFingers);
+			element.removeEventListener("touchmove", holdScroll);
+		});
+		/**
+		 * The canvas's pinch has two fingers: a gesture event is about them and changes nothing. With fewer
+		 * (the first finger already taken by the browser's scroll, which cancels its pointer, or a trackpad)
+		 * the gesture events are the pinch.
 		 */
+		const fingersDown = () => touches.count() >= 2;
 		let gestureScale = 1;
 		let stageAt = { left: 0, top: 0 };
-		let pending: { scale: number; x: number; y: number } | undefined;
-		let stepping = 0;
-		const step = () => {
-			stepping = 0;
-			const g = pending;
-			pending = undefined;
-			if (!g) return;
-			const factor = g.scale / gestureScale;
-			gestureScale = g.scale;
-			if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
-			pushCamera(zoomAbout(ctl.now(), view(), { x: g.x - stageAt.left, y: g.y - stageAt.top }, factor));
-		};
 		const onGestureStart = (event: Event) => {
 			event.preventDefault();
 			gestureScale = 1;
 			gesturing = true;
+			if (fingersDown()) return;
 			const r = element.getBoundingClientRect();
 			stageAt = { left: r.left, top: r.top };
-			pinchScroll = { left: element.scrollLeft, top: element.scrollTop };
 			if (halfWhilePinching()) penLayer.setPinching(true);
 		};
 		const onGestureChange = (event: Event) => {
 			event.preventDefault();
 			const g = event as Event & { scale: number; clientX: number; clientY: number };
-			pending = { scale: g.scale, x: g.clientX, y: g.clientY };
-			stepping ||= requestAnimationFrame(step);
+			const factor = g.scale / gestureScale;
+			// Followed even while the canvas's pinch has the fingers, so handing back to these events does not jump.
+			gestureScale = g.scale;
+			if (fingersDown() || !Number.isFinite(factor) || factor <= 0 || factor === 1) return;
+			pushCamera(zoomAbout(ctl.now(), view(), { x: g.clientX - stageAt.left, y: g.clientY - stageAt.top }, factor));
 		};
 		const onGestureEnd = (event: Event) => {
 			event.preventDefault();
-			// The last step lands before the pinch ends; from here the scroll and the camera agree again (`originFor`).
-			if (stepping) cancelAnimationFrame(stepping);
-			step();
-			pinchScroll = undefined;
 			gesturing = false;
+			if (fingersDown()) return;
 			penLayer.setPinching(false);
 			stoppedMoving();
 		};
@@ -1404,6 +1413,7 @@ export function Stage(props: {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
+				pinchScroll = undefined;
 				setPanning(false);
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
 				trail = [];
@@ -1418,6 +1428,8 @@ export function Stage(props: {
 		if (step.kind === "pinch") {
 			noCoast = true;
 			if (!pinched && halfWhilePinching()) penLayer.setPinching(true);
+			// The scroll stays where the pinch found it, and the view changes by the world's origin (`originFor`).
+			if (!pinched && element) pinchScroll = { left: element.scrollLeft, top: element.scrollTop };
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
@@ -1705,7 +1717,22 @@ export function Stage(props: {
 		 * where a board's node draws its own picture.
 		 *
 		 */
-		const found = new Set(props.renderer !== "dom" || liveNow() ? boardIndex().search(reach()) : []);
+		/*
+		 * Only at rest, as pages are (`liveChoice`): a pan or a zoom keeps the nodes it started with, and
+		 * the boards it brings in are drawn by the sheet until it stops. Making a zoom's new boards' nodes
+		 * mid-pinch, title bars and all, held camera steps for up to 52 ms on an iPad mini.
+		 */
+		const moved = was !== undefined && (moving() || panning() || scaling() || gliding());
+		const found = new Set(
+			moved
+				? was.flatMap((board) => {
+						const at = boardSlot().get(board.path);
+						return at === undefined ? [] : [at];
+					})
+				: props.renderer !== "dom" || liveNow()
+					? boardIndex().search(reach())
+					: [],
+		);
 		const keep = (path: string | undefined) => {
 			const at = path === undefined ? undefined : boardSlot().get(path);
 			if (at !== undefined) found.add(at);
