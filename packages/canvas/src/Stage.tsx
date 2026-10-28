@@ -19,6 +19,7 @@ import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
+import { BUDGET } from "./device.ts";
 import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
@@ -1687,15 +1688,14 @@ export function Stage(props: {
 	/**
 	 * **The rules for pages: below the live zoom (`INTERACT_ZOOM`, 50%) every board is its picture on
 	 * the sheet (`pen/scene.ts`); at it and above, the `LIVE_PAGES` boards nearest the middle of the
-	 * screen have their pages (`livePaths`); and the selected board keeps its page at any zoom.** The
+	 * screen have their pages (six on a computer, one on an iPad or phone, `device.ts`) (`livePaths`); and the selected board keeps its page at any zoom.** The
 	 * set is chosen when the camera rests and held while it moves: nothing is queued, kept on a timer
 	 * or swapped for its picture while the camera moves.
 	 */
 	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
-	/** How many boards have a page showing at once, on every device. */
-	const LIVE_PAGES = 6;
-	/** How many pages let go are kept loaded and hidden (`live-set.ts`). */
-	const HIDDEN_PAGES = 4;
+	/** How many boards have a page showing at once, and how many let go are kept loaded and hidden: this device's budget (`device.ts`). */
+	const LIVE_PAGES = BUDGET.live;
+	const HIDDEN_PAGES = BUDGET.kept;
 	const boardIndex = createMemo(() => new BoxIndex(props.boards));
 	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */

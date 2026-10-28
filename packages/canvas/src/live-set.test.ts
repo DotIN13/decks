@@ -54,3 +54,17 @@ test("a board taken off the canvas leaves both lists", () => {
 	const after = at(0, 4, 2, first, { exists: (path) => path !== "c" && row.includes(path) });
 	assert.ok(!after.live.includes("c") && !after.hidden.includes("c"));
 });
+
+test("a budget of one: the selected board takes it", () => {
+	const one = at(0, 4, 2, EMPTY_LIVE, { limit: 1, keep: 1, selected: "a" });
+	assert.deepEqual(one.live, ["a"]);
+});
+
+test("a budget of one: a short pan keeps the board already up", () => {
+	const first = at(0, 4, 2, EMPTY_LIVE, { limit: 1, keep: 1 });
+	assert.deepEqual(first.live, ["c"]);
+	const after = at(1, 5, 3.6, first, { limit: 1, keep: 1 });
+	assert.deepEqual(after.live, ["c"]);
+	const away = at(4, 8, 6, after, { limit: 1, keep: 1 });
+	assert.deepEqual(away, { live: ["g"], hidden: ["c"] });
+});

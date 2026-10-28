@@ -11,15 +11,6 @@ import type { Board, Camera } from "@decks/protocol";
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 4;
 
-function thisDevice(): { coarse: boolean; short: number } | undefined {
-	return typeof matchMedia === "function" && typeof screen !== "undefined" ? { coarse: matchMedia("(pointer: coarse)").matches, short: Math.min(screen.width, screen.height) } : undefined;
-}
-
-/** A phone: a finger, and a screen under 600 px on its short side. */
-export function isPhone(device = thisDevice()): boolean {
-	return !!device?.coarse && device.short < 600;
-}
-
 /** The live zoom, on every device. */
 const LIVE_ZOOM = 0.5;
 
