@@ -518,10 +518,23 @@ impl Page {
 			let shape = |w: f32, h: f32| stage_paint::list::Shape { w, h, radii: [12.0 * s as f32; 4], ellipse: false };
 			over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Solid(Color(paper)), stroke: None });
 			if let Some((texture, pw, ph)) = picture {
-				// The whole board was pictured: one taller than the box is cut at its foot.
-				let tall = ph as f32 / pw.max(1) as f32 * w;
-				let shown = h.min(tall);
-				over.push(Op::Shape { shape: shape(w, shown), transform: stage_paint::list::Affine::translate(x, y), paint: stage_paint::list::Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, shown / tall] }, stroke: None });
+				/*
+				 * At the box's width, from its top. A picture taller than the box is cut at its foot, as the
+				 * page itself is. One shorter (a page shorter than its box, or one pictured before the board
+				 * grew) has its last row drawn on down to the box's foot, as the page's own background goes
+				 * on below its content: never stretched, and never bare paper under it.
+				 */
+				let r = 12.0 * s as f32;
+				let tall = (ph as f32 / pw.max(1) as f32 * w).round();
+				let image = |uv: [f32; 4]| stage_paint::list::Paint::Image { texture, opacity: 1.0, uv };
+				if tall >= h {
+					over.push(Op::Shape { shape: shape(w, h), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, h / tall]), stroke: None });
+				} else {
+					let last = (ph as f32 - 0.5) / ph.max(1) as f32;
+					let part = |h: f32, radii: [f32; 4]| stage_paint::list::Shape { w, h, radii, ellipse: false };
+					over.push(Op::Shape { shape: part(tall, [r, r, 0.0, 0.0]), transform: stage_paint::list::Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+					over.push(Op::Shape { shape: part(h - tall, [0.0, 0.0, r, r]), transform: stage_paint::list::Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+				}
 				if board.live {
 					carrying.push(board.path.clone());
 				} else {

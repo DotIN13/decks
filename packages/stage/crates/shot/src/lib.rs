@@ -401,10 +401,17 @@ impl Shooter {
 			laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: Paint::Solid(Color(board_paper)), stroke: None });
 			if let Some(file) = &board.picture {
 				let (texture, pw, ph) = self.board_picture(file)?;
-				// The whole board was pictured: one taller than its box is cut at its foot.
-				let tall = ph as f32 / pw.max(1) as f32 * bw;
-				let shown = bh.min(tall);
-				laid_out.push(Op::Shape { shape: shape(bw, shown), transform: Affine::translate(x, y), paint: Paint::Image { texture, opacity: 1.0, uv: [0.0, 0.0, 1.0, shown / tall] }, stroke: None });
+				// At the box's width, from its top, as the stage draws it (`web/src/engine.rs`): cut at its foot if taller, its last row drawn on to the box's foot if shorter.
+				let tall = (ph as f32 / pw.max(1) as f32 * bw).round();
+				let image = |uv: [f32; 4]| Paint::Image { texture, opacity: 1.0, uv };
+				if tall >= bh {
+					laid_out.push(Op::Shape { shape: shape(bw, bh), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, bh / tall]), stroke: None });
+				} else {
+					let last = (ph as f32 - 0.5) / ph.max(1) as f32;
+					let part = |h: f32, radii: [f32; 4]| Shape { w: bw, h, radii, ellipse: false };
+					laid_out.push(Op::Shape { shape: part(tall, [radius, radius, 0.0, 0.0]), transform: Affine::translate(x, y), paint: image([0.0, 0.0, 1.0, 1.0]), stroke: None });
+					laid_out.push(Op::Shape { shape: part(bh - tall, [0.0, 0.0, radius, radius]), transform: Affine::translate(x, y + tall), paint: image([0.0, last, 1.0, last]), stroke: None });
+				}
 			}
 		}
 
