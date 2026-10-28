@@ -22,7 +22,7 @@ import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import SettingsIcon from "lucide-solid/icons/settings";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
@@ -734,8 +734,16 @@ export function LeftPanel(props: {
 										<Icon of={ChevronDown} size={13} class="flex-none" />
 									</button>
 								);
-								/* The canvas switcher where it is given; the canvas manager straight away otherwise. */
-								return props.canvasMenu ? props.canvasMenu((popover) => title(popover)) : title();
+								/*
+								 * The canvas switcher where it is given; the canvas manager straight away otherwise.
+								 * Only whether it is given rebuilds the title, as in the top bar's canvas chip:
+								 * `canvasMenu` is a fresh function on every change to the canvas list.
+								 */
+								return (
+									<Show when={props.canvasMenu !== undefined} fallback={title()}>
+										{untrack(() => props.canvasMenu!((popover) => title(popover)))}
+									</Show>
+								);
 							})()}
 							<div class="v3-lp-status">
 								<span class="v3-lp-deck">

@@ -68,20 +68,9 @@ say("the pill names the stage this conversation is on", !!mine, String(mine));
 const openManager = async () => {
 	const chip = page.locator(".pill button[aria-label^='Canvases']").first();
 	const all = page.locator(".popover [role=menuitem]", { hasText: /^\s*All canvases\s*$/ }).first();
-	/*
-	 * Pressed again if neither the switcher nor the manager came up. The chip is made again whenever a
-	 * stages frame arrives (the top bar rebuilds the switcher around it), so a press can land on a chip
-	 * that is gone, or open a switcher that is replaced a moment later.
-	 */
-	for (let i = 0; i < 5; i++) {
-		if (!(await chip.click({ timeout: 3000 }).then(() => true).catch(() => false))) continue;
-		const up = await Promise.race([
-			all.waitFor({ timeout: 2000 }).then(() => "menu"),
-			page.waitForSelector(".stage-manager", { timeout: 2000 }).then(() => "manager"),
-		]).catch(() => undefined);
-		if (up === "manager") break;
-		if (up === "menu" && (await all.click({ timeout: 3000 }).then(() => true).catch(() => false))) break;
-	}
+	await chip.click({ timeout: 3000 });
+	const up = await Promise.race([all.waitFor({ timeout: 4000 }).then(() => "menu"), page.waitForSelector(".stage-manager", { timeout: 4000 }).then(() => "manager")]).catch(() => undefined);
+	if (up === "menu") await all.click({ timeout: 3000 });
 	await page.waitForSelector(".stage-manager", { timeout: 6000 });
 };
 await openManager();

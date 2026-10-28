@@ -73,7 +73,7 @@ import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import type { CanvasItem } from "./panel/canvas-items.ts";
 import {boxOf, fitInto, keepVisible} from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
-import { type CameraOwner, landingCamera, sameOwner, viewToPark } from "@decks/canvas/camera";
+import { type CameraOwner, frames as showsAny, landingCamera, sameOwner, viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import { closeHistory, setInspectable } from "./state/edge.ts";
 import { canvasBox, insets, insetsMoving, watchInsets } from "@decks/canvas/camera";
@@ -1155,6 +1155,24 @@ export function App() {
 		}, 100);
 		arriving = { ...to, stop: () => clearInterval(timer) };
 	};
+	/**
+	 * The person moved the camera themselves (a pan, a pinch, a wheel: the stage's own setter), so a
+	 * landing still waiting is called off and the view they made is theirs, kept under the canvas it
+	 * was arriving at. Left waiting, it landed up to 3 s later on whatever deck frame came next, a
+	 * drop's answer among them, and threw the view they had made away. Only once that canvas's
+	 * drawing is on screen, and only a move that shows something of it: a move made over the canvas
+	 * being left is not a view of the new one, and one over the empty canvas a page opens on (its
+	 * origin, before the landing) is a person looking for it, whom the landing still brings there.
+	 */
+	const personMoved = (next: Camera) => {
+		const to = arriving;
+		if (to && (!to.canvas || untrack(stagePen)?.scope === to.canvas) && showsAny(next, { width: window.innerWidth, height: window.innerHeight }, untrack(canvasBoxes))) {
+			stopArriving();
+			setOwner({ scope: to.scope, ...(to.canvas ? { canvas: to.canvas } : {}) });
+			switchingFor(false);
+		}
+		setCameraAndReport(next);
+	};
 	createEffect(() => {
 		const agent = state.focused;
 		const canvas = stageOf(agent)?.name;
@@ -1362,7 +1380,7 @@ export function App() {
 								pen: stagePen,
 								// The landing decides where the canvas opens (`landOn`); the stage's own first fit waits for it.
 								opening: () => (owner() ? { camera: camera() } : undefined),
-								camera: [camera, setCameraAndReport],
+								camera: [camera, personMoved],
 								glide,
 								selected: [
 									selected,

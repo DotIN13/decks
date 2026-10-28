@@ -14,7 +14,7 @@ use stage_scene::layout::NOTE_PAD;
 use stage_scene::tree::{Item, MISSING};
 use stage_scene::values::{Theme, Vars, parse_color};
 use stage_scene::{Rect, Root, Scene, geometry::Mat};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 
 use crate::list::{Affine, Align, Clip, Color, DrawList, GlyphQuad, LayerBlur, Op, Paint, Shape};
@@ -76,6 +76,11 @@ pub struct Context<'a> {
 	pub scrolls: Option<&'a std::collections::HashMap<String, f64>>,
 	/// Who last wrote the drawing: the name and colour a placeholder frame is marked with.
 	pub writer: Option<&'a Writer>,
+	/// The target pixels (left, top, right, bottom) words are drawn in, set by `paint_area` for each
+	/// item: a glyph wholly outside them is not asked of the glyph texture. A tile at a large scale
+	/// meets a few words of a long paragraph; asking for all of its glyphs could fill the texture
+	/// with the tile's own, and the glyphs pushed out to make room would be drawn as others.
+	pub glyph_area: Cell<Option<[f64; 4]>>,
 }
 
 /// The agent that last wrote a drawing, as a placeholder frame names it (`placeholder_mark`).
@@ -91,7 +96,7 @@ pub const PLACEHOLDER_ACCENT: [f32; 4] = [0.231, 0.361, 0.965, 1.0];
 
 impl<'a> Context<'a> {
 	pub fn new(scene: &'a Scene, skip: &'a HashSet<String>, image: &'a dyn Fn(&str) -> Option<(u32, u32, u32)>) -> Context<'a> {
-		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None, offsets: None, mute: None, holes: None, scrolls: None, writer: None }
+		Context { scene, dark: scene.dark, skip, image, wanted: RefCell::new(Vec::new()), text: None, atlas: None, only: None, icons: None, offsets: None, mute: None, holes: None, scrolls: None, writer: None, glyph_area: Cell::new(None) }
 	}
 
 	pub fn with_text(mut self, text: &'a Text, atlas: &'a RefCell<Atlas>) -> Context<'a> {
@@ -160,6 +165,10 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 			}
 		}
 		let target = moved(chain.len());
+		// Words under a blur are all drawn: the blur's layer reaches past the area, and a blurred
+		// glyph just outside it still shows inside.
+		let blurred = chain.iter().chain([&i]).any(|&a| stage_scene::blur_radius(&ctx.scene.vars, &root.tree.items[a as usize], &root.placed[a as usize].theme) > 0.0);
+		ctx.glyph_area.set(if blurred { None } else { Some([0.0, 0.0, area.w * scale, area.h * scale]) });
 		if item.children.is_empty() {
 			let mut ops = Vec::new();
 			let mut closing = Vec::new();
@@ -181,6 +190,7 @@ pub fn paint_area(ctx: &Context, area: Rect, scale: f64, clear: Color) -> DrawLi
 	while let Some(scope) = stack.pop() {
 		close(scope, &mut list);
 	}
+	ctx.glyph_area.set(None);
 	list
 }
 
@@ -834,11 +844,30 @@ pub fn draw_laid(ctx: &Context, laid: &Laid, origin: (f64, f64), brushes: &[Colo
 		(origin.0 * raster, origin.1 * raster, Affine(m.then(&back).0.map(|v| v as f32)))
 	};
 	let mut groups: Vec<((u32, u32), Vec<GlyphQuad>)> = Vec::new();
+	let area = ctx.glyph_area.get();
+	/*
+	 * Whether a glyph whose pen is at (x, y), `px` big, can reach the area: its box is not known
+	 * before it is drawn, so a generous one, an em left and above the pen and two right and below it
+	 * (slanted, emboldened and overhanging glyphs included), is taken through to target pixels.
+	 */
+	let reaches = |x: f64, y: f64, px: f64| -> bool {
+		let Some([l, t, r, b]) = area else { return true };
+		let (x0, y0, x1, y1) = (x - px, y - px * 1.5, x + px * 2.0, y + px);
+		let (mut minx, mut miny, mut maxx, mut maxy) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+		for (cx, cy) in [(x0, y0), (x1, y0), (x0, y1), (x1, y1)] {
+			let (tx, ty) = transform.apply(cx as f32, cy as f32);
+			(minx, miny, maxx, maxy) = (minx.min(tx as f64), miny.min(ty as f64), maxx.max(tx as f64), maxy.max(ty as f64));
+		}
+		maxx > l && minx < r && maxy > t && miny < b
+	};
 	for run in &laid.runs {
 		let px = (run.size as f64 * raster) as f32;
 		for &(g, gx, gy) in &run.glyphs {
 			let x = ox + raster * gx as f64;
 			let y = oy + raster * gy as f64;
+			if !reaches(x, y, px as f64) {
+				continue;
+			}
 			let fl = x.floor();
 			let Some((slot, carry)) = atlas.glyph(run, g, px, (x - fl) as f32) else { continue };
 			let quad = GlyphQuad { x: (fl + carry as f64) as f32 + slot.left as f32, y: y.round() as f32 - slot.top as f32, w: slot.w as f32, h: slot.h as f32, u: slot.u as f32, v: slot.v as f32 };

@@ -494,7 +494,15 @@ export function createPointer(editor: Editor, host: PointerHost) {
 		const since = performance.now();
 		const selected = editor.items();
 		const carrying = selected.includes(hit.id);
-		if (carrying) host.claim(pointer);
+		/*
+		 * A finger on what is selected carries it: the finger is the editor's, and so is its touch, or the
+		 * stage's native scroll took it and the canvas panned under the finger instead (`keepTouch`). On
+		 * anything else the finger is the stage's to scroll with, and a tap still selects.
+		 */
+		if (carrying) {
+			host.claim(pointer);
+			host.keepTouch?.(event);
+		}
 		let moved = false;
 		const done = () => {
 			window.removeEventListener("pointermove", move);

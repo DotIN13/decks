@@ -119,11 +119,20 @@ export function documentHeight(doc: Document): number | undefined {
 	if (!body) return undefined;
 	const held = body.style.height;
 	const floor = body.style.minHeight;
+	const display = body.style.display;
 	body.style.height = "auto";
 	body.style.minHeight = "0";
+	/*
+	 * A first or last block's margin collapses through a plain block body and lies outside it, where
+	 * `scrollHeight` does not count it: a board whose first row had a 48 px top margin was measured
+	 * 48 px short, and its page scrolled by that much under a wheel meant to pan the canvas. As its
+	 * own formatting context the body keeps those margins inside it, at the same total height.
+	 */
+	if (doc.defaultView?.getComputedStyle(body).display === "block") body.style.display = "flow-root";
 	const measured = body.scrollHeight;
 	body.style.height = held;
 	body.style.minHeight = floor;
+	body.style.display = display;
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 

@@ -1848,7 +1848,9 @@ mod glyph_overflow {
 		let Some(mut worker) = chinese_worker() else { return };
 		let (tiles, checked, wrong) = zoom_cycle(&mut worker, 12);
 		println!("{tiles} tiles drawn, {checked} glyphs checked, {wrong} pointing at another glyph");
-		assert!(checked > 10_000, "{checked}");
+		// A tile asks only for the glyphs that reach it (`Context::glyph_area`), about 8,700 of them
+		// here; the texture still fills and empties its bands some twenty times on the way.
+		assert!(checked > 5_000, "{checked}");
 		assert_eq!(wrong, 0);
 	}
 }

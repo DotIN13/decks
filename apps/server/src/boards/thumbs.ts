@@ -234,11 +234,15 @@ const MEASURE = `(() => {
 	if (!body) return 0;
 	const held = body.style.height;
 	const floor = body.style.minHeight;
+	const display = body.style.display;
 	body.style.height = "auto";
 	body.style.minHeight = "0";
+	// A child's margin collapsing through a plain block body is counted, as the canvas counts it.
+	if (getComputedStyle(body).display === "block") body.style.display = "flow-root";
 	const page = body.scrollHeight;
 	body.style.height = held;
 	body.style.minHeight = floor;
+	body.style.display = display;
 	return Math.ceil(page);
 })()`;
 

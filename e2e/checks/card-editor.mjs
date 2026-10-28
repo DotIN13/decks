@@ -410,9 +410,11 @@ const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").start
 const wordsBox = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
 await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
 await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
-// The start of the line. Not Home on a Mac: there Home scrolls rather than moving the caret, and what it
-// scrolls now is the stage, whose scroll is the camera (the canvas went 110,000 px up when the card closed).
-await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowLeft" : "Home");
+// The start of the line, by Home: the card moves the caret itself, where a Mac's Home would scroll the stage
+// (the canvas went 110,000 px up), so the camera is held to where it was too.
+const cameraBefore = await page.evaluate(() => globalThis.__decksCameraTransform());
+await page.keyboard.press("Home");
+say("Home in a card moves its caret and leaves the canvas where it was", (await page.evaluate(() => globalThis.__decksCameraTransform())) === cameraBefore);
 await page.keyboard.type("Look: ");
 await page.keyboard.press("Control+Enter");
 const caretAt = await until(() => ((cardNode()?.children ?? []).some((n) => n.content === "Look: A new line in the gap") ? true : undefined));

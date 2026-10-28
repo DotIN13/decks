@@ -3,7 +3,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import Layers from "lucide-solid/icons/layers";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
 import Plus from "lucide-solid/icons/plus";
-import { Show, type JSX } from "solid-js";
+import { Show, untrack, type JSX } from "solid-js";
 import { AgentFace, AgentMenu } from "../agents/AgentPill.tsx";
 import { Switcher } from "../connections/Switcher.tsx";
 import { Icon } from "../ui/icons.tsx";
@@ -125,8 +125,18 @@ export function TopBar(props: {
 							<Icon of={ChevronDown} size={13} class="v3-chev" />
 						</button>
 					);
-					/* The switcher where it is given (a desktop); the canvas manager straight away otherwise. */
-					return props.canvasMenu ? props.canvasMenu((popover) => chip(popover)) : chip();
+					/*
+					 * The switcher where it is given (a desktop); the canvas manager straight away otherwise.
+					 * `canvasMenu` comes as a fresh function each time the canvas list changes, so only
+					 * whether it is given may rebuild the chip: built again on every canvases frame, the
+					 * chip and its open menu would vanish under the pointer. The switcher reads the list
+					 * itself, so the first one keeps up.
+					 */
+					return (
+						<Show when={props.canvasMenu !== undefined} fallback={chip()}>
+							{untrack(() => props.canvasMenu!((popover) => chip(popover)))}
+						</Show>
+					);
 				})()}
 				<Show when={props.viewOnly}>
 					{(owner) => (

@@ -1152,6 +1152,17 @@ export function CardEditor(props: CardEditorProps) {
 		props.onCommit(serialise());
 	}
 	function onKeyDown(event: KeyboardEvent) {
+		/*
+		 * Home and End move the caret to the line's start and end, Shift extending the selection. On a Mac
+		 * they scroll the nearest scroll area instead, which is now the stage (`camera/scroll-area.ts`):
+		 * Home in a card sent the canvas some 110,000 units up. The note editor does the same itself.
+		 */
+		if ((event.key === "Home" || event.key === "End") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+			event.preventDefault();
+			const selection = sel() as Selection & { modify?: (alter: string, direction: string, granularity: string) => void };
+			selection.modify?.(event.shiftKey ? "extend" : "move", event.key === "Home" ? "backward" : "forward", "lineboundary");
+			return;
+		}
 		const at = sel().anchorNode;
 		const here = at ? (at.nodeType === 1 ? (at as Element) : at.parentElement) : null;
 		// In a callout's title, Enter goes on to its first line.
