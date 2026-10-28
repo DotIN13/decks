@@ -127,6 +127,14 @@ if (manual) {
 	// The person's own fingers: one recording of that many seconds, whatever they do in it.
 	console.log(`Recording for ${manual[1]} s: pinch and pan on the iPad now.`);
 	phases.push(await record("Your hands", `new Promise((done) => setTimeout(done, ${Number(manual[1]) * 1000}))`));
+} else if (arg("phases", "pan") === "zoom-split") {
+	// Zooms that stay below the live zoom, where boards are pictures, and above it, where pages are up.
+	await zoomTo(0.05);
+	phases.push(await record("Below 50%: 5% to 45% and back, 3 s", "__pilot.pinch(9, 1500).then(() => __pilot.pinch(1 / 9, 1500))"));
+	phases.push(await record("Below 50%: 5% to 45% and back, 1 s", "__pilot.pinch(9, 500).then(() => __pilot.pinch(1 / 9, 500))"));
+	await zoomTo(0.55);
+	phases.push(await record("Above 50%: 55% to 200% and back, 3 s", "__pilot.pinch(3.6, 1500).then(() => __pilot.pinch(1 / 3.6, 1500))"));
+	phases.push(await record("Above 50%: 55% to 200% and back, 1 s", "__pilot.pinch(3.6, 500).then(() => __pilot.pinch(1 / 3.6, 500))"));
 } else if (arg("phases", "pan") === "zoom") {
 	await zoomTo(0.02);
 	phases.push(await record("Zoom 2% to 200% in 3 s", "__pilot.pinch(100, 3000)"));
