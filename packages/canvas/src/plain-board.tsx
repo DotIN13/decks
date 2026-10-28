@@ -2,7 +2,6 @@ import { attachBoardStorage, SHARED_SANDBOX, storageHash, storageKeeper } from "
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
-import { INTERACT_ZOOM } from "./camera/camera.ts";
 import { measureFrame } from "./extent.ts";
 import { onFrameMessage } from "./frame-messages.ts";
 import { scheme } from "./lib/theme.ts";
@@ -160,11 +159,12 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		return given !== undefined && next !== undefined && withoutTicket(withTheme(given)) === withoutTicket(withTheme(next)) ? given : next;
 	});
 	/*
-	 * Below the live zoom a board is a tile to pan across and to pick up by its body, selected or not.
-	 * `BoardFrame` makes the selected one live at any zoom, and there the drag that selects a tile
-	 * makes the next drag a press on its page, so a tile moves once and then not again.
+	 * A page that shows takes the pointer, at any zoom: below the live zoom that is the selected board,
+	 * whose page is up so that it can be used (`live-set.ts`), and it is moved by its bar and its edge as
+	 * above it. Only a page kept hidden is out of reach. Every other board below the live zoom has no
+	 * page, and is a picture to pan across and to pick up by its body.
 	 */
-	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
+	const inert = createMemo(() => !!props.hidden);
 	const [hovered, setHovered] = createSignal(false);
 	createEffect(() => props.view.hover(hovered()));
 	/** The page has loaded and said it hands the canvas its gestures: only then does it take the pointer. */
