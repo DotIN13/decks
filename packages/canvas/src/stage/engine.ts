@@ -977,8 +977,15 @@ export class StageEngine {
 		if (!this.view.width) return;
 		const { x, y, zoom, width, height } = this.drawRect();
 		const dpr = Math.min(2, devicePixelRatio || 1);
-		// Fingers pinching the zoom: tiles at half the screen's density (`setPinching`); a two-finger pan at one zoom keeps the exact scale.
-		const sent = { zoom, dpr: this.pinching && this.zooming ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
+		/*
+		 * While the zoom changes, by any means (fingers, a trackpad, the wheel, keys, a glide), tiles at
+		 * half the screen's density: a quarter of the pixels a tile, and the sharp ones once the zoom
+		 * rests. A pinch on an iPad mini asked for 35 to 135 tiles, each about 2 ms of the worker's time
+		 * and a copy into the page's texture; text is soft only while the zoom moves. A pan at one zoom
+		 * keeps the exact scale. `__decksHalfZoom = false` paints them sharp, for measuring.
+		 */
+		const half = this.zooming && (globalThis as { __decksHalfZoom?: boolean }).__decksHalfZoom !== false;
+		const sent = { zoom, dpr: half ? dpr / 2 : dpr, moving: this.moving, zooming: this.zooming, fast: this.fastZoom };
 		this.post({ type: "camera", x, y, width, height, ...sent });
 		const want = this.stageModule?.scaleFor(sent.zoom * sent.dpr, sent.zooming);
 		if (want !== undefined && want !== this.wantScale) {
@@ -1010,18 +1017,6 @@ export class StageEngine {
 		if (gone.length) this.post({ type: "dropped", keys: gone });
 	}
 
-	/**
-	 * Fingers are pinching the stage (not a pan, not a wheel): while they do, the worker paints its
-	 * tiles at half the screen's density, a quarter of the pixels a tile, and the sharp ones when they
-	 * lift. A pinch on an iPad mini asked for 35 to 135 tiles, each about 2 ms of the worker's time
-	 * and a copy into the page's texture; text is soft only while the fingers move.
-	 */
-	setPinching(on: boolean): void {
-		if (on === this.pinching) return;
-		this.pinching = on;
-		if (this.moving) this.sendCamera();
-	}
-	private pinching = false;
 
 	/**
 	 * The frame's one draw. Cameras, tiles from the worker and every other change only mark the canvas

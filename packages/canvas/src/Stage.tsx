@@ -276,16 +276,23 @@ export function Stage(props: {
 		element.scrollTo(to.left, to.top);
 	};
 	/**
-	 * While a pinch is under way, the scroll it began at (read once, at its first step in `touch`): the view then
-	 * changes by the world's origin alone, and the scroll is left where it is. Setting it at each step
-	 * made Safari lay out and scroll the whole area, a third of a pinch's script time on an iPad mini.
+	 * While the zoom is changing, the scroll it found when it began (read once): the view then changes
+	 * by the world's origin alone (`originFor`), and the scroll is left where it is until the zoom rests.
+	 * One rule for every zoom: fingers, a trackpad's pinch, Ctrl and the wheel, Safari's gesture events,
+	 * the zoom keys, a glide. Setting the scroll at each step made the browser lay out and scroll the
+	 * whole area: a third of a pinch's script time on an iPad mini, and 8 to 27% of a zoom's on a Mac.
 	 */
-	let pinchScroll: { left: number; top: number } | undefined;
+	let zoomScroll: { left: number; top: number } | undefined;
+	/** The zoom the world was last placed at, to tell a zoom step from a pan. */
+	let placedZoom: number | undefined;
 	const ctl = createCameraController({
 		view,
 		place: (cam) => {
-			if (pinchScroll) {
-				origin = originFor(cam, pinchScroll, view());
+			const zooming = placedZoom !== undefined && cam.zoom !== placedZoom;
+			placedZoom = cam.zoom;
+			if (zooming && !zoomScroll && element) zoomScroll = { left: element.scrollLeft, top: element.scrollTop };
+			if (zoomScroll) {
+				origin = originFor(cam, zoomScroll, view());
 				placeWorld(cam.zoom, true);
 				penLayer.setCamera(cam);
 				return;
@@ -323,10 +330,18 @@ export function Stage(props: {
 			origin = { x: cam.x, y: cam.y };
 			placeWorld(cam.zoom, true);
 			placeScroll(cam);
+			// A zoom not yet rested keeps the scroll it now has.
+			if (zoomScroll) zoomScroll = scrollFor(cam, origin, view());
 		}, { defer: true }),
 	);
 	// The camera's motion, as the controller tracks it (`camera/controller.ts`).
 	const { moving, scaling, gliding, panning, setPanning } = ctl;
+	// The zoom has rested: from here the scroll and the camera agree again, and a pan sets the scroll as before.
+	createEffect(
+		on(scaling, (now) => {
+			if (!now) zoomScroll = undefined;
+		}, { defer: true }),
+	);
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 	/** A press pans: Space is held, or the host's hand tool is on (`state/pen-tools.ts`). */
 	const grabbing = () => spaceHeld() || handTool();
@@ -384,8 +399,8 @@ export function Stage(props: {
 			const own = ownScroll;
 			if (own && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1) return;
 			ownScroll = undefined;
-			// The fingers of a pinch also scroll: its later steps keep the view at the scroll they moved it to.
-			if (pinchScroll) pinchScroll = at;
+			// A scroll in the middle of a zoom (fingers, a wheel): its later steps keep the view at the scroll it moved to.
+			if (zoomScroll) zoomScroll = at;
 			ctl.scrolled(cameraFor(at, origin, ctl.now().zoom, view()));
 		};
 		element.addEventListener("scroll", onScroll, { passive: true });
@@ -454,7 +469,6 @@ export function Stage(props: {
 			if (fingersDown()) return;
 			const r = element.getBoundingClientRect();
 			stageAt = { left: r.left, top: r.top };
-			if (halfWhilePinching()) penLayer.setPinching(true);
 		};
 		const onGestureChange = (event: Event) => {
 			event.preventDefault();
@@ -469,7 +483,6 @@ export function Stage(props: {
 			event.preventDefault();
 			gesturing = false;
 			if (fingersDown()) return;
-			penLayer.setPinching(false);
 			stoppedMoving();
 		};
 		element.addEventListener("gesturestart", onGestureStart, { passive: false });
@@ -1385,8 +1398,6 @@ export function Stage(props: {
 	let noCoast = false;
 	/** The gesture so far has been a pinch: its lift ends the moving state at once (`stoppedMoving`). */
 	let pinched = false;
-	/** Tiles at half density while pinching (`StageEngine.setPinching`); `__decksHalfPinch = false` turns it off, for measuring. */
-	const halfWhilePinching = () => (globalThis as { __decksHalfPinch?: boolean }).__decksHalfPinch !== false;
 	/**
 	 * A finger of this document's, in the stage's own coordinates.
 	 *
@@ -1426,13 +1437,11 @@ export function Stage(props: {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
-				pinchScroll = undefined;
 				setPanning(false);
 				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
 				trail = [];
 				if (thrown) coast(thrown);
 				else if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
-				penLayer.setPinching(false);
 			}
 			return { kind: "idle" };
 		}
@@ -1440,9 +1449,6 @@ export function Stage(props: {
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
 			noCoast = true;
-			if (!pinched && halfWhilePinching()) penLayer.setPinching(true);
-			// The scroll stays where the pinch found it, and the view changes by the world's origin (`originFor`).
-			if (!pinched && element) pinchScroll = { left: element.scrollLeft, top: element.scrollTop };
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
