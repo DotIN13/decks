@@ -416,13 +416,19 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		said = on;
 		props.onLive?.(on);
 	};
-	/** The page has loaded since it was made: a hidden one that is shown again says so at once. */
-	let loaded = false;
+	/**
+	 * The page has loaded since it was made: a hidden one that is shown again says so at once. A signal,
+	 * so the effect below hears a page hidden after it loaded: as a plain flag, an effect that first ran
+	 * before the load never read `hidden`, the page was hidden at a zoom out and kept saying it showed,
+	 * and the sheet drew a hole where the board's picture belonged.
+	 */
+	const [loaded, setLoaded] = createSignal(false);
 	createEffect(() => {
+		const hidden = !!props.hidden;
 		if (!live()) {
-			loaded = false;
+			setLoaded(false);
 			say(false);
-		} else if (loaded) say(!props.hidden);
+		} else if (loaded()) say(!hidden);
 	});
 	onCleanup(() => say(false));
 	return (
@@ -491,7 +497,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						sandbox={props.sandboxed ? SHARED_SANDBOX : undefined}
 						onLoad={() => {
 							setLoads((n) => n + 1);
-							loaded = true;
+							setLoaded(true);
 							say(live() && !props.hidden);
 							measure();
 						}}
