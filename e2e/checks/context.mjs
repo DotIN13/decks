@@ -276,10 +276,28 @@ const agent = {
 			heights: [...new Set(items.map((el) => Math.round(box(el).height)))],
 			inside: box(callout).left >= 0 && box(callout).right <= innerWidth,
 			span: [Math.round(box(callout).left), Math.round(box(callout).right), innerWidth],
+			// The pill is centred on the board's middle wherever that is, off the screen included (`BoardCallout.tsx`, `place`).
+			centre: Math.round((box(callout).left + box(callout).right) / 2),
+			boardMid: (() => {
+				const path = document.querySelector('.board-node[data-selected="true"]')?.dataset.path;
+				const r = (window.__decksBoards?.() ?? []).find((one) => one.path === path)?.rect;
+				return r ? Math.round(r.left + r.width / 2) : null;
+			})(),
 		};
 	});
 	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "New tab", "Comment", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
-	say("…on one row, on the screen, every item a 40px target", menu !== null && menu.rows === 1 && menu.inside && menu.heights.length === 1 && menu.heights[0] >= 40, JSON.stringify(menu));
+	/*
+	 * On the screen whenever the board's middle leaves it room: the pill keeps its edge, centred on what it is
+	 * for, and is carried off the screen with it rather than pushed on (8075ccea). The board tapped is
+	 * the one with the most of it in view, whose middle can still be off the side of a phone.
+	 */
+	const half = menu ? (menu.span[1] - menu.span[0]) / 2 : 0;
+	const midOn = menu?.boardMid !== null && menu?.boardMid !== undefined && menu.boardMid - half >= 0 && menu.boardMid + half <= menu.span[2];
+	say(
+		"…on one row, centred on the board, every item a 40px target",
+		menu !== null && menu.rows === 1 && menu.heights.length === 1 && menu.heights[0] >= 40 && menu.boardMid !== null && Math.abs(menu.centre - menu.boardMid) <= 2 && (!midOn || menu.inside),
+		JSON.stringify(menu),
+	);
 
 	/* One finger on the selected board's edge moves the board: a phone has no mouse to drag it by. */
 	const edge = await page.evaluate(() => {

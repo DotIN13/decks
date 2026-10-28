@@ -166,60 +166,46 @@ await page.waitForSelector(".settings", { timeout: 6000 });
 await settle(page, 500);
 
 /*
- * The redesign, asserted as a shape rather than as pixels.
- *
- * The first version of this panel was a three-column grid, and the assertion here was that
- * the two column headings stayed centred on the controls under them to within a pixel — a
- * check that existed only because the design needed the headings to mean anything. Grouping
- * by *what the app does* removed the need for both, so what is checked now is the grouping
- * itself: two notification groups, one control per row, and every row's control the same kind
- * as its neighbours'.
+ * The Settings redesign (`settings/Settings.tsx`): a window of six sections on a grey left, the
+ * open one on the right under its name, opening on Notifications. Notifications is one table
+ * (`alerts/AlertSettings.tsx`): each moment once, its sound and its banner side by side under
+ * When / Sound / Banner, then Volume as four stops, then the permission line when the browser
+ * will not show banners. The Sounds and Banners groups this replaced printed every moment twice.
  */
-const panel = await page.evaluate(() => {
-	const groups = [...document.querySelectorAll(".set-group")].map((group) => ({
-		name: group.dataset.group,
-		title: group.querySelector(".set-title")?.textContent,
-		rows: [...group.querySelectorAll(".set-row")].map((row) => ({
-			label: row.querySelector(".set-k > .row-label")?.textContent,
-			note: row.querySelector(".set-k > .row-note")?.textContent ?? null,
-			controls: [...row.children].filter((child) => !child.classList.contains("set-k")).map((child) => child.className.split(" ")[0]),
-		})),
-	}));
-	return {
-		groups,
-		strip: document.querySelector(".set-strip")?.innerText.replace(/\s+/g, " ").trim() ?? null,
-		title: document.querySelector(".set-head-title")?.textContent,
-		add: document.querySelector(".set-group[data-group='accounts'] .set-add")?.innerText.trim(),
-		footer: document.querySelectorAll(".settings > footer").length,
-	};
-});
-say("the window has a title rather than a section label", panel.title === "Settings", panel.title);
-say("sounds, banners and accounts come first, in that order", JSON.stringify(panel.groups.slice(0, 3).map((g) => g.name)) === JSON.stringify(["sounds", "banners", "accounts"]), JSON.stringify(panel.groups.map((g) => g.title)));
-
-const sounds = panel.groups[0];
-const banners = panel.groups[1];
-say("sounds has a row per kind, plus the volume", sounds.rows.length === 4 && sounds.rows[3]?.label === "Volume", JSON.stringify(sounds.rows.map((r) => r.label)));
-say("…and every kind carries the sentence that explains it", sounds.rows.every((row) => (row.note ?? "").length > 10), JSON.stringify(sounds.rows.map((r) => r.note?.slice(0, 20))));
-say("banners has the same three kinds, in the same order", JSON.stringify(banners.rows.map((r) => r.label)) === JSON.stringify(sounds.rows.slice(0, 3).map((r) => r.label)), JSON.stringify(banners.rows.map((r) => r.label)));
-/*
- * The sentence is printed once. Repeating it under the switches would be the spreadsheet
- * again with extra words — it describes the event, and the event is the same one.
- */
-say("…without repeating the sentences", banners.rows.every((row) => row.note === null), JSON.stringify(banners.rows.map((r) => r.note)));
-/*
- * One control per row, and all of a group's the same kind. This is what makes a column
- * heading unnecessary: nothing in Sounds is a switch and nothing in Banners is a chip.
- */
-say("one control per row, everywhere", panel.groups.every((group) => group.rows.every((row) => row.controls.length === 1)), JSON.stringify(panel.groups.map((g) => g.rows.map((r) => r.controls))));
-say("…all of Banners' being switches", banners.rows.every((row) => row.controls[0] === "switch"), JSON.stringify(banners.rows.map((r) => r.controls[0])));
-say("…and Sounds' being cue chips, bar the volume", sounds.rows.slice(0, 3).every((row) => row.controls[0] === "chip-button") && sounds.rows[3]?.controls[0] === "segmented", JSON.stringify(sounds.rows.map((r) => r.controls[0])));
-say("the permission line lives inside the group it constrains", /banner/i.test(panel.strip ?? ""), panel.strip?.slice(0, 70));
-say("adding an account is the last row of its own group, not a window footer", /Add an account/.test(panel.add ?? "") && panel.footer === 0, `${panel.add} · ${panel.footer} footers`);
+const panel = await page.evaluate(() => ({
+	nav: [...document.querySelectorAll(".settings .sw-nav button")].map((b) => b.textContent.trim()),
+	open: document.querySelector(".settings .sw-nav button[aria-current='page']")?.textContent.trim(),
+	title: document.querySelector(".settings .sw-head .sw-title")?.textContent,
+	heads: [...document.querySelectorAll(".sw-moments .sw-cols-head > span")].map((s) => s.textContent),
+	moments: [...document.querySelectorAll(".sw-moments .sw-moment")].map((row) => ({
+		name: row.querySelector(".sw-name")?.textContent,
+		note: row.querySelector(".sw-name")?.getAttribute("title") ?? "",
+		sound: Boolean(row.querySelector(".sw-sel")),
+		banner: row.querySelector('[role="switch"]') ? "switch" : null,
+	})),
+	volume: [...document.querySelectorAll('.sw-group[data-group="volume"] .sw-seg > button')].map((b) => b.textContent),
+	strip: document.querySelector(".sw-strip")?.innerText.replace(/\s+/g, " ").trim() ?? null,
+}));
+say("Settings is a window of six sections", JSON.stringify(panel.nav) === JSON.stringify(["General", "Notifications", "Accounts", "Voice", "Connections", "Chrome"]), JSON.stringify(panel.nav));
+say("…opening on Notifications, under its name", panel.open === "Notifications" && panel.title === "Notifications", `${panel.open} / ${panel.title}`);
+say("one table under When, Sound and Banner", JSON.stringify(panel.heads) === JSON.stringify(["When", "Sound", "Banner"]), JSON.stringify(panel.heads));
+say("…with each of the three moments once", panel.moments.length === 3 && new Set(panel.moments.map((m) => m.name)).size === 3, JSON.stringify(panel.moments.map((m) => m.name)));
+say("…each with the sentence that explains it", panel.moments.every((m) => m.note.length > 10), JSON.stringify(panel.moments.map((m) => m.note.slice(0, 20))));
+say("…and a sound and a banner switch side by side", panel.moments.every((m) => m.sound && m.banner === "switch"), JSON.stringify(panel.moments));
+say("volume is four stops, Off first", JSON.stringify(panel.volume) === JSON.stringify(["Off", "Quiet", "Medium", "Loud"]), JSON.stringify(panel.volume));
+say("the permission line is in Notifications, about banners", /banner|permission|notification/i.test(panel.strip ?? ""), panel.strip?.slice(0, 70));
+// Accounts is its own section now, adding one its last row.
+await page.locator(".settings .sw-nav button[data-section='accounts']").click();
+await settle(page, 300);
+const add = await page.evaluate(() => ({ add: document.querySelector(".settings .sw-add")?.innerText.trim(), footer: document.querySelectorAll(".settings > footer").length }));
+say("adding an account is a row of Accounts, not a window footer", /Add an account/.test(add.add ?? "") && add.footer === 0, `${add.add} · ${add.footer} footers`);
+await page.locator(".settings .sw-nav button[data-section='notifications']").click();
+await settle(page, 300);
 
 // --- the cue picker: forty-five sounds, previewed ------------------------------------
 
 const wasPlayed = (await tab()).played;
-await page.locator(".set-row .set-cue").first().click();
+await page.locator(".sw-moment .sw-sel").first().click();
 await page.waitForSelector(".set-sounds", { timeout: 4000 });
 const picker = await page.evaluate(() => ({
 	families: [...document.querySelectorAll(".set-sounds .group-label")].map((el) => el.textContent),
@@ -247,7 +233,7 @@ await settle(page, 400);
 const afterPick = await page.evaluate(() => ({
 	open: Boolean(document.querySelector(".set-sounds")),
 	last: window.__played.at(-1),
-	chip: document.querySelector(".set-row .set-cue")?.innerText.trim(),
+	chip: document.querySelector(".sw-moment .sw-sel")?.innerText.trim(),
 	saved: JSON.parse(localStorage.getItem("decks.alerts") ?? "{}"),
 	played: window.__played.length,
 }));
@@ -262,7 +248,7 @@ await settle(page, 250);
 
 // --- off is a real setting -----------------------------------------------------------
 
-await page.locator(".set-vol > button").filter({ hasText: /^Off$/ }).click();
+await page.locator('.sw-group[data-group="volume"] .sw-seg > button').filter({ hasText: /^Off$/ }).click();
 await settle(page, 300);
 const quiet = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem("decks.alerts") ?? "{}"), played: window.__played.length }));
 await feed({ type: "agent.state", id: "probe", state: "tool" });

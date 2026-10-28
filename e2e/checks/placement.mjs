@@ -7,24 +7,30 @@
  * hundreds of thousands of pixels tall. The ＋ in the corner made a board at the bottom of that
  * column and left the camera where it was.
  *
- * So what is asserted here is the rule: the board arrives near what is already on the canvas, and a
- * board picked out of the rail is flown to (a board.create is not: the stage places it, no camera). Read off the screen rather than off the
- * deck state, because "can the person see it" is a question about pixels.
+ * So what is asserted here is the rule: the board arrives near what is already on the canvas. Read
+ * off the screen rather than off the deck state, because "can the person see it" is a question
+ * about pixels.
+ *
+ * The rail is gone (the panel's Canvas tab lists only what is on the canvas), so a board put back
+ * is put back over the wire, `board.play`, as an agent's `show` does; nothing flies the camera to
+ * it, so whether it is on screen is not asserted, only where it lands.
  */
-import { open, openPanel, resetStage, say, settle, socket } from "../harness.mjs";
+import { open, resetStage, say, settle, socket } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
 await settle(page, 900);
 
-/** Every board on the canvas, as boxes on screen. */
+/**
+ * Every board on the canvas, as boxes on screen: the stage's own list, because below the live zoom
+ * a board is a picture with no `.board-node` (only the selected one keeps its page).
+ */
 const onScreen = () =>
 	page.evaluate(() => {
 		const view = { w: window.innerWidth, h: window.innerHeight };
-		return [...document.querySelectorAll(".board-node")].map((node) => {
-			const box = node.getBoundingClientRect();
+		return (window.__decksBoards?.() ?? []).map(({ path, rect: box }) => {
 			return {
-				path: node.dataset.path,
+				path,
 				x: Math.round(box.x),
 				y: Math.round(box.y),
 				w: Math.round(box.width),
@@ -34,10 +40,10 @@ const onScreen = () =>
 		});
 	});
 
-const paths = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path));
+const paths = (await onScreen()).map((board) => board.path);
 say("the fixture has boards to be placed among", paths.length >= 2, JSON.stringify(paths));
 
-// --- a board picked out of the rail, from the far end of the old column ----------------
+// --- a board put back on the canvas, from the far end of the old column ----------------
 
 const stray = paths.at(-1);
 const link = await socket();
@@ -51,21 +57,19 @@ link.send({ type: "board.move", path: stray, x: 0, y: 520_000 });
  * run this check failed on its second assertion about once in twenty, which reads as the
  * hide being broken rather than as the wait being short.
  */
-await page.waitForFunction((path) => !document.querySelector(`.board-node[data-path="${path}"]`), stray, { timeout: 8000 });
+await page.waitForFunction((path) => !(window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 });
 await settle(page, 300);
 
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);
 
-await openPanel(page);
-await settle(page, 400);
-await page.evaluate((name) => [...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(name))?.click(), stray.split("/").pop());
-await settle(page, 2200);
+link.send({ type: "board.play", path: stray });
+await page.waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), stray, { timeout: 8000 }).catch(() => {});
+await settle(page, 1200);
 
 const after = await onScreen();
 const back = after.find((board) => board.path === stray);
-say("a board picked out of the rail comes back to the canvas", back !== undefined, JSON.stringify(after.map((b) => b.path)));
-say("…and the camera arrives on it, rather than leaving it off screen", back?.inView === true, JSON.stringify(back));
+say("a board put back comes back to the canvas", back !== undefined, JSON.stringify(after.map((b) => b.path)));
 const others = after.filter((board) => board.path !== stray);
 const clear = back !== undefined && others.every((board) => back.x > board.x + board.w || board.x > back.x + back.w || back.y > board.y + board.h || board.y > back.y + back.h);
 say("…and it does not land on top of a board that was already there", clear, JSON.stringify(others.map((b) => `${b.path} ${b.x},${b.y}`)));
@@ -85,8 +89,6 @@ say(
 
 // --- a new board, asked for over the wire (people no longer make boards from the UI) ------
 
-await openPanel(page);
-await settle(page, 300);
 const before = new Set((await onScreen()).map((board) => board.path));
 link.send({ type: "board.create" });
 await settle(page, 2500);

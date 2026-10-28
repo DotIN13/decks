@@ -129,7 +129,8 @@ say("a dormant agent keeps its runtime, dimmed", menu.rows.find((row) => row.nam
  * carrying the full story and the card a hover away, that was unnecessary — and this is the
  * assertion that stops it creeping back.
  */
-say("the rows are still one line, at 264px", menu.width === 264 && menu.rows.every((row) => row.h <= 36), `${menu.width}px · ${JSON.stringify(menu.rows.map((r) => r.h))}`);
+// 280px since the menus redesign (b4905071, `agents/AgentPill.tsx`).
+say("the rows are still one line, at 280px", menu.width === 280 && menu.rows.every((row) => row.h <= 36), `${menu.width}px · ${JSON.stringify(menu.rows.map((r) => r.h))}`);
 say("…and carry no tags: that is the panel's job", menu.tags === 0, `${menu.tags} tags in the menu`);
 
 // --- the hover card, beside the row ------------------------------------------------
@@ -283,7 +284,8 @@ say("a finished turn keeps its place, and says it is not read yet", panel.rows[3
 say("every row is two lines", panel.rows.every((agent) => agent.lines === "2" && agent.shape[0] === "agent-line" && agent.shape.length <= 2), JSON.stringify(panel.rows.map((r) => r.shape)));
 say("the avatar is beside the name, not above it", panel.rows.every((agent) => agent.sideBySide), JSON.stringify(panel.rows.map((r) => r.sideBySide)));
 say("…at 24px", panel.rows.every((agent) => agent.avatar === 24), JSON.stringify(panel.rows.map((r) => r.avatar)));
-say("…on a 50px row, the face centred on the two lines", panel.rows.every((agent) => agent.h === 50 && agent.offCentre <= 1), JSON.stringify(panel.rows.map((r) => [r.h, r.offCentre])));
+// The Agents tab packs its rows: 4px above and below the two lines, 46px (4c556096, `styles/v3.css`); Recent keeps the roomier ones.
+say("…on a 46px row, the face centred on the two lines", panel.rows.every((agent) => agent.h === 46 && agent.offCentre <= 1), JSON.stringify(panel.rows.map((r) => [r.h, r.offCentre])));
 /*
  * **What it is doing is where the time was**, at the right-hand end of the name line, in the
  * row's short wording: `waiting for you`, `running tools…`, `done · 15m`, `idle · 2h`. It reads
@@ -441,10 +443,12 @@ say("…including by a tag you put on yourself", JSON.stringify(await page.evalu
  * screen. This is the one thing the removed strip got right, and it was right because the
  * two lists differ — which is exactly the case here and was not the case there.
  */
-await page.getByRole("tab", { name: "Boards" }).click();
+// Boards is the Canvas tab now, and its field searches the canvas by name (`panel/LeftPanel.tsx`).
+await page.getByRole("tab", { name: "Canvas" }).click();
 await settle(page, 400);
 say("switching tabs clears the query", (await page.locator(".panel-shell .v3-search input").inputValue()) === "", await page.locator(".panel-shell .v3-search input").inputValue());
-say("…and the placeholder follows the tab", /boards$/.test((await page.locator(".panel-shell .v3-search input").getAttribute("placeholder")) ?? ""), await page.locator(".panel-shell .v3-search input").getAttribute("placeholder"));
+const canvasPlaceholder = (await page.locator(".panel-shell .v3-search input").getAttribute("placeholder")) ?? "";
+say("…and the placeholder follows the tab", /^Search /.test(canvasPlaceholder) && !/agents/i.test(canvasPlaceholder), canvasPlaceholder);
 
 // --- the edit window ------------------------------------------------------------------
 
@@ -459,7 +463,9 @@ await settle(page, 400);
 const irisRow = page.locator(".agent-row").filter({ hasText: "Iris" }).first();
 await irisRow.hover();
 await settle(page, 250);
+// The ⋯ opens the agent's menu now; its Rename… opens the window on the name.
 await irisRow.locator(".agent-tagbtn").click();
+await page.getByRole("menuitem", { name: "Rename…" }).click({ timeout: 4000 });
 await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
 await settle(page, 400);
 
@@ -477,7 +483,8 @@ const pop = await page.evaluate(() => ({
 say("the window takes the cursor, in the name", pop.focused === "Agent name", String(pop.focused));
 say("…and holds the three things about an agent you can change, as rows", JSON.stringify(pop.rows) === JSON.stringify(["Name", "Workspace", "Tags"]), JSON.stringify(pop.rows));
 say("…with nothing written under them", pop.notes === 0, `${pop.notes} notes`);
-say("…with fields that did not collapse", pop.fields.length === 3 && pop.fields.every((height) => height === 32), JSON.stringify(pop.fields));
+// The tags are chips inside their own field, which is 34px at least so a 22px chip sits in it (8182a2f2, `styles/v3.css`).
+say("…with fields that did not collapse", pop.fields.length === 3 && pop.fields[0] === 32 && pop.fields[1] === 32 && pop.fields[2] >= 34, JSON.stringify(pop.fields));
 say("…the workspace as a picker, saying it is on none", pop.picker === "No workspace", String(pop.picker));
 /* Yours alone: the agent's own tags stay on its row, and only yours carry a way to remove them. */
 say("…only your tags, each with a way to remove it", pop.theirs === 0 && JSON.stringify(pop.mine) === JSON.stringify(["mine"]), JSON.stringify(pop.mine));
@@ -517,7 +524,8 @@ const picked = await page.evaluate(() => ({
 }));
 say("naming a new one sends the workspace, for the agent whose row it is, and the list closes", picked.workspace === "political-llm" && picked.id === "a3" && !picked.listOpen, JSON.stringify(picked));
 
-await page.locator('[role="dialog"] input[placeholder="Add a tag"]').fill("Panel CSS, later");
+// By its label: the placeholder is there only while the field holds no tag, and Iris has one.
+await page.locator('[role="dialog"] input[aria-label="Add a tag"]').fill("Panel CSS, later");
 await page.keyboard.press("Enter");
 await settle(page, 400);
 const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.tags")).map((frame) => JSON.parse(frame)));
@@ -533,7 +541,9 @@ say("…and the window stays open, so a second tag is one keystroke away", await
 await page.locator('[role="dialog"] .tag-x').first().click();
 await settle(page, 400);
 const after = await page.evaluate(() => JSON.parse(window.__sent.filter((frame) => frame.includes("agent.tags")).at(-1)));
-say("removing one sends the rest", JSON.stringify(after.tags) === JSON.stringify([]), JSON.stringify(after.tags));
+/* The field keeps the tags as they are being edited (`AgentEdit.tsx`, `mine`), so the rest is the two just added:
+   this fed agent's identity never comes back from the server to put it back to ["mine"]. */
+say("removing one sends the rest", JSON.stringify(after.tags) === JSON.stringify(["Panel CSS", "later"]), JSON.stringify(after.tags));
 
 await page.keyboard.press("Escape");
 await settle(page, 300);
@@ -712,11 +722,11 @@ await settle(page, 200);
 
 // --- the square beside the search is the agents' alone ----------------------------------
 
-/* The boards list has one look, a line per board, so on Boards the square is not there. */
-await page.getByRole("tab", { name: "Boards" }).click();
+/* The canvas list has one look, a line per item, so on Canvas (once Boards) the square is not there. */
+await page.getByRole("tab", { name: "Canvas" }).click();
 await settle(page, 300);
 const onBoards = await page.evaluate(() => ({ square: document.querySelectorAll(".panel-view").length, density: document.querySelector(".panel-list")?.getAttribute("data-density") ?? null }));
-say("the boards tab has no grid switch, and the list no density", onBoards.square === 0 && onBoards.density === null, JSON.stringify(onBoards));
+say("the canvas tab has no grid switch, and the list no density", onBoards.square === 0 && onBoards.density === null, JSON.stringify(onBoards));
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 300);
 
@@ -759,7 +769,7 @@ await feed({
 	chats: Array.from({ length: 16 }, (_, index) => chat(`m${index}`, `Many ${index}`, "claude", "idle", undefined, 60_000 * (index + 1))),
 });
 await settle(page, 500);
-await page.getByRole("tab", { name: "Boards" }).click();
+await page.getByRole("tab", { name: "Canvas" }).click();
 await settle(page, 300);
 await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover .agent-menu-more", { timeout: 4000 });

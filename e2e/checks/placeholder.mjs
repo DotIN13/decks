@@ -119,14 +119,22 @@ async function look([png, box, colours, scale]) {
 				if (!inside && near(at(x, y), c)) band++;
 			}
 		}
-		// The line along the top edge, a pixel in from it: its dashes turn on and off.
+		// The line along the top edge, a pixel in from it: its dashes turn on and off. Read on the row
+		// nearest the edge that holds most of the line: the stage now scrolls, and the frame can sit
+		// up to a pixel off the box worked out from the camera, which put the row read off the line.
 		let turns = 0;
-		let was = false;
-		const line = box.y1 + 1 * scale;
-		for (let x = box.x1 + 16 * scale; x <= box.x2 - 16 * scale; x++) {
-			const on = near(at(x, line), c, 64);
-			if (was && !on) turns++;
-			was = on;
+		let most = -1;
+		for (const line of [box.y1 - 1, box.y1, box.y1 + 1, box.y1 + 2]) {
+			let count = 0;
+			let flips = 0;
+			let was = false;
+			for (let x = box.x1 + 16 * scale; x <= box.x2 - 16 * scale; x++) {
+				const on = near(at(x, line), c, 64);
+				if (on) count++;
+				if (was && !on) flips++;
+				was = on;
+			}
+			if (count > most) [most, turns] = [count, flips];
 		}
 		let tag = 0;
 		let white = 0;

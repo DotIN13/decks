@@ -5,50 +5,32 @@
  * socket — no model needed. The agent-side half (`show`/`hide` from the `decks` command) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, emptyCanvas, freshAgent, open, openAgents, openAllBoards, openPanel, pressBoardAction, say, selectBoard, settle, socket } from "../harness.mjs";
+import { deckState, emptyCanvas, freshAgent, open, openPanel, pressBoardAction, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
 
-const { browser, page, errors } = await open({ width: 1600, height: 1000 });
-const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
-
+const { browser, page, errors } = await open({ width: 1600, height: 1000, panelTab: "canvas" });
 /*
- * A row says a board's *basename*, so a check that wants to compare against the deck has to
- * come down to the same thing. `boards/plan.html` is the path everywhere else in this file,
- * and the panel draws `plan.html` — the directory is the same for every row and spending a
- * third of a 264px panel restating it was what the old rail did.
+ * What is on the stage, picture or page. A `.board-node` is only a board whose page is live now
+ * (at most six, chosen at rest, `live-set.ts`), so the stage's own list is what is read.
  */
+const onCanvas = () => page.evaluate(() => (window.__decksBoards?.() ?? []).map((board) => board.path).sort());
+
 const base = (path) => path.split("/").pop();
 const names = paths.map(base).sort();
 
-/**
- * The focused agent's own rows: the "on the canvas" and "held, not shown" sections.
- *
- * `:not([data-kind="deck"])` is the whole of the difference between "what this agent is
- * working from" and "what there is". The panel is one list now — the two tabs were the same
- * list with a line through it — so the line lives in this selector instead, which is where
- * it was always doing its work.
- */
-const mine = () =>
-	page.evaluate(() =>
-		[...document.querySelectorAll('.panel-section:not([data-kind="deck"]) .board-row .row-name')].map((n) => n.textContent).sort(),
-	);
-
-/** Every row in the list, all three sections of it. */
-const listed = () => page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .row-name")].map((n) => n.textContent).sort());
-
 /*
- * The stage is the focused agent's, and the panel says the same thing about it: the harness
- * has put every board in the deck on this agent's stage, so both of its own headings hold
- * the whole deck.
+ * The panel's Canvas tab: one row per board on this canvas (`panel/LeftPanel.tsx`, `itemRow`). It
+ * says a board's title, not its file, so it is compared with the stage by count. The panel no
+ * longer has the agent's "held" and "deck" headings; what the agent holds is read off the
+ * server's `context.changed` instead (below).
  */
+const panelBoards = () => page.evaluate(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length);
+
 await openPanel(page);
 say("the stage shows what the agent has up", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
-say("…and the panel's own headings say the same", (await mine()).join() === names.join(), (await mine()).join(" "));
-
-await openAllBoards(page);
-say("every board is reachable from here, which is where you find one", (await listed()).join() === names.join(), (await listed()).join(" "));
+say("…and the panel's Canvas tab lists the same boards", (await panelBoards()) === paths.length, `${await panelBoards()} rows for ${paths.length} boards`);
 await page.mouse.move(800, 500);
 
 /*
@@ -72,8 +54,8 @@ const made = await freshAgent(page, "tiers-fresh");
 await emptyCanvas(page);
 say("an agent holding nothing puts nothing on its stage", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
 await openPanel(page);
-say("…and the panel lists nothing under its own two headings", (await mine()).length === 0, (await mine()).join(" ") || "(empty)");
-say("…while still showing the deck, so the panel is never a list of nothing", (await listed()).join() === names.join(), (await listed()).join(" "));
+await page.waitForFunction(() => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item').length === 0, null, { timeout: 4000 }).catch(() => {});
+say("…and the panel's Canvas tab lists nothing", (await panelBoards()) === 0, `${await panelBoards()} rows`);
 /*
  * And it is called something nothing else is called.
  *
@@ -102,10 +84,11 @@ const two = twoNames.map((name) => `boards/${name}`);
 const link = await socket();
 if (made) link.send({ type: "agent.focus", id: made.id });
 for (const path of two) link.send({ type: "board.play", path });
-await page.waitForFunction((wanted) => document.querySelectorAll(".board-node").length === wanted, two.length, { timeout: 8000 });
+await page.waitForFunction((wanted) => (window.__decksBoards?.() ?? []).length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).map(base).sort().join() === twoNames.join(), (await onCanvas()).join(" "));
-await openPanel(page, "context");
-say("the panel's own two headings list the same two", (await mine()).join() === twoNames.join(), (await mine()).join(" "));
+await openPanel(page);
+await page.waitForFunction((wanted) => document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]').length === wanted, two.length, { timeout: 4000 }).catch(() => {});
+say("the panel's Canvas tab lists the same two", (await panelBoards()) === two.length, `${await panelBoards()} rows`);
 
 // The hide button on a board takes it off the stage, and the agent keeps it.
 //
@@ -115,25 +98,28 @@ say("the panel's own two headings list the same two", (await mine()).join() === 
 const first = (await onCanvas()).find((path) => base(path) === twoNames[0]) ?? two[0];
 await selectBoard(page, first);
 await pressBoardAction(page, "Hide");
-await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
+await page.waitForFunction((wanted) => !(window.__decksBoards?.() ?? []).some((board) => board.path === wanted), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
  * And the agent still holds it: hiding takes a board off the stage and deliberately does not
- * detach it, so it moves to `Held, not shown` rather than out of the agent's context.
+ * detach it (`wire/boards.ts`, `board.play`'s note), so it stays in the agent's context and out
+ * of its in-play list. The server says so in `context.changed`.
  */
-/* The held row follows the hide over the socket: waited for, not read the instant the board is gone. */
-await page
-	.waitForFunction((name) => [...document.querySelectorAll('.panel-section[data-kind="held"] .board-row .row-name')].some((n) => n.textContent === name), base(first), { timeout: 8000 })
-	.catch(() => {});
-const held = () => page.evaluate(() => [...document.querySelectorAll('.panel-section[data-kind="held"] .board-row .row-name')].map((n) => n.textContent));
-say("…without dropping it from the agent's context: it is held, not shown", (await held()).includes(base(first)) && (await mine()).length === 2, `held=${(await held()).join(" ")}`);
-
-// Clicking its row in the panel puts it back on the stage.
-await openPanel(page, "context");
-await page.locator(`.panel-list .board-row:has(.row-name:text-is("${base(first)}"))`).first().click();
-await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-node[data-path="${wanted}"]`)), first, { timeout: 8000 });
+const told = async () => {
+	for (let i = 0; i < 40; i += 1) {
+		const said = link.received.filter((m) => m.type === "context.changed" && (!made || m.agentId === made.id)).at(-1);
+		if (said && !said.inPlay.some((path) => base(path) === base(first))) return said;
+		await new Promise((resolve) => setTimeout(resolve, 200));
+	}
+	return link.received.filter((m) => m.type === "context.changed").at(-1);
+};
+const context = await told();
+say(
+	"…without dropping it from the agent's context: it is held, not shown",
+	Boolean(context) && context.boards.some((path) => base(path) === base(first)) && !context.inPlay.some((path) => base(path) === base(first)),
+	JSON.stringify(context && { boards: context.boards, inPlay: context.inPlay }),
+);
 await page.mouse.move(800, 500);
-say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));
 
 // The agent this check made is its own: removed, so the checks after it see the deck they expect.
 if (made) link.send({ type: "agent.remove", id: made.id });

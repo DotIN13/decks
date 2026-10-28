@@ -18,7 +18,8 @@
  */
 import { open, resetStage, say, settle } from "../harness.mjs";
 
-const { browser, page, errors } = await open({ width: 1500, height: 1000 });
+// The panel's Canvas tab lists the boards on the canvas (`panel/LeftPanel.tsx`, `itemRow`); a board's row flies to it.
+const { browser, page, errors } = await open({ width: 1500, height: 1000, panelTab: "canvas" });
 await resetStage(page);
 await settle(page, 600);
 
@@ -43,7 +44,7 @@ const watched = (press, ms) =>
 			const samples = [];
 			const start = performance.now();
 			if (press.kind === "row") {
-				[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(press.name))?.click();
+				[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === press.label)?.click();
 			} else {
 				const frame = document.querySelector(`.board-node[data-path$="/${press.path}"] iframe, .board-node[data-path="${press.path}"] iframe`);
 				// The canvas copy writes its links back to the library (`../../../boards/risks.html`), so by the end of the href.
@@ -58,7 +59,9 @@ const watched = (press, ms) =>
 		{ press, ms },
 	);
 
-const row = (name) => ({ kind: "row", name });
+/** A board's row in the Canvas tab, which is labelled with the board's name on the canvas rather than its file. */
+const LABEL = { "risks.html": "Auth refresh — risks", "plan.html": "Auth refresh — the plan" };
+const row = (name) => ({ kind: "row", name, label: LABEL[name] });
 const same = (a, b) => a.x === b.x && a.y === b.y && a.zoom === b.zoom;
 
 // --- a row in the panel -----------------------------------------------------------------
@@ -130,11 +133,17 @@ const stolen = await page.evaluate(async () => {
 	const stage = document.querySelector(".stage");
 	// Back to the plan: the link above has just flown the camera to risks.html, and pressing the board
 	// the camera is already on has nowhere to glide to, so nothing was ever in flight to take back.
-	[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes("plan.html"))?.click();
+	[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click();
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	const midFlight = stage.dataset.gliding === "true";
 	// A wheel over the canvas: the smallest thing a person does that moves the camera.
 	stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 240, bubbles: true, cancelable: true }));
+	/*
+	 * A wheel's pan is a scrollBy of the stage, and the camera follows from the scroll event the
+	 * browser sends before the next frame (`Stage.tsx`, `onWheel`; `camera/controller.ts`, `scrolled`),
+	 * which is what ends the glide: so "within a frame" is read one frame on, not in the same task.
+	 */
+	await new Promise((resolve) => requestAnimationFrame(resolve));
 	const after = [];
 	for (let i = 0; i < 14; i++) {
 		after.push({ gliding: stage.dataset.gliding === "true", ...camera() });

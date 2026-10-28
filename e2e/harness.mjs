@@ -172,7 +172,7 @@ export function write(file, text) {
  * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
  * any more.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "boards" } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "canvas" } = {}) {
 	/*
 	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
 	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the renderer
@@ -219,7 +219,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
-			// The side panel opens on Agents; the checks that find boards in it start on Boards (`panelTab`).
+			// The side panel opens on the tab it was left on; the checks start on Canvas, which lists the boards (`panelTab`).
 			if (tab) localStorage.setItem("decks.panelTab", tab);
 			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
 			if (renderer) localStorage.setItem("decks.renderer", renderer);
@@ -769,7 +769,8 @@ export async function newAgent(page, kind = "pi") {
 		await page.waitForTimeout(250);
 	}
 	await page.locator(".v3-new-agent, .pill .new-agent").first().click();
-	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
+	// The runtimes' rows say each runtime's name (`AgentChoices`): "Pi", "Claude Code", …
+	await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: new RegExp(`^\\s*${kind}`, "i") }) }).first().click();
 	/*
 	 * Counted with the menu re-opened, because picking closes it — and counted as agent
 	 * *rows* rather than every `[data-row]`.
@@ -794,8 +795,11 @@ export async function newAgent(page, kind = "pi") {
  * worth asking under that name.
  */
 export async function openAllBoards(page) {
+	// The side panel's Canvas tab lists what is on the canvas, boards among it (`.v3-item`).
 	await openPanel(page);
-	await page.waitForSelector(".board-row, .rail-item", { timeout: 6000 });
+	const tab = page.locator('.v3-nav [role="tab"]').filter({ hasText: /^\s*Canvas\s*$/i }).first();
+	if ((await tab.count()) > 0 && (await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+	await page.waitForSelector('.v3-item[data-kind="board"]', { timeout: 6000 });
 	await page.waitForTimeout(300);
 }
 

@@ -172,7 +172,8 @@ for (const one of await page.evaluate(() => window.__decksBoards().map(({ path, 
 	if (!one.node) {
 		// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
 		bar = await page.evaluate(({ path, rect: r }) => {
-			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
+			// The boards end 60 px left of the room, partly under the side panel (360 px): their right-hand strip is what shows.
+			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8], [0.85, 0.5], [0.92, 0.3]]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				if (x > 320 && x < 1560 && y > 90 && y < 900 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === path) return { x, y, path };
@@ -274,8 +275,12 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	const b = item("g-b");
 	m = await matrix();
 	const from = await centre("g-b");
-	// Aim b's top four screen pixels below a's: the snap closes the gap.
-	const wantDy = (a.y - b.y) * m.a + 4;
+	/*
+	 * Aim b's top four screen pixels above a's: the snap closes the gap. Above rather than below,
+	 * because a fixture board's edge lies 20 units under a's top here (a guide at y 3840 from x 2680),
+	 * and four pixels below a's top at 30% is nearer that edge than a's, so b rightly snapped to it.
+	 */
+	const wantDy = (a.y - b.y) * m.a - 4;
 	await page.mouse.move(from.x, from.y);
 	await page.mouse.down();
 	await page.mouse.move(from.x + 10, from.y + wantDy / 2, { steps: 4 });

@@ -51,6 +51,12 @@ await page.click('.v3-tool[data-tool="pen"]');
 await page.waitForSelector(".stage-ink");
 
 await page.evaluate(() => {
+	/*
+	 * The stroke under the pen is drawn by the engine now (`props.layer.ink`, 540345fc), with no SVG
+	 * path to read; `__inkOnSvg` puts it back on the glass as an `.ink-live` path, the same shape's
+	 * text, which is what is compared here.
+	 */
+	globalThis.__inkOnSvg = true;
 	const sheet = () => document.querySelector(".stage-ink");
 	let state;
 	const send = (type, x, y, pressure) =>

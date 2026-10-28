@@ -326,7 +326,8 @@ async function main(): Promise<number> {
 
 	// The fixtures are the goldens there are: their names, sizes and pictures.
 	const goldens = new Map<string, Picture>();
-	for (const file of (await readdir(GOLDENS)).filter((f) => f.endsWith(".png")).sort()) {
+	// `shot-*.png` are the native stage-shot crate's goldens (`crates/shot/src/tests.rs`), not fixtures this page draws.
+	for (const file of (await readdir(GOLDENS)).filter((f) => f.endsWith(".png") && !f.startsWith("shot-")).sort()) {
 		const name = file.slice(0, -4);
 		if (only && !only.includes(name)) continue;
 		goldens.set(name, overWhite(decodePng(await readFile(join(GOLDENS, file)))));

@@ -1,62 +1,29 @@
 /**
- * The one boards panel: one list, a button, and folded means gone.
+ * The side panel: a full-height column at the window's left edge, beside the canvas.
  *
- * It replaced three surfaces — a floating context rail, a floating agents panel that could
- * not be open at the same time, and a full-screen browser over the canvas — and then, for a
- * while, it had a tab strip of its own. That is gone too: Context and Deck were the same
- * list with a line through it, so what this asserts is the *absence* of the strip and the
- * presence of all three sections in one scroller.
+ * Four tabs now — Recent, Canvas, Agents, Apps (`panel/LeftPanel.tsx`, `PANEL_TABS`) — and the
+ * Canvas tab is what is on this canvas, boards then drawings, as plain rows (`.v3-item`). The old
+ * boards list (the whole deck in canvas → held → deck sections, a dot/bin/hide column per row,
+ * a count in each heading, the finger rail) is gone with that redesign, and so are its checks.
  *
- * The other half is the camera. A panel *beside* the canvas declares `data-inset="left"`
- * and the camera subtracts it; a sheet *over* the canvas must not, because subtracting one
- * once fitted a 1600px board into the strip beside it at 3.7%. Both are checked, because
- * the difference is invisible until a fit goes wrong.
+ * The other half is the camera. A panel beside the canvas declares `data-inset="left"` and the
+ * camera subtracts it; folded, it declares nothing. Both are checked, because the difference is
+ * invisible until a fit goes wrong.
  */
 import { open, say, settle, zoom, ZOOM_IN_PAGE, ready, rest } from "../harness.mjs";
 
-const { browser, page, errors } = await open({ width: 1400, height: 900 });
-/* What the browser sends back, for the one press here that has to reach the server: the × on a row. */
-await page.addInitScript(() => {
-	if (window.top !== window.self) return;
-	const Real = window.WebSocket;
-	window.__sent = [];
-	// The × goes through the SDK as the person now (`canvas.delete`): its calls are heard as frames too.
-	const realFetch = window.fetch.bind(window);
-	window.fetch = (input, init) => {
-		const url = String(typeof input === "string" ? input : input?.url ?? "");
-		const verb = /\/api\/v1\/([^/?]+)$/.exec(url)?.[1];
-		if (verb && init?.body) window.__sent.push(JSON.stringify({ type: verb, args: JSON.parse(String(init.body)).args }));
-		return realFetch(input, init);
-	};
-	window.WebSocket = class extends Real {
-		constructor(...args) {
-			super(...args);
-			const send = this.send.bind(this);
-			this.send = (data) => {
-				window.__sent.push(String(data));
-				return send(data);
-			};
-		}
-	};
-});
-await page.reload({ waitUntil: "load" });
+// The panel remembers its tab on this device; this check leaves it on Canvas.
+const { browser, page, errors } = await open({ width: 1400, height: 900, panelTab: "canvas" });
 await ready(page);
 await rest(page, { start: 0 });
 try {
 	const inset = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--inset-left").trim());
 	const mounted = () => page.locator("[data-inset='left']").count();
 	/*
-	 * The published inset, waited for rather than read once.
-	 *
-	 * `camera/insets.ts` batches every measurement into one `requestAnimationFrame`, so a surface
-	 * appearing or going and `--inset-left` following it are a frame apart. Reading it straight
-	 * after the change is a coin flip on whether that frame has run, and this check lost that
-	 * coin toss on three CI runs in five while the camera was never actually wrong — which is
-	 * also why each assertion used to print the successor of its own verdict: the condition read
-	 * "264px" and the detail, one round trip later, read "0px".
-	 *
-	 * Waiting is not a weaker assertion. A camera that never takes the window back still fails,
-	 * one 2s timeout later, and the value it failed with is reported.
+	 * The published inset, waited for rather than read once: `camera/insets.ts` batches every
+	 * measurement into one `requestAnimationFrame`, so a surface changing and `--inset-left`
+	 * following it are a frame apart. A camera that never takes the window back still fails,
+	 * one 2s timeout later, with the value it failed with.
 	 */
 	const settled = (expected) =>
 		page
@@ -68,303 +35,64 @@ try {
 			.then(() => expected)
 			.catch(() => inset());
 
-	// 320px: the v3 panel is a full-height column at the window's edge, not a card 12px in.
-	const up = await settled("320px");
-	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "320px", up);
+	// 360px: `PANEL_WIDTH` in `panel/panel-width.ts`.
+	const up = await settled("360px");
+	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "360px", up);
 
 	/*
-	 * The width is the person's. The handle straddles the panel's right edge; the canvas
-	 * hears about the new width the way it hears about the fold, from the measured inset,
-	 * so the assertion is on `--inset-left` rather than on the panel's own style.
+	 * The width is the person's. The handle straddles the panel's right edge; the canvas hears
+	 * about the new width from the measured inset, so the assertion is on `--inset-left`.
 	 */
 	const edge = await page.locator(".panel-resize").boundingBox();
 	await page.mouse.move(edge.x + 4, 400);
 	await page.mouse.down();
 	await page.mouse.move(edge.x + 4 + 96, 410, { steps: 6 });
 	await page.mouse.up();
-	say("dragging the panel's edge makes it wider, and the canvas is told", (await settled("416px")) === "416px", await inset());
-	say("the width is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === "416");
+	say("dragging the panel's edge makes it wider, and the canvas is told", (await settled("456px")) === "456px", await inset());
+	say("the width is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === "456");
 	await page.locator(".panel-resize").dblclick();
-	say("a double-click on the edge puts the width back", (await settled("320px")) === "320px", await inset());
+	say("a double-click on the edge puts the width back", (await settled("360px")) === "360px", await inset());
+	// The default is stored as nothing, so a later change to it reaches everyone who never chose.
+	say("…and forgets the width it had", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === null);
 
-	/*
-	 * A tab strip, and it is not the one that was removed.
-	 *
-	 * **Context** and **Deck** were one collection with a line drawn through it: everything
-	 * in Context was also in Deck, so finding a board began by guessing which side the app
-	 * had put it on this second. That is why that strip went, and the assertion here used to
-	 * be `no tab strip: there is one list`.
-	 *
-	 * **Boards** and **Agents** overlap in nothing — no agent is in the boards list and no
-	 * board is in the agents list. So the invariant that actually mattered, every item
-	 * appearing exactly once, holds trivially rather than by argument; it is still checked
-	 * below, on the boards list, because that is where it could still break.
-	 *
-	 * **Agents is the first tab and Boards is the one that is showing**, and both halves are
-	 * asserted because they are different decisions. The order is the panel's reading order:
-	 * the agents are the list that changes while you watch, so it is read first. The default is
-	 * the stage you were already looking at, which is what the app opens on.
-	 */
 	const tabs = await page.locator('.panel-shell [role="tab"]').allInnerTexts();
-	say("three tabs, agents first, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards", "Apps"]), JSON.stringify(tabs));
-	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
-	// The panel remembers its tab on this device; the harness leaves it on Boards (`harness.mjs`, `panelTab`).
-	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
+	say("four tabs: Recent, Canvas, Agents, Apps", JSON.stringify(tabs.map((t) => t.trim())) === JSON.stringify(["Recent", "Canvas", "Agents", "Apps"]), JSON.stringify(tabs));
+	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent.trim()));
+	say("…and the panel opens on the tab it was left on", JSON.stringify(selected) === JSON.stringify(["Canvas"]), JSON.stringify(selected));
 
-	/*
-	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip
-	 * in the dock already is. It was 28px (`--field`), a value meant for a box inside a row,
-	 * and it read short against the rest of the chrome. Checked because a header that drifts
-	 * back to 28 is exactly the kind of regression nobody files.
-	 */
+	// v3: 30px tabs and a 32px search (`styles/v3.css`, `.v3-nav-tab`, `.v3-search`).
 	const header = await page.evaluate(() => ({
 		strip: Math.round(document.querySelector(".panel-shell .v3-nav-tab")?.getBoundingClientRect().height ?? 0),
 		field: Math.round(document.querySelector(".panel-shell .v3-search")?.getBoundingClientRect().height ?? 0),
-		label: Math.round(document.querySelector(".panel-meta")?.getBoundingClientRect().height ?? 0),
 	}));
-	// v3: 30px tabs, a 32px search, 28px section heads.
 	say("the tabs are 30px and the field 32px", header.strip === 30 && header.field === 32, JSON.stringify(header));
-	say("…and the section heads are 28px", header.label === 28, `${header.label}px`);
 
 	/*
-	 * Every board is in it, whoever is holding what. A fresh agent holds nothing, so this is
-	 * the deck section on its own — which is the point of the change: the panel is never a
-	 * list of nothing with the rest of the deck one tab away.
+	 * The Canvas tab is what is on this canvas: one row per board under "Boards", and the
+	 * heading's count is the rows'. The stage's own list (`__decksBoards`) is the reference.
 	 */
-	const rows = await page.locator(".board-row").count();
-	say("the list is the whole deck", rows >= 4, String(rows));
-	/*
-	 * The headings, and the two things worth asserting about them: they are in the one order
-	 * — what you are looking at, what is held for you, then the rest — and between them they
-	 * account for every board exactly once. Which headings are *present* depends on what the
-	 * agent happens to hold, so that is not the assertion; this fixture's agent holds every
-	 * board and puts them all in play, so "On the canvas" alone is a correct picture of it.
-	 */
-	const kinds = await page.evaluate(() => [...document.querySelectorAll(".panel-section")].map((section) => section.dataset.kind));
-	const order = ["canvas", "held", "deck"];
-	say(
-		"the sections are in canvas → held → deck order",
-		kinds.every((kind, index) => index === 0 || order.indexOf(kind) > order.indexOf(kinds[index - 1])),
-		kinds.join(" → ") || "(none)",
-	);
-	const once = await page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .row-name")].map((n) => n.textContent));
-	say("…and every board is under exactly one of them", once.length === new Set(once).size && once.length === rows, `${once.length} rows, ${new Set(once).size} distinct`);
-
-	/*
-	 * One column down the right edge: a section's count, a row's on-canvas dot and its delete
-	 * all stand in the same 20px. The bin used to be a flex sibling, which cost the row its
-	 * width and put the dot 24px inboard of the counts above it.
-	 *
-	 * And the swap: approaching a row hides the dot and shows the bin *in its place*, so the
-	 * name beside them does not move. That last part is the assertion that matters — a row
-	 * that reflows under the cursor is a row you cannot aim at.
-	 */
-	const column = await page.evaluate(() => {
-		const mid = (el) => { const b = el.getBoundingClientRect(); return Math.round((b.left + b.right) / 2); };
-		const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
+	const listed = await page.evaluate(() => {
+		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
+		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Boards"));
 		return {
-			count: mid(document.querySelector(".panel-meta .count")),
-			dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
-			bin: mid(row.querySelector(".board-del")),
+			rows: rows.length,
+			names: rows.map((row) => row.textContent.trim()),
+			count: Number(head?.querySelector(".v3-sec-n")?.textContent ?? NaN),
+			stage: (window.__decksBoards?.() ?? []).length,
 		};
 	});
-	say(
-		"the count, the dot and the bin share one column",
-		column.count === column.bin && (column.dot === null || column.dot === column.bin),
-		JSON.stringify(column),
-	);
+	say("the Canvas tab lists every board on the canvas, once", listed.rows >= 1 && listed.rows === listed.stage && new Set(listed.names).size === listed.rows, JSON.stringify(listed));
+	say("…and the Boards heading counts them", listed.count === listed.rows, JSON.stringify(listed));
 
-	const swap = await (async () => {
-		const row = page.locator(".board-act:has(.dot)").first();
-		if ((await row.count()) === 0) return null;
-		const read = () => row.evaluate((el) => ({
-			dot: getComputedStyle(el.querySelector(".dot"), "::before").opacity,
-			bin: getComputedStyle(el.querySelector(".board-del")).opacity,
-			name: Math.round(el.querySelector(".row-name").getBoundingClientRect().width),
-		}));
-		const before = await read();
-		await row.hover();
-		await page.waitForTimeout(220);
-		const after = await read();
-		return { before, after };
-	})();
-	say(
-		"approaching a row swaps the dot for the bin, in the same place",
-		swap === null || (swap.before.dot === "1" && swap.before.bin === "0" && swap.after.dot === "0" && swap.after.bin === "1"),
-		JSON.stringify(swap),
-	);
-	/* A row on the canvas carries a hide as well, right beside the bin, and that column
-	   comes out of the name when the row is approached: the dot's swap for the bin is still in
-	   place, and the name ends clear of the × by the row's own gap. */
-	const beside = await (async () => {
-		const row = page.locator(".board-act:has(.dot)").first();
-		if ((await row.count()) === 0) return null;
-		await row.hover();
-		await page.waitForTimeout(220);
-		const laid = await row.evaluate((el) => {
-			const x = el.querySelector(".board-hide")?.getBoundingClientRect();
-			const bin = el.querySelector(".board-del").getBoundingClientRect();
-			const name = el.querySelector(".row-name").getBoundingClientRect();
-			return x ? { shows: getComputedStyle(el.querySelector(".board-hide")).opacity === "1", gap: Math.round(bin.left - x.right), level: Math.round(x.top) === Math.round(bin.top), clear: Math.round(x.left - name.right) } : { missing: true };
-		});
-		return laid;
-	})();
-	say("a row on the canvas has a hide right beside its bin, level with it", beside === null || (beside.shows && beside.gap === 2 && beside.level), JSON.stringify(beside));
-	say("…and the name ends clear of it", beside === null || beside.clear >= 6, JSON.stringify(beside));
-	say("…which is the only thing the approach costs the name", swap === null || swap.after.name < swap.before.name, JSON.stringify(swap));
-	const hid = await (async () => {
-		const row = page.locator(".board-act:has(.board-hide)").first();
-		if ((await row.count()) === 0) return null;
-		await page.evaluate(() => { window.__sent = []; });
-		await row.hover();
-		await row.locator(".board-hide").click();
-		await page.waitForTimeout(250);
-		const sent = await page.evaluate(() => window.__sent.map((raw) => JSON.parse(raw)).filter((message) => message.type === "canvas.delete"));
-		await page.mouse.move(700, 500);
-		return sent;
-	})();
-	say("…and one press takes the board off the canvas, no arming", hid === null || (hid.length === 1 && typeof hid[0].args?.[0] === "string"), JSON.stringify(hid));
-
-	/*
-	 * And the name clears the bin on the rows that have no dot to reserve its column for.
-	 *
-	 * A row with a dot already stops its name short of the rail, because the dot is in flow in
-	 * it. A row *without* one has nothing at the right of it, and that is where this went wrong:
-	 * measured before the rule, the ellipsis and the last two characters of
-	 * `a-board-bar-that-works-with-a-finger.html` were underneath the bin — and behind an *armed*
-	 * bin, which is held visible on purpose, they were underneath a danger-red wash. A delete
-	 * button that covers the word it is about to delete is the worst version of this panel.
-	 *
-	 * So: no overlap while the bin is showing, and the name narrower than it was — 28px of
-	 * filename, which is the bin and the row's own 8px gap. Which rows are allowed to keep the
-	 * width at rest is the design; that they give it up when the bin arrives is the assertion.
-	 */
-	const clear = async (locator) =>
-		locator.evaluate((el) => {
-			const name = el.querySelector(".row-name").getBoundingClientRect();
-			const bin = el.querySelector(".board-del").getBoundingClientRect();
-			return { name: Math.round(name.width), clear: Math.round(bin.left - name.right), shows: getComputedStyle(el.querySelector(".board-del")).opacity === "1" };
-		});
-	const room = await (async () => {
-		const row = page.locator(".board-act").filter({ hasNot: page.locator(".dot") }).first();
-		if ((await row.count()) === 0) return null;
-		const before = await clear(row);
-		await row.hover();
-		await page.waitForTimeout(220);
-		const after = await clear(row);
-		await page.mouse.move(700, 500);
-		return { before, after };
-	})();
-	say(
-		"approaching a row with no dot takes the bin's column out of its name",
-		room === null || (room.after.shows && room.after.clear >= 0 && room.before.clear < 0 && room.after.name <= room.before.name - 28),
-		JSON.stringify(room),
-	);
-
-	/*
-	 * And a count ends on its own list's line whatever it says.
-	 *
-	 * The count was centred in a fixed 20px. That is right for three digits — `601` is 19.2px of
-	 * those 20 — and wrong for four: measured, `6001` put the number's right edge at 264.6 where the
-	 * rail's is 259, and its box could not hold it. So the number moved as the deck grew, which is
-	 * the one thing a count in a column must not do. Right-aligned with a minimum width, every count
-	 * ends on one line, and the digits grow leftward into the label's spare width instead.
-	 *
-	 * That line is not the box's edge, which is the second half of the same problem: everything in the
-	 * rail is centred in the 20px box and smaller than it, so the ink inside ends short of 259. And it
-	 * is **a different line in each list**, because the two repeat different things down the right
-	 * edge — a 6px dot in the boards list, a timestamp in the agents list — which is why the check
-	 * measures one of each rather than one reference for both.
-	 *
-	 * Faked by writing the number in, because the CSS is what is under test and a deck of six
-	 * thousand boards is not something to build. The heading is put back afterwards.
-	 */
-	const ends = await page.evaluate(() => {
-		/*
-		 * The count's ink has to end `padding-right` short of its box's own right edge, and that short
-		 * is what lines it up with whatever the list repeats down the right edge: the 6px dot in the
-		 * boards list, the timestamp in the agents list. Measuring the line this way rather than off
-		 * the dot keeps the assertion working on a fixture whose rows have no dots, and the two
-		 * cross-checks below it say that the ink is really where the dot and the stamp are.
-		 */
-		const n = document.querySelector(".panel-meta .count");
-		if (!n) return null;
-		const said = n.textContent;
-		const read = (text) => {
-			n.textContent = text;
-			const range = document.createRange();
-			range.selectNodeContents(n);
-			return { right: Math.round(range.getBoundingClientRect().right), spills: n.scrollWidth > Math.ceil(n.clientWidth) };
-		};
-		const rows = ["4", "600", "6001"].map(read);
-		n.textContent = said;
-		const inset = parseFloat(getComputedStyle(n).paddingRight);
-		/* A pseudo-element has no rect, so the dot's own ink is its width inside the centred box. */
-		const dot = document.querySelector(".board-act .dot");
-		const dotInk = dot ? (() => { const b = dot.getBoundingClientRect(); return b.left + (b.width + parseFloat(getComputedStyle(dot, "::before").width)) / 2; })() : null;
-		/*
-		 * The bin's icon, read here because the agents list has no bin and this is the one chance to
-		 * see it. It ends on the agents list's line rather than the boards one — 255, where the dot is
-		 * 252 — so it is what the agents assertion cross-checks against when the fixture has no
-		 * timestamp, which it will not until a chat in it has said something.
-		 */
-		const icon = document.querySelector(".board-del svg");
-		return {
-			line: Math.round(n.getBoundingClientRect().right - inset),
-			inset,
-			dotInk: dotInk === null ? null : Math.round(dotInk),
-			iconLine: icon ? Math.round(icon.getBoundingClientRect().right) : null,
-			rights: rows.map((row) => row.right),
-			spills: rows.some((row) => row.spills),
-		};
-	});
-	say(
-		"a boards count ends on the dot's line whatever it says",
-		ends === null || (ends.rights.every((right) => right === ends.line) && !ends.spills && (ends.dotInk === null || ends.dotInk === ends.line)),
-		JSON.stringify(ends),
-	);
-
-	/* The same for the agents list, whose right-hand column is a timestamp rather than a dot. */
-	await page.getByRole("tab", { name: "Agents" }).click();
-	await settle(page, 300);
-	const agentEnds = await page.evaluate(() => {
-		const n = document.querySelector(".panel-meta .count");
-		if (!n) return null;
-		const said = n.textContent;
-		const rights = ["4", "600", "6001"].map((text) => {
-			n.textContent = text;
-			const r = document.createRange();
-			r.selectNodeContents(n);
-			return Math.round(r.getBoundingClientRect().right);
-		});
-		n.textContent = said;
-		const inset = parseFloat(getComputedStyle(n).paddingRight);
-		/*
-		 * The cross-check here is the bin's **icon**, not the timestamp, and the two are the same line
-		 * by construction: the agents rows put their `18m` where the boards rows put the bin, both
-		 * ending at 255 inside the box. The icon is always in the DOM and the timestamp is not — a
-		 * fixture whose chats have never said anything has no `18m` to measure — so this is the one
-		 * that keeps the assertion honest in CI rather than skipped.
-		 */
-		return {
-			line: Math.round(n.getBoundingClientRect().right - inset),
-			inset,
-			rights,
-		};
-	});
-	say(
-		"…and an agents count ends on the timestamp's line",
-		agentEnds === null ||
-			(agentEnds.rights.every((right) => right === agentEnds.line) &&
-				(ends?.iconLine === null || ends?.iconLine === undefined || ends.iconLine === agentEnds.line)),
-		JSON.stringify(agentEnds),
-	);
-	await page.getByRole("tab", { name: "Boards" }).click();
-	await settle(page, 300);
-
-	await page.locator('[data-inset="left"] input').fill("risk");
+	// The one field filters the tab: a word from one board's name leaves that board.
+	const word = (listed.names[0] ?? "").split(/[^A-Za-z]+/).filter((w) => w.length >= 4).sort((a, b) => b.length - a.length)[0] ?? "";
+	await page.locator('[data-inset="left"] input').fill(word);
 	await page.waitForTimeout(250);
-	say("the one field filters the whole list", (await page.locator(".board-row").count()) === 1, String(await page.locator(".board-row").count()));
+	const filtered = await page.locator('.panel-list[data-tab="canvas"] .v3-item').allInnerTexts();
+	say("the one field filters the list", word !== "" && filtered.length >= 1 && filtered.every((name) => name.toLowerCase().includes(word.toLowerCase())), `"${word}" → ${JSON.stringify(filtered)}`);
+	await page.locator('[data-inset="left"] input').fill("zzzz-nothing-is-called-this");
+	await page.waitForTimeout(250);
+	say("…and a word nothing has empties it", (await page.locator('.panel-list[data-tab="canvas"] .v3-item').count()) === 0);
 	await page.locator('[data-inset="left"] input').fill("");
 
 	/*
@@ -401,8 +129,8 @@ try {
 	 */
 	await page.locator('button[aria-label="Show the side panel"]').first().click();
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
-	const told = await settled("320px");
-	say("unfolded, the camera is told again", told === "320px", told);
+	const told = await settled("360px");
+	say("unfolded, the camera is told again", told === "360px", told);
 
 	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");
@@ -430,8 +158,8 @@ try {
 	 */
 	await page.setViewportSize({ width: 900, height: 900 });
 	say("in a narrow window the panel is still there", (await page.locator(".panel-shell").count()) >= 1);
-	const narrow = await settled("320px");
-	say("…still a column beside the canvas, declaring its width", (await mounted()) === 1 && narrow === "320px", `${await mounted()} / ${narrow}`);
+	const narrow = await settled("360px");
+	say("…still a column beside the canvas, declaring its width", (await mounted()) === 1 && narrow === "360px", `${await mounted()} / ${narrow}`);
 	await page.keyboard.press("0");
 	await page.waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
 	say("…so fit still frames the deck at a workable zoom", (await zoom(page)) > 5, `${await zoom(page)}%`);
@@ -441,57 +169,4 @@ try {
 	await browser.close();
 }
 
-// --- a coarse pointer: the rail, where the bin is 28px and always drawn -----------------
-
-/*
- * Its own context, because a touchscreen is a different layout of the same panel: the swap above
- * is a hover, so on this side of the media query the bin is simply always there, and a finger
- * needs a 28px target where a cursor needs a 20px one.
- *
- * The rail is one column on both devices and *cannot* be for all three marks here. The count and
- * the bin share it — before this, the 28px bin hung 4px left of the counts, which is the sort of
- * disagreement the eye reads as a sloping edge — and the dot stands clear of it, in a column of
- * its own: a 28px target and a 20px rail cannot both have the edge when both are drawn at once,
- * and the dot is the one of the two that can be somewhere else without being missed.
- */
-{
-	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
-	try {
-		// A closed panel draws no rows (`LeftPanel.tsx`, `listed`), so the rows are measured with it open.
-		if (await page.locator('[aria-label="Show the side panel"]').count()) await page.locator('[aria-label="Show the side panel"]').first().click();
-		await page.waitForSelector(".panel-shell[data-open='true'] .board-act", { timeout: 6000 });
-		await page.waitForTimeout(300);
-		const rail = await page.evaluate(() => {
-			const mid = (el) => {
-				const b = el.getBoundingClientRect();
-				return Math.round((b.left + b.right) / 2);
-			};
-			const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
-			const name = row.querySelector(".row-name").getBoundingClientRect();
-			const bin = row.querySelector(".board-del").getBoundingClientRect();
-			return {
-				count: mid(document.querySelector(".panel-meta .count")),
-				bin: mid(row.querySelector(".board-del")),
-				dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
-				binShown: getComputedStyle(row.querySelector(".board-del")).opacity === "1",
-				clear: Math.round(bin.left - name.right),
-			};
-		});
-		say(
-			"on a finger the bin is centred on the counts' own column",
-			Math.abs(rail.count - rail.bin) <= 1,
-			JSON.stringify(rail),
-		);
-		say(
-			"…and the dot stands beside it rather than underneath",
-			rail.dot === null || rail.dot < rail.bin - 20,
-			JSON.stringify(rail),
-		);
-		say("…and the name clears the bin that is always drawn", rail.binShown && rail.clear >= 0, JSON.stringify(rail));
-		say("no page errors on a phone", errors.length === 0, errors.join(" | "));
-	} finally {
-		await browser.close();
-	}
-}
-
-// The conversation used to stand 8px above the composer under a finger (iPhone, iPad); that layout is gone, so its block is too.
+// The coarse-pointer block (the finger rail of dot, bin and count) went with the boards list it measured.

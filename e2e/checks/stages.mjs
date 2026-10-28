@@ -61,8 +61,30 @@ const pillStage = () => page.evaluate(() => document.querySelector(".pill [aria-
 const mine = await until(async () => (await pillStage()) || undefined);
 say("the pill names the stage this conversation is on", !!mine, String(mine));
 
-await page.locator(".pill [aria-label^='Canvases']").click();
-await page.waitForSelector(".stage-manager", { timeout: 6000 });
+/*
+ * On a desktop the chip opens the canvas switcher, a menu of the recent few, and its last row, All
+ * canvases, opens the manager (`canvas/CanvasSwitcher.tsx`); on a phone the chip opens it at once.
+ */
+const openManager = async () => {
+	const chip = page.locator(".pill button[aria-label^='Canvases']").first();
+	const all = page.locator(".popover [role=menuitem]", { hasText: /^\s*All canvases\s*$/ }).first();
+	/*
+	 * Pressed again if neither the switcher nor the manager came up. The chip is made again whenever a
+	 * stages frame arrives (the top bar rebuilds the switcher around it), so a press can land on a chip
+	 * that is gone, or open a switcher that is replaced a moment later.
+	 */
+	for (let i = 0; i < 5; i++) {
+		if (!(await chip.click({ timeout: 3000 }).then(() => true).catch(() => false))) continue;
+		const up = await Promise.race([
+			all.waitFor({ timeout: 2000 }).then(() => "menu"),
+			page.waitForSelector(".stage-manager", { timeout: 2000 }).then(() => "manager"),
+		]).catch(() => undefined);
+		if (up === "manager") break;
+		if (up === "menu" && (await all.click({ timeout: 3000 }).then(() => true).catch(() => false))) break;
+	}
+	await page.waitForSelector(".stage-manager", { timeout: 6000 });
+};
+await openManager();
 const cards = () =>
 	page.evaluate(() =>
 		[...document.querySelectorAll(".stage-card")].map((card) => ({
@@ -91,7 +113,7 @@ await page.fill(".stage-manager input", wanted);
 await settle(page, 400);
 const searched = await cards();
 say("a search leaves only the canvases that match", searched.length === 1 && searched[0]?.name === wanted, JSON.stringify(searched.map((one) => one.name)));
-say("…and the count says how many of how many", (await page.textContent(".stage-count"))?.trim() === `1 of ${wall.length}`, (await page.textContent(".stage-count"))?.trim());
+// (The manager's "1 of 2" count went with its redesign, b4905071: the wall alone says what matched.)
 
 // --- a click moves this agent, and lands the camera ---------------------------------------------
 
@@ -114,8 +136,7 @@ say("…and says nothing about it: a toast for a thing you just did is noise", (
 
 // --- and Escape leaves everything as it was -----------------------------------------------------
 
-await page.locator(".pill [aria-label^='Canvases']").click();
-await page.waitForSelector(".stage-manager", { timeout: 6000 });
+await openManager();
 await page.keyboard.press("Escape");
 await settle(page, 500);
 {

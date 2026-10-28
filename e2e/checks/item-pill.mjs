@@ -73,7 +73,13 @@ say("two selected have no handles, and the pill sits 10 px above them", both.anc
 // pointer is over the board): a press inside its page is the page's, which picks the board but does not see Shift.
 const inView = (x, y) => x > 60 && x < 1340 && y > 90 && y < 860;
 let press;
-for (const one of await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })))) {
+/*
+ * A board whose top is on screen first: the pill goes 10 px above the group only when that slot is in
+ * the window, and under it otherwise (a board whose top was above the window put it under the group).
+ */
+const boards = await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom } })));
+boards.sort((a, b) => Number(a.rect.y < 140) - Number(b.rect.y < 140));
+for (const one of boards) {
 	const rect = { x: one.rect.x, y: one.rect.y, right: one.rect.right, bottom: one.rect.bottom };
 	if (!one.node) {
 		// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).

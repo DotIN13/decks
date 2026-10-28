@@ -43,12 +43,24 @@ const matrix = () => page.evaluate(() => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
+// The camera opens at the origin and a few seconds later fits what the agent has up: wait for that
+// to land and stay, or it moves the canvas out from under the card's place worked out below.
+const steady = async (opening = false) => {
+	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
+		const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+		if (now !== last) [last, since] = [now, Date.now()];
+		else if (Date.now() - since > (opening ? 1500 : 500) && !(opening && now.includes("scale(1) translate(0px, 0px)"))) break;
+	}
+};
+await steady(true);
 for (let i = 0; i < 30; i++) {
 	const { a } = await matrix();
 	if (a > 0.85 && a < 1.2) break;
 	await page.keyboard.press(a <= 0.85 ? "=" : "-");
 	await settle(page, 120);
 }
+// The zoom keys glide: where the boards are is known once the camera has stopped.
+await steady();
 const clear = () => page.evaluate(({ w }) => {
 	const stage = document.querySelector(".stage");
 	// On a phone the stage's own surface answers for bare canvas as well as the stage.

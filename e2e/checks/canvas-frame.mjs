@@ -36,8 +36,8 @@ say("the second chat has a canvas of drawing only", !!canvas, String(canvas));
 
 // What the camera shows: are the notes' middle and the window's middle close, at a zoom where notes read?
 const middleShown = () => page.evaluate(() => {
-	const world = document.querySelector("[style*=scale]");
-	const m = world?.style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/);
+	// The camera as the stage reports it: the world's own transform holds only the origin and the zoom now.
+	const m = globalThis.__decksCameraTransform?.().match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/);
 	if (!m) return null;
 	const [, , , zoom, tx, ty] = m.map(Number);
 	return { x: -tx, y: -ty, zoom };

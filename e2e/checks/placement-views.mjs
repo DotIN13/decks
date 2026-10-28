@@ -13,7 +13,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { deckState, newAgent, open, ready, say, settle, socket, WEB, rest } from "../harness.mjs";
+import { deckState, freshAgent, open, ready, say, settle, socket, WEB, rest } from "../harness.mjs";
 
 const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 150)); } };
 const deck = await deckState();
@@ -61,7 +61,8 @@ pageB.on("websocket", (ws) => ws.on("framesent", (f) => { try { const m = JSON.p
 await pageB.goto(WEB, { waitUntil: "load" });
 await ready(pageB);
 await settle(pageB, 1500);
-await newAgent(pageB, "pi");
+// Made over the wire in a workspace of its own and picked from the composer's agent list (`harness.freshAgent`).
+await freshAgent(pageB, "placement-views-check");
 await settle(pageB, 1200);
 await pageB.mouse.move(700, 400);
 for (let i = 0; i < 25; i++) await pageB.mouse.wheel(0, 4000);

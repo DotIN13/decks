@@ -13,7 +13,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, flyToBoard, liveZoom, open, resetStage, say, selectBoard, settle, socket, stagePath } from "../harness.mjs";
+import { API, asPerson, deckState, flyToBoard, liveZoom, open, rest, resetStage, say, selectBoard, settle, socket, stagePath } from "../harness.mjs";
 
 const until = async (test, ms = 10000) => {
 	const deadline = Date.now() + ms;
@@ -55,8 +55,10 @@ link.close();
 const { browser, page } = await open({ width: 1400, height: 900, boards: false });
 await settle(page, 1500);
 const node = 'iframe[data-path$="e2e-doc.html"]';
-const found = await until(() => page.locator(node).count(), 15000);
-say("the document board is on the canvas", found > 0);
+/* The stage's own list: below the live zoom a board is drawn on the sheet and has no frame until it is selected. */
+const docPath = await until(() => page.evaluate(() => (window.__decksBoards?.() ?? []).find((one) => one.path.endsWith("e2e-doc.html"))?.path), 15000);
+const found = docPath ? 1 : 0;
+say("the document board is on the canvas", found > 0, String(docPath));
 
 /** Every copy of the file in the deck: placing the board may bring it into the canvas's folder. */
 const files = (dir = deck.path, out = []) => {
@@ -70,8 +72,18 @@ const files = (dir = deck.path, out = []) => {
 };
 
 if (found) {
-	const path = await page.locator(node).first().getAttribute("data-path");
-	await flyToBoard(page, path);
+	const path = docPath;
+	// The camera to it through the API (as `board-eval.mjs` does), then selected: a fresh deck opens with it off to the side.
+	for (let i = 0; i < 10; i++) {
+		const focused = await fetch(`${API}/api/v1/view.focus`, { method: "POST", headers: { "content-type": "application/json", ...(await asPerson()) }, body: JSON.stringify({ args: [path] }) }).then((r) => r.json());
+		if (!focused.value?.deferred) break;
+		await settle(page, 1000);
+	}
+	await rest(page).catch(() => {});
+	await selectBoard(page, path);
+	// `1` frames the selected board: selecting may have fitted the whole canvas to find it.
+	await page.keyboard.press("1");
+	await rest(page).catch(() => {});
 	// Zoomed in far enough that the board's page is live and takes the pointer.
 	await liveZoom(page);
 	await settle(page, 800);
@@ -81,8 +93,29 @@ if (found) {
 
 	if (shown) {
 		const words = board.getByText("Hello from the file.");
-		await words.click();
-		await page.keyboard.press("End");
+		/*
+		 * Pressed where it is on screen rather than with `locator.click()`: Playwright scrolls an element
+		 * into view first, and the stage is a native scroll container now, so that scroll panned the
+		 * camera ~900px and the press landed on the tool column instead of the words.
+		 */
+		const at = await words.boundingBox();
+		if (at) await page.mouse.click(at.x + Math.min(at.width / 2, 40), at.y + at.height / 2);
+		/*
+		 * The caret to the end of those words, set in the page: End is not "end of line" on a Mac (it
+		 * scrolls), and the press lands mid-sentence, so typing went into the middle of "Hello".
+		 */
+		await words.evaluate((el) => {
+			const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+			let last = null;
+			while (walker.nextNode()) last = walker.currentNode;
+			if (!last) return;
+			const range = el.ownerDocument.createRange();
+			range.setStart(last, last.textContent.length);
+			range.collapse(true);
+			const selection = el.ownerDocument.getSelection();
+			selection.removeAllRanges();
+			selection.addRange(range);
+		});
 		await page.keyboard.type(" Typed here.");
 		const typed = await until(() => files().some((file) => readFileSync(file, "utf8").includes("Typed here.")), 10000);
 		say("words typed in the board reach the file", typed, files().join(", "));
@@ -93,30 +126,36 @@ if (found) {
 	}
 
 	/*
-	 * Selected, a document keeps its page while the camera moves: the other boards turn to pictures for
-	 * the move, and a document's picture is not the page being typed in.
+	 * Selected, a document keeps its page while the camera moves: pages change only when the camera
+	 * rests, and a document's picture is not the page being typed in. A pinch (a wheel with Control),
+	 * because over a page a plain wheel scrolls the page, not the camera; `data-moving` says it moved.
 	 */
 	await page.locator(".v3-zoom-value").first().waitFor({ timeout: 3000 }).catch(() => {});
+	// Selected for certain: the press that put the caret in it sometimes lands before the selection has settled, and leaves it unselected.
+	const isSelected = () => page.evaluate((n) => document.querySelector(n)?.closest(".board-node")?.dataset.selected === "true", node);
+	if (!(await until(isSelected, 2000))) await selectBoard(page, path);
 	const box = await page.locator(node).first().boundingBox();
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	const seen = [];
+	await page.keyboard.down("Control");
 	for (let i = 0; i < 6; i++) {
-		await page.mouse.wheel(0, 40);
+		await page.mouse.wheel(0, 20);
 		await page.waitForTimeout(30);
 		seen.push(await page.evaluate((n) => {
 			const frame = document.querySelector(n);
-			return { pictures: document.querySelector(".stage")?.dataset.pictures === "true", shown: !!frame && getComputedStyle(frame).visibility !== "hidden" };
+			return { moving: document.querySelector(".stage")?.dataset.moving === "true", shown: !!frame && getComputedStyle(frame).visibility !== "hidden", selected: frame?.closest(".board-node")?.dataset.selected === "true" };
 		}, node));
 	}
-	const moving = seen.filter((one) => one.pictures);
+	await page.keyboard.up("Control");
+	const moving = seen.filter((one) => one.moving);
 	say("selected, its page stays up while the camera moves", moving.length > 0 && moving.every((one) => one.shown), JSON.stringify(seen));
 	await settle(page, 600);
 
 	/*
-	 * Not selected, it is drawn as a card with its icon and name while the camera moves, where the other
-	 * boards are drawn as their pictures: a picture of a document is its page before the file came, and
-	 * a fresh deck has none. Read as pixels: the card's middle has the icon and the name in it, where an
-	 * empty picture is one flat colour.
+	 * Not selected and under the live zoom, it is drawn as a card with its icon and name
+	 * (`live-placeholder.ts`), where the other boards are drawn as their pictures: a picture of a
+	 * document is its page before the file came, and a fresh deck has none. Read as pixels, during a
+	 * move: the card's middle has the icon and the name in it, where an empty picture is one flat colour.
 	 */
 	for (let i = 0; i < 3; i++) await page.keyboard.press("Control+Minus");
 	await settle(page, 900);
@@ -131,7 +170,8 @@ if (found) {
 		await page.mouse.wheel(0, 30);
 		await page.waitForTimeout(40);
 		await page.mouse.wheel(0, 1);
-		during = await page.evaluate(() => document.querySelector(".stage")?.dataset.pictures === "true");
+		// No page for it: below the live zoom only the selected board keeps one.
+		during = await page.evaluate((n) => { const frame = document.querySelector(n); return !frame || getComputedStyle(frame).visibility === "hidden"; }, node);
 		const now = await page.evaluate((wanted) => window.__decksBoards?.().find((one) => one.path === wanted)?.rect, path);
 		const shot = await page.screenshot({ clip: { x: now.x + now.width * 0.3, y: now.y + now.height * 0.3, width: Math.max(8, now.width * 0.4), height: Math.max(8, now.height * 0.4) } });
 		spread = await page.evaluate(async (b64) => {
@@ -168,11 +208,11 @@ if (planBox) {
 	for (let i = 0; i < 6; i++) {
 		await page.mouse.wheel(0, 20);
 		await page.waitForTimeout(30);
-		kept.push(await page.evaluate((n) => ({ pictures: document.querySelector(".stage")?.dataset.pictures === "true", shown: getComputedStyle(document.querySelector(n)).visibility !== "hidden" }), planFrame));
+		kept.push(await page.evaluate((n) => ({ moving: document.querySelector(".stage")?.dataset.moving === "true", shown: getComputedStyle(document.querySelector(n)).visibility !== "hidden" }), planFrame));
 	}
 	await page.keyboard.up("Control");
 }
-const movingPlan = kept.filter((one) => one.pictures);
+const movingPlan = kept.filter((one) => one.moving);
 say("any board, selected, keeps its page while the camera moves", movingPlan.length > 0 && movingPlan.every((one) => one.shown), JSON.stringify(kept));
 
 await browser.close();

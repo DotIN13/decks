@@ -9,9 +9,10 @@
  */
 import { open, pressBoardAction, say, selectBoard, settle, stagePath } from "../harness.mjs";
 
-const { browser, page, errors } = await open({ width: 1440, height: 1000 });
+// The panel opens on Canvas, where a board on the canvas has its row (`panel/LeftPanel.tsx`, `itemRow`).
+const { browser, page, errors } = await open({ width: 1440, height: 1000, panelTab: "canvas" });
 
-/* Its row in the panel puts the board on the canvas and flies the camera to it. */
+/* Its row in the panel's Canvas tab flies the camera to the board. */
 await page.locator('.panel-shell [title^="What the survey round found"]').first().click();
 await settle(page, 900);
 const NOTES = await stagePath(page, "boards/notes.html");

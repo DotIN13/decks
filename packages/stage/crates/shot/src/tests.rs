@@ -84,7 +84,11 @@ fn the_drawing_lies_over_the_boards_with_a_hole_for_each() {
 #[test]
 fn what_the_box_needs_is_asked_for_and_kept_once_handed_over() {
 	let Some(mut s) = shooter() else { return };
-	with_fonts(&mut s);
+	// Without the font files (`packages/stage/fonts/`, not in git) words are only estimated, and a card is never read.
+	if !with_fonts(&mut s) {
+		eprintln!("skipped: no fonts in packages/stage/fonts");
+		return;
+	}
 	let doc = json!({ "version": "2.14", "children": [
 		{ "type": "note", "id": "card", "x": 0, "y": 0, "width": 200, "content": "# Hi\n\nWords", "metadata": { "type": "decks.markdown" } },
 		{ "type": "text", "id": "sum", "x": 0, "y": 300, "content": "Area $\\pi r^2$ here" },

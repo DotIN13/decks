@@ -65,7 +65,9 @@ async function boardStaysDropped(page, label, { picture }) {
 	let pick;
 	let grip;
 	for (const path of candidates) {
-		grip = await boardEdge(page, path);
+		// A board shown as a picture has no node, so no edge band to hold: it is picked up by its picture.
+		const hasNode = (await page.locator(`.board-node[data-path="${path}"]`).count()) > 0;
+		grip = hasNode ? await boardEdge(page, path) : null;
 		grip ??= await page.evaluate((path) => {
 			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
 			const r = window.__decksBoards().find((one) => one.path === path).rect;
@@ -148,9 +150,43 @@ async function zoomToPictures(page) {
 	await settle(page, 600);
 }
 
+/**
+ * Live, and small enough that a whole board fits between the chrome: just over the live zoom (50%),
+ * with the narrowest board in the middle of the candidates' box (x 300..width-200, y 60..height-160).
+ * Moved with the mouse as a person would: the pan while every board is still a picture (a wheel over
+ * a live page scrolls the page), then a pinch (Control and the wheel) about that middle, which keeps
+ * the board where it is.
+ */
+async function liveAndSmall(page) {
+	const view = page.viewportSize();
+	const zoom = () => page.evaluate(() => globalThis.__decksRust.camera.zoom);
+	const middle = { x: (300 + view.width - 200) / 2, y: (60 + view.height - 160) / 2 };
+	await page.mouse.move(middle.x, middle.y);
+	const pinch = async (dy) => {
+		await page.keyboard.down("Control");
+		await page.mouse.wheel(0, dy);
+		await page.keyboard.up("Control");
+		await settle(page, 120);
+	};
+	for (let i = 0; i < 40 && (await zoom()) > 0.45; i++) await pinch(40);
+	await rest(page).catch(() => {});
+	const off = await page.evaluate((middle) => {
+		const narrowest = window.__decksBoards().sort((a, b) => a.rect.width - b.rect.width)[0];
+		if (!narrowest) return null;
+		const r = narrowest.rect;
+		return { dx: r.x + r.width / 2 - middle.x, dy: r.y + r.height / 2 - middle.y };
+	}, middle);
+	if (off) await page.mouse.wheel(off.dx, off.dy);
+	await rest(page).catch(() => {});
+	for (let i = 0; i < 40 && (await zoom()) < 0.52; i++) await pinch(-10);
+	await rest(page).catch(() => {});
+	await settle(page, 600);
+}
+
 async function boardDrops(page, engine) {
 	await laggedSocket(page);
 	await editMode(page, true);
+	await liveAndSmall(page);
 	await boardStaysDropped(page, `${engine}, a live board`, { picture: false });
 	await zoomToPictures(page);
 	await boardStaysDropped(page, `${engine}, a board shown as a picture`, { picture: true });
@@ -193,7 +229,8 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 		agentId,
 		ops: [
 			{ op: "insert", node: { type: "frame", id: "lift-col", name: "Column", layout: "vertical", gap: 10, padding: 12, fill: "#eeeeee", children: [rect("lift-r1", "#88aaff"), rect("lift-r2", "#88ffaa"), rect("lift-r3", "#ffcc88")] }, box: { x1: cam.x + 260 / z, y1: cam.y - 260 / z, x2: cam.x + 444 / z, y2: cam.y - 60 / z } },
-			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 420 / z, y1: cam.y + 120 / z, x2: cam.x - 320 / z, y2: cam.y + 180 / z } },
+			// Clear of the side panel (360px since the redesign): at -420 its middle was under it, and the press picked nothing.
+			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 300 / z, y1: cam.y + 120 / z, x2: cam.x - 200 / z, y2: cam.y + 180 / z } },
 		],
 	});
 	const box = (id) => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);

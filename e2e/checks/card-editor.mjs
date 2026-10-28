@@ -70,6 +70,13 @@ const matrix = () => page.evaluate(() => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
+// The camera opens at the origin and a few seconds later fits what the agent has up: wait for that
+// to land and stay, or it moves the canvas out from under the card's place worked out below.
+for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
+	const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+	if (now !== last) [last, since] = [now, Date.now()];
+	else if (Date.now() - since > 1500 && !now.includes("scale(1) translate(0px, 0px)")) break;
+}
 for (let i = 0; i < 30; i++) {
 	const { a } = await matrix();
 	if (a > 0.85 && a < 1.2) break;
@@ -110,9 +117,41 @@ const box = await until(async () => {
 }, 12000);
 say("a card in Obsidian's markdown is drawn", !!box && box.height > 300, JSON.stringify(box && { h: Math.round(box.height) }));
 
+/** The camera at rest: a selection made while it moves keeps the style bar hidden, and the bar's menus with it. */
+const still = () => page.waitForFunction(() => {
+	const d = document.querySelector(".stage")?.dataset ?? {};
+	return d.moving !== "true" && d.gliding !== "true" && d.sliding !== "true";
+}, null, { timeout: 5000, polling: 50 }).catch(() => {});
 const openCard = async () => {
-	await page.mouse.dblclick(box.x + 40, box.y + 30);
-	return until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+	// Where the card is now: the camera has moved since the card was first found.
+	await still();
+	const at = (await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"))) ?? box;
+	await page.mouse.dblclick(at.x + 40, at.y + 30);
+	const opened = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+	await still();
+	return opened;
+};
+/*
+ * A press on a button of the card's style bar where it is on screen, as a person's. Playwright's own
+ * click scrolls its target into view first, and the stage is a scroll container now (its scroll is
+ * the camera): that scroll moved the canvas half a screen under the open card, which hid the bar
+ * and closed the menu just opened.
+ */
+const press = async (selector) => {
+	// Found again until it holds still: the bar is drawn again as the words under it change.
+	const r = await until(() => page.evaluate((selector) => {
+		const el = document.querySelector(selector);
+		// A long menu (the fonts) scrolls in itself: bring the option into it, and only it.
+		const menu = el?.closest(".pce-menu");
+		if (menu) {
+			const [m, o] = [menu.getBoundingClientRect(), el.getBoundingClientRect()];
+			if (o.top < m.top || o.bottom > m.bottom) menu.scrollTop += o.top - m.top - (m.height - o.height) / 2;
+		}
+		const box = el?.getBoundingClientRect();
+		return box && box.width > 0 && el.checkVisibility({ visibilityProperty: true }) ? { x: box.x, y: box.y, width: box.width, height: box.height } : undefined;
+	}, selector), 5000);
+	if (!r) throw new Error(`nothing to press at ${selector}`);
+	await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
 };
 say("a double-click opens it as it reads", await openCard());
 const shown = await page.evaluate(() => ({
@@ -194,8 +233,8 @@ await page.mouse.wheel(0, -60);
 await settle(page, 500);
 say("…which goes while the camera moves and comes back just over the words when it rests", gone && !!back, JSON.stringify({ gone, back }));
 // Colours are in the bar's colour menu.
-await page.click('.pce-bar [data-menu="fg"]');
-await page.click('.pce-bar .pce-menu[data-open] [data-fg="blue"]');
+await press('.pce-bar [data-menu="fg"]');
+await press('.pce-bar .pce-menu[data-open] [data-fg="blue"]');
 
 const drag = async (from, to) => {
 	const f = await page.locator(from).first().boundingBox();
@@ -301,8 +340,8 @@ const across = (button) =>
 		getSelection().removeAllRanges();
 		getSelection().addRange(range);
 	}).then(async () => {
-		if (button.startsWith("[data-hl")) await page.click('.pce-bar [data-menu="hl"]');
-		await page.click(`.pce-bar ${button.startsWith("[data-hl") ? ".pce-menu[data-open] " : ""}${button}`);
+		if (button.startsWith("[data-hl")) await press('.pce-bar [data-menu="hl"]');
+		await press(`.pce-bar ${button.startsWith("[data-hl") ? ".pce-menu[data-open] " : ""}${button}`);
 	});
 await across('[data-hl="green"]');
 await across('[data-cmd="bold"]');
@@ -321,8 +360,8 @@ await settle(page, 400);
 await openCard();
 await settle(page, 300);
 const choose = async (menu, option) => {
-	await page.click(`.pce-bar [data-menu="${menu}"]`);
-	await page.click(`.pce-bar .pce-menu[data-open] ${option}`);
+	await press(`.pce-bar [data-menu="${menu}"]`);
+	await press(`.pce-bar .pce-menu[data-open] ${option}`);
 };
 await page.evaluate(() => {
 	const words = document.querySelector(".pce-body h1");
@@ -344,7 +383,7 @@ await page.evaluate(() => {
 	getSelection().addRange(range);
 });
 await choose("font", '[data-font="Source Serif 4"]');
-await page.click('.pce-bar [data-cmd="underline"]');
+await press('.pce-bar [data-cmd="underline"]');
 await page.keyboard.press("Control+Enter");
 const menus = await until(() => {
 	const kids = (cardNode()?.children ?? []).map((n) => n.content ?? "");
@@ -371,7 +410,9 @@ const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").start
 const wordsBox = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
 await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
 await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
-await page.keyboard.press("Home");
+// The start of the line. Not Home on a Mac: there Home scrolls rather than moving the caret, and what it
+// scrolls now is the stage, whose scroll is the camera (the canvas went 110,000 px up when the card closed).
+await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowLeft" : "Home");
 await page.keyboard.type("Look: ");
 await page.keyboard.press("Control+Enter");
 const caretAt = await until(() => ((cardNode()?.children ?? []).some((n) => n.content === "Look: A new line in the gap") ? true : undefined));

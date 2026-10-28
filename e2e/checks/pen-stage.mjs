@@ -157,10 +157,19 @@ if (inView) {
 // --- the drawing tools: a rectangle drawn by hand, a fill from the bar, and undo ---------------------
 const spot = await page.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
+	const boards = (window.__decksBoards?.() ?? []).map((b) => b.rect);
+	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
+	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150),
+	// with nothing of the chrome anywhere in it: the tool rail floats over the stage's left side, and
+	// four corners alone let a spot straddle it.
+	const clear = (x, y) => {
+		for (let dy = 0; dy <= 260; dy += 20) for (let dx = 0; dx <= 260; dx += 20) if (!empty(x + dx, y + dy)) return false;
+		return true;
+	};
 	for (let y = 200; y < 820; y += 30) {
 		for (let x = 340; x < 1400; x += 30) {
-			if (empty(x, y) && empty(x + 160, y) && empty(x, y + 110) && empty(x + 160, y + 110)) return { x, y };
+			if (clear(x, y)) return { x, y };
 		}
 	}
 });

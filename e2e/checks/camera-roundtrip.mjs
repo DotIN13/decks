@@ -32,8 +32,10 @@ const camera = () =>
 const wallName = (wall, title) => wall.find((one) => one.title === title)?.name ?? wall.find((one) => !one.here)?.name ?? "";
 const pillStage = () => page.evaluate(() => document.querySelector(".pill [aria-label^='Canvases']")?.textContent?.trim() ?? null);
 const cards = () => page.evaluate(() => [...document.querySelectorAll(".stage-card")].map((card) => ({ name: card.dataset.name, title: card.querySelector(".row-label")?.textContent?.trim() ?? null, here: card.dataset.here ?? null })));
+/* The pill opens the canvas switcher (`canvas/CanvasSwitcher.tsx`); its All canvases row opens the manager. */
 const openManager = async () => {
 	await page.locator(".pill [aria-label^='Canvases']").click();
+	await page.getByRole("menuitem", { name: "All canvases" }).click();
 	await page.waitForSelector(".stage-manager", { timeout: 6000 });
 };
 const pick = async (name) => {

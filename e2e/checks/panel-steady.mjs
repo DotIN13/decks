@@ -268,9 +268,11 @@ say("a row with no dormant mark on it wakes the chat", dormant === "none" && wok
 
 // --- a window somebody has open ------------------------------------------------------------
 
-/* The pen opens the edit window now, in a portal of its own: the row it belongs to is the
-   component that draws it, so a list redraw that re-created that row would take it with it. */
+/* The row's ⋯ opens its menu now, and the menu's Edit tags… opens the edit window, in a portal of
+   its own: the row it belongs to is the component that draws it, so a list redraw that re-created
+   that row would take it with it. */
 await page.evaluate(() => window.__rowFor("Sable")?.querySelector(".agent-tagbtn")?.click());
+await page.getByRole("menuitem", { name: "Edit tags…" }).click({ timeout: 4000 });
 await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
 await settle(page, 300);
 

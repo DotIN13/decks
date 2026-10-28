@@ -96,11 +96,13 @@ const { id: B, shown: boBoard } = await make("Bo", paths.at(-1), 3200);
 /** Everything that should belong to one conversation, read in one go. */
 const look = () =>
 	page.evaluate(() => {
-		const world = document.querySelector(".world");
+		// The camera, not the world's style: the world's transform holds only the scroll origin and zoom now.
+		const world = globalThis.__decksCameraTransform?.() ?? null;
 		return {
-			world: world ? (world.getAttribute("style") ?? "").replace(/\s+/g, " ") : "?",
+			world: world ?? "?",
 			zoom: document.querySelector('.v3-zoom-value')?.textContent?.trim(),
-			shown: [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path),
+			// Every board on the stage, picture or page: a `.board-node` is only a board whose page is live.
+			shown: (window.__decksBoards?.() ?? []).map((board) => board.path),
 			typed: document.querySelector(".dockfield")?.textContent ?? "",
 			selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,
 			dialog: document.querySelector(".dialog-card")?.innerText?.replace(/\s+/g, " ").trim() ?? null,
@@ -122,7 +124,7 @@ const goTo = async (name, expected) => {
 	await page.locator('.popover [data-agent="true"]').filter({ hasText: name }).first().click();
 	await page
 		.waitForFunction(
-			(wanted) => JSON.stringify([...document.querySelectorAll(".board-node")].map((node) => node.dataset.path).sort()) === JSON.stringify(wanted),
+			(wanted) => JSON.stringify((window.__decksBoards?.() ?? []).map((board) => board.path).sort()) === JSON.stringify(wanted),
 			[...expected].sort(),
 			{ timeout: 10000 },
 		)
@@ -155,7 +157,7 @@ await page.locator('[aria-label="Fit everything on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
+await selectBoard(page, await page.evaluate(() => (window.__decksBoards?.() ?? [])[0]?.path));
 await page.waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
@@ -234,7 +236,16 @@ await settle(page, 300);
 const beforeEmpty = await look();
 await goTo("Cass", []);
 const empty = await look();
-say("switching to an agent with an empty stage leaves the camera alone", empty.world === beforeEmpty.world, `${beforeEmpty.zoom} → ${empty.zoom}`);
+/*
+ * Since d530ba5a the camera has an owner (`camera/land.ts`): an empty canvas with no view kept for
+ * it lands on the canvas's origin at 100%, never on the camera of the agent being left, which used
+ * to be saved a moment later as this one's own.
+ */
+const origin = await page.evaluate(() => {
+	const m = (globalThis.__decksCameraTransform?.() ?? "").match(/scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/);
+	return m ? { zoom: Number(m[1]), x: -Number(m[2]), y: -Number(m[3]) } : null;
+});
+say("switching to an agent with an empty stage lands on its canvas's origin, at 100%", origin?.zoom === 1 && Math.abs(origin.x) < 1 && Math.abs(origin.y) < 1, `${beforeEmpty.zoom} → ${empty.zoom} · ${JSON.stringify(origin)}`);
 say("…and its stage really is empty", empty.shown.length === 0, JSON.stringify(empty.shown));
 
 // --- a question for an agent you are not looking at ---------------------------------

@@ -40,28 +40,31 @@ const pill = await page.evaluate(() => ({
 say("the top-left bar has the agent and the canvas, no tabs, and the panel folds from its own head", pill.agent === 1 && pill.canvas === 1 && pill.tabs === 0 && pill.unfold === 0 && pill.fold === 1, JSON.stringify(pill));
 
 /*
- * The left panel's board rows are an empty box, a name and a dot: no picture of the board, and no board
- * mounted as a document, so a long list costs a line of text a row. The server still takes
- * pictures (`boards/thumbs.ts`) for the stage's sheet, asked for by revision so each can be
- * cached for a year.
+ * The left panel's Canvas tab (once Boards) lists what is on the canvas as rows of an icon and a
+ * name (`panel/LeftPanel.tsx`, `itemRow`): no picture of the board, and no board mounted as a
+ * document, so a long list costs a line of text a row. The server still takes pictures
+ * (`boards/thumbs.ts`) for the stage's sheet, asked for by revision so each can be cached for a year.
  */
 {
-	const boardsTab = page.locator('.panel-shell [role="tab"]', { hasText: "Boards" });
+	const canvasTab = page.locator('.panel-shell [role="tab"]', { hasText: "Canvas" });
 	if ((await page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open)) !== "true") {
 		await page.locator('button[aria-label="Show the side panel"]').first().click();
 		await settle(page, 400);
 	}
-	await boardsTab.click();
+	await canvasTab.click();
 	await settle(page, 400);
-	const rows = await page.evaluate(() => ({
-		rows: document.querySelectorAll(".board-row").length,
-		named: [...document.querySelectorAll(".board-row")].every((row) => (row.querySelector(".row-name")?.textContent ?? "").length > 0),
-		boxes: [...document.querySelectorAll(".board-row")].filter((row) => { const box = row.querySelector(".board-thumb"); return box && box.childElementCount === 0 && box.getBoundingClientRect().width === 20; }).length,
-		pictures: document.querySelectorAll(".panel-shell img").length,
-		frames: document.querySelectorAll(".panel-shell iframe").length,
-		grid: document.querySelectorAll('.panel-view[aria-label*="grid" i]').length,
-	}));
-	say("the left panel's board rows are an empty box and a name, with no picture, no document and no grid switch", rows.rows > 0 && rows.named && rows.boxes === rows.rows && rows.pictures === 0 && rows.frames === 0 && rows.grid === 0, JSON.stringify(rows));
+	const rows = await page.evaluate(() => {
+		const all = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
+		return {
+			rows: all.length,
+			named: all.every((row) => (row.querySelector(".v3-item-name")?.textContent ?? "").length > 0),
+			icons: all.filter((row) => row.querySelector("svg.v3-item-icon, .v3-item-icon svg, svg")).length,
+			pictures: document.querySelectorAll(".panel-shell img").length,
+			frames: document.querySelectorAll(".panel-shell iframe").length,
+			grid: document.querySelectorAll('.panel-view[aria-label*="grid" i]').length,
+		};
+	});
+	say("the left panel's board rows are an icon and a name, with no picture, no document and no grid switch", rows.rows > 0 && rows.named && rows.icons === rows.rows && rows.pictures === 0 && rows.frames === 0 && rows.grid === 0, JSON.stringify(rows));
 	const board = (await deckState()).boards[0];
 	const again = await page.evaluate(async ({ path, rev }) => {
 		const src = `/api/thumb/${path.split("/").map(encodeURIComponent).join("/")}?v=${rev}&scheme=light&whole=1`;
@@ -136,7 +139,8 @@ await page.waitForSelector(".surface");
 await settle(page, 1500);
 const after = await page.evaluate(() => document.querySelector(".dock")?.getBoundingClientRect().left);
 say("a reload puts the composer back where it was dropped", (await page.getAttribute(".dock", "data-floating")) === "true" && Math.abs((after ?? 0) - (dropped ?? -1)) < 2, `${dropped} -> ${after}`);
-await page.dblclick(".dock-grip");
+// At the grip, which is drawn under the box's drag strip (`.composer-box::before`, `styles/v3.css`): the press lands on the box, the float's handle.
+await page.locator(".dock-grip").dblclick({ force: true });
 await settle(page, 700);
 say("a double-click on the grip sends it home", (await page.getAttribute(".dock", "data-floating")) === null);
 

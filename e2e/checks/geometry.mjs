@@ -35,7 +35,7 @@ const metaOf = (text) => {
  */
 const select = async (path) => {
 	/*
-	 * Flown by its row in the panel, not by its title bar — which is the trap this check fell into
+	 * Flown to, not found by its title bar — which is the trap this check fell into
 	 * first: the bar is only rendered for a board that is on screen (`visible`), so a board the
 	 * camera has left has no bar to double-click, and the press that was supposed to bring it into
 	 * view waited thirty seconds for a button that appears only once it is in view. The row is
@@ -51,14 +51,15 @@ const select = async (path) => {
 	const others = (await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
 	for (const other of others) link.send({ type: "board.hide", path: other });
+	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
+	link.send({ type: "board.play", path });
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	link.close();
 	await settle(page, 500);
-	await page.evaluate((wanted) => {
-		const name = wanted.split("/").pop();
-		[...document.querySelectorAll(".board-row")].find((item) => item.textContent?.includes(name))?.click();
-	}, path);
-	await settle(page, 900);
+	// The panel has no row per board file any more (its Canvas tab lists items by their names), so it is
+	// picked on the canvas and flown to with its Fit, which finds it wherever the camera is (`flyToBoard`).
+	await flyToBoard(page, path);
+	await settle(page, 300);
 	for (let i = 0; i < 8; i++) {
 		const level = await page.evaluate(() =>
 			Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),

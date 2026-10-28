@@ -17,7 +17,7 @@
  * The same assertion ends every case, and it is the point of the whole feature: the board that
  * carried the link is still the board in the frame.
  */
-import { open, resetStage, say, settle, socket, stagePath } from "../harness.mjs";
+import { API, asPerson, open, rest, resetStage, say, settle, socket, stagePath } from "../harness.mjs";
 
 const { browser, context, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
@@ -28,12 +28,12 @@ await resetStage(page);
  */
 const SOURCE = await stagePath(page, "boards/plan.html");
 const LINKED = await stagePath(page, "boards/risks.html");
-const fileName = (path) => path.split("/").pop();
 const FILE = "assets/sketch.svg";
 
 const link = await socket();
 
-const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path));
+/* The stage's own list: below the live zoom a board is a picture with no `.board-node`. */
+const onCanvas = () => page.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path));
 /** Where the frame is, as opposed to what it is *pointed* at: a navigation changes this and nothing else does. */
 const where = () => page.evaluate((wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentWindow.location.pathname, SOURCE);
 const nodeBox = (path) =>
@@ -42,6 +42,36 @@ const nodeBox = (path) =>
 		return node ? { left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), w: Number.parseFloat(node.style.width) } : null;
 	}, path);
 const frame = () => page.frameLocator(`.board-node[data-path="${SOURCE}"] iframe`);
+/**
+ * A link on the board pressed where it is on screen. Not `locator.click()`: Playwright scrolls the
+ * element into view first, and the stage is a native scroll container now, so that scroll pans the
+ * canvas and the press lands somewhere else.
+ */
+const press = async (selector) => {
+	const link = frame().locator(selector).first();
+	/* A point of the link that is not under the side panel or the composer (a 1600px board framed at 80% spans the window). */
+	const open = (box) =>
+		page.evaluate((box) => {
+			for (const fx of [0.5, 0.8, 0.95, 0.2, 0.05]) {
+				const x = box.x + box.width * fx;
+				const y = box.y + box.height / 2;
+				if (x > 0 && y > 0 && x < innerWidth && y < innerHeight && document.elementFromPoint(x, y)?.closest(".board-node iframe")) return { x, y };
+			}
+			return null;
+		}, box);
+	let box = await link.boundingBox();
+	if (!box) throw new Error(`no ${selector} on the board`);
+	let at = await open(box);
+	/* Wholly covered: panned to the middle first, by a wheel on the stage itself. A pan is a touch, so this is the last resort. */
+	if (!at) {
+		await page.evaluate(({ dx, dy }) => document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true, cancelable: true })), { dx: box.x - page.viewportSize().width / 2, dy: box.y - page.viewportSize().height / 2 });
+		await rest(page).catch(() => {});
+		await settle(page, 300);
+		box = await link.boundingBox();
+		at = (await open(box)) ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+	}
+	await page.mouse.click(at.x, at.y);
+};
 
 /**
  * One board, alone, in front of the camera, and zoomed in far enough to click in it.
@@ -55,9 +85,13 @@ const frame = () => page.frameLocator(`.board-node[data-path="${SOURCE}"] iframe
 const focus = async (path) => {
 	for (const other of (await onCanvas()).filter((one) => one !== path)) link.send({ type: "board.hide", path: other });
 	await settle(page, 500);
-	await page.evaluate((wanted) => {
-		[...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(wanted))?.click();
-	}, fileName(path));
+	// The camera to it through the API (`board-eval.mjs` does the same): the panel has no row of the deck's boards any more.
+	for (let i = 0; i < 10; i++) {
+		const focused = await fetch(`${API}/api/v1/view.focus`, { method: "POST", headers: { "content-type": "application/json", ...(await asPerson()) }, body: JSON.stringify({ args: [path] }) }).then((r) => r.json());
+		if (!focused.value?.deferred) break;
+		await settle(page, 1000);
+	}
+	await rest(page).catch(() => {});
 	await settle(page, 900);
 	for (let i = 0; i < 10; i++) {
 		const level = await page.evaluate(() =>
@@ -76,7 +110,7 @@ say("the fixture board is up, at its own address", at === `/api/board/${SOURCE}`
 // --- a link to another board -----------------------------------------------------------
 
 // The copy's links are rewritten to reach the library from the canvas folder, so matched by their end.
-await frame().locator('a[href$="risks.html"]').click();
+await press('a[href$="risks.html"]');
 let arrived = true;
 try {
 	await page.waitForSelector(`.board-node[data-path="${LINKED}"]`, { timeout: 8000 });
@@ -115,10 +149,13 @@ say("…placed beside the board that linked to it", beside, JSON.stringify({ sou
  */
 const view = page.viewportSize();
 const visible = async (path) => {
-	const box = await page.locator(`.board-node[data-path="${path}"]`).boundingBox({ timeout: 2000 }).catch(() => null);
-	return Boolean(box) && box.x < view.width && box.y < view.height && box.x + box.width > 0 && box.y + box.height > 0;
+	// Where the stage draws it, page or picture: a page comes only once the camera rests.
+	await rest(page).catch(() => {});
+	const box = await page.evaluate((wanted) => (window.__decksBoards?.() ?? []).find((one) => one.path === wanted)?.rect.toJSON() ?? null, path);
+	return { in: Boolean(box) && box.x < view.width && box.y < view.height && box.x + box.width > 0 && box.y + box.height > 0, box };
 };
-say("…with the board it opened in view", await visible(LINKED));
+const seen = await visible(LINKED);
+say("…with the board it opened in view", seen.in, JSON.stringify({ box: seen.box, camera: await page.evaluate(() => globalThis.__decksCameraTransform()) }));
 const zoom = () => page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
 const level = await zoom();
 say("…and close enough to read and to click into, which the pair never was", level >= 50, `${level}%`);
@@ -141,7 +178,7 @@ await focus(SOURCE);
  */
 const tabFrom = async (selector) => {
 	const opened = context.waitForEvent("page", { timeout: 8000 });
-	await frame().locator(selector).click();
+	await press(selector);
 	const tab = await opened;
 	await settle(page, 400);
 	const url = tab.url();
@@ -175,7 +212,7 @@ say("…and neither of them moved the board", after === `/api/board/${SOURCE}`, 
  * file that is not a board at all. It is *not* opened in a tab — the frame decided it was a
  * board — so the app has to say what happened, in the one place it says anything briefly.
  */
-await frame().locator('a[href$="not-written-yet.html"]').click();
+await press('a[href$="not-written-yet.html"]');
 await settle(page, 900);
 const notice = await page.evaluate(() => [...document.querySelectorAll(".notice")].map((one) => one.textContent).join(" | "));
 const appeared = (await onCanvas()).some((path) => path.endsWith("/not-written-yet.html"));

@@ -1,14 +1,14 @@
 /**
- * A pan frame is one cheap draw of the window.
+ * A pan is the browser scrolling a sheet already drawn.
  *
- * The engine's canvas is the window's size and is placed over it wherever the world has moved
- * (`stage/engine.ts`, `place`), as the old engine's was. Each camera draws it again: the tiles and the
- * boards' pictures as textured quads, a fraction of a millisecond of the page's time. This check once
- * held that a pan slid a canvas a margin bigger than the window instead of drawing it; that margin
- * made the worker paint it too, and is gone, so what it holds now is that each pan step is one draw,
- * a cheap one, and that the canvas covers the window at every step.
+ * The stage scrolls natively (`camera/scroll-area.ts`), so the engine's canvas is a sheet: the window
+ * and a quarter of it on each side (`stage/engine.ts`, `SHEET_MARGIN`, `drawRect`), drawn round the
+ * camera and scrolled with the world. A pan inside the sheet draws nothing; the sheet is drawn again
+ * only when the window reaches its edge, the zoom changes, or the camera rests, where it is centred
+ * again. What this holds: the sheet's size, no draws for a short pan, a draw when a long one leaves the
+ * sheet, a cheap draw, and the window covered at every step.
  */
-import { open, resetStage, say, settle } from "../harness.mjs";
+import { open, resetStage, rest, say, settle } from "../harness.mjs";
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900, dpr: 2 });
@@ -16,18 +16,18 @@ await settle(page, 1500);
 await page.waitForFunction(() => window.__decksRust?.page && window.__decksSheet, null, { timeout: 15000 });
 
 const draws = () => page.evaluate(() => window.__decksSheet.shown ?? 0);
-/** Whether the canvas covers the whole window, as it must at every frame. */
+/** Whether the canvas covers the whole window, as it must at every frame: the sheet holds the window inside it. */
 const covers = () =>
 	page.evaluate(() => {
 		const r = document.querySelector("canvas.stage-engine-over").getBoundingClientRect();
-		return Math.abs(r.left) <= 0.5 && Math.abs(r.top) <= 0.5 && Math.abs(r.right - innerWidth) <= 0.5 && Math.abs(r.bottom - innerHeight) <= 0.5;
+		return r.left <= 0.5 && r.top <= 0.5 && r.right >= innerWidth - 0.5 && r.bottom >= innerHeight - 0.5;
 	});
 
 const size = await page.evaluate(() => {
 	const c = document.querySelector("canvas.stage-engine-over");
 	return { w: c.width, h: c.height, css: c.getBoundingClientRect().width };
 });
-say("the canvas is the window, no margin", Math.abs(size.css - 1400) < 1 && size.w === 2800 && size.h === 1800, JSON.stringify(size));
+say("the canvas is the window and a quarter of it on each side", Math.abs(size.css - 2100) < 1 && size.w === 4200 && size.h === 2700, JSON.stringify(size));
 
 // The page's time in each draw, from here on.
 await page.evaluate(() => {
@@ -51,21 +51,28 @@ for (let i = 0; i < 20; i++) {
 	if (!(await covers())) gaps++;
 }
 const during = (await draws()) - before;
-say("twenty small pan steps draw the canvas about once a step", during >= 15 && during <= 40, `${during} draws`);
+// 120 by 80 px in all, inside the sheet's 350 by 225 px margin: the browser scrolls what is drawn.
+say("twenty small pan steps inside the sheet draw nothing", during <= 1, `${during} draws`);
 say("the canvas covers the window at every step", gaps === 0, `${gaps} steps with a gap`);
 
+const beforeLong = await draws();
 for (let i = 0; i < 30; i++) {
 	await page.mouse.wheel(60, 0);
 	await page.waitForTimeout(16);
 	if (!(await covers())) gaps++;
 }
+const long = (await draws()) - beforeLong;
 say("a long pan still covers the window at every step", gaps === 0, `${gaps} steps with a gap`);
+// 1,800 px: past the sheet's edge more than once, and each time it is drawn round the camera again, not every step.
+say("…drawing the sheet again as the window reaches its edge, not at every step", long >= 1 && long < 30, `${long} draws`);
 const ms = await page.evaluate(() => [...window.__slideMs].sort((a, b) => a - b));
 const median = ms[Math.floor(ms.length / 2)] ?? Infinity;
 say("a pan frame is one cheap draw: the page's median draw under 2 ms", median < 2, `${median.toFixed(2)} ms over ${ms.length} draws`);
 
+await page.waitForFunction(() => document.querySelector(".stage")?.dataset.moving === "true", null, { timeout: 300 }).catch(() => {});
 const moved = await draws();
-await settle(page, 600);
+await rest(page, { start: 0 });
+await settle(page, 100);
 say("at rest it is drawn once more, over the window", (await draws()) > moved && (await covers()));
 
 // The world is one layer while it slides at one zoom, and never across a change of scale or at rest.

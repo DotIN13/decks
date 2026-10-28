@@ -64,7 +64,15 @@ for (const run of RUNS) {
 	const opened = await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).then(() => true, () => false);
 	const stats = await page.evaluate(() => window.__decksEngine?.stats?.());
 	say(`${run.label}: the stage draws with ${run.want}`, opened && stats?.backend === run.want && stats?.workerBackend === run.want, JSON.stringify(stats));
-	await settle(page, 1200);
+	// The camera opens at the origin and, a couple of seconds later, goes to what the agent has up:
+	// wait for it to get there and stay, or the note is placed (and later sought) in a view that is gone.
+	await page.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await new Promise((r) => setTimeout(r, 150))) {
+		const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+		if (now !== last) [last, since] = [now, Date.now()];
+		else if (Date.now() - since > 1500 && !now.includes("scale(1) translate(0px, 0px)")) break;
+	}
+	await settle(page, 300);
 
 	if (!noteId) {
 		// One note, on empty paper in the first page's view (no board under it), on a stage the later pages open too.

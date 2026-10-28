@@ -9,7 +9,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { boardPath, deckState, open, resetStage, say, settle, socket, stagePath, write } from "../harness.mjs";
+import { API, asPerson, boardPath, deckState, open, rest, resetStage, say, settle, socket, stagePath, write } from "../harness.mjs";
 
 const until = async (fn, ms = 10000) => {
 	const end = Date.now() + ms;
@@ -56,11 +56,18 @@ await resetStage(page);
 PATH = (await until(async () => { const at = await stagePath(page, PATH); return at.startsWith("canvases/") ? at : undefined; })) ?? PATH;
 
 // The fixture alone, in front of the camera and big enough to click in (see `board-eval.mjs`).
-for (const other of await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {
+// The stage's own list: below the live zoom a board is a picture and has no `.board-node`.
+for (const other of await page.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path))) {
 	if (other !== PATH) LINK.send({ type: "board.hide", path: other });
 }
 await settle(page, 500);
-await page.evaluate((name) => [...document.querySelectorAll(".board-row")].find((row) => row.textContent?.includes(name))?.click(), FIXTURE);
+// The camera to it through the API, as `board-eval.mjs` does: the panel has no row for a board to fly to any more.
+for (let i = 0; i < 10; i++) {
+	const focused = await fetch(`${API}/api/v1/view.focus`, { method: "POST", headers: { "content-type": "application/json", ...(await asPerson()) }, body: JSON.stringify({ args: [PATH] }) }).then((r) => r.json());
+	if (!focused.value?.deferred) break;
+	await settle(page, 1000);
+}
+await rest(page).catch(() => {});
 await settle(page, 900);
 for (let i = 0; i < 10; i++) {
 	const level = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
