@@ -1308,6 +1308,7 @@ export function Stage(props: {
 
 	/** Safari's pinch is under way (`gesturechange`): a wheel it may send beside it is not a second zoom. */
 	let gesturing = false;
+	const nativeWheel = typeof localStorage !== "undefined" && localStorage.getItem("decks.nativeWheel") === "1";
 	const onWheel = (event: WheelEvent) => {
 		const zooming = event.ctrlKey || event.metaKey;
 		if (zooming && gesturing) {
@@ -1326,11 +1327,22 @@ export function Stage(props: {
 			}
 		}
 		/*
-		 * Everything else that is not a zoom is the browser's: the stage scrolls, on the compositor, and
-		 * the camera follows from the scroll event (`onScroll`). Not cancelled, so Chrome lets the rest of
-		 * the gesture's events through without waiting for this one.
+		 * A two-finger scroll moves the stage by the wheel's own deltas, and the camera follows from the
+		 * scroll event (`onScroll`). Left to the browser, a trackpad's scroll and its momentum are held to
+		 * an axis whenever they run near one (Chrome's rails on a Mac, within about 27 degrees; Safari
+		 * drops the smaller delta), so a flick went only a few ways. The deltas a page is given are the
+		 * trackpad's own. `decks.nativeWheel` = "1" in localStorage leaves it to the browser, for measuring.
 		 */
-		if (!zooming) return;
+		if (!zooming) {
+			if (nativeWheel) return;
+			event.preventDefault();
+			const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view().height : 1;
+			// Shift turns a mouse wheel sideways, as the browser would have.
+			const dx = (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX) * unit;
+			const dy = (event.shiftKey && event.deltaX === 0 ? 0 : event.deltaY) * unit;
+			element.scrollBy({ left: dx, top: dy, behavior: "instant" });
+			return;
+		}
 		event.preventDefault();
 		const at = local(event);
 		// `ctrlKey` is a trackpad pinch, not a key anybody pressed; `metaKey` is the
