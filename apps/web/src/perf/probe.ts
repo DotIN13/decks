@@ -72,6 +72,9 @@ if (target && new URLSearchParams(location.search).get("handlers")) {
 }
 
 if (target) {
+	// `&pictures-per-frame=N`: how many board pictures go to the GPU a frame (`stage/engine.ts`), for comparing.
+	const perFrame = Number(new URLSearchParams(location.search).get("pictures-per-frame"));
+	if (perFrame > 0) (globalThis as { __decksPicturesPerFrame?: number }).__decksPicturesPerFrame = perFrame;
 	const frames: Frame[] = [];
 	const inputs: Array<{ t: number; kind: string; scale?: number }> = [];
 	const marks: Array<{ t: number; mark: string; ms?: number }> = [];

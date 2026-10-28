@@ -67,6 +67,8 @@ type SheetStats = Record<string, unknown> & { shown?: number; ink?: number; tile
 const sheetStats = (): SheetStats => ((globalThis as { __decksSheet?: SheetStats }).__decksSheet ??= { shown: 0, tiles: 0 });
 
 const EMPTY = '{"version":"2.14","children":[]}';
+/** Board pictures copied to the GPU in one frame (`putPaced`). */
+const PICTURES_PER_FRAME = 1;
 
 type Font = { family: string; fallback: boolean; blob: Blob; bytes?: Uint8Array };
 
@@ -1419,6 +1421,25 @@ export class StageEngine {
 		}
 	}
 
+	/**
+	 * Board pictures waiting to be copied to the GPU, `PICTURES_PER_FRAME` a frame. Copying one is done
+	 * on the page's thread (`copyExternalImageToTexture`), about 2 ms on an iPad mini, and a pan below
+	 * the live zoom that brought a dozen boards in copied them all in one frame: the top cost of that pan.
+	 */
+	private putQueue: Array<() => void> = [];
+	private putFrame = 0;
+	private putPaced(put: () => void): void {
+		this.putQueue.push(put);
+		this.putFrame ||= requestAnimationFrame(this.putSome);
+	}
+	private putSome = (): void => {
+		this.putFrame = 0;
+		// `__decksPicturesPerFrame` changes it, for measuring.
+		const most = (globalThis as { __decksPicturesPerFrame?: number }).__decksPicturesPerFrame ?? PICTURES_PER_FRAME;
+		for (let i = 0; i < most && this.putQueue.length > 0; i++) this.putQueue.shift()!();
+		if (this.putQueue.length > 0 && !this.disposed) this.putFrame = requestAnimationFrame(this.putSome);
+	};
+
 	private fetchPicture(key: string, url: string, board: boolean, source = url, size?: number): void {
 		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0, size };
 		this.picturesAsked.set(key, asked);
@@ -1441,23 +1462,32 @@ export class StageEngine {
 				const blob = await response.blob();
 				const { bitmap: forPage, width, height } = await this.picture(blob);
 				// Asked again since (a sharper copy, an engine started again): this one is not wanted.
-				if (this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return forPage.close();
-				try {
-					this.page.putPicture(key, forPage, width, height);
-				} catch (error) {
-					// The engine's, not the network's: asking again would fail the same way.
-					forPage.close();
-					return this.recover(error, `the picture ${key}`);
+				const wanted = () => !this.disposed && !!this.page && this.picturesAsked.get(key) === asked;
+				if (!wanted()) return forPage.close();
+				const put = () => {
+					if (!wanted()) return forPage.close();
+					try {
+						this.page!.putPicture(key, forPage, width, height);
+					} catch (error) {
+						// The engine's, not the network's: asking again would fail the same way.
+						forPage.close();
+						return this.recover(error, `the picture ${key}`);
+					}
+					this.picturesPut++;
+					this.draw();
+				};
+				// A board's picture waits its turn to the GPU (`putPaced`); an image fill is needed by the worker's tiles now.
+				if (board) {
+					this.putPaced(put);
+					if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source, asked.size), STAND_IN_RETRY_MS);
+					return;
 				}
-				this.picturesPut++;
-				// A board's picture is drawn by the page alone; an image fill by the worker's tiles too.
-				if (!board) {
-					const { bitmap: forWorker } = await this.picture(blob);
-					this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
-					this.laidOut();
-				}
+				put();
+				// An image fill is drawn by the worker's tiles too.
+				const { bitmap: forWorker } = await this.picture(blob);
+				this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
+				this.laidOut();
 				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source, asked.size), STAND_IN_RETRY_MS);
-				this.draw();
 			})
 			.catch(() => {
 				// Not reachable now (a shot that failed, the network): drawn without it, as an empty place,
@@ -1960,6 +1990,9 @@ export class StageEngine {
 	dispose(): void {
 		this.disposed = true;
 		cancelAnimationFrame(this.tickFrame);
+		// Pictures still waiting for the GPU let go of their bitmaps (each sees the engine is gone).
+		cancelAnimationFrame(this.putFrame);
+		for (const put of this.putQueue.splice(0)) put();
 		this.takeChannel?.port1.close();
 		this.dropTileQueue();
 		this.unwatch?.();
