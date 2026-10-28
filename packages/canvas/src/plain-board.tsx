@@ -399,8 +399,13 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		said = on;
 		props.onLive?.(on);
 	};
+	/** The page has loaded since it was made: a hidden one that is shown again says so at once. */
+	let loaded = false;
 	createEffect(() => {
-		if (!live()) say(false);
+		if (!live()) {
+			loaded = false;
+			say(false);
+		} else if (loaded) say(!props.hidden);
 	});
 	onCleanup(() => say(false));
 	return (
@@ -410,7 +415,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			data-selected={props.selected}
 			// The selected board keeps its page while the camera moves (`keptLive` in `Stage.tsx`).
 			data-kept-live={props.selected ? "" : undefined}
-			data-inert={inert() || !live()}
+			data-inert={inert() || !live() || !!props.hidden}
+			data-hidden-page={props.hidden ? "" : undefined}
 			data-carried={props.carried ? "" : undefined}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
@@ -468,7 +474,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						sandbox={props.sandboxed ? SHARED_SANDBOX : undefined}
 						onLoad={() => {
 							setLoads((n) => n + 1);
-							say(live());
+							loaded = true;
+							say(live() && !props.hidden);
 							measure();
 						}}
 						data-wired={wired() ? "" : undefined}

@@ -20,8 +20,10 @@ export interface StageBoardProps {
 	 * one transform moves its page), so it is not handed one, and its code runs only when the zoom changes.
 	 */
 	zoom: number;
-	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
+	/** Whether the board has a document (`Stage`'s `liveChoice`). */
 	mounted: boolean;
+	/** Its document is kept loaded but hidden and out of reach, for coming back to: the sheet draws its picture. */
+	hidden?: boolean;
 	/** Whether the board is on screen or within a viewport of it. */
 	visible: boolean;
 	selected: boolean;

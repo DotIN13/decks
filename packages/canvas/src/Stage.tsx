@@ -18,6 +18,7 @@ import { velocityFrom, type Sample } from "@decks/ui";
 import type { RendererChoice } from "./lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
+import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
 import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
@@ -1643,8 +1644,10 @@ export function Stage(props: {
 	 * or swapped for its picture while the camera moves.
 	 */
 	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
-	/** How many boards have a page at once, on every device. */
+	/** How many boards have a page showing at once, on every device. */
 	const LIVE_PAGES = 6;
+	/** How many pages let go are kept loaded and hidden (`live-set.ts`). */
+	const HIDDEN_PAGES = 4;
 	const boardIndex = createMemo(() => new BoxIndex(props.boards));
 	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
@@ -1765,42 +1768,48 @@ export function Stage(props: {
 		return true;
 	};
 	/**
-	 * The boards with a page, by path: at the live zoom the `LIVE_PAGES` in reach nearest the middle
-	 * of the screen, on every device; and the selected board at any zoom, which takes one of them.
-	 * Chosen when the camera rests, and a new set only when a board joins or leaves it.
+	 * The boards with a page showing, and those whose page is kept hidden (`live-set.ts`): the selected
+	 * board at any zoom; at the live zoom, every board already up that still meets the window, then the
+	 * nearest, up to `LIVE_PAGES`; and the last `HIDDEN_PAGES` let go, kept. Chosen when the camera rests.
 	 */
-	const livePaths = createMemo<ReadonlySet<string>>(
+	const liveChoice = createMemo<LiveSet>(
 		(was) => {
 			const selected = props.selected;
-			const has = selected !== undefined && boardSlot().has(selected);
 			/*
 			 * Never while the camera moves: a pan or a zoom neither starts a page nor takes one away. The
 			 * set is chosen again when it rests, at the zoom and place it rests at.
 			 */
-			if (moving() || panning() || scaling() || gliding()) return has && !was.has(selected!) ? new Set([...was, selected!]) : was;
-			const chosen = new Set<string>();
-			if (has) chosen.add(selected!);
-			if (!liveNow()) return chosen;
+			if (moving() || panning() || scaling() || gliding()) return selected !== undefined && boardSlot().has(selected) && !was.live.includes(selected) ? { ...was, live: [...was.live, selected] } : was;
 			const cam = boardCamera();
-			const distance = (board: Board) => {
-				const dx = Math.max(board.x - cam.x, 0, cam.x - (board.x + board.w));
-				const dy = Math.max(board.y - cam.y, 0, cam.y - (board.y + board.h));
-				return Math.hypot(dx, dy);
-			};
-			const near = [...nearPaths()]
-				.map((path) => props.boards[boardSlot().get(path)!]!)
-				.filter((board) => board !== undefined && !chosen.has(board.path))
-				.sort((a, b) => distance(a) - distance(b));
-			for (const board of near) {
-				if (chosen.size >= LIVE_PAGES) break;
-				chosen.add(board.path);
-			}
-			return chosen;
+			const v = view();
+			const half = { w: v.width / 2 / cam.zoom, h: v.height / 2 / cam.zoom };
+			const boardOf = (path: string) => props.boards[boardSlot().get(path) ?? -1];
+			const distance = (board: Board) => Math.hypot(Math.max(board.x - cam.x, 0, cam.x - (board.x + board.w)), Math.max(board.y - cam.y, 0, cam.y - (board.y + board.h)));
+			const next = chooseLive({
+				was,
+				selected,
+				liveZoom: liveNow(),
+				near: [...nearPaths()].flatMap((path) => {
+					const board = boardOf(path);
+					return board ? [{ path, distance: distance(board) }] : [];
+				}),
+				inWindow: (path) => {
+					const board = boardOf(path);
+					return !!board && board.x < cam.x + half.w && board.x + board.w > cam.x - half.w && board.y < cam.y + half.h && board.y + board.h > cam.y - half.h;
+				},
+				exists: (path) => boardSlot().has(path),
+				limit: LIVE_PAGES,
+				keep: HIDDEN_PAGES,
+			});
+			return sameLive(next, was) ? was : next;
 		},
-		new Set(),
-		{ equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)) },
+		EMPTY_LIVE,
 	);
-	livePages = livePaths;
+	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(liveChoice().live));
+	/** Boards whose page is kept loaded and hidden, so coming back to them loads nothing (`live-set.ts`). */
+	const hiddenPaths = createMemo<ReadonlySet<string>>(() => new Set(liveChoice().hidden));
+	const isHidden = createSelector(hiddenPaths, (path: string, paths) => paths.has(path));
+	livePages = () => new Set([...livePaths(), ...hiddenPaths()]);
 	/** Whether a board has its page: each board is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
 	/** Whether a board is drawn as a page rather than its picture. */
@@ -1859,7 +1868,8 @@ export function Stage(props: {
 			moving={moving()}
 			pictures={pictures}
 			zoom={ctl.zoom()}
-			mounted={isLive(board.path)}
+			mounted={isLive(board.path) || isHidden(board.path)}
+			hidden={!isLive(board.path) && isHidden(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}

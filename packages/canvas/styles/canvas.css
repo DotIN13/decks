@@ -613,6 +613,11 @@
 	/* The page cannot be hit while hidden, so a press lands on the box, which picks the board and wakes it. */
 	content-visibility: hidden;
 }
+/* A page kept loaded for coming back to (`live-set.ts`): unseen and out of reach, while the sheet
+   draws the board's picture in its place. */
+.board-node[data-hidden-page] .surface iframe {
+	visibility: hidden;
+}
 /* Carried by a drag: the sheet's carried layer shows the board's picture under the pointer, and the
    page waits here, unseen, for the move to land (`PenLayer.carry`). Kept, not unloaded. */
 .board-node[data-carried] > :is(.shade, .surface) {
