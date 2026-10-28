@@ -1,4 +1,5 @@
 import type { DocClientMessage, DocServerMessage } from "@decks/protocol";
+import { onFrameMessage } from "@decks/canvas/host";
 import { send } from "../state/socket.ts";
 
 /**
@@ -18,8 +19,6 @@ const frames = new Set<HTMLIFrameElement>();
 
 /** Carry a frame's document messages to the server; answers what stops it. */
 export function attachLiveDoc(frame: HTMLIFrameElement): () => void {
-	// The frame may not be in the page yet (Solid builds it in a template's document, which has no window): this page's, then.
-	const view = frame.ownerDocument.defaultView ?? window;
 	const listener = (event: MessageEvent) => {
 		if (event.source !== frame.contentWindow) return;
 		const data = event.data as { decks?: unknown; message?: { type?: unknown } } | null;
@@ -27,9 +26,10 @@ export function attachLiveDoc(frame: HTMLIFrameElement): () => void {
 		frames.add(frame);
 		send(data.message as DocClientMessage);
 	};
-	view.addEventListener("message", listener);
+	// Through the one listener every board frame shares (`@decks/canvas`'s `onFrameMessage`).
+	const unlisten = onFrameMessage(frame, listener);
 	return () => {
-		view.removeEventListener("message", listener);
+		unlisten();
 		frames.delete(frame);
 	};
 }

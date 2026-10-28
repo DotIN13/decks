@@ -1113,6 +1113,11 @@ export function App() {
 	 * everything on it (`landingCamera`). A later arrival calls an earlier one off.
 	 */
 	const [owner, setOwner] = createSignal<CameraOwner>();
+	/**
+	 * The deck's boards by path, for each board's page address: a search of the store's list per board,
+	 * asked by every board on the canvas, was a fifth of a pan's main thread with 80 pages up.
+	 */
+	const boardsByPath = createMemo(() => new Map(state.boards.map((board) => [board.path, board])));
 	/** Keep the view on screen under its owner, if it has one. */
 	const park = () => {
 		const who = untrack(owner);
@@ -1376,7 +1381,7 @@ export function App() {
 							boards: {
 								list: stageBoards,
 								page: (path) => {
-									const board = state.boards.find((one) => one.path === path);
+									const board = boardsByPath().get(path);
 									// At the revision its page was loaded at, when only its size has changed since (`pageRev`).
 									return board ? boardUrl({ path: board.path, rev: pageRev(board) }) : undefined;
 								},

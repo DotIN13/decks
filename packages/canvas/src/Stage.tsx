@@ -326,7 +326,8 @@ export function Stage(props: {
 	 * on an iPad the pages coming back at the lift held one frame for 0.7 s, and a board's own
 	 * animation, which pictures would have stilled, is already held still there (`plain-board.tsx`).
 	 */
-	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()));
+	// `decks.noPictures` = "1" in localStorage keeps the pages up through a move, for measuring (`pan-heavy`); read last, so this keeps hearing the move.
+	const picturesNow = createMemo(() => props.picturesWhileMoving === true && (moving() || panning() || scaling() || gliding()) && !(typeof localStorage !== "undefined" && localStorage.getItem("decks.noPictures") === "1"));
 	/**
 	 * The board whose page stays up while the camera moves: the selected one, of any kind. Someone
 	 * working in a board pans and zooms to follow their work, and a picture there is not the page they

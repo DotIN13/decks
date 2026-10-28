@@ -22,6 +22,8 @@
  * message, which the board wrote.
  */
 
+import { onFrameMessage } from "./frame-messages.ts";
+
 /** What a board's page posts up when it can take its token. */
 export interface BoardReady {
 	decks: "board.ready";
@@ -159,10 +161,12 @@ export function createBoardHost(options: BoardHostOptions): BoardHost {
 			if (!data || typeof data !== "object" || data.decks !== "board.ready") return;
 			void give();
 		};
-		view.addEventListener("message", listener);
+		// The page's own window is shared by every frame (`frame-messages.ts`); any other (a test's) is listened to directly.
+		const shared = typeof window !== "undefined" && view === window;
+		const unlisten = shared ? onFrameMessage(frame, listener) : (view.addEventListener("message", listener), () => view.removeEventListener("message", listener));
 		const detach = () => {
 			gone = true;
-			view.removeEventListener("message", listener);
+			unlisten();
 			if (renewal !== undefined) clearTimer(renewal);
 			renewal = undefined;
 			held = undefined;

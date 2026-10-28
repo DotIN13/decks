@@ -4,6 +4,7 @@ import type { BoardHost } from "./board-host.ts";
 import type { StageBoardProps } from "./board-slot.ts";
 import { INTERACT_ZOOM } from "./camera/camera.ts";
 import { measureFrame } from "./extent.ts";
+import { onFrameMessage } from "./frame-messages.ts";
 import { scheme } from "./lib/theme.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
 
@@ -128,7 +129,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 	/** The bar and the edge: a mouse or pen press as `press`, a finger as `fingerDrag`. */
 	const grip = (event: PointerEvent) => (event.pointerType === "touch" ? fingerDrag(event) : press(event));
 	const zoom = () => props.camera.zoom;
-	const live = () => props.mounted && props.page !== undefined;
+	// Asked by every effect and attribute of the board: worked out once per change, not once per asker.
+	const live = createMemo(() => props.mounted && props.page !== undefined);
 	/*
 	 * The address the frame keeps while it is up. A host that admits each page by a short-lived ticket
 	 * in its address (`decks_ticket`, Studio's) hands a new address every few minutes for the same
@@ -359,7 +361,6 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 			}
 		}
 	};
-	window.addEventListener("message", onMessage);
 	/*
 	 * A click inside the page selects the board, as a press on a Decks board does. The page is another
 	 * document and its pointer events never reach this one, but the focus going into its frame does.
@@ -370,7 +371,6 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 		});
 	window.addEventListener("blur", onBlur);
 	onCleanup(() => {
-		window.removeEventListener("message", onMessage);
 		window.removeEventListener("blur", onBlur);
 		for (const id of fingers.values()) props.gestures.touch("up", { id, x: 0, y: 0 });
 		fingers.clear();
@@ -459,6 +459,8 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 							// a friend's board, sandboxed, has none, and its storage is kept here (`board-storage.ts`).
 							const detach = props.sandboxed ? attachBoardStorage(element, props.sandboxed.key, sandboxKeeper) : props.boardHost?.attach(element, { path: () => props.board.path, page: src, ...(props.stage ? { stage: props.stage } : {}) });
 							if (detach) onCleanup(detach);
+							// What the page posts up (`board.js`, `embed-guest.js`), heard through the one listener all frames share.
+							onCleanup(onFrameMessage(element, onMessage));
 							if (!props.sandboxed && props.attach) onCleanup(props.attach(element));
 						}}
 						class="plain-board-page"

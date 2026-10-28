@@ -14,10 +14,13 @@
  *
  * - gapP50 / gapP95 / gapMax: ms between frames (8.3 ms is every frame at 120 Hz);
  * - missed: the share of frame gaps over 12 ms;
- * - mainMs: main-thread time per frame (`TaskDuration`), and its script, style and layout parts.
+ * - mainMs: main-thread time per frame (`TaskDuration`), and its script, style and layout parts;
+ * - pictured / pagesShown: the share of frames drawn with boards as pictures, and the pages showing a frame;
+ * - movingFrames / travelPx: the share of frames the stage called moving, and how far the camera went.
  *
  * `PAN_HEAVY_ONLY=real@0.25,perf@0.5` picks scenarios; `PAN_HEAVY_AB=<localStorage key>` runs each
- * scenario with the key unset and set to "1", alternating; `PAN_HEAVY_TRACE=<file prefix>` writes a
+ * scenario with the key unset and set to "1", alternating, the camera at rest between (`decks.noPictures`
+ * compares pictures while moving with live pages); `PAN_HEAVY_TRACE=<file prefix>` writes a
  * Chrome trace of the first measured run of each scenario.
  */
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -148,10 +151,24 @@ const helpers = () => {
 		recording: false,
 		record() {
 			this.frames = [];
+			this.pictured = 0;
+			this.shown = 0;
+			this.movingFrames = 0;
+			this.travel = 0;
+			this.last = undefined;
 			this.recording = true;
 			const tick = (t) => {
 				if (!this.recording) return;
 				this.frames.push(t);
+				// Frames drawn with the boards as pictures, and the pages showing then, to say which way a pan ran.
+				if (stage()?.dataset.pictures === "true") this.pictured++;
+				if (stage()?.dataset.moving === "true") this.movingFrames = (this.movingFrames ?? 0) + 1;
+				const c = globalThis.__decksRust?.camera;
+				if (c) {
+					if (this.last) this.travel = (this.travel ?? 0) + Math.hypot(c.x - this.last.x, c.y - this.last.y) * c.zoom;
+					this.last = { x: c.x, y: c.y };
+				}
+				this.shown += [...document.querySelectorAll("iframe")].filter((f) => getComputedStyle(f).visibility !== "hidden").length;
 				requestAnimationFrame(tick);
 			};
 			requestAnimationFrame(tick);
@@ -159,6 +176,9 @@ const helpers = () => {
 		stop() {
 			this.recording = false;
 			return this.frames;
+		},
+		seen() {
+			return { pictured: this.pictured / Math.max(1, this.frames.length), pagesShown: this.shown / Math.max(1, this.frames.length), moving: this.movingFrames / Math.max(1, this.frames.length), travel: this.travel };
 		},
 		state() {
 			const s = stage();
@@ -209,6 +229,7 @@ const pan = async (point) => {
 	const ms = Date.now() - t0;
 	await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
 	const frames = await page.evaluate(() => globalThis.__pan.stop());
+	const seen = await page.evaluate(() => globalThis.__pan.seen());
 	const after = await metrics();
 	const gaps = frames.slice(1).map((t, i) => t - frames[i]);
 	const per = (k) => ((after[k] - before[k]) * 1000) / Math.max(1, gaps.length);
@@ -223,6 +244,10 @@ const pan = async (point) => {
 		scriptMs: per("ScriptDuration"),
 		styleMs: per("RecalcStyleDuration"),
 		layoutMs: per("LayoutDuration"),
+		pictured: Math.round(seen.pictured * 100) / 100,
+		pagesShown: Math.round(seen.pagesShown * 10) / 10,
+		movingFrames: Math.round(seen.moving * 100) / 100,
+		travelPx: Math.round(seen.travel),
 	};
 };
 
@@ -286,6 +311,8 @@ for (const scenario of SCENARIOS) {
 		for (const v of variants) {
 			// A key starting __ is a page global the code reads as it goes; any other a localStorage key.
 			if (AB) await page.evaluate(({ k, on }) => (k.startsWith("__") ? (globalThis[k] = on) : on ? localStorage.setItem(k, "1") : localStorage.removeItem(k)), { k: AB, on: v === "on" });
+			// The camera at rest between pans: code that reads the switch when a move starts reads it afresh.
+			await quiet(400, 4000);
 			const tracing = run === 0;
 			if (tracing) await cdp.send("Tracing.start", { transferMode: "ReturnAsStream", traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.frame", "gpu", "viz", "cc", "benchmark", "blink"] } });
 			const profiling = PROFILE && run === 1;
