@@ -1,3 +1,4 @@
+import { FpsMeter, showFps } from "./perf/fps.tsx";
 import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
 import { queuedFor } from "./state/queued.ts";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
@@ -1522,6 +1523,9 @@ export function App() {
 						onContext={() => openUsage(state.focused)}
 						more={moreItems()}
 					/>
+<Show when={showFps()}>
+	<FpsMeter />
+</Show>
 					<ZoomBar zoom={camera().zoom} onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))} onFit={() => fitAll(canvasBoxes(), setCamera)} />
 				</Show>
 
