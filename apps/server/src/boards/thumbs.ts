@@ -175,18 +175,23 @@ export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: 
 export const PICTURE_LOOK = 3;
 
 /**
- * The widths a whole picture is also kept at (`ThumbService.smaller`). A zoomed-out canvas draws a
- * board a few dozen pixels wide, and the whole picture, up to 2048 px and 289 KB on average, made a
- * first look at 400 boards a download of 118 MB; at 192 px the same look is a few hundred kilobytes.
+ * The rungs a whole picture is also kept at (`ThumbService.smaller`), each a quarter of the pixels of
+ * the next, the whole picture (up to 2048 px, `wholeScale`) the top one. The canvas fetches the
+ * smallest at least as wide as the board on screen (`stage/engine.ts`): with only 192, 480 and the
+ * whole, a board drawn 700 px wide on an iPad was sent its 2,000 px picture, 10 MB of the GPU's
+ * memory for what a 2.6 MB one shows. A zoomed-out canvas draws a board a few dozen pixels wide, and
+ * the whole picture made a first look at 400 boards a download of 118 MB; at 256 px it is a few MB.
  */
-export const SMALL_WIDTHS: readonly number[] = [192, 480];
+export const SMALL_WIDTHS: readonly number[] = [256, 512, 1024];
 /**
  * The width the background takes a board at (`ThumbKind` "small"), straight from the page: a
- * screenshot at 480 px took 163 ms where the whole one at twice the board's size took 1,522, and
- * a zoomed-out canvas never draws a board wider. The 192 px copy is cut from it, and the whole
- * picture is taken only when a board is asked for at that size.
+ * screenshot at 480 px took 163 ms where the whole one at twice the board's size took 1,522. The
+ * 256 px copy is cut from it; the 1024 from the whole picture, taken only when a board is asked for
+ * that wide.
  */
-export const SMALL_TAKEN = 480;
+export const SMALL_TAKEN = 512;
+/** The rungs the background makes for every board ahead of being asked: the ones cut from `SMALL_TAKEN`. */
+export const AHEAD_WIDTHS: readonly number[] = SMALL_WIDTHS.filter((width) => width <= SMALL_TAKEN);
 
 /** A whole picture's smaller copy, beside it on disk. */
 export function smallName(whole: string, width: number): string {
@@ -406,7 +411,7 @@ export class ThumbService {
 						const { board, scheme } = next;
 						try {
 							// The sizes a canvas draws when zoomed out; the whole picture is taken when a board is asked for at it.
-							for (const width of [...SMALL_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
+							for (const width of [...AHEAD_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
 						} catch {
 							this.failures.add(`${board.path}:${scheme}`);
 						}
@@ -472,7 +477,7 @@ export class ThumbService {
 		for (const scheme of this.indexSchemes()) {
 			for (const board of boards) {
 				const whole = thumbName(board.path, board.rev, scheme, "whole");
-				if (SMALL_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
+				if (AHEAD_WIDTHS.every((width) => have.has(smallName(whole, width)))) continue;
 				// A picture this sweep could not take is not missing again until the board changes.
 				if (this.failures.has(`${board.path}:${scheme}`) && !this.sweeping) continue;
 				out.push({ board, scheme });
@@ -518,8 +523,8 @@ export class ThumbService {
 
 	/**
 	 * A board's picture at a size, made if it is missing: `"whole"`, or a copy's width (`SMALL_WIDTHS`).
-	 * A copy is cut from the whole picture when there is one, the 192 from the 480 otherwise, and the
-	 * 480 is taken straight from the page (`SMALL_TAKEN`). `ahead` is the background's: a browser's
+	 * A copy is cut from the whole picture when there is one; otherwise the 256 from the 512, the 512
+	 * taken straight from the page (`SMALL_TAKEN`), and the 1024 from the whole picture, taken for it. `ahead` is the background's: a browser's
 	 * request is taken before it.
 	 */
 	async picture(board: Board, scheme: ThumbScheme, size: "whole" | number, gone: () => boolean = () => false, ahead = false): Promise<string> {
@@ -529,6 +534,8 @@ export class ThumbService {
 		if (existsSync(target)) return target;
 		let source: string;
 		if (existsSync(whole)) source = whole;
+		// Wider than the background takes a board: cut from the whole picture, taken now.
+		else if (size > SMALL_TAKEN) source = await this.ask(board, scheme, gone, ahead, "whole");
 		else if (size !== SMALL_TAKEN) source = await this.picture(board, scheme, SMALL_TAKEN, gone, ahead);
 		else return this.ask(board, scheme, gone, ahead, "small");
 		const made = await this.smaller(source, size, true, target);
@@ -596,7 +603,7 @@ export class ThumbService {
 				// A whole picture is retaken as its small sizes; the whole one when somebody asks for it.
 				if (kind === "whole") {
 					void (async () => {
-						for (const width of [...SMALL_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
+						for (const width of [...AHEAD_WIDTHS].sort((a, b) => b - a)) await this.picture(board, scheme, width, () => false, true);
 					})().catch(() => {});
 				} else this.ask(board, scheme, () => false, true, kind ?? "card").catch(() => {});
 			}

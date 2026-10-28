@@ -43,11 +43,16 @@ export const DEVICE: DeviceKind =
 export interface LiveBudget {
 	live: number;
 	kept: number;
+	/**
+	 * The GPU memory board pictures may hold, in MB (`stage/engine.ts`, `fitPictures`): over it, the
+	 * boards farthest from the window drop to the size they are drawn at, or to the smallest, 256 px.
+	 */
+	pictureMB: number;
 }
 
 export const BUDGETS: Record<DeviceKind, LiveBudget> = {
-	computer: { live: 6, kept: 4 },
-	mobile: { live: 1, kept: 1 },
+	computer: { live: 6, kept: 4, pictureMB: 512 },
+	mobile: { live: 1, kept: 1, pictureMB: 128 },
 };
 
 export const BUDGET: LiveBudget = BUDGETS[DEVICE];

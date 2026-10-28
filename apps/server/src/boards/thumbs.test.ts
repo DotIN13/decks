@@ -241,22 +241,22 @@ test("what stands in for a picture: this revision at the nearest size, else the 
 	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
 	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir }, async () => fake().browser);
 	const a = board("boards/a.html", 4);
-	assert.equal(thumbs.nearest(a, "light", 192), undefined, "nothing at all: the caller waits");
+	assert.equal(thumbs.nearest(a, "light", 256), undefined, "nothing at all: the caller waits");
 	// An earlier revision's whole picture, from before a look change.
 	const old = join(dir, thumbName("boards/a.html", 3, "light", "whole").replace(/-l\d+\.webp$/, ".jpg"));
 	writeFileSync(old, "old");
-	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: old, exact: false });
-	assert.equal(thumbs.nearest(a, "dark", 192), undefined, "another scheme's picture does not stand in");
-	// This revision's 480 beats any earlier revision, for a 192 and for the whole picture alike.
+	assert.deepEqual(thumbs.nearest(a, "light", 256), { file: old, exact: false });
+	assert.equal(thumbs.nearest(a, "dark", 256), undefined, "another scheme's picture does not stand in");
+	// This revision's 512 beats any earlier revision, for a 256 and for the whole picture alike.
 	const whole = thumbName("boards/a.html", 4, "light", "whole");
-	const at480 = join(dir, thumbName("boards/a.html", 4, "light", "small"));
-	writeFileSync(at480, "480");
-	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: at480, exact: false });
-	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: at480, exact: false });
-	assert.deepEqual(thumbs.nearest(a, "light", 480), { file: at480, exact: true });
+	const at512 = join(dir, thumbName("boards/a.html", 4, "light", "small"));
+	writeFileSync(at512, "512");
+	assert.deepEqual(thumbs.nearest(a, "light", 256), { file: at512, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: at512, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", 512), { file: at512, exact: true });
 	// Of this revision's, the smallest at least the size asked for.
 	writeFileSync(join(dir, whole), "whole");
-	assert.deepEqual(thumbs.nearest(a, "light", 192), { file: at480, exact: false });
+	assert.deepEqual(thumbs.nearest(a, "light", 256), { file: at512, exact: false });
 	assert.deepEqual(thumbs.nearest(a, "light", "whole"), { file: join(dir, whole), exact: true });
 	thumbs.dispose();
 });
@@ -299,8 +299,8 @@ test("the indexer takes every board's small pictures, not its whole one, and say
 	for (const one of boards) {
 		const whole = thumbName(one.path, one.rev, "light", "whole");
 		assert.ok(!existsSync(join(dir, whole)), `${one.path} has no whole picture until one is asked for`);
-		assert.ok(existsSync(join(dir, thumbName(one.path, one.rev, "light", "small"))), `${one.path} has its 480 px picture`);
-		assert.ok(readdirSync(dir).some((name) => name.startsWith(whole.replace(/-whole-l\d+\.\w+$/, "-whole-w192"))), `${one.path} has its 192 px copy`);
+		assert.ok(existsSync(join(dir, thumbName(one.path, one.rev, "light", "small"))), `${one.path} has its 512 px picture`);
+		assert.ok(readdirSync(dir).some((name) => name.startsWith(whole.replace(/-whole-l\d+\.\w+$/, "-whole-w256"))), `${one.path} has its 256 px copy`);
 	}
 	// Nothing missing: a second sweep takes nothing.
 	const before = chrome.opened.length;

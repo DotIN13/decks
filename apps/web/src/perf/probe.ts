@@ -75,6 +75,9 @@ if (target) {
 	// `&pictures-per-frame=N`: how many board pictures go to the GPU a frame (`stage/engine.ts`), for comparing.
 	const perFrame = Number(new URLSearchParams(location.search).get("pictures-per-frame"));
 	if (perFrame > 0) (globalThis as { __decksPicturesPerFrame?: number }).__decksPicturesPerFrame = perFrame;
+	// `&picture-mb=N`: the board pictures' GPU budget (`device.ts`, `stage/engine.ts`), for measuring.
+	const pictureMB = Number(new URLSearchParams(location.search).get("picture-mb"));
+	if (pictureMB > 0) (globalThis as { __decksPictureMB?: number }).__decksPictureMB = pictureMB;
 	// `&skip-levels=0`: the drawing paints new levels during a fast zoom too (`stage/engine.ts`, `fastZoom`), for comparing.
 	if (new URLSearchParams(location.search).get("skip-levels") === "0") (globalThis as { __decksSkipLevels?: boolean }).__decksSkipLevels = false;
 	const frames: Frame[] = [];

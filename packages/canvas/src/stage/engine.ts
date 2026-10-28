@@ -26,12 +26,19 @@ import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
+import { BUDGET } from "../device.ts";
 import { noticeFor } from "./backends/notice.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
-/** The copies of a board's picture the server keeps (0 is the whole one), smallest that covers the board on screen. */
-const SMALL = [192, 480];
+/**
+ * The rungs of a board's picture the server keeps (`thumbs.ts`, `SMALL_WIDTHS`; 0 is the whole one,
+ * up to 2048 px): a board is fetched at the smallest at least as wide as it is drawn, so it is never
+ * more than twice as sharp as shown.
+ */
+const SMALL = [256, 512, 1024];
+/** The rung of a board's picture for a width on screen, in device pixels: 0 for the whole one. */
+const rungFor = (need: number): number => SMALL.find((one) => one >= need) ?? 0;
 /**
  * A board's picture is fetched again, larger, once it is shown this much bigger than the copy held
  * (a zoom in on a phone kept the first, small one, blurred): checked when the zoom has rested this
@@ -942,6 +949,8 @@ export class StageEngine {
 			this.wantBoardPictures();
 			// Drawn again where the camera came to rest, at the tiles' resting scale.
 			this.draw();
+			// And, a moment later, the pictures held to the budget, after a pan as after a zoom (`fitPictures`).
+			this.fitSoon();
 		}
 	}
 
@@ -1287,6 +1296,16 @@ export class StageEngine {
 			const asked = this.picturesAsked.get(`board:${board.path}`);
 			if (asked && board.picture && asked.source !== board.picture) this.picturesAsked.delete(`board:${board.path}`);
 		}
+		// A board taken off the canvas lets go of its picture on the GPU: nothing else ever did.
+		if (this.pictureBytes.size > 0) {
+			const here = new Set(boards.map((board) => `board:${board.path}`));
+			for (const key of [...this.pictureBytes.keys()]) {
+				if (here.has(key)) continue;
+				this.pictureBytes.delete(key);
+				this.picturesAsked.delete(key);
+				this.page?.forgetPicture(key);
+			}
+		}
 		this.wantBoardPictures();
 		this.draw();
 	}
@@ -1378,9 +1397,48 @@ export class StageEngine {
 				if (!sharper || !sized || !asked.size || need <= asked.size * SHARPER_AT || asked.source !== board.picture) continue;
 				this.picturesAsked.delete(key);
 			}
-			const size = sized ? (SMALL.find((one) => one >= need) ?? 0) : 0;
+			const size = sized ? rungFor(need) : 0;
 			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}` : board.picture;
 			this.fetchPicture(key, url, true, board.picture, size);
+		}
+	}
+
+	/** Each board picture on the GPU: its bytes, and the width it was fetched at (`fitPictures`). */
+	private pictureBytes = new Map<string, { bytes: number; width: number }>();
+
+	/**
+	 * Board pictures within this device's budget (`device.ts`, `pictureMB`), at rest. A sharper rung
+	 * is kept while there is room; over it, the boards farthest from the middle of the window go to the
+	 * rung they are drawn at, or to the smallest when off screen, until the total fits. Every board keeps
+	 * a picture, so one coming back into view shows at once and sharpens at the next rest. Wandering a
+	 * canvas used to collect every board at its whole size: 154 MB for 26 boards on an iPad's screen.
+	 */
+	private fitPictures(): void {
+		if (!this.view.width) return;
+		// `__decksPictureMB` changes it, for measuring.
+		const budget = ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? BUDGET.pictureMB) * 2 ** 20;
+		let total = 0;
+		for (const { bytes } of this.pictureBytes.values()) total += bytes;
+		if (total <= budget) return;
+		const dpr = Math.min(2, devicePixelRatio || 1);
+		const w = this.view.width / this.camera.zoom;
+		const h = this.view.height / this.camera.zoom;
+		const left = this.camera.x - w / 2;
+		const top = this.camera.y - h / 2;
+		const far = (board: SceneBoard) => Math.hypot(Math.max(board.x - this.camera.x, 0, this.camera.x - (board.x + board.w)), Math.max(board.y - this.camera.y, 0, this.camera.y - (board.y + board.h)));
+		const held = this.boards.filter((board) => board.picture && this.pictureBytes.has(`board:${board.path}`) && /^(https?:|\/)/.test(board.picture));
+		held.sort((a, b) => far(b) - far(a));
+		for (const board of held) {
+			if (total <= budget) break;
+			const key = `board:${board.path}`;
+			const has = this.pictureBytes.get(key)!;
+			const seen = board.x < left + w && board.x + board.w > left && board.y < top + h && board.y + board.h > top;
+			const want = seen ? rungFor(board.w * this.camera.zoom * dpr) : SMALL[0]!;
+			// Already that small, or shown wider than the largest rung: nothing smaller would do.
+			if (want === 0 || has.width <= want) continue;
+			total -= has.bytes - has.bytes * (want / has.width) ** 2;
+			this.picturesAsked.delete(key);
+			this.fetchPicture(key, `${board.picture}${board.picture!.includes("?") ? "&" : "?"}w=${want}`, true, board.picture, want);
 		}
 	}
 
@@ -1391,9 +1449,19 @@ export class StageEngine {
 			if (this.disposed) return;
 			if (this.moving) return this.sharperSoon();
 			this.wantBoardPictures(true);
+			this.fitPictures();
 		}, SHARPER_AFTER_MS);
 	}
 	private sharperTimer: ReturnType<typeof setTimeout> | undefined;
+	/** `fitPictures` once the camera has rested `SHARPER_AFTER_MS`: a pan collects pictures as a zoom does. */
+	private fitSoon(): void {
+		clearTimeout(this.fitTimer);
+		this.fitTimer = setTimeout(() => {
+			if (this.disposed || this.moving) return;
+			this.fitPictures();
+		}, SHARPER_AFTER_MS);
+	}
+	private fitTimer: ReturnType<typeof setTimeout> | undefined;
 	/** The zoom the boards' pictures were last looked at for: a new one looks again (`sharperSoon`). */
 	private sharperZoom = 0;
 
@@ -1435,6 +1503,25 @@ export class StageEngine {
 		if (this.putQueue.length > 0 && !this.disposed) this.putFrame = requestAnimationFrame(this.putSome);
 	};
 
+	/**
+	 * Ask again for a picture the server answered with a stand-in while it makes it. A board's is asked
+	 * again only at the rung it is drawn at now: one asked at 1024 px, the server taking its whole
+	 * picture to cut it from, was asked again every 1.2 s through a zoom out that left it 256 px wide.
+	 */
+	private retryStandIn(key: string, url: string, board: boolean, asked: { source: string; size?: number | undefined }): void {
+		if (this.disposed || this.picturesAsked.get(key) !== asked) return;
+		const shown = board ? this.boards.find((one) => `board:${one.path}` === key) : undefined;
+		if (shown && asked.size !== undefined && this.view.width) {
+			const now = rungFor(shown.w * this.camera.zoom * Math.min(2, devicePixelRatio || 1));
+			if (now !== asked.size && (now === 0 || asked.size === 0 || now < asked.size)) {
+				this.picturesAsked.delete(key);
+				this.wantBoardPictures();
+				return;
+			}
+		}
+		this.fetchPicture(key, url, board, asked.source, asked.size);
+	}
+
 	private fetchPicture(key: string, url: string, board: boolean, source = url, size?: number): void {
 		const asked = this.picturesAsked.get(key) ?? { url, source, tries: 0, size };
 		this.picturesAsked.set(key, asked);
@@ -1461,6 +1548,8 @@ export class StageEngine {
 				if (!wanted()) return forPage.close();
 				const put = () => {
 					if (!wanted()) return forPage.close();
+					// What it holds on the GPU, read before the engine closes the bitmap (`fitPictures`).
+					if (board) this.pictureBytes.set(key, { bytes: forPage.width * forPage.height * 4, width: forPage.width });
 					try {
 						this.page!.putPicture(key, forPage, width, height);
 					} catch (error) {
@@ -1474,7 +1563,7 @@ export class StageEngine {
 				// A board's picture waits its turn to the GPU (`putPaced`); an image fill is needed by the worker's tiles now.
 				if (board) {
 					this.putPaced(put);
-					if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source, asked.size), STAND_IN_RETRY_MS);
+					if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, board, asked), STAND_IN_RETRY_MS);
 					return;
 				}
 				put();
@@ -1482,7 +1571,7 @@ export class StageEngine {
 				const { bitmap: forWorker } = await this.picture(blob);
 				this.post({ type: "picture", url: key, bitmap: forWorker, width, height }, [forWorker]);
 				this.laidOut();
-				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.fetchPicture(key, url, board, asked.source, asked.size), STAND_IN_RETRY_MS);
+				if (standIn && asked.tries++ < STAND_IN_TRIES) setTimeout(() => this.retryStandIn(key, url, board, asked), STAND_IN_RETRY_MS);
 			})
 			.catch(() => {
 				// Not reachable now (a shot that failed, the network): drawn without it, as an empty place,
@@ -1992,6 +2081,7 @@ export class StageEngine {
 		this.dropTileQueue();
 		this.unwatch?.();
 		clearTimeout(this.sharperTimer);
+		clearTimeout(this.fitTimer);
 		clearTimeout(this.showAnyway);
 		clearTimeout(this.fastTimer);
 		this.worker?.terminate();

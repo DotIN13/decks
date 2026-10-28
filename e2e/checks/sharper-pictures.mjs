@@ -1,6 +1,6 @@
 /**
  * A board's picture is fetched again, larger, when a zoom in outgrows the copy held: on a phone the
- * first copy was a small one (`?w=192`, `?w=480`) and stayed, blurred, however far in the camera went
+ * first copy was a small one (`?w=256`, `?w=512`) and stayed, blurred, however far in the camera went
  * (`stage/engine.ts`, `wantBoardPictures`). The larger copy is asked once the zoom has rested, not
  * at every step of it, and never smaller again on the way out. Chromium and WebKit as an iPhone.
  */
@@ -46,15 +46,17 @@ for (const target of TARGETS) {
 		steps.push(Date.now());
 		await page.waitForTimeout(60);
 	}
-	const during = asked.filter((one) => one.w > 192 || one.w === 0).length;
+	// Larger than the smallest rung (`SMALL` in `stage/engine.ts`).
+	const during = asked.filter((one) => one.w > 256 || one.w === 0).length;
 	await settle(page, 2500);
 	const after = await page.evaluate(() => Object.fromEntries([...window.__decksRust.picturesAsked.entries()].filter(([key]) => key.startsWith("board:")).map(([key, one]) => [key, one.size ?? 0])));
 	const sharper = Object.entries(after).filter(([key, w]) => small[key] && (w === 0 || w > small[key]));
 	say(`${name}: zoomed in, boards shown wider than their copy are fetched larger`, sharper.length > 0, JSON.stringify({ zoom: await page.evaluate(() => window.__decksRust.camera.zoom), after }));
 	say(`${name}: nothing larger is asked while the zoom is still changing`, during === 0, JSON.stringify(asked.slice(0, 8)));
+	// Sizes, not requests: a copy the server is still making is a stand-in, asked again until it is there.
 	const perBoard = new Map();
-	for (const one of asked) perBoard.set(one.board, (perBoard.get(one.board) ?? 0) + 1);
-	say(`${name}: one larger copy a board, not a request at every step`, [...perBoard.values()].every((n) => n <= 2), JSON.stringify([...perBoard]));
+	for (const one of asked) perBoard.set(one.board, new Set([...(perBoard.get(one.board) ?? []), one.w]));
+	say(`${name}: one larger copy a board, not a request at every step`, [...perBoard.values()].every((sizes) => sizes.size <= 2), JSON.stringify([...perBoard].map(([board, sizes]) => [board, [...sizes]])));
 
 	// Back out: the sharp copy stays.
 	for (let i = 0; i < 4; i++) {

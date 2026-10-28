@@ -25,6 +25,6 @@ test("the address can force either, for testing", () => {
 });
 
 test("one budget, different numbers", () => {
-	assert.deepEqual(BUDGETS.computer, { live: 6, kept: 4 });
-	assert.deepEqual(BUDGETS.mobile, { live: 1, kept: 1 });
+	assert.deepEqual(BUDGETS.computer, { live: 6, kept: 4, pictureMB: 512 });
+	assert.deepEqual(BUDGETS.mobile, { live: 1, kept: 1, pictureMB: 128 });
 });
