@@ -407,6 +407,51 @@ export function Stage(props: {
 		};
 		element.addEventListener("keydown", holdScrollKeys);
 		onCleanup(() => element.removeEventListener("keydown", holdScrollKeys));
+		/*
+		 * A finger on an item, a handle or a board is the editor's: its touch must not scroll the stage.
+		 * The pointer event comes first and says so (`keepTouch`); cancelling the touch's start is what
+		 * keeps the browser from taking it. Every other finger is left to scroll natively.
+		 */
+		const holdTouch = (event: TouchEvent) => {
+			if (keptTouches.size > 0) event.preventDefault();
+		};
+		element.addEventListener("touchstart", holdTouch, { passive: false });
+		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
+		/*
+		 * A pinch on an iPad (and a trackpad in Safari) comes as Safari's gesture events, with the scale
+		 * since it began: cancelled, so the page does not zoom, and turned into the canvas's zoom about
+		 * the gesture's middle. The fingers' pan around it is the browser's.
+		 */
+		let gestureScale = 1;
+		const onGestureStart = (event: Event) => {
+			event.preventDefault();
+			gestureScale = 1;
+			gesturing = true;
+			if (halfWhilePinching()) penLayer.setPinching(true);
+		};
+		const onGestureChange = (event: Event) => {
+			event.preventDefault();
+			const g = event as Event & { scale: number; clientX: number; clientY: number };
+			const factor = g.scale / gestureScale;
+			gestureScale = g.scale;
+			if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
+			const r = element.getBoundingClientRect();
+			pushCamera(zoomAbout(ctl.now(), view(), { x: g.clientX - r.left, y: g.clientY - r.top }, factor));
+		};
+		const onGestureEnd = (event: Event) => {
+			event.preventDefault();
+			gesturing = false;
+			penLayer.setPinching(false);
+			stoppedMoving();
+		};
+		element.addEventListener("gesturestart", onGestureStart, { passive: false });
+		element.addEventListener("gesturechange", onGestureChange, { passive: false });
+		element.addEventListener("gestureend", onGestureEnd, { passive: false });
+		onCleanup(() => {
+			element.removeEventListener("gesturestart", onGestureStart);
+			element.removeEventListener("gesturechange", onGestureChange);
+			element.removeEventListener("gestureend", onGestureEnd);
+		});
 		const measure = () => {
 			const viewport = { width: element.clientWidth, height: element.clientHeight };
 			setView(viewport);
@@ -651,6 +696,7 @@ export function Stage(props: {
 			fingers: () => touches.count(),
 			claim: (pointer) => claimed.add(pointer),
 			beginTouch: (event) => beginTouch(event),
+			keepTouch: (event) => keptTouches.add(event.pointerId),
 			pan: (event, how) => panFrom(event, how),
 			toggleMedia: (id, media) => toggleMedia(id, media),
 			open: { liveFile: (id) => openLiveFile(id) },
@@ -1234,8 +1280,14 @@ export function Stage(props: {
 	/** A wheel or a trackpad's pinch, already in stage coordinates (`camera/controller.ts`). */
 	const wheel = ctl.wheel;
 
+	/** Safari's pinch is under way (`gesturechange`): a wheel it may send beside it is not a second zoom. */
+	let gesturing = false;
 	const onWheel = (event: WheelEvent) => {
 		const zooming = event.ctrlKey || event.metaKey;
+		if (zooming && gesturing) {
+			event.preventDefault();
+			return;
+		}
 		/*
 		 * A sideways scroll over a card's wide table scrolls the table, as it would in a page; Shift and
 		 * a wheel is sideways too.
@@ -1280,6 +1332,8 @@ export function Stage(props: {
 	 * had started to drag is a change of mind, not an ambiguity.
 	 */
 	const touches = createTouches();
+	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
+	const keptTouches = new Set<number>();
 	const claimed = new Set<number>();
 	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
 	const carried = new Set<number>();
@@ -1311,7 +1365,12 @@ export function Stage(props: {
 	};
 
 	/** One finger's worth of a gesture, from this document or from a board's. */
-	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
+	/**
+	 * Fingers on the stage itself pan it natively (`camera/scroll-area.ts`): the browser scrolls, and
+	 * the camera follows from the scroll. So a finger of this document moves nothing here, and nothing
+	 * coasts after it; a finger reported from a board's page (`decks:touch`) still pans by hand.
+	 */
+	const touch = (phase: "down" | "move" | "up", finger: Finger, native = false): TouchStep => {
 		if (phase === "down") {
 			// A finger on the glass stops a coast, the way a hand stops a spinning list.
 			cancelCoast();
@@ -1349,7 +1408,7 @@ export function Stage(props: {
 			return step;
 		}
 		if (step.kind === "pan") {
-			if (claimed.has(finger.id)) noCoast = true;
+			if (claimed.has(finger.id) || native) noCoast = true;
 			else {
 				pushCamera(pan(ctl.now(), step.dx, step.dy));
 				trailAt = { x: trailAt.x + step.dx, y: trailAt.y + step.dy };
@@ -1362,13 +1421,16 @@ export function Stage(props: {
 
 	const onTouchMove = (event: PointerEvent) => {
 		if (!carried.has(event.pointerId)) return;
-		touch("move", fingerOf(event));
+		touch("move", fingerOf(event), true);
 	};
 
 	const onTouchEnd = (event: PointerEvent) => {
 		if (!carried.has(event.pointerId)) return;
 		carried.delete(event.pointerId);
-		touch("up", fingerOf(event));
+		keptTouches.delete(event.pointerId);
+		// The browser took the finger to scroll with: its momentum is the browser's too.
+		if (event.type === "pointercancel") noCoast = true;
+		touch("up", fingerOf(event), true);
 		if (carried.size > 0) return;
 		window.removeEventListener("pointermove", onTouchMove);
 		window.removeEventListener("pointerup", onTouchEnd);

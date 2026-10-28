@@ -87,6 +87,8 @@ export type PointerHost = {
 	fingers: () => number;
 	claim: (pointer: number) => void;
 	beginTouch: (event: PointerEvent) => void;
+	/** A finger's press is the editor's (an item, a handle, a board): the stage keeps it from scrolling natively. */
+	keepTouch?: (event: PointerEvent) => void;
 	/** The camera dragged from this press (`decidePress`, `pan`). */
 	pan: (event: PointerEvent, how: { deselect: boolean; middle: boolean }) => void;
 	/** A tool armed: the item made from this press (`Stage`'s `penCreate`). */
@@ -653,6 +655,8 @@ export function createPointer(editor: Editor, host: PointerHost) {
 			onItem: () => !!pickAtHere(worldAt(event)),
 			picture: () => pictureUnder(event),
 		});
+		// A finger that presses something rather than the canvas is the editor's, not the browser's to scroll with.
+		if (kind === "touch" && act.do !== "touch" && act.do !== "pan") host.keepTouch?.(event);
 		switch (act.do) {
 			case "make":
 			case "press":
