@@ -6,7 +6,7 @@ import { For, Show, createEffect, createSelector, type Component, createMemo, cr
 import { boxOf, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "./camera/camera.ts";
 import { canvasBox } from "./camera/insets.ts";
 import { createCameraController } from "./camera/controller.ts";
-import { cameraFor, nearEdge, scrollFor, worldTransform, type Origin } from "./camera/scroll-area.ts";
+import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin } from "./camera/scroll-area.ts";
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
@@ -274,9 +274,21 @@ export function Stage(props: {
 		ownScroll = to;
 		element.scrollTo(to.left, to.top);
 	};
+	/**
+	 * While a pinch is under way, the scroll it began at (read once, `onGestureStart`): the view then
+	 * changes by the world's origin alone, and the scroll is left where it is. Setting it at each step
+	 * made Safari lay out and scroll the whole area, a third of a pinch's script time on an iPad mini.
+	 */
+	let pinchScroll: { left: number; top: number } | undefined;
 	const ctl = createCameraController({
 		view,
 		place: (cam) => {
+			if (pinchScroll) {
+				origin = originFor(cam, pinchScroll, view());
+				placeWorld(cam.zoom, true);
+				penLayer.setCamera(cam);
+				return;
+			}
 			placeWorld(cam.zoom);
 			placeScroll(cam);
 			// The drawing moves in the same call as the boards, so the two can never be a frame apart.
@@ -371,6 +383,8 @@ export function Stage(props: {
 			const own = ownScroll;
 			if (own && Math.abs(at.left - own.left) < 1 && Math.abs(at.top - own.top) < 1) return;
 			ownScroll = undefined;
+			// The fingers of a pinch also scroll: its later steps keep the view at the scroll they moved it to.
+			if (pinchScroll) pinchScroll = at;
 			ctl.scrolled(cameraFor(at, origin, ctl.now().zoom, view()));
 		};
 		element.addEventListener("scroll", onScroll, { passive: true });
@@ -404,24 +418,46 @@ export function Stage(props: {
 		 * since it began: cancelled, so the page does not zoom, and turned into the canvas's zoom about
 		 * the gesture's middle. The fingers' pan around it is the browser's.
 		 */
+		/*
+		 * A pinch's steps, one a frame: Safari sends about two gesture events a frame, and each one moved
+		 * the camera. The latest is kept and applied at the next frame; where the stage is on the page is
+		 * read once, when the pinch starts.
+		 */
 		let gestureScale = 1;
+		let stageAt = { left: 0, top: 0 };
+		let pending: { scale: number; x: number; y: number } | undefined;
+		let stepping = 0;
+		const step = () => {
+			stepping = 0;
+			const g = pending;
+			pending = undefined;
+			if (!g) return;
+			const factor = g.scale / gestureScale;
+			gestureScale = g.scale;
+			if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
+			pushCamera(zoomAbout(ctl.now(), view(), { x: g.x - stageAt.left, y: g.y - stageAt.top }, factor));
+		};
 		const onGestureStart = (event: Event) => {
 			event.preventDefault();
 			gestureScale = 1;
 			gesturing = true;
+			const r = element.getBoundingClientRect();
+			stageAt = { left: r.left, top: r.top };
+			pinchScroll = { left: element.scrollLeft, top: element.scrollTop };
 			if (halfWhilePinching()) penLayer.setPinching(true);
 		};
 		const onGestureChange = (event: Event) => {
 			event.preventDefault();
 			const g = event as Event & { scale: number; clientX: number; clientY: number };
-			const factor = g.scale / gestureScale;
-			gestureScale = g.scale;
-			if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
-			const r = element.getBoundingClientRect();
-			pushCamera(zoomAbout(ctl.now(), view(), { x: g.clientX - r.left, y: g.clientY - r.top }, factor));
+			pending = { scale: g.scale, x: g.clientX, y: g.clientY };
+			stepping ||= requestAnimationFrame(step);
 		};
 		const onGestureEnd = (event: Event) => {
 			event.preventDefault();
+			// The last step lands before the pinch ends; from here the scroll and the camera agree again (`originFor`).
+			if (stepping) cancelAnimationFrame(stepping);
+			step();
+			pinchScroll = undefined;
 			gesturing = false;
 			penLayer.setPinching(false);
 			stoppedMoving();

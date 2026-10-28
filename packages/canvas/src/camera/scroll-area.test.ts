@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { cameraFor, MIDDLE, nearEdge, scrollFor, SIZE } from "./scroll-area.ts";
+import { cameraFor, originFor, MIDDLE, nearEdge, scrollFor, SIZE } from "./scroll-area.ts";
 
 const view = { width: 1500, height: 900 };
 
@@ -22,6 +22,15 @@ describe("scroll area", () => {
 		const a = scrollFor({ x: 0, y: 0, zoom: 0.5 }, origin, view);
 		const b = scrollFor({ x: 100, y: 10, zoom: 0.5 }, origin, view);
 		assert.deepEqual({ dx: b.left - a.left, dy: b.top - a.top }, { dx: 50, dy: 5 });
+	});
+
+	it("finds the origin that shows a camera at a scroll that stays put", () => {
+		const scroll = { left: MIDDLE - 400, top: MIDDLE + 250 };
+		for (const camera of [{ x: 10, y: 20, zoom: 0.3 }, { x: -4000, y: 900, zoom: 1.7 }]) {
+			const origin = originFor(camera, scroll, view);
+			const at = scrollFor(camera, origin, view);
+			assert.ok(Math.abs(at.left - scroll.left) < 1e-6 && Math.abs(at.top - scroll.top) < 1e-6, JSON.stringify(at));
+		}
 	});
 
 	it("is near an edge only within a few windows of one", () => {

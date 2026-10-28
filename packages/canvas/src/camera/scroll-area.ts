@@ -49,6 +49,17 @@ export function cameraFor(scroll: { left: number; top: number }, origin: Origin,
 	};
 }
 
+/**
+ * The origin that shows `camera` at a scroll position that does not move: how a pinch changes the
+ * view without setting the scroll, which on an iPad lays out and scrolls the whole area at each step.
+ */
+export function originFor(camera: Camera, scroll: { left: number; top: number }, view: Viewport): Origin {
+	return {
+		x: camera.x - (scroll.left + view.width / 2 - MIDDLE) / camera.zoom,
+		y: camera.y - (scroll.top + view.height / 2 - MIDDLE) / camera.zoom,
+	};
+}
+
 /** The world's transform: the origin at the spacer's middle, at the zoom. */
 export function worldTransform(origin: Origin, zoom: number): string {
 	return `translate(${MIDDLE}px, ${MIDDLE}px) scale(${zoom}) translate(${-origin.x}px, ${-origin.y}px)`;
