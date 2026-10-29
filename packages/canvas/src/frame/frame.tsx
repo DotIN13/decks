@@ -244,6 +244,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		},
 	});
 	const { handle } = editor;
+	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
+	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
 	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
 	function takeOff(path: string): boolean {
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
