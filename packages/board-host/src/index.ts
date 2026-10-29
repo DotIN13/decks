@@ -3,6 +3,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+export { cardModuleOf, cardModules, runsInCard } from "./cards.ts";
+
 /**
  * What a board needs to run anywhere. A board is a standalone HTML page that loads `../lib/board.css`
  * and `../lib/board.js`; whoever serves boards (a harness, Decks Studio, your sharing site) serves

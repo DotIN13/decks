@@ -1,4 +1,7 @@
+import { cardModules, runsInCard } from "@decks/board-host";
 import { IMPORT_MAP } from "./templates.ts";
+
+const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 
 /**
  * A card: a piece of HTML in a canvas's `cards/`, which the stage puts in a shadow root of its own
@@ -8,27 +11,11 @@ import { IMPORT_MAP } from "./templates.ts";
  * the server's Chrome, is the same piece in a page of its own (`cardPage`).
  */
 
-/** A script's `type` that is JavaScript a card runs: none, a module, or a plain script. */
-const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
-const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
-const typeOf = (attrs: string) => /\btype\s*=\s*["']?([^"'\s>]*)/i.exec(attrs)?.[1] ?? "";
-
-/** The card's inline scripts that run, in order: the nth is served at `<card>.m<n>.js`. */
-export function cardModules(source: string): string[] {
-	const out: string[] = [];
-	for (const match of source.matchAll(SCRIPT)) {
-		const attrs = match[1] ?? "";
-		if (/\bsrc\s*=/.test(attrs) || !RUNS.test(typeOf(attrs))) continue;
-		out.push(match[2] ?? "");
-	}
-	return out;
-}
-
 /** The card with the scripts it runs taken out, for a page that loads them by address instead. */
 function withoutModules(source: string): { html: string; srcs: string[] } {
 	const srcs: string[] = [];
 	const html = source.replace(SCRIPT, (all, attrs: string) => {
-		if (!RUNS.test(typeOf(attrs))) return all;
+		if (!runsInCard(attrs)) return all;
 		const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
 		if (src) srcs.push(src);
 		return "";
@@ -43,6 +30,8 @@ const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "
  * piece goes in the body as it is, under board.css, and its scripts are called with a card whose
  * root is this page's own document.
  */
+export { cardModules };
+
 export function cardPage(input: { path: string; source: string; title: string; w: number; shared: boolean }): string {
 	const name = input.path.split("/").pop() ?? "card.html";
 	const { html, srcs } = withoutModules(input.source);
