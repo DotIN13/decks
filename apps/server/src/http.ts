@@ -14,7 +14,8 @@ import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
-import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
+import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isCardPath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
+import { cardModules, cardPage } from "./boards/cards.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
@@ -551,6 +552,23 @@ export function createHttpApp(app: App): Express {
 			const served = servedAs(asked);
 			if ("refused" in served) throw new PathRefused(asked, served.refused);
 			let requested = served.path;
+			/*
+			 * A card's scripts, each at its own address beside the card (`sales.html.m0.js`), so its relative
+			 * imports resolve from its folder (`boards/cards.ts`). A friend's card runs none: the stage cleans
+			 * them out, and none is served either.
+			 */
+			const cardModule = /^(.+\.html?)\.m(\d+)\.js$/i.exec(requested);
+			if (cardModule && isCardPath(cardModule[1]!)) {
+				const file = resolveServed(app.deck.path, cardModule[1]!);
+				if (!existsSync(file) || !statSync(file).isFile()) throw new PathRefused(requested, "not a file");
+				if (isSharedCanvas(canvasOfPath(asked)?.name ?? "")) throw new PathRefused(requested, "a card shared with you runs no scripts");
+				const source = cardModules(await readFile(file, "utf8"))[Number(cardModule[2])];
+				if (source === undefined) throw new PathRefused(requested, "the card has no such script");
+				boardHeaders(res);
+				res.setHeader("Cache-Control", "no-cache");
+				res.type("text/javascript").send(source);
+				return;
+			}
 			// The runtime at a versioned address (`deck/lib-version.ts`): the file is the one in `lib/`.
 			const versioned = requested.startsWith("lib/") ? splitLibVersion(requested.slice(4)) : undefined;
 			if (versioned) requested = `lib/${versioned.file}`;
@@ -595,6 +613,13 @@ export function createHttpApp(app: App): Express {
 			 * the shell stays *relative* and a nested board resolves its own sibling.
 			 */
 			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
+			// A card opened by itself, or pictured: the piece in a page of its own (`boards/cards.ts`).
+			if (req.query.raw === undefined && isCardPath(requested)) {
+				const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
+				const page = cardPage({ path: requested, source: await readFile(target, "utf8"), title: board?.title ?? requested, w: board?.w ?? 600, shared });
+				res.type("html").send(versionLibRefs(page, libVersion(app.deck.path)));
+				return;
+			}
 			// A board that has to be rendered *into* a document: a `.md`, or a page
 			// from somewhere else (`deck/kinds.ts`).
 			if (board?.shell) {

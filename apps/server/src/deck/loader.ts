@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { boardFolders } from "./stage-boards.ts";
+import { isCardPath } from "./layout.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
@@ -423,6 +424,7 @@ export class Deck {
 			path,
 			title: meta.title ?? basename(path).replace(/\.(html?|mdx?)$/i, ""),
 			...(shell ? { shell } : {}),
+			...(isCardPath(path) ? { card: true as const } : {}),
 			x: 0,
 			y: 0,
 			w: width,

@@ -17,6 +17,10 @@ import { canvasFolder, referenceFor, resolveReference, urlFor } from "../deck/la
  * as the drawing is written (`adopt`), so a canvas only ever names its own.
  */
 export const BOARD_ITEM = "decks.board";
+/** A card: a board drawn in a shadow root of the stage's own page (`deck/layout.ts`, `isCardPath`). */
+export const CARD_ITEM = "decks.card";
+/** Whether a tag is a board's or a card's: both name a page in the canvas's folder by `path`. */
+export const isPageTag = (type: unknown): type is string => type === BOARD_ITEM || type === CARD_ITEM;
 /** What a refused board item is held as, in memory only. */
 export const REFUSED_ITEM = "decks.board.refused";
 
@@ -25,6 +29,7 @@ interface Meta {
 	path?: unknown;
 	url?: unknown;
 	why?: unknown;
+	was?: unknown;
 	[key: string]: unknown;
 }
 
@@ -34,13 +39,13 @@ const metaOf = (node: PenNode): Meta | undefined => (node.metadata && typeof nod
 export function toMemory(name: string, doc: PenDocument): PenDocument {
 	for (const node of walk(doc.children)) {
 		const meta = metaOf(node);
-		if (node.type !== "browser" || meta?.type !== BOARD_ITEM || typeof meta.path !== "string") continue;
+		if (node.type !== "browser" || !isPageTag(meta?.type) || typeof meta.path !== "string") continue;
 		const resolved = resolveReference(name, meta.path);
 		if ("path" in resolved) {
-			node.metadata = { ...meta, type: BOARD_ITEM, path: resolved.path };
+			node.metadata = { ...meta, type: meta.type as string, path: resolved.path };
 			continue;
 		}
-		node.metadata = { ...meta, type: REFUSED_ITEM, url: node.url, why: resolved.refused };
+		node.metadata = { ...meta, type: REFUSED_ITEM, was: meta.type, url: node.url, why: resolved.refused };
 		node.url = "about:blank";
 	}
 	return doc;
@@ -68,13 +73,13 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 	for (const node of walk(out.children)) {
 		const meta = metaOf(node);
 		if (node.type === "browser" && meta?.type === REFUSED_ITEM) {
-			const { why: _why, url, ...rest } = meta;
-			node.metadata = { ...rest, type: BOARD_ITEM };
+			const { why: _why, url, was, ...rest } = meta;
+			node.metadata = { ...rest, type: isPageTag(was) ? was : BOARD_ITEM };
 			if (typeof url === "string") node.url = url;
 			else delete node.url;
 			continue;
 		}
-		if (node.type !== "browser" || meta?.type !== BOARD_ITEM || typeof meta.path !== "string") continue;
+		if (node.type !== "browser" || !isPageTag(meta?.type) || typeof meta.path !== "string") continue;
 		let reference = referenceFor(name, meta.path);
 		if ("refused" in reference) {
 			if (!adopt) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
@@ -82,7 +87,7 @@ export function toDisk(name: string, doc: PenDocument, adopt?: Adopt): PenDocume
 			reference = referenceFor(name, copied);
 			if ("refused" in reference) throw new PenError(`${meta.path} cannot be placed on ${name}: ${reference.refused}.`);
 		}
-		node.metadata = { ...meta, type: BOARD_ITEM, path: reference.path };
+		node.metadata = { ...meta, type: meta.type as string, path: reference.path };
 		node.url = urlFor(name, reference.path);
 	}
 	if (adopt?.frame) for (const ref of frameRefsOf(out)) adopt.frame(name, ref);

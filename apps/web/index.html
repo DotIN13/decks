@@ -25,6 +25,23 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 
 		<!--
+			The libraries a card imports by name (`packages/canvas/src/card.ts`): the same map a board's
+			page has (`boards/templates.ts`), here once for every card, so sixty cards that import three
+			share one copy of it.
+		-->
+		<script type="importmap">
+{
+			  "imports": {
+			    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+			    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+			    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+			    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+			    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+			  }
+			}
+		</script>
+
+		<!--
 			The mark, as a favicon. Four files, and they are not redundant.
 
 			`favicon.svg` is the one nearly every browser uses: one file at every size, and

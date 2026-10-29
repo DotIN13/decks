@@ -14,7 +14,7 @@ import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
-import { canvasFolder, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { copyBoardInto, copyFileInto, copyFrameInto } from "../boards/copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
@@ -29,10 +29,14 @@ import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
  * pen.dev shows it as a web page; Decks draws the board itself in its place.
  */
 export const BOARD_ITEM = "decks.board";
+/** A card's tag: a board in `cards/`, drawn in a shadow root of the stage's page (`deck/layout.ts`). */
+export const CARD_ITEM = "decks.card";
+/** The tag a page item takes for its path: a card's in a canvas's `cards/`, a board's anywhere else. */
+export const pageTag = (path: string): string => (isCardPath(path) ? CARD_ITEM : BOARD_ITEM);
 
 /** The deck board an item stands for, by path, or undefined when it is not one. */
 export function boardOf(node: PenNode): string | undefined {
-	if (node.type !== "browser" || !node.metadata || node.metadata.type !== BOARD_ITEM) return undefined;
+	if (node.type !== "browser" || !node.metadata || (node.metadata.type !== BOARD_ITEM && node.metadata.type !== CARD_ITEM)) return undefined;
 	const path = node.metadata.path;
 	return typeof path === "string" && path ? path : undefined;
 }
@@ -912,7 +916,7 @@ export class StagePens {
 				taken.add(id);
 				ops.push({
 					op: "insert",
-					node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: BOARD_ITEM, path: spot.path } },
+					node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: pageTag(spot.path), path: spot.path } },
 					box: { x1: spot.x, y1: spot.y },
 				});
 				continue;
@@ -967,7 +971,7 @@ export class StagePens {
 			let id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 			taken.add(id);
-			ops.push({ op: "insert", node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: BOARD_ITEM, path: spot.path } }, box: { x1: spot.x, y1: spot.y } });
+			ops.push({ op: "insert", node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: pageTag(spot.path), path: spot.path } }, box: { x1: spot.x, y1: spot.y } });
 		}
 		if (ops.length) this.edit(name, ops);
 	}
@@ -1008,7 +1012,7 @@ export class StagePens {
 	repointBoard(name: string, from: string, to: string): void {
 		const node = this.boardItems(name).get(from);
 		if (!node) return;
-		this.edit(name, [{ op: "update", id: node.id, set: { url: `../../${to}`, metadata: { ...(node.metadata ?? {}), type: BOARD_ITEM, path: to } } }]);
+		this.edit(name, [{ op: "update", id: node.id, set: { url: `../../${to}`, metadata: { ...(node.metadata ?? {}), type: pageTag(to), path: to } } }]);
 	}
 
 	/**

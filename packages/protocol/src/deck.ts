@@ -72,6 +72,11 @@ export interface Board {
 	 * bar becomes the view's header, where any other board is a designed page that is scaled to the width.
 	 */
 	fills?: true;
+	/**
+	 * A card: a piece of HTML in a canvas's `cards/`, drawn in a shadow root of the stage's own page
+	 * instead of a frame (`card.ts`). Every other rule of a board holds for it.
+	 */
+	card?: true;
 	x: number;
 	y: number;
 	w: number;

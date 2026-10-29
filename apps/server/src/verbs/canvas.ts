@@ -2,7 +2,8 @@ import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
-import { BOARD_ITEM, boardOf, type ReadMore } from "../stage/pens.ts";
+import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
+import { isCardPath } from "../deck/layout.ts";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
@@ -52,6 +53,8 @@ export function toItem(node: Record<string, unknown>): Record<string, unknown> {
 	const path = boardOf(node as unknown as PenNode);
 	if (path) {
 		const { type: _type, url: _url, metadata: _metadata, name, children: _children, ...rest } = node;
+		// A card reads as one (`{ type: "card", card }`), every other page as a board.
+		if (isCardPath(path)) return { type: "card", ...rest, card: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
 		return { type: "board", ...rest, board: path, ...(typeof name === "string" ? { title: name } : {}), ...(children ? { children } : {}) };
 	}
 	return { ...node, ...(children ? { children } : {}) };
@@ -124,9 +127,16 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	/** A caller's item as pen's: a board becomes its `browser` item, sized as its file says unless told. */
 	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
 		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "board", board: "boards/plan.html" }.');
-		const item = raw as Record<string, unknown>;
+		let item = raw as Record<string, unknown>;
+		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
+		if (item.type === "card") {
+			const { card, ...others } = item;
+			if (typeof card !== "string" || !card) throw new Error('A card item names its file: { type: "card", card: "canvases/<canvas>/cards/sales.html" }.');
+			if (!isCardPath(card)) throw new Error(`${card} is not in a canvas's cards/ folder, where cards live.`);
+			item = { ...others, type: "board", board: card };
+		}
 		// What a read adds and no file keeps (`read.ts`), so an item read and written back is the item.
-		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, ...rest } = item;
+		const { box: _box, clipped: _clipped, childCount: _childCount, outline: _outline, inside: _inside, children: kids, card: _card, ...rest } = item;
 		const children = Array.isArray(kids) ? kids.map((one) => fromItem(one, taken, frame)) : undefined;
 		if (item.type !== "board") return { ...rest, ...(children ? { children } : {}) };
 		if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items, not boards: place the board on a canvas, beside the frame.`);
@@ -141,7 +151,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 		}
 		taken.add(id);
-		return { ...own, id, type: "browser", name: file.title, url: `../../${board}`, width: own.width ?? file.w, height: own.height ?? file.h, metadata: { type: BOARD_ITEM, path: board }, ...(children ? { children } : {}) };
+		return { ...own, id, type: "browser", name: file.title, url: `../../${board}`, width: own.width ?? file.w, height: own.height ?? file.h, metadata: { type: pageTag(board), path: board }, ...(children ? { children } : {}) };
 	};
 
 	/** Where an op puts its item: a corner, or beside or below another item on the document as it is now. */
@@ -234,7 +244,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 							const file = service.fileBoard(set.board);
 							if (!file) throw new Error(`There is no board ${set.board} in the deck.`);
 							set.url = `../../${set.board}`;
-							set.metadata = { ...(node?.metadata ?? {}), type: BOARD_ITEM, path: set.board };
+							set.metadata = { ...(node?.metadata ?? {}), type: pageTag(set.board), path: set.board };
 							set.name = file.title;
 							delete set.board;
 						}

@@ -200,13 +200,24 @@ export function servedAs(path: string): Resolution {
 	return { path };
 }
 
-/** Whether a deck path is a board's page: in the library, or in a canvas's own `boards/`. */
+/** Whether a deck path is a board's page: in the library, or in a canvas's own `boards/` or `cards/`. */
 export function isBoardPagePath(path: string): boolean {
 	const clean = path.split("\\").join("/").replace(/^\/+/, "");
 	if (!/\.x?html?$/i.test(clean) || clean.includes("\0")) return false;
 	if (/^boards\//.test(clean)) return true;
 	const at = canvasOfPath(clean);
-	return !!at && at.rest.startsWith("boards/");
+	return !!at && (at.rest.startsWith("boards/") || at.rest.startsWith("cards/"));
+}
+
+/**
+ * Whether a deck path is a card: an HTML piece in a canvas's own `cards/`, which the stage puts in a
+ * shadow root of its own page rather than a frame. A card is a board in every other way.
+ */
+export function isCardPath(path: string): boolean {
+	const clean = path.split("\\").join("/").replace(/^\/+/, "");
+	if (!/\.html?$/i.test(clean) || clean.includes("\0")) return false;
+	const at = canvasOfPath(clean);
+	return !!at && at.rest.startsWith("cards/");
 }
 
 /**

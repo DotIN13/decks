@@ -1931,7 +1931,16 @@ export function Stage(props: {
 		},
 		EMPTY_LIVE,
 	);
-	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(liveChoice().live));
+	/*
+	 * Cards near the window are always live, at any zoom and outside the page budget: a card is a few
+	 * elements in this page, not a document (`card.ts`), so what a board's page costs it does not.
+	 */
+	const nearCards = createMemo<readonly string[]>(
+		() => [...nearPaths()].filter((path) => props.boards[boardSlot().get(path) ?? -1]?.card),
+		[],
+		{ equals: (a, b) => a.length === b.length && a.every((path, i) => b[i] === path) },
+	);
+	const livePaths = createMemo<ReadonlySet<string>>(() => new Set([...liveChoice().live, ...nearCards()]));
 	/** Boards whose page is kept loaded and hidden, so coming back to them loads nothing (`live-set.ts`). */
 	const hiddenPaths = createMemo<ReadonlySet<string>>(() => new Set(liveChoice().hidden));
 	const isHidden = createSelector(hiddenPaths, (path: string, paths) => paths.has(path));

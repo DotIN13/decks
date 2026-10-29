@@ -131,7 +131,7 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
  * resolves beside the same `three` build the map names — those two have to match, or a scene ends up
  * with two copies of the library and an object from one is not an object from the other.
  */
-const IMPORT_MAP = JSON.stringify(
+export const IMPORT_MAP = JSON.stringify(
 	{
 		imports: {
 			d3: "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",

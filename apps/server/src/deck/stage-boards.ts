@@ -16,7 +16,7 @@ export function stageBoardsDir(stage: string): string {
 
 /** True for a deck-relative path in any board folder: `boards/…`, `frames/…` or `canvases/<name>/boards/…`. */
 export function inBoardFolder(path: string): boolean {
-	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/boards\/.+/.test(path) || /^shared\/canvases\/[^/]+\/[^/]+\/boards\/.+/.test(path);
+	return /^(?:boards|frames)\/.+/.test(path) || /^canvases\/[^/]+\/(?:boards|cards)\/.+/.test(path) || /^shared\/canvases\/[^/]+\/[^/]+\/(?:boards|cards)\/.+/.test(path);
 }
 
 /**
@@ -30,6 +30,8 @@ export function boardFolders(deck: string): string[] {
 	if (existsSync(stages)) {
 		for (const entry of readdirSync(stages, { withFileTypes: true })) {
 			if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "boards"))) folders.push(stageBoardsDir(entry.name));
+			// A canvas's cards are boards drawn in the stage's own page (`isCardPath`), listed like its boards.
+			if (entry.isDirectory() && !entry.name.startsWith(".") && existsSync(join(stages, entry.name, "cards"))) folders.push(`${canvasFolder(entry.name)}/cards`);
 		}
 	}
 	// The canvases friends shared, each with its own boards (`deck/layout.ts`).
@@ -39,6 +41,7 @@ export function boardFolders(deck: string): string[] {
 		if (!owner.isDirectory() || owner.name.startsWith(".")) continue;
 		for (const canvas of readdirSync(join(shared, owner.name), { withFileTypes: true })) {
 			if (canvas.isDirectory() && !canvas.name.startsWith(".") && existsSync(join(shared, owner.name, canvas.name, "boards"))) folders.push(`shared/canvases/${owner.name}/${canvas.name}/boards`);
+			if (canvas.isDirectory() && !canvas.name.startsWith(".") && existsSync(join(shared, owner.name, canvas.name, "cards"))) folders.push(`shared/canvases/${owner.name}/${canvas.name}/cards`);
 		}
 	}
 	return folders;

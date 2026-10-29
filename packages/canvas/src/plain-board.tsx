@@ -6,6 +6,7 @@ import { measureFrame } from "./extent.ts";
 import { onFrameMessage } from "./frame-messages.ts";
 import { scheme } from "./lib/theme.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
+import { CardSurface } from "./card-surface.tsx";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live board's edge that moves it, in screen pixels outside the border and inside it (as `BoardFrame`). */
@@ -480,7 +481,24 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 				)}
 			</Show>
 			<div class="surface" style={{ width: `${size().w}px`, height: `${size().h}px` }} onPointerDown={(event) => !wired() && press(event)}>
-				<Show when={live()}>
+				<Show when={live() && props.board.card}>
+					<CardSurface
+						page={props.page!}
+						path={props.board.path}
+						trusted={!props.sandboxed && !props.board.path.startsWith("shared/")}
+						rev={props.board.rev}
+						reload={props.reload}
+						size={size}
+						selected={props.selected}
+						onSelect={() => props.view.select()}
+						onShown={() => {
+							setLoaded(true);
+							setGuest(true);
+							say(live() && !props.hidden);
+						}}
+					/>
+				</Show>
+				<Show when={live() && !props.board.card}>
 					<iframe
 						ref={(element) => {
 							frame = element;

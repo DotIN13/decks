@@ -9,7 +9,7 @@
 export const CANVASES = "canvases";
 export const SHARED_CANVASES = "shared/canvases";
 /** What a canvas's own folder holds besides its drawing (`canvas.pen`). */
-export const OWN_PARTS = ["boards", "frames", "files"] as const;
+export const OWN_PARTS = ["boards", "cards", "frames", "files"] as const;
 /** The deck folders a canvas's boards may point at, synced at their deck paths inside the canvas's bundle. */
 export const MIRRORED_PARTS = ["assets", "docs"] as const;
 /** The canvas's pictures, the one hidden part a bundle has. */
