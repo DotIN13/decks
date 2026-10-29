@@ -191,8 +191,6 @@ export function LeftPanel(props: {
 	// --- the Canvas tab ---------------------------------------------------------------
 	/** The drawing on screen: the tab lists its top-level items. */
 	canvasDoc?: PenDocument;
-	/** No Canvas tab: the canvas frame draws the layers itself, beside the canvas (`frame/layers.tsx`). */
-	noCanvasTab?: boolean;
 	canvasTitle?: string;
 	/** The drawn items selected on the canvas, by id. */
 	selectedItems?: string[];
@@ -769,7 +767,7 @@ export function LeftPanel(props: {
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
 				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
-					<For each={PANEL_TABS.filter((name) => (name === "canvas" ? !props.noCanvasTab : (name !== "agents" && name !== "recent") || (props.chats && can("agents"))))}>
+					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
 						{(name) => (
 							<button
 								type="button"

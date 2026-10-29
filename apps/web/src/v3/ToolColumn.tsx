@@ -7,7 +7,6 @@ import Diamond from "lucide-solid/icons/diamond";
 import FileText from "lucide-solid/icons/file-text";
 import FrameIcon from "lucide-solid/icons/frame";
 import Hand from "lucide-solid/icons/hand";
-import Layers from "lucide-solid/icons/layers";
 import Minus from "lucide-solid/icons/minus";
 import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import SquareDashedMousePointer from "lucide-solid/icons/square-dashed-mouse-pointer";
@@ -80,8 +79,6 @@ export function ToolColumn(props: {
 	 */
 	mode: "browse" | "edit";
 	onMode: (mode: "browse" | "edit") => void;
-	/** The drawing's layers, in a panel beside the column: the canvas frame's (`frame/chrome.tsx`). */
-	layers?: { open: boolean; onToggle: () => void };
 }) {
 	let column: HTMLDivElement | undefined;
 	let grip: HTMLDivElement | undefined;
@@ -361,14 +358,6 @@ export function ToolColumn(props: {
 					<i />
 					<i />
 				</div>
-				<Show when={props.layers}>
-					{(layers) => (
-						<>
-							{tool({ id: "layers", label: "Layers", icon: () => Layers, on: () => layers().open, onClick: () => layers().onToggle() })}
-							<span class="v3-rule" aria-hidden="true" />
-						</>
-					)}
-				</Show>
 				{tool({ id: "select", label: "Select", key: "V", icon: () => MousePointer, on: on.select, onClick: () => select(false) })}
 				{tool({ id: "view", label: "Hand or highlight", icon: viewIcon, on: on.view, family: "view", onClick: (b) => openMenu("view", b) })}
 				<span class="v3-rule" aria-hidden="true" />

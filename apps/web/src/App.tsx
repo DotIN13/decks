@@ -1077,7 +1077,7 @@ export function App() {
 	 */
 	const flyToBoards = (boards: Board[], options?: { animate?: boolean }) => {
 		if (boards.length === 0) return;
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return;
 		const view = { width: stage.clientWidth, height: stage.clientHeight };
 		moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
@@ -1343,7 +1343,7 @@ export function App() {
 		}
 		untrack(editorHandle)?.select([item.id]);
 		setPenSelected([item.id]);
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage || item.box.w <= 0) return;
 		const view = { width: stage.clientWidth, height: stage.clientHeight };
 		const region = canvasBox(view);
@@ -1371,7 +1371,7 @@ export function App() {
 
 	/** A file of any kind, chosen in the file picker and placed in the middle of the view by what it is. */
 	const openFileAtMiddle = () => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return;
 		void files.fileAt({ x: stage.clientWidth / 2, y: stage.clientHeight / 2 }, false).then((path) => {
 			if (!path) return;
@@ -1724,7 +1724,6 @@ export function App() {
 					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
 					selectedItems={penSelected()}
 					onPickItem={pickItem}
-					noCanvasTab={framedCanvas}
 					onCanvases={() => void setStagesOpen((was) => !was)}
 					{...(stages().length > 0 ? { canvasMenu: (trigger: Parameters<typeof canvasMenu>[0]) => canvasMenu(trigger) } : {})}
 					onPickArrows={(ids) => {
@@ -2142,7 +2141,7 @@ export function App() {
 }
 
 function fitAll(boxes: Array<{ x: number; y: number; w: number; h: number }>, setCamera: (camera: Camera) => void): void {
-	const stage = document.querySelector(".stage");
+	const stage = document.querySelector(".stage, iframe.canvas-frame");
 	if (!stage || boxes.length === 0) return;
 	const view = { width: stage.clientWidth, height: stage.clientHeight };
 	setCamera(fitInto(boxes, view, canvasBox(view)));

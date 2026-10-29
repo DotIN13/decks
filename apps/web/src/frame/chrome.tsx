@@ -2,8 +2,7 @@ import type { FrameChrome } from "@decks/canvas";
 import { insets } from "@decks/canvas/camera";
 import { PenBar } from "@decks/canvas/host";
 import { drawing, setDrawing } from "@decks/canvas/tools";
-import { createEffect, createSignal, Show } from "solid-js";
-import { FrameLayers } from "./layers.tsx";
+import { createEffect, Show } from "solid-js";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import { PenTray } from "../v3/PenTray.tsx";
 import { ToolColumn } from "../v3/ToolColumn.tsx";
@@ -11,17 +10,12 @@ import { ZoomBar } from "../v3/ZoomBar.tsx";
 
 /**
  * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `frame/chrome.ts`):
- * the tool column, the pen tray, the drawing's properties, the zoom and the comment popover, the same
+ * the tool column, the pen tray, the drawing's properties, the zoom and the comment popover (the layers stay in the page's sidebar), the same
  * components the page draws around a canvas it holds itself. A press on any of them stays in the frame;
  * what crosses to the page is a draft for the composer, or opening the apps panel.
  */
 export function DecksFrameChrome(chrome: FrameChrome) {
 	const { handle } = chrome;
-	const [layers, setLayers] = createSignal(false);
-	// The pen tray stands where the layers do: taking up the pen puts them away.
-	createEffect(() => {
-		if (drawing()) setLayers(false);
-	});
 	const step = (direction: "undo" | "redo") => (direction === "undo" ? handle.undo() : handle.redo());
 	const setPen = (on: boolean) => {
 		if (on && !chrome.canWrite()) return;
@@ -55,14 +49,11 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
 			<Show
 				when={chrome.narrow()}
-				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} layers={{ open: layers(), onToggle: () => setLayers((was) => !was) }} />}
+				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
 			>
 				<div class="frame-tool-row" style={{ bottom: `${chrome.dock() + 8}px` }}>
 					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
 				</div>
-			</Show>
-			<Show when={layers() && !drawing()}>
-				<FrameLayers chrome={chrome} onClose={() => setLayers(false)} />
 			</Show>
 			<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
 			<Show when={chrome.offer()} keyed>

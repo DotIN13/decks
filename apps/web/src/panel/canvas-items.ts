@@ -29,6 +29,10 @@ export function canvasItems(doc: PenDocument | undefined, query = ""): { items: 
 		if (meta.type === "decks.arrow") {
 			arrows.push(id);
 			continue;
+		} else if (meta.type === "decks.document" || meta.type === "decks.app") {
+			// A document or an app item: listed with the cards, by its name, its file's or its app's.
+			const what = meta.type === "decks.app" ? String((meta as { name?: unknown }).name ?? "App") : String(meta.path ?? "Document").split("/").pop()!;
+			item = { id, box, kind: "board", label: named ?? clip(what, "Item"), board: `item:${id}` };
 		} else if (meta.type === "decks.board" || meta.type === "decks.card") item = { id, box, kind: "board", label: named ?? clip(meta.path?.split("/").pop()?.replace(/\.html$/, ""), "Board"), ...(meta.path ? { board: meta.path } : {}) };
 		else if (n.type === "note") item = { id, box, kind: "note", label: named ?? clip(n.content, "Note") };
 		else if (n.type === "text") item = { id, box, kind: "text", label: named ?? clip(n.content, "Text") };
