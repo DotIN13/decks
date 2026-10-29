@@ -35,7 +35,7 @@ export interface FrameHostOptions {
 	/** A view the frame kept for another conversation: the harness hears it, to answer that agent's `view.camera`. */
 	viewFor?(agent: string, camera: Camera): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
-	upload?(file: FrameCalls["upload"]["data"]): Promise<{ path: string }>;
+	upload?(drop: { files: File[]; at: { x: number; y: number } }): void;
 }
 
 type Options = CanvasOptions & { state?: EditorState; frame: FrameHostOptions };
@@ -183,7 +183,11 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		page.answer("upload", (data) => {
 			if (!options.frame.upload) throw new CallRefused("Files cannot be dropped on this canvas here.", "refused");
-			return options.frame.upload(data);
+			// The point on this page: where the frame sits, plus where in it they landed.
+			const box = frameAt()?.getBoundingClientRect();
+			const at = { x: (box?.x ?? 0) + data.at.x, y: (box?.y ?? 0) + data.at.y };
+			options.frame.upload({ files: data.files.map((one) => new File([one.bytes], one.name, { type: one.type })), at });
+			return true;
 		});
 	};
 

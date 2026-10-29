@@ -126,7 +126,8 @@ export type FrameCalls = {
 	open: { data: { path: string; from: string }; value: boolean };
 	/** A card's agent call, or showing another canvas: the page's, with your token, and your OK before a message goes to an agent. */
 	agent: { data: { verb: string; args: unknown[]; card: string }; value: unknown };
-	upload: { data: { name: string; type: string; bytes: ArrayBuffer; at: Point }; value: { path: string } };
+	/** Files dropped on the canvas, at a point of the frame: the page uploads them into the canvas's folder and places them, as it does a drop of its own. */
+	upload: { data: { files: Array<{ name: string; type: string; bytes: ArrayBuffer }>; at: Point }; value: boolean };
 };
 
 /** A call refused, with why: what a promise from `call` rejects with. */

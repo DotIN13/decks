@@ -379,6 +379,27 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	end.answer("read", () => handle.drawn());
 
 	/*
+	 * Files dropped from outside the browser: never opened in place (a dropped file's default is to
+	 * replace the page with it), but handed to the page, which uploads them into this canvas's folder
+	 * and places them where they landed, as it does a drop of its own.
+	 */
+	const carries = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+	addEventListener("dragover", (event) => {
+		if (!carries(event)) return;
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+	});
+	addEventListener("drop", (event) => {
+		if (!carries(event)) return;
+		event.preventDefault();
+		const at = { x: event.clientX, y: event.clientY };
+		const files = Array.from(event.dataTransfer?.files ?? []);
+		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
+			end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
+		);
+	});
+
+	/*
 	 * A shortcut the canvas did not take goes to the page, so the app's own keys work wherever the focus
 	 * is: only one with a modifier, since a bare letter typed here is the canvas's or a card's.
 	 */

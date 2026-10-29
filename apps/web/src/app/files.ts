@@ -177,7 +177,7 @@ export function createFileDrops() {
 	 * — as a file card (`asFileCards`).
 	 */
 	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }) => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage || refusedOn(stageOnScreen())) return;
 		// Asked first, before anything is made for them: a big file said no to leaves no board behind.
 		const files: File[] = [];
@@ -393,7 +393,7 @@ export function createFileDrops() {
 	 */
 	const paste = (files: File[]) => {
 		if (files.length === 0 || refusedOn(stageOnScreen())) return;
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return;
 		void onEmptyCanvas(files, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 });
 	};
@@ -410,7 +410,7 @@ export function createFileDrops() {
 	 * the blank board's own (880×400), sent for that arithmetic and not to choose anything.
 	 */
 	const boardAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return undefined;
 		// `at` is already in stage pixels — the stage is the viewport (`camera/coords.ts`).
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
@@ -434,7 +434,7 @@ export function createFileDrops() {
 	 * board (`newDocBoard`); the file is edited where it is, and its history is kept in `docs/`.
 	 */
 	const documentAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return undefined;
 		const picked = await new Promise<string | undefined>((resolve) =>
 			setPicking({
@@ -473,7 +473,7 @@ export function createFileDrops() {
 	 * rather than landing on whatever is in the middle of the screen.
 	 */
 	const fileAt = async (at: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage");
+		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage) return undefined;
 		const picked = await new Promise<string | undefined>((resolve) =>
 			setPicking({
@@ -598,27 +598,29 @@ export function createFileDrops() {
 		 * is dropped into a board. The input bar takes its own. The files land where they were dropped.
 		 */
 		onMount(() => {
-			onCleanup(
-				guardDocumentDrops(document, (at, files) => {
-					// A canvas file opens as a canvas, wherever it lands (`connections/`).
-					const bundle = files.find((file) => /\.decks$/i.test(file.name));
-					if (bundle) {
-						void openDroppedBundle(bundle);
-						return;
-					}
-					if (!can("write")) {
-						notice("info", "This canvas was opened from a file, so it can only be read.");
-						return;
-					}
-					if (deps.preview()) {
-						notice("info", "That is the canvas as it used to be. Let go of the timeline first.");
-						return;
-					}
-					if (files.length > 0) void onEmptyCanvas(files, at);
-				}),
-			);
+			dropPreview = deps.preview;
+			onCleanup(guardDocumentDrops(document, dropAt));
 		});
 	};
+	let dropPreview: () => unknown = () => undefined;
+	/** Files dropped at a point of the window: on the canvas here, or handed over by the canvas frame (`frame/`). */
+	const dropAt = (at: { x: number; y: number }, files: File[]) => {
+		// A canvas file opens as a canvas, wherever it lands (`connections/`).
+		const bundle = files.find((file) => /\.decks$/i.test(file.name));
+		if (bundle) {
+			void openDroppedBundle(bundle);
+			return;
+		}
+		if (!can("write")) {
+			notice("info", "This canvas was opened from a file, so it can only be read.");
+			return;
+		}
+		if (dropPreview()) {
+			notice("info", "That is the canvas as it used to be. Let go of the timeline first.");
+			return;
+		}
+		if (files.length > 0) void onEmptyCanvas(files, at);
+	};
 
-	return { addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install };
+	return { addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install, dropAt };
 }
