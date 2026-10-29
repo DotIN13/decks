@@ -1328,6 +1328,13 @@ export function Stage(props: {
 	/** Safari's pinch is under way (`gesturechange`): a wheel it may send beside it is not a second zoom. */
 	let gesturing = false;
 	const nativeWheel = typeof localStorage !== "undefined" && localStorage.getItem("decks.nativeWheel") === "1";
+	/**
+	 * What the wheel's steps have asked for and the scroll has not taken yet, below a pixel. The
+	 * browser keeps whole pixels of a `scrollBy`, so a slow diagonal's smaller direction (a trackpad
+	 * step of 1.3 right and 0.9 down) was dropped step after step and the pan went as a staircase;
+	 * kept here, it moves once it adds up to a pixel, and the pan goes the fingers' way.
+	 */
+	const wheelCarry = { x: 0, y: 0 };
 	const onWheel = (event: WheelEvent) => {
 		const zooming = event.ctrlKey || event.metaKey;
 		if (zooming && gesturing) {
@@ -1359,7 +1366,13 @@ export function Stage(props: {
 			// Shift turns a mouse wheel sideways, as the browser would have.
 			const dx = (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX) * unit;
 			const dy = (event.shiftKey && event.deltaX === 0 ? 0 : event.deltaY) * unit;
-			element.scrollBy({ left: dx, top: dy, behavior: "instant" });
+			wheelCarry.x += dx;
+			wheelCarry.y += dy;
+			const left = Math.trunc(wheelCarry.x);
+			const top = Math.trunc(wheelCarry.y);
+			wheelCarry.x -= left;
+			wheelCarry.y -= top;
+			if (left !== 0 || top !== 0) element.scrollBy({ left, top, behavior: "instant" });
 			return;
 		}
 		event.preventDefault();
