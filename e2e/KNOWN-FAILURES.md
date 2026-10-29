@@ -18,7 +18,7 @@ from run to run. Each of them passes when run alone (`node e2e/run.mjs <check>.m
 because the machine is busy: a press, a glide or a page load takes longer than the check allows.
 They are not failing because of the app. Seen in the last runs: `stage-scroll`, `media` and `frames` find
 no empty spot; `camera-roundtrip`, `board-links`, `stage-gestures`, `pen-stage`, `card-phone`,
-`highlighting`, and the WebKit half of `drop-lands`. `DECKS_E2E_JOBS=2` mostly avoids it (one
+`highlighting`, the WebKit half of `drop-lands`, and `context`'s finger drag of a board. `DECKS_E2E_JOBS=2` mostly avoids it (one
 flake in 66 checks), at twice the time (12 minutes).
 
 ## Not app bugs, but worth knowing
