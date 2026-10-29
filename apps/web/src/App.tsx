@@ -899,7 +899,12 @@ export function App() {
 	 */
 	const askAboutInk = (request: InkRequest) => {
 		const agentId = state.focused;
-		if (!agentId || request.ids.length === 0) return;
+		const text = inkAsked(request);
+		if (agentId && text) send({ type: "agent.prompt", id: agentId, text });
+	};
+	/** What a sketch handed to the agent asks it, in words: sent from the page's canvas, a draft from the frame's. */
+	const inkAsked = (request: InkRequest): string | undefined => {
+		if (request.ids.length === 0) return undefined;
 		const n = request.ids.length;
 		const b = request.box;
 		const where = `[${n} ink ${n === 1 ? "stroke" : "strokes"} on the canvas ${request.canvas}, at x ${Math.round(b.x)} y ${Math.round(b.y)}, ${Math.round(b.w)} × ${Math.round(b.h)}: ${request.ids.join(", ")}]`;
@@ -910,7 +915,38 @@ export function App() {
 				: request.action === "board"
 					? `Make this a board, placed where the strokes are and about their size. ${keep}`
 					: "Read what is written or drawn there and act on it. If it is an instruction, carry it out; if it is a question, answer it; if it is a sketch or notes, say in a line what you read and what you would make of it.";
-		send({ type: "agent.prompt", id: agentId, text: `${where}\n${asked}` });
+		return `${where}\n${asked}`;
+	};
+	/*
+	 * What the canvas frame hands the composer (`@decks/canvas`, `frame/`): a comment, a sketch. Drafts,
+	 * shown in the composer and sent only when you press Send there: anything in the frame can hand
+	 * these over, a card's script too, so nothing from it goes to an agent on its word alone.
+	 */
+	const frameComment = (comment: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
+		const agentId = state.focused;
+		if (!agentId) return;
+		const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
+		if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });
+		else {
+			addComment(agentId, note);
+			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
+		}
+	};
+	const frameInk = (request: InkRequest) => {
+		const agentId = state.focused;
+		const text = inkAsked(request);
+		if (agentId && text) setDraft({ text, at: Date.now(), insert: true, agentId });
+	};
+	/** A picture of these drawn items to download, taken by the server. */
+	const exportPicture = (ids: string[]) => {
+		const agentId = state.focused;
+		if (!agentId) return;
+		// A link the browser downloads: the picture is taken on the server, which can take a moment.
+		notice("info", "Taking the picture…");
+		const link = document.createElement("a");
+		link.href = api(`/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format: "png", scheme: scheme() })}`);
+		link.download = "";
+		link.click();
 	};
 	const loadApps = () =>
 		void act<Array<{ name: string; title?: string; status: string; board: string }>>("apps.list", []).then((list) => {
@@ -1395,7 +1431,7 @@ export function App() {
 						 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
 						 * same options and state, its files read on a ticket for the canvas on screen.
 						 */
-						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend } }) : createEditor;
+						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel() } }) : createEditor;
 						const editor = make({
 							text: "",
 							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
@@ -1455,6 +1491,7 @@ export function App() {
 							},
 							onViewport: () => reportCameraSoon(camera()),
 							onComment: (comment) => setCommenting({ ...comment, open: true }),
+							onExport: exportPicture,
 							// Ink selected: the pill hands it to the agent on screen.
 							onInk: (request) => askAboutInk(request),
 							inkAgent: () => (state.focused ? (state.identities[state.focused]?.name ?? "the agent") : undefined),
@@ -1570,7 +1607,9 @@ export function App() {
 <Show when={showFps()}>
 	<FpsMeter />
 </Show>
+					<Show when={!framedCanvas}>
 					<ZoomBar zoom={camera().zoom} onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))} onFit={() => fitAll(canvasBoxes(), setCamera)} />
+					</Show>
 				</Show>
 
 
@@ -1588,7 +1627,8 @@ export function App() {
 					)}
 				</Show>
 
-				<Show when={drawing() && mode() === "browse"}>
+				{/* With the canvas in its frame, these are drawn in there, beside it (`frame/chrome.tsx`). */}
+				<Show when={!framedCanvas && drawing() && mode() === "browse"}>
 					<PenTray
 						onFloat={(tray, grip) => mountToolsFloat(tray, grip, "pen-tray")}
 						onDone={() => setDrawing(false)}
@@ -1601,7 +1641,7 @@ export function App() {
 				</Show>
 
 				{/* The drawing's tools, in both modes: browse leaves the boards' pages as they are, not the drawing. */}
-				<Show when={!(drawing() && mode() === "browse") && stagePen()}>
+				<Show when={!framedCanvas && !(drawing() && mode() === "browse") && stagePen()}>
 					{(pen) => (
 						<PenBar
 							tools={false}
@@ -1612,22 +1652,13 @@ export function App() {
 							}}
 							onStep={penStep}
 							onArm={() => {}}
-							onExport={(ids) => {
-								const agentId = state.focused;
-								if (!agentId) return;
-								// A link the browser downloads: the picture is taken on the server, which can take a moment.
-								notice("info", "Taking the picture…");
-								const link = document.createElement("a");
-								link.href = api(`/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format: "png", scheme: scheme() })}`);
-								link.download = "";
-								link.click();
-							}}
+							onExport={exportPicture}
 						/>
 					)}
 				</Show>
 
 				{/* The tools, in every mode and while the pen is out: the pen is one of them (`v3/ToolColumn.tsx`). On a phone, a row in the dock. */}
-				<Show when={stagePen() && !phone()}>
+				<Show when={!framedCanvas && stagePen() && !phone()}>
 					<ToolColumn onStep={penStep} onFloat={mountToolsFloat} onApps={openAppsPanel} onOpenFile={openFileAtMiddle} onPen={setPen} mode={mode()} onMode={(next) => setMode(next)} />
 				</Show>
 
@@ -1677,6 +1708,7 @@ export function App() {
 					{...(stageOf(state.focused) ? { canvasTitle: stageOf(state.focused)!.title } : {})}
 					selectedItems={penSelected()}
 					onPickItem={pickItem}
+					noCanvasTab={framedCanvas}
 					onCanvases={() => void setStagesOpen((was) => !was)}
 					{...(stages().length > 0 ? { canvasMenu: (trigger: Parameters<typeof canvasMenu>[0]) => canvasMenu(trigger) } : {})}
 					onPickArrows={(ids) => {
@@ -1977,7 +2009,7 @@ export function App() {
 					<Show when={!chatShown() && (phone() || !boardsOpen())}>
 						<StatusPill chat={focusedChat()} identity={state.identities[state.focused ?? ""]} onOpen={openChat} />
 					</Show>
-					<Show when={phone() && stagePen() && !phoneChat()}>
+					<Show when={!framedCanvas && phone() && stagePen() && !phoneChat()}>
 						<ToolColumn row onStep={penStep} onApps={openAppsPanel} onOpenFile={openFileAtMiddle} onPen={setPen} mode={mode()} onMode={(next) => setMode(next)} />
 					</Show>
 

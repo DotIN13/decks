@@ -1,6 +1,7 @@
 import type { PenDocument } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
 import type { PenTool } from "../state/pen-tools.ts";
+import type { Insets } from "../camera/insets.ts";
 
 /**
  * The canvas frame: the canvas, its engine and every card on it, in one sandboxed page of its own,
@@ -51,7 +52,7 @@ export interface Start {
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`. */
 	pictures: string;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -72,7 +73,8 @@ export interface PageToFrame {
 	token: { token: string };
 	pages: { pages: Page[] };
 	reload: { path: string };
-	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean };
+	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
+	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets };
 	tool: { tool?: PenTool; ink?: { on: boolean } };
 	camera: { camera: Camera; glide?: number };
 	fit: Record<string, never>;
@@ -91,31 +93,39 @@ export type PageCalls = {
 	read: { data: Record<string, never>; value: PenDocument };
 };
 
+/**
+ * What the frame hands the composer: what you point at, a comment written in the frame's popover, a
+ * sketch to turn into something. **A draft, never a message**: whatever runs in the frame can say this,
+ * a card's script too, so the page shows it in the composer and only your Send there sends it.
+ */
+export interface ComposerPart {
+	selection?: { ids: readonly string[]; page?: string };
+	pills?: Array<{ kind: "board" | "item"; id: string; label: string }>;
+	/** `send`: you pressed Send in the popover, so the page puts it in the composer as its own message, still for you to send. */
+	comment?: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
+	ink?: { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: Rect };
+}
+
 /** What the frame sends the page. */
 export interface FrameToPage {
+	composer: ComposerPart;
+	/** Open one of the app's own panels, beside the canvas (the apps list). */
+	panel: { name: "apps" };
 	started: Record<string, never>;
-	selection: { ids: readonly string[]; page?: string };
-	tool: { tool: PenTool };
 	camera: { camera: Camera };
 	viewport: { width: number; height: number };
-	refer: { pills: Array<{ kind: "board" | "item"; id: string; label: string }> };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
-	menu: { path?: string; ids?: string[]; at: Rect };
-	properties: Record<string, never>;
 	export: { ids: string[] };
-	ink: { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: Rect };
-	hide: { path: string };
 	seen: { path: string };
 	extent: { path: string; rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	store: { key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
-	/** The tools' state, what changed of it (`ui-sync.ts`). */
+	/** The tools' state, what changed of it (`ui-sync.ts`), for a frame with no chrome of its own. */
 	ui: Record<string, unknown>;
 }
 
 /** The calls the frame makes of the page, and what each answers. */
 export type FrameCalls = {
-	remove: { data: { path: string }; value: boolean };
 	open: { data: { path: string; from: string }; value: boolean };
 	token: { data: { path: string }; value: string | undefined };
 	decks: { data: { verb: string; args: unknown[]; card: string }; value: unknown };

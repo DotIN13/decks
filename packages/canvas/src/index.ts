@@ -19,5 +19,6 @@ export type { PenTool } from "./state/pen-tools.ts";
 export type { DocEdits, DrawingWriter } from "./stage/types.ts";
 // The canvas frame (`frame/`): the canvas in a sandboxed page of its own, and the protocol to it.
 export { bootFrame } from "./frame/frame.tsx";
+export type { FrameChrome, FrameChromeView } from "./frame/chrome.ts";
 export { CallRefused, PROTOCOL, peer, type FrameCalls, type FrameToPage, type Message, type Page as FramePage, type PageCalls, type PageEnd, type PageToFrame, type Start as FrameStart } from "./frame/protocol.ts";
 export { createFramedEditor, type FrameHostOptions } from "./frame/host.tsx";

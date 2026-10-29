@@ -4,7 +4,8 @@ import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } fr
 import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../mount.tsx";
 import type { PenTool } from "../state/pen-tools.ts";
 import { syncTools, toolsNow } from "./ui-sync.ts";
-import { CallRefused, PROTOCOL, peer, type FrameCalls, type Page, type PageEnd, type Rect, type Start } from "./protocol.ts";
+import { insets } from "../camera/insets.ts";
+import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type Page, type PageEnd, type Rect, type Start } from "./protocol.ts";
 
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
@@ -23,6 +24,12 @@ export interface FrameHostOptions {
 	decks?(call: FrameCalls["decks"]["data"]): Promise<unknown>;
 	/** Where what the frame keeps between visits is kept: this page's own storage. */
 	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
+	/** A comment written in the frame's popover: put in the composer as a draft, kept or to send, never sent from here. */
+	comment?(comment: NonNullable<ComposerPart["comment"]>): void;
+	/** A sketch to turn into something: a draft for the composer, never sent from here. */
+	ink?(ink: NonNullable<ComposerPart["ink"]>): void;
+	/** Open one of the app's panels. */
+	panel?(name: "apps"): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(file: FrameCalls["upload"]["data"]): Promise<{ path: string }>;
 }
@@ -84,7 +91,7 @@ export function createFramedEditor(options: Options): Editor {
 			pages: pagesNow(),
 			files: { base: ticket.files, expires: ticket.expires },
 			pictures: ticket.pictures,
-			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false },
+			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets) },
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
 			stored,
@@ -130,19 +137,25 @@ export function createFramedEditor(options: Options): Editor {
 		stopTools?.();
 		stopTools = syncTools((patch) => page.emit("ui", patch), (apply) => page.on("ui", apply));
 		page.on("started", () => options.boards?.onStarted?.());
-		page.on("selection", (data) => {
-			if (data.page !== undefined || data.ids.length === 0) {
-				fromFrame.selected = data.page;
-				state?.selected?.[1](data.page);
-				options.onSelect?.(data.page);
+		/*
+		 * Drafts for the composer: shown there, never sent from here. Anything in the frame can say these,
+		 * a card's script too, so what reaches an agent is only what you send yourself.
+		 */
+		page.on("composer", (data) => {
+			const selection = data.selection;
+			if (selection) {
+				if (selection.page !== undefined || selection.ids.length === 0) {
+					fromFrame.selected = selection.page;
+					state?.selected?.[1](selection.page);
+					options.onSelect?.(selection.page);
+				}
+				if (selection.page === undefined) options.onSelection?.(selection.ids);
 			}
-			if (data.page === undefined) options.onSelection?.(data.ids);
+			if (data.pills) options.onRefer?.(data.pills);
+			if (data.comment) options.frame.comment?.(data.comment);
+			if (data.ink) options.frame.ink?.(data.ink);
 		});
-		page.on("tool", (data) => {
-			tool = data.tool;
-			options.onTool?.(data.tool);
-			if (data.tool === "select") options.onSelectTool?.();
-		});
+		page.on("panel", (data) => options.frame.panel?.(data.name));
 		page.on("camera", (data) => {
 			fromFrame.camera = data.camera;
 			localCamera = data.camera;
@@ -150,16 +163,8 @@ export function createFramedEditor(options: Options): Editor {
 			options.onCamera?.(data.camera);
 		});
 		page.on("viewport", (data) => options.onViewport?.(data));
-		page.on("refer", (data) => options.onRefer?.(data.pills));
 		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), anchor: () => onPage(data.at) }));
-		page.on("menu", (data) => {
-			const at = onPage(data.at);
-			if (at) options.onPillMore?.({ ...(data.path ? { path: data.path } : {}), ...(data.ids ? { ids: data.ids } : {}) }, at);
-		});
-		page.on("properties", () => options.onProperties?.());
 		page.on("export", (data) => options.onExport?.(data.ids));
-		page.on("ink", (data) => options.onInk?.(data));
-		page.on("hide", (data) => options.boards?.onHide?.(data.path));
 		page.on("seen", (data) => options.boards?.onRead?.(data.path));
 		page.on("extent", (data) => {
 			const { path, ...extent } = data;
@@ -172,7 +177,6 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		// A shortcut the canvas did not take, played on this page as if typed here.
 		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
-		page.answer("remove", async (data) => (options.onDeleteBoard ? (await options.onDeleteBoard(data.path)) !== false : false));
 		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
 		page.answer("token", async (data) => options.boards?.mintBoardToken?.(data.path, canvas));
 		page.answer("decks", (data) => {
@@ -203,6 +207,12 @@ export function createFramedEditor(options: Options): Editor {
 				{ defer: true },
 			),
 		);
+		// What of the frame the page's own chrome covers, so the frame's tools sit clear of it and a fit frames into the rest.
+		createEffect(() => {
+			const page = end();
+			const covered = insets();
+			if (page) page.emit("look", { insets: covered });
+		});
 		createEffect(() => {
 			const page = end();
 			const pages = pagesNow();

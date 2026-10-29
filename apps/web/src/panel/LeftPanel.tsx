@@ -97,7 +97,7 @@ export type PanelTab = "recent" | "canvas" | "agents" | "apps";
 /** The strip's order: who is working, what is on the stage, and the deck's apps. It opens on Agents. */
 const PANEL_TABS: PanelTab[] = ["recent", "canvas", "agents", "apps"];
 const PANEL_TAB_LABEL: Record<PanelTab, string> = { recent: "Recent", canvas: "Canvas", agents: "Agents", apps: "Apps" };
-const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
+export const ITEM_ICON: Record<ItemKind, typeof Layers> = { board: FileText, note: StickyNote, text: Type, shape: Circle, frame: Square, ink: PenLine, other: Square };
 const PANEL_TAB_ICON = { recent: Clock, canvas: Layers, agents: Sparkles, apps: AppWindow };
 
 /** An app in the deck's `apps/` folder, as `apps.list` answers: its name, title, state and board. */
@@ -191,6 +191,8 @@ export function LeftPanel(props: {
 	// --- the Canvas tab ---------------------------------------------------------------
 	/** The drawing on screen: the tab lists its top-level items. */
 	canvasDoc?: PenDocument;
+	/** No Canvas tab: the canvas frame draws the layers itself, beside the canvas (`frame/layers.tsx`). */
+	noCanvasTab?: boolean;
 	canvasTitle?: string;
 	/** The drawn items selected on the canvas, by id. */
 	selectedItems?: string[];
@@ -767,7 +769,7 @@ export function LeftPanel(props: {
 				{/* No agents behind a canvas opened from a file, so no Agents tab either. */}
 				<div class="v3-nav" role="tablist" aria-label="Panel" ref={nav}>
 					<span class="v3-nav-mark" ref={navMark} aria-hidden="true" />
-					<For each={PANEL_TABS.filter((name) => (name !== "agents" && name !== "recent") || (props.chats && can("agents")))}>
+					<For each={PANEL_TABS.filter((name) => (name === "canvas" ? !props.noCanvasTab : (name !== "agents" && name !== "recent") || (props.chats && can("agents"))))}>
 						{(name) => (
 							<button
 								type="button"

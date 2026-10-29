@@ -267,3 +267,17 @@ export function watchInsets(root: HTMLElement = document.body): void {
 		window.removeEventListener("resize", resized);
 	});
 }
+
+/**
+ * Insets told rather than measured: in the canvas frame the chrome standing beside the canvas is the
+ * app page's, outside the frame, so the page says what it covers (`look.insets`) and the frame takes it.
+ */
+export function useInsets(next: Insets): void {
+	setInsets(next);
+	publishInsets({
+		"--inset-left": `${next.left}px`,
+		"--inset-right": `${next.right}px`,
+		"--inset-top": `${next.top}px`,
+		"--inset-bottom": `${next.bottom}px`,
+	});
+}

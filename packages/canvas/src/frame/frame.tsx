@@ -4,8 +4,12 @@ import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
 import { createEditor, type Editor } from "../mount.tsx";
 import { setCanvasHost } from "../host.ts";
-import { setDrawing } from "../state/ink.ts";
+import { drawing, setDrawing } from "../state/ink.ts";
+import type { StageComment } from "../Stage.tsx";
+import type { Camera } from "@decks/protocol";
+import type { FrameChromeView } from "./chrome.ts";
 import { syncTools } from "./ui-sync.ts";
+import { useInsets } from "../camera/insets.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
@@ -18,14 +22,14 @@ import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type S
  * What a host answered with a function (a board's address, its picture, its storage) is worked out
  * here from `start`: the files' ticketed address, the pages' trust, the page's kept values.
  */
-export function bootFrame(root: HTMLElement): void {
+export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView } = {}): void {
 	const parent = window.parent;
 	if (parent === window) throw new Error("The canvas frame runs inside the app's page.");
 	const onStart = (event: MessageEvent<StartMessage>) => {
 		// Only the parent's answer, with its port: nothing else is read, then or later.
 		if (event.source !== parent || event.data?.t !== "start" || !event.ports[0]) return;
 		removeEventListener("message", onStart);
-		void run(root, event.data.start, peer(event.ports[0]) as FrameEnd);
+		void run(root, event.data.start, peer(event.ports[0]) as FrameEnd, options.chrome);
 	};
 	addEventListener("message", onStart);
 	parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
@@ -34,11 +38,20 @@ export function bootFrame(root: HTMLElement): void {
 /** A rectangle on this frame's screen, as the page places it (it adds where the frame sits). */
 const rectOf = (box: DOMRect | undefined): Rect | undefined => (box ? { x: box.x, y: box.y, w: box.width, h: box.height } : undefined);
 
-async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void> {
+async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined): Promise<void> {
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
 	end.on("token", (data) => backend.setToken(data.token));
 	const first = await backend.drawing();
 	const [pages, setPages] = createSignal<Page[]>(start.pages);
+	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
+	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
+	const [dark, setDark] = createSignal(start.look.dark);
+	const [comment, setComment] = createSignal<StageComment>();
+	const [revision, setRevision] = createSignal(0);
+	const changed = () => setRevision((n) => n + 1);
+	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
+	if (start.look.insets) useInsets(start.look.insets);
+	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
 	const [news, setNews] = createSignal<Record<string, string>>({});
 	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
 	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
@@ -80,6 +93,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 		base: first.base,
 		dark: start.look.dark,
 		mode: start.look.mode,
+		// With chrome of its own, the frame's mode and pen are the editor's state, set by its toolbars.
+		...(chrome ? { state: { mode: [mode, setMode], inking: () => drawing() && mode() === "browse" } } : {}),
 		readOnly: start.look.readOnly,
 		toolbar: start.look.toolbar,
 		...(start.camera ? { camera: start.camera } : {}),
@@ -88,6 +103,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 		document: {
 			// Your edits, straight to the harness; one it refuses is dropped, and the drawing read again.
 			send: async (ops, edit) => {
+				changed();
 				const answer = await backend.call("canvas.batch", [ops], edit);
 				if (!answer.ok) reread();
 				return answer.ok;
@@ -124,30 +140,34 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 			mayStart: () => busy().mayStart !== false,
 			switching: () => busy().switching === true,
 			onStarted: () => end.emit("started", {}),
-			onHide: (path) => end.emit("hide", { path }),
+			// Hidden is the card taken off the drawing, as canvas.delete does.
+			onHide: (path) => void backend.call("canvas.delete", [path]),
 			marks: (path) => marks()[path] ?? [],
 		},
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.
-		onCamera: (camera) => {
+		onCamera: (moved) => {
+			setCamera(moved);
 			clearTimeout(restUntil);
-			restUntil = setTimeout(() => end.emit("camera", { camera }), 250);
+			restUntil = setTimeout(() => end.emit("camera", { camera: moved }), 250);
 		},
-		onSelection: (ids) => end.emit("selection", { ids: [...ids] }),
-		onSelect: (path) => end.emit("selection", { ids: [], ...(path ? { page: path } : {}) }),
-		onTool: (tool) => end.emit("tool", { tool }),
-		onSelectTool: () => end.emit("tool", { tool: "select" }),
+		// What you point at, a comment, a sketch: drafts for the composer, which the page sends only on your Send.
+		onSelection: (ids) => end.emit("composer", { selection: { ids: [...ids] } }),
+		onSelect: (path) => end.emit("composer", { selection: { ids: [], ...(path ? { page: path } : {}) } }),
 		onViewport: (viewport) => end.emit("viewport", viewport),
-		onRefer: (pills) => end.emit("refer", { pills }),
-		onComment: (comment) => {
-			const at = rectOf(comment.anchor());
-			end.emit("comment", { path: comment.path, title: comment.title, quote: comment.quote, ...(comment.component ? { component: comment.component } : {}), ...(comment.items ? { items: comment.items } : {}), ...(at ? { at } : {}) });
+		onRefer: (pills) => end.emit("composer", { pills }),
+		onComment: (target) => {
+			if (chrome) return void setComment(target);
+			const at = rectOf(target.anchor());
+			end.emit("comment", { path: target.path, title: target.title, quote: target.quote, ...(target.component ? { component: target.component } : {}), ...(target.items ? { items: target.items } : {}), ...(at ? { at } : {}) });
 		},
 		onExport: (ids) => end.emit("export", { ids }),
-		onPillMore: (on, anchor) => end.emit("menu", { ...on, at: rectOf(anchor)! }),
-		onInk: (request) => end.emit("ink", { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box }),
+		onInk: (request) => end.emit("composer", { ink: { action: request.action, ids: request.ids, canvas: request.canvas, box: request.box } }),
 		inkAgent: () => busy().writer?.name,
-		onProperties: () => end.emit("properties", {}),
-		onDeleteBoard: (path) => end.call("remove", { path }),
+		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
+		onDeleteBoard: async (path) => {
+			const answer = await backend.call("canvas.delete", [path]);
+			return answer.ok;
+		},
 	});
 	const { handle } = editor;
 
@@ -157,8 +177,15 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 	 */
 	let reading = false;
 	const follower = drawingFollower({
-		whole: (doc, base, made) => handle.setDocument(serialize(doc), base, made),
-		edits: (edits, base, made) => handle.applyEdits(edits, base, made) !== false,
+		whole: (doc, base, made) => {
+			handle.setDocument(serialize(doc), base, made);
+			changed();
+		},
+		edits: (edits, base, made) => {
+			const applied = handle.applyEdits(edits, base, made) !== false;
+			changed();
+			return applied;
+		},
 		reread: () => reread(),
 	});
 	function reread(): void {
@@ -169,6 +196,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 			.then((now) => {
 				follower.at(now.rev);
 				handle.setDocument(serialize(now.doc), now.base);
+				changed();
 			})
 			.catch((error: unknown) => console.warn(error))
 			.finally(() => (reading = false));
@@ -178,7 +206,12 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 	end.on("pages", (data) => setPages(data.pages));
 	end.on("reload", (data) => handle.reloadBoard(data.path));
 	end.on("look", (data) => {
-		if (data.dark !== undefined) handle.setDark(data.dark);
+		if (data.insets) useInsets(data.insets);
+		if (data.dark !== undefined) {
+			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
+			setDark(data.dark);
+			handle.setDark(data.dark);
+		}
 		if (data.mode !== undefined) handle.setMode(data.mode);
 	});
 	end.on("tool", (data) => {
@@ -207,7 +240,36 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void
 		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
 	});
 
-	// The tools as the app's chrome has them, then kept in step both ways.
+	if (chrome) {
+		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
+		const view = chrome({
+			handle,
+			revision,
+			camera,
+			mode,
+			setMode: (next) => {
+				if (next === "edit" && !canWrite()) return;
+				setMode(next);
+			},
+			canWrite,
+			dark,
+			comment,
+			setComment,
+			compose: (part) => end.emit("composer", part),
+			exportPicture: (ids) => end.emit("export", { ids }),
+			panel: (name) => end.emit("panel", { name }),
+			canvas: start.canvas.name,
+		});
+		render(() => (
+			<>
+				{editor.surface()}
+				{view}
+			</>
+		), root);
+		return;
+	}
+
+	// No chrome of its own: the tools as the app's page has them, kept in step both ways.
 	let applyTools: ((patch: Record<string, unknown>) => void) | undefined;
 	syncTools((patch) => end.emit("ui", patch), (apply) => {
 		applyTools = apply;

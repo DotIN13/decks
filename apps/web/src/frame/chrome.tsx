@@ -1,0 +1,75 @@
+import type { FrameChrome } from "@decks/canvas";
+import { insets } from "@decks/canvas/camera";
+import { PenBar } from "@decks/canvas/host";
+import { drawing, setDrawing } from "@decks/canvas/tools";
+import { createEffect, createSignal, Show } from "solid-js";
+import { FrameLayers } from "./layers.tsx";
+import { CommentPopup } from "../markup/CommentPopup.tsx";
+import { PenTray } from "../v3/PenTray.tsx";
+import { ToolColumn } from "../v3/ToolColumn.tsx";
+import { ZoomBar } from "../v3/ZoomBar.tsx";
+
+/**
+ * The Decks app's chrome, drawn inside the canvas frame beside the canvas (`@decks/canvas`, `frame/chrome.ts`):
+ * the tool column, the pen tray, the drawing's properties, the zoom and the comment popover, the same
+ * components the page draws around a canvas it holds itself. A press on any of them stays in the frame;
+ * what crosses to the page is a draft for the composer, or opening the apps panel.
+ */
+export function DecksFrameChrome(chrome: FrameChrome) {
+	const { handle } = chrome;
+	const [layers, setLayers] = createSignal(false);
+	// The pen tray stands where the layers do: taking up the pen puts them away.
+	createEffect(() => {
+		if (drawing()) setLayers(false);
+	});
+	const step = (direction: "undo" | "redo") => (direction === "undo" ? handle.undo() : handle.redo());
+	const setPen = (on: boolean) => {
+		if (on && !chrome.canWrite()) return;
+		if (on && chrome.mode() === "edit") chrome.setMode("browse");
+		setDrawing(on);
+	};
+	// A canvas you may not change has no edit mode and no pen, whatever asked for them.
+	createEffect(() => {
+		if (chrome.canWrite()) return;
+		if (chrome.mode() !== "browse") chrome.setMode("browse");
+		if (drawing()) setDrawing(false);
+	});
+	// Taking up the pen puts the popover away.
+	createEffect(() => {
+		if (drawing() && chrome.comment()) chrome.setComment(undefined);
+	});
+	const comment = (text: string, send: boolean) => {
+		const target = chrome.comment();
+		if (!target) return;
+		chrome.compose({ comment: { path: target.path, title: target.title, quote: target.quote, text, send, ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) } });
+		chrome.setComment(undefined);
+	};
+	return (
+		<>
+			<Show when={drawing() && chrome.mode() === "browse"}>
+				<PenTray onDone={() => setDrawing(false)} onStep={step} onDelete={(ids) => handle.edit(ids.map((id) => ({ op: "delete", id })))} />
+			</Show>
+			<Show when={!(drawing() && chrome.mode() === "browse")}>
+				<PenBar tools={false} doc={(chrome.revision(), handle.drawn())} onEdit={(ops) => handle.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => chrome.exportPicture(ids)} />
+			</Show>
+			<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} layers={{ open: layers(), onToggle: () => setLayers((was) => !was) }} />
+			<Show when={layers() && !drawing()}>
+				<FrameLayers chrome={chrome} onClose={() => setLayers(false)} />
+			</Show>
+			<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
+			<Show when={chrome.comment()} keyed>
+				{(target) => (
+					<CommentPopup
+						target={{ ...target, anchor: () => target.anchor() }}
+						moved={() => [chrome.camera(), insets()]}
+						left={insets().left}
+						canSend
+						onKeep={(text) => comment(text, false)}
+						onSend={(text) => comment(text, true)}
+						onClose={() => chrome.setComment(undefined)}
+					/>
+				)}
+			</Show>
+		</>
+	);
+}
