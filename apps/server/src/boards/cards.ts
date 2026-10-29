@@ -89,3 +89,29 @@ ${withDeckImports(input.deckImports)}
 </html>
 `;
 }
+
+const escapeTitle = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+/**
+ * A new card's `index.html`: its title, its size, a style for its one block, the block with the title
+ * in it, and a module that is handed the card. The agent fills it in with its own tools; what it
+ * keeps beside it (a stylesheet, a module, data) goes in the same folder.
+ */
+export function cardShell(title: string, size: { w: number; h?: number }): string {
+	return `<title>${escapeTitle(title)}</title>
+<meta name="card" content='${JSON.stringify(size)}' />
+<style>
+	.doc { padding: 40px 48px; font-size: 17px; line-height: 1.5 }
+	/* your design */
+</style>
+<div class="doc" data-id="doc">
+	<h1>${escapeTitle(title)}</h1>
+</div>
+<script type="module">
+	// Runs each time the card wakes; return a function to stop what it started.
+	export default function (card) {
+		// card.root is what document is to a page: card.root.querySelector("h1").
+	}
+</script>
+`;
+}

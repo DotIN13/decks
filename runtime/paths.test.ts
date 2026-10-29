@@ -31,7 +31,7 @@ test("the named spots are the ones the app asks for", () => {
 });
 
 test("the install directory is the one node_modules sits in", () => {
-	// This is the value handed to an agent as `DECKS_APP_DIR`, and the `board-debug` skill
+	// This is the value handed to an agent as `DECKS_APP_DIR`, and the `card-debug` skill
 	// anchors `createRequire` on it to find Playwright — from a deck, which is not inside the
 	// install. A wrong answer here is a skill that cannot work, only for agents, only
 	// sometimes.
@@ -51,5 +51,5 @@ test("the two out-of-process shims are where their runtimes are told to look", (
 test("the command reference every agent is given is there", () => {
 	// Generated from the verb table (`scripts/gen-sdk.mjs`) and read into each agent's context.
 	const text = existsSync(decksCommands()) ? readFileSync(decksCommands(), "utf8") : "";
-	assert.match(text, /`decks board create`/, "the command reference is missing or empty");
+	assert.match(text, /`decks card create`/, "the command reference is missing or empty");
 });

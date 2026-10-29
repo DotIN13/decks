@@ -249,8 +249,8 @@ export class ClaudeBackend implements AgentBackend {
 			/*
 			 * Decks' own skills, as a local plugin.
 			 *
-			 * `AGENTS.md.tmpl` tells every agent to read the **board-authoring** skill before
-			 * building a board, and until now that instruction was only true on pi, which
+			 * `AGENTS.md.tmpl` tells every agent to read the **card-authoring** skill before
+			 * building a card, and until now that instruction was only true on pi, which
 			 * takes `additionalSkillPaths` directly. A Claude agent called `Skill`, got an
 			 * error, and went hunting the filesystem with `find` for a directory it had been
 			 * told existed — so the one document that explains the component classes was

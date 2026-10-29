@@ -8,7 +8,7 @@ test("the table has every call of the redesign, each named once, and the old nam
 	for (const name of [
 		"canvas.read", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy", "canvas.variables", "canvas.batch",
 		"canvas.space", "canvas.fit", "canvas.save", "canvas.screenshot", "canvas.export", "canvas.rename", "canvas.file", "canvas.list", "canvas.create", "canvas.copyShared",
-		"board.list", "board.create", "board.get", "board.canvases", "board.url", "frame.create", "file.url",
+		"card.list", "card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url",
 		"agent.me", "agent.update", "here", "agent.claim", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create",
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
 		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",

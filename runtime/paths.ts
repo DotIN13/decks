@@ -40,7 +40,7 @@ export function installDir(): string {
 	return resolve(SELF, "..");
 }
 
-/** The skills an agent is taught with (`board-authoring`, `board-debug`). */
+/** The skills an agent is taught with (`card-authoring`, `card-debug`). */
 export function skillsDir(): string {
 	return resolve(HERE, "skills");
 }

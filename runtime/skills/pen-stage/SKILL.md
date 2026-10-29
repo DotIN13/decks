@@ -1,6 +1,6 @@
 ---
 name: pen-stage
-description: A canvas is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, canvas calls and boxes, beside and below, canvases, and patterns for arranging boards. Read before your first decks canvas insert or batch.
+description: A canvas is a native pen.dev .pen file — its cards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, canvas calls and boxes, beside and below, canvases, and patterns for arranging cards. Read before your first decks canvas insert or batch.
 ---
 
 # Drawing on the stage
@@ -8,25 +8,26 @@ description: A canvas is a native pen.dev .pen file — its boards, and notes, t
 Your stage is one file, `canvases/<name>/canvas.pen`, in **pen.dev's own format**: it opens in pen.dev
 as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
-- **Boards**: the HTML pages you write, kept in the canvas's own folder, `canvases/<name>/boards/`.
-  In the file each one is a pen `browser` item pointing at its file, tagged
-  `metadata: { type: "decks.board", path: "boards/…" }` — the path is the canvas's own folder's, so the
-  folder stands alone and can be shared whole. Every canvas call reads and writes it as
-  **`{ type: "board", board: "canvases/<name>/boards/…" }`**, its path in the deck, and takes a
-  board's path wherever it takes an item's id. Make the file with `decks.board.create` (it goes in
-  your canvas's `boards/`, or `{ canvas }`'s), then place it with
-  `decks.canvas.insert({ type: "board", board: path }, { beside })`. A board from another canvas or the
-  library (`boards/`, read only) placed on your canvas is **copied in**, and the answer names the copy; `canvas.move`, `canvas.update`
-  (`{ size: { w, h } }`) and `canvas.delete` (the file stays) do the rest, or put it inside a frame.
+- **Cards**: the HTML pieces you write (the card-authoring skill), each a folder in the canvas's own
+  `canvases/<name>/cards/`, the card being its `index.html`. In the file each one is a pen `browser`
+  item pointing at it, tagged `metadata: { type: "decks.card", path: "cards/<name>/index.html" }` — the
+  path is the canvas's own folder's, so the folder stands alone and can be shared whole. Every canvas
+  call reads and writes it as **`{ type: "card", card: "canvases/<name>/cards/<card>/index.html" }`**,
+  its path in the deck, and takes a card's path wherever it takes an item's id. Make it with
+  `decks.card.create` (it goes in your canvas's `cards/`, or `{ canvas }`'s), then place it with
+  `decks.canvas.insert({ type: "card", card: path }, { beside })`; `canvas.move`, `canvas.update`
+  (`{ size: { w, h } }`) and `canvas.delete` (the folder stays) do the rest, or put it inside a frame.
+  Older canvases also hold **boards** (`{ type: "board", board }`, HTML pages in `boards/`): they are
+  read, moved and sized the same way, but boards are retired and new work is a card.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
-  boards — a note beside one, an arrow from one to the next, an outline round a group. Put an
-  answer on a board; put the arrangement around it here.
+  cards — a note beside one, an arrow from one to the next, an outline round a group. Put an
+  answer on a card; put the arrangement around it here.
 
-**Boards are at the back.** Every drawn item is shown over the boards, wherever it sits in the
-file, so a note placed on a board covers that part of it, and a filled frame round a group of
-boards hides them. To mark out a group, give the frame a stroke and no fill. The person can use a
-board everywhere nothing is drawn over it, and not where something is. So keep notes beside a
-board rather than on it, unless covering part of it is the point.
+**Order decides what covers what.** A drawn item after a card in the file is shown over it, and one
+before it is hidden behind it, so a note placed on a card covers that part of it, and a filled frame
+laid over a group of cards hides them. To mark out a group, give the frame a stroke and no fill. The
+person can use a card everywhere nothing is drawn over it, and not where something is. So keep notes
+beside a card rather than on it, unless covering part of it is the point.
 
 The person can move, delete and rewrite drawn items by hand, so read before you edit:
 the file may have changed since you last looked.
@@ -42,14 +43,14 @@ Every canvas call takes `{ canvas }` last: a canvas's folder name or its title. 
 `decks.here()`, your home canvas, the one the person sees beside you. None of these moves you:
 
 ```ts
-await decks.canvas.list();                    // every canvas: { name, title, open: [agents], boards }
+await decks.canvas.list();                    // every canvas: { name, title, open: [agents], boards (cards counted) }
 await decks.canvas.create("Launch plan");     // a new, empty canvas; nobody is moved to it
 await decks.canvas.read({ canvas: "deploy" }); // another canvas, read where it is
 await decks.agent.update({ canvas: "deploy" }); // make it your home: the person sees it beside you
 await decks.view.goto("deploy");              // bring the person's screen there
 ```
 
-Two agents with one home canvas share its boards and its drawing. Make a new canvas for a new
+Two agents with one home canvas share its cards and its drawing. Make a new canvas for a new
 piece of work; make an old one your home to continue it.
 
 **A friend's canvas.** A canvas shared with you through Decks Studio is named `shared/<owner>/<canvas>`
@@ -57,35 +58,35 @@ piece of work; make an old one your home to continue it.
 same shape as yours. What the share lets you do is its `role`:
 
 - `edit`: change it as your own, and everything goes into **its** folder, which syncs back to its
-  owner and everyone else it is shared with: a board you make (`board.create({ canvas })`) goes in its
-  `boards/`, a picture or file in its `files/` (the person's drops do this; from a script,
+  owner and everyone else it is shared with: a card you make (`card.create({ canvas })`) goes in its
+  `cards/`, a picture or file in its `files/` (the person's drops do this; from a script,
   `decks.upload(file, { canvas })`, or write the file into its `files/` yourself), named in its
   drawing as `files/<name>`. Never put what it uses in this deck's `assets/`: the owner would not get it.
 - `view`: it follows its owner's copy, and every call that would change it refuses. To change it,
   make your own copy: `decks.canvas.copyShared({ canvas: "shared/ada/plan" })` copies its drawing,
-  boards, frames and files into a new `canvases/copy-of-…/` of yours (its owner's deck files go in the
+  cards, frames and files into a new `canvases/copy-of-…/` of yours (its owner's deck files go in the
   copy's `files/`, links re-pointed), titled "Copy of …". The copy syncs as your canvas and never
-  changes theirs; an app's board in it stays a picture, since the app runs on its owner's harness.
+  changes theirs; an app in it stays a picture, since the app runs on its owner's harness.
 
 ## The calls
 
 ```ts
 const { items } = await decks.canvas.read();          // every item as saved, plus its box
-await decks.canvas.insert(item, { beside: "boards/plan.html" });  // or { below }, { at }, { parent }
+await decks.canvas.insert(item, { beside: plan });           // plan: a card's path; or { below }, { at }, { parent }
 await decks.canvas.update("check", { set: { content: "Done" } }); // fields, { at }, { size }
-await decks.canvas.move("check", { below: "boards/plan.html" });
+await decks.canvas.move("check", { below: plan });
 await decks.canvas.delete("check");
 await decks.canvas.batch([ /* ops */ ]);              // applied together, or not at all
 const file = await decks.canvas.file();               // "canvases/<name>/canvas.pen", to edit by hand
 ```
 
 - `read()` returns `{ canvas, title, version, variables?, themes?, items }`. Each item is exactly
-  what the file holds, plus **`box: { x1, y1, x2, y2 }`**: where it is on the canvas; a board reads
-  as `{ type: "board", board, title, width, height, box }`. An instance (`type: "ref"`) also lists
+  what the file holds, plus **`box: { x1, y1, x2, y2 }`**: where it is on the canvas; a card reads
+  as `{ type: "card", card, title, width, height, box }`. An instance (`type: "ref"`) also lists
   `inside`, the items in its copy with their id paths and boxes.
-- **`beside` and `below`** take an item's id or a board's path and put the item 160 px clear of
+- **`beside` and `below`** take an item's id or a card's path and put the item 160 px clear of
   that item's box: `beside` to its right with the tops aligned, `below` under it with the lefts
-  aligned. They work for any item, a note under a board or a board beside a note.
+  aligned. They work for any item, a note under a card or a card beside a note.
 - Each call answers with the item as it now is, box included; `batch` with one per op. A note says
   what happened that you did not ask for (a size the layout overrode, a place chosen because you
   gave none). If any op of a batch fails, none is saved, and the error names the op and why.
@@ -108,8 +109,8 @@ await decks.canvas.batch([
 
 The server turns the box into pen's own numbers — `x` and `y` from the parent's corner, `width`,
 `height` — against wherever the parent really is. Give `x1, y1` alone to move without resizing.
-`decks.canvas.read()` gives each board a `box` too, so a note 40 px beside a board is
-`{ x1: board.box.x2 + 40, y1: board.box.y1, … }`; `beside` is the same at 160 px. Inside a frame that lays out its children (a row
+`decks.canvas.read()` gives each card a `box` too, so a note 40 px beside a card is
+`{ x1: card.box.x2 + 40, y1: card.box.y1, … }`; `beside` is the same at 160 px. Inside a frame that lays out its children (a row
 or a column), the frame decides where they go, so only the size is taken from a box.
 
 ## Edits
@@ -152,7 +153,7 @@ no field for: `{ type: "…", … }`).
 | `group` | a container, no layout: its box is its children's | `children` |
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
 | `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
-| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — read and written as `{ type: "board", board }` through the canvas calls |
+| `browser` | a card (see above), or an old board | `url`, `metadata: { type: "decks.card", path }` — read and written as `{ type: "card", card }` through the canvas calls (a board: `decks.board`, `{ type: "board", board }`) |
 | `frame` + `metadata: { type: "decks.shape", kind }` | a **shape** from the library, with words in it (see Shapes) | its outline is its first `path` child, its words a `text` child |
 
 Any item with a line can draw it in dashes or dots: `strokeDash: "dashed"` or `"dotted"` (ours;
@@ -208,7 +209,7 @@ To change one block, `update` that text's `content`; to add one, `insert` with `
 an `index`. A person follows a card's link with a click, and types into the whole card as it reads.
 A note with `metadata: { type: "decks.markdown" }` is a card from before: it is still drawn, and
 becomes a frame when someone edits it. Use a plain `note` for one line; a card when there is a
-heading or a list. Keep it short: a card is read on the canvas, and a long document is a board.
+heading or a list. Keep it short: a note is read on the canvas, and a long document is a card or a document.
 
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",
@@ -245,7 +246,7 @@ reusable item marked `slot: ["<item id>", …]` is a place for content: a copy f
 `descendants: { "<slot id>": { children: [ … ] } }`, refs included.
 
 **Saved frames.** A frame worth using again goes in your canvas's own `frames/` folder
-(`canvases/<name>/frames/`), as its boards go in its `boards/`, in folders if you like; a frame from the
+(`canvases/<name>/frames/`), as its cards go in its `cards/`, in folders if you like; a frame from the
 deck's old `frames/` placed on a canvas is copied in. Two ways in:
 
 - `decks.frame.create("frames/ui/agent-card", { type: "frame", layout: "vertical", children: [ … ] })` makes
@@ -259,7 +260,7 @@ with nothing to declare. To change the frame itself, give the canvas item calls 
 `delete`, `move`, `copy`, `variables` or `batch` with the same items, as in
 `decks.canvas.update("title", { set: { content: "Agent" } }, { frame: "frames/ui/agent-card" })`
 (`decks canvas update title --set.content Agent --frame frames/ui/agent-card`). Every canvas placing it
-shows the change. A frame holds drawn items, never a board, and a call names a canvas or a frame, not both.
+shows the change. A frame holds drawn items, never a card, and a call names a canvas or a frame, not both.
 
 Items can also come from any other `.pen` file: `"imports": { "kit": "../../kit.pen" }` at the top of
 the stage file names it (relative to the stage file, inside the deck), and `ref: "kit:<id>"` places a
@@ -304,15 +305,15 @@ choose; the person's panel then shows its kind as it is, and can swap it for one
 
 pen has no arrow type: an arrow is a `path` whose `metadata` says what it joins. Give the ends and
 nothing else — the server draws the line and its head between the facing edges, and **redraws it
-whenever either end moves**, a board included:
+whenever either end moves**, a card included:
 
 ```ts
 await decks.canvas.batch([
-  { op: "insert", node: { type: "path", id: "then", metadata: { type: "decks.arrow", from: "boards/draft.html", to: "boards/final.html" } } },
+  { op: "insert", node: { type: "path", id: "then", metadata: { type: "decks.arrow", from: draft, to: final } } },
 ]);
 ```
 
-`from` and `to` are an item's id, a board's path, or a point on the stage as `[x, y]`: an end
+`from` and `to` are an item's id, a card's path, or a point on the stage as `[x, y]`: an end
 that stops on bare canvas, which the person makes by letting an arrow go there. An end can also
 keep to one side of what it joins — `{ item: "check", side: "right" }`, with `"top"`, `"right"`,
 `"bottom"` or `"left"` — and then leaves the middle of that side, square to it, however things
@@ -335,18 +336,18 @@ drawn on the middle of the line.
 
 ## Look at it
 
-`decks.canvas.screenshot()` takes a picture of your canvas as the person sees it, boards and drawing
+`decks.canvas.screenshot()` takes a picture of your canvas as the person sees it, cards and drawing
 together, and hands it to you in the call's result. Check with it after a big change: text that
-overflows a note, an arrow that crosses a board, a frame that clips what is in it are plain in a
+overflows a note, an arrow that crosses a card, a frame that clips what is in it are plain in a
 picture and invisible in `read()`.
 
-**Point the person's camera at one item** with `decks.view.focus`: an item's id or a board's path,
-and the screen flies to it. Nothing on the canvas changes, and naming an item and a board together
+**Point the person's camera at one item** with `decks.view.focus`: an item's id or a card's path,
+and the screen flies to it. Nothing on the canvas changes, and naming an item and a card together
 frames both. It is the only thing that moves the person's view; nothing else does.
 
 ```ts
 await decks.view.focus("summary");                          // look at this note
-await decks.view.focus(["boards/plan.html", "summary"]);    // the board and the note beside it
+await decks.view.focus([plan, "summary"]);                  // the card and the note beside it
 ```
 
 The person can drag an item **into the composer** to talk about it, and it arrives in their
@@ -355,7 +356,7 @@ message as `@item:<id>` — the id to look up in `read()`.
 ```ts
 await decks.canvas.screenshot();                               // the whole stage
 await decks.canvas.screenshot({ of: "summary" });             // one item, with a margin
-await decks.canvas.screenshot({ of: ["boards/plan.html", "then"] });
+await decks.canvas.screenshot({ of: [plan, "then"] });
 await decks.canvas.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
 await decks.canvas.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
 ```
@@ -375,21 +376,21 @@ near. Leave it as they drew it: move or delete a stroke only when asked.
 
 ## Patterns
 
-- **A note beside a board:** `decks.canvas.insert({ type: "note", content: "…" }, { beside: "boards/plan.html" })`,
-  or, closer than 160 px, read the board's `box` from `decks.canvas.read()` and insert with
+- **A note beside a card:** `decks.canvas.insert({ type: "note", content: "…" }, { beside: plan })`,
+  or, closer than 160 px, read the card's `box` from `decks.canvas.read()` and insert with
   `at: { x1: box.x2 + 40, y1: box.y1 }`.
-- **A titled area behind boards:** a `frame` with `layout: "none"`, a soft `fill`
-  (`"#3b82f614"`), `cornerRadius: 16`, boxed 40 px outside the boards it gathers, and a `text`
+- **A titled area behind cards:** a `frame` with `layout: "none"`, a soft `fill`
+  (`"#3b82f614"`), `cornerRadius: 16`, boxed 40 px outside the cards it gathers, and a `text`
   above its top edge. Insert it at `index: 0` so it paints first.
-- **A flow:** boards left to right with `decks.arrow` paths between them; the arrows follow when
-  a board is moved.
+- **A flow:** cards left to right with `decks.arrow` paths between them; the arrows follow when
+  a card is moved.
 - **A flowchart:** `decks.shape` frames (a Terminator to start, Process boxes, Decision diamonds)
   in a column 60 to 80 apart, joined by arrows whose ends name their sides, with `label`s on the
   arrows out of each decision.
-- **Boards in a row:** a frame with `gap: 80` and no size, then `move` each board's item into it:
+- **Cards in a row:** a frame with `gap: 80` and no size, then `move` each card's item into it:
   the frame lines them up, and keeps them lined up as they grow.
 - **A labelled icon:** a row frame with `alignItems: "center"`, `gap: 8`, an `icon` and a `text`.
 - **A checklist:** a vertical `frame` of `text` items; update each `content` as work lands.
 
-Keep the drawing light: a handful of notes and arrows around the boards, not a second document.
-The finding still goes on a board.
+Keep the drawing light: a handful of notes and arrows around the cards, not a second document.
+The finding still goes on a card.

@@ -9,13 +9,13 @@ A design here is a **top-level frame on the canvas**: a screen, a page, a slide.
 is pen.dev's own items (frames, text, shapes, icons, pictures), so the person can select and move
 any part, pen.dev opens the canvas as it is, and `decks canvas export` turns a frame into a web
 page. Every item type and field, with its values and what Decks does not draw, is in
-[schema.md](schema.md) beside this file; pen-stage covers the canvas calls and boards. This skill is
+[schema.md](schema.md) beside this file; pen-stage covers the canvas calls and cards. This skill is
 about putting them together.
 
-**Drawing, board or app?** Draw a design when the person wants to see it and shape it: a screen,
-a page, a slide, a component, a set of screens side by side. Write an HTML board instead when it
+**Drawing, card or app?** Draw a design when the person wants to see it and shape it: a screen,
+a page, a slide, a component, a set of screens side by side. Write an HTML card instead when it
 has to be clicked through or run: a demo, an interactive mockup, a prototype with states. Build an
-app when it is a tool they will use again. Stay open: a drawn screen can sit beside the board that
+app when it is a tool they will use again. Stay open: a drawn screen can sit beside the card that
 makes it clickable.
 
 ## The loop

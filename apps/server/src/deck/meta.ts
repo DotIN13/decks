@@ -60,7 +60,8 @@ export function readBoardMeta(html: string): BoardMeta {
 			meta.poster = value;
 			continue;
 		}
-		if (name !== "board") continue;
+		// A card says its size in `<meta name="card">`, a board in `<meta name="board">`: the same JSON.
+		if (name !== "board" && name !== "card") continue;
 
 		// `content` is JSON so a board can grow a field without a new meta tag.
 		// Written by hand as often as by an agent, so a broken one is ignored
@@ -154,7 +155,7 @@ function withTagSize(html: string, size: { w?: number; h?: number }, fallback: n
 
 	META.lastIndex = 0;
 	for (let tag = META.exec(html); tag; tag = META.exec(html)) {
-		if (tag[1]?.toLowerCase() !== "board") continue;
+		if (tag[1]?.toLowerCase() !== "board" && tag[1]?.toLowerCase() !== "card") continue;
 		const content = CONTENT.exec(tag[0]);
 		let rest: Record<string, unknown> = {};
 		if (content) {

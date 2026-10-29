@@ -1,12 +1,15 @@
 ---
-name: board-debug
-description: Look at a board with your own eyes — screenshot it, read its console, measure or click things — using Playwright over bash. Use when you have built or changed a board, when something may be clipping or overlapping, or when the user says a board looks wrong.
+name: card-debug
+description: Look at a card with your own eyes — screenshot it, read its console, measure or click things — using Playwright over bash. Use when you have built or changed a card, when something may be clipping or overlapping, or when the user says a card looks wrong.
 ---
 
-# Looking at a board
+# Looking at a card
 
-Boards are HTML, and the app serves them at a URL, so the way to see one is to open
-it in a browser you drive. There is no screenshot tool to call: you have `bash`, and
+A card is HTML, and the app serves each card as a page of its own at a URL (`decks card url <path>`),
+so the way to see one is to open it in a browser you drive. On that page the card's `index.html` is
+the page's body and its module is called with the page itself as `card.root`, so it looks as it
+does on the canvas. `decks canvas screenshot --of <path>` is the other way: the card as the
+person's browser has it now, among nothing else. There is no screenshot tool to call: you have `bash`, and
 that is enough.
 
 ## Once, if the browser is not installed
@@ -26,9 +29,9 @@ trying — `npx playwright install-deps chromium`, as root, is the fix.
 
 ## The loop
 
-The app serves boards at `/api/board/<deck-relative path>`. Wait for
-`window.__boardReady`: the board sets it after fonts, markdown, diagrams and PDFs have
-all finished, and a screenshot taken before it is a picture of a board still loading.
+`decks card url <path>` is the address. Wait for `window.__boardReady`: the page sets it
+after fonts, markdown, maths and diagrams have finished, and a screenshot taken before it is
+a picture of a card still loading.
 
 Two things in the preamble are worth keeping when you adapt this. `createRequire`
 anchored at `DECKS_APP_DIR` is what lets the script resolve `playwright` from wherever
@@ -57,10 +60,10 @@ console.log(notes.join("\n") || "(clean)");
 await browser.close();
 JS
 HOST=${DECKS_HOST:-127.0.0.1}; [ "$HOST" = "0.0.0.0" ] && HOST=127.0.0.1
-node /tmp/shot.mjs "http://$HOST:${DECKS_PORT:-4329}/api/board/boards/plan.html" /tmp/board.png
+node /tmp/shot.mjs "$(decks card url canvases/<canvas>/cards/plan/index.html)" /tmp/card.png
 ```
 
-Then `read /tmp/board.png`. That is the picture, in your context, at full size.
+Then `read /tmp/card.png`. That is the picture, in your context, at full size.
 
 ## What else the page will tell you
 
@@ -76,32 +79,16 @@ await page.evaluate(() => [...document.querySelectorAll("[data-id]")].map((el) =
 }));
 ```
 
-**Did an embed resolve?** An embed that failed has `data-kind="missing"`:
-
-```js
-await page.evaluate(() => [...document.querySelectorAll(".embed")]
-  .map((el) => ({ id: el.dataset.id, kind: el.dataset.kind, embed: el.dataset.embed })));
-```
-
-**Just one component, not the whole board:**
+**Just one block, not the whole card:**
 
 ```js
 await page.locator('[data-id="risk"]').screenshot({ path: "/tmp/risk.png" });
 ```
 
-**Dark as well as light**, since the app hands boards its theme:
+**Dark as well as light**, since the app hands cards its theme:
 
 ```js
 await page.emulateMedia({ colorScheme: "dark" });
-```
-
-## Baking a poster
-
-A board that is slow to mount — many PDF pages, a large diagram — can hand the rail
-a still image instead. Screenshot it, save it into `assets/`, and add the meta tag:
-
-```html
-<meta name="poster" content="assets/plan.png" />
 ```
 
 ## Habits
@@ -111,4 +98,6 @@ a still image instead. Screenshot it, save it into `assets/`, and add the meta t
 - Fix from the source. A screenshot tells you *that* something is wrong and roughly
   where; the HTML tells you why.
 - If `__boardReady` never arrives, the console output in the same run usually says
-  which mount threw.
+  which mount threw. A module that throws is named with its card's file (`index.html.m0.js`).
+- A card that works on its own page and not on the canvas is reaching for `document` or `window`:
+  on the canvas those are the app's page. Use `card.root`.

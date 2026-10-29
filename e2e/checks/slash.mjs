@@ -46,7 +46,7 @@ const commands = [
 	{ name: "compact", hint: "Compress the conversation", arg: "[notes]", source: "runtime" },
 	{ name: "doctor", hint: "Check the install", source: "runtime" },
 	{ name: "review", hint: "Review the branch", source: "skill" },
-	{ name: "board-authoring", hint: "How to write a board", source: "skill" },
+	{ name: "card-authoring", hint: "How to write a card", source: "skill" },
 	...Array.from({ length: 40 }, (_, index) => ({ name: `extra-${index}`, hint: `Filler ${index}`, source: "runtime" })),
 	{ name: "zebra", hint: "Last in the list", source: "prompt" },
 ];

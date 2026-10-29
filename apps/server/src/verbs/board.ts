@@ -1,4 +1,8 @@
-import { canvasFolder, canvasOfPath } from "../deck/layout.ts";
+import { canvasFolder, canvasOfPath, isCardPath } from "../deck/layout.ts";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { cardShell } from "../boards/cards.ts";
+import { slug } from "../agents/slug.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { boardWidth } from "../boards/templates.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
@@ -9,7 +13,7 @@ import type { VerbContext } from "./context.ts";
  * and file addresses. A board file is the deck's, on any number of canvases or none: making one does
  * not place it, which is the canvas's job (`canvas.insert`).
  */
-export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "file"> {
+export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "card" | "frame" | "file"> {
 	const { service, agent, notes, viewport, needPens } = ctx;
 
 	/** Who wrote a board, as a name: an agent's, or "person" for the person's own edit. */
@@ -29,8 +33,20 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 		return { path: board.path, title: board.title, ...(by ? { lastWrittenBy: by } : {}) };
 	};
 
-	return {
-		board: {
+	/** The canvas a new card is made in: the one named, or the caller's own. */
+	const homeOf = (canvas: string | undefined, what: string): string => {
+		let name: string | undefined;
+		try {
+			name = ctx.canvasOf(canvas);
+		} catch (error) {
+			throw new Error(`A ${what} is made in a canvas: name it with { canvas }, as in decks ${what} create '{"title":"…","canvas":"launch-plan"}'. ${(error as Error).message}`);
+		}
+		if (!name) throw new Error(`A ${what} is made in a canvas: name it with { canvas }. decks canvas list names them.`);
+		needPens().mayWrite(name);
+		return name;
+	};
+
+	const board = {
 			list: async () => service.allBoards().map(asBoard),
 			create: async (options: { title: string; w?: number; h?: number; canvas?: string }) => {
 				const title = options?.title?.trim();
@@ -89,7 +105,41 @@ export function boardVerbs(ctx: VerbContext): Pick<Stage, "board" | "frame" | "f
 				needBoard(path);
 				return service.url(path, ctx.port);
 			},
-		},
+	};
+
+	const card = {
+			/** Every card in the deck, placed or not. */
+			list: async () => service.allBoards().filter((one) => isCardPath(one.path)).map(asBoard),
+			/**
+			 * A blank card, `cards/<title>/index.html` in a canvas's own folder: a piece of HTML the stage draws
+			 * in its own page (`card.ts`), with a folder for what it keeps beside it. Placing it is the canvas's job.
+			 */
+			create: async (options: { title: string; w?: number; h?: number; canvas?: string }) => {
+				const title = options?.title?.trim();
+				if (!title) throw new Error("A card needs a title: the finding it states, as a sentence.");
+				const view = viewport();
+				const width = boardWidth(options.w, view?.width);
+				const stageName = homeOf(options?.canvas, "card");
+				const base = slug(title, 48) || "card";
+				let path = `${canvasFolder(stageName)}/cards/${base}/index.html`;
+				for (let n = 2; service.fileBoard(path) || existsSync(join(service.deckPath(), path)); n++) path = `${canvasFolder(stageName)}/cards/${base}-${n}/index.html`;
+				service.writeCard(path, cardShell(title, { w: width, ...(options.h ? { h: options.h } : {}) }));
+				agent.worked?.(path);
+				if (view) notes.push(`viewport ${view.width}×${view.height} px`);
+				notes.push(
+					`card width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. Its folder is ${path.replace(/\/index\.html$/, "/")}: anything it keeps beside it (card.css, chart.js, data.json) goes there. Not placed yet: decks canvas insert --type card --card ${path} --canvas ${stageName} --beside <id> puts it there, then decks canvas fit ${path}.`,
+				);
+				return asBoard(service.fileBoard(path) ?? { path, title });
+			},
+			get: board.get,
+			canvases: board.canvases,
+			url: board.url,
+	};
+
+	return {
+		// Boards are retired: an old name that makes one makes a card instead.
+		board: { ...board, create: card.create },
+		card,
 		frame: {
 			// A frame is made in the caller's canvas's own frames/, so the canvas stands alone (`deck/layout.ts`).
 			create: async (path: string, item?: Record<string, unknown>) => {

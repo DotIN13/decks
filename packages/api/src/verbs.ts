@@ -99,13 +99,13 @@ const outsideChange = { touches: "outside", effect: "change" } as const;
 const AgentPatch = obj({ name: opt(str()), avatar: opt(union(obj({ emoji: str() }), obj({ svg: str() }))), tags: opt(arr(str())), workspace: opt(str()), canvas: opt(str()) });
 
 export const VERBS: readonly Verb[] = [
-	// --- canvas: everything on one canvas, boards included -------------------------------------
+	// --- canvas: everything on one canvas, cards included --------------------------------------
 	{
 		name: "canvas.read",
 		group: "canvas",
 		...deckRead,
 		summary:
-			'Everything on the canvas, boards included, each with its box; an item cut by a frame round it that clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside), as does a text whose words overflow its fixed width and height. A board is { type: "board", board: <path>, box }; every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a board\'s path, or an id inside an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name\'s value in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids "ref/child"; `geometry` adds a path\'s or shape\'s `outline`, an SVG path in its own space (0,0 its top-left corner).',
+			'Everything on the canvas, cards included, each with its box; an item cut by a frame round it that clips says `clipped: "partly"` (some of its box is outside) or `"fully"` (none is inside), as does a text whose words overflow its fixed width and height. A card is { type: "card", card: <path>, box } (an old board, { type: "board", board }); every other item has pen.dev\'s own fields. Read it before placing anything. `frame: "frames/<name>"` reads a frame file instead, its items in its own space; this and the item calls below take `frame` in place of `canvas`, and a change to a frame shows on every canvas placing it. `of` (an id, a board\'s path, or an id inside an instance such as "card-1/label") reads that one item and what is in it; `depth` keeps that many levels of children (0: the items alone), and an item whose children were left out says how many in `childCount`. `resolve` works values out instead of reading them as written, each off by default: `variables` puts each $name\'s value in, for the light theme or `theme` ({ mode: "dark" }); `instances` reads a ref as its expanded copy, overrides applied, its items under `children` with ids "ref/child"; `geometry` adds a path\'s or shape\'s `outline`, an SVG path in its own space (0,0 its top-left corner).',
 		params: [onItems({ of: opt(str()), depth: opt(int()), resolve: opt(obj({ variables: opt(bool()), instances: opt(bool()), geometry: opt(bool()) })), theme: opt(rec(str())) })],
 		result: obj({ canvas: opt(str()), frame: opt(str()), title: opt(str()), file: opt(str()), version: str(), rev: opt(num()), error: opt(str()), variables: opt(rec(true)), themes: opt(rec(true)), items: arr(Item) }),
 	},
@@ -114,7 +114,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a board\'s path) it starts on that item\'s `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. Nothing is placed: give the corner to insert or move as `at`.',
+			'Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside). With `near` (an id or a card\'s path) it starts on that item\'s `side` (right; or below, left, above), tops or lefts aligned as beside and below do, and steps outward past whatever is in the way. Nothing is placed: give the corner to insert or move as `at`.',
 		params: [p("size", obj({ w: num(), h: num() })), onItems({ near: opt(str()), side: opt(lit("right", "below", "left", "above")), margin: opt(num()) })],
 		result: obj({ x1: num(), y1: num() }),
 	},
@@ -123,7 +123,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			'Add an item to the canvas. A board is { type: "board", board: <path>, width? }; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item\'s id or a board\'s path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children too; the answer has every id.',
+			'Add an item to the canvas. A card is { type: "card", card: <its folder or index.html> }, or { type: "card", html, title?, width?, height? } to write one and place it; anything else is a pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or `below` (an item\'s id or a card\'s path) puts it 160 px clear of that item, tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children too; the answer has every id.',
 		params: [p("item", Item), o("options", Place)],
 		result: Item,
 	},
@@ -131,7 +131,7 @@ export const VERBS: readonly Verb[] = [
 		name: "canvas.update",
 		group: "canvas",
 		...deckChange,
-		summary: "Change an item's fields (`set`), its place (`at`) or its size (`size`). A board can be named by its path; its size here is its size on this canvas.",
+		summary: "Change an item's fields (`set`), its place (`at`) or its size (`size`). A card can be named by its path; its size here is its size on this canvas.",
 		params: [p("id", str()), p("change", obj({ set: opt(rec(true)), at: opt(Corner), size: opt(Size) })), onItems()],
 		result: Item,
 	},
@@ -147,7 +147,7 @@ export const VERBS: readonly Verb[] = [
 		name: "canvas.delete",
 		group: "canvas",
 		...deckChange,
-		summary: "Take an item off the canvas. A board's file stays in the deck.",
+		summary: "Take an item off the canvas. A card's folder stays in the deck.",
 		params: [p("id", str()), onItems()],
 		result: obj({ deleted: str() }),
 	},
@@ -189,8 +189,8 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			"Set a board's height from its content, measured at the width it has on this canvas; it must be on it. `notes` say what the browser found: the height, the word count, the smallest type, content wider than the board, boxes that cut off their content, and views that break when a control is pressed. Use it instead of a screenshot.",
-		params: [p("board", str()), onCanvas({ margin: opt(num()) })],
+			"Set a card's height from its content, measured at the width it has on this canvas; it must be on it. `notes` say what the browser found: the height, the word count, the smallest type, content wider than the card, boxes that cut off their content, and views that break when a control is pressed. Use it instead of a screenshot.",
+		params: [p("card", str()), onCanvas({ margin: opt(num()) })],
 		result: Fit,
 	},
 	{
@@ -206,7 +206,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckRead,
 		summary:
-			'A picture of the canvas, or part of it: drawing and boards together, saved to `file`. `of` is an item\'s id, a board\'s path, a list of them, or a box; one board\'s path alone is that board as the person\'s browser has it now, without the drawing round it. A .pen file\'s path pictures that file whole. The picture is the area at one pixel per canvas unit, shrunk until its long side is at most 1,600 px; `scale` multiplies that, so `scale: 2` of a 1,000 px board is 2,000 px wide and of a 7,500 px row is 3,200. `format` "jpeg" or "pdf", and `to` a path in the deck (`exports/plan.png`), make a file to hand on. Drawn natively over each board\'s current picture (`how` "native"), or in the browser with live boards when asked (`live: true`) or when it must be: math, a picture it cannot load, a board not yet pictured, a PDF (`how` "chromium: <why>").',
+			'A picture of the canvas, or part of it: drawing and cards together, saved to `file`. `of` is an item\'s id, a card\'s path, a list of them, or a box; one card\'s path alone is that card as the person\'s browser has it now, without the drawing round it. A .pen file\'s path pictures that file whole. The picture is the area at one pixel per canvas unit, shrunk until its long side is at most 1,600 px; `scale` multiplies that, so `scale: 2` of a 1,000 px card is 2,000 px wide and of a 7,500 px row is 3,200. `format` "jpeg" or "pdf", and `to` a path in the deck (`exports/plan.png`), make a file to hand on. Drawn natively over each card\'s current picture (`how` "native"), or in the browser with live cards when asked (`live: true`) or when it must be: math, a picture it cannot load, a card not yet pictured, a PDF (`how` "chromium: <why>").',
 		params: [onCanvas({ of: opt(union(str(), arr(str()), PartialBox)), scale: opt(num()), format: opt(lit("png", "jpeg", "pdf")), to: opt(str()), scheme: opt(lit("light", "dark")), live: opt(bool()) })],
 		result: Screenshot,
 	},
@@ -236,20 +236,20 @@ export const VERBS: readonly Verb[] = [
 		result: str(),
 	},
 
-	// --- board and deck: files in the deck folder ------------------------------------------------
-	{ name: "board.list", group: "board", ...deckRead, summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
+	// --- cards and the deck: files in the deck folder -------------------------------------------
+	{ name: "card.list", group: "board", ...deckRead, summary: "Every card in the deck, placed or not.", params: [], result: arr(Board) },
 	{
-		name: "board.create",
+		name: "card.create",
 		group: "board",
 		...deckChange,
 		summary:
-			'Write a blank board in a canvas\'s own boards/ (`canvas`, or your own canvas) and return it; placing it is the canvas\'s job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence; the board is one HTML page you design. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.',
+			'Write a blank card in a canvas\'s own cards/ (`canvas`, or your own canvas) and return it: a folder, cards/<title>/, holding its index.html and whatever it keeps beside it (card.css, chart.js, data.json). Placing it is the canvas\'s job (decks.canvas.insert({ type: "card", card: path }, { beside })). The title is the finding, as a sentence; the card is a piece of HTML you design, drawn in the canvas\'s own page.',
 		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
 		result: Board,
 	},
-	{ name: "board.get", group: "board", ...deckRead, summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
-	{ name: "board.canvases", group: "board", ...deckRead, summary: "The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.", params: [p("board", str())], result: arr(Placement) },
-	{ name: "board.url", group: "board", ...deckRead, summary: "The board's address, for a browser such as Playwright.", params: [p("board", str())], result: str() },
+	{ name: "card.get", group: "board", ...deckRead, summary: "A card's path and title (the finding it states), and who last wrote it.", params: [p("card", str())], result: Board },
+	{ name: "card.canvases", group: "board", ...deckRead, summary: "The canvas this card is on, with its place and size there.", params: [p("card", str())], result: arr(Placement) },
+	{ name: "card.url", group: "board", ...deckRead, summary: "The card's address as a page of its own, for a browser such as Playwright.", params: [p("card", str())], result: str() },
 	{ name: "canvas.list", group: "board", ...deckRead, summary: "Every canvas in the deck, and which agents have it open.", params: [], result: arr(Canvas) },
 	{
 		name: "canvas.create",
@@ -264,7 +264,7 @@ export const VERBS: readonly Verb[] = [
 		group: "canvas",
 		...deckChange,
 		summary:
-			'Make your own copy of a canvas a friend shared with you (`canvas`, shared/<owner>/<canvas>): its drawing, boards, frames and files copied into a new canvases/<name>/ of yours, titled "Copy of …" (or `title`). The copy is yours and syncs as your own; it never changes theirs. How a canvas shared with you to view is changed.',
+			'Make your own copy of a canvas a friend shared with you (`canvas`, shared/<owner>/<canvas>): its drawing, cards, frames and files copied into a new canvases/<name>/ of yours, titled "Copy of …" (or `title`). The copy is yours and syncs as your own; it never changes theirs. How a canvas shared with you to view is changed.',
 		params: [onCanvas({ title: opt(str()) })],
 		result: Canvas,
 	},
@@ -276,7 +276,7 @@ export const VERBS: readonly Verb[] = [
 		params: [p("path", str()), o("item", PenItem)],
 		result: obj({ file: str(), ref: opt(str()), id: str() }),
 	},
-	{ name: "file.url", group: "board", ...deckRead, summary: "A file on disk, as the address a board embeds.", params: [p("file", str())], result: str() },
+	{ name: "file.url", group: "board", ...deckRead, summary: "A file on disk, as the address a card embeds.", params: [p("file", str())], result: str() },
 
 	// --- agent: who works --------------------------------------------------------------------
 	{ name: "agent.me", group: "agent", ...agentsRead, summary: "You: name, avatar, colour, workspace, tags and home canvas.", params: [], result: Agent },
@@ -293,11 +293,11 @@ export const VERBS: readonly Verb[] = [
 		name: "here",
 		group: "agent",
 		...agentsRead,
-		summary: "The canvas a call means when it names none: your home canvas for an agent, the board's canvas for a board button, the canvas on screen for the person. Asked, never set.",
+		summary: "The canvas a call means when it names none: your home canvas for an agent, the card's canvas for a card's button, the canvas on screen for the person. Asked, never set.",
 		params: [],
 		result: Canvas,
 	},
-	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these boards carry your work, without showing them: you become their writer.", params: [paths("boards")], result: arr(str()) },
+	{ name: "agent.claim", group: "agent", ...agentsChange, summary: "Say these cards carry your work, without showing them: you become their writer.", params: [paths("boards")], result: arr(str()) },
 	{ name: "agent.inbox", group: "agent", ...agentsRead, summary: "Hand-offs waiting for you from other agents. Changes to a canvas need no watching: they reach you with your next message.", params: [], result: arr(Message) },
 	{
 		name: "agent.list",
@@ -348,7 +348,7 @@ export const VERBS: readonly Verb[] = [
 		name: "view.focus",
 		group: "view",
 		...screenChange,
-		summary: "Move the camera to a board or a drawn item on a canvas (a list frames them all), optionally outlining one data-id block inside a board. `animate: true` glides.",
+		summary: "Move the camera to a card or a drawn item on a canvas (a list frames them all), optionally outlining one data-id block inside a card. `animate: true` glides.",
 		params: [{ ...p("target", union(str(), arr(str()))), variadic: true }, onCanvas({ highlight: opt(str()), animate: opt(bool()) })],
 		result: obj({ canvas: str(), target: union(str(), arr(str())), deferred: opt(str()) }),
 	},
@@ -362,13 +362,13 @@ export const VERBS: readonly Verb[] = [
 		result: Camera,
 	},
 	{ name: "view.viewport", group: "view", ...screenRead, summary: "The room the screen has, in CSS pixels, or null when no screen has said.", params: [], result: union(obj({ width: num(), height: num() }), nul) },
-	{ name: "view.cursor", group: "view", ...screenChange, summary: "A labelled dot on a board, at board coordinates; null removes it.", params: [p("board", str()), p("at", union(Point, nul))] },
+	{ name: "view.cursor", group: "view", ...screenChange, summary: "A labelled dot on a card, at the card's coordinates; null removes it.", params: [p("board", str()), p("at", union(Point, nul))] },
 	{
 		name: "view.reload",
 		group: "view",
 		...screenChange,
 		summary:
-			"Reload the board's page in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.",
+			"Reload the card in every browser and iPad showing it on that canvas; with no `canvas`, on every canvas it is on. For a change the watcher cannot see (a file it fetches, data from outside). No file changes.",
 		params: [p("options", obj({ board: str(), canvas: opt(str()) }))],
 		result: obj({ reloaded: num() }),
 	},
@@ -462,7 +462,7 @@ export const VERBS: readonly Verb[] = [
 		name: "ports",
 		group: "misc",
 		...outsideChange,
-		summary: "Forward a local server so a board can frame it: read with nothing, { open: port, label } to forward one, { close: port } to stop. `node` passes the path on; `rnode` strips it.",
+		summary: "Forward a local server so a card can frame it: read with nothing, { open: port, label } to forward one, { close: port } to stop. `node` passes the path on; `rnode` strips it.",
 		params: [o("change", obj({ open: opt(int()), close: opt(int()), label: opt(str()) }))],
 		result: arr(obj({ port: num(), label: opt(str()), by: opt(str()), at: num(), node: str(), rnode: str() })),
 	},
@@ -493,6 +493,21 @@ export const VERBS: readonly Verb[] = [
  * that call, so a caller learns the new name from using the old.
  */
 export const ALIASES: readonly Verb[] = [
+	// Boards are retired: a new one is a card (`card.*`), and these read a card or an old board alike.
+	{ name: "board.list", group: "board", ...deckRead, alias: "decks.card.list", summary: "Every board file in the deck, placed or not.", params: [], result: arr(Board) },
+	{
+		name: "board.create",
+		group: "board",
+		...deckChange,
+		alias: "decks.card.create",
+		summary:
+			'Old name: now writes a card. Write a blank board in a canvas\'s own boards/ (`canvas`, or your own canvas) and return it; placing it is the canvas\'s job (decks.canvas.insert({ type: "board", board: path }, { beside })). The title is the finding, as a sentence; the board is one HTML page you design. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from anywhere else placed on it is copied in.',
+		params: [p("options", obj({ title: str(), w: opt(num()), h: opt(num()), canvas: opt(str()) }))],
+		result: Board,
+	},
+	{ name: "board.get", group: "board", ...deckRead, alias: "decks.card.get", summary: "A board's path and title (the finding it states), and who last wrote it.", params: [p("board", str())], result: Board },
+	{ name: "board.canvases", group: "board", ...deckRead, alias: "decks.card.canvases", summary: "The canvas this board is on, with its place and size there: a board in a canvas's folder is on that canvas alone. For a board in the library (boards/, on no canvas), the canvases that copied it, each with its copy's path.", params: [p("board", str())], result: arr(Placement) },
+	{ name: "board.url", group: "board", ...deckRead, alias: "decks.card.url", summary: "The board's address, for a browser such as Playwright.", params: [p("board", str())], result: str() },
 	{
 		name: "newBoard",
 		group: "board",

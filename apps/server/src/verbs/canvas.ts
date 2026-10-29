@@ -144,7 +144,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			// A folder of its own, `cards/<title>/index.html`, for what the card keeps beside it.
 			let path = `${canvasFolder(onCanvas)}/cards/${base}/index.html`;
 			for (let n = 2; service.fileBoard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}/index.html`;
-			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["']board["']/i.test(html) ? "" : `<meta name="board" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
+			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["'](?:card|board)["']/i.test(html) ? "" : `<meta name="card" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
 			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
 			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
 		}
