@@ -185,6 +185,164 @@ function asDocument(root: ShadowRoot, body: HTMLElement): Document {
 	});
 }
 
+/*
+ * What `board.js` draws on a board, drawn in a card: `[data-md]` as markdown, maths in it and in a
+ * `.doc`, `[data-mermaid]` as a diagram, and code in `<pre>` coloured. From the same vendored files in
+ * the deck's `lib/`, each loaded once for the page whatever number of cards asks for it.
+ */
+const loaded = new Map<string, Promise<unknown>>();
+function once<T>(key: string, make: () => Promise<T>): Promise<T> {
+	let got = loaded.get(key) as Promise<T> | undefined;
+	if (!got) {
+		got = make();
+		loaded.set(key, got);
+	}
+	return got;
+}
+/** A classic script from `lib/`, put in the page once: the UMD builds set a global. */
+const pageScript = (lib: string, name: string) =>
+	once(`script:${lib}${name}`, () => new Promise<void>((resolve, reject) => {
+		const script = document.createElement("script");
+		script.src = new URL(name, lib).href;
+		script.onload = () => resolve();
+		script.onerror = () => reject(new Error(`${name} did not load`));
+		document.head.append(script);
+	}));
+const pageModule = <T>(lib: string, name: string) => once(`module:${lib}${name}`, () => import(/* @vite-ignore */ new URL(name, lib).href) as Promise<T>);
+/** A stylesheet in the root, where its rules apply, and in the page, where its fonts do: a shadow root's `@font-face` is not used. */
+function rootStyle(root: ShadowRoot, lib: string, name: string): void {
+	const href = new URL(name, lib).href;
+	void once(`style:${href}`, async () => {
+		const link = document.createElement("link");
+		link.rel = "stylesheet";
+		link.href = href;
+		document.head.append(link);
+	});
+	if (root.querySelector(`link[href="${href}"]`)) return;
+	const link = document.createElement("link");
+	link.rel = "stylesheet";
+	link.href = href;
+	root.prepend(link);
+}
+
+function dedent(text: string): string {
+	const lines = text.replace(/\t/g, "  ").split("\n");
+	const indents = lines.filter((line) => line.trim()).map((line) => line.match(/^ */)![0].length);
+	const common = indents.length ? Math.min(...indents) : 0;
+	return lines.map((line) => line.slice(common)).join("\n").trim();
+}
+
+async function cardMath(root: ShadowRoot, target: Element, lib: string): Promise<void> {
+	if (!/\$|\\\(|\\\[/.test(target.textContent ?? "")) return;
+	rootStyle(root, lib, "katex.min.css");
+	await pageScript(lib, "katex.min.js");
+	await pageScript(lib, "katex-auto-render.min.js");
+	const render = (window as unknown as { renderMathInElement?: (el: Element, options: unknown) => void }).renderMathInElement;
+	render?.(target, {
+		delimiters: [
+			{ left: "$$", right: "$$", display: true },
+			{ left: "$", right: "$", display: false },
+			{ left: "\\(", right: "\\)", display: false },
+			{ left: "\\[", right: "\\]", display: true },
+		],
+		throwOnError: false,
+	});
+}
+
+async function cardCode(target: Element, lib: string): Promise<void> {
+	const blocks = [...target.querySelectorAll("pre")].map((pre) => (pre.firstElementChild?.tagName === "CODE" ? pre.firstElementChild : pre)).filter((el) => !el.classList.contains("hljs") && (el.textContent ?? "").length < 65536);
+	if (!blocks.length) return;
+	const module = await pageModule<{ default?: unknown }>(lib, "hljs.bundle.mjs");
+	const hljs = (module.default ?? module) as { getLanguage(name: string): unknown; highlight(code: string, o: { language: string; ignoreIllegals: boolean }): { value: string }; highlightAuto(code: string): { value: string; language?: string } };
+	for (const element of blocks) {
+		const named = [...element.classList, ...(element.parentElement?.classList ?? [])].map((c) => /^(?:language|lang)-(.+)$/.exec(c)?.[1]).find(Boolean) ?? element.getAttribute("data-lang") ?? undefined;
+		if (!named || !hljs.getLanguage(named)) continue;
+		element.innerHTML = hljs.highlight(element.textContent ?? "", { language: named, ignoreIllegals: true }).value;
+		element.classList.add("hljs", `language-${named}`);
+	}
+}
+
+async function cardMermaid(host: HTMLElement, target: HTMLElement, lib: string, source: string): Promise<void> {
+	type Mermaid = { initialize(o: unknown): void; render(id: string, text: string): Promise<{ svg: string }> };
+	const mermaid = await once(`mermaid:${lib}`, async () => {
+		const module = await pageModule<{ default?: Mermaid }>(lib, "mermaid.bundle.mjs");
+		return (module.default ?? module) as Mermaid;
+	});
+	const token = (name: string, fallback: string) => getComputedStyle(host).getPropertyValue(name).trim() || fallback;
+	const dark = host.dataset.theme === "dark";
+	/*
+	 * Mermaid sizes each box by measuring its words in the page, and the card's face is declared there
+	 * only as the card arrives (`cardSheet`): measured in a fallback face and drawn in the real one, the
+	 * words outran their boxes. So the face is loaded first.
+	 */
+	const family = getComputedStyle(target).fontFamily;
+	try {
+		await Promise.race([document.fonts.load(`14px ${family}`), new Promise((done) => setTimeout(done, 1500))]);
+	} catch {
+		/* drawn in what there is */
+	}
+	// Each diagram in its card's own colours: initialised again before each, as a card may be light or dark.
+	mermaid.initialize({
+		startOnLoad: false,
+		theme: "base",
+		securityLevel: "strict",
+		/*
+		 * Words as SVG text, not HTML: mermaid measures an HTML label in the page and then draws it in the
+		 * card, where the card's own paragraph and size rules restyle it, and the words overran their boxes.
+		 */
+		htmlLabels: false,
+		flowchart: { htmlLabels: false },
+		fontFamily: family,
+		themeVariables: {
+			background: token("--b-bg", dark ? "#161616" : "#ffffff"),
+			primaryColor: token("--b-accent-soft", dark ? "#1e2a52" : "#d7e2fc"),
+			primaryBorderColor: token("--b-accent", "#3b5cf6"),
+			primaryTextColor: token("--b-fg", dark ? "#fafafa" : "#161616"),
+			lineColor: token("--b-border-strong", dark ? "#666" : "#999"),
+			textColor: token("--b-fg", dark ? "#fafafa" : "#161616"),
+			tertiaryColor: token("--b-bg-layer", dark ? "#242424" : "#f2f2f2"),
+			tertiaryTextColor: token("--b-muted", dark ? "#aeaeae" : "#5c5c5c"),
+			edgeLabelBackground: token("--b-bg", dark ? "#161616" : "#ffffff"),
+			fontSize: "14px",
+		},
+	});
+	const { svg } = await mermaid.render(`card-mermaid-${Math.random().toString(36).slice(2, 10)}`, dedent(source));
+	target.innerHTML = svg;
+	const drawn = target.querySelector("svg");
+	if (drawn) {
+		drawn.removeAttribute("width");
+		drawn.removeAttribute("height");
+		drawn.style.maxWidth = "100%";
+		drawn.style.maxHeight = "100%";
+		drawn.setAttribute("preserveAspectRatio", "xMidYMid meet");
+	}
+}
+
+/** Draw a card's markdown, maths, diagrams and code, as `board.js` draws a board's. Never throws: a part that fails says so in place. */
+async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement, lib: string): Promise<void> {
+	const work: Promise<unknown>[] = [];
+	for (const element of body.querySelectorAll<HTMLElement>("[data-md], [data-mermaid]")) {
+		const source = element.textContent ?? "";
+		const diagram = element.dataset.mermaid !== undefined;
+		work.push(
+			(async () => {
+				if (diagram) return cardMermaid(host, element, lib, source);
+				await pageScript(lib, "marked.umd.js");
+				const marked = (window as unknown as { marked: { parse(text: string, o: unknown): string } }).marked;
+				element.innerHTML = marked.parse(dedent(source.replace(/^---\n[\s\S]*?\n---\n/, "")), { gfm: true, breaks: false });
+				await cardMath(root, element, lib);
+				await cardCode(element, lib);
+			})().catch((error) => {
+				if (diagram) element.textContent = `mermaid: ${error instanceof Error ? error.message : String(error)}`;
+				console.warn(`card ${diagram ? "mermaid" : "markdown"}:`, error);
+			}),
+		);
+	}
+	for (const doc of body.querySelectorAll(".doc")) work.push(cardMath(root, doc, lib).catch((error) => console.warn("card maths:", error)));
+	await Promise.allSettled(work);
+	await cardCode(body, lib).catch((error) => console.warn("card code:", error));
+}
+
 const registryPerRoot = (() => {
 	try {
 		const Registry = (globalThis as { CustomElementRegistry?: new () => CustomElementRegistry }).CustomElementRegistry;
@@ -247,11 +405,14 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		on: (what, listener) => void listeners[what].add(listener),
 	};
 	const cleanups: Array<() => void> = [];
+	// Its markdown, maths, diagrams and code drawn, after board.css so a diagram takes the card's colours.
+	const partsDrawn = sheetReady.then(() => drawParts(host, root, body, lib));
 	if (source.trusted && scripts.length) {
 		const base = source.url.replace(/[?#].*$/, "");
 		void (async () => {
-			// After board.css, so a script that measures its card measures it styled.
+			// After board.css and the parts it draws, so a script that measures its card measures it as it shows.
 			await sheetReady;
+			await partsDrawn;
 			for (const script of scripts) {
 				if (controller.signal.aborted) return;
 				const address = script.src ?? `${base}.m${script.n}.js`;
