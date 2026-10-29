@@ -216,3 +216,23 @@ test("the frame says a card on its canvas was read and how it measured, and gets
 		cleanup();
 	}
 });
+
+test("a document or an app item is placed by the person, not the frame, and the frame opens only the files document items name", async () => {
+	const { app, one, post, bearer, sandboxed, cleanup } = await open();
+	try {
+		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const doc = { type: "browser", id: "paper", width: 800, height: 600, metadata: { type: "decks.document", path: "notes.md" } };
+		assert.equal((await post("/api/v1/canvas.insert", frame, { args: [doc, { at: { x1: 0, y1: 0 } }] })).status, 403, "the frame may not place one");
+		assert.equal((await post("/api/v1/canvas.batch", frame, { args: [[{ op: "insert", item: { ...doc, id: "p2", metadata: { type: "decks.app", name: "terminal" } }, at: { x1: 0, y1: 0 } }]] })).status, 403, "nor an app, in a batch");
+		assert.equal((await post("/api/v1/canvas.insert", person, { args: [doc, { canvas: one, at: { x1: 0, y1: 0 } }] })).status, 200, "the person may");
+		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { set: { metadata: { type: "decks.document", path: "secret.md" } } }] })).status, 403, "the frame may not point it elsewhere");
+		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { at: { x1: 40, y1: 40 } }] })).status, 200, "but may move it");
+		assert.deepEqual([...app.documentsOn(one)].includes("notes.md"), true);
+		assert.equal((await post("/api/v1/doc", frame, { frame: "f1", message: { type: "doc.open", path: "deck.json" } })).status, 403, "a file no document item names");
+		assert.equal((await post("/api/v1/doc", frame, { frame: "f1", message: { type: "doc.open", path: "notes.md" } })).status, 200, "the one it names");
+		assert.equal((await post("/api/v1/doc", person, { frame: "f1", message: { type: "doc.open", path: "notes.md" } })).status, 403, "a tab sends documents on its socket");
+	} finally {
+		cleanup();
+	}
+});

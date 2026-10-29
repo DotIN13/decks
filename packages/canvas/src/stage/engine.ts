@@ -1950,7 +1950,7 @@ export class StageEngine {
 		const near = reach ? this.index().search(reach).map((at) => list[at]!) : list;
 		for (const placed of near) {
 			const { node, box } = placed;
-			if (node.type === "group" || isShape(node) || (node.type === "browser" && (node.metadata?.type === "decks.board" || node.metadata?.type === "decks.card"))) continue;
+			if (node.type === "group" || isShape(node) || (node.type === "browser" && ["decks.board", "decks.card", "decks.document", "decks.app"].includes(String(node.metadata?.type)))) continue;
 			let top = placed;
 			while (top.parent) top = this.placed.get(top.parent) ?? top;
 			if (top.parent) continue;

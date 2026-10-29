@@ -7,6 +7,7 @@ import { onFrameMessage } from "./frame-messages.ts";
 import { scheme } from "./lib/theme.ts";
 import { pointFromBoard, type FrameAt } from "./camera/coords.ts";
 import { CardSurface } from "./card-surface.tsx";
+import { AppSurface, DocumentSurface } from "./item-surfaces.tsx";
 
 const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 /** The band along a live board's edge that moves it, in screen pixels outside the border and inside it (as `BoardFrame`). */
@@ -502,7 +503,30 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						}}
 					/>
 				</Show>
-				<Show when={live() && !props.board.card}>
+				{/* A document or an app item: no page of its own, drawn here (`item-surfaces.tsx`). */}
+				<Show when={live() && props.board.item === "document"}>
+					<DocumentSurface
+						file={props.board.file ?? ""}
+						selected={props.selected}
+						onSelect={() => props.view.select()}
+						ref={() => {
+							setLoaded(true);
+							setGuest(true);
+						}}
+					/>
+				</Show>
+				<Show when={live() && props.board.item === "app"}>
+					<AppSurface
+						app={props.board.app ?? ""}
+						selected={props.selected}
+						onSelect={() => props.view.select()}
+						ref={() => {
+							setLoaded(true);
+							setGuest(true);
+						}}
+					/>
+				</Show>
+				<Show when={live() && !props.board.card && !props.board.item}>
 					<iframe
 						ref={(element) => {
 							frame = element;

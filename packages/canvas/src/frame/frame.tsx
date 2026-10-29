@@ -16,6 +16,7 @@ import { runStageCall } from "../stage-ops.ts";
 import type { ViewOffer } from "./chrome.ts";
 import { AgentCursor } from "../AgentCursor.tsx";
 import { isNews } from "../board-news.ts";
+import { boardsOf } from "../drawing.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
@@ -54,7 +55,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	 */
 	const studio = start.backend.kind === "studio" ? createStudioLine(start.backend.api, start.canvas.name, start.backend.token) : undefined;
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
+	let currentToken = start.backend.token;
+	const backendToken = () => currentToken;
 	end.on("token", (data) => {
+		currentToken = data.token;
 		backend.setToken(data.token);
 		studio?.setToken(data.token);
 	});
@@ -77,6 +81,15 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
 	let touched = 0;
 	for (const type of ["pointerdown", "wheel", "keydown"]) addEventListener(type, () => (touched = performance.now()), { capture: true, passive: true });
+	/** The document and app items on the drawing, placed as cards are (`drawing.ts`). */
+	let made: Editor | undefined;
+	const items = () => {
+		revision();
+		const doc = made?.handle.drawn();
+		return doc ? boardsOf(doc).filter((one) => one.item).map((one) => ({ ...one, inContext: [], trust: "own" as const })) : [];
+	};
+	/** Every place the stage draws a page in: the cards and boards, and the document and app items. */
+	const places = () => [...pages(), ...items()];
 	const changed = () => {
 		setRevision((n) => n + 1);
 		queueMicrotask(placeCards);
@@ -87,7 +100,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	 */
 	let cardsReading = false;
 	function placeCards(): void {
-		const doc = editor?.handle.drawn();
+		const doc = made?.handle.drawn();
 		if (!doc) return;
 		const placed = placements(doc, { theme: baseTheme(doc, "light") });
 		const boxes = new Map<string, { x: number; y: number; w: number; h: number }>();
@@ -198,8 +211,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 		} }),
 		boards: {
-			list: () => pages() as Board[],
+			list: () => places() as Board[],
 			page: (path) => {
+				// A document or an app item has no page to load: it is drawn in place, and only needs saying it may be.
+				if (path.startsWith("item:")) return path;
 				const page = pages().find((one) => one.path === path);
 				return page ? `${address(path)}?rev=${page.rev}` : undefined;
 			},
@@ -260,6 +275,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		},
 	});
 	const { handle } = editor;
+	made = editor;
+	changed();
 	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
 	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
 	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => news();
@@ -286,6 +303,42 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		const view = { width: innerWidth, height: innerHeight };
 		handle.glide(fitInto(boxes, view, canvasBox(view)), 400);
 	};
+	/*
+	 * A document item's editor, on this frame's line (`item-surfaces.tsx`): what it sends goes to the harness,
+	 * which answers only for files a document item on this canvas names, down this frame's own stream.
+	 */
+	const docListeners = new Set<(message: unknown) => void>();
+	const hearDoc = (message: unknown) => {
+		for (const listener of docListeners) listener(message);
+	};
+	setCanvasHost({
+		...(studio
+			? {}
+			: {
+					documents: {
+						send: (message: unknown) => void backend.post("doc", { frame: backend.frame, message }).then((answer) => answer.ok === false && console.warn(answer.error)),
+						listen: (listener: (message: unknown) => void) => {
+							docListeners.add(listener);
+							return () => docListeners.delete(listener);
+						},
+						// The canvas's own `lib/`, beside its cards, as a card reads it.
+						lib: address(inFolder("lib/")),
+					},
+				}),
+		// An app opens in a tab, which the page opens, outside this sandbox; the frame only asks what it is.
+		apps: {
+			status: async (name: string) => {
+				if (studio) return undefined;
+				try {
+					const response = await fetch(`${start.backend.api.replace(/\/+$/, "")}/apps/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${backendToken()}` } });
+					return response.ok ? ((await response.json()) as { title?: string; status?: string }) : undefined;
+				} catch {
+					return undefined;
+				}
+			},
+			open: (name: string) => end.emit("open-app", { name }),
+		},
+	});
 	// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
 	setCanvasHost({
 		cardCall: cardCalls({
@@ -384,6 +437,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		);
 	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
+		if (message.type.startsWith("doc.")) return hearDoc(message);
 		// A card's file changed: its record taken, its place kept, as the drawing says it.
 		if (message.type === "board.changed") {
 			if (message.removed || !message.board) return;

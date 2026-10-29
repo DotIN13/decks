@@ -1447,7 +1447,7 @@ export function App() {
 						 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
 						 * same options and state, its files read on a ticket for the canvas on screen.
 						 */
-						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, dock: dockCover, upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])), viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
+						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, dock: dockCover, openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"), upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])), viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
 						const editor = make({
 							text: "",
 							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.

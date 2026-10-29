@@ -77,6 +77,15 @@ export interface Board {
 	 * instead of a frame (`card.ts`). Every other rule of a board holds for it.
 	 */
 	card?: true;
+	/**
+	 * An item of the drawing with no file of its own, drawn in a board's place: a document (`decks.document`,
+	 * the file it edits in `file`) or an app (`decks.app`, its name in `app`). Its `path` is its item's.
+	 */
+	item?: "document" | "app";
+	/** A document item's file, as the deck names it. */
+	file?: string;
+	/** An app item's app, by name. */
+	app?: string;
 	x: number;
 	y: number;
 	w: number;

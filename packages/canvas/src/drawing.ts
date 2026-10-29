@@ -79,11 +79,24 @@ export interface DrawingOptions {
  */
 export const PENDING_MS = 6000;
 
-/** A board's tag, or a card's: a card is a board drawn in a shadow root of the stage's page (`card.ts`). */
-const PAGE_TAGS = new Set(["decks.board", "decks.card"]);
+/**
+ * A board's tag, or a card's: a card is a board drawn in a shadow root of the stage's page (`card.ts`);
+ * or a document's or an app's, items with no file of their own that the stage places as it places a board.
+ */
+export const PAGE_TAGS = new Set(["decks.board", "decks.card", "decks.document", "decks.app"]);
+/** A document or an app item: what it is, or nothing for a board or a card. */
+export const itemKind = (node: PenNode): "document" | "app" | undefined => {
+	const type = (node.metadata as { type?: string } | undefined)?.type;
+	return type === "decks.document" ? "document" : type === "decks.app" ? "app" : undefined;
+};
 export const isBoard = (node: PenNode) => node.type === "browser" && PAGE_TAGS.has(String((node.metadata as { type?: string } | undefined)?.type));
 export const isCardItem = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.card";
-export const boardPath = (node: PenNode) => String((node.metadata as { path?: unknown }).path ?? node.id);
+export const boardPath = (node: PenNode) => {
+	const kind = itemKind(node);
+	// An item is its own: its path is its id, so two of one file or app are two places.
+	if (kind) return `item:${String(node.id)}`;
+	return String((node.metadata as { path?: unknown }).path ?? node.id);
+};
 const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 
 /** The drawing's boards, as the stage takes them. Top-level only: a board's x and y are the canvas's. */
@@ -101,6 +114,7 @@ export function boardsOf(doc: PenDocument): Board[] {
 			rev: 0,
 			inContext: [],
 			...(isCardItem(node) ? { card: true as const } : {}),
+			...itemFields(node),
 		});
 	}
 	return boards;
@@ -559,4 +573,13 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			if (id) edit([{ op: "update", id, set: { width: Math.round(size.w), height: Math.round(size.h) } }]);
 		},
 	};
+}
+
+/** What a document or an app item adds to its board record: its kind, and its file or its app. */
+export function itemFields(node: PenNode): { item?: "document" | "app"; file?: string; app?: string } {
+	const kind = itemKind(node);
+	const meta = (node.metadata ?? {}) as { path?: unknown; name?: unknown };
+	if (kind === "document") return { item: "document", file: String(meta.path ?? "") };
+	if (kind === "app") return { item: "app", app: String(meta.name ?? "") };
+	return {};
 }

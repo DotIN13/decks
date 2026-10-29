@@ -30,6 +30,8 @@ export interface FrameHostOptions {
 	ink?(ink: NonNullable<ComposerPart["ink"]>): void;
 	/** Open one of the app's panels. */
 	panel?(name: "apps"): void;
+	/** Open an app in a tab of its own (`decks.app`), outside the canvas's sandbox. */
+	openApp?(name: string): void;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */
 	dock?(): number;
 	/** Each agent's name and colour, for what is new on the canvas. */
@@ -163,6 +165,7 @@ export function createFramedEditor(options: Options): Editor {
 			if (data.ink) options.frame.ink?.(data.ink);
 		});
 		page.on("panel", (data) => options.frame.panel?.(data.name));
+		page.on("open-app", (data) => options.frame.openApp?.(data.name));
 		page.on("camera", (data) => {
 			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera);
 			fromFrame.camera = data.camera;

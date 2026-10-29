@@ -962,6 +962,41 @@ export class App {
 	private readonly listeners = new Set<(message: ServerMessage) => void>();
 
 	/** Hear every broadcast, as it goes to the browsers; the answer stops it. */
+	/** Say something to the streams alone (`/api/v1/events`), not the sockets: a canvas frame's own answers. */
+	tellStreams(message: ServerMessage): void {
+		for (const listener of this.listeners) listener(message);
+	}
+
+	/**
+	 * The files the document items on a canvas name (`decks.document`), each as the deck names it and as
+	 * the document service keys it: the only files a canvas frame may open (`verbs/router.ts`).
+	 */
+	documentsOn(canvas: string): Set<string> {
+		const out = new Set<string>();
+		let doc: { children?: unknown[] } | undefined;
+		try {
+			doc = this.pens.get(canvas).doc as { children?: unknown[] };
+		} catch {
+			return out;
+		}
+		const walk = (nodes: unknown[] | undefined) => {
+			for (const node of nodes ?? []) {
+				const item = node as { type?: string; metadata?: { type?: string; path?: unknown }; children?: unknown[] };
+				if (item.type === "browser" && item.metadata?.type === "decks.document" && typeof item.metadata.path === "string" && item.metadata.path) {
+					out.add(item.metadata.path);
+					try {
+						out.add(resolveDoc(this.deck.roots, item.metadata.path).key);
+					} catch {
+						/* a file that does not resolve opens nothing */
+					}
+				}
+				walk(item.children);
+			}
+		};
+		walk(doc?.children);
+		return out;
+	}
+
 	listen(listener: (message: ServerMessage) => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);

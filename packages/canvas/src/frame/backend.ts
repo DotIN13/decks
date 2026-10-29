@@ -13,6 +13,8 @@ export interface Backend {
 	follow(hear: (message: Heard) => void): () => void;
 	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
 	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	/** This frame's name on its stream (`/api/v1/doc` answers to it). */
+	frame: string;
 	/** One of the harness's own routes beside the verbs (`/api/v1/board-seen`, `board-extent`, `board-token`), answering its JSON. */
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
@@ -28,14 +30,18 @@ export type Heard =
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; sized?: true }
 	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
 	| { type: "stage.call"; call: StageCall }
+	/** About a document on this canvas: for its editor (`item-surfaces.tsx`). */
+	| { type: `doc.${string}`; path?: string; [key: string]: unknown }
 	/** The stream is back after a drop: what was missed is read again. */
 	| { type: "reconnected" };
 
-const TYPES = ["stage.pen", "stage.pen.delta", "board.changed", "stage.call"];
+const TYPES = ["stage.pen", "stage.pen.delta", "board.changed", "stage.call", "doc.state", "doc.patched", "doc.changed", "doc.versions", "doc.version", "doc.compiled", "doc.repo", "doc.gdoc", "doc.gcomments", "doc.remote"];
 
 /** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {
 	let token = firstToken;
+	/** This frame's name on its stream: what the harness says to it alone (a document's answers) carries it. */
+	const frame = `f${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 	const base = api.replace(/\/+$/, "");
 	const headers = (more: Record<string, string> = {}) => ({ authorization: `Bearer ${token}`, ...more });
 
@@ -54,7 +60,7 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 				while (!stopped) {
 					controller = new AbortController();
 					try {
-						const response = await fetch(`${base}/v1/events?types=${TYPES.join(",")}`, { headers: headers(), signal: controller.signal, cache: "no-store" });
+						const response = await fetch(`${base}/v1/events?types=${TYPES.join(",")}&frame=${frame}`, { headers: headers(), signal: controller.signal, cache: "no-store" });
 						if (!response.ok || !response.body) throw new Error(String(response.status));
 						if (again) hear({ type: "reconnected" });
 						again = true;
@@ -88,6 +94,8 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 				return { ok: false, error: error instanceof Error ? error.message : String(error) };
 			}
 		},
+
+		frame,
 
 		async post(route, body) {
 			try {

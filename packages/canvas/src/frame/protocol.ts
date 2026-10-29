@@ -110,6 +110,8 @@ export interface ComposerPart {
 /** What the frame sends the page. */
 export interface FrameToPage {
 	composer: ComposerPart;
+	/** Open an app in a tab of its own: the page's, outside the canvas's sandbox (`decks.app`). */
+	"open-app": { name: string };
 	/** Open one of the app's own panels, beside the canvas (the apps list). */
 	panel: { name: "apps" };
 	started: Record<string, never>;

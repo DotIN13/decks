@@ -32,7 +32,8 @@
 		"marked": "^15.0.12",
 		"mathjax-full": "^3.2.2",
 		"solid-js": "^1.9.14",
-		"@decks/hub": "*"
+		"@decks/hub": "*",
+		"@decks/docs": "*"
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.1.11",

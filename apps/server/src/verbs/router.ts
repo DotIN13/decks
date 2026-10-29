@@ -51,12 +51,20 @@ export function verbRoutes(app: App): express.Router {
 	 */
 	router.get("/events", (req: Request, res: Response) => {
 		const wanted = new Set(String(req.query.types ?? "").split(",").map((one) => one.trim()).filter(Boolean));
-		// A canvas frame hears its own canvas and nothing else (`onCanvas`).
+		// A canvas frame hears its own canvas and nothing else (`onCanvas`), and what was said to it alone (`frame`).
 		const own = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
+		const frameId = typeof req.query.frame === "string" ? req.query.frame : undefined;
 		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
 		res.write(": decks events\n\n");
 		if (own !== undefined) app.canvasFrames += 1;
 		const stop = app.listen((message) => {
+			const to = (message as { frameTo?: string }).frameTo;
+			if (to !== undefined) {
+				if (own === undefined || to !== frameId) return;
+				const { frameTo: _to, ...rest } = message as { frameTo?: string };
+				res.write(`event: ${message.type}\ndata: ${JSON.stringify(rest)}\n\n`);
+				return;
+			}
 			if (wanted.size && !wanted.has(message.type)) return;
 			if (own !== undefined && !onCanvas(app, message, own)) return;
 			res.write(`event: ${message.type}\ndata: ${JSON.stringify(message)}\n\n`);
@@ -107,6 +115,31 @@ export function verbRoutes(app: App): express.Router {
 		res.status(403).json({ ok: false, error: `${path} is not on this canvas.` });
 		return undefined;
 	};
+	/**
+	 * A document item's editor, in the canvas frame (`decks.document`): what it sends, for a file a
+	 * document item on the frame's canvas names, and nothing else. The answers go down the frame's own
+	 * stream (`frame` in its address), since some come later, as a compile does.
+	 */
+	router.post("/doc", (req: Request, res: Response) => {
+		if (req.principal?.kind !== "canvas") {
+			res.status(403).json({ ok: false, error: "A document item's calls are the canvas frame's; a tab sends them on its socket." });
+			return;
+		}
+		const body = (req.body ?? {}) as { frame?: unknown; message?: { type?: unknown; path?: unknown } };
+		const message = body.message;
+		const frame = typeof body.frame === "string" ? body.frame : "";
+		if (!message || typeof message.type !== "string" || !DOC_CALLS.has(message.type) || typeof message.path !== "string" || !frame) {
+			res.status(400).json({ ok: false, error: "Send { frame, message }, a document message for a file on this canvas." });
+			return;
+		}
+		if (!app.documentsOn(req.principal.canvas).has(message.path)) {
+			res.status(403).json({ ok: false, error: `${message.path} is not a document on this canvas.` });
+			return;
+		}
+		app.docs.handle(message as never, (answer) => app.tellStreams({ ...answer, frameTo: frame } as never));
+		res.json({ ok: true });
+	});
+
 	router.post("/board-seen", (req: Request, res: Response) => {
 		const path = onItsCanvas(req, res);
 		if (!path) return;
@@ -273,10 +306,51 @@ export const CANVAS_FRAME_VERBS = new Set([
 	"card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url", "here", "now",
 ]);
 
+/** What a document item's editor may send (`@decks/docs`'s `DocClientMessage`). */
+const DOC_CALLS = new Set(["doc.open", "doc.close", "doc.patch", "doc.review", "doc.versions", "doc.version", "doc.compile", "doc.restore", "doc.git", "doc.gstyle", "doc.gcomment"]);
+
+/** The items only the person and agents place: a document names a file to open, an app a server to reach. */
+const TRUSTED_ITEMS = ["decks.document", "decks.app"];
+/** What of a trusted item the canvas frame may still change: where it is and how big. */
+const PLACE_ONLY = new Set(["x", "y", "width", "height"]);
+
+/**
+ * Whether a canvas frame's call would make a document or an app item, or change what one names: a
+ * card's script beside the frame could otherwise name any file to read, or a server to drive. Placing,
+ * sizing and deleting one stays the frame's.
+ */
+function touchesTrustedItems(app: Pick<App, "stage">, verb: string, args: readonly unknown[], canvas: string): boolean {
+	if (!["canvas.insert", "canvas.replace", "canvas.update", "canvas.batch", "canvas.copy"].includes(verb)) return false;
+	if (TRUSTED_ITEMS.some((tag) => JSON.stringify(args).includes(tag))) return true;
+	const trusted = new Set<string>();
+	try {
+		const walk = (nodes: unknown[] | undefined) => {
+			for (const node of nodes ?? []) {
+				const item = node as { id?: string; type?: string; metadata?: { type?: string }; children?: unknown[] };
+				if (item.id && item.type === "browser" && TRUSTED_ITEMS.includes(item.metadata?.type ?? "")) trusted.add(item.id);
+				walk(item.children);
+			}
+		};
+		walk((app.stage.pens?.get(canvas).doc as { children?: unknown[] } | undefined)?.children);
+	} catch {
+		return false;
+	}
+	if (!trusted.size) return false;
+	const ops: Array<{ op?: string; id?: string; set?: Record<string, unknown> }> =
+		verb === "canvas.batch" ? ((args[0] as typeof ops | undefined) ?? []) : verb === "canvas.update" ? [{ op: "update", id: String(args[0]), set: (args[1] as { set?: Record<string, unknown> } | undefined)?.set ?? {} }] : verb === "canvas.replace" ? [{ op: "replace", id: String(args[0]) }] : [];
+	return ops.some((op) => {
+		if (!op.id || !trusted.has(op.id)) return false;
+		if (op.op === "replace") return true;
+		if (op.op === "update") return Object.keys(op.set ?? {}).some((key) => !PLACE_ONLY.has(key));
+		return false;
+	});
+}
+
 /** Why a canvas frame may not make this call, or undefined when it may. */
 export function refusedForCanvas(app: Pick<App, "stage">, verb: string, args: readonly unknown[], canvas: string, role: "edit" | "view"): string | undefined {
 	if (!CANVAS_FRAME_VERBS.has(verb)) return `${verb} is not the canvas frame's to call: it reaches past this canvas.`;
 	if (role === "view" && VERB_BY_NAME.get(verb)?.effect !== "read") return `${canvas} was shared with you to view, so ${verb} is not yours to call on it.`;
+	if (touchesTrustedItems(app, verb, args, canvas)) return "A document or an app item is placed by the person or an agent: the canvas frame may move, size or delete one, not make one or change what it names.";
 	const pens = app.stage.pens;
 	for (const arg of args) {
 		const asked = arg && typeof arg === "object" && !Array.isArray(arg) ? (arg as { canvas?: unknown }).canvas : undefined;
@@ -301,11 +375,16 @@ function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }
  * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
  * cards and boards (`board.changed` for one on it), and what is said to it alone.
  */
-export function onCanvas(app: Pick<App, "stage" | "agents">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
+export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
 	/*
 	 * An agent's `decks view …` that moves or marks this canvas: the frame showing it answers. Showing
 	 * another canvas, and a board's picture, stay the page's.
 	 */
+	// A document's messages, for a file a document item on this canvas names.
+	if (message.type.startsWith("doc.")) {
+		const path = (message as { path?: unknown }).path;
+		return typeof path === "string" && app.documentsOn(canvas).has(path);
+	}
 	if (message.type === "stage.call") {
 		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
 		if (!call || !["show", "camera", "reload", "cursor"].includes(call.op ?? "")) return false;

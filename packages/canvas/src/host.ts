@@ -32,6 +32,23 @@ export interface CanvasHost {
 	 * where a card may not reach. Absent: cards make no calls.
 	 */
 	cardCall?(verb: string, args: unknown[], card: string): Promise<unknown>;
+	/**
+	 * A document item's line to its file (`decks.document`, `item-surfaces.tsx`): what its editor sends,
+	 * and every message about the files this canvas's documents name. Absent: documents do not open here.
+	 */
+	documents?: {
+		send(message: unknown): void;
+		listen(listener: (message: unknown) => void): () => void;
+		/** A file's bytes, for a Word page or a picture in a document. */
+		file?(path: string): Promise<ArrayBuffer>;
+		/** The deck's `lib/`, for markdown and maths in a document. */
+		lib?: string;
+	};
+	/** An app item's (`decks.app`): what the app is and whether it runs, and opening it, which the app's page does, in a tab. */
+	apps?: {
+		status(name: string): Promise<{ title?: string; status?: string } | undefined>;
+		open(name: string): void;
+	};
 }
 
 const fallback: CanvasHost = {

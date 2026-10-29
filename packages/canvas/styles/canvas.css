@@ -1991,3 +1991,64 @@
 		touch-action: none;
 	}
 }
+
+/* ---- a document or an app item, in a board's place (`item-surfaces.tsx`) ------------------- */
+
+@layer components {
+	:where(.decks-canvas, .decks-layer) .app-surface {
+		display: flex;
+		width: 100%;
+		height: 100%;
+		flex-direction: column;
+		overflow: hidden;
+		border-radius: 12px;
+		background: var(--color-surface, #fff);
+		color: var(--color-text, #111);
+		font: 15px/1.4 var(--font-sans, system-ui);
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-bar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--color-border, #e5e5e5);
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--color-muted, #999);
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-dot[data-status="running"] {
+		background: #2ea043;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-status {
+		color: var(--color-muted, #777);
+		font-size: 13px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-body {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-body p {
+		margin: 0;
+		color: var(--color-muted, #666);
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-open {
+		padding: 8px 22px;
+		border: 0;
+		border-radius: 10px;
+		background: var(--color-accent, #2563eb);
+		color: #fff;
+		cursor: pointer;
+		font: inherit;
+		font-weight: 600;
+	}
+	:where(.decks-canvas, .decks-layer) .document-surface .dp {
+		height: 100%;
+	}
+}
