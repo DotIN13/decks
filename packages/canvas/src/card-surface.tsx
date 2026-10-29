@@ -33,6 +33,8 @@ export function CardSurface(props: {
 	onOpenBoard?: ((path: string) => void) | undefined;
 	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
+	/** Words selected in the card, when a press or a key ends a selection: what to quote, the block they are in, and where they are. */
+	onWords?: ((words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
 	/*
@@ -118,6 +120,38 @@ export function CardSurface(props: {
 		);
 		for (const type of ["keydown", "keyup", "keypress"]) root.addEventListener(type, (event) => editable(event) && event.stopPropagation());
 		root.addEventListener("click", (event) => followLink(event as MouseEvent));
+		// A selection ends with a press let go, or a key with Shift: a moment later, it is read.
+		const readSoon = () => void setTimeout(() => readWords(root), 0);
+		root.addEventListener("pointerup", readSoon);
+		root.addEventListener("keyup", (event) => (event as KeyboardEvent).shiftKey && readSoon());
+	};
+
+	/**
+	 * The words selected in this card. A closed root hides its selection from the page's `getSelection()`,
+	 * which reports the host; `getComposedRanges`, handed the root, gives the range inside it.
+	 */
+	const readWords = (root: ShadowRoot) => {
+		if (!props.onWords) return;
+		const selection = document.getSelection() as (Selection & { getComposedRanges?: (...args: unknown[]) => StaticRange[] }) | null;
+		// Not `isCollapsed`: seen from the page, a selection inside a shadow root is collapsed at its host.
+		if (!selection || selection.rangeCount === 0 || typeof selection.getComposedRanges !== "function") return;
+		let ranges: StaticRange[];
+		try {
+			ranges = selection.getComposedRanges({ shadowRoots: [root] });
+		} catch {
+			// Safari 17's form: the roots as arguments.
+			ranges = selection.getComposedRanges(root);
+		}
+		const given = ranges[0];
+		if (!given || given.collapsed || !root.contains(given.startContainer) || !root.contains(given.endContainer)) return;
+		const range = document.createRange();
+		range.setStart(given.startContainer, given.startOffset);
+		range.setEnd(given.endContainer, given.endOffset);
+		const quote = range.toString().replace(/\s+/g, " ").trim();
+		if (!quote) return;
+		const at = given.startContainer instanceof Element ? given.startContainer : given.startContainer.parentElement;
+		const component = at?.closest("[data-id]")?.getAttribute("data-id") ?? undefined;
+		props.onWords({ quote, ...(component ? { component } : {}), anchor: () => (range.collapsed ? undefined : range.getBoundingClientRect()) });
 	};
 
 	/*

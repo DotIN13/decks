@@ -17,7 +17,7 @@ import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, isInk, strokeOf } from "./pen/ink.ts";
-import { inkSelection, setInkSelection } from "./state/ink.ts";
+import { drawing, inkSelection, setInkSelection } from "./state/ink.ts";
 import { handTool, PEN_TOOL_KEYS, penLive, penTool, setPenBoxes, setPenLive, setPenTool, type PenTool } from "./state/pen-tools.ts";
 import { scheme } from "./lib/theme.ts";
 import { mediaOf, isCard, ids as penIds, newId, walk, type PenDocument, type PenNode } from "@decks/pen";
@@ -1726,6 +1726,15 @@ export function Stage(props: {
 			{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 			onMove={(x, y) => props.onMove(board.path, x, y)}
 			onOpen={() => pushCamera(frame([boxOf(board)]))}
+			{...(props.onComment
+				? {
+						// Words selected in a card while browsing: a comment on them, as on a board's page before.
+						onWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => {
+							if (props.mode !== "browse" || drawing()) return;
+							props.onComment?.({ path: board.path, title: board.title, quote: words.quote, ...(words.component ? { component: words.component } : {}), anchor: words.anchor });
+						},
+					}
+				: {})}
 		/>
 	);
 

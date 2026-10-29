@@ -40,6 +40,8 @@ export interface StageBoardProps {
 	onExtent?: (extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** A link on a card to another board or card of the deck: `true` once the host has opened it. */
 	onOpenBoard?: (path: string, from: string) => boolean;
+	/** Words selected in a card, to comment on: the stage gives this while you may. */
+	onWords?: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) => void;
 	/** The stage's fingers: a finger on the bar or the edge carries the item, and a second makes it a pinch. */
 	gestures: { claimTouch(id: number): void; pinching(): boolean };
 }
@@ -190,6 +192,7 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 						onOpenBoard={(path) => props.onOpenBoard?.(path, props.board.path)}
 						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
 						onShown={() => setShown(true)}
+						{...(props.onWords ? { onWords: props.onWords } : {})}
 					/>
 				</Show>
 				{/* A document or an app item: no file of its own, drawn here (`item-surfaces.tsx`). */}
