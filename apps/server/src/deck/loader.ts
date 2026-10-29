@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { boardFolders } from "./stage-boards.ts";
-import { isCardPath } from "./layout.ts";
+import { isCardPath, pageName } from "./layout.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckPen, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
@@ -298,10 +298,11 @@ export class Deck {
 	resync(): { changed: Board[]; removed: string[] } {
 		const found = boardFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
 		const changed: Board[] = [];
+
 		const removed: string[] = [];
 
 		for (const path of found) {
-			const signature = signatureOf(join(this.path, path));
+			const signature = pageSignature(this.path, path);
 			const known = this.boardsByPath.get(path);
 			if (known && this.signatures.get(path) === signature) continue;
 			const board = this.refresh(path);
@@ -388,7 +389,7 @@ export class Deck {
 		const meta = readMeta(path, source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
-		this.signatures.set(path, signatureOf(absolute));
+		this.signatures.set(path, pageSignature(this.path, path));
 		/*
 		 * Where the size comes from: **the board's own file**, and nowhere else.
 		 *
@@ -415,14 +416,15 @@ export class Deck {
 		 */
 		const floor = meta.h ?? 0;
 		this.floors.set(path, floor);
-		const rev = revisionOf(source);
+		// A card is its folder: a change to its `chart.js` is a new revision of the card, as a change to its HTML is.
+		const rev = revisionOf(isCardPath(path) ? `${source}\n${folderSignature(dirname(absolute))}` : source);
 		// Read before, at this revision, when browsers still sized boards (`heights`).
 		const known = this.heights.get(path);
 		// The file's own height when it states one, as its agent wrote it; an old reading only when it does not.
 		const height = floor || (known?.rev === rev ? known.h : shell === "foreign" ? FOREIGN_H : START_H);
 		return {
 			path,
-			title: meta.title ?? basename(path).replace(/\.(html?|mdx?)$/i, ""),
+			title: meta.title ?? pageName(path).replace(/\.(html?|mdx?)$/i, ""),
 			...(shell ? { shell } : {}),
 			...(isCardPath(path) ? { card: true as const } : {}),
 			x: 0,
@@ -447,6 +449,33 @@ export class Deck {
 			inContext: [],
 		};
 	}
+}
+
+/** A board's file, or a card's whole folder: what `resync` compares to tell it changed. */
+function pageSignature(deck: string, path: string): string {
+	const absolute = join(deck, path);
+	return isCardPath(path) ? `${signatureOf(absolute)}|${folderSignature(dirname(absolute))}` : signatureOf(absolute);
+}
+
+/** Every file in a card's folder, by its place, time and size; hidden ones left out. */
+function folderSignature(dir: string): string {
+	const out: string[] = [];
+	const walk = (current: string) => {
+		let entries: import("node:fs").Dirent[] = [];
+		try {
+			entries = readdirSync(current, { withFileTypes: true });
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (entry.name.startsWith(".")) continue;
+			const full = join(current, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else out.push(`${relative(dir, full)}:${signatureOf(full)}`);
+		}
+	};
+	walk(dir);
+	return out.sort().join(",");
 }
 
 /** `mtime:size` for a file, or `""` if it went away between the scan and the stat. */
@@ -477,7 +506,12 @@ function scanBoards(dir: string, deckRoot: string): string[] {
 			if (entry.name.startsWith(".")) continue;
 			const full = join(current, entry.name);
 			if (entry.isDirectory()) walk(full);
-			else if (isBoardFile(entry.name)) out.push(normalizeBoardPath(relative(deckRoot, full)));
+			else if (isBoardFile(entry.name)) {
+				const path = normalizeBoardPath(relative(deckRoot, full));
+				// In a canvas's `cards/`, the card is each folder's `index.html`; the rest is the card's own.
+				if (/(?:^|\/)cards\//.test(path) && /^(?:shared\/)?canvases\//.test(path) && !isCardPath(path)) continue;
+				out.push(path);
+			}
 		}
 	};
 	walk(dir);

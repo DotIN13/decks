@@ -34,6 +34,8 @@ export interface CardContext {
 	signal: AbortSignal;
 	/** The card's own address, for files beside it. */
 	url: string;
+	/** The address of a file in the card's own folder: `card.file("data.json")`. */
+	file(name: string): string;
 	/** "light" or "dark", as the canvas is now; `on("theme")` hears a change. */
 	theme: "light" | "dark";
 	/** The card's box on the canvas. */
@@ -116,9 +118,49 @@ export function clean(fragment: DocumentFragment, base: string): void {
 			else if (key === "style" && /url\s*\(|expression\s*\(/i.test(attr.value) && !cssInDeck(attr.value, base)) node.removeAttribute(attr.name);
 		}
 		if (name === "form") node.removeAttribute("action"), node.setAttribute("method", "dialog");
-		if (name === "style" && !cssInDeck(node.textContent ?? "", base)) node.textContent = (node.textContent ?? "").replace(/@import[^;]*;/gi, "").replace(/url\s*\(([^)]*)\)/gi, (all, inner: string) => (inDeck(inner.replace(/["']/g, ""), base) ? all : "none"));
+		if (name === "style" && !cssInDeck(node.textContent ?? "", base)) node.textContent = cleanCss(node.textContent ?? "", base);
 	}
 	for (const node of gone) node.remove();
+}
+
+/** CSS from a friend's card with its imports gone and every address outside the deck made `none`. */
+function cleanCss(css: string, base: string): string {
+	return css.replace(/@import[^;]*;/gi, "").replace(/url\s*\(([^)]*)\)/gi, (all, inner: string) => (inDeck(inner.replace(/["']/g, "").trim(), base) ? all : "none"));
+}
+
+/** A relative address made absolute against the card's own, leaving `#`, `data:` and the like as they are. */
+function fromCard(value: string, base: string): string {
+	const trimmed = value.trim();
+	if (!trimmed || /^(?:#|[a-z][a-z0-9+.-]*:)/i.test(trimmed)) return value;
+	try {
+		return new URL(trimmed, base).href;
+	} catch {
+		return value;
+	}
+}
+
+/** CSS with its relative `url()`s and `@import`s made absolute against the card. */
+function cssFromCard(css: string, base: string): string {
+	return css
+		.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (_all, quote: string, address: string) => `url(${quote}${fromCard(address, base)}${quote})`)
+		.replace(/@import\s+(["'])([^"']+)\1/gi, (_all, quote: string, address: string) => `@import ${quote}${fromCard(address, base)}${quote}`);
+}
+
+/**
+ * Every relative address in a card made absolute against the card's own (`cards/sales@<rev>/index.html`).
+ * In a shadow root an element's address resolves against the page it is in, not the file it came
+ * from: `card.css` beside a card would be asked of the app's own address.
+ */
+function addressesFromCard(fragment: DocumentFragment, base: string): void {
+	for (const node of fragment.querySelectorAll("*")) {
+		for (const attr of [...node.attributes]) {
+			const key = attr.name.toLowerCase();
+			if (key === "srcset") node.setAttribute(attr.name, attr.value.split(",").map((part) => part.trim().replace(/^(\S+)/, (address) => fromCard(address, base))).join(", "));
+			else if (ADDRESSES.includes(key)) node.setAttribute(attr.name, fromCard(attr.value, base));
+			else if (key === "style" && /url\(/i.test(attr.value)) node.setAttribute(attr.name, cssFromCard(attr.value, base));
+		}
+		if (node.localName === "style") node.textContent = cssFromCard(node.textContent ?? "", base);
+	}
 }
 
 function cssInDeck(css: string, base: string): boolean {
@@ -361,7 +403,7 @@ async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement,
  * first address, as import maps do, so a deck cannot swap the boards' d3.
  */
 function deckImports(cardUrl: string): Promise<void> {
-	const at = new URL("../assets/importmap.json", cardUrl).href;
+	const at = new URL("../../assets/importmap.json", cardUrl).href;
 	return once(`importmap:${at}`, async () => {
 		try {
 			const response = await fetch(at, { cache: "no-cache" });
@@ -403,7 +445,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const registry = registryPerRoot ? new (globalThis as unknown as { CustomElementRegistry: new () => CustomElementRegistry }).CustomElementRegistry() : undefined;
 	const root = host.attachShadow({ mode: "closed", ...(registry ? { customElementRegistry: registry } : {}) } as ShadowRootInit);
 	host.dataset.theme = source.theme;
-	const lib = new URL("../lib/", source.url).href;
+	// A card is `cards/<name>/index.html`: its canvas's `lib/` is two folders up.
+	const lib = new URL("../../lib/", source.url).href;
 	const sheetReady = cardSheet(lib).then((sheet) => {
 		if (sheet) root.adoptedStyleSheets = [sheet, ...root.adoptedStyleSheets];
 	});
@@ -421,7 +464,27 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		else scripts.push({ n: n++ });
 		script.remove();
 	}
-	if (!source.trusted) clean(fragment, source.url);
+	/*
+	 * A friend's card keeps its own stylesheets, cleaned: each is fetched, its imports and outside
+	 * addresses taken out, and put in as a `<style>`, since a linked sheet's own `url()`s cannot be.
+	 */
+	addressesFromCard(fragment, source.url);
+	const sheetsToClean: Array<{ href: string; into: HTMLStyleElement }> = [];
+	if (!source.trusted) {
+		for (const link of [...fragment.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]')]) {
+			const href = link.getAttribute("href") ?? "";
+			if (!inDeck(href, source.url)) continue;
+			const into = document.createElement("style");
+			link.replaceWith(into);
+			sheetsToClean.push({ href: new URL(href, source.url).href, into });
+		}
+		clean(fragment, source.url);
+	}
+	for (const { href, into } of sheetsToClean)
+		void fetch(href)
+			.then((response) => (response.ok ? response.text() : ""))
+			.then((css) => (into.textContent = cleanCss(cssFromCard(css, href), href)))
+			.catch(() => undefined);
 	const body = document.createElement("div");
 	// Also `board`, so a board's own `.board .doc` rules match a card made from it.
 	body.className = "card-body board";
@@ -440,6 +503,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		document: asDocument(root, body),
 		signal: controller.signal,
 		url: source.url,
+		file: (name: string) => new URL(name, source.url).href,
 		theme: source.theme,
 		size: { ...source.size },
 		elements: registry ?? customElements,

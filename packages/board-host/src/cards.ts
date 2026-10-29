@@ -26,7 +26,17 @@ export function cardModules(source: string): string[] {
 
 /** A card script's address taken apart: the card's path and which script, or undefined for any other path. */
 export function cardModuleOf(path: string): { card: string; n: number } | undefined {
-	// `cards/a.html.m0.js` in a canvas's own folder (Studio), or `canvases/x/cards/a.html.m0.js` in a deck (a harness).
-	const match = /^((?:.*\/)?cards\/[^/]+\.html?)\.m(\d+)\.js$/i.exec(path);
+	// `cards/sales/index.html.m0.js` in a canvas's own folder (Studio), or `canvases/x/cards/sales/index.html.m0.js` in a deck (a harness).
+	const match = /^((?:.*\/)?cards\/[^/]+\/index\.html)\.m(\d+)\.js$/i.exec(unstampCard(path));
 	return match ? { card: match[1]!, n: Number(match[2]) } : undefined;
+}
+
+/**
+ * A card's folder at one of its versions: `cards/sales@<rev>/chart.js`. The stage loads a card from its
+ * folder stamped with its revision, so a changed `chart.js` is a new address: a page keeps every module
+ * it has imported for as long as it lives, and the same address would hand it the old one. Whoever
+ * serves cards takes the stamp off before looking for the file.
+ */
+export function unstampCard(path: string): string {
+	return path.replace(/((?:^|\/)cards\/[^/@]+)@[A-Za-z0-9]+(?=\/)/, "$1");
 }

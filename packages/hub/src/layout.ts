@@ -206,18 +206,35 @@ export function isBoardPagePath(path: string): boolean {
 	if (!/\.x?html?$/i.test(clean) || clean.includes("\0")) return false;
 	if (/^boards\//.test(clean)) return true;
 	const at = canvasOfPath(clean);
-	return !!at && (at.rest.startsWith("boards/") || at.rest.startsWith("cards/"));
+	return !!at && (at.rest.startsWith("boards/") || isCardPath(clean));
 }
 
 /**
- * Whether a deck path is a card: an HTML piece in a canvas's own `cards/`, which the stage puts in a
- * shadow root of its own page rather than a frame. A card is a board in every other way.
+ * Whether a deck path is a card: the `index.html` of a folder in a canvas's own `cards/`
+ * (`cards/sales/index.html`), which the stage puts in a shadow root of its own page rather than a
+ * frame. Everything else in the folder is the card's own (its scripts, styles, data); a card is a
+ * board in every other way.
  */
 export function isCardPath(path: string): boolean {
 	const clean = path.split("\\").join("/").replace(/^\/+/, "");
-	if (!/\.html?$/i.test(clean) || clean.includes("\0")) return false;
+	if (clean.includes("\0")) return false;
 	const at = canvasOfPath(clean);
-	return !!at && at.rest.startsWith("cards/");
+	return !!at && /^cards\/[^/]+\/index\.html$/i.test(at.rest);
+}
+
+/** The card a deck path belongs to: `canvases/x/cards/sales/chart.js` is `canvases/x/cards/sales/index.html`. */
+export function cardOf(path: string): string | undefined {
+	const clean = path.split("\\").join("/").replace(/^\/+/, "");
+	const at = canvasOfPath(clean);
+	const name = at ? /^cards\/([^/]+)\//.exec(at.rest)?.[1] : undefined;
+	return at && name ? `${clean.slice(0, clean.length - at.rest.length)}cards/${name}/index.html` : undefined;
+}
+
+/** What a board or card is called from its path: a card by its folder (`sales`), a board by its file (`plan`). */
+export function pageName(path: string): string {
+	const parts = path.split("/");
+	if (isCardPath(path)) return parts[parts.length - 2] ?? "card";
+	return (parts[parts.length - 1] ?? "board").replace(/\.[^.]+$/, "");
 }
 
 /**

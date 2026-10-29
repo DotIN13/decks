@@ -42,7 +42,7 @@ export function shellFor(path: string, source?: string): "content" | "foreign" |
 	if (!HTML.test(path)) return "content";
 	if (source === undefined) return undefined;
 	// A card is a piece of HTML, never a document: the stage puts it in a shadow root as it is (`isCardPath`).
-	if (/(?:^|\/)cards\/[^/]+$/.test(path)) return undefined;
+	if (/(?:^|\/)cards\/[^/]+\/index\.html$/i.test(path)) return undefined;
 	return isOurs(source) ? undefined : "foreign";
 }
 

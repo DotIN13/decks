@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import { boardFolders, inBoardFolder } from "./stage-boards.ts";
+import { cardOf } from "./layout.ts";
 import { isBoardFile } from "./kinds.ts";
 import { basename, join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";
@@ -127,6 +128,8 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				// change for `boards` with every board save.
 				if (isFolder(path) || isRootItself(path)) return;
 				if (path === "deck.json") onChange({ kind: "deck" });
+				// Anything in a card's folder is the card's: its `chart.js` changing is the card changing.
+				else if (cardOf(path)) onChange({ kind: "board", path: cardOf(path)! });
 				// Every format the loader lists, so a saved `.md` reloads its frame like a `.html`.
 				else if (inBoardFolder(path) && isBoardFile(path)) onChange({ kind: "board", path });
 				else onChange({ kind: "asset", path });

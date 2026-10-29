@@ -28,19 +28,27 @@ export function CardSurface(props: {
 	selected: boolean;
 	onSelect: () => void;
 	onShown: () => void;
+	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenBoard`), by its deck path. */
+	onOpenBoard?: ((path: string) => void) | undefined;
 	/** The card's token for its buttons, when the host gives cards one. */
 	token?: (() => Promise<string | undefined>) | undefined;
 	/** The card's content height, for a host that grows a board to fit it (`extent.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
+	/*
+	 * The card's address with its folder stamped with its revision (`cards/sales@<rev>/index.html`,
+	 * `@decks/board-host`): what it imports beside it is then a new address at each version. A page keeps
+	 * every module it has imported, so the same address would hand a changed `chart.js` back as it was.
+	 */
+	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);
 	let mounted: MountedCard | undefined;
 	let asked = 0;
 	const load = async () => {
 		const ask = ++asked;
 		let html = "";
 		try {
-			const url = new URL(props.page, location.href);
+			const url = new URL(stamped());
 			url.searchParams.set("raw", "1");
 			const response = await fetch(url, { cache: "no-cache" });
 			html = response.ok ? await response.text() : "";
@@ -57,7 +65,7 @@ export function CardSurface(props: {
 		host.replaceChildren(fresh);
 		mounted = mountCard(fresh, {
 			html,
-			url: new URL(props.page, location.href).href.replace(/[?#].*$/, ""),
+			url: stamped(),
 			path: props.path,
 			trusted: props.trusted,
 			theme: untrack(scheme),
@@ -107,6 +115,32 @@ export function CardSurface(props: {
 		);
 		for (const type of ["keydown", "keyup", "keypress"]) root.addEventListener(type, (event) => editable(event) && event.stopPropagation());
 		root.addEventListener("click", (event) => runEval(root, event as MouseEvent), true);
+		root.addEventListener("click", (event) => followLink(event as MouseEvent));
+	};
+
+	/*
+	 * A link in a card never takes the app's own page away. A link to a board or card of the deck opens it
+	 * beside this one, as on a board (`board.js`); any other opens in a tab of its own.
+	 */
+	const followLink = (event: MouseEvent) => {
+		if (event.defaultPrevented || event.button !== 0) return;
+		const origin = event.composedPath()[0];
+		const link = origin instanceof Element ? origin.closest("a[href]") : null;
+		const href = link?.getAttribute("href");
+		if (!link || !href || href.startsWith("#")) return;
+		event.preventDefault();
+		let url: URL;
+		try {
+			url = new URL(href, location.href);
+		} catch {
+			return;
+		}
+		const at = url.pathname.indexOf("/api/board/");
+		if (url.origin === location.origin && at >= 0 && /\.(?:html?|md)$/i.test(url.pathname) && props.onOpenBoard) {
+			const path = decodeURIComponent(url.pathname.slice(at + "/api/board/".length)).replace(/(\/cards\/[^/@]+)@[A-Za-z0-9]+\//, "$1/");
+			if (!path.split("/").some((part) => part === "" || part === "." || part === "..")) return props.onOpenBoard(path);
+		}
+		if (/^https?:$/.test(url.protocol)) window.open(url.href, "_blank", "noopener");
 	};
 
 	const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (...values: unknown[]) => Promise<unknown>;

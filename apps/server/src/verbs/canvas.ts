@@ -3,7 +3,7 @@ import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
-import { canvasFolder, isCardPath } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, pageName } from "../deck/layout.ts";
 import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
@@ -141,17 +141,20 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			const title = typeof given === "string" && given.trim() ? given.trim() : (/<title>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.trim() ?? "Card");
 			const size = { w: typeof width === "number" ? Math.round(width) : 600, ...(typeof height === "number" ? { h: Math.round(height) } : {}) };
 			const base = slug(title, 48) || "card";
-			let path = `${canvasFolder(onCanvas)}/cards/${base}.html`;
-			for (let n = 2; service.fileBoard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}.html`;
+			// A folder of its own, `cards/<title>/index.html`, for what the card keeps beside it.
+			let path = `${canvasFolder(onCanvas)}/cards/${base}/index.html`;
+			for (let n = 2; service.fileBoard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}/index.html`;
 			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["']board["']/i.test(html) ? "" : `<meta name="board" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
 			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
 			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
 		}
 		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
 		if (item.type === "card") {
-			const { card, ...others } = item;
-			if (typeof card !== "string" || !card) throw new Error('A card item names its file: { type: "card", card: "canvases/<canvas>/cards/sales.html" }.');
-			if (!isCardPath(card)) throw new Error(`${card} is not in a canvas's cards/ folder, where cards live.`);
+			const { card: named, ...others } = item;
+			if (typeof named !== "string" || !named) throw new Error('A card item names its folder: { type: "card", card: "canvases/<canvas>/cards/sales" }.');
+			// Its folder or the folder's index.html, either way.
+			const card = /\.html$/i.test(named) ? named : `${named.replace(/\/+$/, "")}/index.html`;
+			if (!isCardPath(card)) throw new Error(`${named} is not a card: a card is a folder in a canvas's cards/, with its index.html in it.`);
 			item = { ...others, type: "board", board: card };
 		}
 		// What a read adds and no file keeps (`read.ts`), so an item read and written back is the item.
@@ -165,7 +168,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 		if (!file) throw new Error(`There is no board ${board} in the deck. decks board create makes one; decks board list lists them.`);
 		let id = typeof own.id === "string" && own.id ? own.id : undefined;
 		if (!id) {
-			const base = slug(basename(board).replace(/\.[^.]+$/, ""), 40) || "board";
+			const base = slug(pageName(board), 40) || "board";
 			id = base;
 			for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
 		}

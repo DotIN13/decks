@@ -493,6 +493,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 						size={size}
 						selected={props.selected}
 						onSelect={() => props.view.select()}
+						onOpenBoard={(path) => props.onOpenBoard?.(path, props.board.path)}
 						token={props.boardHost && !props.sandboxed ? () => props.boardHost!.token(props.board.path, props.stage?.()) : undefined}
 						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}
 						onShown={() => {

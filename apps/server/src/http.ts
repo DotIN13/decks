@@ -16,6 +16,7 @@ import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, 
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isCardPath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
 import { cardModules, cardPage, readDeckImports } from "./boards/cards.ts";
+import { unstampCard } from "@decks/board-host";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
@@ -547,7 +548,8 @@ export function createHttpApp(app: App): Express {
 	api.get(
 		"/board/*path",
 		asyncRoute(async (req, res) => {
-			const asked = wildcard(req);
+			// A card's folder at a version (`cards/sales@<rev>/`, `@decks/board-host`) is the folder.
+			const asked = unstampCard(wildcard(req));
 			// A canvas's `lib/`, and the deck's `assets/`, `docs/` and `apps/` beside its boards (`deck/layout.ts`).
 			const served = servedAs(asked);
 			if ("refused" in served) throw new PathRefused(asked, served.refused);
@@ -617,7 +619,7 @@ export function createHttpApp(app: App): Express {
 			if (req.query.raw === undefined && isCardPath(requested)) {
 				const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
 				const mapFile = resolveServed(app.deck.path, "assets/importmap.json");
-				const deckImports = readDeckImports(existsSync(mapFile) ? await readFile(mapFile, "utf8") : undefined, "../assets/");
+				const deckImports = readDeckImports(existsSync(mapFile) ? await readFile(mapFile, "utf8") : undefined, "../../assets/");
 				const page = cardPage({ path: requested, source: await readFile(target, "utf8"), title: board?.title ?? requested, w: board?.w ?? 600, shared, deckImports });
 				res.type("html").send(versionLibRefs(page, libVersion(app.deck.path)));
 				return;

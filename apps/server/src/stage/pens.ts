@@ -14,7 +14,7 @@ import { serverText } from "./text.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
-import { canvasFolder, isCardPath, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
+import { canvasFolder, isCardPath, pageName, canvasNameOk, canvasOfPath, isSharedCanvas, plainSegment, referenceFor, SHARED_CANVASES, sharedName, sharedParts, viewOnlySentence } from "../deck/layout.ts";
 import { copyBoardInto, copyFileInto, copyFrameInto } from "../boards/copy-in.ts";
 import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 
