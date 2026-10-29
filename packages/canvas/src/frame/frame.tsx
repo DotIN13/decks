@@ -189,7 +189,9 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 			picture: (path, scheme) => {
 				const page = untrack(pages).find((one) => one.path === path);
-				return `${start.pictures}${path.split("/").map(encodeURIComponent).join("/")}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}`;
+				const at = path.split("/").map(encodeURIComponent).join("/");
+				if (start.pictures.includes("{path}")) return start.pictures.replace("{path}", at).replace("{scheme}", scheme);
+				return `${start.pictures}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}`;
 			},
 			// An old board's own token, for its buttons, from the harness on this canvas's token.
 			mintBoardToken: async (path) => {

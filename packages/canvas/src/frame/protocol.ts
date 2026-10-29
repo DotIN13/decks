@@ -53,7 +53,7 @@ export interface Start {
 	backend: { api: string; token: string; idle: number; kind?: "harness" | "studio" };
 	/** The address the canvas's files are read at, with its ticket in it: `…/api/t/<ticket>/board/canvases/<name>/`. */
 	files: { base: string; expires: number };
-	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`. */
+	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;
 	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string };
 	camera?: Camera;
