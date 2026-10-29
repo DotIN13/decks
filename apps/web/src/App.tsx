@@ -8,7 +8,6 @@ import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { shownHeight } from "./board/extent.ts";
 import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
 import type { InkRequest } from "@decks/canvas";
@@ -711,22 +710,12 @@ export function App() {
 	};
 
 	/**
-	 * How tall each board's page was last measured, in this browser (`board/extent.ts`, `measureFrame`).
-	 */
-	const [flowHeights, setFlowHeights] = createSignal<Readonly<Record<string, number>>>({});
-	const noteFlow = (path: string, h: number) => {
-		if (flowHeights()[path] === h) return;
-		setFlowHeights({ ...flowHeights(), [path]: h });
-	};
-
-	/**
 	 * The boards on the focused agent's stage, at the size the stage draws them.
 	 *
-	 * **A board's height is a floor its content raises.** The stage file's height for a board is what a
-	 * drag or a `decks.canvas.fit` gave it, and the board is drawn at least as tall as its page measures
-	 * here, so it never clips a paragraph. Read in each browser and never written back: two browsers
-	 * whose fonts lay it out a pixel apart each draw their own, rather than answering each other's
-	 * height for ever.
+	 * **A board is as tall as the stage file says, and no taller.** Its height is what a drag, a
+	 * `decks.canvas.fit` or `decks.canvas.update` gave it; what its page measures in this browser is
+	 * sent to the harness for `fit` to report (`board.extent`) and never grows the board by itself,
+	 * for a board and a card alike. A page taller than its board is cut at the board's foot.
 	 *
 	 * Kept in a store reconciled by path, so a board keeps its identity when its height is raised or
 	 * changes: what lists the boards by identity (the stage's board pages) keeps its page rather than
@@ -735,14 +724,11 @@ export function App() {
 	const [shownBoards, setShownBoards] = createStore<Board[]>([]);
 	createComputed(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
-		const flows = flowHeights();
 		const list = state.boards
 			.filter((board) => playing.has(board.path))
 			.map((board) => {
 				// A copy of its own: the merge below writes into this store's objects, never into the deck's.
-				const copy = JSON.parse(JSON.stringify(board)) as Board;
-				const h = shownHeight(board, flows[board.path]);
-				return h === board.h ? copy : { ...copy, h };
+				return JSON.parse(JSON.stringify(board)) as Board;
 			});
 		setShownBoards(reconcile(list, { key: "path", merge: true }));
 	});
@@ -1447,7 +1433,6 @@ export function App() {
 								switching: switchingCanvas,
 								onStarted: canvasOpened,
 								onExtent: (path, extent) => {
-									noteFlow(path, extent.h);
 									send({ type: "board.extent", path, ...extent });
 								},
 								onOpenLink: openLinkedBoard,

@@ -63,6 +63,8 @@ export interface MountedCard {
 	root: ShadowRoot;
 	setTheme(theme: "light" | "dark"): void;
 	setSize(size: { w: number; h: number }): void;
+	/** Hear the card's content height, in its own pixels, as it lays out and whenever it changes. */
+	onHeight(listener: (h: number) => void): void;
 	/** Stop its scripts and empty it. */
 	dispose(): void;
 }
@@ -151,7 +153,11 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				.replace(/body\.board/g, ".card-body")
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
 				// The card is as wide as its box, and as tall as the box at least: board.css sizes a board's body by its meta.
-				+ "\n.card-body { width: 100%; min-height: 100%; overflow: hidden }\n:host { display: block; contain: strict; overflow: hidden }";
+				/*
+				 * As tall as what is in it, so the card can be measured and grow (`onHeight`); the paper is the
+				 * host's, so a card shorter than its box still fills it.
+				 */
+				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }";
 			const sheet = new CSSStyleSheet();
 			sheet.replaceSync(css);
 			return sheet;
@@ -430,8 +436,21 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			}
 		})();
 	}
+	const heightListeners = new Set<(h: number) => void>();
+	let lastHeight = 0;
+	const sizes = new ResizeObserver(() => {
+		const h = Math.ceil(body.offsetHeight);
+		if (h === lastHeight || h === 0) return;
+		lastHeight = h;
+		for (const listener of heightListeners) listener(h);
+	});
+	sizes.observe(body);
 	return {
 		root,
+		onHeight(listener) {
+			heightListeners.add(listener);
+			if (lastHeight) listener(lastHeight);
+		},
 		setTheme(theme) {
 			if (context.theme === theme) return;
 			context.theme = theme;
@@ -444,6 +463,8 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			for (const listener of listeners.size) listener();
 		},
 		dispose() {
+			sizes.disconnect();
+			heightListeners.clear();
 			controller.abort();
 			for (const done of cleanups.splice(0)) {
 				try {

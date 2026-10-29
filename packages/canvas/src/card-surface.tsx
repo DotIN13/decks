@@ -30,6 +30,8 @@ export function CardSurface(props: {
 	onShown: () => void;
 	/** The card's token for its buttons, when the host gives cards one. */
 	token?: (() => Promise<string | undefined>) | undefined;
+	/** The card's content height, for a host that grows a board to fit it (`extent.ts`): its file's height stays the floor. */
+	onExtent?: ((extent: { w: number; h: number; at: number; page: number }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
 	let mounted: MountedCard | undefined;
@@ -62,6 +64,10 @@ export function CardSurface(props: {
 			size: untrack(props.size),
 		});
 		listen(mounted.root, fresh);
+		mounted.onHeight((h) => {
+			const w = untrack(props.size).w;
+			props.onExtent?.({ w, h, at: w, page: h });
+		});
 		props.onShown();
 	};
 	createEffect(on(() => [props.page.replace(/[?#].*$/, ""), props.rev, props.reload] as const, () => void load()));
