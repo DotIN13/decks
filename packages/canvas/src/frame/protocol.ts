@@ -47,7 +47,6 @@ export interface Start {
 	canvas: { name: string; title?: string; role: "owner" | "edit" | "view" };
 	/** The harness, as the frame reaches it: its `/api` address and the canvas token, which lapses after `idle` unused. */
 	backend: { api: string; token: string; idle: number };
-	pages: Page[];
 	/** The address the canvas's files are read at, with its ticket in it: `…/api/t/<ticket>/board/canvases/<name>/`. */
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`. */
@@ -71,7 +70,6 @@ export type Point = { x: number; y: number };
 export interface PageToFrame {
 	/** The canvas token, renewed before it lapses. */
 	token: { token: string };
-	pages: { pages: Page[] };
 	reload: { path: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
 	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string };

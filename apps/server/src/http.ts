@@ -828,7 +828,15 @@ export function createHttpApp(app: App): Express {
 		}
 		const frame = pens.frame("", name) as { doc: unknown; base: string; rev: number; by?: string };
 		res.setHeader("Cache-Control", "no-store");
-		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
+		/*
+		 * Each card and board on it with its record (title, revision, card or not, who wrote it and when,
+		 * when it was read), at its place on this drawing: what the canvas frame shows them from.
+		 */
+		const cards = pens.boards(name).flatMap(({ path, x, y, w, h }) => {
+			const board = app.deck.board(path);
+			return board ? [{ ...board, x, y, w, h }] : [];
+		});
+		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**

@@ -92,7 +92,6 @@ export function createFramedEditor(options: Options): Editor {
 			protocol: PROTOCOL,
 			canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
 			backend,
-			pages: pagesNow(),
 			files: { base: ticket.files, expires: ticket.expires },
 			pictures: ticket.pictures,
 			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
@@ -217,11 +216,6 @@ export function createFramedEditor(options: Options): Editor {
 			const page = end();
 			const covered = insets();
 			if (page) page.emit("look", { insets: covered });
-		});
-		createEffect(() => {
-			const page = end();
-			const pages = pagesNow();
-			if (page) page.emit("pages", { pages });
 		});
 		createEffect(
 			on(

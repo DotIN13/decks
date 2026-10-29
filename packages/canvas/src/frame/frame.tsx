@@ -46,7 +46,9 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
 	end.on("token", (data) => backend.setToken(data.token));
 	const first = await backend.drawing();
-	const [pages, setPages] = createSignal<Page[]>(start.pages);
+	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
+	const own = (path: string): Page["trust"] => (path.startsWith("shared/") ? "friend" : "own");
+	const [pages, setPages] = createSignal<Page[]>(first.cards.map((card) => ({ ...card, trust: own(card.path) })));
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
 	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
 	const [dark, setDark] = createSignal(start.look.dark);
@@ -57,14 +59,47 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
 	let touched = 0;
 	for (const type of ["pointerdown", "wheel", "keydown"]) addEventListener(type, () => (touched = performance.now()), { capture: true, passive: true });
-	const changed = () => setRevision((n) => n + 1);
+	const changed = () => {
+		setRevision((n) => n + 1);
+		queueMicrotask(placeCards);
+	};
+	/*
+	 * Where each card is, read off the drawing at each change: the same boxes the harness gives
+	 * (`StagePens.boards`). A card placed or taken off that the list does not know yet is read again.
+	 */
+	let cardsReading = false;
+	function placeCards(): void {
+		const doc = editor?.handle.drawn();
+		if (!doc) return;
+		const placed = placements(doc, { theme: baseTheme(doc, "light") });
+		const boxes = new Map<string, { x: number; y: number; w: number; h: number }>();
+		for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string; type?: string } }>) {
+			const path = child.metadata?.path;
+			const box = child.id ? placed.get(child.id)?.box : undefined;
+			if (path && box && (child.metadata?.type === "decks.card" || child.metadata?.type === "decks.board")) boxes.set(path, { x: box.x, y: box.y, w: box.w, h: box.h });
+		}
+		const now = untrack(pages);
+		const same = now.length === boxes.size && now.every((page) => boxes.has(page.path));
+		if (!same) {
+			if (cardsReading) return;
+			cardsReading = true;
+			void backend
+				.drawing()
+				.then((read) => setPages(read.cards.map((card) => ({ ...card, ...(boxes.get(card.path) ?? {}), trust: own(card.path) }))))
+				.catch(() => undefined)
+				.finally(() => (cardsReading = false));
+			return;
+		}
+		if (now.some((page) => { const box = boxes.get(page.path)!; return box.x !== page.x || box.y !== page.y || box.w !== page.w || box.h !== page.h; }))
+			setPages(now.map((page) => ({ ...page, ...boxes.get(page.path)! })));
+	}
 	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
 	if (start.look.insets) useInsets(start.look.insets);
 	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
 	const [news, setNews] = createSignal<Record<string, string>>({});
 	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
 	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
-	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? (path.startsWith("shared/") ? "friend" : "own");
+	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
 	const kept = new Map(Object.entries(start.stored));
 	/** The page keeps what this frame cannot: it has no storage of its own. */
 	const storage = {
@@ -287,7 +322,17 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		backend.answer(call.id, value);
 	};
-	backend.follow((message) => (message.type === "stage.call" ? stageCall(message.call) : follower.hear(message)));
+	backend.follow((message) => {
+		if (message.type === "stage.call") return stageCall(message.call);
+		// A card's file changed: its record taken, its place kept, as the drawing says it.
+		if (message.type === "board.changed") {
+			if (message.removed || !message.board) return;
+			const record = message.board;
+			setPages(untrack(pages).map((page) => (page.path === record.path ? { ...record, x: page.x, y: page.y, w: page.w, h: page.h, trust: page.trust } : page)));
+			return;
+		}
+		follower.hear(message);
+	});
 	// A conversation opened that an agent kept a view for while it was not on screen: it arrives framed as meant.
 	const arrive = (id: string | undefined) => {
 		if (!id) return;
@@ -302,7 +347,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			/* a view that does not read is no view */
 		}
 	};
-	end.on("pages", (data) => setPages(data.pages));
 	end.on("reload", (data) => handle.reloadBoard(data.path));
 	end.on("look", (data) => {
 		if (data.agent !== undefined && data.agent !== untrack(agent)) {
