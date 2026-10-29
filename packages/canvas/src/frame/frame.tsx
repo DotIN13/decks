@@ -137,8 +137,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--color-accent)";
 		return out;
 	};
-	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
-	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
+	const [busy, setBusy] = createSignal<{ writer?: { name?: string; color: string } }>(start.writer ? { writer: start.writer } : {});
 	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
 	const kept = new Map(Object.entries(start.stored));
 	/** The page keeps what this frame cannot: it has no storage of its own. */
@@ -224,15 +223,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				if (start.pictures.includes("{path}")) return start.pictures.replace("{path}", at).replace("{scheme}", scheme);
 				return `${start.pictures}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}`;
 			},
-			// An old board's own token, for its buttons, from the harness on this canvas's token.
-			mintBoardToken: async (path) => {
-				if (studio) return undefined;
-				const answer = await backend.post("board-token", { path });
-				return typeof answer.token === "string" ? answer.token : undefined;
-			},
-			sandboxed: (path) => trust(path) === "friend",
 			cardScripts: (path) => trust(path) !== "friend",
-			storageKey: (path) => `${start.canvas.name}\u0000${path}`,
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
 			onExtent: (path, extent) => void (studio ? undefined : backend.post("board-extent", { path, ...extent })),
 			onOpenLink: (path, from) => {
@@ -241,12 +232,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 			news: () => news(),
 			onRead: (path) => void (studio ? undefined : backend.post("board-seen", { path })),
-			mayStart: () => busy().mayStart !== false,
-			switching: () => busy().switching === true,
-			onStarted: () => end.emit("started", {}),
 			// Hidden is the card taken off the drawing, as canvas.delete does.
 			onHide: (path) => (studio ? takeOff(path) : void backend.call("canvas.delete", [path])),
-			marks: (path) => marks()[path] ?? [],
 		},
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.
 		onCamera: (moved) => {
@@ -485,7 +472,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	end.on("fit", () => handle.fit());
 	end.on("select", (data) => handle.select(data.ids));
 	end.on("step", (data) => (data.direction === "undo" ? handle.undo() : handle.redo()));
-	end.on("marks", (data) => setMarks({ ...untrack(marks), [data.path]: data.marks }));
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
 	end.answer("edit", (data) => {
 		handle.edit(data.ops);

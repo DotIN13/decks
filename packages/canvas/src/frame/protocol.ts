@@ -82,8 +82,8 @@ export interface PageToFrame {
 	fit: Record<string, never>;
 	select: { ids: readonly string[]; page?: string };
 	step: { direction: "undo" | "redo" };
-	marks: { path: string; marks: Array<{ id: string; quote: string; component?: string }> };
-	busy: { switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } };
+	/** Who writes on the drawing now: what it is drawing is shown in their colour, with their name. */
+	busy: { writer?: { name?: string; color: string } };
 	/** The tools' state, what changed of it (`ui-sync.ts`). */
 	ui: Record<string, unknown>;
 }
@@ -114,7 +114,6 @@ export interface FrameToPage {
 	"open-app": { name: string };
 	/** Open one of the app's own panels, beside the canvas (the apps list). */
 	panel: { name: "apps" };
-	started: Record<string, never>;
 	/** Once the camera rests; or a view kept for another conversation (`agent`), for the harness to answer that agent's `view.camera` by. */
 	camera: { camera: Camera; agent?: string };
 	viewport: { width: number; height: number };

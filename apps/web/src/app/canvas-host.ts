@@ -1,12 +1,30 @@
-import { setCanvasHost } from "@decks/canvas/host";
+import { createCardTokens, setCanvasHost } from "@decks/canvas/host";
 import { connect } from "@decks/sdk";
-import { boardTokens } from "../board/board-token.ts";
+import { api } from "../connections/connection.ts";
+import { authHeaders } from "../lib/session.ts";
 import { deckAddress } from "../state/decks.ts";
 import { deckBoardLink } from "../board/board-links.ts";
 import { can } from "../connections/backend.ts";
 import { deckFileUrl } from "../lib/api.ts";
 import { stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/stages.ts";
+
+/**
+ * A card's own token, for its buttons: asked of the harness with this tab's person token, a token that
+ * is that card and nothing else (`POST /api/tokens { kind: "board", path, stage }`).
+ */
+async function mintCardToken(path: string, stage?: string): Promise<string | undefined> {
+	const response = await fetch(api("/tokens"), {
+		method: "POST",
+		headers: { ...authHeaders(), "Content-Type": "application/json" },
+		body: JSON.stringify({ kind: "board", path, ...(stage ? { stage } : {}) }),
+	});
+	const answer = (await response.json().catch(() => ({}))) as { token?: unknown; error?: unknown };
+	if (!response.ok || typeof answer.token !== "string") throw new Error(typeof answer.error === "string" ? answer.error : `Decks answered ${response.status} when asked for this card's token.`);
+	return answer.token;
+}
+
+const cardTokens = createCardTokens({ mint: mintCardToken });
 
 /**
  * The Decks app's answers to the canvas's questions (`canvas/host.ts`): deck files from this
@@ -24,7 +42,7 @@ setCanvasHost({
 	 * the frame answers instead (`@decks/canvas`, `frame/card-calls.ts`).
 	 */
 	cardCall: async (verb, args, card) => {
-		const token = await boardTokens.token(card, stageOnScreen());
+		const token = await cardTokens.token(card, stageOnScreen());
 		if (!token) throw new Error(`${card} has no token here, so it makes no calls.`);
 		const answer = await connect({ url: deckAddress(), notes: () => {}, headers: { authorization: `Bearer ${token}` } }).call(verb, args);
 		return answer.value;

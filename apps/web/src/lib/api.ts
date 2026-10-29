@@ -42,6 +42,14 @@ export function thumbUrl(board: Pick<Board, "path" | "rev">, scheme: "light" | "
 	return api(`/thumb/${path}?v=${board.rev}&scheme=${scheme}&look=${PICTURE_LOOK}`);
 }
 
+/**
+ * The picture the stage's sheet draws of a board or a card that is not awake (`StageShots.picture`):
+ * the server's, of the whole page, at an absolute address the sheet can fetch from its worker.
+ */
+export function boardPicture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
+	return new URL(`${thumbUrl(board, scheme)}&whole=1`, location.href).href;
+}
+
 /** A deck-relative path (a poster, an asset) as a URL. */
 export function deckFileUrl(path: string, rev?: number): string {
 	const encoded = path.split("/").map(encodeURIComponent).join("/");

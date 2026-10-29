@@ -145,7 +145,6 @@ export function createFramedEditor(options: Options): Editor {
 	const wire = (page: PageEnd, canvas: string) => {
 		stopTools?.();
 		stopTools = syncTools((patch) => page.emit("ui", patch), (apply) => page.on("ui", apply));
-		page.on("started", () => options.boards?.onStarted?.());
 		/*
 		 * Drafts for the composer: shown there, never sent from here. Anything in the frame can say these,
 		 * a card's script too, so what reaches an agent is only what you send yourself.
@@ -260,11 +259,6 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		createEffect(() => {
 			const page = end();
-			if (!page) return;
-			page.emit("busy", { switching: options.boards?.switching?.() ?? false, mayStart: options.boards?.mayStart?.() ?? true });
-		});
-		createEffect(() => {
-			const page = end();
 			const dock = options.frame.dock?.();
 			if (page && dock !== undefined) page.emit("look", { dock });
 		});
@@ -273,11 +267,6 @@ export function createFramedEditor(options: Options): Editor {
 			const page = end();
 			const agents = options.frame.agents?.();
 			if (page && agents) page.emit("look", { agents });
-		});
-		createEffect(() => {
-			const page = end();
-			if (!page || !options.boards?.marks) return;
-			for (const board of options.boards.list?.() ?? []) page.emit("marks", { path: board.path, marks: options.boards.marks(board.path) });
 		});
 	};
 

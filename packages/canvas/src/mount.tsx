@@ -7,7 +7,6 @@ import { fitInto, frames } from "./camera/camera.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { createBoardHost, type MintBoardToken } from "./board-host.ts";
 import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
 import { stageMeasure } from "./stage/measure.ts";
 import type { DocEdits, DrawingWriter } from "./stage/types.ts";
@@ -15,9 +14,8 @@ import { setCanvasHost, type CanvasHost } from "./host.ts";
 import { InkBar } from "./ink/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
 import { PenBar } from "./pen/PenBar.tsx";
-import { PlainBoard } from "./plain-board.tsx";
+import { ItemSlot } from "./item-slot.tsx";
 import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
-import type { RendererChoice } from "./lib/renderer.ts";
 import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
 
@@ -34,36 +32,20 @@ export interface CanvasOptions {
 	 */
 	onEdits?: (edits: PenEdit[], doc: PenDocument) => void;
 	/**
-	 * The boards on the drawing (its `browser` items with `metadata.type: "decks.board"`), by their
-	 * deck path: the address of a board's live page, if it has one here, and of its picture, for
-	 * the sheet that draws every board without a page. Absent: boards are drawn as empty frames.
+	 * The cards and boards on the drawing (its `browser` items with `metadata.type` `decks.card` or
+	 * `decks.board`), by their deck path: the address of a card's file, and the picture of each, for
+	 * the sheet that draws every board and every card not awake. A board is only ever its picture: the
+	 * canvas runs no board's page. Absent: they are drawn as empty frames.
 	 */
 	boards?: {
+		/** A card's address (its `index.html`); for a document or an app item, anything at all. */
 		page?(path: string): string | undefined;
 		picture?(path: string, scheme: "light" | "dark"): string | undefined;
 		/**
-		 * A board's own token, for its buttons (`board-host.ts`): the host asks the harness the board's
-		 * page came from (`POST /api/tokens { kind: "board", path }`), and the canvas hands it to that
-		 * board's frame alone. Undefined, or absent, when a board can have none here: its buttons then
-		 * say they have no stage.
-		 */
-		mintBoardToken?: MintBoardToken;
-		/**
-		 * The host's own wiring for each board's frame (one of its own boards, not a friend's), such as the
-		 * Decks app carrying a document board's messages to its server (`board/live-doc.ts`). Returns its undo.
-		 */
-		attach?(frame: HTMLIFrameElement): () => void;
-		/**
-		 * Whether a board is a friend's, on a canvas shared with the person (`board-storage.ts`): its frame
-		 * is sandboxed with no token, and its `localStorage` is kept by this page under `storageKey`.
-		 */
-		sandboxed?(path: string): boolean;
-		/** Where a sandboxed board's storage is kept in this page's own storage: one key per harness, canvas and board. */
-		storageKey?(path: string): string;
-		/**
 		 * Whether a card's scripts run (`card.ts`): a card is drawn in this page, so its script acts as this
-		 * page does. Left out, a card runs its scripts unless it is sandboxed; a host whose sandbox comes
-		 * from its own server's headers (Studio's copy of a friend's canvas) says no here instead.
+		 * page does. Left out, a card runs its scripts unless it is on a canvas a friend shared (`shared/`);
+		 * a host whose sandbox comes from its own server's headers (Studio's copy of a friend's canvas)
+		 * says no here instead.
 		 */
 		cardScripts?(path: string): boolean;
 		/**
@@ -71,26 +53,18 @@ export interface CanvasOptions {
 		 * them, in place of the ones read off the drawing. Read reactively.
 		 */
 		list?(): Board[];
-		/** A board's page measured itself (same-origin pages only): its size and how it reads, for the host's agents. */
+		/** A card measured itself: its size and how it reads, for the host's agents (`decks.canvas.fit`). */
 		onExtent?(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void;
-		/** A link on a board to another board: open it, and say whether this host has it. */
+		/** A link on a card to a board or card of the deck: open it, and say whether this host has it. */
 		onOpenLink?(path: string, from: string): boolean;
 		/** Boards written since the person last looked (path to who wrote them): each shows a dot. Read reactively. */
 		news?(): Record<string, string>;
 		/** The person looked at a board with a dot. */
 		onRead?(path: string): void;
-		/** Whether the boards' pages may start loading yet (the host may hold them until the canvas has opened). Read reactively. */
-		mayStart?(): boolean;
-		/** Every board on screen has started. */
-		onStarted?(): void;
-		/** The host is moving to another canvas: the boards hold still until it has. Read reactively. */
-		switching?(): boolean;
-		/** Pictures of boards the host takes itself (in the browser), in place of `picture`. */
+		/** Where the host's pictures of boards and cards are, by their revision, in place of `picture`. */
 		shots?(): import("./Stage.tsx").StageShots;
 		/** A board's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
 		onHide?(path: string): void;
-		/** Words on a board with a comment waiting on them, kept marked in its page. Read reactively. */
-		marks?(path: string): Array<{ id: string; quote: string; component?: string }>;
 	};
 	/**
 	 * The folder the drawing's own relative addresses are read against (image fills, files on the
@@ -167,8 +141,6 @@ export interface CanvasOptions {
 	inkAgent?: () => string | undefined;
 	/** The pill's Properties was pressed: show the host's own properties panel. Absent: the canvas's own opens. */
 	onProperties?: () => void;
-	/** How boards are drawn: each a live page (`dom`, the default), or each into its own canvas where the browser can (`canvas-per-board`). */
-	renderer?: RendererChoice;
 	/** The tool in hand changed (by `setTool`, a key, or placing what it makes). */
 	onTool?: (tool: PenTool) => void;
 	/** The drawn items selected changed (their ids), by the person or by `select`. */
@@ -218,7 +190,7 @@ export interface CanvasHandle {
 	/** The camera now, and moving it. */
 	camera(): Camera;
 	setCamera(camera: Camera): void;
-	/** A board's file changed where its page comes from (a drop, an agent's edit): its page loads again. */
+	/** A card's file changed where it comes from (a drop, an agent's edit): it loads again. */
 	reloadBoard(path: string): void;
 	/** The canvas opened on the view kept for its scope (`views`), rather than on a fit. */
 	readonly restored: boolean;
@@ -412,9 +384,6 @@ export function createEditor(
 		return done;
 	});
 
-	// Each board's frame is handed its own token, by the host's way of asking for one.
-	const boardHost = options.boards?.mintBoardToken ? createBoardHost({ mint: options.boards.mintBoardToken }) : undefined;
-
 	// A drawing the host gives as state is the one shown; the editor's own copy follows it, for its board calls.
 	if (options.state?.pen) createComputed(() => {
 		const given = options.state!.pen!();
@@ -454,10 +423,6 @@ export function createEditor(
 	const stageView = () => (
 		<Stage
 			mode={mode()}
-			renderer={options.renderer ?? "dom"}
-			boardsMayStart={options.boards?.mayStart ? options.boards.mayStart() : true}
-			switching={options.boards?.switching?.() ?? false}
-			{...(options.boards?.onStarted ? { onBoardsStarted: options.boards.onStarted } : {})}
 			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
 			{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
 			news={options.boards?.news?.() ?? {}}
@@ -488,14 +453,8 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={moveBoard}
-			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.boards?.attach ? { attach: options.boards.attach } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
-			shots={
-			options.boards?.shots ??
-			(() => ({
-			picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK,
-			ownPicture: true,
-			}))
-			}
+			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false } : {})} />}
+			shots={options.boards?.shots ?? (() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK }))}
 			{...commenting}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}
@@ -572,7 +531,6 @@ export function createEditor(
 		dispose() {
 			disposeViews?.();
 			tools();
-			boardHost?.dispose();
 			setDrawing(false);
 			setPenTool("select");
 		},

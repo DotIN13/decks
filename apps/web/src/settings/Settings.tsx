@@ -13,7 +13,6 @@ import User from "lucide-solid/icons/user";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js";
 import { SetGroup, SetRow, SetSegments, SetSelect } from "./rows.tsx";
-import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
 import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
 import { usageLevel } from "../lib/context-usage.ts";
@@ -293,13 +292,10 @@ function TimeSettings() {
 	);
 }
 
-/** Where a board's picture comes from when it has no live page (`canvas/shots/adaptors.ts`), and the frame-rate meter (`perf/fps.tsx`). */
+/** The frame-rate meter (`perf/fps.tsx`). */
 function BoardSettings() {
 	return (
 		<SetGroup label="Boards" group="renderer">
-			<SetRow title="Pictures" sub={SHOT_ADAPTORS.find((one) => one.id === shotAdaptorId())?.note}>
-				<SetSegments label="Pictures" options={SHOT_ADAPTORS} value={shotAdaptorId()} onPick={chooseShotAdaptor} />
-			</SetRow>
 			<SetRow title="Frame rate" sub="A meter over the canvas: frames a second, the slowest frame, and how many took over 12 ms.">
 				<button class="sw-switch" type="button" role="switch" aria-label="Show the frame rate" aria-checked={showFps()} data-on={showFps()} onClick={() => chooseShowFps(!showFps())} />
 			</SetRow>

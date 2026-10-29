@@ -9,8 +9,7 @@
  * Read once, before anything else on the page runs, and the tag taken out of the document straight
  * away, so a script that looks later finds nothing there. From then on this page sends it on every
  * request of its own to the harness, `Authorization: Bearer`, and on its socket (`decks_token`). A
- * board is a page on the same address but in its own frame, with its own `fetch`: it is not given
- * this one, but a token of its own that is that board alone (`board/board-token.ts`).
+ * card is not given this one, but a token of its own that is that card alone (`app/canvas-host.ts`).
  */
 const tag = typeof document === "undefined" ? null : document.querySelector<HTMLMetaElement>('meta[name="decks-session"]');
 const token = tag?.content || undefined;

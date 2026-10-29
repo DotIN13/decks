@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BUDGETS, deviceKind, gpuClass, PICTURES } from "./device.ts";
+import { deviceKind, gpuClass, PICTURES } from "./device.ts";
 
 const safariMac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15";
 
@@ -22,11 +22,6 @@ test("a touch laptop is a computer", () => {
 test("the address can force either, for testing", () => {
 	assert.equal(deviceKind({ platform: "MacIntel", userAgent: safariMac, maxTouchPoints: 0, forced: "mobile" }), "mobile");
 	assert.equal(deviceKind({ platform: "iPhone", userAgent: "", maxTouchPoints: 5, forced: "computer" }), "computer");
-});
-
-test("one budget, different numbers", () => {
-	assert.deepEqual(BUDGETS.computer, { live: 6, kept: 4 });
-	assert.deepEqual(BUDGETS.mobile, { live: 1, kept: 1 });
 });
 
 test("a phone or tablet has a small GPU, and so has a computer with little memory or small WebGPU buffers", () => {

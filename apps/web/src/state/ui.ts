@@ -235,18 +235,6 @@ function createUi() {
 	const [unread, setUnread] = createStore<Record<string, number>>({});
 
 	/**
-	 * Whether the app has opened, which is when the boards may start (`Stage`).
-	 *
-	 * Opened means the deck is laid out and the chat you are looking at has its history — the
-	 * two things on screen that are the app's own. A board is a document on the same main
-	 * thread, so boards that start while the chat is still arriving are a page that does not
-	 * answer; they wait for this, and it happens once. Two frames after the history lands so it
-	 * is painted first, or after a few seconds whatever happened, so a history that never comes
-	 * cannot keep the canvas empty.
-	 */
-	const [boardsMayStart, setBoardsMayStart] = createSignal(false);
-
-	/**
 	 * The board being read on its own, filling the canvas.
 	 *
 	 * A *view* of the canvas rather than an overlay: the chrome stays, so the inspector, the
@@ -256,13 +244,12 @@ function createUi() {
 	const [focus, setFocus] = createSignal<string | undefined>();
 
 	/**
-	 * And after that, the boards on the canvas are in: the rest of the panel's list may be
-	 * drawn. Chat, then canvas, then the rest.
+	 * Whether the app has opened, so the rest of the panel's list may be drawn: chat first, then the rest.
 	 *
-	 * The rail's thumbnails are the canvas's own business, and it starts them itself when it
-	 * admits the first board (`canvas/Stage.tsx`). They used to be started from here, which
-	 * meant this module imported the canvas's queue to tap it on the shoulder — the one edge
-	 * in this file pointing at a layer above it.
+	 * Opened means the deck is laid out and the chat you are looking at has its history — the two
+	 * things on screen that are the app's own. Two frames after the history lands so it is painted
+	 * first, or after a few seconds whatever happened, so a history that never comes cannot keep
+	 * the list short.
 	 */
 	const [boardsStarted, setBoardsStarted] = createSignal(false);
 
@@ -281,11 +268,7 @@ function createUi() {
 	const releaseBoards = () => {
 		if (opened) return;
 		opened = true;
-		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsMayStart(true)));
-	};
-
-	const canvasOpened = () => {
-		setBoardsStarted(true);
+		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsStarted(true)));
 	};
 
 	return {
@@ -314,11 +297,8 @@ function createUi() {
 		openUsage,
 		unread,
 		setUnread,
-		boardsMayStart,
-		setBoardsMayStart,
 		boardsStarted,
 		setBoardsStarted,
-		canvasOpened,
 		releaseBoards,
 	};
 }
@@ -355,10 +335,7 @@ export const {
 	openUsage,
 	unread,
 	setUnread,
-	boardsMayStart,
-	setBoardsMayStart,
 	boardsStarted,
 	setBoardsStarted,
-	canvasOpened,
 	releaseBoards,
 } = ui;

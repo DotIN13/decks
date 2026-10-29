@@ -1,4 +1,4 @@
-import { readingOfCard } from "./extent.ts";
+import { readingOfCard } from "./card-reading.ts";
 /**
  * A card: a piece of HTML drawn in a closed shadow root of the stage's own page, where a board has a
  * frame of its own.
@@ -106,7 +106,7 @@ export interface MountedCard {
 	setSize(size: { w: number; h: number }): void;
 	/** Hear the card's content height, in its own pixels, as it lays out and whenever it changes. */
 	onHeight(listener: (h: number) => void): void;
-	/** How the card reads now: words, smallest type, spill and cut boxes (`extent.ts`), for `fit`. */
+	/** How the card reads now: words, smallest type, spill and cut boxes (`card-reading.ts`), for `fit`. */
 	reading(): ReturnType<typeof readingOfCard>;
 	/** Stop its scripts and empty it. */
 	dispose(): void;

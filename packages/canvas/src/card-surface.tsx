@@ -4,20 +4,20 @@ import { scheme } from "./lib/theme.ts";
 import { canvasHost } from "./host.ts";
 
 /**
- * A card's surface in a board's place (`plain-board.tsx`): a host element whose shadow root holds the
- * card (`card.ts`). Where a board's frame needs a bridge to hand the stage its gestures, a card's
- * events reach the stage as they are; this only decides which of them are the card's own.
+ * A card's surface in its slot on the stage (`item-slot.tsx`): a host element whose shadow root holds the
+ * card (`card.ts`). A card's events reach the stage as they are; this only decides which of them are
+ * the card's own.
  *
  * Decided on the card's root, not its host: from outside a closed root an event's path stops at the
  * host, so nothing there can tell a press on the card's button from one on its background.
  *
  * - **A mouse or pen press** inside the card is the card's: it never starts a marquee or a pan, and it
- *   selects the card. The card moves by its bar and its edge, as a live board does.
+ *   selects the card. The card moves by its bar and its edge.
  * - **A finger** pans the canvas across a card, unless it lands on one of the card's controls.
  * - **A wheel** scrolls what inside the card can take it, and pans the canvas otherwise; a pinch always zooms.
  * - **Keys** typed into the card's own fields stay in it, so Delete in a text box deletes a letter, not the card.
  * - **Its buttons** are the card's own module's: they act through `card.decks` (`card.ts`), answered
- *   where the host says (`CanvasHost.cardCall`). A card has no `data-eval` blocks; a board keeps its own.
+ *   where the host says (`CanvasHost.cardCall`). A card has no `data-eval` blocks.
  */
 export function CardSurface(props: {
 	page: string;
@@ -31,7 +31,7 @@ export function CardSurface(props: {
 	onShown: () => void;
 	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenBoard`), by its deck path. */
 	onOpenBoard?: ((path: string) => void) | undefined;
-	/** The card's content height, for a host that grows a board to fit it (`extent.ts`): its file's height stays the floor. */
+	/** The card's content height, for `decks.canvas.fit` (`card-reading.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
@@ -73,7 +73,7 @@ export function CardSurface(props: {
 			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
 		});
 		listen(mounted.root, fresh);
-		// What fit reads, as a board's frame says it (`extent.ts`): the height, and how the card reads at it.
+		// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
 		const card = mounted;
 		mounted.onHeight((h) => {
 			const w = untrack(props.size).w;

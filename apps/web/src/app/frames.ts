@@ -3,7 +3,6 @@ import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
 import { framedCanvas } from "../board/canvas-frame.ts";
 import { handsOn } from "@decks/canvas/camera";
-import { seenPicture } from "../canvas/shots/adaptors.ts";
 import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend } from "../chat/history-page.ts";
@@ -25,17 +24,8 @@ import { historyShown } from "../state/edge.ts";
 import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
-/**
- * The revision each board's page was loaded at, when a write since changed only the size in its tag
- * (`board.changed … sized`): the page keeps that address, so a resize does not reload it. A change
- * to anything else takes it away, and the page loads the new revision.
- */
-const pageRevs = new Map<string, number>();
-/** The revision a board's page is loaded at: its own, unless only its size has changed since. */
-export const pageRev = (board: { path: string; rev: number }): number => pageRevs.get(board.path) ?? board.rev;
 import { forgetPen, receivePen, receivePenDelta, receivePenRefused } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
-import { receiveDoc } from "../board/live-doc.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -169,11 +159,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// bytes the live DOM already has. Merging leaves the identity alone and
 					// updates only the fields that moved.
 					const index = state.boards.findIndex((existing) => existing.path === board.path);
-					// A size-only write keeps the page's revision; a new revision of anything else lets it go. The
-					// same revision again (who wrote it, when it was read) changes nothing about the page.
-					if (message.sized && index !== -1) {
-						if (!pageRevs.has(board.path)) pageRevs.set(board.path, state.boards[index]!.rev);
-					} else if (index === -1 || board.rev !== state.boards[index]!.rev) pageRevs.delete(board.path);
 					if (index === -1) {
 						setState("boards", (boards) => [...boards, board].sort((a, b) => a.path.localeCompare(b.path)));
 					} else {
@@ -391,20 +376,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
 					return;
 
-				// A document page's answers and news, for the boards that hold one (`board/live-doc.ts`).
-				case "doc.state":
-				case "doc.patched":
-				case "doc.changed":
-				case "doc.versions":
-				case "doc.version":
-				case "doc.compiled":
-				case "doc.repo":
-				case "doc.remote":
-				case "doc.gdoc":
-				case "doc.gcomments":
-					receiveDoc(message);
-					return;
-
 				case "stage.pen":
 					receivePen(message);
 					if (message.error) notice("warn", message.error);
@@ -446,16 +417,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						}
 					}
 					/*
-					 * A picture of a board as this browser has it, for an agent's screenshot: taken
-					 * asynchronously, so answered on its own (`canvas/shots/adaptors.ts`).
+					 * A picture of a board as this browser has it, for an agent's screenshot: the canvas runs no
+					 * board's page, so there is none, and the server's picture is the one.
 					 */
 					if (message.call.op === "shot") {
-						const id = message.call.id;
-						const path = (message.call.args as { path?: string } | undefined)?.path;
-						const board = state.boards.find((one) => one.path === path);
-						void (board ? seenPicture(board) : Promise.resolve({ how: "none" as const, why: "no such board in this browser" }))
-							.catch((error: unknown) => ({ how: "none" as const, why: error instanceof Error ? error.message : String(error) }))
-							.then((value) => send({ type: "stage.result", result: { id, value } }));
+						send({ type: "stage.result", result: { id: message.call.id, value: { how: "none", why: "the canvas draws a board as its picture, not its page" } } });
 						return;
 					}
 					/*

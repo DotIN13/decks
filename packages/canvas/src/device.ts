@@ -37,22 +37,6 @@ export const DEVICE: DeviceKind =
 			});
 
 /**
- * How many board pages show at once, and how many let go are kept loaded and hidden for going back
- * (`live-set.ts`). One rule on every device; only these numbers differ.
- */
-export interface LiveBudget {
-	live: number;
-	kept: number;
-}
-
-export const BUDGETS: Record<DeviceKind, LiveBudget> = {
-	computer: { live: 6, kept: 4 },
-	mobile: { live: 1, kept: 1 },
-};
-
-export const BUDGET: LiveBudget = BUDGETS[DEVICE];
-
-/**
  * How much a device's GPU can hold, as far as a page can tell: no browser says how much memory its
  * GPU has, so it is read from what they do say. A phone or tablet is small, and so is a computer whose
  * WebGPU allows buffers under 1 GB or that says it has 4 GB of memory or less; any other is big.

@@ -5,7 +5,6 @@ import { resetPens } from "../state/pens.ts";
 import { resetStages } from "../state/stages.ts";
 import { resetHistory } from "../state/history.ts";
 import { resetToolResults } from "../chat/tool-results.ts";
-import { resetTaken } from "../canvas/shots/adaptors.ts";
 import { scratch } from "../state/agent.ts";
 import { setMode, setSelected } from "../state/selection.ts";
 import { setDrawing, setInkSelection } from "@decks/canvas/tools";
@@ -47,7 +46,6 @@ function forget(): void {
 	resetStages();
 	resetHistory();
 	resetToolResults();
-	resetTaken();
 	scratch.clear();
 	setBackend(undefined);
 	setPairing({ paired: [] });

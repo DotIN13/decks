@@ -10,17 +10,14 @@ import { loadComments, saveComments, type BoardComment } from "../markup/comment
  */
 
 /**
- * What a comment is about, as the popup needs it: what to quote, and where it is on screen. A
- * selection in a board has its frame and range; a comment on the whole board (the board pill's
- * Comment) has neither, an empty quote, and a box in window pixels to sit by.
+ * What a comment is about, as the popup needs it: what to quote, and where it is on screen, as a box
+ * in window pixels to sit by. A comment on a whole board or card (the pill's Comment) has an empty quote.
  */
 export interface CommentTarget {
 	path: string;
 	component?: string;
 	quote: string;
-	frame?: HTMLIFrameElement;
-	range?: Range;
-	/** Where to sit, in window pixels, when there is no selection to sit under. */
+	/** Where to sit, in window pixels. */
 	anchor?: () => { left: number; top: number; right: number; bottom: number } | undefined;
 	/** The board's title, to name a comment on the whole board. */
 	title?: string;

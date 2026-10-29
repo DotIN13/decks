@@ -37,21 +37,11 @@ export function CommentPopup(props: {
 	const [text, setText] = createSignal("");
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>(undefined);
 
-	/** The selection in window pixels: the frame is scaled by the camera, its contents are not. */
+	/** Beside what the comment is on, in window pixels. */
 	const place = () => {
-		const { frame, range, anchor } = props.target;
-		if (!box) return;
-		if (anchor) {
-			const around = anchor();
-			if (around) setAt(popupPlace(around, { w: box.offsetWidth, h: box.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, left: props.left }));
-			return;
-		}
-		if (!frame?.isConnected || !range) return;
-		const inner = range.getBoundingClientRect();
-		const outer = frame.getBoundingClientRect();
-		const k = frame.clientWidth > 0 ? outer.width / frame.clientWidth : 1;
-		const selection = { left: outer.left + inner.left * k, top: outer.top + inner.top * k, right: outer.left + inner.right * k, bottom: outer.top + inner.bottom * k };
-		setAt(popupPlace(selection, { w: box.offsetWidth, h: box.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, left: props.left }));
+		const around = props.target.anchor?.();
+		if (!box || !around) return;
+		setAt(popupPlace(around, { w: box.offsetWidth, h: box.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, left: props.left }));
 	};
 	createEffect(() => {
 		void props.target;

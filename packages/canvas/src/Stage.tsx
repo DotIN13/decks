@@ -1,4 +1,3 @@
-import { hasPlaceholder, placeholderPicture } from "./live-placeholder.ts";
 import { touchedCanvas } from "./camera/touched.ts";
 import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera } from "@decks/protocol";
@@ -10,16 +9,9 @@ import { cameraFor, nearEdge, originFor, scrollFor, worldTransform, type Origin 
 import { canvasHost } from "./host.ts";
 import MediaPlayer from "./pen/MediaPlayer.tsx";
 import { checkStageOrigin, stagePoint } from "./camera/coords.ts";
-import type { StageBoardProps } from "./board-slot.ts";
-import type { FrameGestureHost } from "./frame-host.ts";
+import type { StageBoardProps } from "./item-slot.tsx";
 import { zoomKey } from "./zoom-keys.ts";
-import { coastStart, createTouches, type Finger, type TouchStep } from "./touch.ts";
-import { velocityFrom, type Sample } from "@decks/ui";
-import type { RendererChoice } from "./lib/renderer.ts";
-import { createRedrawQueue } from "./redraw-queue.ts";
-import { openThumbnails } from "./thumb-budget.ts";
-import { chooseLive, EMPTY_LIVE, sameLive, type LiveSet } from "./live-set.ts";
-import { BUDGET } from "./device.ts";
+import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 import type { DocEdits, DrawingWriter, SceneBoard } from "./stage/types.ts";
 import { docIndex } from "./pen/doc-index.ts";
 import { BoxIndex } from "./spatial.ts";
@@ -94,10 +86,8 @@ const TOOL_KEYS: Record<string, "select"> = { v: "select" };
  */
 /** Where the stage's pictures of boards come from (`Stage`'s `shots`). */
 export interface StageShots {
-	/** The picture of a board with no live page, as an address the sheet can fetch. */
+	/** The picture of a board or a card, as an address the sheet can fetch. */
 	picture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string;
-	/** Under the Canvas renderer, whether a live page draws its own picture (true) or hands it to the sheet. */
-	ownPicture: boolean;
 }
 
 /** What a comment is about (`Stage`'s `onComment`). */
@@ -123,19 +113,6 @@ export function Stage(props: {
 	 * different for as long as it lasts, not a question you learn to dismiss.
 	 */
 	mode: "browse" | "edit";
-	/** How boards are drawn (`lib/renderer.ts`): documents, a canvas each, or one canvas. */
-	renderer: RendererChoice;
-	/**
-	 * While the camera moves, show every board as its picture: pages are hidden and the sheet paints
-	 * their pictures, so a pan or zoom moves pictures only. Back to pages when it rests (Studio's choice).
-	 */
-	/**
-	 * Whether the app has opened — the deck and the chat you are looking at are drawn — so the
-	 * boards may start. Until it is true no board has a document (`admitted` below).
-	 */
-	boardsMayStart: boolean;
-	/** The person has picked another canvas and its camera has not landed yet: no board starts a page (`App.landOnStage`). */
-	switching?: boolean;
 	/**
 	 * What the canvas should do when this conversation's boards first arrive.
 	 *
@@ -143,8 +120,6 @@ export function Stage(props: {
 	 * `camera` means nothing was remembered, so the canvas fits what it has.
 	 */
 	opening?: { camera?: Camera };
-	/** Every board on screen at the open has been let in, so less urgent documents may start. */
-	onBoardsStarted?: () => void;
 	boards: Board[];
 	/**
 	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
@@ -180,15 +155,11 @@ export function Stage(props: {
 	/** The pill's Properties, for a host with its own properties panel; absent, the canvas's own opens. */
 	onProperties?: () => void;
 	/**
-	 * What draws one board: the stage says where it is and what it may do (`board-slot.ts`), the host
-	 * draws it. The Decks app's is `board/BoardFrame.tsx`; `mount.tsx` has a plain one.
+	 * What draws one placed item's slot: the stage says where it is and what it may do, the host adds
+	 * what it knows of its file (`item-slot.tsx`, `mount.tsx`).
 	 */
 	frame: Component<StageBoardProps>;
-	/**
-	 * Where a board's picture comes from, for the sheet that draws every board with no live page:
-	 * its address (`picture`), whether a live page draws its own picture rather than handing it to the
-	 * sheet (`ownPicture`, false for HTML-in-Canvas). The Decks app's are its shot adaptors (`canvas/shots/adaptors.ts`).
-	 */
+	/** Where the picture of a board or a card comes from, for the sheet that draws every one not awake. */
 	shots: () => StageShots;
 	/**
 	 * Comment on a board or on drawn items, from the button in a bar or a pill: `path` is the board
@@ -219,15 +190,13 @@ export function Stage(props: {
 	onRead?: (path: string) => void;
 	/** So the server can answer `decks.view.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
-	/** How much room a board's content took, measured in its frame once it had mounted. */
+	/** How much room a card's content took, measured where it is drawn. */
 	onExtent?: (path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: "select") => void;
 	/**
-	 * A link on a board pointing at another board — `true` once the deck has opened it.
-	 *
-	 * Handed straight through to the frame that asked (`BoardFrame`). `false` is a path this
-	 * deck does not hold, which the app has already said in a notice.
+	 * A link on a card or in the drawing pointing at a board or card of the deck — `true` once the
+	 * deck has opened it. `false` is a path this deck does not hold, which the app has already said.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
 	/**
@@ -424,9 +393,8 @@ export function Stage(props: {
 		 * The pointer event comes first and says so (`keepTouch`); cancelling the touch's start is what
 		 * keeps the browser from taking it. Every other finger is left to scroll natively.
 		 */
-		// A finger on the canvas while one is on a board's page is the second finger of a pinch, not a scroll.
 		const holdTouch = (event: TouchEvent) => {
-			if (keptTouches.size > 0 || forwarded.size > 0) event.preventDefault();
+			if (keptTouches.size > 0) event.preventDefault();
 		};
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
@@ -445,27 +413,16 @@ export function Stage(props: {
 		 * The listener that holds the scroll is only there while two fingers are, so one finger's scroll
 		 * never waits for the page.
 		 */
-		/*
-		 * Fingers count wherever they are: one on a board's page reaches this document only as a message
-		 * (`frame-gestures.ts`, `forwarded`), so a pinch with one finger there and one here was one finger
-		 * to the browser, which scrolled the canvas with it while the pinch moved the camera too: the two
-		 * fought for every frame. The second finger is held too while it has not scrolled yet.
-		 */
 		const holdScroll = (event: TouchEvent) => {
-			if (event.touches.length + forwarded.size >= 2) event.preventDefault();
+			if (event.touches.length >= 2) event.preventDefault();
 		};
 		let holding = false;
-		let ownFingers = 0;
-		syncHold = () => {
-			const two = ownFingers + forwarded.size >= 2;
+		const twoFingers = (event: TouchEvent) => {
+			const two = event.touches.length >= 2;
 			if (two === holding) return;
 			holding = two;
 			if (two) element.addEventListener("touchmove", holdScroll, { passive: false });
 			else element.removeEventListener("touchmove", holdScroll);
-		};
-		const twoFingers = (event: TouchEvent) => {
-			ownFingers = event.touches.length;
-			syncHold();
 		};
 		for (const kind of ["touchstart", "touchend", "touchcancel"] as const) element.addEventListener(kind, twoFingers, { passive: true });
 		onCleanup(() => {
@@ -568,12 +525,8 @@ export function Stage(props: {
 			 * matched anyway, so **⌘C stopped copying**: `event.key` is `"c"` whatever else is
 			 * held, so a copy switched the tool to *card* and then `preventDefault()` cancelled
 			 * the clipboard. Selecting a line of a reply and copying it did nothing at all, and
-			 * ⌘V, ⌘S, ⌘E and ⌘0 were quietly taken the same way.
-			 *
-			 * `frame-gestures.ts` has had this guard from the start, for the keys it forwards
-			 * out of a board — the asymmetry is what hid the bug: anything typed with a board
-			 * focused behaved, and only the app's own document swallowed the shortcut. Space
-			 * is inside the guard too, because ⌘Space belongs to the OS.
+			 * ⌘V, ⌘S, ⌘E and ⌘0 were quietly taken the same way. Space is inside the guard
+			 * too, because ⌘Space belongs to the OS.
 			 */
 			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (event.code === "Space") {
@@ -595,7 +548,7 @@ export function Stage(props: {
 	});
 
 	/**
-	 * How many boards may be put on layers of their own before it stops being a saving.
+	 * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.
 	 *
 	 * A layer is a picture the compositor keeps and can stretch without waking the main
 	 * thread, and that trade is a good one until there are so many that compositing them
@@ -611,15 +564,13 @@ export function Stage(props: {
 	 * budget is there to stop this making that case worse, not to rescue it.
 	 */
 	const LAYER_BUDGET = 48;
-	/** How many recently shown boards keep their node, with no page in it (`shownBoards`). */
-	const SHOWN_NODES = 32;
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
 	/*
 	 * The stage's engine (`stage/engine.ts`): the drawing and the boards' pictures, drawn with WebGPU
-	 * on two canvases, one under the board pages and one over them, in the same call that moves the
-	 * pages (`writeTransform`). The document, the window's size and the colour scheme reach it here.
+	 * on two canvases, one under the item slots and one over them, in the same call that moves the
+	 * slots (`writeTransform`). The document, the window's size and the colour scheme reach it here.
 	 */
 	const penLayer = new StageEngine();
 	/* An engine that cannot start says so over the stage (`stage/backends/notice.ts`): no WebGPU and no WebGL 2, most often. */
@@ -634,7 +585,7 @@ export function Stage(props: {
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	/*
-	 * The over canvas is inside the world only to sit after the board pages and before the
+	 * The over canvas is inside the world only to sit after the item slots and before the
 	 * selection's outlines and handles. The engine places it, in stage units, at the rectangle it last
 	 * drew (the window and a margin round it), so a pan moves it with the world until it is drawn again.
 	 */
@@ -644,44 +595,16 @@ export function Stage(props: {
 		if (untrack(penLive)) setPenLive(undefined);
 	});
 
-	/**
-	 * No board has a title bar: a board is picked by pressing it, and the selected one gets the
-	 * action pill (`BoardCallout`) on every device. When a board has a page is `INTERACT_ZOOM`, per
-	 * device, high enough on a phone that only a board or two are ever live: thirteen live pages on
-	 * a 2 to 10% zoom were what every recorded crash had in common.
-	 */
-	/** The board the action pill is for: the selected one, while it is on the canvas. */
 	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
 	const groupPicked = () => editor.boardPicks().length + editor.items().length > 1;
 	const calloutBoard = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
 	/**
-	 * Boards whose documents are showing, by how many of their frames say so: the sheet is a hole
-	 * over each of them, and the board's picture everywhere else. A count and not a set, so a frame
-	 * that goes as another comes for the same board never leaves it wrongly unmarked.
+	 * Cards whose surfaces are showing, by how many of their slots say so: the sheet is a hole over each
+	 * of them, and the card's picture everywhere else. A count and not a set, so a slot that goes as
+	 * another comes for the same card never leaves it wrongly unmarked.
 	 */
 	const [liveBoards, setLiveBoards] = createSignal<ReadonlyMap<string, number>>(new Map());
-	/** When each board's page last came up (`shownBoards`). */
-	const [shownAt, setShownAt] = createSignal<ReadonlyMap<string, number>>(new Map());
-	/**
-	 * The boards whose pages were shown most recently, up to `SHOWN_NODES`: they keep their node when the
-	 * camera leaves them or zooms out, with no page in it (`mounted` is off). Their pictures are what the
-	 * sheet draws there, and without the node a board that had been live did not come back as its picture
-	 * after a zoom out (`e2e/checks/drop-lands.mjs`).
-	 */
-	const shownBoards = createMemo<ReadonlySet<string>>((was) => {
-		const onCanvas = new Set(props.boards.map((board) => board.path));
-		const next = [...shownAt()]
-			.filter(([path]) => onCanvas.has(path))
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, SHOWN_NODES)
-			.map(([path]) => path);
-		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
-	});
-	const markLive = (path: string, on: boolean) => {
-		markLiveCount(path, on);
-		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
-	};
-	const markLiveCount = (path: string, on: boolean) =>
+	const markLive = (path: string, on: boolean) =>
 		setLiveBoards((was) => {
 			const next = new Map(was);
 			const count = (next.get(path) ?? 0) + (on ? 1 : -1);
@@ -839,10 +762,8 @@ export function Stage(props: {
 	createEffect(() => {
 		const live = liveBoards();
 		const look = scheme();
-		// A board drawn into a canvas of its own keeps its own picture: the sheet leaves it alone.
-		const own = props.renderer === "canvas-per-board";
 		/*
-		 * A live board being sized is its page, drawn over the sheet at the new box, so the sheet
+		 * An awake card being sized is its surface, drawn over the sheet at the new box, so the sheet
 		 * keeps it where it was until the file has the size: each step otherwise painted the whole
 		 * sheet again, about 10 ms of the worker's time, to move a hole nobody can see. A board
 		 * shown as a picture is drawn by the sheet, and one an arrow ends on is followed by the
@@ -866,27 +787,25 @@ export function Stage(props: {
 						y: sized?.y ?? board.y,
 						w: sized?.w ?? board.w,
 						h: sized?.h ?? board.h,
-						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
-						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
 						// A document or an app item draws itself at any zoom and has no picture (`item-surfaces.tsx`).
-						live: board.item !== undefined || (own && props.shots().ownPicture) || live.has(board.path),
-						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
+						live: board.item !== undefined || live.has(board.path),
+						// An awake card's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
-						// A document or an app has no picture worth drawing: a card with its icon and name instead.
-						picture: board.item ? "" : hasPlaceholder(board) ? placeholderPicture(board, look) : props.shots().picture(board, look),
-						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !paged(board) } : {}),
+						// A board is always its picture: the canvas runs no board's page.
+						picture: board.item ? "" : props.shots().picture(board, look),
+						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !isLive(board.path) } : {}),
 					};
 				}),
 		);
 	});
 	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
 	// The boards a drag carries go with it on the engine's carried layer (`editor/dom/controller.ts`).
-	/** The boards whose carried picture is on screen: their pages hide where they were picked up (`BoardFrame`). */
+	/** The items whose carried picture is on screen: their slots hide where they were picked up (`item-slot.tsx`). */
 	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
 	penLayer.carrying = setCarriedPages;
 	/*
-	 * A board a drag carries while the sheet draws it as its picture (its page not live): its picture goes with the drag, so its page waits unseen too, or it stayed
-	 * on screen where the drag began (a finger on a phone's board, `plain-board.tsx`, `fingerDrag`).
+	 * An item a drag carries while the sheet draws it as its picture (not awake): its picture goes with the drag, so its slot waits unseen too, or its
+	 * title stayed on screen where the drag began (a finger on a phone, `item-slot.tsx`, `fingerDrag`).
 	 */
 	const draggedAsPicture = createMemo<ReadonlySet<string>>(() => {
 		const paths = [...(editor.boardDrag()?.paths ?? []), ...(editor.ownDrag() ? [editor.ownDrag()!.path] : [])];
@@ -1274,24 +1193,13 @@ export function Stage(props: {
 
 
 	// Moving the camera: the controller's (`camera/controller.ts`).
-	const { push: pushCamera, write: writeCamera, glideTo, cancelGlide, coast, cancelCoast, stopped: stoppedMoving } = ctl;
+	const { push: pushCamera, write: writeCamera, glideTo, cancelGlide, cancelCoast, stopped: stoppedMoving } = ctl;
 
 	/**
-	 * The camera shortcuts, in one place.
-	 *
-	 * Called from this document's keydown and from a board frame's — a click on a board
-	 * puts focus inside its iframe, and a keypress there never reaches the parent, so
-	 * without forwarding the shortcuts stopped working the moment anyone touched a
-	 * board. Returns whether the key meant anything, so the caller knows to swallow it.
+	 * The camera shortcuts, and the palette's one key, in one place. Returns whether the key meant
+	 * anything, so the caller knows to swallow it.
 	 */
 	const shortcut = (key: string): boolean => {
-		/*
-		 * The palette's keys live here rather than in the palette, for the same reason
-		 * the camera's do: a click on a board puts focus inside its iframe, so a
-		 * keypress arrives in the board's document and is handed back through
-		 * `frame-gestures.ts`. A component listening for its own key would hear nothing
-		 * the moment anyone touched a board.
-		 */
 		const tool = TOOL_KEYS[key];
 		if (tool && props.onTool) {
 			props.onTool(tool);
@@ -1328,13 +1236,6 @@ export function Stage(props: {
 	 */
 	const local = stagePoint;
 
-	/**
-	 * One wheel gesture, wherever it came from.
-	 *
-	 * The stage calls this with its own events; a board frame calls it through
-	 * `frame-gestures.ts`, because a wheel event inside an iframe never reaches this
-	 * document at all. Positions arrive already in stage coordinates.
-	 */
 	/** A wheel or a trackpad's pinch, already in stage coordinates (`camera/controller.ts`). */
 	const wheel = ctl.wheel;
 
@@ -1396,76 +1297,37 @@ export function Stage(props: {
 	};
 
 	/**
-	 * Every finger on the canvas, wherever it landed, and the camera they move.
+	 * Every finger on the canvas, and the camera they move.
 	 *
-	 * **One set of fingers for the whole stage**, and that is the load-bearing decision
-	 * here. A pinch does not respect the boundaries of the documents it happens over: one
-	 * finger can be inside a board's iframe and the other on bare canvas, or one on a
-	 * board's title bar and the other on a third board. Each of those is two event
-	 * streams and one gesture, and a tracker per stream turns it into two one-finger pans
-	 * — which is precisely the bug that made a pinch shove the canvas about. So the
-	 * fingers are pooled here (`touch.ts` reduces the pool), and the other documents feed
-	 * them in: `frame-gestures.ts` for a board's own document, `BoardFrame` for its title
-	 * bar.
-	 *
-	 * A finger can also be **claimed** by whoever it landed on — a scrollable embed, a
-	 * board being dragged by its bar. A claimed finger still counts towards the pool, so
-	 * a second finger makes a pinch with the right positions; it just does not pan. Two
-	 * fingers always win: a pinch clears every claim, because zooming out of a board you
-	 * had started to drag is a change of mind, not an ambiguity.
+	 * Fingers on the stage pan it natively (`camera/scroll-area.ts`): the browser scrolls, and the
+	 * camera follows from the scroll. Two are one pinch, the canvas's own (`touch.ts` reduces the pool,
+	 * `pinchCamera` moves the camera), wherever each landed: on bare canvas, on a card or on an item's
+	 * bar. A finger can be **claimed** by whoever it landed on (an item carried by its bar or its edge):
+	 * it still counts towards the pool, so a second finger makes a pinch with the right positions, and a
+	 * pinch clears every claim, because zooming out of an item you had started to drag is a change of
+	 * mind, not an ambiguity.
 	 */
 	const touches = createTouches();
 	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
 	const keptTouches = new Set<number>();
-	/** Fingers down on a board's page, as its messages tell them (`frame-gestures.ts`), by the stage's id. */
-	const forwarded = new Set<number>();
-	/** Hold the browser's scroll while two fingers are down, here or on a board (set when the stage mounts). */
-	let syncHold = (): void => {};
 	const claimed = new Set<number>();
-	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
+	/** Fingers this document is carrying. */
 	const carried = new Set<number>();
-	/*
-	 * The pan so far, as a path the camera has been dragged along, for the speed at release.
-	 * A gesture that was ever more than a one-finger pan of the camera (a pinch, a finger a
-	 * board claimed) does not coast.
-	 */
-	let trail: Sample[] = [];
-	let trailAt = { x: 0, y: 0 };
-	let noCoast = false;
 	/** The gesture so far has been a pinch: its lift ends the moving state at once (`stoppedMoving`). */
 	let pinched = false;
-	/**
-	 * A finger of this document's, in the stage's own coordinates.
-	 *
-	 * The pool is kept in stage coordinates because that is the space the camera works
-	 * in, and because a board's document has no other way to describe where a finger is —
-	 * it converts on its way out (`frame-gestures.ts`). Converting again on the way in
-	 * would subtract the stage's offset twice, which is a pinch that walks the canvas 90px
-	 * *down* for a gesture that never moved vertically at all: exactly the bug that this
-	 * conversion existing in one place instead of two is meant to stop.
-	 */
+	/** A finger, in the stage's own coordinates: the space the camera works in. */
 	const fingerOf = (event: PointerEvent): Finger => {
 		const at = stagePoint(event);
 		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 
-	/** One finger's worth of a gesture, from this document or from a board's. */
-	/**
-	 * Fingers on the stage itself pan it natively (`camera/scroll-area.ts`): the browser scrolls, and
-	 * the camera follows from the scroll. So a finger of this document moves nothing here, and nothing
-	 * coasts after it; a finger reported from a board's page (`decks:touch`) still pans by hand.
-	 */
-	const touch = (phase: "down" | "move" | "up", finger: Finger, native = false): TouchStep => {
+	/** One finger's worth of a gesture. A one-finger pan is the browser's scroll, so only a pinch moves the camera here. */
+	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		if (phase === "down") {
 			// A finger on the glass stops a coast, the way a hand stops a spinning list.
 			cancelCoast();
 			touches.down(finger);
-			if (touches.count() === 1) {
-				trail = [];
-				trailAt = { x: 0, y: 0 };
-				noCoast = false;
-				pinched = false;
-			}
+			if (touches.count() === 1) pinched = false;
 			setPanning(true);
 			return { kind: "idle" };
 		}
@@ -1474,46 +1336,30 @@ export function Stage(props: {
 			claimed.delete(finger.id);
 			if (touches.count() === 0) {
 				setPanning(false);
-				const thrown = noCoast ? undefined : coastStart(velocityFrom(trail, performance.now()));
-				trail = [];
-				if (thrown) coast(thrown);
-				else if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
+				if (pinched && (globalThis as { __decksPinchTail?: boolean }).__decksPinchTail !== true) stoppedMoving();
 			}
 			return { kind: "idle" };
 		}
 
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
-			noCoast = true;
 			pinched = true;
 			claimed.clear();
 			pushCamera(pinchCamera(ctl.now(), view(), step.from, step.to));
-			return step;
-		}
-		if (step.kind === "pan") {
-			if (claimed.has(finger.id) || native) noCoast = true;
-			else {
-				pushCamera(pan(ctl.now(), step.dx, step.dy));
-				trailAt = { x: trailAt.x + step.dx, y: trailAt.y + step.dy };
-				trail.push({ ...trailAt, t: performance.now() });
-				if (trail.length > 8) trail.shift();
-			}
 		}
 		return step;
 	};
 
 	const onTouchMove = (event: PointerEvent) => {
 		if (!carried.has(event.pointerId)) return;
-		touch("move", fingerOf(event), true);
+		touch("move", fingerOf(event));
 	};
 
 	const onTouchEnd = (event: PointerEvent) => {
 		if (!carried.has(event.pointerId)) return;
 		carried.delete(event.pointerId);
 		keptTouches.delete(event.pointerId);
-		// The browser took the finger to scroll with: its momentum is the browser's too.
-		if (event.type === "pointercancel") noCoast = true;
-		touch("up", fingerOf(event), true);
+		touch("up", fingerOf(event));
 		if (carried.size > 0) return;
 		window.removeEventListener("pointermove", onTouchMove);
 		window.removeEventListener("pointerup", onTouchEnd);
@@ -1566,10 +1412,8 @@ export function Stage(props: {
 	 * The whole hand, gone: the tab went to the background, or the OS took the gesture.
 	 *
 	 * Neither of those ends a touch in a way any document is told about — the events
-	 * simply stop — so every finger in the pool is released, including the ones reported
-	 * from a board's own document, because whatever took the gesture took all of them.
-	 * Without this, backgrounding the tab mid-pan is enough to leave the canvas reading
-	 * every later touch as a pinch.
+	 * simply stop — so every finger in the pool is released. Without this, backgrounding the
+	 * tab mid-pan is enough to leave the canvas reading every later touch as a pinch.
 	 */
 	const lostTouches = () => {
 		if (carried.size === 0 && touches.count() === 0) return;
@@ -1582,10 +1426,10 @@ export function Stage(props: {
 		if (document.visibilityState === "hidden") lostTouches();
 	};
 	/*
-	 * Focus moving *into* a board blurs this window too, and that happens on an ordinary
-	 * tap — so a bare `blur` handler would throw the gesture away as it began.
-	 * `document.hasFocus()` is the difference: it counts a nested frame as this document
-	 * having focus, and is false only when the browser or the tab really has lost it.
+	 * Focus moving into a card's field, or another frame, blurs this window too, and that happens on
+	 * an ordinary tap — so a bare `blur` handler would throw the gesture away as it began.
+	 * `document.hasFocus()` is the difference: it counts a nested frame as this document having focus,
+	 * and is false only when the browser or the tab really has lost it.
 	 */
 	const onBlur = () => {
 		if (document.hasFocus()) return;
@@ -1601,48 +1445,13 @@ export function Stage(props: {
 		window.removeEventListener("pointercancel", onTouchEnd);
 	});
 
-	/** What a board frame hands back when a canvas gesture starts inside it. */
-	const gestures: FrameGestureHost = {
-		wheel: (gesture) => wheel(gesture),
-		touch: (phase, finger) => {
-			// A board's finger: counted for holding the browser's scroll (`holdScroll`).
-			if (phase === "down") forwarded.add(finger.id);
-			else if (phase === "up") forwarded.delete(finger.id);
-			if (phase !== "move") syncHold();
-			return touch(phase, finger);
-		},
-		// A finger a board took (its bar or edge carries the board): the camera does not pan with it, and nor does the stage's native scroll.
+	/** What an item's slot asks of the stage's fingers: a finger its bar or edge took carries the item, and the camera does not pan with it. */
+	const gestures: StageBoardProps["gestures"] = {
 		claimTouch: (id) => {
 			claimed.add(id);
 			keptTouches.add(id);
 		},
 		pinching: () => touches.count() > 1,
-		pan: (dx, dy) => pushCamera(pan(ctl.now(), dx, dy)),
-		space: (held) => setSpaceHeld(held),
-		spaceHeld: () => grabbing(),
-		interactive: () => ctl.now().zoom >= INTERACT_ZOOM,
-		/*
-		 * Where a world point is on the stage right now, from the camera the gestures are
-		 * moving — `ctl.now()`, which is written synchronously in the same handler that
-		 * moves the world, so a frame asking mid-gesture gets the camera its event was
-		 * dispatched against. This is what lets a board frame convert a finger without
-		 * measuring itself: `getBoundingClientRect` on a frame is a forced layout of the
-		 * whole stage, and a pinch had two of them per step.
-		 */
-		screenOf: (world) => {
-			const at = toScreen(ctl.now(), view(), world);
-			return { x: at.x, y: at.y, scale: ctl.now().zoom };
-		},
-		key: (name) => shortcut(name),
-		/*
-		 * Same three keys as the window handler above, and deliberately the same code path —
-		 * a board frame forwards the *intent* rather than a key name, because `shortcut` takes
-		 * a bare key and `zoom-keys.ts` has already read the modifier.
-		 */
-		zoom: (direction) => {
-			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
-			else pushCamera(zoomAbout(ctl.now(), view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
-		},
 	};
 
 	/** Where the hovered block's grip goes: in the card's left margin, level with the block's first line. */
@@ -1713,16 +1522,9 @@ export function Stage(props: {
 	/** The camera boards and their bookkeeping see: the settled one (`camera/controller.ts`). */
 	const boardCamera = ctl.settled;
 	/**
-	 * Which boards are on screen, or within a viewport of it.
-	 *
-	 * A board off screen is a document not loaded — three of them is nothing, but a
-	 * deck of forty each pulling pdf.js is a browser on its knees. The margin is
-	 * one viewport, so panning reaches a board that is already rendered.
-	 */
-	/**
-	 * The boards within a window of the screen, by path, from the R-tree, as of the settled camera. A
-	 * new set only when a board enters or leaves it, so what reads it through `isNear` hears only
-	 * about its own board, and a pan that keeps the same boards near reaches none of them.
+	 * The boards and cards within a window of the screen, by path, from the R-tree, as of the settled
+	 * camera. A new set only when one enters or leaves it, so what reads it through `isNear` hears only
+	 * about its own item, and a pan that keeps the same ones near reaches none of them.
 	 */
 	const nearPaths = createMemo<ReadonlySet<string>>(
 		() => {
@@ -1738,28 +1540,8 @@ export function Stage(props: {
 	/** On screen, or within a window of it: the R-tree's answer, not each board's own arithmetic. */
 	const isVisible = (board: Board) => isNear(board.path);
 
-	/**
-	 * The boards that exist on the page at all: the ones `isVisible` would say yes to, found through a
-	 * spatial index (`spatial.ts`) rather than by asking every board — and any board that must stay
-	 * whatever the camera does: one whose document is showing, the selected one, the one being
-	 * edited, dragged or resized.
-	 *
-	 * A board outside that is not a node: no frame component, no title bar, nothing re-evaluated when
-	 * the camera moves. Every per-board thing a frame of the camera costs — `isVisible`,
-	 * the bar, the glow's read check — is then paid for the boards near the window, not for the stage.
-	 * The sheet draws the rest (`pen/scene.ts`), from the same kind of index.
-	 */
-	/**
-	 * **The rules for pages: below the live zoom (`INTERACT_ZOOM`, 50%) every board is its picture on
-	 * the sheet (`pen/scene.ts`); at it and above, the `LIVE_PAGES` boards nearest the middle of the
-	 * screen have their pages (six on a computer, one on an iPad or phone, `device.ts`) (`livePaths`); and the selected board keeps its page at any zoom.** The
-	 * set is chosen when the camera rests and held while it moves: nothing is queued, kept on a timer
-	 * or swapped for its picture while the camera moves.
-	 */
+	/** At or above this device's live zoom (`INTERACT_ZOOM`): items near the window have their slots, title and all. */
 	const liveNow = createMemo(() => ctl.zoom() >= INTERACT_ZOOM);
-	/** How many boards have a page showing at once, and how many let go are kept loaded and hidden: this device's budget (`device.ts`). */
-	const LIVE_PAGES = BUDGET.live;
-	const HIDDEN_PAGES = BUDGET.kept;
 	const boardIndex = createMemo(() => new BoxIndex(props.boards));
 	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
 	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
@@ -1769,22 +1551,37 @@ export function Stage(props: {
 		const corner = toWorld(cam, v, { x: -v.width, y: -v.height });
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
-	/** The boards with a page (`livePaths`, made further down, which sets this): each keeps its node, since a node taken away takes its page with it. */
-	let livePages: () => ReadonlySet<string> = () => new Set();
+	/*
+	 * Cards near the window are awake, at any zoom: a card is a few elements in this page, not a
+	 * document (`card.ts`), and one further off sleeps as its picture. A board is never awake: the sheet
+	 * draws it as its picture, and the canvas runs no board's page. A document or an app item is always
+	 * awake (`item-surfaces.tsx`).
+	 */
+	const nearCards = createMemo<readonly string[]>(
+		() => [...nearPaths()].filter((path) => props.boards[boardSlot().get(path) ?? -1]?.card),
+		[],
+		{ equals: (a, b) => a.length === b.length && a.every((path, i) => b[i] === path) },
+	);
+	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(nearCards()));
+	/** Whether a card is awake: each slot is told only when its own answer changes. */
+	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
+	/**
+	 * The items that have a slot on the page at all: those near the window at the live zoom, found
+	 * through a spatial index (`spatial.ts`) rather than by asking every one, and any that must stay
+	 * whatever the camera does: an awake card, the selected item, one being dragged or resized, and
+	 * every document and app item.
+	 *
+	 * Below the live zoom a board or a sleeping card is its picture on the sheet and nothing else, so it
+	 * has no node: 400 of them cost a pan step 10 ms of the page's time, and each camera step reached
+	 * every one. The stage finds the one under a press itself (`editor/dom/pointer.ts`, `pictureUnder`).
+	 */
 	const rendered = createMemo<readonly Board[]>((was) => {
 		const boards = props.boards;
 		if (view().width === 0) return was ?? [];
 		/*
-		 * Below the live zoom a board is its picture on the sheet and nothing else, so it has no node:
-		 * 400 of them cost a pan step 10 ms of the page's time, and each camera step reached every one.
-		 * The stage finds the board under a press itself (`editor/dom/pointer.ts`, `pictureUnder`). Not under the Canvas renderer,
-		 * where a board's node draws its own picture.
-		 *
-		 */
-		/*
-		 * Only at rest, as pages are (`liveChoice`): a pan or a zoom keeps the nodes it started with, and
-		 * the boards it brings in are drawn by the sheet until it stops. Making a zoom's new boards' nodes
-		 * mid-pinch, title bars and all, held camera steps for up to 52 ms on an iPad mini.
+		 * Only at rest: a pan or a zoom keeps the nodes it started with, and the items it brings in are
+		 * drawn by the sheet until it stops. Making a zoom's new nodes mid-pinch, title bars and all,
+		 * held camera steps for up to 52 ms on an iPad mini.
 		 */
 		const moved = was !== undefined && (moving() || panning() || scaling() || gliding());
 		const found = new Set(
@@ -1793,7 +1590,7 @@ export function Stage(props: {
 						const at = boardSlot().get(board.path);
 						return at === undefined ? [] : [at];
 					})
-				: props.renderer !== "dom" || liveNow()
+				: liveNow()
 					? boardIndex().search(reach())
 					: [],
 		);
@@ -1802,9 +1599,8 @@ export function Stage(props: {
 			if (at !== undefined) found.add(at);
 		};
 		for (const path of liveBoards().keys()) keep(path);
-		for (const path of shownBoards()) keep(path);
 		keep(props.selected);
-		for (const path of livePages()) keep(path);
+		for (const path of livePaths()) keep(path);
 		for (const path of editor.heldBoards()) keep(path);
 		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
 		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
@@ -1819,7 +1615,7 @@ export function Stage(props: {
 	const renderedPaths = createMemo(() => new Set(rendered().map((board) => board.path)));
 	/** Whether a board has a node: each board's slot is told only when its own answer changes. */
 	const isRendered = createSelector(renderedPaths, (path: string, paths) => paths.has(path));
-	/** The boards may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
+	/** The awake items may go on layers while the scale moves: few enough of them near the window. Worked out once per change, not per read. */
 	const layered = createMemo(() => scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET);
 
 	/** The camera as of its last rest. */
@@ -1896,89 +1692,6 @@ export function Stage(props: {
 		window.open(canvasHost().fileUrl(node.metadata.file), "_blank", "noopener");
 		return true;
 	};
-	/**
-	 * The boards with a page showing, and those whose page is kept hidden (`live-set.ts`): the selected
-	 * board at any zoom; at the live zoom, every board already up that still meets the window, then the
-	 * nearest, up to `LIVE_PAGES`; and the last `HIDDEN_PAGES` let go, kept. Chosen when the camera rests.
-	 */
-	const liveChoice = createMemo<LiveSet>(
-		(was) => {
-			const selected = props.selected;
-			/*
-			 * Never while the camera moves: a pan or a zoom neither starts a page nor takes one away. The
-			 * set is chosen again when it rests, at the zoom and place it rests at.
-			 */
-			if (moving() || panning() || scaling() || gliding()) return selected !== undefined && boardSlot().has(selected) && !was.live.includes(selected) ? { ...was, live: [...was.live, selected] } : was;
-			const cam = boardCamera();
-			const v = view();
-			const half = { w: v.width / 2 / cam.zoom, h: v.height / 2 / cam.zoom };
-			const boardOf = (path: string) => props.boards[boardSlot().get(path) ?? -1];
-			const distance = (board: Board) => Math.hypot(Math.max(board.x - cam.x, 0, cam.x - (board.x + board.w)), Math.max(board.y - cam.y, 0, cam.y - (board.y + board.h)));
-			const next = chooseLive({
-				was,
-				selected,
-				liveZoom: liveNow(),
-				near: [...nearPaths()].flatMap((path) => {
-					const board = boardOf(path);
-					return board ? [{ path, distance: distance(board) }] : [];
-				}),
-				inWindow: (path) => {
-					const board = boardOf(path);
-					return !!board && board.x < cam.x + half.w && board.x + board.w > cam.x - half.w && board.y < cam.y + half.h && board.y + board.h > cam.y - half.h;
-				},
-				exists: (path) => boardSlot().has(path),
-				limit: LIVE_PAGES,
-				keep: HIDDEN_PAGES,
-			});
-			return sameLive(next, was) ? was : next;
-		},
-		EMPTY_LIVE,
-	);
-	/*
-	 * Cards near the window are always live, at any zoom and outside the page budget: a card is a few
-	 * elements in this page, not a document (`card.ts`), so what a board's page costs it does not.
-	 */
-	const nearCards = createMemo<readonly string[]>(
-		() => [...nearPaths()].filter((path) => props.boards[boardSlot().get(path) ?? -1]?.card),
-		[],
-		{ equals: (a, b) => a.length === b.length && a.every((path, i) => b[i] === path) },
-	);
-	const livePaths = createMemo<ReadonlySet<string>>(() => new Set([...liveChoice().live, ...nearCards()]));
-	/** Boards whose page is kept loaded and hidden, so coming back to them loads nothing (`live-set.ts`). */
-	const hiddenPaths = createMemo<ReadonlySet<string>>(() => new Set(liveChoice().hidden));
-	const isHidden = createSelector(hiddenPaths, (path: string, paths) => paths.has(path));
-	livePages = () => new Set([...livePaths(), ...hiddenPaths()]);
-	/** Whether a board has its page: each board is told only when its own answer changes. */
-	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
-	/** Whether a board is drawn as a page rather than its picture. */
-	const paged = (board: Board) => isLive(board.path);
-	/*
-	 * The canvas's thumbnails and the host's word that boards have started, once the app has opened:
-	 * a thumbnail is a document on the same main thread as a board, and the least urgent one.
-	 */
-	let started = false;
-	createEffect(() => {
-		if (started || !props.boardsMayStart) return;
-		started = true;
-		openThumbnails();
-		props.onBoardsStarted?.();
-	});
-
-	// --- the canvas renderers ---------------------------------------------------------
-
-	/**
-	 * Settle redraws for every board, a few per frame (`redraw-queue.ts`).
-	 *
-	 * Under `canvas-per-board` each board draws its own canvas through it, so sixteen boards
-	 * settling at once is four frames of work rather than one long one.
-	 */
-	const redraws = createRedrawQueue({ perFrame: 4 });
-	onCleanup(() => redraws.clear());
-
-	/** What each board frame is given for the canvas renderer (`canvas/picture.ts`). */
-	const pictures = { queue: redraws };
-
-
 	/*
 	 * Where the canvas opens, the first time this conversation's boards arrive.
 	 *
@@ -1997,37 +1710,21 @@ export function Stage(props: {
 		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
 	});
 
-	/** One board, as the canvas draws it: the host's frame, told where it is and what it may do. */
+	/** One placed item's slot: the host's, told where it is and what it may do. */
 	const boardNode = (board: Board) => (
 		<Frame
 			board={board}
-			renderer={props.renderer}
-			scaling={scaling()}
-			moving={moving()}
-			pictures={pictures}
 			zoom={ctl.zoom()}
-			mounted={board.item !== undefined || isLive(board.path) || isHidden(board.path)}
-			hidden={board.item === undefined && !isLive(board.path) && isHidden(board.path)}
+			mounted={board.item !== undefined || isLive(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
 			selected={props.selected === board.path}
-			{...(props.onComment
-				? {
-						onCommentWords: (words: { quote: string; component?: string; anchor: () => DOMRect | undefined }) =>
-							props.onComment?.({ path: board.path, title: board.title, quote: words.quote, anchor: words.anchor, ...(words.component ? { component: words.component } : {}) }),
-					}
-				: {})}
-			sizing={sizingPaths().has(board.path)}
-			news={paged(board) ? props.news?.[board.path] : undefined}
-			onRead={() => props.onRead?.(board.path)}
 			gestures={gestures}
 			{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 			view={editor.boardView(board.path)}
 			{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 			onMove={(x, y) => props.onMove(board.path, x, y)}
-			{...(props.onResize ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
-			{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 			onOpen={() => pushCamera(frame([boxOf(board)]))}
 		/>
 	);
@@ -2123,14 +1820,12 @@ export function Stage(props: {
 			 */
 			tabindex={-1}
 			data-mode={props.mode}
-			data-renderer={props.renderer}
 			data-engine="true"
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
 			data-scaling={layered()}
 			data-gliding={gliding()}
-			/* Boards drawn as pictures while the camera moves: their pages are hidden (`canvas.css`). */
-			/* The camera rests at or above this device's live zoom: boards have pages and take the pointer. */
+			/* The camera rests at or above this device's live zoom: items near the window have their slots. */
 			data-live={liveNow() ? "true" : undefined}
 			data-moving={moving() || panning() || gliding() ? "true" : undefined}
 			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`). Off in the frame a zoom starts, so the layer is never stretched. */
@@ -2191,7 +1886,7 @@ export function Stage(props: {
 						);
 					}}
 				</For>
-				{/* The engine's canvas over the pages (`stage/engine.ts`): the pictures of boards with no live page, the drawing as tiles with a hole for each board, and what a gesture is moving. */}
+				{/* The engine's canvas over the slots (`stage/engine.ts`): the pictures of boards and sleeping cards, the drawing as tiles with a hole for each awake item, and what a gesture is moving. */}
 				<canvas
 					class="stage-engine stage-engine-over"
 					aria-hidden="true"

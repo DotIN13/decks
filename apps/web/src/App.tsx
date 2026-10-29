@@ -17,7 +17,7 @@ import { camera, glide, moveCamera, reducedMotion, setCamera } from "./state/cam
 import { cameraOntoPage } from "@decks/canvas/camera";
 import { flyAlong } from "./app/fly-along.ts";
 import { SPRING_BACK_MS, SPRING_BACK_RESPONSE, SPRING_MS } from "@decks/canvas/camera";
-import { handleFrame, pageRev, type FrameHooks } from "./app/frames.ts";
+import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
@@ -31,28 +31,23 @@ import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state}
 import { onPenRefused, pens } from "./state/pens.ts";
 import { optionFor } from "./chat/composer/thinking.ts";
 import { notice } from "./state/notices.ts";
-import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
+import {boardsOpen, boardsStarted, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
-import type { RendererChoice } from "@decks/canvas/host";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { PenBar } from "@decks/canvas/host";
 import { setPenTool } from "@decks/canvas/tools";
 import { pageKey } from "./chat/composer/parked.ts";
 import { CommentPopup } from "./markup/CommentPopup.tsx";
 import { commentBlock, withComments } from "./markup/comments.ts";
-import { markComment, unmarkComments } from "./markup/comment-select.ts";
 import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import "./app/canvas-host.ts";
-import { createEditor, createFramedEditor, isSharedBoard, type CanvasHandle } from "@decks/canvas";
+import { createEditor, createFramedEditor, type CanvasHandle } from "@decks/canvas";
 import { canvasBackend, canvasTicket, cardAgentCall, framedCanvas } from "./board/canvas-frame.ts";
-import { boardUrl } from "./lib/api.ts";
-import { mintBoardToken } from "./board/board-token.ts";
-import { attachBoardFrame } from "./board/frame-hooks.ts";
-import { shotAdaptor } from "./canvas/shots/adaptors.ts";
+import { boardPicture, boardUrl } from "./lib/api.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Stream } from "./chat/Stream.tsx";
@@ -101,11 +96,6 @@ export function App() {
 	 * (`state/history.ts`). The map of waiting readers lives with the request it mints, which
 	 * is why it is not part of the frame switch that answers it.
 	 */
-
-	/** How boards are drawn: each a live page (`dom`). The per-board canvas renderer went with the board frame. */
-	const renderer = (): RendererChoice => "dom";
-	/* What the stage is built for: a new renderer builds it again (`Show keyed` below). */
-	const stageBuild = createMemo(() => ({ renderer: renderer() }), undefined, { equals: (a, b) => a.renderer === b.renderer });
 
 	/*
 	 * The alerts: a cue, a banner and a badge, and the three conditions behind them
@@ -218,7 +208,6 @@ export function App() {
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
 		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused) : [];
 		const notes = commentIds.flatMap((id) => held.filter((note) => note.id === id));
-		unmarkComments(notes.map((note) => note.id));
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
 			case "prompt": {
@@ -249,20 +238,13 @@ export function App() {
 		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}), ...(target.items?.length ? { items: target.items } : {}) };
 		if (how === "keep") {
 			addComment(agentId, note);
-			if (target.range) markComment(note.id, target.range);
 			// Handed to the composer the way a dropped file is: a one-shot draft, here a pill.
 			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
 		} else {
 			send({ type: "agent.prompt", id: agentId, text: commentBlock([note]) });
 		}
-		target.frame?.contentDocument?.getSelection()?.removeAllRanges();
 		setCommenting(undefined);
 	};
-	/* The popup belongs to browsing with the pen down; anything else puts it away. */
-	createEffect(() => {
-		// A comment on the whole board, from its pill, is not a selection and stays in any mode.
-		if ((mode() !== "browse" || drawing()) && untrack(commenting)?.range) setCommenting(undefined);
-	});
 	/** The canvas on screen, when it is a friend's shared with you to view (`state/stages.ts`). */
 	const viewOnlyStage = () => viewOnly(stageOf(state.focused)?.name);
 	/* A backend that cannot write is read, and so is a friend's canvas shared with you to view: no edit mode and no pen, whichever key asked for them. */
@@ -1083,25 +1065,10 @@ export function App() {
 		moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
 	};
 
-	/**
-	 * From the pick of another canvas until its camera has landed. The new canvas's boards can reach
-	 * the page before the message that names the canvas, and drawn at the old camera they started
-	 * pages for a view that lasted half a second; this holds every page from the moment of the pick.
-	 */
-	const [switchingCanvas, setSwitchingCanvas] = createSignal(false);
-	let switchingTimer: ReturnType<typeof setTimeout> | undefined;
-	const switchingFor = (on: boolean) => {
-		clearTimeout(switchingTimer);
-		setSwitchingCanvas(on);
-		// Never for long: a switch the server refuses must not hold the canvas's pages.
-		if (on) switchingTimer = setTimeout(() => setSwitchingCanvas(false), 4000);
-	};
-
 	/** Move the conversation to a canvas: the stage manager's pick, and the panel's Open. The camera follows when the server says the agent is there (the canvas effect below). */
 	const openCanvas = (name: string) => {
 		const agentId = state.focused;
 		if (!agentId || stageOf(agentId)?.name === name) return;
-		switchingFor(true);
 		void act("agent.update", [{ canvas: name }], agentId);
 	};
 
@@ -1130,10 +1097,7 @@ export function App() {
 			if (!made) return;
 			setStagesOpen(false);
 			notice("info", `${made.title} is your own copy: change it as you like. It never changes theirs.`);
-			if (agentId) {
-				switchingFor(true);
-				void act("agent.update", [{ canvas: made.name }], agentId);
-			}
+			if (agentId) void act("agent.update", [{ canvas: made.name }], agentId);
 		});
 	};
 
@@ -1178,7 +1142,6 @@ export function App() {
 		moveCamera(next);
 		setSelected(chosen);
 		setOwner(to);
-		switchingFor(false);
 		reportCamera(next, to.scope);
 	};
 	const landOn = (to: CameraOwner) => {
@@ -1243,7 +1206,6 @@ export function App() {
 		if (to && (!to.canvas || untrack(stagePen)?.scope === to.canvas) && showsAny(next, { width: window.innerWidth, height: window.innerHeight }, untrack(canvasBoxes))) {
 			stopArriving();
 			setOwner({ scope: to.scope, ...(to.canvas ? { canvas: to.canvas } : {}) });
-			switchingFor(false);
 		}
 		setCameraAndReport(next);
 	};
@@ -1410,6 +1372,93 @@ export function App() {
 		},
 	];
 
+	/** The canvas: made once, as a component, so nothing read while it is made makes it again. */
+	const StageEditor = (): JSX.Element => {
+		/*
+		 * The shared editor (`@decks/canvas`'s `createEditor`), as Studio's is: boards shown as their
+		 * pictures, cards awake near the window, the pill instead of title bars. This app keeps what is its
+		 * own: the drawing is its server's (`document`), and the camera, selection, mode and ink are
+		 * this app's state, so the agent-centric camera (per agent and canvas, on this device) and
+		 * agents moving the view work as before.
+		 */
+		/*
+		 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
+		 * same options and state, its files read on a ticket for the canvas on screen.
+		 */
+		const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, dock: dockCover, openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"), upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])), viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
+		const editor = make({
+			text: "",
+			// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
+			dark: untrack(scheme) === "dark",
+			toolbar: false,
+			onSelection: (ids) => setPenSelected([...ids]),
+			state: {
+				pen: stagePen,
+				// The landing decides where the canvas opens (`landOn`); the stage's own first fit waits for it.
+				opening: () => (owner() ? { camera: camera() } : undefined),
+				camera: [camera, personMoved],
+				glide,
+				selected: [
+					selected,
+					(path) => setSelected(path),
+				],
+				mode: [mode, setMode],
+				inking: drawing,
+			},
+			document: {
+				send: (ops, edit) => {
+					const agentId = state.focused;
+					return agentId ? sendDrawingEdit(agentId, ops, edit) : Promise.resolve(false);
+				},
+				step: sendPenStep,
+			},
+			canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
+			boards: {
+				list: stageBoards,
+				// A card's file; a board is only ever its picture.
+				page: (path) => {
+					const board = boardsByPath().get(path);
+					return board ? boardUrl({ path: board.path, rev: board.rev }) : undefined;
+				},
+				onExtent: (path, extent) => {
+					send({ type: "board.extent", path, ...extent });
+				},
+				onOpenLink: openLinkedBoard,
+				news: newsGlow,
+				onRead: (path) => send({ type: "board.seen", path }),
+				// Hide is the board's item deleted from the drawing, as the server's canvas.delete does: shown at once (`drawing.ts`).
+				// Each picture the harness took of a board or a card, at its revision (`lib/api.ts`).
+				shots: () => ({ picture: boardPicture }),
+			},
+			onViewport: () => reportCameraSoon(camera()),
+			onComment: (comment) => setCommenting({ ...comment, open: true }),
+			onExport: exportPicture,
+			// Ink selected: the pill hands it to the agent on screen.
+			onInk: (request) => askAboutInk(request),
+			inkAgent: () => (state.focused ? (state.identities[state.focused]?.name ?? "the agent") : undefined),
+			onSelectTool: () => setPenTool("select"),
+			onRefer: (pills) =>
+				setDraft({
+					text: "",
+					pills,
+					at: Date.now(),
+					insert: true,
+					...(state.focused ? { agentId: state.focused } : {}),
+				}),
+		});
+		setEditorHandle(editor.handle);
+		// Every edit to the drawing on screen goes through the canvas, which shows it at once (`state/decks.ts`).
+		setDrawingEditor({ agentId: () => state.focused, edit: (ops) => editor.handle.edit(ops) });
+		onPenRefused((_agentId, edit) => editor.handle.refused(edit));
+		onCleanup(() => {
+			setDrawingEditor(undefined);
+			onPenRefused(undefined);
+			setEditorHandle(undefined);
+			editor.dispose();
+		});
+		return editor.surface();
+	};
+
 	return (
 		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
 			{/*
@@ -1427,113 +1476,9 @@ export function App() {
 			*/}
 
 			<div class="work">
-				{/*
-				 * Keyed on the renderer, so changing it in Settings rebuilds the stage: a board's document
-				 * lives in a different element under each renderer, and moving an iframe reloads it anyway,
-				 * so a clean remount is the honest version of the same cost.
-				 */}
 				<div class="surface" data-surface="stage">
 					<div class="surface-layer" data-layer="stage">
-				<Show when={stageBuild()} keyed>
-					{(current) => {
-						/*
-						 * The shared editor (`@decks/canvas`'s `createEditor`), as Studio's is: plain boards shown as
-						 * pictures while the camera moves, the pill instead of title bars. This app keeps what is its
-						 * own: the drawing is its server's (`document`), and the camera, selection, mode and ink are
-						 * this app's state, so the agent-centric camera (per agent and canvas, on this device) and
-						 * agents moving the view work as before.
-						 */
-						/*
-						 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
-						 * same options and state, its files read on a ticket for the canvas on screen.
-						 */
-						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, dock: dockCover, openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"), upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])), viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
-						const editor = make({
-							text: "",
-							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
-							dark: untrack(scheme) === "dark",
-							renderer: current.renderer,
-							toolbar: false,
-							onSelection: (ids) => setPenSelected([...ids]),
-							state: {
-								pen: stagePen,
-								// The landing decides where the canvas opens (`landOn`); the stage's own first fit waits for it.
-								opening: () => (owner() ? { camera: camera() } : undefined),
-								camera: [camera, personMoved],
-								glide,
-								selected: [
-									selected,
-									(path) => setSelected(path),
-								],
-								mode: [mode, setMode],
-								inking: drawing,
-							},
-							document: {
-								send: (ops, edit) => {
-									const agentId = state.focused;
-									return agentId ? sendDrawingEdit(agentId, ops, edit) : Promise.resolve(false);
-								},
-								step: sendPenStep,
-							},
-							canvasName: () => (state.focused ? pens()[state.focused]?.stage : undefined),
-							boards: {
-								list: stageBoards,
-								page: (path) => {
-									const board = boardsByPath().get(path);
-									// At the revision its page was loaded at, when only its size has changed since (`pageRev`).
-									return board ? boardUrl({ path: board.path, rev: pageRev(board) }) : undefined;
-								},
-								mintBoardToken: mintBoardToken,
-								// A document board's socket, and comments on words selected in a board (`board/frame-hooks.ts`).
-								attach: attachBoardFrame,
-								sandboxed: isSharedBoard,
-								mayStart: boardsMayStart,
-								switching: switchingCanvas,
-								onStarted: canvasOpened,
-								onExtent: (path, extent) => {
-									send({ type: "board.extent", path, ...extent });
-								},
-								onOpenLink: openLinkedBoard,
-								news: newsGlow,
-								onRead: (path) => send({ type: "board.seen", path }),
-								// Hide is the board's item deleted from the drawing, as the server's canvas.delete does: shown at once (`drawing.ts`).
-								shots: () => {
-									const adaptor = shotAdaptor();
-									return {
-										picture: (board, look) => adaptor.picture(board, look),
-										ownPicture: adaptor.id !== "canvas",
-									};
-								},
-							},
-							onViewport: () => reportCameraSoon(camera()),
-							onComment: (comment) => setCommenting({ ...comment, open: true }),
-							onExport: exportPicture,
-							// Ink selected: the pill hands it to the agent on screen.
-							onInk: (request) => askAboutInk(request),
-							inkAgent: () => (state.focused ? (state.identities[state.focused]?.name ?? "the agent") : undefined),
-							onSelectTool: () => setPenTool("select"),
-							onRefer: (pills) =>
-								setDraft({
-									text: "",
-									pills,
-									at: Date.now(),
-									insert: true,
-									...(state.focused ? { agentId: state.focused } : {}),
-								}),
-						});
-						setEditorHandle(editor.handle);
-						// Every edit to the drawing on screen goes through the canvas, which shows it at once (`state/decks.ts`).
-						setDrawingEditor({ agentId: () => state.focused, edit: (ops) => editor.handle.edit(ops) });
-						onPenRefused((_agentId, edit) => editor.handle.refused(edit));
-						onCleanup(() => {
-							setDrawingEditor(undefined);
-							onPenRefused(undefined);
-							setEditorHandle(undefined);
-							editor.dispose();
-						});
-						return editor.surface();
-					}}
-				</Show>
+				<StageEditor />
 					</div>
 				</div>
 
@@ -2052,7 +1997,6 @@ export function App() {
 						comments={waitingComments(state.focused)}
 						onCommentsGone={(ids) => {
 							for (const id of ids) if (state.focused) removeComment(state.focused, id);
-							unmarkComments(ids);
 						}}
 						onText={setBarText}
 						destination={destinationLabel(destination(barText(), barContext()))}

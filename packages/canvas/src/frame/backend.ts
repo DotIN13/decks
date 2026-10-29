@@ -15,7 +15,7 @@ export interface Backend {
 	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
 	/** This frame's name on its stream (`/api/v1/doc` answers to it). */
 	frame: string;
-	/** One of the harness's own routes beside the verbs (`/api/v1/board-seen`, `board-extent`, `board-token`), answering its JSON. */
+	/** One of the harness's own routes beside the verbs (`/api/v1/board-seen`, `board-extent`), answering its JSON. */
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
