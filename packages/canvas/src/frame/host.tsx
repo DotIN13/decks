@@ -30,6 +30,10 @@ export interface FrameHostOptions {
 	ink?(ink: NonNullable<ComposerPart["ink"]>): void;
 	/** Open one of the app's panels. */
 	panel?(name: "apps"): void;
+	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */
+	dock?(): number;
+	/** Each agent's name and colour, for what is new on the canvas. */
+	agents?(): Record<string, { name: string; color: string }>;
 	/** The conversation on screen, whose `decks view …` the frame carries out on its canvas. */
 	focused?(): string | undefined;
 	/** A view the frame kept for another conversation: the harness hears it, to answer that agent's `view.camera`. */
@@ -94,7 +98,7 @@ export function createFramedEditor(options: Options): Editor {
 			backend,
 			files: { base: ticket.files, expires: ticket.expires },
 			pictures: ticket.pictures,
-			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
+			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.agents?.()) ? { agents: untrack(() => options.frame.agents!())! } : {}), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
 			stored,
@@ -258,7 +262,14 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		createEffect(() => {
 			const page = end();
-			if (page && options.boards?.news) page.emit("news", { glow: options.boards.news() });
+			const dock = options.frame.dock?.();
+			if (page && dock !== undefined) page.emit("look", { dock });
+		});
+		// Each agent's name and colour, when they change: the frame works out what is new itself.
+		createEffect(() => {
+			const page = end();
+			const agents = options.frame.agents?.();
+			if (page && agents) page.emit("look", { agents });
 		});
 		createEffect(() => {
 			const page = end();

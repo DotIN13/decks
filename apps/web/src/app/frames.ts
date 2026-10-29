@@ -435,9 +435,15 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
 					 */
 					if (framedCanvas && ["show", "camera", "reload", "cursor"].includes(message.call.op)) {
-						const named = (message.call.args as { stage?: unknown } | undefined)?.stage;
-						const on = typeof named === "string" ? named : stageOf(message.call.agentId)?.name;
-						if (on && on === stageOf(state.focused)?.name) return;
+						const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
+						const screen = stageOf(state.focused)?.name;
+						// A cursor or a reload names a card: the frame answers when that card is on the canvas it shows.
+						if ((message.call.op === "cursor" || message.call.op === "reload") && typeof args?.path === "string") {
+							if (state.boards.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
+						} else {
+							const on = typeof args?.stage === "string" ? args.stage : stageOf(message.call.agentId)?.name;
+							if (on && on === screen) return;
+						}
 					}
 					/*
 					 * A picture of a board as this browser has it, for an agent's screenshot: taken

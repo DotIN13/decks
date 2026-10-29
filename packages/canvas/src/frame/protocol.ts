@@ -55,7 +55,7 @@ export interface Start {
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`; or a pattern with `{path}` and `{scheme}` in it, where they are kept otherwise (Studio). */
 	pictures: string;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string; agents?: Record<string, { name: string; color: string }> };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -76,13 +76,12 @@ export interface PageToFrame {
 	token: { token: string };
 	reload: { path: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
-	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string };
+	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number };
 	tool: { tool?: PenTool; ink?: { on: boolean } };
 	camera: { camera: Camera; glide?: number };
 	fit: Record<string, never>;
 	select: { ids: readonly string[]; page?: string };
 	step: { direction: "undo" | "redo" };
-	news: { glow: Record<string, string> };
 	marks: { path: string; marks: Array<{ id: string; quote: string; component?: string }> };
 	busy: { switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } };
 	/** The tools' state, what changed of it (`ui-sync.ts`). */
@@ -176,11 +175,21 @@ export function peer<Out, OutCalls extends Record<string, { data: unknown; value
 	let next = 1;
 	const waiting = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 	const listeners = new Map<string, Handler[]>();
+	/*
+	 * Events that came before anything listened for them: the frame starts listening only once it has
+	 * its drawing, and what the page said meanwhile (its dock, its agents) is not lost but handed over
+	 * when the first listener for it comes. A few of each are kept.
+	 */
+	const early = new Map<string, unknown[]>();
 	const answers = new Map<string, Handler>();
 	port.onmessage = (event: MessageEvent<Message>) => {
 		const message = event.data;
 		if (!message || typeof message !== "object") return;
-		if (message.t === "event") for (const handler of listeners.get(message.name) ?? []) handler(message.data);
+		if (message.t === "event") {
+			const handlers = listeners.get(message.name);
+			if (handlers?.length) for (const handler of handlers) handler(message.data);
+			else early.set(message.name, [...(early.get(message.name) ?? []), message.data].slice(-20));
+		}
 		else if (message.t === "reply") {
 			const one = waiting.get(message.id);
 			if (!one) return;
@@ -211,6 +220,11 @@ export function peer<Out, OutCalls extends Record<string, { data: unknown; value
 			const list = listeners.get(name) ?? [];
 			list.push(handler as Handler);
 			listeners.set(name, list);
+			const waiting = early.get(name);
+			if (waiting) {
+				early.delete(name);
+				for (const data of waiting) (handler as Handler)(data);
+			}
 		},
 		answer: (name, handler) => void answers.set(name, handler as Handler),
 		close: () => {

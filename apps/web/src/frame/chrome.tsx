@@ -52,7 +52,15 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			<Show when={!(drawing() && chrome.mode() === "browse")}>
 				<PenBar tools={false} doc={(chrome.revision(), handle.drawn())} onEdit={(ops) => handle.edit(ops)} onStep={step} onArm={() => {}} onExport={(ids) => chrome.exportPicture(ids)} />
 			</Show>
-			<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} layers={{ open: layers(), onToggle: () => setLayers((was) => !was) }} />
+			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
+			<Show
+				when={chrome.narrow()}
+				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} layers={{ open: layers(), onToggle: () => setLayers((was) => !was) }} />}
+			>
+				<div class="frame-tool-row" style={{ bottom: `${chrome.dock() + 8}px` }}>
+					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
+				</div>
+			</Show>
 			<Show when={layers() && !drawing()}>
 				<FrameLayers chrome={chrome} onClose={() => setLayers(false)} />
 			</Show>

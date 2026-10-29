@@ -3606,4 +3606,15 @@ body {
 		background: var(--v3-bg2);
 		color: var(--v3-fg);
 	}
+	/* A phone's tool row in the canvas frame, above the page's dock (`frame/chrome.tsx`). */
+	.frame-tool-row {
+		position: absolute;
+		z-index: 20;
+		left: 8px;
+		right: 8px;
+	}
+	.frame-tool-row .v3-tools[data-row="true"] {
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
 }

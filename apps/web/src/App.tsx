@@ -295,6 +295,22 @@ export function App() {
 		onCleanup(() => window.removeEventListener("pointerdown", press, true));
 	});
 	let dockEl: HTMLDivElement | undefined;
+	/** How far up from the bottom the dock reaches: the canvas frame puts a phone's tool row above it. */
+	const [dockCover, setDockCover] = createSignal(0);
+	/** Measured from the dock itself, whenever it is drawn: it comes and goes with the conversation. */
+	const watchDock = (el: HTMLDivElement) => {
+		dockEl = el;
+		const measure = () => setDockCover(el.isConnected ? Math.max(0, Math.round(window.innerHeight - el.getBoundingClientRect().top)) : 0);
+		const watch = new ResizeObserver(measure);
+		watch.observe(el);
+		addEventListener("resize", measure);
+		queueMicrotask(measure);
+		onCleanup(() => {
+			watch.disconnect();
+			removeEventListener("resize", measure);
+			setDockCover(0);
+		});
+	};
 	/** How much of a put-away composer still shows: the tab that brings it back. */
 	const STOW_TAB = 36;
 	let unstowComposer = () => {};
@@ -1431,7 +1447,7 @@ export function App() {
 						 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
 						 * same options and state, its files read on a ticket for the canvas on screen.
 						 */
-						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
+						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend, comment: frameComment, ink: frameInk, panel: () => openAppsPanel(), agent: cardAgentCall, dock: dockCover, upload: ({ files: dropped, at }) => files.dropAt(at, dropped), focused: () => state.focused, agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])), viewFor: (agentId, camera) => reportCamera(camera, agentId) } }) : createEditor;
 						const editor = make({
 							text: "",
 							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.
@@ -1984,7 +2000,7 @@ export function App() {
 				 * is the whole reason it is a row and not a chip that comes and goes: the box
 				 * you type into must not move between turns.
 				 */}
-				<div class="dock" ref={dockEl}>
+				<div class="dock" ref={watchDock}>
 					{/* Only drawn while the bar is put away behind the right edge (a hard throw
 					    at it, `float.ts`): the one part of it left on screen, and the way back. */}
 					<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => unstowComposer()}>

@@ -14,6 +14,8 @@ import { fitInto } from "../camera/camera.ts";
 import { cardCalls } from "./card-calls.ts";
 import { runStageCall } from "../stage-ops.ts";
 import type { ViewOffer } from "./chrome.ts";
+import { AgentCursor } from "../AgentCursor.tsx";
+import { isNews } from "../board-news.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
@@ -67,6 +69,11 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const [revision, setRevision] = createSignal(0);
 	const [agent, setAgent] = createSignal<string | undefined>(start.look.agent);
 	const [offer, setOffer] = createSignal<ViewOffer>();
+	const [dock, setDock] = createSignal(0);
+	const [narrow, setNarrow] = createSignal(innerWidth < 600);
+	addEventListener("resize", () => setNarrow(innerWidth < 600));
+	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
+	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
 	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
 	let touched = 0;
 	for (const type of ["pointerdown", "wheel", "keydown"]) addEventListener(type, () => (touched = performance.now()), { capture: true, passive: true });
@@ -109,7 +116,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
 	if (start.look.insets) useInsets(start.look.insets);
 	document.documentElement.dataset.colorScheme = start.look.dark ? "dark" : "light";
-	const [news, setNews] = createSignal<Record<string, string>>({});
+	/** Each agent's name and colour, from the page: what is new glows in its writer's colour. */
+	const [agents, setAgents] = createSignal<Record<string, { name: string; color: string }>>(start.look.agents ?? {});
+	/** What is new on the canvas: a card an agent changed that you have not read since, in that agent's colour (`board-news.ts`). */
+	const news = () => {
+		const out: Record<string, string> = {};
+		for (const page of pages()) if (isNews(page)) out[page.path] = (page.lastWrittenBy && agents()[page.lastWrittenBy]?.color) || "var(--color-accent)";
+		return out;
+	};
 	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
 	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
 	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? own(path);
@@ -248,6 +262,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const { handle } = editor;
 	// For the checks: the drawing as this frame has it (a card can read it anyway, with canvas.read).
 	(globalThis as { __decksFrameDrawn?: () => unknown }).__decksFrameDrawn = () => handle.drawn();
+	(globalThis as { __decksFrameNews?: () => unknown }).__decksFrameNews = () => news();
+	(globalThis as { __decksFrameState?: () => unknown }).__decksFrameState = () => ({ dock: dock(), agents: Object.keys(agents()).length, agent: agent(), cursor: cursor(), pages: pages().length });
 	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
 	function takeOff(path: string): boolean {
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
@@ -349,8 +365,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				},
 				select: selectCard,
 				reload: (path) => handle.reloadBoard(path),
-				// An agent's labelled dot on a card is the page's to draw, and the frame has none yet.
-				cursor: () => {},
+				cursor: (at) => setCursor(at),
 			});
 		} catch (error) {
 			value = { error: error instanceof Error ? error.message : String(error) };
@@ -399,6 +414,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			arrive(data.agent);
 		}
 		if (data.insets) useInsets(data.insets);
+		if (data.agents) setAgents(data.agents);
+		if (data.dock !== undefined) setDock(data.dock);
 		if (data.dark !== undefined) {
 			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
 			setDark(data.dark);
@@ -414,7 +431,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	end.on("fit", () => handle.fit());
 	end.on("select", (data) => handle.select(data.ids));
 	end.on("step", (data) => (data.direction === "undo" ? handle.undo() : handle.redo()));
-	end.on("news", (data) => setNews(data.glow));
 	end.on("marks", (data) => setMarks({ ...untrack(marks), [data.path]: data.marks }));
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
 	end.answer("edit", (data) => {
@@ -453,6 +469,23 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
 	});
 
+	/*
+	 * The agent's cursor, over the canvas on a layer that follows the camera: the card's place plus the
+	 * point on it, drifting from one place to the next and one size on the screen at any zoom.
+	 */
+	const cursorAt = () => {
+		const at = cursor();
+		const card = at ? pages().find((page) => page.path === at.path) : undefined;
+		return at && card ? { x: card.x + at.x, y: card.y + at.y, label: at.label, color: at.color } : null;
+	};
+	const cursors = () => (
+		<div class="frame-cursors" style={{ position: "absolute", inset: "0", overflow: "hidden", "pointer-events": "none", "z-index": "5" }}>
+			<div style={{ position: "absolute", left: "0", top: "0", "transform-origin": "0 0", transform: `translate(${innerWidth / 2}px, ${innerHeight / 2}px) scale(${camera().zoom}) translate(${-camera().x}px, ${-camera().y}px)` }}>
+				<AgentCursor cursor={cursorAt()} zoom={camera().zoom} />
+			</div>
+		</div>
+	);
+
 	if (chrome) {
 		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
 		const view = chrome({
@@ -472,12 +505,15 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			setComment,
 			compose: (part) => end.emit("composer", part),
 			exportPicture: (ids) => end.emit("export", { ids }),
+			narrow,
+			dock,
 			panel: (name) => end.emit("panel", { name }),
 			canvas: start.canvas.name,
 		});
 		render(() => (
 			<>
 				{editor.surface()}
+				{cursors()}
 				{view}
 			</>
 		), root);
@@ -492,7 +528,12 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	});
 	if (start.tools) applyTools?.(start.tools);
 
-	render(() => (start.look.toolbar ? editor.root() : editor.surface()), root);
+	render(() => (
+		<>
+			{start.look.toolbar ? editor.root() : editor.surface()}
+			{cursors()}
+		</>
+	), root);
 }
 
 /** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */

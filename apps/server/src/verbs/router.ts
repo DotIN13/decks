@@ -307,8 +307,10 @@ export function onCanvas(app: Pick<App, "stage" | "agents">, message: { type: st
 	 * another canvas, and a board's picture, stay the page's.
 	 */
 	if (message.type === "stage.call") {
-		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown } } | undefined;
+		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
 		if (!call || !["show", "camera", "reload", "cursor"].includes(call.op ?? "")) return false;
+		// A cursor or a reload names a card: the frame showing the canvas it is on answers, whoever's home that is.
+		if ((call.op === "cursor" || call.op === "reload") && typeof call.args?.path === "string") return boardOnCanvas(app, call.args.path, canvas);
 		const named = typeof call.args?.stage === "string" ? call.args.stage : undefined;
 		if (named !== undefined) return named === canvas;
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;

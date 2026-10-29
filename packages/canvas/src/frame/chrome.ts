@@ -36,6 +36,10 @@ export interface FrameChrome {
 	exportPicture(ids: string[]): void;
 	/** Open one of the app's own panels. */
 	panel(name: "apps"): void;
+	/** Whether the frame is a phone's width: the tools are a row then, above the page's dock. */
+	narrow: Accessor<boolean>;
+	/** How far up from the bottom the page's dock reaches, in pixels. */
+	dock: Accessor<number>;
 	/** The canvas's name, and the frame's own width, for a chrome that lays out by it. */
 	canvas: string;
 }
