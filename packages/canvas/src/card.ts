@@ -354,6 +354,37 @@ async function drawParts(host: HTMLElement, root: ShadowRoot, body: HTMLElement,
 	await cardCode(body, lib).catch((error) => console.warn("card code:", error));
 }
 
+/**
+ * The deck's own libraries, beside the boards' (`assets/importmap.json`, `{ "imports": { "name": "address" } }`):
+ * added to the page's import map once, before the first card's script that could name one. An address
+ * is taken from the file's own folder when it is relative. A name the page already maps keeps its
+ * first address, as import maps do, so a deck cannot swap the boards' d3.
+ */
+function deckImports(cardUrl: string): Promise<void> {
+	const at = new URL("../assets/importmap.json", cardUrl).href;
+	return once(`importmap:${at}`, async () => {
+		try {
+			const response = await fetch(at, { cache: "no-cache" });
+			if (!response.ok) return;
+			const given = (await response.json()) as { imports?: Record<string, unknown> };
+			const imports: Record<string, string> = {};
+			for (const [name, address] of Object.entries(given.imports ?? {})) {
+				if (typeof address !== "string" || !name) continue;
+				const url = new URL(address, at);
+				if (url.protocol === "https:" || url.origin === location.origin) imports[name] = url.href;
+			}
+			if (!Object.keys(imports).length) return;
+			const script = document.createElement("script");
+			script.type = "importmap";
+			script.dataset.cardImports = at;
+			script.textContent = JSON.stringify({ imports });
+			document.head.append(script);
+		} catch (error) {
+			console.warn(`card libraries ${at}:`, error);
+		}
+	});
+}
+
 const registryPerRoot = (() => {
 	try {
 		const Registry = (globalThis as { CustomElementRegistry?: new () => CustomElementRegistry }).CustomElementRegistry;
@@ -424,6 +455,7 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 			// After board.css and the parts it draws, so a script that measures its card measures it as it shows.
 			await sheetReady;
 			await partsDrawn;
+			await deckImports(source.url);
 			for (const script of scripts) {
 				if (controller.signal.aborted) return;
 				const address = script.src ?? `${base}.m${script.n}.js`;

@@ -23,6 +23,30 @@ function withoutModules(source: string): { html: string; srcs: string[] } {
 	return { html, srcs };
 }
 
+/** The boards' import map, with the deck's own names (`assets/importmap.json`) added where the boards' have none. */
+function withDeckImports(extra: Record<string, string> | undefined): string {
+	if (!extra || !Object.keys(extra).length) return IMPORT_MAP;
+	const map = JSON.parse(IMPORT_MAP) as { imports: Record<string, string> };
+	for (const [name, address] of Object.entries(extra)) if (!(name in map.imports)) map.imports[name] = address;
+	return JSON.stringify(map, null, 2);
+}
+
+/** A deck's `assets/importmap.json` read for a card's page: names to addresses, relative ones from the deck's `assets/`. */
+export function readDeckImports(text: string | undefined, assetsUrl: string): Record<string, string> {
+	if (!text) return {};
+	try {
+		const given = JSON.parse(text) as { imports?: Record<string, unknown> };
+		const out: Record<string, string> = {};
+		for (const [name, address] of Object.entries(given.imports ?? {})) {
+			if (typeof address !== "string" || !name) continue;
+			out[name] = /^https:\/\//.test(address) ? address : `${assetsUrl}${address.replace(/^\.\//, "")}`;
+		}
+		return out;
+	} catch {
+		return {};
+	}
+}
+
 const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /**
@@ -32,7 +56,7 @@ const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "
  */
 export { cardModules };
 
-export function cardPage(input: { path: string; source: string; title: string; w: number; shared: boolean }): string {
+export function cardPage(input: { path: string; source: string; title: string; w: number; shared: boolean; deckImports?: Record<string, string> }): string {
 	const name = input.path.split("/").pop() ?? "card.html";
 	const { html, srcs } = withoutModules(input.source);
 	const count = cardModules(input.source).length;
@@ -45,7 +69,7 @@ export function cardPage(input: { path: string; source: string; title: string; w
 	<meta name="board" content='${JSON.stringify({ w: input.w })}' />
 	<link rel="stylesheet" href="../lib/board.css" />
 	<script type="importmap">
-${IMPORT_MAP}
+${withDeckImports(input.deckImports)}
 	</script>
 </head>
 <body class="board" style="width:${input.w}px">

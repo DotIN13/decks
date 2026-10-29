@@ -307,6 +307,8 @@ export class BoardService {
 		if (refused) throw new Error(refused);
 		const file = this.deck.fileOf(path);
 		const before = existsSync(file) ? readFileSync(file, "utf8") : undefined;
+		// A canvas's first card makes its `cards/`.
+		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);

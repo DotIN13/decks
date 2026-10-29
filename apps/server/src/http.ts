@@ -15,7 +15,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { MAX_UPLOAD_BYTES, STT_MODELS, THINKING_LEVELS, type ExtensionUiAnswer, type ThinkingLevel } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck, resolveServed } from "./deck/roots.ts";
 import { canvasFolder, canvasNameOk, canvasOfPath, isBoardPagePath, isCardPath, isSharedCanvas, servedAs, SHARED_SANDBOX } from "./deck/layout.ts";
-import { cardModules, cardPage } from "./boards/cards.ts";
+import { cardModules, cardPage, readDeckImports } from "./boards/cards.ts";
 import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
@@ -616,7 +616,9 @@ export function createHttpApp(app: App): Express {
 			// A card opened by itself, or pictured: the piece in a page of its own (`boards/cards.ts`).
 			if (req.query.raw === undefined && isCardPath(requested)) {
 				const shared = isSharedCanvas(canvasOfPath(asked)?.name ?? "");
-				const page = cardPage({ path: requested, source: await readFile(target, "utf8"), title: board?.title ?? requested, w: board?.w ?? 600, shared });
+				const mapFile = resolveServed(app.deck.path, "assets/importmap.json");
+				const deckImports = readDeckImports(existsSync(mapFile) ? await readFile(mapFile, "utf8") : undefined, "../assets/");
+				const page = cardPage({ path: requested, source: await readFile(target, "utf8"), title: board?.title ?? requested, w: board?.w ?? 600, shared, deckImports });
 				res.type("html").send(versionLibRefs(page, libVersion(app.deck.path)));
 				return;
 			}

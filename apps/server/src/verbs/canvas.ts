@@ -3,7 +3,8 @@ import { basename, dirname } from "node:path";
 import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
-import { isCardPath } from "../deck/layout.ts";
+import { canvasFolder, isCardPath } from "../deck/layout.ts";
+import { existsSync } from "node:fs";
 import { serverText } from "../stage/text.ts";
 import { slug } from "../agents/slug.ts";
 import type { ShotFormat, ShotOf } from "../stage/shots.ts";
@@ -125,9 +126,27 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 	};
 
 	/** A caller's item as pen's: a board becomes its `browser` item, sized as its file says unless told. */
+	/** Whether a deck path is a file already, recorded or not. */
+	const existsIn = (path: string): boolean => existsSync(resolveInDeck(service.deckPath(), path) ?? "");
 	const fromItem = (raw: unknown, taken: Set<string>, frame?: string): Record<string, unknown> => {
 		if (!raw || typeof raw !== "object" || typeof (raw as { type?: unknown }).type !== "string") throw new Error('An item has a type: { type: "note", content: "…" }, or { type: "board", board: "boards/plan.html" }.');
 		let item = raw as Record<string, unknown>;
+		/*
+		 * A card from its HTML, `{ type: "card", html, title?, width?, height? }`: written to the canvas's own
+		 * `cards/` first, named from its title, then placed by its file like any other.
+		 */
+		if (item.type === "card" && typeof item.html === "string" && item.card === undefined) {
+			if (frame || !onCanvas) throw new Error("A card from HTML is written into a canvas's own cards/: name a canvas, not a frame.");
+			const { html, title: given, width, height, ...others } = item as Record<string, unknown> & { html: string };
+			const title = typeof given === "string" && given.trim() ? given.trim() : (/<title>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.trim() ?? "Card");
+			const size = { w: typeof width === "number" ? Math.round(width) : 600, ...(typeof height === "number" ? { h: Math.round(height) } : {}) };
+			const base = slug(title, 48) || "card";
+			let path = `${canvasFolder(onCanvas)}/cards/${base}.html`;
+			for (let n = 2; service.fileBoard(path) || existsIn(path); n++) path = `${canvasFolder(onCanvas)}/cards/${base}-${n}.html`;
+			const head = [/<title>/i.test(html) ? "" : `<title>${title.replace(/</g, "&lt;")}</title>`, /<meta\s+name=["']board["']/i.test(html) ? "" : `<meta name="board" content='${JSON.stringify(size)}' />`].filter(Boolean).join("\n");
+			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
+			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
+		}
 		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
 		if (item.type === "card") {
 			const { card, ...others } = item;

@@ -292,6 +292,11 @@ export class StageService {
 		return this.host.newBoard(options);
 	}
 
+	/** Write a card's file (a canvas's `cards/`), recorded and announced as a board's write is. */
+	writeCard(path: string, html: string): Board {
+		return this.host.writeBoard(path, html);
+	}
+
 	/**
 	 * Set a board's size: the one number in the file, written by the thing that owns it.
 	 *
