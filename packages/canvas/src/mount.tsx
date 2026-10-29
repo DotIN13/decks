@@ -61,6 +61,12 @@ export interface CanvasOptions {
 		/** Where a sandboxed board's storage is kept in this page's own storage: one key per harness, canvas and board. */
 		storageKey?(path: string): string;
 		/**
+		 * Whether a card's scripts run (`card.ts`): a card is drawn in this page, so its script acts as this
+		 * page does. Left out, a card runs its scripts unless it is sandboxed; a host whose sandbox comes
+		 * from its own server's headers (Studio's copy of a friend's canvas) says no here instead.
+		 */
+		cardScripts?(path: string): boolean;
+		/**
 		 * The host's own records of the boards (their revision, format and title), as its server keeps
 		 * them, in place of the ones read off the drawing. Read reactively.
 		 */
@@ -482,7 +488,7 @@ export function createEditor(
 			if (!path) document.querySelector<HTMLElement>(".decks-canvas .stage, .stage")?.focus();
 			}}
 			onMove={moveBoard}
-			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.boards?.attach ? { attach: options.boards.attach } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
+			frame={(slot) => <PlainBoard {...slot} reload={reloads()[slot.board.path]} marks={options.boards?.marks?.(slot.board.path)} page={options.boards?.page?.(slot.board.path)} {...(boardHost ? { boardHost } : {})} {...(options.boards?.attach ? { attach: options.boards.attach } : {})} {...(options.canvasName ? { stage: options.canvasName } : {})} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false } : {})} {...(options.boards?.sandboxed?.(slot.board.path) ? { sandboxed: { key: () => options.boards?.storageKey?.(slot.board.path) ?? slot.board.path } } : {})} />}
 			shots={
 			options.boards?.shots ??
 			(() => ({

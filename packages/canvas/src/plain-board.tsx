@@ -83,6 +83,8 @@ export interface PlainBoardExtras {
 	stage?: (() => string | undefined) | undefined;
 	/** Words on this board with a comment waiting on them: kept marked in its page (`board.js`). */
 	marks?: Array<{ id: string; quote: string; component?: string }> | undefined;
+	/** False when a card's scripts may not run here, whatever else it is (`mount.tsx`, `cardScripts`). */
+	cardScripts?: boolean | undefined;
 }
 
 export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
@@ -485,7 +487,7 @@ export function PlainBoard(props: StageBoardProps & PlainBoardExtras) {
 					<CardSurface
 						page={props.page!}
 						path={props.board.path}
-						trusted={!props.sandboxed && !props.board.path.startsWith("shared/")}
+						trusted={!props.sandboxed && props.cardScripts !== false && !props.board.path.startsWith("shared/")}
 						rev={props.board.rev}
 						reload={props.reload}
 						size={size}
