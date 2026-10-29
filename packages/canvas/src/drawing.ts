@@ -79,7 +79,10 @@ export interface DrawingOptions {
  */
 export const PENDING_MS = 6000;
 
-export const isBoard = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.board";
+/** A board's tag, or a card's: a card is a board drawn in a shadow root of the stage's page (`card.ts`). */
+const PAGE_TAGS = new Set(["decks.board", "decks.card"]);
+export const isBoard = (node: PenNode) => node.type === "browser" && PAGE_TAGS.has(String((node.metadata as { type?: string } | undefined)?.type));
+export const isCardItem = (node: PenNode) => node.type === "browser" && (node.metadata as { type?: string } | undefined)?.type === "decks.card";
 export const boardPath = (node: PenNode) => String((node.metadata as { path?: unknown }).path ?? node.id);
 const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 
@@ -97,6 +100,7 @@ export function boardsOf(doc: PenDocument): Board[] {
 			h: num(node.height, 640),
 			rev: 0,
 			inContext: [],
+			...(isCardItem(node) ? { card: true as const } : {}),
 		});
 	}
 	return boards;

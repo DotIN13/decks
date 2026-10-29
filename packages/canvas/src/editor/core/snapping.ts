@@ -22,7 +22,7 @@ export function snapTargets(scene: SceneQuery, ids: readonly string[], boards: r
 	for (const placed of scene.items()) {
 		const { node } = placed;
 		if (moving.has(node.id) || node.id.includes("/") || isArrow(node)) continue;
-		if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
+		if (node.type === "browser" && (node.metadata?.type === "decks.board" || node.metadata?.type === "decks.card")) continue;
 		if (placed.parent && !parents.has(placed.parent)) continue;
 		const box = scene.box(node.id) ?? placed.box;
 		if (seen(box)) out.push(box);

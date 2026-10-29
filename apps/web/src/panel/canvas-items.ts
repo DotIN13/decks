@@ -29,7 +29,7 @@ export function canvasItems(doc: PenDocument | undefined, query = ""): { items: 
 		if (meta.type === "decks.arrow") {
 			arrows.push(id);
 			continue;
-		} else if (meta.type === "decks.board") item = { id, box, kind: "board", label: named ?? clip(meta.path?.split("/").pop()?.replace(/\.html$/, ""), "Board"), ...(meta.path ? { board: meta.path } : {}) };
+		} else if (meta.type === "decks.board" || meta.type === "decks.card") item = { id, box, kind: "board", label: named ?? clip(meta.path?.split("/").pop()?.replace(/\.html$/, ""), "Board"), ...(meta.path ? { board: meta.path } : {}) };
 		else if (n.type === "note") item = { id, box, kind: "note", label: named ?? clip(n.content, "Note") };
 		else if (n.type === "text") item = { id, box, kind: "text", label: named ?? clip(n.content, "Text") };
 		else if (meta.type === "decks.ink" || n.type === "path") item = { id, box, kind: "ink", label: named ?? "Drawing" };

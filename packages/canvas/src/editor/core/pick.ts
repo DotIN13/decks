@@ -32,7 +32,7 @@ export type PickOptions = {
 /** What a press found: the item, its node, and the box it covers (a copy). */
 export type Picked = { id: string; node: PenNode; box: Rect };
 
-const isBoard = (node: PenNode) => node.type === "browser" && node.metadata?.type === "decks.board";
+const isBoard = (node: PenNode) => node.type === "browser" && (node.metadata?.type === "decks.board" || node.metadata?.type === "decks.card");
 const contains = (box: Rect, point: Pt) => point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
 
 /**
