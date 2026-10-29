@@ -1,4 +1,4 @@
-// Write runtime/skills/pen-design/schema.md, the .pen field reference agents read, from the pen package:
+// Write runtime/skills/canvas-design/schema.md, the .pen field reference agents read, from the pen package:
 //   packages/pen/src/types.ts   each field's values and its comment (PenNode, Fill, Effect)
 //   packages/pen/src/fields.ts  which item type has which field, and what Decks keeps without drawing
 // Run: node --import tsx scripts/gen-pen-schema.mjs        Check only: node --import tsx scripts/gen-pen-schema.mjs --check
@@ -9,7 +9,7 @@ import { FIELDS, UNDRAWN_EFFECTS, UNDRAWN_FILLS } from "../packages/pen/src/fiel
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const typesFile = `${root}packages/pen/src/types.ts`;
-const out = `${root}runtime/skills/pen-design/schema.md`;
+const out = `${root}runtime/skills/canvas-design/schema.md`;
 
 const source = ts.createSourceFile(typesFile, readFileSync(typesFile, "utf8"), ts.ScriptTarget.Latest, true);
 
@@ -129,7 +129,7 @@ if (process.argv.includes("--check")) {
 		/* missing is drift too */
 	}
 	if (had !== text) {
-		console.error("runtime/skills/pen-design/schema.md is out of date with packages/pen: run node --import tsx scripts/gen-pen-schema.mjs");
+		console.error("runtime/skills/canvas-design/schema.md is out of date with packages/pen: run node --import tsx scripts/gen-pen-schema.mjs");
 		process.exit(1);
 	}
 } else {

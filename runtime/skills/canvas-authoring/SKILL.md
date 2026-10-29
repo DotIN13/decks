@@ -1,5 +1,5 @@
 ---
-name: pen-stage
+name: canvas-authoring
 description: A canvas is a native pen.dev .pen file — its cards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, canvas calls and boxes, beside and below, canvases, and patterns for arranging cards. Read before your first decks canvas insert or batch.
 ---
 
@@ -132,7 +132,7 @@ instance is updated by its id path, `"card-1/label"`, and the change is kept in 
 
 ## The items
 
-To design a screen, a page or a slide, read the pen-design skill; its `schema.md` lists every
+To design a screen, a page or a slide, read the canvas-design skill; its `schema.md` lists every
 item type and field with its values.
 
 Every item has `type` and `id`, and may have `name`, `x`, `y`, `width`, `height`, `opacity` (0–1),

@@ -1,6 +1,6 @@
 ---
-name: pen-design
-description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a design, a UI, a layout or a visual to look at and change; an interactive mockup or a demo is an HTML board instead. Read pen-stage first for the canvas calls; schema.md beside this skill lists every item type and field.
+name: canvas-design
+description: Design an app screen, a web page, a slide, a dashboard or a component as real pen frames on the canvas, editable by hand, openable in pen.dev and exportable as HTML. Use when someone asks for a design, a UI, a layout or a visual to look at and change; an interactive mockup or a demo is an HTML board instead. Read canvas-authoring first for the canvas calls; schema.md beside this skill lists every item type and field.
 ---
 
 # Designing on the canvas
@@ -9,7 +9,7 @@ A design here is a **top-level frame on the canvas**: a screen, a page, a slide.
 is pen.dev's own items (frames, text, shapes, icons, pictures), so the person can select and move
 any part, pen.dev opens the canvas as it is, and `decks canvas export` turns a frame into a web
 page. Every item type and field, with its values and what Decks does not draw, is in
-[schema.md](schema.md) beside this file; pen-stage covers the canvas calls and cards. This skill is
+[schema.md](schema.md) beside this file; canvas-authoring covers the canvas calls and cards. This skill is
 about putting them together.
 
 **Drawing, card or app?** Draw a design when the person wants to see it and shape it: a screen,
