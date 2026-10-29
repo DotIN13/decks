@@ -35,8 +35,15 @@ export const FOLDER_TICKET_MS = 12 * 3_600_000;
  */
 const SHARED_FOLDER = /^\/api\/board\/shared\/canvases\/[^/.][^/]*\/[^/.][^/]*\/$/;
 
-/** Whether a ticket's path is a shared canvas's whole folder rather than one page. */
-export const isFolderTicket = (path: string): boolean => SHARED_FOLDER.test(path);
+/**
+ * One of your own canvases' folders, `/api/board/canvases/<name>/`: what the canvas frame reads its
+ * files on (`packages/canvas/src/frame/`). The frame is sandboxed, with no token and no cookie of the
+ * harness's, so the ticket in its addresses is all it has, and it reads that canvas and nothing else.
+ */
+const OWN_FOLDER = /^\/api\/board\/canvases\/[^/.][^/]*\/$/;
+
+/** Whether a ticket's path is a canvas's whole folder rather than one page. */
+export const isFolderTicket = (path: string): boolean => SHARED_FOLDER.test(path) || OWN_FOLDER.test(path);
 
 /**
  * The token id a ticket the harness makes for its own pages is made with (`stage/shots.ts`): its own
@@ -70,6 +77,8 @@ export function ticketPath(given: string): string | undefined {
 		const folder = `/api/board/shared/canvases/${shared[1]}/${shared[2]}/`;
 		return SHARED_FOLDER.test(folder) ? folder : undefined;
 	}
+	// One of your own canvases' folders, for the canvas frame.
+	if (OWN_FOLDER.test(path)) return path;
 	if (!/^\/api\/(?:board|f)\/[^/]/.test(path)) return undefined;
 	// No `..` or `.` segment: a ticket names the page it is for, and that page only.
 	if (path.split("/").some((segment) => segment === ".." || segment === ".")) return undefined;
@@ -79,9 +88,11 @@ export function ticketPath(given: string): string | undefined {
 /** Whether a ticket's path admits a request for `requested` (decoded): the same page, or inside the same app. */
 export function covers(path: string, requested: string): boolean {
 	if (isFolderTicket(path)) {
+		// The folder's pictures too (`/api/thumb/<the same folder>…`), which the canvas draws its cards and boards from.
+		const asked = requested.startsWith("/api/thumb/") ? `/api/board/${requested.slice("/api/thumb/".length)}` : requested;
 		// Inside the folder, every part plain: never `..`, `.`, or a hidden folder.
-		if (!requested.startsWith(path)) return false;
-		return requested.slice(path.length).split("/").every((part) => part !== "" && !part.startsWith("."));
+		if (!asked.startsWith(path)) return false;
+		return asked.slice(path.length).split("/").every((part) => part !== "" && !part.startsWith("."));
 	}
 	if (!path.startsWith("/app/")) return requested === path;
 	// The bare `/app/<name>` is redirected to `/app/<name>/`, ticket and all.

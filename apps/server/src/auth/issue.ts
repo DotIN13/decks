@@ -4,7 +4,7 @@ import type { App } from "../app.ts";
 import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
-import { FOLDER_TICKET_MS, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
+import { FOLDER_TICKET_MS, isFolderTicket, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
 import { TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
 import { bearerOf, originOf } from "./guard.ts";
 
@@ -412,7 +412,7 @@ export function doorRoutes(app: App): express.Router {
 			const path = ticketPath(given);
 			if (path) made[given] = app.tickets.make(path, id, now);
 		}
-		res.json({ tickets: made, expires: now + TICKET_MS, ...(Object.values(made).length && Object.keys(made).some((one) => ticketPath(one)?.endsWith("/") && ticketPath(one)?.startsWith("/api/board/shared/")) ? { folderExpires: now + FOLDER_TICKET_MS } : {}) });
+		res.json({ tickets: made, expires: now + TICKET_MS, ...(Object.values(made).length && Object.keys(made).some((one) => isFolderTicket(ticketPath(one) ?? "")) ? { folderExpires: now + FOLDER_TICKET_MS } : {}) });
 	});
 
 	return api;

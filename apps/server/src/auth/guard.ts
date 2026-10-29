@@ -229,6 +229,12 @@ export function guard(gate: Gate) {
 				req.url = carried.rest;
 				req.principal = { kind: "page", path } satisfies Principal;
 				res.setHeader("Referrer-Policy", "no-referrer");
+				/*
+				 * Readable by a sandboxed page: the canvas frame fetches its cards and imports their modules
+				 * with `Origin: null`. The ticket in the address is the credential, and what it admits is the
+				 * canvas's own files, which that frame shows anyway.
+				 */
+				res.setHeader("Access-Control-Allow-Origin", "*");
 				next();
 				return;
 			}

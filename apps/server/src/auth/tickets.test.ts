@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { TokenStore } from "./tokens.ts";
-import { covers, TICKET_MS, ticketPath, Tickets } from "./tickets.ts";
+import { covers, isFolderTicket, TICKET_MS, ticketPath, Tickets } from "./tickets.ts";
 
 /** A token store in a fresh folder, a token in it, and tickets that ask it whether the token still works. */
 function setUp() {
@@ -116,4 +116,18 @@ test("a token is refused from a page on a site other than the one it was given t
 	} finally {
 		cleanup();
 	}
+});
+
+test("a canvas frame's ticket admits its own canvas's folder and pictures, and nothing else", () => {
+	const folder = ticketPath("/api/board/canvases/plan/");
+	assert.equal(folder, "/api/board/canvases/plan/");
+	assert.ok(!isFolderTicket(ticketPath("/api/board/canvases/.hidden/") ?? ""), "never a hidden folder's ticket");
+	assert.ok(covers(folder!, "/api/board/canvases/plan/cards/sales/index.html"));
+	assert.ok(covers(folder!, "/api/board/canvases/plan/cards/sales@abc/index.html.m0.js"), "a card's module, at a version");
+	assert.ok(covers(folder!, "/api/board/canvases/plan/lib/board.css"), "the runtime beside it");
+	assert.ok(covers(folder!, "/api/thumb/canvases/plan/cards/sales/index.html"), "its pictures");
+	assert.ok(!covers(folder!, "/api/board/canvases/other/cards/x/index.html"), "not another canvas");
+	assert.ok(!covers(folder!, "/api/thumb/canvases/other/boards/x.html"), "not another canvas's pictures");
+	assert.ok(!covers(folder!, "/api/board/canvases/plan/.decks/x"), "not a hidden part");
+	assert.ok(!covers(folder!, "/api/v1/canvas.read"), "not the API");
 });

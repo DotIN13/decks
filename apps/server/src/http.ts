@@ -1303,6 +1303,15 @@ export function createHttpApp(app: App): Express {
 		server.get(["/", "/index.html"], (req, res, next) => void shell(req, res).catch(next));
 		// Compressed and cached by name first (`static.ts`); anything it passes on is sent plain,
 		// with the same cache rule.
+		/*
+		 * The app's own scripts, styles, fonts and engine are public, and the canvas frame loads them from a
+		 * sandboxed page with no origin: a module script, a font and a fetched `.wasm` are read only with
+		 * CORS, so they say anyone may. The Decks page itself (`/`) is not among them.
+		 */
+		server.use((req, res, next) => {
+			if ((req.method === "GET" || req.method === "HEAD") && !req.path.startsWith("/api/") && req.path !== "/" && req.path !== "/index.html") res.setHeader("Access-Control-Allow-Origin", "*");
+			next();
+		});
 		server.use(compressedStatic(webDist));
 		server.use(
 			express.static(webDist, {
