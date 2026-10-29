@@ -17,6 +17,7 @@ pub async fn headless_with(limits: wgpu::Limits) -> Option<Gpu> {
 pub async fn headless_sampled(limits: wgpu::Limits, samples: u32) -> Option<Gpu> {
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::METAL, ..wgpu::InstanceDescriptor::new_without_display_handle() });
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.ok()?;
-	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits: limits, ..Default::default() }).await.ok()?;
+	let required_features = adapter.features() & wgpu::Features::TEXTURE_COMPRESSION_ASTC;
+	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits: limits, required_features, ..Default::default() }).await.ok()?;
 	Some(Gpu::on(device, queue, crate::Api::Native, samples))
 }

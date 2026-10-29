@@ -36,6 +36,29 @@ const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse
  * shrunk board near the screen gets its whole picture back (`wantBoardPictures`).
  */
 const REST_MS = 250;
+
+/**
+ * A board picture compressed for the GPU, as the server sends it (`apps/server/src/boards/astc.ts`):
+ * `DKA1`, width, height and the number of sizes, each size's length, then the sizes' ASTC blocks.
+ * What `putCompressedPicture` takes: the bytes, and `[at, length, …]` of each size.
+ */
+export function readCompressed(data: Uint8Array): { data: Uint8Array; width: number; height: number; spans: Uint32Array; bytes: number } | undefined {
+	if (data.length < 16 || String.fromCharCode(...data.subarray(0, 4)) !== "DKA1") return undefined;
+	const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+	const width = view.getUint32(4, true);
+	const height = view.getUint32(8, true);
+	const levels = view.getUint32(12, true);
+	const spans = new Uint32Array(levels * 2);
+	let at = 16 + 4 * levels;
+	for (let n = 0; n < levels; n++) {
+		const length = view.getUint32(16 + 4 * n, true);
+		spans[n * 2] = at;
+		spans[n * 2 + 1] = length;
+		at += length;
+	}
+	if (at > data.length || levels === 0) return undefined;
+	return { data, width, height, spans, bytes: at - (16 + 4 * levels) };
+}
 /** Pictures fetched at once, and a stand-in picture asked for again this often, this many times. */
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
@@ -1391,7 +1414,9 @@ export class StageEngine {
 				this.shrunk.delete(key);
 			}
 			const size = /^(https?:|\/)/.test(board.picture) ? this.pictures.width : 0;
-			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}` : board.picture;
+			// Compressed for the GPU where it takes them (`putCompressedPicture`): written as it comes, a quarter of the memory.
+			const astc = size && this.page.compressedPictures() ? "&astc=1" : "";
+			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}${astc}` : board.picture;
 			this.fetchPicture(key, url, true, board.picture, size);
 		}
 	}
@@ -1409,6 +1434,10 @@ export class StageEngine {
 	private budgetBytes(): number {
 		return ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? this.pictures.budgetMB) * 2 ** 20;
 	}
+	/** Board pictures put compressed (`putCompressedPicture`), for checks. */
+	private compressedPut = 0;
+	/** Each compressed board picture's width and height, for checks. */
+	private compressedSize = new Map<string, [number, number]>();
 	/** Boards whose picture was shrunk on the GPU to fit the budget, to get back whole when near the window again. */
 	private shrunk = new Set<string>();
 
@@ -1523,6 +1552,22 @@ export class StageEngine {
 			.then(async (response) => {
 				if (!response.ok) throw new Error(String(response.status));
 				const standIn = response.headers.get("X-Decks-Stand-In") === "1";
+				if (board && response.headers.get("Content-Type")?.startsWith("application/vnd.decks.astc")) {
+					const packed = readCompressed(new Uint8Array(await response.arrayBuffer()));
+					if (!packed || this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return;
+					this.putPaced(() => {
+						if (this.disposed || !this.page || this.picturesAsked.get(key) !== asked) return;
+						if (!this.page.putCompressedPicture(key, packed.data, packed.width, packed.height, packed.spans)) return;
+						this.pictureBytes.set(key, packed.bytes);
+						this.wholeBytes.set(key, packed.bytes);
+						this.shrunk.delete(key);
+						this.picturesPut++;
+						this.compressedPut++;
+						this.compressedSize.set(key, [packed.width, packed.height]);
+						this.draw();
+					});
+					return;
+				}
 				const blob = await response.blob();
 				const { bitmap: forPage, width, height } = await this.picture(blob);
 				// Asked again since (a sharper copy, an engine started again): this one is not wanted.

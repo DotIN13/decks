@@ -91,6 +91,10 @@ export class PageEngine {
      */
     carrying(): string;
     /**
+     * Whether this device takes compressed pictures (`putCompressedPicture`): ASTC, on Apple's GPUs and most phones.
+     */
+    compressedPictures(): boolean;
+    /**
      * Tiles let go of past the budget, `[[scale, x, y], …]`, to tell the worker.
      */
     evict(): string;
@@ -177,6 +181,12 @@ export class PageEngine {
      * The boards drawn as their picture in the last frame.
      */
     pictured(): string;
+    /**
+     * A picture by its address that came compressed: ASTC 4 × 4 blocks for each of `levels` sizes,
+     * size `n` at `data[at[n] .. at[n] + length[n]]` (`spans` is `[at, length, …]`), `width` × `height`
+     * its first, each a multiple of 4. Written as it came, straight to the GPU, nothing decoded.
+     */
+    putCompressedPicture(url: string, data: Uint8Array, width: number, height: number, spans: Uint32Array, later?: boolean | null): boolean;
     /**
      * An icon's shapes, as `parseIcon` gives them, by the key the engine asked for (after `icon:`).
      */
@@ -443,6 +453,7 @@ export interface InitOutput {
     readonly pageengine_cards: (a: number) => [number, number];
     readonly pageengine_carry: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_carrying: (a: number) => [number, number];
+    readonly pageengine_compressedPictures: (a: number) => number;
     readonly pageengine_evict: (a: number) => [number, number];
     readonly pageengine_extent: (a: number) => [number, number];
     readonly pageengine_fontNeeds: (a: number) => [number, number];
@@ -466,6 +477,7 @@ export interface InitOutput {
     readonly pageengine_pick: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pickAll: (a: number, b: number, c: number, d: number) => [number, number];
     readonly pageengine_pictured: (a: number) => [number, number];
+    readonly pageengine_putCompressedPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number, h: number, i: number) => number;
     readonly pageengine_putIcon: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly pageengine_putPicture: (a: number, b: number, c: number, d: any, e: number, f: number, g: number) => void;
     readonly pageengine_putTile: (a: number, b: number, c: number, d: number, e: any) => void;
@@ -526,8 +538,8 @@ export interface InitOutput {
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined___js_sys_762d7119dc256902___Function_fn_wasm_bindgen_88dfb4ffd4c83218___JsValue_____wasm_bindgen_88dfb4ffd4c83218___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___JsValue__core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__106: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__107: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__108: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wasm_bindgen_88dfb4ffd4c83218___sys__JsNullable_wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_37ee0ce0c4cd57d5___result__Result_____wasm_bindgen_88dfb4ffd4c83218___JsError___true__109: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___web_sys_46aa44363d28b235___features__gen_Event__Event______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_88dfb4ffd4c83218___convert__closures_____invoke___wgpu_67f4ba21438bfaa9___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

@@ -29,7 +29,9 @@ pub async fn adapter() -> Result<Found, String> {
 pub async fn open(found: Found, target: wgpu::SurfaceTarget<'static>, width: u32, height: u32, samples: u32) -> Result<Gpu, String> {
 	let Found { instance, adapter } = found;
 	let surface = instance.create_surface(target).map_err(|e| e.to_string())?;
-	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(|e| e.to_string())?;
+	// Compressed pictures (`Gpu::compressed_picture`) where the adapter has them: Apple's GPUs, most phones.
+	let required_features = adapter.features() & wgpu::Features::TEXTURE_COMPRESSION_ASTC;
+	let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_features, ..Default::default() }).await.map_err(|e| e.to_string())?;
 	let mut gpu = Gpu::on(device, queue, Api::WebGpu, samples);
 	gpu.set_surface(surface, &adapter, width, height);
 	Ok(gpu)

@@ -53,6 +53,9 @@ impl Api {
 	}
 }
 
+/// Compressed pictures' format: ASTC in 4 × 4 blocks, a byte a pixel, colours as they are (as RGBA8 holds them).
+pub const ASTC: wgpu::TextureFormat = wgpu::TextureFormat::Astc { block: wgpu::AstcBlock::B4x4, channel: wgpu::AstcChannel::Unorm };
+
 pub struct Gpu {
 	pub device: wgpu::Device,
 	pub queue: wgpu::Queue,
@@ -120,6 +123,35 @@ impl Gpu {
 		self.textures.insert(id, tex);
 	}
 
+	/// Whether this device takes compressed pictures (`compressed_picture`).
+	pub fn compressed_pictures(&self) -> bool {
+		self.device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_ASTC)
+	}
+
+	/// A compressed picture's texture under `id`: ASTC in 4 × 4 blocks, a byte a pixel, `width` ×
+	/// `height` (each a multiple of 4) with `levels` sizes, every one written as it came
+	/// (`write_level`): the GPU draws it as it is, with nothing decoded or copied by the page.
+	pub fn compressed_picture(&mut self, id: u32, width: u32, height: u32, levels: u32) {
+		let tex = Tex::with_format(&self.device, &self.pipelines.picture_layout, ASTC, width, height, levels);
+		self.textures.insert(id, tex);
+	}
+
+	/// One size of a compressed picture (`compressed_picture`), its 4 × 4 blocks in rows.
+	pub fn write_level(&mut self, id: u32, level: u32, blocks: &[u8]) {
+		let Some(tex) = self.textures.get(&id) else { return };
+		let size = tex.texture.size().mip_level_size(level, wgpu::TextureDimension::D2).physical_size(tex.texture.format());
+		let (across, down) = (size.width / 4, size.height / 4);
+		if blocks.len() < (across * down * 16) as usize {
+			return;
+		}
+		self.queue.write_texture(
+			wgpu::TexelCopyTextureInfo { texture: &tex.texture, mip_level: level, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+			blocks,
+			wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(across * 16), rows_per_image: Some(down) },
+			size,
+		);
+	}
+
 	/// Make the smaller sizes of the picture under `id` from its first, on the GPU.
 	pub fn fill_levels(&mut self, id: u32) {
 		let Some(tex) = self.textures.get(&id) else { return };
@@ -141,10 +173,16 @@ impl Gpu {
 			return None;
 		}
 		let (w, h) = ((tex.width / 2).max(1), (tex.height / 2).max(1));
-		let smaller = Tex::with_levels(&self.device, &self.pipelines.picture_layout, TextureKind::Color, w, h, levels - 1);
+		let format = tex.texture.format();
+		// A compressed texture is whole blocks wide and tall: one that would not be is kept as it is.
+		let (bw, bh) = format.block_dimensions();
+		if w % bw != 0 || h % bh != 0 {
+			return None;
+		}
+		let smaller = Tex::with_format(&self.device, &self.pipelines.picture_layout, format, w, h, levels - 1);
 		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("shrink") });
 		for n in 1..levels {
-			let size = tex.texture.size().mip_level_size(n, wgpu::TextureDimension::D2);
+			let size = tex.texture.size().mip_level_size(n, wgpu::TextureDimension::D2).physical_size(format);
 			encoder.copy_texture_to_texture(
 				wgpu::TexelCopyTextureInfo { texture: &tex.texture, mip_level: n, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
 				wgpu::TexelCopyTextureInfo { texture: &smaller.texture, mip_level: n - 1, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },

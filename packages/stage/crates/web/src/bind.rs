@@ -379,6 +379,35 @@ impl PageEngine {
 		}
 	}
 
+	/// Whether this device takes compressed pictures (`putCompressedPicture`): ASTC, on Apple's GPUs and most phones.
+	#[wasm_bindgen(js_name = compressedPictures)]
+	pub fn compressed_pictures(&self) -> bool {
+		self.gpu.as_ref().is_some_and(Gpu::compressed_pictures)
+	}
+
+	/// A picture by its address that came compressed: ASTC 4 × 4 blocks for each of `levels` sizes,
+	/// size `n` at `data[at[n] .. at[n] + length[n]]` (`spans` is `[at, length, …]`), `width` × `height`
+	/// its first, each a multiple of 4. Written as it came, straight to the GPU, nothing decoded.
+	#[wasm_bindgen(js_name = putCompressedPicture)]
+	pub fn put_compressed_picture(&mut self, url: &str, data: &js_sys::Uint8Array, width: u32, height: u32, spans: Vec<u32>, later: Option<bool>) -> bool {
+		let Some(gpu) = &mut self.gpu else { return false };
+		if !gpu.compressed_pictures() || width % 4 != 0 || height % 4 != 0 || spans.len() < 2 {
+			return false;
+		}
+		let levels = (spans.len() / 2) as u32;
+		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
+		gpu.compressed_picture(id, width, height, levels);
+		for (level, span) in spans.chunks(2).enumerate() {
+			gpu.write_level_js(id, level as u32, &data.subarray(span[0], span[0] + span[1]));
+		}
+		if later.unwrap_or(false) {
+			self.page.picture_unlaid(url, id, width, height);
+		} else {
+			self.page.picture(url, id, width, height);
+		}
+		true
+	}
+
 	/// The picture `url` at its next size down, on the GPU, for a quarter of the memory (`Gpu::shrink`):
 	/// `[width, height]` of what is held now, or null if it has no smaller size or is not held.
 	#[wasm_bindgen(js_name = shrinkPicture)]

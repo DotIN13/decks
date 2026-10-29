@@ -613,3 +613,38 @@ fn a_pictures_smaller_sizes_are_its_averages_and_shrinking_keeps_them() {
 	}
 	assert_eq!(g.shrink(9), Some((16, 8)), "and again, from what it kept");
 }
+
+/// One ASTC block of one colour (the format's "void extent"), RGBA as 16-bit values.
+fn astc_flat(rgba: [u16; 4]) -> [u8; 16] {
+	let mut block = [0u8; 16];
+	block[..8].copy_from_slice(&0xFFFF_FFFF_FFFF_FDFCu64.to_le_bytes());
+	for (i, v) in rgba.iter().enumerate() {
+		block[8 + i * 2..10 + i * 2].copy_from_slice(&v.to_le_bytes());
+	}
+	block
+}
+
+/// A compressed picture is written size by size as it came (`Gpu::write_level`), and shrinks on the
+/// GPU while its half is still whole blocks: 32 × 16 to 16 × 8 to 8 × 4, then no further.
+#[test]
+fn a_compressed_picture_is_written_as_it_came_and_shrinks_by_whole_blocks() {
+	let Some(mut g) = gpu() else { return };
+	if !g.compressed_pictures() {
+		eprintln!("no ASTC on this GPU: skipped");
+		return;
+	}
+	let (w, h) = (32u32, 16u32);
+	let levels = crate::exec::resources::levels_for(w, h);
+	g.compressed_picture(5, w, h, levels);
+	for level in 0..levels {
+		let (lw, lh) = ((w >> level).max(1), (h >> level).max(1));
+		let blocks = (lw.div_ceil(4) * lh.div_ceil(4)) as usize;
+		let data: Vec<u8> = std::iter::repeat_n(astc_flat([0x8080, 0x4040, 0x2020, 0xFFFF]), blocks).flatten().collect();
+		g.write_level(5, level, &data);
+	}
+	assert_eq!(g.texture_handle(5).unwrap().format(), crate::ASTC);
+	assert_eq!(g.shrink(5), Some((16, 8)));
+	assert_eq!(g.shrink(5), Some((8, 4)));
+	assert_eq!(g.shrink(5), None, "4 × 2 is not whole blocks");
+	assert_eq!(g.texture_handle(5).unwrap().width(), 8);
+}

@@ -15,7 +15,7 @@ function watchCopies(page) {
 		const url = new URL(request.url());
 		// The server's picture of a board (`canvas/shots/adaptors.ts`): `whole=1`, and `w=` for a copy.
 		if (!url.searchParams.has("whole")) return;
-		asked.push({ board: url.searchParams.get("path") ?? url.pathname, w: Number(url.searchParams.get("w") ?? 0) });
+		asked.push({ board: url.searchParams.get("path") ?? url.pathname, w: Number(url.searchParams.get("w") ?? 0), astc: url.searchParams.get("astc") === "1" });
 	});
 	return asked;
 }
@@ -41,6 +41,21 @@ for (const target of TARGETS) {
 	const first = await held(page);
 	say(`${name}: every board's picture is fetched at ${width} px`, Object.keys(first).length > 0 && Object.values(first).every((w) => w === width), JSON.stringify(first));
 	const before = asked.length;
+	if (target.slug === "chromium") {
+		// Compressed: asked for so, sent so, and a byte a pixel on the GPU (four, as RGBA, before).
+		// A first look gets the server's stand-in for a size it has not made yet, asked again until it has.
+		const boards = Object.keys(first).length;
+		const put = () => page.evaluate(() => window.__decksRust.compressedPut);
+		for (let i = 0; i < 40 && (await put()) < boards; i++) await settle(page, 500);
+		const perPixel = await page.evaluate(() => {
+			const engine = window.__decksRust;
+			const each = [...engine.compressedSize].map(([key, [w, h]]) => engine.pictureBytes.get(key) / (w * h));
+			return each.length ? Math.max(...each) : 0;
+		});
+		say(`${name}: pictures are asked for compressed, for the GPU`, asked.every((one) => one.astc), JSON.stringify(asked.slice(0, 3)));
+		say(`${name}: …and come compressed, every board`, (await put()) >= boards, `${await put()} put compressed for ${boards} boards`);
+		say(`${name}: …about a byte a pixel on the GPU, its smaller sizes included`, perPixel > 1 && perPixel < 1.6, perPixel.toFixed(2));
+	} else say(`${name}: on WebGL 2 pictures are not asked for compressed`, asked.every((one) => !one.astc), JSON.stringify(asked.slice(0, 3)));
 
 	// In and back out, in steps a pinch would make, below the live zoom, resting between.
 	for (const delta of [-30, -30, -30, -30, 80, 80, 80, 80]) {

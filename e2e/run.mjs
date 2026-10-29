@@ -15,7 +15,7 @@
  *   DECKS_E2E_JOBS=1 npm run test:e2e    # one at a time (still a deck each)
  */
 import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { get } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -330,6 +330,8 @@ function launch(command, args, { cwd, env, log }) {
 	for (const stream of [child.stdout, child.stderr]) {
 		stream.setEncoding("utf8");
 		stream.on("data", (chunk) => {
+			// `DECKS_E2E_SERVER_LOG=<file>`: every server's output, appended there as well, to read after a run.
+			if (process.env.DECKS_E2E_SERVER_LOG) appendFileSync(process.env.DECKS_E2E_SERVER_LOG, chunk);
 			log.push(chunk);
 			if (log.length > 400) log.splice(0, log.length - 200);
 		});

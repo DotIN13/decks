@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Board } from "@decks/protocol";
+import { compress, encoder, type Level } from "./astc.ts";
 
 /**
  * A picture of a board, taken on the server, for the panel's thumbnails.
@@ -301,6 +302,53 @@ const SHRINK = `async ([b64, width]) => {
 	return btoa(binary);
 }`;
 
+/**
+ * Every size of a picture for the GPU (`compressed`): its first a multiple of 16 pixels each way, so
+ * it and two halvings below it are whole 4 × 4 blocks (the canvas shrinks a picture to them), then
+ * each half the one before down to one pixel. RGBA, premultiplied, rows from the top.
+ */
+const LEVELS = `async (b64) => {
+	const text = atob(b64);
+	const bytes = new Uint8Array(text.length);
+	for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+	const source = await createImageBitmap(new Blob([bytes]));
+	const round = (n) => Math.max(16, Math.round(n / 16) * 16);
+	let width = round(source.width), height = round(source.height);
+	let bitmap = await createImageBitmap(source, { resizeWidth: width, resizeHeight: height, resizeQuality: "high" });
+	source.close();
+	const sizes = [];
+	const parts = [];
+	for (;;) {
+		const canvas = new OffscreenCanvas(width, height);
+		const g = canvas.getContext("2d");
+		g.drawImage(bitmap, 0, 0);
+		const px = g.getImageData(0, 0, width, height).data;
+		for (let i = 0; i < px.length; i += 4) {
+			const a = px[i + 3] / 255;
+			px[i] = Math.round(px[i] * a); px[i + 1] = Math.round(px[i + 1] * a); px[i + 2] = Math.round(px[i + 2] * a);
+		}
+		sizes.push([width, height]);
+		parts.push(px);
+		if (width === 1 && height === 1) break;
+		width = Math.max(1, width >> 1); height = Math.max(1, height >> 1);
+		const next = await createImageBitmap(bitmap, { resizeWidth: width, resizeHeight: height, resizeQuality: "high" });
+		bitmap.close();
+		bitmap = next;
+	}
+	bitmap.close();
+	const all = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+	let at = 0;
+	for (const p of parts) { all.set(p, at); at += p.length; }
+	let binary = "";
+	for (let i = 0; i < all.length; i += 0x8000) binary += String.fromCharCode(...all.subarray(i, i + 0x8000));
+	return { sizes, b64: btoa(binary) };
+}`;
+
+/** A picture's compressed sizes, beside it on disk (`astc.ts`). */
+export function compressedName(picture: string): string {
+	return picture.replace(/\.(webp|jpg)$/, ".astc");
+}
+
 export class ThumbService {
 	private browser: Promise<Browser> | undefined;
 	private idle: ReturnType<typeof setTimeout> | undefined;
@@ -377,6 +425,48 @@ export class ThumbService {
 			return target;
 		}).finally(() => this.shrinking.delete(target));
 		this.shrinking.set(target, making);
+		return making;
+	}
+
+	/** Compressed pictures being made, by the file they will be. */
+	private compressing = new Map<string, Promise<string | undefined>>();
+
+	/**
+	 * A picture's every size compressed for the GPU (`astc.ts`), made once from its WebP by the
+	 * server's Chrome (the sizes) and `astcenc` (the blocks), and kept beside it. Undefined when this
+	 * machine has no encoder or the making failed: the canvas is sent the WebP.
+	 */
+	async compressed(file: string): Promise<string | undefined> {
+		const target = compressedName(file);
+		if (existsSync(target)) return target;
+		if (!encoder()) return undefined;
+		const known = this.compressing.get(target);
+		if (known) return known;
+		const bytes = readFileSync(file);
+		const making = this.borrow(async (browser) => {
+			if (this.resizer?.browser !== browser) this.resizer = { browser, pages: [], next: 0 };
+			const turn = this.resizer.next++ % RESIZERS;
+			const opening = (this.resizer.pages[turn] ??= browser.newContext().then((context) => context.newPage()));
+			const page = await opening;
+			const out = await page.evaluate<{ sizes: [number, number][]; b64: string }>(`(${LEVELS})(${JSON.stringify(bytes.toString("base64"))})`);
+			const all = Buffer.from(out.b64, "base64");
+			let at = 0;
+			const levels: Level[] = out.sizes.map(([width, height]) => {
+				const rgba = all.subarray(at, at + width * height * 4);
+				at += width * height * 4;
+				return { width, height, rgba };
+			});
+			const packed = await compress(levels);
+			mkdirSync(this.host.dir, { recursive: true });
+			writeFileSync(target, packed);
+			return target;
+		})
+			.catch((error: unknown) => {
+				console.log(`[decks] board pictures: compressing ${file} failed: ${String(error).slice(0, 200)}`);
+				return undefined;
+			})
+			.finally(() => this.compressing.delete(target));
+		this.compressing.set(target, making);
 		return making;
 	}
 
@@ -820,10 +910,12 @@ export class ThumbService {
 		const any = pictureOf(job.board.path, job.scheme, job.kind);
 		// A whole or small picture replaces the small ones of earlier revisions; its own revision's stay.
 		const small = job.kind !== "card" ? smallOf(job.board.path, job.scheme) : undefined;
+		// And their compressed sizes (`compressedName`), which no stand-in ever is.
+		const packed = small ? new RegExp(small.source.replace("\\.webp$", "\\.astc$")) : undefined;
 		try {
 			for (const name of readdirSync(this.host.dir)) {
 				if (job.kind !== "small" && name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });
-				else if (small?.test(name) && !name.startsWith(thisRev)) rmSync(join(this.host.dir, name), { force: true });
+				else if ((small?.test(name) || packed?.test(name)) && !name.startsWith(thisRev)) rmSync(join(this.host.dir, name), { force: true });
 			}
 		} catch {
 			/* a directory that cannot be listed keeps its old pictures, which costs bytes and nothing else */
@@ -867,6 +959,7 @@ export class ThumbService {
 		} finally {
 			await context.close().catch(() => {});
 			this.running -= 1;
+			this.pump();
 			if (this.running === 0 && this.queue.length === 0) this.rest();
 		}
 	}
@@ -893,6 +986,10 @@ export class ThumbService {
 			return await use(browser);
 		} finally {
 			this.running -= 1;
+			// What waited for this slot goes now: a picture's copies or its compressed sizes held both
+			// slots as the last job ended, and nothing started the queue again, so every board after
+			// it waited for ever.
+			this.pump();
 			if (this.running === 0 && this.queue.length === 0) this.rest();
 		}
 	}

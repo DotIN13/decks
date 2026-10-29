@@ -38,6 +38,14 @@ impl Tex {
 			TextureKind::Color => wgpu::TextureFormat::Rgba8Unorm,
 			TextureKind::Mask => wgpu::TextureFormat::R8Unorm,
 		};
+		Tex::with_format(device, layout, format, width, height, levels)
+	}
+
+	/// A colour texture of `format` with `levels` sizes: RGBA8, drawn into and read from, or a
+	/// compressed picture (`ASTC`), only written and drawn from.
+	pub fn with_format(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, format: wgpu::TextureFormat, width: u32, height: u32, levels: u32) -> Tex {
+		let usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
+		let usage = if format.is_compressed() { usage } else { usage | wgpu::TextureUsages::RENDER_ATTACHMENT };
 		let texture = device.create_texture(&wgpu::TextureDescriptor {
 			label: Some("stage texture"),
 			size: wgpu::Extent3d { width: width.max(1), height: height.max(1), depth_or_array_layers: 1 },
@@ -45,9 +53,10 @@ impl Tex {
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
 			format,
-			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::RENDER_ATTACHMENT,
+			usage,
 			view_formats: &[],
 		});
+		let kind = if format == wgpu::TextureFormat::R8Unorm { TextureKind::Mask } else { TextureKind::Color };
 		Tex::wrap(device, layout, texture, kind)
 	}
 

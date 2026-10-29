@@ -703,6 +703,14 @@ export function createHttpApp(app: App): Express {
 				const file = near?.file ?? (await app.thumbs.picture(board, scheme, size, () => gone));
 				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
+				// Compressed for the GPU, when the canvas takes it (`astc=1`) and this machine can make it; else the WebP.
+				const packed = req.query.astc === "1" && small !== undefined ? await app.thumbs.compressed(file) : undefined;
+				if (gone) return;
+				if (packed) {
+					res.type("application/vnd.decks.astc");
+					await sendFile(res, packed);
+					return;
+				}
 				await send(file);
 			} catch (error) {
 				if (!gone) res.status(503).type("text").send((error as Error).message);

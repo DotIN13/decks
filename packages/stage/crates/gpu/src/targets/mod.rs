@@ -84,6 +84,38 @@ impl Gpu {
 			wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
 		);
 	}
+
+	/// One size of a compressed picture (`compressed_picture`), its blocks straight from their
+	/// JavaScript array to WebGPU's `writeTexture`, never through this module's memory: the whole
+	/// cost to the page's thread of a picture that arrives compressed. Elsewhere, `write_level`.
+	pub fn write_level_js(&mut self, id: u32, level: u32, blocks: &js_sys::Uint8Array) {
+		let Some(tex) = self.textures.get(&id) else { return };
+		let size = tex.texture.size().mip_level_size(level, wgpu::TextureDimension::D2).physical_size(tex.texture.format());
+		let (across, down) = (size.width / 4, size.height / 4);
+		if blocks.length() < across * down * 16 {
+			return;
+		}
+		if let (Some(queue), Some(target)) = (self.queue.as_webgpu(), tex.texture.as_webgpu()) {
+			use wasm_bindgen::JsValue;
+			let set = |o: &js_sys::Object, k: &str, v: &JsValue| {
+				let _ = js_sys::Reflect::set(o, &JsValue::from_str(k), v);
+			};
+			let dest = js_sys::Object::new();
+			set(&dest, "texture", target.as_ref());
+			set(&dest, "mipLevel", &JsValue::from(level));
+			let layout = js_sys::Object::new();
+			set(&layout, "bytesPerRow", &JsValue::from(across * 16));
+			set(&layout, "rowsPerImage", &JsValue::from(down));
+			let extent = js_sys::Array::of2(&JsValue::from(size.width), &JsValue::from(size.height));
+			let queue: &JsValue = queue.as_ref();
+			if let Ok(write) = js_sys::Reflect::get(queue, &JsValue::from_str("writeTexture")) {
+				let write: js_sys::Function = write.into();
+				let _ = write.apply(queue, &js_sys::Array::of4(&dest, blocks, &layout, &extent));
+			}
+			return;
+		}
+		self.write_level(id, level, &blocks.to_vec());
+	}
 }
 
 impl Gpu {
