@@ -1,4 +1,4 @@
-import { baseTheme, placements, serialize } from "@decks/pen";
+import { baseTheme, placements, serialize, type PenEdit } from "@decks/pen";
 import { createSignal, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
@@ -15,6 +15,7 @@ import { cardCalls } from "./card-calls.ts";
 import { runStageCall } from "../stage-ops.ts";
 import type { ViewOffer } from "./chrome.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
+import { createStudioLine } from "./studio-line.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
 /**
@@ -43,12 +44,20 @@ export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView
 const rectOf = (box: DOMRect | undefined): Rect | undefined => (box ? { x: box.x, y: box.y, w: box.width, h: box.height } : undefined);
 
 async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: FrameChromeView | undefined): Promise<void> {
+	/*
+	 * Who keeps this canvas: a harness, which answers the canvas's calls, its cards' and its agents'
+	 * views as well; or Decks Studio, which keeps the drawing and its files and nothing else.
+	 */
+	const studio = start.backend.kind === "studio" ? createStudioLine(start.backend.api, start.canvas.name, start.backend.token) : undefined;
 	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
-	end.on("token", (data) => backend.setToken(data.token));
-	const first = await backend.drawing();
+	end.on("token", (data) => {
+		backend.setToken(data.token);
+		studio?.setToken(data.token);
+	});
+	const first = studio ? { ...(await studio.drawing()), base: start.files.base, cards: [] as Board[] } : await backend.drawing();
 	/** The cards and boards on the canvas: their records from the harness, their places from the drawing. */
 	const own = (path: string): Page["trust"] => (path.startsWith("shared/") ? "friend" : "own");
-	const [pages, setPages] = createSignal<Page[]>(first.cards.map((card) => ({ ...card, trust: own(card.path) })));
+	const [pages, setPages] = createSignal<Page[]>(studio ? cardsOf(first.doc, own) : first.cards.map((card) => ({ ...card, trust: own(card.path) })));
 	const [camera, setCamera] = createSignal<Camera>(start.camera ?? { x: 0, y: 0, zoom: 1 });
 	const [mode, setMode] = createSignal<"edit" | "browse">(start.look.mode);
 	const [dark, setDark] = createSignal(start.look.dark);
@@ -80,6 +89,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		const now = untrack(pages);
 		const same = now.length === boxes.size && now.every((page) => boxes.has(page.path));
+		// Studio keeps no records of cards: the drawing is all there is of them.
+		if (!same && studio) return void setPages(cardsOf(doc, own));
 		if (!same) {
 			if (cardsReading) return;
 			cardsReading = true;
@@ -119,7 +130,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	 * (`deck/layout.ts`); a link from a board to another is its deck path, when it is one on this canvas.
 	 */
 	const folder = `canvases/${start.canvas.name}/`;
-	const inFolder = (path: string) => (path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
+	// On Studio the address is the canvas's own folder already.
+	const inFolder = (path: string) => (studio || path.startsWith(folder) || path.startsWith("shared/") ? path : `${folder}${path}`);
 	setCanvasHost({
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
 		canWrite: () => start.canvas.role !== "view" && !start.look.readOnly,
@@ -145,7 +157,15 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		...(start.camera ? { camera: start.camera } : {}),
 		views: { scope: () => start.canvas.name, storage, key: "frame" },
 		canvasName: () => start.canvas.name,
-		document: {
+		/*
+		 * On Studio the editor keeps the drawing and its undo, as Studio's own page does, and each edit is
+		 * sent as it is made (`studio-line.ts`). On a harness the harness keeps both (`document`).
+		 */
+		...(studio ? { onEdits: (edits: PenEdit[]) => {
+			changed();
+			studio.save(edits);
+		} } : {}),
+		...(studio ? {} : { document: {
 			// Your edits, straight to the harness; one it refuses is dropped, and the drawing read again.
 			send: async (ops, edit) => {
 				changed();
@@ -160,7 +180,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 					console.info(answer.error);
 				});
 			},
-		},
+		} }),
 		boards: {
 			list: () => pages() as Board[],
 			page: (path) => {
@@ -173,6 +193,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			},
 			// An old board's own token, for its buttons, from the harness on this canvas's token.
 			mintBoardToken: async (path) => {
+				if (studio) return undefined;
 				const answer = await backend.post("board-token", { path });
 				return typeof answer.token === "string" ? answer.token : undefined;
 			},
@@ -180,18 +201,18 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			cardScripts: (path) => trust(path) !== "friend",
 			storageKey: (path) => `${start.canvas.name}\u0000${path}`,
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
-			onExtent: (path, extent) => void backend.post("board-extent", { path, ...extent }),
+			onExtent: (path, extent) => void (studio ? undefined : backend.post("board-extent", { path, ...extent })),
 			onOpenLink: (path, from) => {
 				void end.call("open", { path, from });
 				return true;
 			},
 			news: () => news(),
-			onRead: (path) => void backend.post("board-seen", { path }),
+			onRead: (path) => void (studio ? undefined : backend.post("board-seen", { path })),
 			mayStart: () => busy().mayStart !== false,
 			switching: () => busy().switching === true,
 			onStarted: () => end.emit("started", {}),
 			// Hidden is the card taken off the drawing, as canvas.delete does.
-			onHide: (path) => void backend.call("canvas.delete", [path]),
+			onHide: (path) => (studio ? takeOff(path) : void backend.call("canvas.delete", [path])),
 			marks: (path) => marks()[path] ?? [],
 		},
 		// Said once the camera rests, not for every step of a pan: the page keeps it, and the view is drawn here.
@@ -215,11 +236,19 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		inkAgent: () => busy().writer?.name,
 		// Taking a card off the canvas is an edit like any other, undone the same way: no question first.
 		onDeleteBoard: async (path) => {
+			if (studio) return takeOff(path);
 			const answer = await backend.call("canvas.delete", [path]);
 			return answer.ok;
 		},
 	});
 	const { handle } = editor;
+	/** Take a card off the drawing by its path, as an edit of yours: what Studio does for Hide and Delete. */
+	function takeOff(path: string): boolean {
+		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path);
+		if (!child?.id) return false;
+		handle.edit([{ op: "delete", id: child.id }]);
+		return true;
+	}
 
 	/** Frame these items, by id or by a card's path, as `view.focus` does. */
 	const focus = (targets: string[]) => {
@@ -244,7 +273,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			focus,
 			viewport: () => ({ width: innerWidth, height: innerHeight }),
 			reload: (path) => handle.reloadBoard(path),
-			harness: (verb, args) => backend.call(verb, args),
+			harness: (verb, args) => (studio ? Promise.resolve({ ok: false, error: `${verb}: a canvas kept by Studio takes its changes from its page here, not from a card.` }) : backend.call(verb, args)),
 			page: (verb, args, card) => end.call("agent", { verb, args, card }),
 		}),
 	});
@@ -322,7 +351,17 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		backend.answer(call.id, value);
 	};
-	backend.follow((message) => {
+	// On Studio: the drawing as Studio's revisions change it, kept in step as Studio's own page keeps it.
+	if (studio)
+		studio.follow(
+			(doc) => {
+				handle.setDocument(serialize(doc));
+				changed();
+			},
+			() => handle.document(),
+			first.rev,
+		);
+	else backend.follow((message) => {
 		if (message.type === "stage.call") return stageCall(message.call);
 		// A card's file changed: its record taken, its place kept, as the drawing says it.
 		if (message.type === "board.changed") {
@@ -448,4 +487,18 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	if (start.tools) applyTools?.(start.tools);
 
 	render(() => (start.look.toolbar ? editor.root() : editor.surface()), root);
+}
+
+/** The cards and boards a drawing places, as the frame lists them, for a canvas kept where cards have no records of their own (Studio). */
+function cardsOf(doc: import("@decks/pen").PenDocument, trust: (path: string) => Page["trust"]): Page[] {
+	const placed = placements(doc, { theme: baseTheme(doc, "light") });
+	const cards: Page[] = [];
+	for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; name?: string; metadata?: { path?: string; type?: string } }>) {
+		const path = child.metadata?.path;
+		const type = child.metadata?.type;
+		const box = child.id ? placed.get(child.id)?.box : undefined;
+		if (!path || !box || (type !== "decks.card" && type !== "decks.board")) continue;
+		cards.push({ path, title: child.name ?? path.split("/").slice(-2).join("/"), rev: 0, x: box.x, y: box.y, w: box.w, h: box.h, inContext: [], ...(type === "decks.card" ? { card: true as const } : {}), trust: trust(path) });
+	}
+	return cards;
 }

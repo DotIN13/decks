@@ -31,7 +31,8 @@
 		"lucide-solid": "^1.37.0",
 		"marked": "^15.0.12",
 		"mathjax-full": "^3.2.2",
-		"solid-js": "^1.9.14"
+		"solid-js": "^1.9.14",
+		"@decks/hub": "*"
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.1.11",

@@ -17,18 +17,25 @@ export const INLINE_MAX = 64 * 1024;
  * send where their pointer is, and everyone else on that canvas sees it; harnesses only listen.
  */
 export class Live {
-	private readonly sockets = new Set<{ ws: LiveSocket; who: Who }>();
+	/** Whether a socket hears about a canvas: its person may see it, and a socket held to one canvas (`only`, a canvas frame's) hears that one alone. */
+	private hears(who: Who & { only?: string }, canvas: string): boolean {
+		if (who.only !== undefined && who.only !== canvas) return false;
+		return !!this.store.role(who.user.id, canvas);
+	}
+
+	private readonly sockets = new Set<{ ws: LiveSocket; who: Who & { only?: string } }>();
 
 	constructor(private readonly store: HubStore) {}
 
-	add(ws: LiveSocket, who: Who): void {
+	/** A socket; `only` holds it to one canvas, for a canvas frame, which hears that canvas and sends no cursor. */
+	add(ws: LiveSocket, who: Who & { only?: string }): void {
 		const store = this.store;
 		const entry = { ws, who };
 		this.sockets.add(entry);
 		/** The canvases this page has shown a cursor on, so the others hear when it leaves. */
 		const pointed = new Set<string>();
 		ws.on("message", (raw) => {
-			if (who.harness) return;
+			if (who.harness || who.only !== undefined) return;
 			let got: LiveSend;
 			try {
 				got = LiveSend.parse(JSON.parse(String(raw)));
@@ -38,11 +45,11 @@ export class Live {
 			if (!store.role(who.user.id, got.canvas)) return;
 			pointed.add(got.canvas);
 			const event: LiveEvent = { type: "cursor", canvas: got.canvas, user: who.user.id, name: who.user.name, x: got.x, y: got.y };
-			for (const s of this.sockets) if (s !== entry && !s.who.harness && store.role(s.who.user.id, got.canvas)) s.ws.send(JSON.stringify(event));
+			for (const s of this.sockets) if (s !== entry && !s.who.harness && this.hears(s.who, got.canvas)) s.ws.send(JSON.stringify(event));
 		});
 		ws.on("close", () => {
 			this.sockets.delete(entry);
-			for (const canvas of pointed) for (const s of this.sockets) if (!s.who.harness && store.role(s.who.user.id, canvas)) s.ws.send(JSON.stringify({ type: "cursor.gone", canvas, user: who.user.id } satisfies LiveEvent));
+			for (const canvas of pointed) for (const s of this.sockets) if (!s.who.harness && this.hears(s.who, canvas)) s.ws.send(JSON.stringify({ type: "cursor.gone", canvas, user: who.user.id } satisfies LiveEvent));
 		});
 		ws.send(JSON.stringify({ type: "hello", user: who.user.id, ...(who.harness ? { harness: who.harness.id } : {}) } satisfies LiveEvent));
 	}
@@ -50,13 +57,14 @@ export class Live {
 	/** To every socket of one person. */
 	toUser(user: string, event: LiveEvent): void {
 		const text = JSON.stringify(event);
-		for (const s of this.sockets) if (s.who.user.id === user) s.ws.send(text);
+		// Not to a socket held to one canvas: what is said to a person is about all of theirs.
+		for (const s of this.sockets) if (s.who.user.id === user && (s.who as { only?: string }).only === undefined) s.ws.send(text);
 	}
 
 	/** To everyone who may see a canvas. */
 	toCanvas(canvas: string, event: LiveEvent): void {
 		const text = JSON.stringify(event);
-		for (const s of this.sockets) if (this.store.role(s.who.user.id, canvas)) s.ws.send(text);
+		for (const s of this.sockets) if (this.hears(s.who, canvas)) s.ws.send(text);
 	}
 
 	/**
@@ -67,7 +75,7 @@ export class Live {
 		const { changes, ...rest } = change;
 		const inline = JSON.stringify({ type: "canvas", ...rest, changes });
 		const text = new TextEncoder().encode(inline).length <= INLINE_MAX ? inline : JSON.stringify({ type: "canvas", ...rest });
-		for (const s of this.sockets) if (this.store.role(s.who.user.id, change.id)) s.ws.send(text);
+		for (const s of this.sockets) if (this.hears(s.who, change.id)) s.ws.send(text);
 	}
 
 	/** Close a harness's sockets: its key was revoked. */

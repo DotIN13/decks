@@ -46,7 +46,11 @@ export interface Start {
 	protocol: number;
 	canvas: { name: string; title?: string; role: "owner" | "edit" | "view" };
 	/** The harness, as the frame reaches it: its `/api` address and the canvas token, which lapses after `idle` unused. */
-	backend: { api: string; token: string; idle: number };
+	/**
+	 * Who keeps the canvas, as the frame reaches it: a harness (`kind` left out), on its `/api` address,
+	 * or Decks Studio (`studio`), on its own; and the token for this one canvas, which lapses after `idle` unused.
+	 */
+	backend: { api: string; token: string; idle: number; kind?: "harness" | "studio" };
 	/** The address the canvas's files are read at, with its ticket in it: `…/api/t/<ticket>/board/canvases/<name>/`. */
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`. */
