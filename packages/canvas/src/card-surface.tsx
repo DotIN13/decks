@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, untrack } from "solid-js";
 import { INTERACTIVE, mountCard, scrollsInside, type MountedCard } from "./card.ts";
 import { scheme } from "./lib/theme.ts";
+import { canvasHost } from "./host.ts";
 
 /**
  * A card's surface in a board's place (`plain-board.tsx`): a host element whose shadow root holds the
@@ -15,8 +16,8 @@ import { scheme } from "./lib/theme.ts";
  * - **A finger** pans the canvas across a card, unless it lands on one of the card's controls.
  * - **A wheel** scrolls what inside the card can take it, and pans the canvas otherwise; a pinch always zooms.
  * - **Keys** typed into the card's own fields stay in it, so Delete in a text box deletes a letter, not the card.
- * - **A `data-eval` button** runs its `text/decks-eval` block with the stage as this card, as a board's
- *   does (`board.js`): the card's own token, from the host, and the harness asks the person once.
+ * - **Its buttons** are the card's own module's: they act through `card.decks` (`card.ts`), answered
+ *   where the host says (`CanvasHost.cardCall`). A card has no `data-eval` blocks; a board keeps its own.
  */
 export function CardSurface(props: {
 	page: string;
@@ -30,8 +31,6 @@ export function CardSurface(props: {
 	onShown: () => void;
 	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenBoard`), by its deck path. */
 	onOpenBoard?: ((path: string) => void) | undefined;
-	/** The card's token for its buttons, when the host gives cards one. */
-	token?: (() => Promise<string | undefined>) | undefined;
 	/** The card's content height, for a host that grows a board to fit it (`extent.ts`): its file's height stays the floor. */
 	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
 }) {
@@ -43,6 +42,7 @@ export function CardSurface(props: {
 	 */
 	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);
 	let mounted: MountedCard | undefined;
+	const cardCall = canvasHost().cardCall;
 	let asked = 0;
 	const load = async () => {
 		const ask = ++asked;
@@ -70,6 +70,7 @@ export function CardSurface(props: {
 			trusted: props.trusted,
 			theme: untrack(scheme),
 			size: untrack(props.size),
+			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
 		});
 		listen(mounted.root, fresh);
 		// What fit reads, as a board's frame says it (`extent.ts`): the height, and how the card reads at it.
@@ -116,7 +117,6 @@ export function CardSurface(props: {
 			{ passive: true },
 		);
 		for (const type of ["keydown", "keyup", "keypress"]) root.addEventListener(type, (event) => editable(event) && event.stopPropagation());
-		root.addEventListener("click", (event) => runEval(root, event as MouseEvent), true);
 		root.addEventListener("click", (event) => followLink(event as MouseEvent));
 	};
 
@@ -143,48 +143,6 @@ export function CardSurface(props: {
 			if (!path.split("/").some((part) => part === "" || part === "." || part === "..")) return props.onOpenBoard(path);
 		}
 		if (/^https?:$/.test(url.protocol)) window.open(url.href, "_blank", "noopener");
-	};
-
-	const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (...values: unknown[]) => Promise<unknown>;
-	let stage: Promise<unknown> | undefined;
-	/** The SDK as this card: the harness that served it, with the card's own token. */
-	const cardStage = (): Promise<unknown> => {
-		if (stage) return stage;
-		const url = new URL(props.page, location.href);
-		const at = url.pathname.indexOf("/api/board/");
-		const prefix = at < 0 ? "" : url.pathname.slice(0, at);
-		let token: string | undefined;
-		stage = (async () => {
-			token = await props.token?.();
-			if (!token) throw new Error("This canvas gives this card no token, so its buttons have no stage here.");
-			const sdk = (await import(/* @vite-ignore */ `${url.origin}${prefix}/api/sdk/decks.mjs`)) as { connect(o: { url: string; token: () => string | undefined }): unknown };
-			return sdk.connect({ url: `${url.origin}${prefix}`, token: () => token });
-		})();
-		// A refusal is not kept: the token may come on the next press.
-		stage.catch(() => (stage = undefined));
-		return stage;
-	};
-	/** A person's press on a `data-eval` control: its block runs, as on a board (`board.js`, `onEvalClick`). */
-	const runEval = (root: ShadowRoot, event: MouseEvent) => {
-		if (!props.trusted || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !event.isTrusted) return;
-		const origin = event.composedPath()[0];
-		const target = origin instanceof Element ? origin.closest("[data-eval]") : null;
-		const id = target?.getAttribute("data-eval")?.trim();
-		if (!target || !id) return;
-		event.preventDefault();
-		const carried = target.getAttribute("data-value");
-		const own = (target as HTMLInputElement).value;
-		const value = carried !== null ? carried : typeof own === "string" ? own : undefined;
-		const block = [...root.querySelectorAll('script[type="text/decks-eval"]')].find((one) => (one.getAttribute("data-for") ?? "").trim() === id);
-		if (!block) return console.warn(`card ${props.path}: nothing answers "${id}".`);
-		const card = { id, board: props.path, path: props.path, ...(value !== undefined ? { value } : {}) };
-		void (async () => {
-			try {
-				await new AsyncFunction("stage", "event", block.textContent ?? "")(await cardStage(), card);
-			} catch (error) {
-				console.error(`card ${props.path}: "${id}" failed:`, error);
-			}
-		})();
 	};
 
 	return <div class="card-surface" ref={(element) => (host = element)} style={{ width: "100%", height: "100%" }} />;

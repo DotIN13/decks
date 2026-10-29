@@ -20,8 +20,8 @@ export interface FrameHostOptions {
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** Whether a card or board on it is yours or a friend's. */
 	trust?(path: string): "own" | "friend";
-	/** A card's `card.decks` call, for the broker to answer (`broker.ts`). */
-	decks?(call: FrameCalls["decks"]["data"]): Promise<unknown>;
+	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
+	agent?(call: FrameCalls["agent"]["data"]): Promise<unknown>;
 	/** Where what the frame keeps between visits is kept: this page's own storage. */
 	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 	/** A comment written in the frame's popover: put in the composer as a draft, kept or to send, never sent from here. */
@@ -179,9 +179,9 @@ export function createFramedEditor(options: Options): Editor {
 		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
 		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
 		page.answer("token", async (data) => options.boards?.mintBoardToken?.(data.path, canvas));
-		page.answer("decks", (data) => {
-			if (!options.frame.decks) throw new CallRefused("This page answers no card's calls.", "refused");
-			return options.frame.decks(data);
+		page.answer("agent", (data) => {
+			if (!options.frame.agent) throw new CallRefused("This page answers no card's agent calls.", "refused");
+			return options.frame.agent(data);
 		});
 		page.answer("upload", (data) => {
 			if (!options.frame.upload) throw new CallRefused("Files cannot be dropped on this canvas here.", "refused");

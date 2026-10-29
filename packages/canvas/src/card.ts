@@ -20,7 +20,39 @@ import { readingOfCard } from "./extent.ts";
  * page's import map names the shared libraries. A module runs once per address; its default export
  * is called for each placement of the card each time it wakes, with the card (`CardContext`), and
  * what it returns is called when the card sleeps or goes.
+ *
+ * ### What a card can do
+ *
+ * Its buttons are wired in its module, as any page's are, and act through `card.decks`: the SDK's
+ * calls by their names (`await card.decks.canvas.insert(item, { beside })`, `card.decks.now()`).
+ * Where each is answered is the canvas's to say (`CanvasHost.cardCall`); in the canvas frame, the
+ * view and the time in the frame, the canvas's own calls by the harness, an agent's by the app's
+ * page, which asks you before anything is sent to one, and nothing that reaches past the canvas.
  */
+
+/**
+ * The SDK as a card has it: every call by its group and name, `card.decks.canvas.read()`, answering a
+ * promise of its value. A call the canvas does not let a card make rejects with why.
+ */
+export type CardDecks = { [group: string]: { [call: string]: (...args: unknown[]) => Promise<unknown> } } & {
+	here(): Promise<unknown>;
+	now(): Promise<unknown>;
+};
+
+/** `card.decks`, its calls made by `call` with the dotted name: `decks.canvas.insert(…)` is `call("canvas.insert", […])`. */
+export function cardDecks(call: ((verb: string, args: unknown[]) => Promise<unknown>) | undefined): CardDecks {
+	const at = (path: readonly string[]): unknown =>
+		new Proxy(function () {}, {
+			// `then` is no call: awaiting `card.decks` or a group must not look like a promise.
+			get: (_target, key) => (typeof key === "string" && key !== "then" ? at([...path, key]) : undefined),
+			apply: (_target, _self, args: unknown[]) => {
+				const verb = path.join(".");
+				if (!call) return Promise.reject(new Error(`${verb}: this canvas gives cards no calls here.`));
+				return call(verb, args);
+			},
+		});
+	return at([]) as CardDecks;
+}
 
 /** What a card's script is handed: its own root, and what the stage knows of it. */
 export interface CardContext {
@@ -47,6 +79,10 @@ export interface CardContext {
 	store: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 	/** Hear a change of the theme or the size. */
 	on(what: "theme" | "size", listener: () => void): void;
+	/** The SDK, as this card (`CardDecks`): `await card.decks.canvas.insert(item, { beside: card.path })`. */
+	decks: CardDecks;
+	/** The card's deck path, as the canvas names it. */
+	path: string;
 }
 
 export type CardCleanup = void | (() => void);
@@ -60,6 +96,8 @@ export interface CardSource {
 	trusted: boolean;
 	theme: "light" | "dark";
 	size: { w: number; h: number };
+	/** How its `card.decks` calls are answered (`CanvasHost.cardCall`), with this card as the caller. */
+	call?: (verb: string, args: unknown[]) => Promise<unknown>;
 }
 
 export interface MountedCard {
@@ -512,6 +550,9 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 		elements: registry ?? customElements,
 		store,
 		on: (what, listener) => void listeners[what].add(listener),
+		// A friend's card runs no script, so it never makes a call; the deck's own make them as themselves.
+		decks: cardDecks(source.trusted ? source.call : undefined),
+		path: source.path,
 	};
 	const cleanups: Array<() => void> = [];
 	// Its markdown, maths, diagrams and code drawn, after board.css so a diagram takes the card's colours.

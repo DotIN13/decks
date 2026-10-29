@@ -27,6 +27,11 @@ export interface CanvasHost {
 	 * is right wherever the canvas's folder is itself an address, as in the Decks app.
 	 */
 	pictureUrl?(url: string, base: string): string;
+	/**
+	 * A card's `card.decks` call (`card.ts`), made as that card: answered where this host can, refused
+	 * where a card may not reach. Absent: cards make no calls.
+	 */
+	cardCall?(verb: string, args: unknown[], card: string): Promise<unknown>;
 }
 
 const fallback: CanvasHost = {

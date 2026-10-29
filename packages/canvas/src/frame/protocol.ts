@@ -128,7 +128,8 @@ export interface FrameToPage {
 export type FrameCalls = {
 	open: { data: { path: string; from: string }; value: boolean };
 	token: { data: { path: string }; value: string | undefined };
-	decks: { data: { verb: string; args: unknown[]; card: string }; value: unknown };
+	/** A card's agent call, or showing another canvas: the page's, with your token, and your OK before a message goes to an agent. */
+	agent: { data: { verb: string; args: unknown[]; card: string }; value: unknown };
 	upload: { data: { name: string; type: string; bytes: ArrayBuffer; at: Point }; value: { path: string } };
 };
 

@@ -40,7 +40,7 @@ test("the markdown and the items go round: a picture written back with its width
 
 test("a new card is a column frame with one empty block", () => {
 	const card = newCard("c", "t");
-	assert.deepEqual([card.type, card.layout, card.metadata?.type, card.children?.length, card.children?.[0]?.metadata?.type], ["frame", "vertical", "decks.card", 1, "decks.markdown"]);
+	assert.deepEqual([card.type, card.layout, card.metadata?.type, card.children?.length, card.children?.[0]?.metadata?.type], ["frame", "vertical", "decks.markdown-card", 1, "decks.markdown"]);
 });
 
 test("a save is one edit per item that changed: delete, insert, move and update, and nothing for the rest", () => {

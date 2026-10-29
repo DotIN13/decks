@@ -28,6 +28,11 @@ export function stageOnScreen(): string | undefined {
 	return onScreen();
 }
 
+/** The address the SDK reaches this harness at, from this tab: its own server, or the connection it is on. */
+export function deckAddress(): string {
+	return `${location.origin}${apiBase().replace(/\/api$/, "")}`;
+}
+
 let client: Decks | undefined;
 let clientBase: string | undefined;
 function decks(): Decks {

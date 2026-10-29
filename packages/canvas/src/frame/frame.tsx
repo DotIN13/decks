@@ -1,4 +1,4 @@
-import { serialize } from "@decks/pen";
+import { baseTheme, placements, serialize } from "@decks/pen";
 import { createSignal, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
@@ -9,7 +9,9 @@ import type { StageComment } from "../Stage.tsx";
 import type { Camera } from "@decks/protocol";
 import type { FrameChromeView } from "./chrome.ts";
 import { syncTools } from "./ui-sync.ts";
-import { useInsets } from "../camera/insets.ts";
+import { canvasBox, useInsets } from "../camera/insets.ts";
+import { fitInto } from "../camera/camera.ts";
+import { cardCalls } from "./card-calls.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
@@ -170,6 +172,34 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		},
 	});
 	const { handle } = editor;
+
+	/** Frame these items, by id or by a card's path, as `view.focus` does. */
+	const focus = (targets: string[]) => {
+		const doc = handle.drawn();
+		const placed = placements(doc, { theme: baseTheme(doc, "light") });
+		const byPath = new Map<string, string>();
+		for (const child of (doc.children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>) if (child.id && child.metadata?.path) byPath.set(child.metadata.path, child.id);
+		const boxes = targets
+			.map((target) => placed.get(target)?.box ?? placed.get(byPath.get(target) ?? [...byPath].find(([path]) => target.endsWith(path) || path.endsWith(target))?.[1] ?? "")?.box)
+			.filter((box): box is NonNullable<typeof box> => !!box)
+			.map((box) => ({ x: box.x, y: box.y, w: box.w, h: box.h }));
+		if (!boxes.length) throw new Error(`Nothing on this canvas is ${targets.join(", ")}.`);
+		const view = { width: innerWidth, height: innerHeight };
+		handle.glide(fitInto(boxes, view, canvasBox(view)), 400);
+	};
+	// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
+	setCanvasHost({
+		cardCall: cardCalls({
+			canvas: start.canvas.name,
+			camera: () => untrack(camera),
+			move: (next, glide) => (glide ? handle.glide(next, glide) : handle.setCamera(next)),
+			focus,
+			viewport: () => ({ width: innerWidth, height: innerHeight }),
+			reload: (path) => handle.reloadBoard(path),
+			harness: (verb, args) => backend.call(verb, args),
+			page: (verb, args, card) => end.call("agent", { verb, args, card }),
+		}),
+	});
 
 	/*
 	 * The drawing as the harness changes it, from its stream: each change is said once per agent on the
