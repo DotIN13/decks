@@ -199,3 +199,20 @@ test("an agent's view of its canvas reaches the frame on its stream, and the fra
 		cleanup();
 	}
 });
+
+test("the frame says a card on its canvas was read and how it measured, and gets an old board's token, for its own canvas only", async () => {
+	const { app, one, two, post, bearer, sandboxed, cleanup } = await open();
+	try {
+		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		const mine = String(((await post("/api/v1/card.create", person, { args: [{ title: "Mine", canvas: one }] })).body.value as { path: string }).path);
+		const theirs = String(((await post("/api/v1/card.create", person, { args: [{ title: "Theirs", canvas: two }] })).body.value as { path: string }).path);
+		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		assert.equal((await post("/api/v1/board-seen", frame, { path: mine })).status, 200);
+		assert.equal((await post("/api/v1/board-extent", frame, { path: mine, rev: 1, w: 400, h: 300, words: 12 })).status, 200);
+		const token = await post("/api/v1/board-token", frame, { path: mine });
+		assert.match(String(token.body.token), /^dk_b_/);
+		for (const route of ["board-seen", "board-extent", "board-token"]) assert.equal((await post(`/api/v1/${route}`, frame, { path: theirs, rev: 1, w: 1, h: 1 })).status, 403, route);
+	} finally {
+		cleanup();
+	}
+});

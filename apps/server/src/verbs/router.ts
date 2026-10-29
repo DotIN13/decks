@@ -89,6 +89,63 @@ export function verbRoutes(app: App): express.Router {
 		res.json({ ok: true, settled });
 	});
 
+	/**
+	 * What the canvas frame says about a card on its canvas, which a tab says on the socket: that you
+	 * read it (`board-seen`), how it measured (`board-extent`, kept for `decks canvas fit` to report),
+	 * and a token for an old board's own buttons (`board-token`). Each for a card or board on the
+	 * caller's own canvas; the person and a paired site may say them for any.
+	 */
+	const onItsCanvas = (req: Request, res: Response): string | undefined => {
+		const path = String((req.body as { path?: unknown } | undefined)?.path ?? "");
+		const principal = req.principal;
+		if (!path || !app.deck.board(path)) {
+			res.status(404).json({ ok: false, error: `There is no card or board at ${path || "that path"}.` });
+			return undefined;
+		}
+		if (principal?.kind === "person" || principal?.kind === "site") return path;
+		if (principal?.kind === "canvas" && boardOnCanvas(app, path, principal.canvas)) return path;
+		res.status(403).json({ ok: false, error: `${path} is not on this canvas.` });
+		return undefined;
+	};
+	router.post("/board-seen", (req: Request, res: Response) => {
+		const path = onItsCanvas(req, res);
+		if (!path) return;
+		app.boards.seen(path);
+		res.json({ ok: true });
+	});
+	router.post("/board-extent", (req: Request, res: Response) => {
+		const path = onItsCanvas(req, res);
+		if (!path) return;
+		const body = req.body as Record<string, unknown>;
+		const num = (key: string) => (typeof body[key] === "number" && Number.isFinite(body[key]) ? (body[key] as number) : undefined);
+		const rev = num("rev");
+		const w = num("w");
+		const h = num("h");
+		if (rev === undefined || w === undefined || h === undefined) {
+			res.status(400).json({ ok: false, error: "Send { path, rev, w, h }, and what else was measured." });
+			return;
+		}
+		const extra: Record<string, number> = {};
+		for (const key of ["at", "page", "words", "minFont", "overflowX", "cut", "overlaps"]) {
+			const value = num(key);
+			if (value !== undefined) extra[key] = value;
+		}
+		app.boards.noteExtent(path, { rev, w, h, ...extra });
+		res.json({ ok: true });
+	});
+	router.post("/board-token", (req: Request, res: Response) => {
+		const path = onItsCanvas(req, res);
+		if (!path) return;
+		// A friend's board runs sandboxed with no token: it is someone else's code on this machine.
+		if (/^shared\//.test(path)) {
+			res.status(403).json({ ok: false, error: "A board on a canvas shared with you runs without a token." });
+			return;
+		}
+		const stage = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
+		const { token } = app.tokens.issue({ kind: "board", path, ...(stage ? { stage } : {}) });
+		res.set("cache-control", "no-store").json({ ok: true, token });
+	});
+
 	router.post("/:verb", async (req: Request, res: Response) => {
 		const name = String(req.params.verb ?? "");
 		const verb = VERB_BY_NAME.get(name);
@@ -261,14 +318,19 @@ export function onCanvas(app: Pick<App, "stage" | "agents">, message: { type: st
 		const board = message.board as { path?: unknown } | undefined;
 		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;
 		if (!path) return false;
-		if (path.startsWith(`canvases/${canvas}/`)) return true;
-		try {
-			return !!app.stage.pens?.boards(canvas).some((one) => one.path === path);
-		} catch {
-			return false;
-		}
+		return boardOnCanvas(app, path, canvas);
 	}
 	return false;
+}
+
+/** Whether a card or board is on a canvas: in its folder, or placed on its drawing. */
+export function boardOnCanvas(app: Pick<App, "stage">, path: string, canvas: string): boolean {
+	if (path.startsWith(`canvases/${canvas}/`)) return true;
+	try {
+		return !!app.stage.pens?.boards(canvas).some((one) => one.path === path);
+	} catch {
+		return false;
+	}
 }
 
 /**

@@ -170,11 +170,6 @@ export function createFramedEditor(options: Options): Editor {
 		page.on("viewport", (data) => options.onViewport?.(data));
 		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), anchor: () => onPage(data.at) }));
 		page.on("export", (data) => options.onExport?.(data.ids));
-		page.on("seen", (data) => options.boards?.onRead?.(data.path));
-		page.on("extent", (data) => {
-			const { path, ...extent } = data;
-			options.boards?.onExtent?.(path, extent);
-		});
 		page.on("store", (data) => {
 			if (!storage) return;
 			if (data.value === null) storage.removeItem(storeKey(canvas) + data.key);
@@ -183,7 +178,6 @@ export function createFramedEditor(options: Options): Editor {
 		// A shortcut the canvas did not take, played on this page as if typed here.
 		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
 		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
-		page.answer("token", async (data) => options.boards?.mintBoardToken?.(data.path, canvas));
 		page.answer("agent", (data) => {
 			if (!options.frame.agent) throw new CallRefused("This page answers no card's agent calls.", "refused");
 			return options.frame.agent(data);

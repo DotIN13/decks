@@ -117,8 +117,6 @@ export interface FrameToPage {
 	viewport: { width: number; height: number };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
 	export: { ids: string[] };
-	seen: { path: string };
-	extent: { path: string; rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	store: { key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
 	/** The tools' state, what changed of it (`ui-sync.ts`), for a frame with no chrome of its own. */
@@ -128,7 +126,6 @@ export interface FrameToPage {
 /** The calls the frame makes of the page, and what each answers. */
 export type FrameCalls = {
 	open: { data: { path: string; from: string }; value: boolean };
-	token: { data: { path: string }; value: string | undefined };
 	/** A card's agent call, or showing another canvas: the page's, with your token, and your OK before a message goes to an agent. */
 	agent: { data: { verb: string; args: unknown[]; card: string }; value: unknown };
 	upload: { data: { name: string; type: string; bytes: ArrayBuffer; at: Point }; value: { path: string } };

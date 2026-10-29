@@ -136,17 +136,22 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				const page = untrack(pages).find((one) => one.path === path);
 				return `${start.pictures}${path.split("/").map(encodeURIComponent).join("/")}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}`;
 			},
-			mintBoardToken: async (path) => end.call("token", { path }),
+			// An old board's own token, for its buttons, from the harness on this canvas's token.
+			mintBoardToken: async (path) => {
+				const answer = await backend.post("board-token", { path });
+				return typeof answer.token === "string" ? answer.token : undefined;
+			},
 			sandboxed: (path) => trust(path) === "friend",
 			cardScripts: (path) => trust(path) !== "friend",
 			storageKey: (path) => `${start.canvas.name}\u0000${path}`,
-			onExtent: (path, extent) => end.emit("extent", { path, ...extent }),
+			// How a card measured, kept by the harness for `decks canvas fit` to report.
+			onExtent: (path, extent) => void backend.post("board-extent", { path, ...extent }),
 			onOpenLink: (path, from) => {
 				void end.call("open", { path, from });
 				return true;
 			},
 			news: () => news(),
-			onRead: (path) => end.emit("seen", { path }),
+			onRead: (path) => void backend.post("board-seen", { path }),
 			mayStart: () => busy().mayStart !== false,
 			switching: () => busy().switching === true,
 			onStarted: () => end.emit("started", {}),

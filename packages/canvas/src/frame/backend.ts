@@ -13,6 +13,8 @@ export interface Backend {
 	follow(hear: (message: Heard) => void): () => void;
 	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
 	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	/** One of the harness's own routes beside the verbs (`/api/v1/board-seen`, `board-extent`, `board-token`), answering its JSON. */
+	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
 	/** A renewed token, for every request from now on. */
@@ -82,6 +84,15 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 				});
 				const answer = (await response.json().catch(() => ({ ok: false, error: `${verb}: ${response.status}` }))) as { ok: boolean; value?: unknown; error?: string; notes?: string[] };
 				return answer;
+			} catch (error) {
+				return { ok: false, error: error instanceof Error ? error.message : String(error) };
+			}
+		},
+
+		async post(route, body) {
+			try {
+				const response = await fetch(`${base}/v1/${route}`, { method: "POST", headers: headers({ "content-type": "application/json" }), body: JSON.stringify(body) });
+				return (await response.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
 			} catch (error) {
 				return { ok: false, error: error instanceof Error ? error.message : String(error) };
 			}
