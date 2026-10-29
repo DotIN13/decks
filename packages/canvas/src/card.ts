@@ -104,6 +104,11 @@ export function clean(fragment: DocumentFragment, base: string): void {
 			gone.push(node);
 			continue;
 		}
+		// An SVG animation can write an address into a link after the cleaning: one that targets an address goes.
+		if (/^(?:animate|set|animatemotion|animatetransform)$/i.test(name) && /href|src|action/i.test(node.getAttribute("attributeName") ?? "")) {
+			gone.push(node);
+			continue;
+		}
 		for (const attr of [...node.attributes]) {
 			const key = attr.name.toLowerCase();
 			if (key.startsWith("on")) node.removeAttribute(attr.name);
