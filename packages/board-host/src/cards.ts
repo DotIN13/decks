@@ -26,6 +26,7 @@ export function cardModules(source: string): string[] {
 
 /** A card script's address taken apart: the card's path and which script, or undefined for any other path. */
 export function cardModuleOf(path: string): { card: string; n: number } | undefined {
-	const match = /^(.+\/cards\/[^/]+\.html?)\.m(\d+)\.js$/i.exec(path);
+	// `cards/a.html.m0.js` in a canvas's own folder (Studio), or `canvases/x/cards/a.html.m0.js` in a deck (a harness).
+	const match = /^((?:.*\/)?cards\/[^/]+\.html?)\.m(\d+)\.js$/i.exec(path);
 	return match ? { card: match[1]!, n: Number(match[2]) } : undefined;
 }
