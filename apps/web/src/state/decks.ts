@@ -23,7 +23,7 @@ export function setPersonStage(stage: () => string | undefined, agent: () => str
 	talkingTo = agent;
 }
 
-/** The canvas on screen, for the token this page asks for a card on it (`app/canvas-host.ts`). */
+/** The canvas on screen, named on a card's agent call this page makes (`board/canvas-frame.ts`). */
 export function stageOnScreen(): string | undefined {
 	return onScreen();
 }

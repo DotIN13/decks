@@ -9,7 +9,6 @@ export type { InkTool } from "./state/ink.ts";
 export { boardsOf, createDrawing, type Drawing, type DrawingOptions } from "./drawing.ts";
 export { canvasHost, setCanvasHost, type CanvasHost } from "./host.ts";
 export { ItemSlot, type ItemSlotExtras, type StageBoardProps } from "./item-slot.tsx";
-export { createCardTokens, type CardTokens, type MintCardToken } from "./card-tokens.ts";
 export { Stage, type InkRequest, type StageComment, type StageShots } from "./Stage.tsx";
 export type { PenEdit, PenDocument } from "@decks/pen";
 export type { PenTool } from "./state/pen-tools.ts";

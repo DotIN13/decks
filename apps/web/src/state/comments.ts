@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import { loadComments, saveComments, type BoardComment } from "../markup/comments.ts";
 
 /**
- * Comments on boards: the one being written, and the ones waiting for the next message.
+ * Comments on boards: whether the one being written has words in it, and the ones waiting for the next message.
  *
  * Waiting comments are kept per agent, because a comment is said *to* somebody: it was made
  * on that agent's canvas and goes with the next thing sent to that agent. They are in
@@ -27,10 +27,9 @@ export interface CommentTarget {
 	items?: string[];
 }
 
-const [commenting, setCommenting] = createSignal<CommentTarget | undefined>(undefined);
 /** Something has been typed into the popup, so a stray click on the board must not throw it away. */
 const [commentDirty, setCommentDirty] = createSignal(false);
-export { commenting, setCommenting, commentDirty, setCommentDirty };
+export { commentDirty, setCommentDirty };
 
 const storage = () => (typeof localStorage === "undefined" ? undefined : localStorage);
 const [waiting, setWaiting] = createSignal<Record<string, BoardComment[]>>(loadComments(storage()));

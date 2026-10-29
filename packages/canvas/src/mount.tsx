@@ -61,8 +61,6 @@ export interface CanvasOptions {
 		news?(): Record<string, string>;
 		/** The person looked at a board with a dot. */
 		onRead?(path: string): void;
-		/** Where the host's pictures of boards and cards are, by their revision, in place of `picture`. */
-		shots?(): import("./Stage.tsx").StageShots;
 		/** A board's Hide, when the host takes it off the canvas itself (its server); absent: taken off this drawing. */
 		onHide?(path: string): void;
 	};
@@ -99,8 +97,6 @@ export interface CanvasOptions {
 	};
 	/** The camera moved (a pan, a zoom, a fit). */
 	onCamera?: (camera: Camera) => void;
-	/** The select tool picked by its key (V): a host with tools of its own puts them down too. */
-	onSelectTool?: () => void;
 	/** The canvas shown, by name: the stage lands on a new one, and each board's token names it. */
 	canvasName?: () => string | undefined;
 	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
@@ -109,8 +105,7 @@ export interface CanvasOptions {
 	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
 	/**
 	 * A drawing the host owns (its server): edits go to `send` as pen operations, each with a name
-	 * (`edit`) the host's server sends back with the drawing that has it (`setDocument`'s `made`, or the
-	 * `made` of `state.pen`); undo and redo are `step`'s. Each edit is shown at once and kept on top of
+	 * (`edit`) the host's server sends back with the drawing that has it (`setDocument`'s `made`); undo and redo are `step`'s. Each edit is shown at once and kept on top of
 	 * the drawings the host gives until one has it (`drawing.ts`). `send` may answer whether the edit was
 	 * made. Absent: the drawing is this page's, and `onEdits` hears every change.
 	 */
@@ -211,7 +206,9 @@ const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 
 /**
  * State a host keeps itself and the editor reads and writes (the Decks app's camera, selection and
- * mode are the app's own): each a getter and a setter. What is not given, the editor keeps.
+ * mode are the app's own): each a getter and a setter. What is not given, the editor keeps. The
+ * framed editor (`frame/host.tsx`) keeps all of it in step with its frame; `createEditor` itself
+ * takes only the mode and the ink (`EditorOwnState`), which is what the canvas frame keeps.
  */
 export interface EditorState {
 	camera?: [Accessor<Camera>, (camera: Camera) => void];
@@ -235,6 +232,9 @@ export interface EditorState {
 	opening?: Accessor<{ camera?: Camera } | undefined>;
 }
 
+/** What of `EditorState` the editor made in a host's own tree reads: the mode and the ink. */
+export type EditorOwnState = Pick<EditorState, "mode" | "inking">;
+
 /** The editor, made in the host's own tree (`createEditor`): its handle, and what it draws. */
 export interface Editor {
 	handle: CanvasHandle;
@@ -248,15 +248,15 @@ export interface Editor {
 /**
  * The Decks canvas editor, made inside a host's own Solid tree: the stage, its camera, the
  * drawing's tools and properties, and ink. `mountCanvas` puts one in an element for any page; a
- * Solid app (the Decks app) makes one where its layout wants the stage, with its own state given
- * in `state`.
+ * Solid app (the canvas frame, `frame/frame.tsx`) makes one where its layout wants the stage, with its
+ * own mode and ink given in `state`.
  *
  * One canvas to a page: the tools and the host's answers are module state, as they are in the
  * Decks app.
  */
 export function createEditor(
 	options: CanvasOptions & {
-		state?: EditorState;
+		state?: EditorOwnState;
 		/** How big the stage is on screen. Default: the window. */
 		size?: () => { width: number; height: number };
 		/** The scheme changed (`setDark`): a host paints it where its own styles read it. */
@@ -264,7 +264,7 @@ export function createEditor(
 	},
 ): Editor {
 	const size = () => options.size?.() ?? { width: innerWidth, height: innerHeight };
-	// No text is an empty drawing: a host that gives its drawing as state (`state.pen`) has none yet.
+	// No text is an empty drawing.
 	const first: PenDocument = options.text.trim() ? parse(options.text) : emptyDocument();
 	const base = options.base ?? (typeof location === "undefined" ? "/" : location.href);
 
@@ -283,13 +283,11 @@ export function createEditor(
 	const firstView = kept(firstScope, first, options.dark ? "dark" : "light");
 
 	const opening = firstView?.camera ?? options.camera ?? fitAll(first, size(), options.dark ? "dark" : "light");
-	const [camera, setCameraSignal] = options.state?.camera ?? createSignal<Camera>(opening);
-	// A host that keeps the camera opens it on the kept view too.
-	if (options.state?.camera && firstView) setCameraSignal(firstView.camera);
+	const [camera, setCameraSignal] = createSignal<Camera>(opening);
 	/** How many times each board's page has been told to load again (`reloadBoard`). */
 	const [reloads, setReloads] = createSignal<Record<string, number>>({});
 	const [mode, setModeSignal] = options.state?.mode ?? createSignal<"edit" | "browse">(options.mode ?? "edit");
-	const [selected, setSelected] = options.state?.selected ?? createSignal<string | undefined>();
+	const [selected, setSelected] = createSignal<string | undefined>();
 	const [dark, setDarkSignal] = createSignal(options.dark === true);
 	const look = () => (dark() ? "dark" : "light");
 	/*
@@ -308,7 +306,6 @@ export function createEditor(
 	const [penBase, setPenBase] = createSignal(base);
 	/** A glide the host asked for (`glide`): the stage animates to the camera it is given while the token is new. */
 	const [ownGlide, setGlideAsk] = createSignal<{ token: number; ms: number }>();
-	const glideAsk = () => options.state?.glide?.() ?? ownGlide();
 	let glides = 0;
 	const { doc, edit, step, moveBoard, resizeBoard, removeBoard } = drawing;
 
@@ -384,18 +381,11 @@ export function createEditor(
 		return done;
 	});
 
-	// A drawing the host gives as state is the one shown; the editor's own copy follows it, for its board calls.
-	if (options.state?.pen) createComputed(() => {
-		const given = options.state!.pen!();
-		if (given) drawing.set(given.doc, given.edits, given.made, given.scope);
-	});
 	// With what made the drawing from the last one, when known, so the stage's engines apply just that.
 	const pen = createMemo(() => {
 		const now = doc();
 		const edits = drawing.editsTo(now);
-		if (!options.state?.pen) return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
-		const given = options.state.pen();
-		return given ? { doc: now, base: given.base, ...(edits ? { edits } : {}), ...(given.writer ? { writer: given.writer } : {}) } : undefined;
+		return { doc: now, base: penBase(), ...(edits ? { edits } : {}) };
 	});
 	/*
 	 * Owned by whoever makes the editor (mountCanvas's own root, or the host's component), never by
@@ -429,15 +419,12 @@ export function createEditor(
 			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
 			{...(options.onViewport ? { onViewport: options.onViewport } : {})}
 			{...(options.onRefer ? { onRefer: options.onRefer } : {})}
-			glide={glideAsk()}
+			glide={ownGlide()}
 			boardPill={true}
 			{...(options.onProperties ? { onProperties: options.onProperties } : {})}
-			opening={options.state?.opening ? options.state.opening() : { camera: opening }}
+			opening={{ camera: opening }}
 			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
-			onTool={() => {
-				setPenTool("select");
-				options.onSelectTool?.();
-			}}
+			onTool={() => setPenTool("select")}
 			boards={boards}
 			pen={pen()}
 			{...editing}
@@ -454,7 +441,7 @@ export function createEditor(
 			}}
 			onMove={moveBoard}
 			frame={(slot) => <ItemSlot {...slot} reload={reloads()[slot.board.path]} page={options.boards?.page?.(slot.board.path)} {...(options.boards?.cardScripts && !options.boards.cardScripts(slot.board.path) ? { cardScripts: false } : {})} />}
-			shots={options.boards?.shots ?? (() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK }))}
+			shots={() => ({ picture: (board, scheme) => options.boards?.picture?.(board.path, scheme) ?? BLANK })}
 			{...commenting}
 			{...(options.onInk ? { onInk: options.onInk } : {})}
 			inkAgent={options.inkAgent?.()}

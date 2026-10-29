@@ -3540,3 +3540,44 @@ body {
 	.fps-key .k60::before { border-color: #d29922; }
 }
 
+/* ---- the canvas frame's own chrome beside its tools (`frame/chrome.tsx`) ---------------- */
+
+@layer components {
+	.frame-offer.float.pill {
+		top: 68px;
+		left: 50%;
+		gap: 8px;
+		padding: 0 6px 0 14px;
+		color: var(--v3-fg);
+		font-size: 13px;
+		transform: translateX(-50%);
+	}
+	.frame-offer-go,
+	.frame-offer-no {
+		height: 30px;
+		padding: 0 12px;
+		border: 0;
+		border-radius: 10px;
+		cursor: pointer;
+		font: inherit;
+	}
+	.frame-offer-go {
+		background: var(--v3-accent);
+		color: white;
+	}
+	.frame-offer-no {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
+	/* A phone's tool row in the canvas frame, above the page's dock (`frame/chrome.tsx`). */
+	.frame-tool-row {
+		position: absolute;
+		z-index: 20;
+		left: 8px;
+		right: 8px;
+	}
+	.frame-tool-row .v3-tools[data-row="true"] {
+		background: var(--v3-panel);
+		box-shadow: var(--v3-shadow);
+	}
+}

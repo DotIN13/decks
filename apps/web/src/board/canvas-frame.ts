@@ -4,12 +4,6 @@ import { authHeaders } from "../lib/session.ts";
 import { ask } from "../state/confirm.ts";
 import { deckAddress, stageOnScreen } from "../state/decks.ts";
 
-/**
- * The canvas in a sandboxed frame (`@decks/canvas`, `frame/`), while it is tried beside the canvas in
- * this page: `?frame=1` in the address. Measured against the page before it becomes the only way.
- */
-export const framedCanvas = typeof location !== "undefined" && new URLSearchParams(location.search).get("frame") === "1";
-
 /** The folder a canvas keeps its files in, as the harness serves it: `canvases/plan/`, or a friend's `shared/canvases/ana/trip/`. */
 const folderOf = (canvas: string) => {
 	const shared = /^shared\/([^/]+)\/([^/]+)$/.exec(canvas);

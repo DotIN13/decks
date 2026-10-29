@@ -1,5 +1,4 @@
 import { api, rebase } from "../connections/connection.ts";
-import type { Board } from "@decks/protocol";
 
 /**
  * The server's file surface, over HTTP: what a URL is, for reading.
@@ -14,47 +13,6 @@ import type { Board } from "@decks/protocol";
  * connect and on every change (`state/socket.ts`). There used to be a `fetchDeck()` in this
  * file for the first paint, from before the greeting carried everything.
  */
-
-/**
- * The URL a board's frame loads.
- *
- * `rev` is in the query because the frame fetched the document itself and
- * re-reading the file cannot reach it: a new URL is the only way to say "this
- * changed". It is the file's modification time, so it is stable across reloads
- * and unique per edit.
- */
-export function boardUrl(board: Pick<Board, "path" | "rev">): string {
-	const path = board.path.split("/").map(encodeURIComponent).join("/");
-	return api(`/board/${path}?rev=${board.rev}`);
-}
-
-/** The server's `PICTURE_LOOK` (`boards/thumbs.ts`): raised with it, so a picture taken before a change to how every board looks is a URL the browser has not kept. */
-const PICTURE_LOOK = 3;
-
-/**
- * The server's picture of a board (`boards/thumbs.ts` over there), in the app's scheme.
- *
- * `v` is the revision, for the same reason `rev` is in `boardUrl`: the picture is cached for
- * a year, and an edited board has to be a URL the browser has never seen.
- */
-export function thumbUrl(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
-	const path = board.path.split("/").map(encodeURIComponent).join("/");
-	return api(`/thumb/${path}?v=${board.rev}&scheme=${scheme}&look=${PICTURE_LOOK}`);
-}
-
-/**
- * The picture the stage's sheet draws of a board or a card that is not awake (`StageShots.picture`):
- * the server's, of the whole page, at an absolute address the sheet can fetch from its worker.
- */
-export function boardPicture(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
-	return new URL(`${thumbUrl(board, scheme)}&whole=1`, location.href).href;
-}
-
-/** A deck-relative path (a poster, an asset) as a URL. */
-export function deckFileUrl(path: string, rev?: number): string {
-	const encoded = path.split("/").map(encodeURIComponent).join("/");
-	return rev ? api(`/board/${encoded}?rev=${rev}`) : api(`/board/${encoded}`);
-}
 
 /** The families an embed's file can belong to, as `board.js` counts them. */
 export type EmbedFamily = "md" | "pdf" | "image" | "video" | "audio" | "html" | "text" | "file";

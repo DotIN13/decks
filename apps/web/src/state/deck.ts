@@ -75,10 +75,7 @@ function createDeck() {
 		 * `panelSections`, which indexes it itself. Moving it means changing that signature.
 		 */
 		contexts: Record<string, string[]>;
-		/** Reload counters from `decks.view.reload`, per board. */
-		nonces: Record<string, number>;
 		defaultKind: AgentKind;
-		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 		/**
 		 * What this install can run, and what each runtime is called, from the greeting.
 		 *
@@ -106,7 +103,6 @@ function createDeck() {
 		identities: {},
 		agents: {} as Record<string, AgentRecord | undefined>,
 		contexts: {} as Record<string, string[]>,
-		nonces: {} as Record<string, number>,
 		defaultKind: "pi" as AgentKind,
 		runtimes: [] as RuntimeInfo[],
 		accounts: [] as ClaudeAccount[],
@@ -199,8 +195,6 @@ export function resetDeck(): void {
 		agents: {},
 		web: undefined,
 		contexts: {},
-		nonces: {},
-		cursor: undefined,
 		runtimes: [],
 		accounts: [],
 		settings: {},

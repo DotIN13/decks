@@ -1,7 +1,6 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
-import { framedCanvas } from "../board/canvas-frame.ts";
 import { handsOn } from "@decks/canvas/camera";
 import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
@@ -24,7 +23,7 @@ import { historyShown } from "../state/edge.ts";
 import { accountChanged, releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
-import { forgetPen, receivePen, receivePenDelta, receivePenRefused } from "../state/pens.ts";
+import { forgetPen, receivePen, receivePenDelta } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
 
 /** What the frame handler needs from the component it used to live in. */
@@ -385,8 +384,8 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					receivePenDelta(message);
 					return;
 
+				// The canvas frame makes the person's edits to the canvas on screen itself, and hears its own refusals.
 				case "stage.pen.refused":
-					receivePenRefused(message);
 					return;
 
 				// What stages there are, and who is on them: the manager's whole list.
@@ -405,7 +404,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * The canvas in its frame answers an agent's view on the canvas it shows, from its own stream
 					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
 					 */
-					if (framedCanvas && ["show", "camera", "reload", "cursor"].includes(message.call.op)) {
+					if (["show", "camera", "reload", "cursor"].includes(message.call.op)) {
 						const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
 						const screen = stageOf(state.focused)?.name;
 						// A cursor or a reload names a card: the frame answers when that card is on the canvas it shows.
@@ -434,7 +433,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						value = runStageCall(message.call, {
 							boards: () => state.boards,
 							viewport: () => {
-								const stage = document.querySelector(".stage");
+								const stage = document.querySelector("iframe.canvas-frame");
 								return { width: stage?.clientWidth ?? 0, height: stage?.clientHeight ?? 0 };
 							},
 							/*
@@ -474,8 +473,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 								reportCamera(camera, agentId);
 							},
 							select: (path) => setSelected(path),
-							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
-							cursor: (cursor) => setState("cursor", cursor),
+							// A card or a cursor on a canvas that is not on screen: nothing here shows it.
+							reload: () => {},
+							cursor: () => {},
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };

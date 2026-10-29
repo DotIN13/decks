@@ -5,7 +5,7 @@ import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../mount.
 import type { PenTool } from "../state/pen-tools.ts";
 import { syncTools, toolsNow } from "./ui-sync.ts";
 import { insets } from "../camera/insets.ts";
-import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type Page, type PageEnd, type Rect, type Start } from "./protocol.ts";
+import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type PageEnd, type Rect, type Start } from "./protocol.ts";
 
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
@@ -18,8 +18,6 @@ export interface FrameHostOptions {
 	backend(canvas: string): Promise<{ api: string; token: string; idle: number }>;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
-	/** Whether a card or board on it is yours or a friend's. */
-	trust?(path: string): "own" | "friend";
 	/** A card's agent call, or showing another canvas (`frame/card-calls.ts`): the page answers it with your token, asking first before a message goes to an agent. */
 	agent?(call: FrameCalls["agent"]["data"]): Promise<unknown>;
 	/** Where what the frame keeps between visits is kept: this page's own storage. */
@@ -138,8 +136,6 @@ export function createFramedEditor(options: Options): Editor {
 		}, every);
 		onCleanup(() => clearInterval(timer));
 	};
-
-	const pagesNow = (): Page[] => (options.boards?.list?.() ?? []).map((board) => ({ ...board, trust: options.frame.trust?.(board.path) ?? (board.path.startsWith("shared/") ? "friend" : "own") }));
 
 	/** What the frame says, as the host's own callbacks and state. */
 	const wire = (page: PageEnd, canvas: string) => {
