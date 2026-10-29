@@ -76,6 +76,11 @@ fn copy_in(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(
 }
 
 fn copy_in_keep(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool) -> bool {
+	copy_in_as(gpu, id, bitmap, size, from_canvas, keep, false)
+}
+
+/// As `copy_in_keep`; `levels`: a picture, kept with its smaller sizes, made on the GPU after the copy.
+fn copy_in_as(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Option<(u32, u32)>, from_canvas: bool, keep: bool, levels: bool) -> bool {
 	let Some(_) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (u32::MAX, u32::MAX)) else {
 		web_sys::console::warn_1(&"stage: a picture with nothing in it (closed, or sent elsewhere) was not copied".into());
 		return false;
@@ -86,12 +91,17 @@ fn copy_in_keep(gpu: &mut Gpu, id: u32, bitmap: &web_sys::ImageBitmap, size: Opt
 	if bitmap.width() > w || bitmap.height() > h {
 		web_sys::console::warn_1(&format!("stage: a {}×{} picture is over the {cap}-pixel limit: only {w}×{h} of it is kept", bitmap.width(), bitmap.height()).into());
 	}
-	if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h) {
+	if levels {
+		gpu.picture_texture(id, w, h);
+	} else if gpu.texture_handle(id).is_none_or(|t| t.width() != w || t.height() != h || t.mip_level_count() != 1) {
 		gpu.texture(id, TextureKind::Color, w, h, None);
 	}
 	let texture = gpu.texture_handle(id).expect("just made").clone();
 	let (cw, ch) = crate::engine::copy_extent((bitmap.width(), bitmap.height()), (w, h)).expect("not empty, checked above");
 	gpu.copy_bitmap(bitmap, &texture, cw, ch, from_canvas);
+	if levels {
+		gpu.fill_levels(id);
+	}
 	if !keep {
 		bitmap.close();
 	}
@@ -360,13 +370,23 @@ impl PageEngine {
 		let Some(gpu) = &mut self.gpu else { return };
 		let (w, h) = (width.unwrap_or(bitmap.width()), height.unwrap_or(bitmap.height()));
 		let id = self.page.pictures.get(url).map(|p| p.0).unwrap_or_else(|| self.page.new_texture());
-		if copy_in(gpu, id, &bitmap, None, false) {
+		if copy_in_as(gpu, id, &bitmap, None, false, false, true) {
 			if later.unwrap_or(false) {
 				self.page.picture_unlaid(url, id, w, h);
 			} else {
 				self.page.picture(url, id, w, h);
 			}
 		}
+	}
+
+	/// The picture `url` at its next size down, on the GPU, for a quarter of the memory (`Gpu::shrink`):
+	/// `[width, height]` of what is held now, or null if it has no smaller size or is not held.
+	#[wasm_bindgen(js_name = shrinkPicture)]
+	pub fn shrink_picture(&mut self, url: &str) -> Option<Vec<u32>> {
+		let gpu = self.gpu.as_mut()?;
+		let id = self.page.pictures.get(url)?.0;
+		let (w, h) = gpu.shrink(id)?;
+		Some(vec![w, h])
 	}
 
 	/// Lay the drawing out for the pictures put `later` since the last time; false if there were none.

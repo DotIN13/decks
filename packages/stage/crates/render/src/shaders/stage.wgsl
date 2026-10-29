@@ -209,7 +209,8 @@ fn inner_hole(p: vec2<f32>, size: vec2<f32>, radii: vec4<f32>, ellipse: f32, off
 	return shadow(q, hole, max(sigma, 0.25 / max(scale, 1e-6)), corner);
 }
 
-fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
+// `scale`: device pixels a local unit, which picks a picture's size (its level) to draw from; 0 draws from its first.
+fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>, scale: f32) -> vec4<f32> {
 	let rec = paint_rec(index);
 	let kind = rec.head.x;
 	if (kind == 0.0) {
@@ -235,7 +236,11 @@ fn paint_at(index: i32, local: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
 	let f = local / max(size, vec2<f32>(1e-6));
 	let uv = mix(rec.uv.xy, rec.uv.zw, f);
 	let inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-	return textureSampleLevel(picture, smooth_sampler, clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0) * rec.head.z * inside;
+	// The level whose texels are nearest the pixels the box covers: one picture, copied once, drawn at any zoom.
+	let texels = abs(rec.uv.zw - rec.uv.xy) * vec2<f32>(textureDimensions(picture, 0));
+	let pixels = max(size * scale, vec2<f32>(1e-3));
+	let lod = select(0.0, max(log2(max(texels.x / pixels.x, texels.y / pixels.y)), 0.0), scale > 0.0);
+	return textureSampleLevel(picture, smooth_sampler, clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)), lod) * rec.head.z * inside;
 }
 
 // How much of the pixel at `pixel` (in what the pass draws into) clip `index` keeps.
@@ -319,7 +324,7 @@ fn fs_shape(in: ShapeOut) -> @location(0) vec4<f32> {
 		}
 		return texel * color.a * coverage;
 	}
-	return paint_at(i32(in.extra.z), in.local, in.size) * coverage;
+	return paint_at(i32(in.extra.z), in.local, in.size, in.scale) * coverage;
 }
 
 struct MeshIn {
@@ -352,5 +357,5 @@ fn fs_mesh(in: MeshOut) -> @location(0) vec4<f32> {
 	if (coverage <= 0.0) {
 		discard;
 	}
-	return paint_at(i32(in.refs.x), in.local, in.size) * coverage;
+	return paint_at(i32(in.refs.x), in.local, in.size, 0.0) * coverage;
 }

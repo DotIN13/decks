@@ -585,3 +585,31 @@ fn spares_come_back_and_warming_draws_the_same() {
 	}
 	assert_eq!(g.spare_textures[&(64, 64, TextureKind::Color as u8)].len(), 2);
 }
+
+/// A picture's smaller sizes are made on the GPU from its first (`Gpu::fill_levels`), and shrinking it
+/// (`Gpu::shrink`) keeps them, GPU to GPU: one-pixel black and white stripes average to grey.
+#[test]
+fn a_pictures_smaller_sizes_are_its_averages_and_shrinking_keeps_them() {
+	let Some(mut g) = gpu() else { return };
+	let (w, h) = (64u32, 32u32);
+	g.picture_texture(9, w, h);
+	assert_eq!(g.texture_handle(9).unwrap().mip_level_count(), 7, "64 wide: 64, 32, 16, 8, 4, 2, 1");
+	let mut pixels = vec![0u8; (w * h * 4) as usize];
+	for y in 0..h {
+		for x in 0..w {
+			let v = if x % 2 == 0 { 255 } else { 0 };
+			pixels[((y * w + x) * 4) as usize..][..4].copy_from_slice(&[v, v, v, 255]);
+		}
+	}
+	let texture = g.texture_handle(9).unwrap().clone();
+	g.queue.write_texture(texture.as_image_copy(), &pixels, wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) }, wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 });
+	g.fill_levels(9);
+	assert_eq!(g.shrink(9), Some((32, 16)));
+	assert_eq!(g.texture_handle(9).unwrap().mip_level_count(), 6);
+	let half = g.read(9).expect("read back");
+	for (x, y) in [(0, 0), (15, 7), (31, 15)] {
+		let [r, _, _, a] = px(&half, 32, x, y);
+		assert!((120..=135).contains(&r) && a == 255, "({x}, {y}) is {r}/{a}, not the stripes' grey");
+	}
+	assert_eq!(g.shrink(9), Some((16, 8)), "and again, from what it kept");
+}

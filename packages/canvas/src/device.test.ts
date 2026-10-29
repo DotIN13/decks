@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BUDGETS, deviceKind } from "./device.ts";
+import { BUDGETS, deviceKind, gpuClass, PICTURES } from "./device.ts";
 
 const safariMac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15";
 
@@ -25,6 +25,17 @@ test("the address can force either, for testing", () => {
 });
 
 test("one budget, different numbers", () => {
-	assert.deepEqual(BUDGETS.computer, { live: 6, kept: 4, pictureMB: 512 });
-	assert.deepEqual(BUDGETS.mobile, { live: 1, kept: 1, pictureMB: 128 });
+	assert.deepEqual(BUDGETS.computer, { live: 6, kept: 4 });
+	assert.deepEqual(BUDGETS.mobile, { live: 1, kept: 1 });
+});
+
+test("a phone or tablet has a small GPU, and so has a computer with little memory or small WebGPU buffers", () => {
+	assert.equal(gpuClass({ kind: "mobile" }), "small");
+	assert.equal(gpuClass({ kind: "computer" }), "big");
+	assert.equal(gpuClass({ kind: "computer", deviceMemory: 4 }), "small");
+	assert.equal(gpuClass({ kind: "computer", deviceMemory: 8, maxBufferSize: 2 ** 32 }), "big");
+	assert.equal(gpuClass({ kind: "computer", maxBufferSize: 256 * 2 ** 20 }), "small");
+	assert.equal(gpuClass({ kind: "mobile", forced: "1024" }), "big");
+	assert.equal(gpuClass({ kind: "computer", forced: "512" }), "small");
+	assert.deepEqual(PICTURES, { big: { width: 1024, budgetMB: 512 }, small: { width: 512, budgetMB: 128 } });
 });

@@ -67,6 +67,8 @@ pub struct Gpu {
 	next_layer: u32,
 	limits: Limits,
 	api: Api,
+	/// What makes a picture's smaller sizes (`exec/mips.rs`), made the first time one is needed.
+	mips: Option<exec::mips::Mips>,
 	/// How pictures go into textures under WebGL 2.
 	#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 	webgl: targets::webgl::Uploads,
@@ -100,9 +102,58 @@ impl Gpu {
 			next_layer: LAYER_IDS,
 			limits,
 			api,
+			mips: None,
 			#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 			webgl: Default::default(),
 		}
+	}
+
+	/// A picture's texture under `id`, `width` × `height`, with room for its smaller sizes
+	/// (`fill_levels`), unless the one there already is that. WebGL 2 keeps one size: drawing into
+	/// one level of a texture while reading the next is not something its backend promises.
+	pub fn picture_texture(&mut self, id: u32, width: u32, height: u32) {
+		let levels = if self.api == Api::WebGl2 { 1 } else { exec::resources::levels_for(width, height) };
+		if self.textures.get(&id).is_some_and(|t| t.width == width && t.height == height && t.texture.mip_level_count() == levels) {
+			return;
+		}
+		let tex = Tex::with_levels(&self.device, &self.pipelines.picture_layout, TextureKind::Color, width, height, levels);
+		self.textures.insert(id, tex);
+	}
+
+	/// Make the smaller sizes of the picture under `id` from its first, on the GPU.
+	pub fn fill_levels(&mut self, id: u32) {
+		let Some(tex) = self.textures.get(&id) else { return };
+		if tex.texture.mip_level_count() < 2 {
+			return;
+		}
+		let texture = tex.texture.clone();
+		let mips = self.mips.get_or_insert_with(|| exec::mips::Mips::new(&self.device));
+		mips.fill(&self.device, &self.queue, &texture);
+	}
+
+	/// The picture under `id` at its next size down, a quarter of the memory: its smaller sizes
+	/// copied into a texture of their own, GPU to GPU, and the first let go. The new size, or None
+	/// for a picture with no smaller size to keep.
+	pub fn shrink(&mut self, id: u32) -> Option<(u32, u32)> {
+		let tex = self.textures.get(&id)?;
+		let levels = tex.texture.mip_level_count();
+		if levels < 2 {
+			return None;
+		}
+		let (w, h) = ((tex.width / 2).max(1), (tex.height / 2).max(1));
+		let smaller = Tex::with_levels(&self.device, &self.pipelines.picture_layout, TextureKind::Color, w, h, levels - 1);
+		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("shrink") });
+		for n in 1..levels {
+			let size = tex.texture.size().mip_level_size(n, wgpu::TextureDimension::D2);
+			encoder.copy_texture_to_texture(
+				wgpu::TexelCopyTextureInfo { texture: &tex.texture, mip_level: n, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+				wgpu::TexelCopyTextureInfo { texture: &smaller.texture, mip_level: n - 1, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+				size,
+			);
+		}
+		self.queue.submit([encoder.finish()]);
+		self.textures.insert(id, smaller);
+		Some((w, h))
 	}
 
 	/// The graphics API this backend's device is on.

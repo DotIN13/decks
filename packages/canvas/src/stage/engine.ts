@@ -26,26 +26,16 @@ import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../editor/core/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneBoard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
-import { BUDGET } from "../device.ts";
+import { PICTURES, readGpuClass } from "../device.ts";
 import { noticeFor } from "./backends/notice.ts";
 
 /** How far a press reaches a line, in screen pixels: wider for a finger. */
 const BAND_PX = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 12 : 8;
 /**
- * The rungs of a board's picture the server keeps (`thumbs.ts`, `SMALL_WIDTHS`; 0 is the whole one,
- * up to 2048 px): a board is fetched at the smallest at least as wide as it is drawn, so it is never
- * more than twice as sharp as shown.
+ * How long the camera rests before the pictures are held to their budget (`fitPictures`), and a
+ * shrunk board near the screen gets its whole picture back (`wantBoardPictures`).
  */
-const SMALL = [256, 512, 1024];
-/** The rung of a board's picture for a width on screen, in device pixels: 0 for the whole one. */
-const rungFor = (need: number): number => SMALL.find((one) => one >= need) ?? 0;
-/**
- * A board's picture is fetched again, larger, once it is shown this much bigger than the copy held
- * (a zoom in on a phone kept the first, small one, blurred): checked when the zoom has rested this
- * long, so a pinch asks once at its end rather than at every step.
- */
-const SHARPER_AT = 1.2;
-const SHARPER_AFTER_MS = 250;
+const REST_MS = 250;
 /** Pictures fetched at once, and a stand-in picture asked for again this often, this many times. */
 const FETCHES = 6;
 const STAND_IN_RETRY_MS = 1200;
@@ -287,6 +277,12 @@ export class StageEngine {
 	private workerBackend = "";
 	/** The widest and tallest a picture is kept (the device's limit, or 4096): bigger ones are resized. */
 	private maxPicture = 4096;
+	/**
+	 * Board pictures, by this device's GPU (`device.ts`, `readGpuClass`): each board's is fetched at
+	 * one width, copied to the GPU once, and drawn at any zoom from the smaller sizes the GPU makes of
+	 * it. Big until the adapter has been asked.
+	 */
+	private pictures = PICTURES.big;
 	/** What this browser draws with (`backends/detect.ts`), found once. */
 	private detected: Detected | undefined;
 	/** Stops watching for the device to be lost. */
@@ -361,6 +357,8 @@ export class StageEngine {
 		if (this.disposed) return gpu.free();
 		this.backend = gpu.backend();
 		this.maxPicture = gpu.maxPictureSize();
+		this.pictures = PICTURES[await readGpuClass()];
+		if (this.disposed) return gpu.free();
 		const doc = this.doc ? JSON.stringify(this.doc) : EMPTY;
 		(globalThis as { __decksRust?: unknown }).__decksRust = this;
 		const self = this;
@@ -921,10 +919,6 @@ export class StageEngine {
 			this.sendCamera();
 			this.wantBoardPictures();
 		}
-		if (camera.zoom !== this.sharperZoom) {
-			this.sharperZoom = camera.zoom;
-			this.sharperSoon();
-		}
 		// The click shapes follow the window: written again once it leaves the area they cover.
 		const w = this.hitWindow;
 		if (w && this.placed.size) {
@@ -1302,6 +1296,8 @@ export class StageEngine {
 			for (const key of [...this.pictureBytes.keys()]) {
 				if (here.has(key)) continue;
 				this.pictureBytes.delete(key);
+				this.wholeBytes.delete(key);
+				this.shrunk.delete(key);
 				this.picturesAsked.delete(key);
 				this.page?.forgetPicture(key);
 			}
@@ -1371,14 +1367,13 @@ export class StageEngine {
 	}
 
 	/**
-	 * Fetch the pictures of the boards in view (and of live ones kept ready), at the size they are
-	 * shown. A board already fetched keeps its copy, unless `sharper` and it is now shown
-	 * `SHARPER_AT` times wider than that copy: then the next copy up is fetched, drawn over the old
-	 * one when it comes. Never a smaller one: a zoom out keeps the sharp copy it has.
+	 * Fetch the pictures of the boards near the window that have none, each once, at this device's one
+	 * width (`pictures`): the GPU makes its smaller sizes, so no zoom fetches or copies one again. At
+	 * rest, a board near the window that was shrunk to fit the budget (`fitPictures`) gets its whole
+	 * picture back.
 	 */
-	private wantBoardPictures(sharper = false): void {
+	private wantBoardPictures(): void {
 		if (!this.page || !this.view.width) return;
-		const dpr = Math.min(2, devicePixelRatio || 1);
 		const w = this.view.width / this.camera.zoom;
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w;
@@ -1389,81 +1384,81 @@ export class StageEngine {
 			if (!board.picture || (board.live && !board.ready)) continue;
 			if (board.x + board.w < left || board.x > left + w * 2 || board.y + board.h < top || board.y > top + h * 2) continue;
 			const key = `board:${board.path}`;
-			const need = board.w * this.camera.zoom * dpr;
-			const sized = /^(https?:|\/)/.test(board.picture);
-			const asked = this.picturesAsked.get(key);
-			if (asked) {
-				// Held at a copy's size, and shown wider than it: the next one up, when the zoom rests.
-				if (!sharper || !sized || !asked.size || need <= asked.size * SHARPER_AT || asked.source !== board.picture) continue;
+			if (this.picturesAsked.has(key)) {
+				// Whole again only if it fits: else the next rest would shrink it again, and copy it in at every rest.
+				if (this.moving || !this.shrunk.has(key) || this.heldBytes() - this.pictureBytes.get(key)! + this.wholeBytes.get(key)! > this.budgetBytes()) continue;
 				this.picturesAsked.delete(key);
+				this.shrunk.delete(key);
 			}
-			const size = sized ? rungFor(need) : 0;
+			const size = /^(https?:|\/)/.test(board.picture) ? this.pictures.width : 0;
 			const url = size ? `${board.picture}${board.picture.includes("?") ? "&" : "?"}w=${size}` : board.picture;
 			this.fetchPicture(key, url, true, board.picture, size);
 		}
 	}
 
-	/** Each board picture on the GPU: its bytes, and the width it was fetched at (`fitPictures`). */
-	private pictureBytes = new Map<string, { bytes: number; width: number }>();
+	/** Each board picture on the GPU: its bytes, its smaller sizes included (`fitPictures`). */
+	private pictureBytes = new Map<string, number>();
+	/** Each board picture's bytes as it was copied in, before any shrinking. */
+	private wholeBytes = new Map<string, number>();
+	private heldBytes(): number {
+		let total = 0;
+		for (const bytes of this.pictureBytes.values()) total += bytes;
+		return total;
+	}
+	/** `__decksPictureMB` changes it, for measuring. */
+	private budgetBytes(): number {
+		return ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? this.pictures.budgetMB) * 2 ** 20;
+	}
+	/** Boards whose picture was shrunk on the GPU to fit the budget, to get back whole when near the window again. */
+	private shrunk = new Set<string>();
 
 	/**
-	 * Board pictures within this device's budget (`device.ts`, `pictureMB`), at rest. A sharper rung
-	 * is kept while there is room; over it, the boards farthest from the middle of the window go to the
-	 * rung they are drawn at, or to the smallest when off screen, until the total fits. Every board keeps
-	 * a picture, so one coming back into view shows at once and sharpens at the next rest. Wandering a
-	 * canvas used to collect every board at its whole size: 154 MB for 26 boards on an iPad's screen.
+	 * Board pictures within this device's budget (`device.ts`, `PICTURES`), at rest. Over it, the
+	 * pictures of the boards farthest from the window are shrunk on the GPU to their next size down,
+	 * a quarter of the memory each time, with no fetch and no copy from the page; boards in the window
+	 * only once every other is as small as it goes. Every board keeps a picture, so one coming back into
+	 * view shows at once.
 	 */
 	private fitPictures(): void {
-		if (!this.view.width) return;
-		// `__decksPictureMB` changes it, for measuring.
-		const budget = ((globalThis as { __decksPictureMB?: number }).__decksPictureMB ?? BUDGET.pictureMB) * 2 ** 20;
-		let total = 0;
-		for (const { bytes } of this.pictureBytes.values()) total += bytes;
+		if (!this.view.width || !this.page) return;
+		const budget = this.budgetBytes();
+		let total = this.heldBytes();
 		if (total <= budget) return;
-		const dpr = Math.min(2, devicePixelRatio || 1);
 		const w = this.view.width / this.camera.zoom;
 		const h = this.view.height / this.camera.zoom;
 		const left = this.camera.x - w / 2;
 		const top = this.camera.y - h / 2;
 		const far = (board: SceneBoard) => Math.hypot(Math.max(board.x - this.camera.x, 0, this.camera.x - (board.x + board.w)), Math.max(board.y - this.camera.y, 0, this.camera.y - (board.y + board.h)));
-		const held = this.boards.filter((board) => board.picture && this.pictureBytes.has(`board:${board.path}`) && /^(https?:|\/)/.test(board.picture));
-		held.sort((a, b) => far(b) - far(a));
-		for (const board of held) {
-			if (total <= budget) break;
-			const key = `board:${board.path}`;
-			const has = this.pictureBytes.get(key)!;
-			const seen = board.x < left + w && board.x + board.w > left && board.y < top + h && board.y + board.h > top;
-			const want = seen ? rungFor(board.w * this.camera.zoom * dpr) : SMALL[0]!;
-			// Already that small, or shown wider than the largest rung: nothing smaller would do.
-			if (want === 0 || has.width <= want) continue;
-			total -= has.bytes - has.bytes * (want / has.width) ** 2;
-			this.picturesAsked.delete(key);
-			this.fetchPicture(key, `${board.picture}${board.picture!.includes("?") ? "&" : "?"}w=${want}`, true, board.picture, want);
+		const seen = (board: SceneBoard) => board.x < left + w && board.x + board.w > left && board.y < top + h && board.y + board.h > top;
+		const held = this.boards.filter((board) => this.pictureBytes.has(`board:${board.path}`));
+		held.sort((a, b) => Number(seen(a)) - Number(seen(b)) || far(b) - far(a));
+		// Round after round, each a size down, until the total fits or nothing has a smaller size.
+		for (let shrank = true; total > budget && shrank; ) {
+			shrank = false;
+			for (const board of held) {
+				if (total <= budget) break;
+				const key = `board:${board.path}`;
+				const size = this.page.shrinkPicture(key);
+				if (!size) continue;
+				const now = Math.round(size[0]! * size[1]! * 4 * (4 / 3));
+				total -= this.pictureBytes.get(key)! - now;
+				this.pictureBytes.set(key, now);
+				this.shrunk.add(key);
+				shrank = true;
+			}
 		}
+		if (this.shrunk.size) this.draw();
 	}
 
-	/** Look for blurred boards (`wantBoardPictures`) once the zoom has stopped changing for `SHARPER_AFTER_MS`, and the camera moving. */
-	private sharperSoon(): void {
-		clearTimeout(this.sharperTimer);
-		this.sharperTimer = setTimeout(() => {
-			if (this.disposed) return;
-			if (this.moving) return this.sharperSoon();
-			this.wantBoardPictures(true);
-			this.fitPictures();
-		}, SHARPER_AFTER_MS);
-	}
-	private sharperTimer: ReturnType<typeof setTimeout> | undefined;
-	/** `fitPictures` once the camera has rested `SHARPER_AFTER_MS`: a pan collects pictures as a zoom does. */
+	/** `fitPictures` once the camera has rested `REST_MS`: a pan collects pictures as a zoom does. */
 	private fitSoon(): void {
 		clearTimeout(this.fitTimer);
 		this.fitTimer = setTimeout(() => {
 			if (this.disposed || this.moving) return;
 			this.fitPictures();
-		}, SHARPER_AFTER_MS);
+		}, REST_MS);
 	}
 	private fitTimer: ReturnType<typeof setTimeout> | undefined;
-	/** The zoom the boards' pictures were last looked at for: a new one looks again (`sharperSoon`). */
-	private sharperZoom = 0;
 
 	// --- pictures, fonts, icons -----------------------------------------------------------------
 
@@ -1503,22 +1498,9 @@ export class StageEngine {
 		if (this.putQueue.length > 0 && !this.disposed) this.putFrame = requestAnimationFrame(this.putSome);
 	};
 
-	/**
-	 * Ask again for a picture the server answered with a stand-in while it makes it. A board's is asked
-	 * again only at the rung it is drawn at now: one asked at 1024 px, the server taking its whole
-	 * picture to cut it from, was asked again every 1.2 s through a zoom out that left it 256 px wide.
-	 */
+	/** Ask again for a picture the server answered with a stand-in while it makes it. */
 	private retryStandIn(key: string, url: string, board: boolean, asked: { source: string; size?: number | undefined }): void {
 		if (this.disposed || this.picturesAsked.get(key) !== asked) return;
-		const shown = board ? this.boards.find((one) => `board:${one.path}` === key) : undefined;
-		if (shown && asked.size !== undefined && this.view.width) {
-			const now = rungFor(shown.w * this.camera.zoom * Math.min(2, devicePixelRatio || 1));
-			if (now !== asked.size && (now === 0 || asked.size === 0 || now < asked.size)) {
-				this.picturesAsked.delete(key);
-				this.wantBoardPictures();
-				return;
-			}
-		}
 		this.fetchPicture(key, url, board, asked.source, asked.size);
 	}
 
@@ -1549,7 +1531,13 @@ export class StageEngine {
 				const put = () => {
 					if (!wanted()) return forPage.close();
 					// What it holds on the GPU, read before the engine closes the bitmap (`fitPictures`).
-					if (board) this.pictureBytes.set(key, { bytes: forPage.width * forPage.height * 4, width: forPage.width });
+					if (board) {
+						// With its smaller sizes, a third again.
+						const bytes = Math.round(forPage.width * forPage.height * 4 * (4 / 3));
+						this.pictureBytes.set(key, bytes);
+						this.wholeBytes.set(key, bytes);
+						this.shrunk.delete(key);
+					}
 					try {
 						this.page!.putPicture(key, forPage, width, height);
 					} catch (error) {
@@ -2080,7 +2068,6 @@ export class StageEngine {
 		this.takeChannel?.port1.close();
 		this.dropTileQueue();
 		this.unwatch?.();
-		clearTimeout(this.sharperTimer);
 		clearTimeout(this.fitTimer);
 		clearTimeout(this.showAnyway);
 		clearTimeout(this.fastTimer);

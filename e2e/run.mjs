@@ -156,12 +156,12 @@ const CHECKS = [
 	{ file: "live-pictures.mjs", needsAgent: false },
 	/*
 	 * What the stage draws with (`stage/backends/`), in Chromium and in WebKit as an iPhone: WebGL 2
-	 * with no WebGPU, the notice with neither, a lost context started again, and a board's picture
-	 * fetched sharper when a zoom in outgrows its copy.
+	 * with no WebGPU, the notice with neither, and a lost context started again; then every board's
+	 * one picture, fetched once at the device's width and drawn at any zoom (`one-picture`).
 	 */
 	{ file: "backends.mjs", needsAgent: false },
 	{ file: "context-loss.mjs", needsAgent: false },
-	{ file: "sharper-pictures.mjs", needsAgent: false },
+	{ file: "one-picture.mjs", needsAgent: false },
 	/* A note's soft edge, painted in a tile and sent as an ImageBitmap, is not drawn too bright on WebGL 2. */
 	{ file: "note-edges.mjs", needsAgent: false },
 	/* Tiles handed over as their bytes (WebKit's way, `pixelsFirst`) draw the same pixels as tiles handed over as pictures. */

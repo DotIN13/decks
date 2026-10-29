@@ -43,16 +43,57 @@ export const DEVICE: DeviceKind =
 export interface LiveBudget {
 	live: number;
 	kept: number;
-	/**
-	 * The GPU memory board pictures may hold, in MB (`stage/engine.ts`, `fitPictures`): over it, the
-	 * boards farthest from the window drop to the size they are drawn at, or to the smallest, 256 px.
-	 */
-	pictureMB: number;
 }
 
 export const BUDGETS: Record<DeviceKind, LiveBudget> = {
-	computer: { live: 6, kept: 4, pictureMB: 512 },
-	mobile: { live: 1, kept: 1, pictureMB: 128 },
+	computer: { live: 6, kept: 4 },
+	mobile: { live: 1, kept: 1 },
 };
 
 export const BUDGET: LiveBudget = BUDGETS[DEVICE];
+
+/**
+ * How much a device's GPU can hold, as far as a page can tell: no browser says how much memory its
+ * GPU has, so it is read from what they do say. A phone or tablet is small, and so is a computer whose
+ * WebGPU allows buffers under 1 GB or that says it has 4 GB of memory or less; any other is big.
+ * Each board's picture is fetched at one width for the class (`PICTURES`) and copied to the GPU once;
+ * the GPU makes its smaller sizes and draws it at any zoom from the nearest (`stage/engine.ts`).
+ */
+export type GpuClass = "big" | "small";
+
+export interface GpuFacts {
+	kind: DeviceKind;
+	/** `navigator.deviceMemory`, in GB, where the browser gives it (Chrome). */
+	deviceMemory?: number | undefined;
+	/** WebGPU's `maxBufferSize`, in bytes. */
+	maxBufferSize?: number | undefined;
+	/** `?pictures=512` or `?pictures=1024` in the page's address, for testing one class on the other. */
+	forced?: string | null | undefined;
+}
+
+export function gpuClass(facts: GpuFacts): GpuClass {
+	if (facts.forced === "512") return "small";
+	if (facts.forced === "1024") return "big";
+	if (facts.kind === "mobile") return "small";
+	if (facts.deviceMemory !== undefined && facts.deviceMemory <= 4) return "small";
+	if (facts.maxBufferSize !== undefined && facts.maxBufferSize < 2 ** 30) return "small";
+	return "big";
+}
+
+/** A class's board pictures: the width each is fetched at, and the GPU memory they may hold together, in MB. */
+export const PICTURES: Record<GpuClass, { width: number; budgetMB: number }> = {
+	big: { width: 1024, budgetMB: 512 },
+	small: { width: 512, budgetMB: 128 },
+};
+
+/** This device's class, asked of its WebGPU adapter once; without WebGPU, from the rest. */
+export async function readGpuClass(): Promise<GpuClass> {
+	const nav = typeof navigator === "undefined" ? undefined : (navigator as Navigator & { deviceMemory?: number; gpu?: { requestAdapter(): Promise<{ limits: { maxBufferSize: number } } | null> } });
+	const adapter = await nav?.gpu?.requestAdapter().catch(() => null);
+	return gpuClass({
+		kind: DEVICE,
+		deviceMemory: nav?.deviceMemory,
+		maxBufferSize: adapter?.limits.maxBufferSize,
+		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),
+	});
+}

@@ -3,5 +3,6 @@
 //! draw ([`draw`]).
 
 pub mod draw;
+pub mod mips;
 pub mod pipelines;
 pub mod resources;

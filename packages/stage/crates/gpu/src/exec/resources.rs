@@ -11,6 +11,11 @@ use stage_render::{Limits, Table};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
+/// How many sizes a `width` × `height` texture can have, each half the one before, down to one pixel.
+pub fn levels_for(width: u32, height: u32) -> u32 {
+	32 - width.max(height).max(1).leading_zeros()
+}
+
 /// A texture of the stage's: a tile, a glyph atlas, a picture, or a layer.
 pub struct Tex {
 	pub texture: wgpu::Texture,
@@ -24,6 +29,11 @@ pub struct Tex {
 
 impl Tex {
 	pub fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32) -> Tex {
+		Tex::with_levels(device, layout, kind, width, height, 1)
+	}
+
+	/// As `new`, with `levels` sizes, each half the one before (`mips.rs`): a picture drawn small.
+	pub fn with_levels(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, kind: TextureKind, width: u32, height: u32, levels: u32) -> Tex {
 		let format = match kind {
 			TextureKind::Color => wgpu::TextureFormat::Rgba8Unorm,
 			TextureKind::Mask => wgpu::TextureFormat::R8Unorm,
@@ -31,7 +41,7 @@ impl Tex {
 		let texture = device.create_texture(&wgpu::TextureDescriptor {
 			label: Some("stage texture"),
 			size: wgpu::Extent3d { width: width.max(1), height: height.max(1), depth_or_array_layers: 1 },
-			mip_level_count: 1,
+			mip_level_count: levels.clamp(1, levels_for(width, height)),
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
 			format,
@@ -123,6 +133,8 @@ impl Resources {
 			label: Some("smooth"),
 			mag_filter: wgpu::FilterMode::Linear,
 			min_filter: wgpu::FilterMode::Linear,
+			// Between a picture's sizes too (`mips.rs`); a texture with one size is unchanged.
+			mipmap_filter: wgpu::MipmapFilterMode::Linear,
 			address_mode_u: wgpu::AddressMode::ClampToEdge,
 			address_mode_v: wgpu::AddressMode::ClampToEdge,
 			..Default::default()
