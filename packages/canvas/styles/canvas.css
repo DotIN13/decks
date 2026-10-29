@@ -1995,36 +1995,90 @@
 /* ---- a document or an app item, in a board's place (`item-surfaces.tsx`) ------------------- */
 
 @layer components {
+	/* An app, as a macOS window: a title bar with the three lights, its name in the middle. */
 	:where(.decks-canvas, .decks-layer) .app-surface {
 		display: flex;
 		width: 100%;
 		height: 100%;
 		flex-direction: column;
 		overflow: hidden;
+		border: 0.5px solid rgb(0 0 0 / 22%);
 		border-radius: 12px;
 		background: var(--color-surface, #fff);
-		color: var(--color-text, #111);
-		font: 15px/1.4 var(--font-sans, system-ui);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 10%), 0 12px 32px rgb(0 0 0 / 14%);
+		color: var(--color-text, #1d1d1f);
+		font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-sans, system-ui), sans-serif;
 	}
 	:where(.decks-canvas, .decks-layer) .app-surface-bar {
+		position: relative;
+		display: flex;
+		height: 32px;
+		flex: none;
+		align-items: center;
+		padding: 0 12px;
+		border-bottom: 0.5px solid rgb(0 0 0 / 14%);
+		background: linear-gradient(#ececec, #e2e2e2);
+		user-select: none;
+	}
+	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-bar {
+		border-bottom-color: rgb(0 0 0 / 50%);
+		background: linear-gradient(#3a3a3c, #323234);
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-lights {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		gap: 8px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-light {
+		width: 12px;
+		height: 12px;
+		padding: 0;
+		border: 0.5px solid rgb(0 0 0 / 18%);
+		border-radius: 50%;
+		background: #ff5f57;
+	}
+	:where(.decks-canvas, .decks-layer) .app-light[data-light="min"] {
+		background: #febc2e;
+	}
+	:where(.decks-canvas, .decks-layer) .app-light[data-light="zoom"] {
+		background: #28c840;
+		cursor: pointer;
+	}
+	/* The green light shows what it does on hover, as macOS draws its glyph. */
+	:where(.decks-canvas, .decks-layer) .app-light[data-light="zoom"]:hover {
+		background: #28c840 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.5 8.5V4.6L7.4 8.5zM8.5 3.5V7.4L4.6 3.5z' fill='%23005a00' fill-opacity='.75'/%3E%3C/svg%3E") center / 12px no-repeat;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-title {
+		position: absolute;
+		inset: 0 90px;
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 10px 14px;
-		border-bottom: 1px solid var(--color-border, #e5e5e5);
+		justify-content: center;
+		overflow: hidden;
+		color: rgb(0 0 0 / 80%);
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
-	:where(.decks-canvas, .decks-layer) .app-surface-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--color-muted, #999);
-	}
-	:where(.decks-canvas, .decks-layer) .app-surface-dot[data-status="running"] {
-		background: #2ea043;
+	[data-color-scheme="dark"] :where(.decks-canvas, .decks-layer) .app-surface-title {
+		color: rgb(255 255 255 / 85%);
 	}
 	:where(.decks-canvas, .decks-layer) .app-surface-status {
-		color: var(--color-muted, #777);
-		font-size: 13px;
+		position: relative;
+		margin-left: auto;
+		color: rgb(0 0 0 / 45%);
+		font-size: 11px;
+	}
+	:where(.decks-canvas, .decks-layer) .app-surface-status[data-status="running"]::before {
+		content: "";
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		margin-right: 5px;
+		border-radius: 50%;
+		background: #28c840;
+		vertical-align: 1px;
 	}
 	:where(.decks-canvas, .decks-layer) .app-surface-body {
 		display: flex;
@@ -2036,17 +2090,19 @@
 	}
 	:where(.decks-canvas, .decks-layer) .app-surface-body p {
 		margin: 0;
-		color: var(--color-muted, #666);
+		color: var(--color-muted, #6e6e73);
+		font-size: 14px;
 	}
 	:where(.decks-canvas, .decks-layer) .app-surface-open {
-		padding: 8px 22px;
+		padding: 6px 20px;
 		border: 0;
-		border-radius: 10px;
-		background: var(--color-accent, #2563eb);
+		border-radius: 8px;
+		background: #0a84ff;
 		color: #fff;
 		cursor: pointer;
 		font: inherit;
-		font-weight: 600;
+		font-size: 14px;
+		font-weight: 500;
 	}
 	:where(.decks-canvas, .decks-layer) .document-surface .dp {
 		height: 100%;

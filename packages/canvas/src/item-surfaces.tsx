@@ -1,6 +1,6 @@
 import { mountDocPage } from "@decks/docs/page";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { scrollsInside } from "./card.ts";
+import { INTERACTIVE, scrollsInside } from "./card.ts";
 import { canvasHost } from "./host.ts";
 
 /**
@@ -12,7 +12,9 @@ import { canvasHost } from "./host.ts";
 function ownEvents(host: HTMLElement, selected: () => boolean, onSelect: () => void): void {
 	host.addEventListener("pointerdown", (event) => {
 		if (event.pointerType === "touch") return;
-		if (!selected()) onSelect();
+		// A press on one of its own controls is that control's: selecting first would take the click it makes.
+		const control = event.composedPath().some((target) => target instanceof Element && target.matches?.(INTERACTIVE));
+		if (!control && !selected()) onSelect();
 		event.stopPropagation();
 	});
 	for (const type of ["pointerup", "click", "dblclick", "contextmenu"]) host.addEventListener(type, (event) => (event as PointerEvent).pointerType !== "touch" && event.stopPropagation());
@@ -68,15 +70,22 @@ export function AppSurface(props: { app: string; selected: boolean; onSelect: ()
 	});
 	return (
 		<div class="app-surface" ref={(element) => (host = element)} on:dblclick={open}>
+			{/* A window's title bar, as macOS draws one: the lights, the name in the middle, whether it runs. */}
 			<div class="app-surface-bar">
-				<span class="app-surface-dot" data-status={about()?.status ?? "unknown"} />
-				<b>{about()?.title ?? props.app}</b>
-				<span class="app-surface-status">{about()?.status ?? ""}</span>
+				<span class="app-surface-lights">
+					<span class="app-light" data-light="close" aria-hidden="true" />
+					<span class="app-light" data-light="min" aria-hidden="true" />
+					{/* The green one opens it, as a window's grows: a listener of its own, since the item keeps its presses from the canvas. */}
+					<button type="button" class="app-light" data-light="zoom" title="Open in a tab" aria-label={`Open ${about()?.title ?? props.app} in a tab`} on:click={open} />
+				</span>
+				<span class="app-surface-title">{about()?.title ?? props.app}</span>
+				<span class="app-surface-status" data-status={about()?.status ?? "unknown"}>
+					{about()?.status ?? ""}
+				</span>
 			</div>
 			<div class="app-surface-body">
 				<Show when={canvasHost().apps} fallback={<p>This app opens from the Decks app.</p>}>
 					<p>{about()?.title ?? props.app} runs in a tab of its own.</p>
-					{/* A listener of its own: the item keeps its presses from the canvas, so a page-wide one would never hear it. */}
 					<button type="button" class="app-surface-open" on:click={open}>
 						Open
 					</button>
