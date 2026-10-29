@@ -868,11 +868,12 @@ export function Stage(props: {
 						h: sized?.h ?? board.h,
 						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
 						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
-						live: (own && props.shots().ownPicture) || live.has(board.path),
+						// A document or an app item draws itself at any zoom and has no picture (`item-surfaces.tsx`).
+						live: board.item !== undefined || (own && props.shots().ownPicture) || live.has(board.path),
 						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
 						...(live.has(board.path) ? { ready: true } : {}),
 						// A document or an app has no picture worth drawing: a card with its icon and name instead.
-						picture: hasPlaceholder(board) ? placeholderPicture(board, look) : props.shots().picture(board, look),
+						picture: board.item ? "" : hasPlaceholder(board) ? placeholderPicture(board, look) : props.shots().picture(board, look),
 						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !paged(board) } : {}),
 					};
 				}),
@@ -1805,6 +1806,8 @@ export function Stage(props: {
 		keep(props.selected);
 		for (const path of livePages()) keep(path);
 		for (const path of editor.heldBoards()) keep(path);
+		// A document or an app item has no picture: it is drawn at any zoom (`item-surfaces.tsx`).
+		for (const [at, board] of boards.entries()) if (board.item) found.add(at);
 		const next = [...found]
 			.sort((a, b) => a - b)
 			.map((at) => boards[at]!);
@@ -2003,8 +2006,8 @@ export function Stage(props: {
 			moving={moving()}
 			pictures={pictures}
 			zoom={ctl.zoom()}
-			mounted={isLive(board.path) || isHidden(board.path)}
-			hidden={!isLive(board.path) && isHidden(board.path)}
+			mounted={board.item !== undefined || isLive(board.path) || isHidden(board.path)}
+			hidden={board.item === undefined && !isLive(board.path) && isHidden(board.path)}
 			visible={isNear(board.path)}
 			onLive={(on: boolean) => markLive(board.path, on)}
 			carried={carriedPages().has(board.path) || draggedAsPicture().has(board.path)}
