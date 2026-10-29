@@ -152,6 +152,7 @@ const CHECKS = [
 	/* A page opens on its boards at once, not after the arrival's 3 s cap. */
 	{ file: "opening-lands.mjs", needsAgent: false },
 	{ file: "wheel-diagonal.mjs", needsAgent: false },
+	{ file: "split-pinch.mjs", needsAgent: false },
 	/* Zoomed in for a moment and out again, no board is left to a page that went to sleep: each shows its picture. */
 	{ file: "live-pictures.mjs", needsAgent: false },
 	/*

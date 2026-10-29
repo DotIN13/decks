@@ -424,8 +424,9 @@ export function Stage(props: {
 		 * The pointer event comes first and says so (`keepTouch`); cancelling the touch's start is what
 		 * keeps the browser from taking it. Every other finger is left to scroll natively.
 		 */
+		// A finger on the canvas while one is on a board's page is the second finger of a pinch, not a scroll.
 		const holdTouch = (event: TouchEvent) => {
-			if (keptTouches.size > 0) event.preventDefault();
+			if (keptTouches.size > 0 || forwarded.size > 0) event.preventDefault();
 		};
 		element.addEventListener("touchstart", holdTouch, { passive: false });
 		onCleanup(() => element.removeEventListener("touchstart", holdTouch));
@@ -444,16 +445,27 @@ export function Stage(props: {
 		 * The listener that holds the scroll is only there while two fingers are, so one finger's scroll
 		 * never waits for the page.
 		 */
+		/*
+		 * Fingers count wherever they are: one on a board's page reaches this document only as a message
+		 * (`frame-gestures.ts`, `forwarded`), so a pinch with one finger there and one here was one finger
+		 * to the browser, which scrolled the canvas with it while the pinch moved the camera too: the two
+		 * fought for every frame. The second finger is held too while it has not scrolled yet.
+		 */
 		const holdScroll = (event: TouchEvent) => {
-			if (event.touches.length >= 2) event.preventDefault();
+			if (event.touches.length + forwarded.size >= 2) event.preventDefault();
 		};
 		let holding = false;
-		const twoFingers = (event: TouchEvent) => {
-			const two = event.touches.length >= 2;
+		let ownFingers = 0;
+		syncHold = () => {
+			const two = ownFingers + forwarded.size >= 2;
 			if (two === holding) return;
 			holding = two;
 			if (two) element.addEventListener("touchmove", holdScroll, { passive: false });
 			else element.removeEventListener("touchmove", holdScroll);
+		};
+		const twoFingers = (event: TouchEvent) => {
+			ownFingers = event.touches.length;
+			syncHold();
 		};
 		for (const kind of ["touchstart", "touchend", "touchcancel"] as const) element.addEventListener(kind, twoFingers, { passive: true });
 		onCleanup(() => {
@@ -1404,6 +1416,10 @@ export function Stage(props: {
 	const touches = createTouches();
 	/** Fingers whose press the editor took (`keepTouch`): their touch is kept from scrolling the stage. */
 	const keptTouches = new Set<number>();
+	/** Fingers down on a board's page, as its messages tell them (`frame-gestures.ts`), by the stage's id. */
+	const forwarded = new Set<number>();
+	/** Hold the browser's scroll while two fingers are down, here or on a board (set when the stage mounts). */
+	let syncHold = (): void => {};
 	const claimed = new Set<number>();
 	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
 	const carried = new Set<number>();
@@ -1587,7 +1603,13 @@ export function Stage(props: {
 	/** What a board frame hands back when a canvas gesture starts inside it. */
 	const gestures: FrameGestureHost = {
 		wheel: (gesture) => wheel(gesture),
-		touch: (phase, finger) => touch(phase, finger),
+		touch: (phase, finger) => {
+			// A board's finger: counted for holding the browser's scroll (`holdScroll`).
+			if (phase === "down") forwarded.add(finger.id);
+			else if (phase === "up") forwarded.delete(finger.id);
+			if (phase !== "move") syncHold();
+			return touch(phase, finger);
+		},
 		// A finger a board took (its bar or edge carries the board): the camera does not pan with it, and nor does the stage's native scroll.
 		claimTouch: (id) => {
 			claimed.add(id);

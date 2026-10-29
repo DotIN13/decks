@@ -126,6 +126,18 @@ if (target) {
 	});
 	let moves = 0;
 	window.addEventListener("touchmove", () => moves++, { passive: true, capture: true });
+	/*
+	 * Each touch as the page's own (how many fingers it sees, and whether it was held from the browser's
+	 * scroll by the time it bubbled back), each finger a board's page forwards (`decks:touch`), and each
+	 * pointer the browser took away for its scroll: what a pinch split between a board and the canvas does.
+	 */
+	const fingers = (event: Event) => (event as TouchEvent).touches?.length ?? 0;
+	for (const kind of ["touchstart", "touchmove", "touchend", "touchcancel"]) window.addEventListener(kind, (event) => inputs.push({ t: Math.round(performance.now()), kind: `${kind} ${fingers(event)} ${event.defaultPrevented ? "held" : "free"}` }), { passive: true });
+	window.addEventListener("pointercancel", (event) => inputs.push({ t: Math.round(performance.now()), kind: `pointercancel ${event.pointerType}` }), { passive: true, capture: true });
+	window.addEventListener("message", (event) => {
+		const m = event.data as { t?: string; phase?: string } | null;
+		if (m?.t === "decks:touch" && m.phase !== "move") inputs.push({ t: Math.round(performance.now()), kind: `board finger ${m.phase}` });
+	});
 	window.addEventListener("gesturechange", note("gesturechange"), { passive: true, capture: true });
 	/** Sent only to an address; `probe=1` keeps the gestures for an inspector and sends nothing. */
 	const posting = /^https?:/.test(target);
