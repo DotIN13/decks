@@ -26,3 +26,14 @@ export async function canvasTicket(canvas: string): Promise<{ files: string; pic
 	const at = (rest: string) => new URL(api(`/t/${ticket}/${rest}`), location.href).href;
 	return { files: at("board/"), pictures: at("thumb/"), expires: answer.folderExpires ?? Date.now() + 3_600_000 };
 }
+
+/**
+ * The harness as the frame reaches it, and a token for the one canvas it shows (`kind: "canvas"`): the
+ * frame reads, follows and edits that canvas on it, and this page asks again before it lapses.
+ */
+export async function canvasBackend(canvas: string): Promise<{ api: string; token: string; idle: number }> {
+	const response = await fetch(api("/tokens"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ kind: "canvas", canvas }) });
+	const answer = (await response.json().catch(() => ({}))) as { token?: string; idle?: number; error?: string };
+	if (!answer.token) throw new Error(`No token for the canvas ${canvas}: ${answer.error ?? response.status}`);
+	return { api: new URL(api("/"), location.href).href.replace(/\/$/, ""), token: answer.token, idle: answer.idle ?? 15 * 60_000 };
+}

@@ -1,4 +1,4 @@
-import type { PenDocument, PenEdit } from "@decks/pen";
+import type { PenDocument } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
 import type { PenTool } from "../state/pen-tools.ts";
 
@@ -6,11 +6,12 @@ import type { PenTool } from "../state/pen-tools.ts";
  * The canvas frame: the canvas, its engine and every card on it, in one sandboxed page of its own,
  * and the app's page around it as its broker.
  *
- * The frame holds no token and keeps nothing: it is sandboxed (`allow-scripts`, an origin of its own),
- * so a card's script there can reach neither the app's page nor your token, and it reads its canvas's
- * files on a ticket for that canvas alone (`server/src/auth/tickets.ts`). Everything else it asks of
- * the page, and the page answers what is its own (the view, your edits) and sends the rest to the
- * harness as the card that asked, with a token for that canvas and card.
+ * The frame keeps nothing and holds one credential: a token for its canvas alone, with your role on it,
+ * lasting minutes and renewed by the page (`backend.ts`, `server/src/auth`, kind `canvas`). On it the
+ * frame reads its drawing, follows the canvas's stream and makes your edits itself; the page never
+ * relays the drawing. It is sandboxed (`allow-scripts`, an origin of its own), so a card's script there
+ * cannot reach the app's page or your own token, and it reads its canvas's files on a ticket for that
+ * canvas alone (`server/src/auth/tickets.ts`).
  *
  * The two talk on one `MessagePort`. The frame says `hello` to its parent once; the page answers on
  * that window alone with `start` and the port, and after that no window message is read again.
@@ -43,7 +44,8 @@ export interface StartMessage {
 export interface Start {
 	protocol: number;
 	canvas: { name: string; title?: string; role: "owner" | "edit" | "view" };
-	drawing: { text: string; base: string };
+	/** The harness, as the frame reaches it: its `/api` address and the canvas token, which lapses after `idle` unused. */
+	backend: { api: string; token: string; idle: number };
 	pages: Page[];
 	/** The address the canvas's files are read at, with its ticket in it: `…/api/t/<ticket>/board/canvases/<name>/`. */
 	files: { base: string; expires: number };
@@ -66,9 +68,8 @@ export type Point = { x: number; y: number };
 
 /** What the page sends the frame: events, and the calls it makes of it. */
 export interface PageToFrame {
-	drawing: { text: string; base: string; made?: readonly string[] };
-	edits: { edits: readonly PenEdit[]; base?: string; made?: readonly string[] };
-	refused: { edit: string };
+	/** The canvas token, renewed before it lapses. */
+	token: { token: string };
 	pages: { pages: Page[] };
 	reload: { path: string };
 	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean };
@@ -93,7 +94,6 @@ export type PageCalls = {
 /** What the frame sends the page. */
 export interface FrameToPage {
 	started: Record<string, never>;
-	step: { direction: "undo" | "redo"; edit?: string };
 	selection: { ids: readonly string[]; page?: string };
 	tool: { tool: PenTool };
 	camera: { camera: Camera };
@@ -115,7 +115,6 @@ export interface FrameToPage {
 
 /** The calls the frame makes of the page, and what each answers. */
 export type FrameCalls = {
-	send: { data: { ops: unknown[]; edit?: string }; value: boolean };
 	remove: { data: { path: string }; value: boolean };
 	open: { data: { path: string; from: string }; value: boolean };
 	token: { data: { path: string }; value: string | undefined };

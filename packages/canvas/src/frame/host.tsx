@@ -10,6 +10,11 @@ import { CallRefused, PROTOCOL, peer, type FrameCalls, type Page, type PageEnd, 
 export interface FrameHostOptions {
 	/** A ticket for one canvas's folder: the address its files are read at, and its pictures'. */
 	ticket(canvas: string): Promise<{ files: string; pictures: string; expires: number }>;
+	/**
+	 * The harness as the frame reaches it, and a token for this one canvas (`kind: "canvas"`), asked for
+	 * again before it lapses: the frame reads, follows and edits its canvas on it.
+	 */
+	backend(canvas: string): Promise<{ api: string; token: string; idle: number }>;
 	/** Your role on the canvas on screen. */
 	role?(canvas: string): "owner" | "edit" | "view";
 	/** Whether a card or board on it is yours or a friend's. */
@@ -59,7 +64,7 @@ export function createFramedEditor(options: Options): Editor {
 
 	/** Start the frame on the canvas on screen: the ticket first, then everything it begins with. */
 	const startFrame = async (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean) => {
-		const ticket = await options.frame.ticket(canvas);
+		const [ticket, backend] = await Promise.all([options.frame.ticket(canvas), options.frame.backend(canvas)]);
 		if (cancelled()) return;
 		const pen = untrack(() => state?.pen?.());
 		const doc = pen?.doc;
@@ -75,7 +80,7 @@ export function createFramedEditor(options: Options): Editor {
 		const start: Start = {
 			protocol: PROTOCOL,
 			canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
-			drawing: { text: doc ? serialize(doc) : options.text, base: pen?.base ?? "" },
+			backend,
 			pages: pagesNow(),
 			files: { base: ticket.files, expires: ticket.expires },
 			pictures: ticket.pictures,
@@ -92,12 +97,30 @@ export function createFramedEditor(options: Options): Editor {
 			const page = peer(channel.port1) as PageEnd;
 			wire(page, canvas);
 			setEnd(page);
+			renew(page, canvas, backend.idle, cancelled);
 			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
 			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
 			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify(start)) as Start }, "*", [channel.port2]);
 		};
 		addEventListener("message", onHello);
 		onCleanup(() => removeEventListener("message", onHello));
+	};
+
+	/** The canvas token, asked for again at a third of its life, for as long as the frame is there. */
+	const renew = (page: PageEnd, canvas: string, idle: number, cancelled: () => boolean) => {
+		const every = Math.max(30_000, Math.floor(idle / 3));
+		const timer = setInterval(() => {
+			if (cancelled()) return clearInterval(timer);
+			options.frame
+				.backend(canvas)
+				.then((next) => {
+					if (!cancelled()) page.emit("token", { token: next.token });
+				})
+				.catch(() => {
+					/* tried again next time; the old one lasts its idle time */
+				});
+		}, every);
+		onCleanup(() => clearInterval(timer));
 	};
 
 	const pagesNow = (): Page[] => (options.boards?.list?.() ?? []).map((board) => ({ ...board, trust: options.frame.trust?.(board.path) ?? (board.path.startsWith("shared/") ? "friend" : "own") }));
@@ -107,7 +130,6 @@ export function createFramedEditor(options: Options): Editor {
 		stopTools?.();
 		stopTools = syncTools((patch) => page.emit("ui", patch), (apply) => page.on("ui", apply));
 		page.on("started", () => options.boards?.onStarted?.());
-		page.on("step", (data) => options.document?.step(data.direction, data.edit));
 		page.on("selection", (data) => {
 			if (data.page !== undefined || data.ids.length === 0) {
 				fromFrame.selected = data.page;
@@ -150,7 +172,6 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		// A shortcut the canvas did not take, played on this page as if typed here.
 		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
-		page.answer("send", async (data) => (options.document ? (await options.document.send(data.ops, data.edit)) !== false : false));
 		page.answer("remove", async (data) => (options.onDeleteBoard ? (await options.onDeleteBoard(data.path)) !== false : false));
 		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
 		page.answer("token", async (data) => options.boards?.mintBoardToken?.(data.path, canvas));
@@ -165,8 +186,7 @@ export function createFramedEditor(options: Options): Editor {
 	};
 
 	/*
-	 * The host's state, kept in step: the drawing as its server has it (the edits when it says them,
-	 * the whole drawing otherwise), the cards and boards, the camera an agent or the app moved, the
+	 * The host's state, kept in step: the cards and boards, the camera an agent or the app moved, the
 	 * selected board, the mode, the scheme, ink, and what is going on around the canvas.
 	 */
 	const keepInStep = () => {
@@ -174,12 +194,11 @@ export function createFramedEditor(options: Options): Editor {
 			on(
 				() => state?.pen?.(),
 				(pen) => {
-					const page = end();
-					if (!page || !pen) return;
-					if (pen.edits && drawn && pen.edits.from === drawn) page.emit("edits", { edits: pen.edits.edits, base: pen.base, ...(pen.made ? { made: pen.made } : {}) });
-					else page.emit("drawing", { text: serialize(pen.doc), base: pen.base, ...(pen.made ? { made: pen.made } : {}) });
+					// The drawing is the frame's own to read (`backend.ts`); this page's copy is only for its panels.
+					if (!pen) return;
 					drawn = pen.doc;
-					if (pen.writer) page.emit("busy", { writer: pen.writer });
+					const page = end();
+					if (page && pen.writer) page.emit("busy", { writer: pen.writer });
 				},
 				{ defer: true },
 			),
@@ -270,12 +289,10 @@ export function createFramedEditor(options: Options): Editor {
 	};
 
 	const handle: CanvasHandle = {
-		setDocument: (text, base, made) => end()?.emit("drawing", { text: typeof text === "string" ? text : serialize(text), base: base ?? "", ...(made ? { made } : {}) }),
-		applyEdits: (edits, base, made) => {
-			end()?.emit("edits", { edits, ...(base ? { base } : {}), ...(made ? { made } : {}) });
-			return true;
-		},
-		refused: (edit) => end()?.emit("refused", { edit }),
+		// The frame follows the drawing itself, from the harness: nothing of it is passed on from here.
+		setDocument: () => {},
+		applyEdits: () => true,
+		refused: () => {},
 		drawn: () => drawn ?? { version: "2.14", children: [] } as unknown as PenDocument,
 		glide: (camera, ms) => end()?.emit("camera", { camera, glide: ms ?? 400 }),
 		document: () => drawn ?? ({ version: "2.14", children: [] } as unknown as PenDocument),

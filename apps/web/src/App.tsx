@@ -48,7 +48,7 @@ import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import "./app/canvas-host.ts";
 import { createEditor, createFramedEditor, isSharedBoard, type CanvasHandle } from "@decks/canvas";
-import { canvasTicket, framedCanvas } from "./board/canvas-frame.ts";
+import { canvasBackend, canvasTicket, framedCanvas } from "./board/canvas-frame.ts";
 import { boardUrl } from "./lib/api.ts";
 import { mintBoardToken } from "./board/board-token.ts";
 import { attachBoardFrame } from "./board/frame-hooks.ts";
@@ -1395,7 +1395,7 @@ export function App() {
 						 * With `?frame=1`, the same editor in a sandboxed frame of its own (`@decks/canvas`, `frame/`): the
 						 * same options and state, its files read on a ticket for the canvas on screen.
 						 */
-						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket } }) : createEditor;
+						const make = framedCanvas ? (options: Parameters<typeof createEditor>[0]) => createFramedEditor({ ...options, frame: { ticket: canvasTicket, backend: canvasBackend } }) : createEditor;
 						const editor = make({
 							text: "",
 							// The app's scheme (`lib/theme.ts`): left out, the editor painted light over it on mount.

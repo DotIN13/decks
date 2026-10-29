@@ -1,0 +1,151 @@
+import type { PenDocument, PenEdit } from "@decks/pen";
+import type { Board } from "@decks/protocol";
+
+/**
+ * The canvas frame's own line to the harness: its drawing, the canvas's stream, and the calls it makes
+ * as the person on that canvas, all on the canvas token the page handed it (`server/src/auth`, kind
+ * `canvas`). The page renews the token (`token`), and never sees what goes over this line.
+ */
+export interface Backend {
+	/** The drawing as it is now: its document, the folder its fills are read against, its revision. */
+	drawing(): Promise<{ doc: PenDocument; base: string; rev: number; by?: string }>;
+	/** Follow the canvas's stream until stopped, coming back after a drop. Answers what stops it. */
+	follow(hear: (message: Heard) => void): () => void;
+	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
+	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	/** A renewed token, for every request from now on. */
+	setToken(token: string): void;
+}
+
+/** What the stream says about this canvas. */
+export type Heard =
+	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
+	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
+	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; sized?: true }
+	/** The stream is back after a drop: what was missed is read again. */
+	| { type: "reconnected" };
+
+const TYPES = ["stage.pen", "stage.pen.delta", "board.changed"];
+
+/** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
+export function createBackend(api: string, canvas: string, firstToken: string): Backend {
+	let token = firstToken;
+	const base = api.replace(/\/+$/, "");
+	const headers = (more: Record<string, string> = {}) => ({ authorization: `Bearer ${token}`, ...more });
+
+	return {
+		async drawing() {
+			const response = await fetch(`${base}/stage-pen/${encodeURIComponent(canvas)}`, { headers: headers(), cache: "no-store" });
+			if (!response.ok) throw new Error(`The canvas ${canvas} did not load: ${response.status} ${await response.text().catch(() => "")}`.trim());
+			return (await response.json()) as { doc: PenDocument; base: string; rev: number; by?: string };
+		},
+
+		follow(hear) {
+			let stopped = false;
+			let controller: AbortController | undefined;
+			let wait = 500;
+			const run = async (again: boolean) => {
+				while (!stopped) {
+					controller = new AbortController();
+					try {
+						const response = await fetch(`${base}/v1/events?types=${TYPES.join(",")}`, { headers: headers(), signal: controller.signal, cache: "no-store" });
+						if (!response.ok || !response.body) throw new Error(String(response.status));
+						if (again) hear({ type: "reconnected" });
+						again = true;
+						wait = 500;
+						await readEvents(response.body, hear);
+					} catch {
+						/* dropped or refused: tried again, a little later each time */
+					}
+					if (stopped) return;
+					await new Promise((done) => setTimeout(done, wait));
+					wait = Math.min(wait * 2, 10_000);
+				}
+			};
+			void run(false);
+			return () => {
+				stopped = true;
+				controller?.abort();
+			};
+		},
+
+		async call(verb, args, edit) {
+			try {
+				const response = await fetch(`${base}/v1/${verb}`, {
+					method: "POST",
+					headers: headers({ "content-type": "application/json", ...(edit ? { "x-decks-edit": edit } : {}) }),
+					body: JSON.stringify({ args }),
+				});
+				const answer = (await response.json().catch(() => ({ ok: false, error: `${verb}: ${response.status}` }))) as { ok: boolean; value?: unknown; error?: string; notes?: string[] };
+				return answer;
+			} catch (error) {
+				return { ok: false, error: error instanceof Error ? error.message : String(error) };
+			}
+		},
+
+		setToken(next) {
+			token = next;
+		},
+	};
+}
+
+/** Read Server-Sent Events off a body: each `data:` line a message, until the body ends. */
+async function readEvents(body: ReadableStream<Uint8Array>, hear: (message: Heard) => void): Promise<void> {
+	const reader = body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = "";
+	for (;;) {
+		const { value, done } = await reader.read();
+		if (done) return;
+		buffer += decoder.decode(value, { stream: true });
+		let cut: number;
+		while ((cut = buffer.indexOf("\n\n")) >= 0) {
+			const block = buffer.slice(0, cut);
+			buffer = buffer.slice(cut + 2);
+			const data = block
+				.split("\n")
+				.filter((line) => line.startsWith("data:"))
+				.map((line) => line.slice(5).trimStart())
+				.join("\n");
+			if (!data) continue;
+			try {
+				hear(JSON.parse(data) as Heard);
+			} catch {
+				/* a line that is not a message */
+			}
+		}
+	}
+}
+
+/**
+ * Keeps one drawing from the stream: the harness says each change once per agent on the canvas (or
+ * once to none), so a revision already held is passed over; edits from the revision held are applied;
+ * anything else, a gap, and the drawing is read whole again.
+ */
+export function drawingFollower(handlers: {
+	whole(doc: PenDocument, base: string, made?: readonly string[]): void;
+	edits(edits: readonly PenEdit[], base: string, made?: readonly string[]): boolean;
+	reread(): void;
+}) {
+	let rev = -1;
+	return {
+		/** The revision the drawing was read at. */
+		at(next: number) {
+			rev = next;
+		},
+		hear(message: Heard) {
+			if (message.type === "stage.pen") {
+				if (message.rev === rev) return;
+				rev = message.rev;
+				handlers.whole(message.doc, message.base, message.made);
+			} else if (message.type === "stage.pen.delta") {
+				if (message.rev <= rev) return;
+				if (message.from !== rev || !handlers.edits(message.edits, message.base, message.made)) {
+					handlers.reread();
+					return;
+				}
+				rev = message.rev;
+			} else if (message.type === "reconnected") handlers.reread();
+		},
+	};
+}

@@ -1,3 +1,4 @@
+import { serialize } from "@decks/pen";
 import { createSignal, untrack } from "solid-js";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
@@ -5,12 +6,14 @@ import { createEditor, type Editor } from "../mount.tsx";
 import { setCanvasHost } from "../host.ts";
 import { setDrawing } from "../state/ink.ts";
 import { syncTools } from "./ui-sync.ts";
+import { createBackend, drawingFollower } from "./backend.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
 /**
- * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, makes the
- * editor from what `start` says, and from then on turns every one of the editor's callbacks into a
- * message to the page and every message from the page into a call on the editor (`protocol.ts`).
+ * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its
+ * drawing from the harness on the canvas token (`backend.ts`), makes the editor, follows the canvas's
+ * stream and sends your edits itself. With the page it trades only what is the page's: its chrome, the
+ * composer, your storage (`protocol.ts`).
  *
  * What a host answered with a function (a board's address, its picture, its storage) is worked out
  * here from `start`: the files' ticketed address, the pages' trust, the page's kept values.
@@ -22,7 +25,7 @@ export function bootFrame(root: HTMLElement): void {
 		// Only the parent's answer, with its port: nothing else is read, then or later.
 		if (event.source !== parent || event.data?.t !== "start" || !event.ports[0]) return;
 		removeEventListener("message", onStart);
-		run(root, event.data.start, peer(event.ports[0]) as FrameEnd);
+		void run(root, event.data.start, peer(event.ports[0]) as FrameEnd);
 	};
 	addEventListener("message", onStart);
 	parent.postMessage({ t: "hello", protocol: PROTOCOL } satisfies Hello, "*");
@@ -31,7 +34,10 @@ export function bootFrame(root: HTMLElement): void {
 /** A rectangle on this frame's screen, as the page places it (it adds where the frame sits). */
 const rectOf = (box: DOMRect | undefined): Rect | undefined => (box ? { x: box.x, y: box.y, w: box.width, h: box.height } : undefined);
 
-function run(root: HTMLElement, start: Start, end: FrameEnd): void {
+async function run(root: HTMLElement, start: Start, end: FrameEnd): Promise<void> {
+	const backend = createBackend(start.backend.api, start.canvas.name, start.backend.token);
+	end.on("token", (data) => backend.setToken(data.token));
+	const first = await backend.drawing();
 	const [pages, setPages] = createSignal<Page[]>(start.pages);
 	const [news, setNews] = createSignal<Record<string, string>>({});
 	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
@@ -70,8 +76,8 @@ function run(root: HTMLElement, start: Start, end: FrameEnd): void {
 	});
 
 	const editor: Editor = createEditor({
-		text: start.drawing.text,
-		base: start.drawing.base,
+		text: serialize(first.doc),
+		base: first.base,
 		dark: start.look.dark,
 		mode: start.look.mode,
 		readOnly: start.look.readOnly,
@@ -80,8 +86,19 @@ function run(root: HTMLElement, start: Start, end: FrameEnd): void {
 		views: { scope: () => start.canvas.name, storage, key: "frame" },
 		canvasName: () => start.canvas.name,
 		document: {
-			send: (ops, edit) => end.call("send", { ops, ...(edit ? { edit } : {}) }),
-			step: (direction, edit) => end.emit("step", { direction, ...(edit ? { edit } : {}) }),
+			// Your edits, straight to the harness; one it refuses is dropped, and the drawing read again.
+			send: async (ops, edit) => {
+				const answer = await backend.call("canvas.batch", [ops], edit);
+				if (!answer.ok) reread();
+				return answer.ok;
+			},
+			step: (direction, edit) => {
+				void backend.call("canvas.step", [direction], edit).then((answer) => {
+					if (answer.ok) return;
+					if (edit) handle.refused(edit);
+					console.info(answer.error);
+				});
+			},
 		},
 		boards: {
 			list: () => pages() as Board[],
@@ -134,9 +151,30 @@ function run(root: HTMLElement, start: Start, end: FrameEnd): void {
 	});
 	const { handle } = editor;
 
-	end.on("drawing", (data) => handle.setDocument(data.text, data.base, data.made));
-	end.on("edits", (data) => void handle.applyEdits(data.edits, data.base, data.made));
-	end.on("refused", (data) => handle.refused(data.edit));
+	/*
+	 * The drawing as the harness changes it, from its stream: each change is said once per agent on the
+	 * canvas, so one already held is passed over, and a gap reads the drawing whole again.
+	 */
+	let reading = false;
+	const follower = drawingFollower({
+		whole: (doc, base, made) => handle.setDocument(serialize(doc), base, made),
+		edits: (edits, base, made) => handle.applyEdits(edits, base, made) !== false,
+		reread: () => reread(),
+	});
+	function reread(): void {
+		if (reading) return;
+		reading = true;
+		void backend
+			.drawing()
+			.then((now) => {
+				follower.at(now.rev);
+				handle.setDocument(serialize(now.doc), now.base);
+			})
+			.catch((error: unknown) => console.warn(error))
+			.finally(() => (reading = false));
+	}
+	follower.at(first.rev);
+	backend.follow((message) => follower.hear(message));
 	end.on("pages", (data) => setPages(data.pages));
 	end.on("reload", (data) => handle.reloadBoard(data.path));
 	end.on("look", (data) => {
