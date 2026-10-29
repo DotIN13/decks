@@ -748,7 +748,8 @@ export class HarnessSync {
 		// The deck files this canvas's boards point at: `../assets/x` beside its boards is the deck's assets/x (`deck/layout.ts`).
 		const named = new Set<string>();
 		for (const [path, deckPath] of [...out]) {
-			if (!path.startsWith("boards/") || !/\.(?:x?html?|mdx?|css)$/i.test(path)) continue;
+			// A board, or anything in a card's folder that can name a file (`cards/<name>/`, its HTML, styles and scripts).
+			if (!(path.startsWith("boards/") || path.startsWith("cards/")) || !/\.(?:x?html?|mdx?|css|m?js)$/i.test(path)) continue;
 			for (const target of this.linksOf(deckPath)) {
 				named.add(target);
 				if (out.has(target)) continue;
@@ -757,6 +758,31 @@ export class HarnessSync {
 				} catch {
 					/* named but not there */
 				}
+			}
+		}
+		/*
+		 * A canvas with cards takes the deck's own libraries with it (`assets/importmap.json`, `@decks/canvas`
+		 * card.ts) and the files the map names beside it: no card names them in its text, it imports them by name.
+		 */
+		if ([...out.keys()].some((path) => path.startsWith("cards/"))) {
+			const map = "assets/importmap.json";
+			try {
+				const imports = (JSON.parse(readFileSync(join(this.o.deck, map), "utf8")) as { imports?: Record<string, unknown> }).imports ?? {};
+				named.add(map);
+				out.set(map, map);
+				for (const address of Object.values(imports)) {
+					if (typeof address !== "string" || /^[a-z][a-z0-9+.-]*:|^\//i.test(address)) continue;
+					const target = posix.normalize(posix.join("assets", address));
+					if (!target.startsWith("assets/") || secretLooking(target)) continue;
+					named.add(target);
+					try {
+						if (statSync(join(this.o.deck, target)).isFile()) out.set(target, target);
+					} catch {
+						/* named but not there */
+					}
+				}
+			} catch {
+				/* no map, or not one */
 			}
 		}
 		this.links.set(name, named);
