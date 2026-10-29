@@ -1,5 +1,5 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
-import type { Board } from "@decks/protocol";
+import type { Board, StageCall } from "@decks/protocol";
 
 /**
  * The canvas frame's own line to the harness: its drawing, the canvas's stream, and the calls it makes
@@ -13,6 +13,8 @@ export interface Backend {
 	follow(hear: (message: Heard) => void): () => void;
 	/** One call on this canvas, with the edit's name when it is one (`X-Decks-Edit`). */
 	call(verb: string, args: readonly unknown[], edit?: string): Promise<{ ok: boolean; value?: unknown; error?: string; notes?: string[] }>;
+	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
+	answer(id: string, value: unknown): void;
 	/** A renewed token, for every request from now on. */
 	setToken(token: string): void;
 }
@@ -22,10 +24,12 @@ export type Heard =
 	| { type: "stage.pen"; stage: string; rev: number; doc: PenDocument; base: string; made?: string[]; by?: string }
 	| { type: "stage.pen.delta"; stage: string; from: number; rev: number; edits: PenEdit[]; base: string; made?: string[]; by?: string }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean; sized?: true }
+	/** An agent's `decks view …` on this canvas: the frame showing it answers (`answer`). */
+	| { type: "stage.call"; call: StageCall }
 	/** The stream is back after a drop: what was missed is read again. */
 	| { type: "reconnected" };
 
-const TYPES = ["stage.pen", "stage.pen.delta", "board.changed"];
+const TYPES = ["stage.pen", "stage.pen.delta", "board.changed", "stage.call"];
 
 /** `api` is the harness's `/api` address as the frame reaches it (`http://host:4329/api`). */
 export function createBackend(api: string, canvas: string, firstToken: string): Backend {
@@ -81,6 +85,15 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 			} catch (error) {
 				return { ok: false, error: error instanceof Error ? error.message : String(error) };
 			}
+		},
+
+		answer(id, value) {
+			const error = value && typeof value === "object" && typeof (value as { error?: unknown }).error === "string" ? (value as { error: string }).error : undefined;
+			void fetch(`${base}/v1/stage-result`, {
+				method: "POST",
+				headers: headers({ "content-type": "application/json" }),
+				body: JSON.stringify(error ? { id, error } : { id, value }),
+			}).catch(() => undefined);
 		},
 
 		setToken(next) {

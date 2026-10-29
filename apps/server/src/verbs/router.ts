@@ -6,6 +6,7 @@ import { fromThisMachine } from "../auth/issue.ts";
 import type { Principal } from "../auth/principal.ts";
 import { personAgent } from "./person.ts";
 import { penEditBy } from "../stage/pens.ts";
+import { settleStage } from "../wire/deck.ts";
 import type { StageCallResult, StageTool } from "../stage/tool.ts";
 
 /**
@@ -54,6 +55,7 @@ export function verbRoutes(app: App): express.Router {
 		const own = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
 		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
 		res.write(": decks events\n\n");
+		if (own !== undefined) app.canvasFrames += 1;
 		const stop = app.listen((message) => {
 			if (wanted.size && !wanted.has(message.type)) return;
 			if (own !== undefined && !onCanvas(app, message, own)) return;
@@ -63,8 +65,28 @@ export function verbRoutes(app: App): express.Router {
 		beat.unref?.();
 		req.on("close", () => {
 			clearInterval(beat);
+			if (own !== undefined) app.canvasFrames -= 1;
 			stop();
 		});
+	});
+
+	/**
+	 * A canvas frame's answer to an agent's `decks view …` on its canvas (`stage.call`, which its stream
+	 * carries), as a tab answers on the socket. Only a front end showing the canvas answers one.
+	 */
+	router.post("/stage-result", (req: Request, res: Response) => {
+		const kind = req.principal?.kind;
+		if (kind !== "canvas" && kind !== "person" && kind !== "site") {
+			res.status(403).json({ ok: false, error: "Only a page showing the canvas answers the canvas's calls." });
+			return;
+		}
+		const result = (req.body ?? {}) as { id?: unknown; value?: unknown; error?: unknown };
+		if (typeof result.id !== "string") {
+			res.status(400).json({ ok: false, error: "Send { id, value } or { id, error }." });
+			return;
+		}
+		const settled = settleStage(app.pendingStage, { id: result.id, value: result.value, ...(typeof result.error === "string" ? { error: result.error } : {}) });
+		res.json({ ok: true, settled });
 	});
 
 	router.post("/:verb", async (req: Request, res: Response) => {
@@ -222,7 +244,18 @@ function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }
  * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
  * cards and boards (`board.changed` for one on it), and what is said to it alone.
  */
-export function onCanvas(app: Pick<App, "stage">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
+export function onCanvas(app: Pick<App, "stage" | "agents">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
+	/*
+	 * An agent's `decks view …` that moves or marks this canvas: the frame showing it answers. Showing
+	 * another canvas, and a board's picture, stay the page's.
+	 */
+	if (message.type === "stage.call") {
+		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown } } | undefined;
+		if (!call || !["show", "camera", "reload", "cursor"].includes(call.op ?? "")) return false;
+		const named = typeof call.args?.stage === "string" ? call.args.stage : undefined;
+		if (named !== undefined) return named === canvas;
+		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;
+	}
 	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
 	if (message.type === "board.changed") {
 		const board = message.board as { path?: unknown } | undefined;

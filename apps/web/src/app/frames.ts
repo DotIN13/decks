@@ -1,6 +1,7 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
+import { framedCanvas } from "../board/canvas-frame.ts";
 import { handsOn } from "@decks/canvas/camera";
 import { seenPicture } from "../canvas/shots/adaptors.ts";
 import type { AgentState, ServerMessage } from "@decks/protocol";
@@ -429,6 +430,15 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 
 				case "stage.call": {
+					/*
+					 * The canvas in its frame answers an agent's view on the canvas it shows, from its own stream
+					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
+					 */
+					if (framedCanvas && ["show", "camera", "reload", "cursor"].includes(message.call.op)) {
+						const named = (message.call.args as { stage?: unknown } | undefined)?.stage;
+						const on = typeof named === "string" ? named : stageOf(message.call.agentId)?.name;
+						if (on && on === stageOf(state.focused)?.name) return;
+					}
 					/*
 					 * A picture of a board as this browser has it, for an agent's screenshot: taken
 					 * asynchronously, so answered on its own (`canvas/shots/adaptors.ts`).

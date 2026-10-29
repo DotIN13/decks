@@ -16,6 +16,9 @@ export interface FrameChrome {
 	handle: CanvasHandle;
 	/** Counts up each time the drawing changes, by the stream or by your edit: what to read `handle.drawn()` again on. */
 	revision: Accessor<number>;
+	/** An agent on screen asked to move the view while the person was using the canvas: offered, with a Go. */
+	offer: Accessor<ViewOffer | undefined>;
+	dismissOffer(): void;
 	/** The camera as it moves, step by step. */
 	camera: Accessor<Camera>;
 	/** Browse or edit; the chrome's toggle sets it, and the canvas follows. */
@@ -35,6 +38,13 @@ export interface FrameChrome {
 	panel(name: "apps"): void;
 	/** The canvas's name, and the frame's own width, for a chrome that lays out by it. */
 	canvas: string;
+}
+
+/** A view an agent asked for while the person was at the canvas: theirs to take (`go`) or leave. */
+export interface ViewOffer {
+	agent: string;
+	what: "board" | "view";
+	go(): void;
 }
 
 /** What an app draws around the canvas in the frame. */

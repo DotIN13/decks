@@ -133,6 +133,8 @@ export class App {
 	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
 	readonly cameras = new Cameras();
 	/** Stage calls waiting for the browser to carry them out. */
+	/** Canvas frames following their canvas's stream now (`verbs/router.ts`): each can answer an agent's view of its canvas. */
+	canvasFrames = 0;
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	readonly claudeAccounts: ClaudeAccounts;
@@ -216,7 +218,8 @@ export class App {
 			},
 			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
 			callAll: (call, timeoutMs) => this.callStageAll(call, timeoutMs),
-			connected: () => (this.hub?.connections ?? 0) > 0,
+			// A tab on the socket, or a canvas frame following its canvas's stream (`/api/v1/events`).
+			connected: () => (this.hub?.connections ?? 0) > 0 || this.canvasFrames > 0,
 			broadcast: (message) => this.send(message),
 			stagesChanged: () => this.publishStages(),
 			wrote: (path, who) => this.boards.wrote(path, who),

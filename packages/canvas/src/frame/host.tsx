@@ -30,6 +30,10 @@ export interface FrameHostOptions {
 	ink?(ink: NonNullable<ComposerPart["ink"]>): void;
 	/** Open one of the app's panels. */
 	panel?(name: "apps"): void;
+	/** The conversation on screen, whose `decks view …` the frame carries out on its canvas. */
+	focused?(): string | undefined;
+	/** A view the frame kept for another conversation: the harness hears it, to answer that agent's `view.camera`. */
+	viewFor?(agent: string, camera: Camera): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(file: FrameCalls["upload"]["data"]): Promise<{ path: string }>;
 }
@@ -91,7 +95,7 @@ export function createFramedEditor(options: Options): Editor {
 			pages: pagesNow(),
 			files: { base: ticket.files, expires: ticket.expires },
 			pictures: ticket.pictures,
-			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets) },
+			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false, insets: untrack(insets), ...(untrack(() => options.frame.focused?.()) ? { agent: untrack(() => options.frame.focused!())! } : {}) },
 			camera: localCamera,
 			...(pen?.writer ? { writer: pen.writer } : {}),
 			stored,
@@ -157,6 +161,7 @@ export function createFramedEditor(options: Options): Editor {
 		});
 		page.on("panel", (data) => options.frame.panel?.(data.name));
 		page.on("camera", (data) => {
+			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera);
 			fromFrame.camera = data.camera;
 			localCamera = data.camera;
 			state?.camera?.[1](data.camera);
@@ -207,6 +212,12 @@ export function createFramedEditor(options: Options): Editor {
 				{ defer: true },
 			),
 		);
+		// The conversation on screen: an agent's view calls move this canvas only for it.
+		createEffect(() => {
+			const page = end();
+			const agent = options.frame.focused?.();
+			if (page && agent) page.emit("look", { agent });
+		});
 		// What of the frame the page's own chrome covers, so the frame's tools sit clear of it and a fit frames into the rest.
 		createEffect(() => {
 			const page = end();

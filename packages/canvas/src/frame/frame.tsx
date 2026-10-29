@@ -12,6 +12,8 @@ import { syncTools } from "./ui-sync.ts";
 import { canvasBox, useInsets } from "../camera/insets.ts";
 import { fitInto } from "../camera/camera.ts";
 import { cardCalls } from "./card-calls.ts";
+import { runStageCall } from "../stage-ops.ts";
+import type { ViewOffer } from "./chrome.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
@@ -50,6 +52,11 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const [dark, setDark] = createSignal(start.look.dark);
 	const [comment, setComment] = createSignal<StageComment>();
 	const [revision, setRevision] = createSignal(0);
+	const [agent, setAgent] = createSignal<string | undefined>(start.look.agent);
+	const [offer, setOffer] = createSignal<ViewOffer>();
+	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
+	let touched = 0;
+	for (const type of ["pointerdown", "wheel", "keydown"]) addEventListener(type, () => (touched = performance.now()), { capture: true, passive: true });
 	const changed = () => setRevision((n) => n + 1);
 	const canWrite = () => start.canvas.role !== "view" && !start.look.readOnly;
 	if (start.look.insets) useInsets(start.look.insets);
@@ -67,6 +74,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			end.emit("store", { key, value });
 		},
 	};
+	const kept_ = (key: string) => kept.get(key) || undefined;
 	/** A deck path's address, read on the canvas's ticket. */
 	const address = (path: string) => `${start.files.base}${path.split("/").map(encodeURIComponent).join("/")}`;
 	let restUntil: ReturnType<typeof setTimeout> | undefined;
@@ -232,10 +240,70 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			.finally(() => (reading = false));
 	}
 	follower.at(first.rev);
-	backend.follow((message) => follower.hear(message));
+
+	/** A view kept for a conversation not on screen, in what the page keeps for this frame: it arrives when that chat opens. */
+	const viewKey = (id: string) => `view:${id}`;
+	const selectCard = (path: string | undefined) => {
+		if (!path) return;
+		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"));
+		if (child?.id) handle.select([child.id]);
+	};
+	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
+	/*
+	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out
+	 * for a canvas it holds (`stage-ops.ts`), and answered to the harness.
+	 */
+	const stageCall = (call: import("@decks/protocol").StageCall) => {
+		let value: unknown;
+		try {
+			value = runStageCall(call, {
+				boards: () => untrack(pages) as Board[],
+				viewport: () => ({ width: innerWidth, height: innerHeight }),
+				focused: () => untrack(agent),
+				stageOnScreen: () => start.canvas.name,
+				setCamera: (to, options) => moveTo(to, options?.animate),
+				handsOn: () => performance.now() - touched < 3000,
+				offerView: (from, to, selected, what) => setOffer({ agent: from, what, go: () => {
+					moveTo(to, true);
+					selectCard(selected);
+					setOffer(undefined);
+				} }),
+				rememberView: (id, to, selected) => {
+					storage.setItem(viewKey(id), JSON.stringify({ camera: to, ...(selected ? { selected } : {}) }));
+					end.emit("camera", { camera: to, agent: id });
+				},
+				select: selectCard,
+				reload: (path) => handle.reloadBoard(path),
+				// An agent's labelled dot on a card is the page's to draw, and the frame has none yet.
+				cursor: () => {},
+			});
+		} catch (error) {
+			value = { error: error instanceof Error ? error.message : String(error) };
+		}
+		backend.answer(call.id, value);
+	};
+	backend.follow((message) => (message.type === "stage.call" ? stageCall(message.call) : follower.hear(message)));
+	// A conversation opened that an agent kept a view for while it was not on screen: it arrives framed as meant.
+	const arrive = (id: string | undefined) => {
+		if (!id) return;
+		const kept = kept_(viewKey(id));
+		if (!kept) return;
+		storage.setItem(viewKey(id), "");
+		try {
+			const view = JSON.parse(kept) as { camera: Camera; selected?: string };
+			moveTo(view.camera, true);
+			selectCard(view.selected);
+		} catch {
+			/* a view that does not read is no view */
+		}
+	};
 	end.on("pages", (data) => setPages(data.pages));
 	end.on("reload", (data) => handle.reloadBoard(data.path));
 	end.on("look", (data) => {
+		if (data.agent !== undefined && data.agent !== untrack(agent)) {
+			setAgent(data.agent);
+			arrive(data.agent);
+		}
 		if (data.insets) useInsets(data.insets);
 		if (data.dark !== undefined) {
 			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
@@ -275,6 +343,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		const view = chrome({
 			handle,
 			revision,
+			offer,
+			dismissOffer: () => setOffer(undefined),
 			camera,
 			mode,
 			setMode: (next) => {

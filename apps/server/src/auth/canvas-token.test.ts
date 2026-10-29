@@ -162,3 +162,40 @@ test("its stream carries its own canvas's drawing and nothing else", async () =>
 		cleanup();
 	}
 });
+
+test("an agent's view of its canvas reaches the frame on its stream, and the frame's answer settles it", async () => {
+	const { app, origin, one, post, bearer, sandboxed, cleanup } = await open();
+	const controller = new AbortController();
+	try {
+		const agent = app.agents.focused();
+		// A view of this canvas by name: the frame following it is the one to answer.
+		const person = bearer(app.tokens.issue({ kind: "person" }).token);
+		assert.equal((await post("/api/v1/canvas.insert", person, { args: [{ type: "note", id: "n", content: "x" }, { canvas: one, at: { x1: 0, y1: 0 } }] })).status, 200);
+		const frame = { ...bearer(app.tokens.issue({ kind: "canvas", canvas: one, role: "edit" }).token), ...sandboxed };
+		const response = await fetch(`${origin}/api/v1/events?types=stage.call`, { headers: frame, signal: controller.signal });
+		const reader = response.body!.getReader();
+		const decoder = new TextDecoder();
+		let text = "";
+		const asked = (async () => {
+			while (!text.includes('"stage.call"')) {
+				const { value, done } = await reader.read();
+				if (done) break;
+				text += decoder.decode(value);
+			}
+		})();
+		const answered = post("/api/v1/view.focus", bearer(app.bridge.issue(agent.id)), { args: ["n", { canvas: one }] });
+		await asked;
+		const line = text.split("\n").find((one) => one.startsWith("data:") && one.includes('"stage.call"'));
+		const id = line ? (JSON.parse(line.slice(5)) as { call: { id: string } }).call.id : undefined;
+		assert.ok(id, text);
+		assert.equal((await post("/api/v1/stage-result", bearer(app.bridge.issue(agent.id)), { id, value: { no: 1 } })).status, 403, "an agent does not answer the canvas's calls");
+		const settled = await post("/api/v1/stage-result", frame, { id, value: { shown: ["n"] } });
+		assert.equal(settled.body.settled, true);
+		const shown = (await answered).body as { value?: { deferred?: string }; notes?: string[] };
+		assert.equal(shown.value?.deferred, undefined, `shown, not skipped: ${JSON.stringify(shown)}`);
+		await reader.cancel().catch(() => undefined);
+	} finally {
+		controller.abort();
+		cleanup();
+	}
+});

@@ -57,6 +57,19 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 				<FrameLayers chrome={chrome} onClose={() => setLayers(false)} />
 			</Show>
 			<ZoomBar zoom={chrome.camera().zoom} onZoom={(zoom) => handle.setCamera({ ...chrome.camera(), zoom })} onFit={() => handle.fit()} />
+			<Show when={chrome.offer()} keyed>
+				{(offer) => (
+					<div class="v3-bar float pill frame-offer" role="status">
+						<span>An agent wants to {offer.what === "board" ? "show you a board" : "move the view"}</span>
+						<button type="button" class="frame-offer-go" onClick={() => offer.go()}>
+							Go
+						</button>
+						<button type="button" class="frame-offer-no" aria-label="Stay here" onClick={() => chrome.dismissOffer()}>
+							Stay
+						</button>
+					</div>
+				)}
+			</Show>
 			<Show when={chrome.comment()} keyed>
 				{(target) => (
 					<CommentPopup

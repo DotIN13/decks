@@ -52,7 +52,7 @@ export interface Start {
 	files: { base: string; expires: number };
 	/** Where the canvas's pictures are, by the same ticket: `…/api/t/<ticket>/thumb/`. */
 	pictures: string;
-	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets };
+	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean; insets?: Insets; agent?: string };
 	camera?: Camera;
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
@@ -74,7 +74,7 @@ export interface PageToFrame {
 	pages: { pages: Page[] };
 	reload: { path: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
-	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets };
+	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string };
 	tool: { tool?: PenTool; ink?: { on: boolean } };
 	camera: { camera: Camera; glide?: number };
 	fit: Record<string, never>;
@@ -112,7 +112,8 @@ export interface FrameToPage {
 	/** Open one of the app's own panels, beside the canvas (the apps list). */
 	panel: { name: "apps" };
 	started: Record<string, never>;
-	camera: { camera: Camera };
+	/** Once the camera rests; or a view kept for another conversation (`agent`), for the harness to answer that agent's `view.camera` by. */
+	camera: { camera: Camera; agent?: string };
 	viewport: { width: number; height: number };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
 	export: { ids: string[] };

@@ -3580,4 +3580,30 @@ body {
 		color: var(--v3-fg3);
 		line-height: 1.4;
 	}
+	.frame-offer.float.pill {
+		top: 68px;
+		left: 50%;
+		gap: 8px;
+		padding: 0 6px 0 14px;
+		color: var(--v3-fg);
+		font-size: 13px;
+		transform: translateX(-50%);
+	}
+	.frame-offer-go,
+	.frame-offer-no {
+		height: 30px;
+		padding: 0 12px;
+		border: 0;
+		border-radius: 10px;
+		cursor: pointer;
+		font: inherit;
+	}
+	.frame-offer-go {
+		background: var(--v3-accent);
+		color: white;
+	}
+	.frame-offer-no {
+		background: var(--v3-bg2);
+		color: var(--v3-fg);
+	}
 }

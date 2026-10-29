@@ -29,21 +29,28 @@ export const deck = {
 			if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
 	},
 
-	"stage.result": (message, _reply, wire) => {
-		const pending = wire.pendingStage.get(message.result.id);
-		if (!pending) return;
-		const value = message.result.error ? { error: message.result.error } : (message.result.value ?? null);
-		// Asked of every browser: wait for each, or for the timer.
-		if (pending.many) {
-			pending.many.answers.push(value);
-			if (pending.many.answers.length < pending.many.expected) return;
-			wire.pendingStage.delete(message.result.id);
-			clearTimeout(pending.timer);
-			pending.resolve(pending.many.answers);
-			return;
-		}
-		wire.pendingStage.delete(message.result.id);
-		clearTimeout(pending.timer);
-		pending.resolve(value);
-	},
+	"stage.result": (message, _reply, wire) => settleStage(wire.pendingStage, message.result),
 } satisfies WirePart;
+
+/**
+ * A browser's answer to a `stage.call`: from a tab on the socket, or a canvas frame over HTTP
+ * (`/api/v1/stage-result`). The first answer settles a call asked of one; one asked of every browser
+ * waits for each, or for its timer.
+ */
+export function settleStage(pendingStage: Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout; many?: { answers: unknown[]; expected: number } }>, result: { id: string; value?: unknown; error?: string }): boolean {
+	const pending = pendingStage.get(result.id);
+	if (!pending) return false;
+	const value = result.error ? { error: result.error } : (result.value ?? null);
+	if (pending.many) {
+		pending.many.answers.push(value);
+		if (pending.many.answers.length < pending.many.expected) return true;
+		pendingStage.delete(result.id);
+		clearTimeout(pending.timer);
+		pending.resolve(pending.many.answers);
+		return true;
+	}
+	pendingStage.delete(result.id);
+	clearTimeout(pending.timer);
+	pending.resolve(value);
+	return true;
+}
