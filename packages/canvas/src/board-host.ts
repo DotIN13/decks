@@ -62,6 +62,11 @@ export interface BoardFrameSpec {
 export interface BoardHost {
 	/** Hand this frame its board's token whenever its page asks; answers what stops it. */
 	attach(frame: HTMLIFrameElement, spec: BoardFrameSpec): () => void;
+	/**
+	 * A card's token: a card is in this page, not a frame, so its buttons ask here (`card-surface.tsx`).
+	 * Kept per board and canvas until it is due for renewal.
+	 */
+	token(path: string, stage?: string): Promise<string | undefined>;
 	/** Stop every frame's renewals and listening. */
 	dispose(): void;
 }
@@ -176,9 +181,23 @@ export function createBoardHost(options: BoardHostOptions): BoardHost {
 		return detach;
 	};
 
+	const cardTokens = new Map<string, { token: Promise<string | undefined>; until: number }>();
+	const token = (path: string, stage?: string): Promise<string | undefined> => {
+		const key = `${stage ?? ""}\n${path}`;
+		const kept = cardTokens.get(key);
+		if (kept && kept.until > Date.now()) return kept.token;
+		const made = options.mint(path, stage).catch(() => undefined);
+		cardTokens.set(key, { token: made, until: Date.now() + renewMs });
+		// A refusal is not kept: the person may allow it on the next press.
+		void made.then((got) => !got && cardTokens.delete(key));
+		return made;
+	};
+
 	return {
 		attach,
+		token,
 		dispose: () => {
+			cardTokens.clear();
 			for (const detach of [...detachers]) detach();
 		},
 	};
