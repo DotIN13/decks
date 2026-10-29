@@ -30,6 +30,8 @@ import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type S
 export function bootFrame(root: HTMLElement, options: { chrome?: FrameChromeView } = {}): void {
 	const parent = window.parent;
 	if (parent === window) throw new Error("The canvas frame runs inside the app's page.");
+	// The canvas's own styles are scoped to it (`canvas.css`, `.decks-canvas`), as `mountCanvas` scopes them.
+	root.classList.add("decks-canvas");
 	const onStart = (event: MessageEvent<StartMessage>) => {
 		// Only the parent's answer, with its port: nothing else is read, then or later.
 		if (event.source !== parent || event.data?.t !== "start" || !event.ports[0]) return;
