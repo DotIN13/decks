@@ -14,6 +14,8 @@
  * - `app`: one app's server, by name.
  * - `board`: one board's own code, by path, acting on the canvas it is on (`stage`).
  * - `page`: one page's GET and nothing else: a ticket for another site's frame or tab (`tickets.ts`).
+ * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
+ *   role there (`view` reads only): the editor in its sandboxed page, and the cards it runs.
  */
 export type Principal =
 	| { kind: "person" }
@@ -21,7 +23,8 @@ export type Principal =
 	| { kind: "agent"; id: string }
 	| { kind: "app"; name: string }
 	| { kind: "board"; path: string; stage?: string }
-	| { kind: "page"; path: string };
+	| { kind: "page"; path: string }
+	| { kind: "canvas"; canvas: string; role: "edit" | "view" };
 
 export type PrincipalKind = Principal["kind"];
 
@@ -45,6 +48,8 @@ export function describe(principal: Principal): string {
 			return `board ${principal.path}`;
 		case "page":
 			return `a ticket for ${principal.path}`;
+		case "canvas":
+			return `the canvas frame for ${principal.canvas}`;
 	}
 }
 

@@ -166,14 +166,14 @@ test("calls are stateless: a canvas named is acted on, and nobody moves to it", 
 	}
 });
 
-test("board.create writes the file and places nothing", async () => {
+test("board.create, an alias of card.create, writes a card and places nothing", async () => {
 	const { must, cleanup } = await open();
 	try {
 		const made = (await must("board.create", [{ title: "Churn halved" }])).value;
 		const home = (await must("here")).value.name;
-		assert.equal(made.path, `canvases/${home}/boards/churn-halved.html`, "a board is made in the caller's canvas's own folder");
+		assert.equal(made.path, `canvases/${home}/cards/churn-halved/index.html`, "a card is made in the caller's canvas's own folder");
 		const named = (await must("canvas.create", ["Elsewhere"])).value.name;
-		assert.match((await must("board.create", [{ title: "Over there", canvas: named }])).value.path, new RegExp(`^canvases/${named}/boards/over-there\\.html$`), "or in the canvas it names");
+		assert.match((await must("board.create", [{ title: "Over there", canvas: named }])).value.path, new RegExp(`^canvases/${named}/cards/over-there/index\\.html$`), "or in the canvas it names");
 		assert.equal(made.title, "Churn halved");
 		assert.deepEqual((await must("board.canvases", [made.path])).value, []);
 		assert.ok((await must("board.list")).value.some((one: { path: string }) => one.path === made.path));

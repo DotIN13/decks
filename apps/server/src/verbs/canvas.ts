@@ -492,6 +492,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				return { variables: (doc.variables ?? {}) as Record<string, unknown>, ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
 			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
+			/** Undo and redo of the person's own edits (`StagePens.step`), as the socket's `stage.pen.step` does them. */
+			step: async (direction: "undo" | "redo", options?: { canvas?: string }) => {
+				const name = canvasOf(options?.canvas);
+				const pens = needPens();
+				if (pens.sharing(name)?.role === "view") throw new Error("This canvas was shared with you to view, so there is nothing of yours on it to undo.");
+				pens.step(name, direction === "redo" ? "redo" : "undo");
+				return pens.steps(name);
+			},
 			fit: async (board: string, options?: { canvas?: string; margin?: number }) => {
 				const name = canvasOf(options?.canvas);
 				const { board: sized, canvas, said } = await fitOn(ctx, board, name, options?.margin);

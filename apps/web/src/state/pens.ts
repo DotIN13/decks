@@ -36,6 +36,8 @@ const madeSince = (known: StagePen | undefined, made: readonly string[] | undefi
 
 export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }>): void {
 	const { type: _type, agentId, ...given } = message;
+	// A drawing said to no agent is for a canvas frame following the canvas (`App.publishPen`).
+	if (!agentId) return;
 	const known = pens()[agentId];
 	if (known && known.rev === given.rev && known.stage === given.stage) return;
 	// The folder image fills are read against is a path on the backend, so it goes under this tab's prefix.
@@ -52,6 +54,7 @@ export function receivePen(message: Extract<ServerMessage, { type: "stage.pen" }
  * is asked for again.
  */
 export function receivePenDelta(message: Extract<ServerMessage, { type: "stage.pen.delta" }>): void {
+	if (!message.agentId) return;
 	const known = pens()[message.agentId];
 	if (!known || known.stage !== message.stage || known.rev !== message.from) {
 		if (known?.rev !== message.rev) send({ type: "stage.pen.get", agentId: message.agentId });

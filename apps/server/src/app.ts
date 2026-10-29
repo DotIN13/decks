@@ -1003,8 +1003,13 @@ export class App {
 	private publishPen(name: string, entry: PenEntry): void {
 		const on = (this.agents?.all() ?? []).filter((agent) => agent.stageName() === name);
 		for (const agent of on) agent.penChanged();
-		// What changed, not the whole drawing: a browser that missed a revision asks for it whole.
-		for (const message of this.pens.changes(on.map((agent) => agent.id), name)) this.send(message);
+		/*
+		 * What changed, not the whole drawing: a browser that missed a revision asks for it whole. With
+		 * no agent on the canvas it is still said once, to no agent (`agentId` ""), for a canvas frame
+		 * showing it (`/api/v1/events`), which follows the canvas rather than an agent.
+		 */
+		const ids = on.length ? on.map((agent) => agent.id) : [""];
+		for (const message of this.pens.changes(ids, name)) this.send(message);
 		// The manager lists what each stage holds, and this is the moment that changed.
 		this.publishStages();
 	}

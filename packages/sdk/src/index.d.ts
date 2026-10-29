@@ -216,6 +216,12 @@ export interface Verbs {
 		 */
 		batch(ops: (CanvasOp | PenEdit)[], options?: { canvas?: string; frame?: string }): Promise<Item[]>;
 		/**
+		 * Take back the person's last edit to the drawing, or put it back ("undo" or "redo"); refused, with
+		 * why, when an agent or the file changed the drawing since. Answers whether a step is left each
+		 * way.
+		 */
+		step(direction: "undo" | "redo", options?: { canvas?: string }): Promise<{ undo: boolean; redo: boolean }>;
+		/**
 		 * Set a card's height from its content, measured at the width it has on this canvas; it must be on
 		 * it. `notes` say what the browser found: the height, the word count, the smallest type, content
 		 * wider than the card, boxes that cut off their content, and views that break when a control is

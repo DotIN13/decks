@@ -826,9 +826,9 @@ export function createHttpApp(app: App): Express {
 			res.status(404).end();
 			return;
 		}
-		const frame = pens.frame("", name) as { doc: unknown; base: string };
+		const frame = pens.frame("", name) as { doc: unknown; base: string; rev: number; by?: string };
 		res.setHeader("Cache-Control", "no-store");
-		res.json({ doc: frame.doc, base: frame.base, boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
+		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
 	});
 
 	/**

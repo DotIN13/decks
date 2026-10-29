@@ -54,6 +54,7 @@ export const VERBS = [
 	["canvas.copy",["id","options?"]],
 	["canvas.variables",["set","options?"]],
 	["canvas.batch",["ops","options?"]],
+	["canvas.step",["direction","options?"]],
 	["canvas.fit",["card","options?"]],
 	["canvas.save",["id","frame","options?"]],
 	["canvas.screenshot",["options?"]],

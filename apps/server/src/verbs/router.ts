@@ -50,10 +50,13 @@ export function verbRoutes(app: App): express.Router {
 	 */
 	router.get("/events", (req: Request, res: Response) => {
 		const wanted = new Set(String(req.query.types ?? "").split(",").map((one) => one.trim()).filter(Boolean));
+		// A canvas frame hears its own canvas and nothing else (`onCanvas`).
+		const own = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
 		res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
 		res.write(": decks events\n\n");
 		const stop = app.listen((message) => {
 			if (wanted.size && !wanted.has(message.type)) return;
+			if (own !== undefined && !onCanvas(app, message, own)) return;
 			res.write(`event: ${message.type}\ndata: ${JSON.stringify(message)}\n\n`);
 		});
 		const beat = setInterval(() => res.write(": still here\n\n"), 25_000);
@@ -76,6 +79,13 @@ export function verbRoutes(app: App): express.Router {
 		if (!Array.isArray(args)) {
 			res.status(400).json({ ok: false, error: `Send the arguments as a list: { "args": [...] }. ${signature(verb)}`, notes: [] });
 			return;
+		}
+		if (req.principal?.kind === "canvas") {
+			const refused = refusedForCanvas(app, name, Array.isArray(args) ? args : [], req.principal.canvas, req.principal.role);
+			if (refused) {
+				res.status(403).json({ ok: false, error: refused, notes: [] });
+				return;
+			}
 		}
 		const problem = checkArgs(verb, args);
 		if (problem) {
@@ -133,6 +143,8 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 			return boardCaller(app, principal.path, principal.stage ?? header("x-decks-stage"), allowedOnce);
 		case "page":
 			return { status: 403, error: "A ticket opens one page; it calls no verbs." };
+		case "canvas":
+			return canvasCaller(app, principal, header("x-decks-edit")?.slice(0, 80));
 		default:
 			return { status: 401, error: "Say who is calling with a token: Authorization: Bearer <token>. An agent's shell and an app's server have DECKS_TOKEN; a terminal gets one with decks login." };
 	}
@@ -169,6 +181,61 @@ async function boardCaller(app: App, path: string, stage: string | undefined, al
 			else focused.translator.notice("error", `${path} called ${verb} and failed: ${answer.error}`);
 		},
 	};
+}
+
+/**
+ * The calls a canvas frame may make, on its one canvas: reading and changing it, its cards, its
+ * frames and files, undo and redo, and the time. Never another canvas, an agent, an app, the
+ * person's tab, or anything that reaches past this canvas; a canvas shared to view reads only.
+ */
+export const CANVAS_FRAME_VERBS = new Set([
+	"canvas.read", "canvas.space", "canvas.insert", "canvas.update", "canvas.replace", "canvas.delete", "canvas.move", "canvas.copy",
+	"canvas.variables", "canvas.batch", "canvas.step", "canvas.fit", "canvas.save", "canvas.screenshot", "canvas.export", "canvas.rename",
+	"card.create", "card.get", "card.canvases", "card.url", "frame.create", "file.url", "here", "now",
+]);
+
+/** Why a canvas frame may not make this call, or undefined when it may. */
+export function refusedForCanvas(app: Pick<App, "stage">, verb: string, args: readonly unknown[], canvas: string, role: "edit" | "view"): string | undefined {
+	if (!CANVAS_FRAME_VERBS.has(verb)) return `${verb} is not the canvas frame's to call: it reaches past this canvas.`;
+	if (role === "view" && VERB_BY_NAME.get(verb)?.effect !== "read") return `${canvas} was shared with you to view, so ${verb} is not yours to call on it.`;
+	const pens = app.stage.pens;
+	for (const arg of args) {
+		const asked = arg && typeof arg === "object" && !Array.isArray(arg) ? (arg as { canvas?: unknown }).canvas : undefined;
+		if (asked === undefined || asked === null || asked === "") continue;
+		const raw = String(asked).trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "");
+		if (raw !== canvas && pens?.titleOf(canvas).toLowerCase() !== raw.toLowerCase()) return `The canvas frame for ${canvas} acts on that canvas alone, not on ${String(asked)}.`;
+	}
+	return undefined;
+}
+
+/**
+ * The canvas frame: the person, on its one canvas. Its calls are the person's own edits (the edit's
+ * name comes back in `made`, as a tab's do), made on that canvas whatever the call names, which
+ * `refusedForCanvas` has already held to it.
+ */
+function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }>, edit: string | undefined): Caller {
+	const agent = personAgent({ agents: app.agents, pens: app.stage.pens }, { stage: principal.canvas });
+	return { tool: agent.personTool(), on: { stage: principal.canvas }, ...(edit ? { edit } : {}) };
+}
+
+/**
+ * Whether a broadcast is about one canvas: its drawing (`stage.pen`, `stage.pen.delta`, refusals), its
+ * cards and boards (`board.changed` for one on it), and what is said to it alone.
+ */
+export function onCanvas(app: Pick<App, "stage">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
+	if (message.type === "stage.pen" || message.type === "stage.pen.delta") return message.stage === canvas;
+	if (message.type === "board.changed") {
+		const board = message.board as { path?: unknown } | undefined;
+		const path = typeof board?.path === "string" ? board.path : typeof message.path === "string" ? message.path : undefined;
+		if (!path) return false;
+		if (path.startsWith(`canvases/${canvas}/`)) return true;
+		try {
+			return !!app.stage.pens?.boards(canvas).some((one) => one.path === path);
+		} catch {
+			return false;
+		}
+	}
+	return false;
 }
 
 /**

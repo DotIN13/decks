@@ -185,6 +185,14 @@ export const VERBS: readonly Verb[] = [
 		result: arr(Item),
 	},
 	{
+		name: "canvas.step",
+		group: "canvas",
+		...deckChange,
+		summary: 'Take back the person\'s last edit to the drawing, or put it back ("undo" or "redo"); refused, with why, when an agent or the file changed the drawing since. Answers whether a step is left each way.',
+		params: [p("direction", lit("undo", "redo")), onCanvas()],
+		result: obj({ undo: bool(), redo: bool() }),
+	},
+	{
 		name: "canvas.fit",
 		group: "canvas",
 		...deckChange,

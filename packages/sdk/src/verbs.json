@@ -1589,6 +1589,45 @@
   ]
  },
  {
+  "name": "canvas.step",
+  "command": [
+   "canvas",
+   "step"
+  ],
+  "group": "canvas",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Take back the person's last edit to the drawing, or put it back (\"undo\" or \"redo\"); refused, with why, when an agent or the file changed the drawing since. Answers whether a step is left each way.",
+  "signature": "canvas.step(direction: \"undo\" | \"redo\", options?: { canvas?: string })",
+  "returns": "{ undo: boolean; redo: boolean }",
+  "params": [
+   {
+    "name": "direction",
+    "type": "\"undo\" | \"redo\"",
+    "schema": {
+     "enum": [
+      "undo",
+      "redo"
+     ]
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
   "name": "canvas.fit",
   "command": [
    "canvas",

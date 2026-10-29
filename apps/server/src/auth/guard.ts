@@ -137,6 +137,32 @@ export function boardMay(method: string, path: string): boolean {
 	return isPublic(method, path) || isPageRead(method, path);
 }
 
+/**
+ * What a canvas frame's token may ask for: the verbs (`POST /api/v1/<verb>`, which the router keeps
+ * to that canvas's own calls, `verbs/router.ts`), their list, the canvas's stream (`/api/v1/events`,
+ * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, and the
+ * pages anyone's frame may read. Nothing of the person's, no other canvas, nothing passed on.
+ */
+export function canvasMay(method: string, path: string, canvas: string): boolean {
+	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return path !== "/api/v1/events";
+	if ((method === "GET" || method === "HEAD") && (path === "/api/v1" || path === "/api/v1/events")) return true;
+	if ((method === "GET" || method === "HEAD") && path.startsWith("/api/stage-pen/")) return decodedSegment(path.slice("/api/stage-pen/".length)) === canvas;
+	if (path === "/api/session") return true;
+	if (path.startsWith("/c/")) return false;
+	return isPublic(method, path) || isPageRead(method, path);
+}
+
+function decodedSegment(segment: string): string | undefined {
+	try {
+		return decodeURIComponent(segment);
+	} catch {
+		return undefined;
+	}
+}
+
+/** What a canvas frame's token is told when it asks for anything else. */
+export const CANVAS_ONLY = "A canvas frame's token reads and changes its one canvas, and nothing else.";
+
 /** What a board's token is told when it asks for anything else. */
 export const BOARD_ONLY = "A board's token calls verbs as that board, and nothing else: not the person's routes, and not another token.";
 
@@ -158,7 +184,7 @@ export interface Gate {
  */
 export function verifyOn(gate: Pick<Gate, "tokens">, token: string | undefined, headers: Record<string, string | string[] | undefined>): Verified | { ok: false; reason: "kind" } {
 	const seen = gate.tokens.verify(token, { origin: originOf(headers) });
-	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site" && seen.principal.kind !== "board") return { ok: false, reason: "kind" };
+	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site" && seen.principal.kind !== "board" && seen.principal.kind !== "canvas") return { ok: false, reason: "kind" };
 	return seen;
 }
 
@@ -177,7 +203,7 @@ export function guard(gate: Gate) {
 			if (origin) {
 				res.setHeader("Vary", "Origin");
 				res.setHeader("Access-Control-Allow-Origin", origin);
-				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage");
+				res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Decks-Agent, X-Decks-App, X-Decks-Person, X-Decks-Stage, X-Decks-Edit");
 				res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 				if (req.headers["access-control-request-private-network"]) res.setHeader("Access-Control-Allow-Private-Network", "true");
@@ -194,6 +220,10 @@ export function guard(gate: Gate) {
 			if (seen.ok) {
 				if (seen.principal.kind === "board" && !boardMay(req.method, req.path)) {
 					res.status(403).type("text").send(BOARD_ONLY);
+					return;
+				}
+				if (seen.principal.kind === "canvas" && !canvasMay(req.method, req.path, seen.principal.canvas)) {
+					res.status(403).type("text").send(CANVAS_ONLY);
 					return;
 				}
 				req.principal = seen.principal;
