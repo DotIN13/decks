@@ -36,7 +36,7 @@ export function canvasItems(doc: PenDocument | undefined, query = ""): { items: 
 		else if (meta.type === "decks.shape" || n.type === "rectangle" || n.type === "ellipse") {
 			const words = ((n.children ?? []) as Record<string, unknown>[]).find((c) => c.type === "text")?.content;
 			item = { id, box, kind: "shape", label: named ?? clip(words, "Shape") };
-		} else if (n.type === "frame") item = { id, box, kind: "frame", label: named ?? (meta.type === "decks.card" ? "Card" : "Frame") };
+		} else if (n.type === "frame") item = { id, box, kind: "frame", label: named ?? (meta.type === "decks.markdown-card" || meta.type === "decks.card" ? "Card" : "Frame") };
 		else item = { id, box, kind: "other", label: named ?? clip(n.type, "Item") };
 		if (!q || item.label.toLowerCase().includes(q)) items.push(item);
 	}

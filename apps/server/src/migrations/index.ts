@@ -1,6 +1,7 @@
 import { migrateStages } from "./2026-10-16-stages-to-canvases.ts";
 import { describe, migrated, migrateStandalone } from "./2026-10-20-standalone-canvases.ts";
 import { migrated as isolationMigrated, migrateIsolation } from "./2026-10-21-isolation-removed.ts";
+import { migrated as markdownCardsMigrated, migrateMarkdownCards } from "./2026-10-28-markdown-cards.ts";
 
 /**
  * Every change to how a deck is kept on disk, oldest first, and when each one runs.
@@ -44,7 +45,8 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 		const lines: string[] = [];
 		if (!migrated(deck)) migrateStandalone(deck, { dryRun: true, log: (line) => lines.push(line) });
 		if (!isolationMigrated(deck)) migrateIsolation(deck, { dryRun: true, log: (line) => lines.push(line) });
-		if (migrated(deck) && isolationMigrated(deck)) lines.push(`${deck} is migrated already: nothing to do.`);
+		if (!markdownCardsMigrated(deck)) migrateMarkdownCards(deck, { dryRun: true, log: (line) => lines.push(line) });
+		if (migrated(deck) && isolationMigrated(deck) && markdownCardsMigrated(deck)) lines.push(`${deck} is migrated already: nothing to do.`);
 		throw new DryRun(lines);
 	}
 	const moved = migrateStages(deck);
@@ -56,6 +58,11 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 	if (!isolationMigrated(deck)) {
 		const { plan, ran, backup } = migrateIsolation(deck, { log: (line) => said.push(line) });
 		if (ran && (plan.marks.length || plan.agents.length)) said.push(`isolated mode is gone: ${plan.agents.length} agent(s) and the canvases they used are ordinary now`, ...(backup ? [`what changed is backed up in ${backup}`] : []));
+	}
+	if (!markdownCardsMigrated(deck)) {
+		const { plan, ran, backup } = migrateMarkdownCards(deck, { log: (line) => said.push(line) });
+		const frames = plan.files.reduce((sum, file) => sum + file.frames, 0);
+		if (ran && frames) said.push(`markdown cards are decks.markdown-card now: ${frames} in ${plan.files.length} drawing(s)`, ...(backup ? [`the drawings as they were are in ${backup}`] : []));
 	}
 	return said;
 }

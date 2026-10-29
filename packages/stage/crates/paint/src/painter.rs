@@ -472,7 +472,9 @@ fn dash_of(item: &Item, width: f32) -> Option<Vec<f64>> {
 }
 
 const ARROW: &str = "decks.arrow";
-const CARD: &str = "decks.card";
+const CARD: &str = "decks.markdown-card";
+/// A markdown card's old tag, still read on a frame until its harness rewrites it.
+const OLD_CARD: &str = "decks.card";
 const MARKDOWN: &str = "decks.markdown";
 const MEDIA: &str = "decks.media";
 
@@ -525,7 +527,7 @@ fn own_ops(ctx: &Context, root: &Root, i: u32, target: &Mat, _alpha: f32, ops: &
 			let shape = rrect(vars, item, theme, w, h);
 			let media = meta_type(item) == Some(MEDIA);
 			let sound = media && item.get("metadata").and_then(|m| m.get("kind")).and_then(Value::as_str) == Some("audio");
-			let paper = (meta_type(item) == Some(CARD) && fills_of(item.get("fill")).is_empty()) || sound;
+			let paper = (matches!(meta_type(item), Some(t) if t == CARD || t == OLD_CARD) && fills_of(item.get("fill")).is_empty()) || sound;
 			if paper {
 				card_paper(ctx.dark, shape, transform, ops);
 			}

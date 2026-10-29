@@ -1,7 +1,7 @@
 export * from "./types.ts";
 export { check, clone, emptyDocument, idFor, ids, indexOf, newId, parse, PEN_VERSION, PenError, serialize, walk } from "./doc.ts";
 export { expand, MISSING } from "./refs.ts";
-export { CARD, DEFAULT_FONT, DEFAULT_FONT_SIZE, estimateText, isCard, isMarkdown, isMarkdownText, layout, MARKDOWN, MEDIA, mediaOf, NOTE_PAD, NOTE_WIDTH, textStyleOf, type Frame, type MediaItem, type MeasureText, type Placed, type TextStyle } from "./layout.ts";
+export { CARD, OLD_CARD, DEFAULT_FONT, DEFAULT_FONT_SIZE, estimateText, isCard, isMarkdown, isMarkdownText, layout, MARKDOWN, MEDIA, mediaOf, NOTE_PAD, NOTE_WIDTH, textStyleOf, type Frame, type MediaItem, type MeasureText, type Placed, type TextStyle } from "./layout.ts";
 export { apply, type Op, type OpResult } from "./ops.ts";
 export { FIELDS, UNDRAWN_EFFECTS, UNDRAWN_FILLS, updateWarnings, warnings } from "./fields.ts";
 export { applyEdits, diff, editDocument, type PenEdit } from "./diff.ts";

@@ -489,7 +489,8 @@ fn reach(vars: &Vars, item: &tree::Item, theme: &Theme) -> f64 {
 			r = r.max(dx.max(dy) + vars.num(e.get("blur"), theme, 0.0) * 1.5 + vars.num(e.get("spread"), theme, 0.0).max(0.0));
 		}
 	}
-	let card = item.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str) == Some("decks.card");
+	// A markdown card, by its tag or its old one (an HTML card is a browser item, never a frame).
+	let card = item.kind() == "frame" && matches!(item.get("metadata").and_then(|m| m.get("type")).and_then(Value::as_str), Some("decks.markdown-card" | "decks.card"));
 	if matches!(item.kind(), "note" | "prompt" | "context") || card {
 		r = r.max(6.0 + 18.0 * 1.5);
 	}

@@ -50,13 +50,19 @@ export const isMarkdown = (node: PenNode): boolean => node.type !== "text" && no
  */
 export const isMarkdownText = (node: PenNode): boolean => node.type === "text" && node.metadata?.type === MARKDOWN;
 /**
- * A card: pen's own frame, a column, marked `metadata: { type: "decks.card" }`. Each block of its
- * markdown is a child of its own (a markdown text, a picture as an image-filled rectangle), so the
- * frame's drop slots are the gaps between lines and pen.dev opens it as a column with its pictures.
- * Decks draws it on the card's paper when it has no fill of its own.
+ * A markdown card: pen's own frame, a column, marked `metadata: { type: "decks.markdown-card" }`. Each
+ * block of its markdown is a child of its own (a markdown text, a picture as an image-filled rectangle),
+ * so the frame's drop slots are the gaps between lines and pen.dev opens it as a column with its
+ * pictures. Decks draws it on the card's paper when it has no fill of its own.
+ *
+ * It was `decks.card` until a card became a board drawn in the stage's own page (a `browser` item with
+ * that tag). A frame still tagged so is read as a markdown card, and rewritten once when its harness
+ * starts (`migrations/2026-10-28-markdown-cards.ts`).
  */
-export const CARD = "decks.card";
-export const isCard = (node: PenNode | undefined): boolean => node?.type === "frame" && node.metadata?.type === CARD;
+export const CARD = "decks.markdown-card";
+/** The markdown card's old tag, on a frame only: a `browser` item with it is an HTML card. */
+export const OLD_CARD = "decks.card";
+export const isCard = (node: PenNode | undefined): boolean => node?.type === "frame" && (node.metadata?.type === CARD || node.metadata?.type === OLD_CARD);
 
 /**
  * A film or a sound on the stage: `metadata: { type: "decks.media", kind, file }`, on pen's own
