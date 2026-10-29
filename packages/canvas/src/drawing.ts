@@ -106,7 +106,7 @@ export function boardsOf(doc: PenDocument): Board[] {
 		if (!isBoard(node)) continue;
 		boards.push({
 			path: boardPath(node),
-			title: typeof node.name === "string" && node.name ? node.name : boardPath(node),
+			title: typeof node.name === "string" && node.name ? node.name : itemTitle(node) ?? boardPath(node),
 			x: num(node.x, 0),
 			y: num(node.y, 0),
 			w: num(node.width, 960),
@@ -582,4 +582,13 @@ export function itemFields(node: PenNode): { item?: "document" | "app"; file?: s
 	if (kind === "document") return { item: "document", file: String(meta.path ?? "") };
 	if (kind === "app") return { item: "app", app: String(meta.name ?? "") };
 	return {};
+}
+
+/** What a document or an app item is called when it has no name of its own: its file's name, or its app's. */
+function itemTitle(node: PenNode): string | undefined {
+	const meta = (node.metadata ?? {}) as { path?: unknown; name?: unknown };
+	const kind = itemKind(node);
+	if (kind === "document") return String(meta.path ?? "").split("/").pop() || undefined;
+	if (kind === "app") return String(meta.name ?? "") || undefined;
+	return undefined;
 }
