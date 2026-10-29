@@ -1,0 +1,315 @@
+import { serialize, type PenDocument } from "@decks/pen";
+import type { Camera } from "@decks/protocol";
+import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
+import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../mount.tsx";
+import type { PenTool } from "../state/pen-tools.ts";
+import { syncTools, toolsNow } from "./ui-sync.ts";
+import { CallRefused, PROTOCOL, peer, type FrameCalls, type Page, type PageEnd, type Rect, type Start } from "./protocol.ts";
+
+/** What the page answers for its frame beyond the editor's own options. */
+export interface FrameHostOptions {
+	/** A ticket for one canvas's folder: the address its files are read at, and its pictures'. */
+	ticket(canvas: string): Promise<{ files: string; pictures: string; expires: number }>;
+	/** Your role on the canvas on screen. */
+	role?(canvas: string): "owner" | "edit" | "view";
+	/** Whether a card or board on it is yours or a friend's. */
+	trust?(path: string): "own" | "friend";
+	/** A card's `card.decks` call, for the broker to answer (`broker.ts`). */
+	decks?(call: FrameCalls["decks"]["data"]): Promise<unknown>;
+	/** Where what the frame keeps between visits is kept: this page's own storage. */
+	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
+	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
+	upload?(file: FrameCalls["upload"]["data"]): Promise<{ path: string }>;
+}
+
+type Options = CanvasOptions & { state?: EditorState; frame: FrameHostOptions };
+
+/**
+ * The editor in a sandboxed frame (`protocol.ts`), made as `createEditor` makes it, so a host can take
+ * one for the other: the same options and state, the same handle, its stage in a frame. The canvas runs
+ * in the frame; this end keeps it in step with the host's state, turns its messages into the host's
+ * callbacks, and answers what it asks.
+ *
+ * One frame for one canvas: when the host moves to another canvas the frame is made again, on a ticket
+ * for that canvas.
+ */
+export function createFramedEditor(options: Options): Editor {
+	const state = options.state;
+	const [end, setEnd] = createSignal<PageEnd>();
+	const [frameAt, setFrameAt] = createSignal<HTMLIFrameElement>();
+	/** The last of each the frame said, so this end does not say it back. */
+	let fromFrame: { camera?: Camera; selected?: string; mode?: "edit" | "browse" } = {};
+	let drawn: PenDocument | undefined;
+	/** What keeps the tools in step with the frame on screen (`ui-sync.ts`). */
+	let stopTools: (() => void) | undefined;
+	let tool: PenTool = "select";
+	let localCamera: Camera = untrack(() => state?.camera?.[0]()) ?? options.camera ?? { x: 0, y: 0, zoom: 1 };
+	let darkNow = options.dark === true;
+	let modeNow: "edit" | "browse" = options.mode ?? "edit";
+	const storage = options.frame.storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
+	const storeKey = (canvas: string) => `decks.frame:${canvas}:`;
+
+	/** A rectangle on the frame's screen, on this page's. */
+	const onPage = (at: Rect | undefined): DOMRect | undefined => {
+		const frame = frameAt();
+		if (!at || !frame) return undefined;
+		const box = frame.getBoundingClientRect();
+		return new DOMRect(box.x + at.x, box.y + at.y, at.w, at.h);
+	};
+
+	/** Start the frame on the canvas on screen: the ticket first, then everything it begins with. */
+	const startFrame = async (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean) => {
+		const ticket = await options.frame.ticket(canvas);
+		if (cancelled()) return;
+		const pen = untrack(() => state?.pen?.());
+		const doc = pen?.doc;
+		drawn = doc;
+		const stored: Record<string, string> = {};
+		if (storage) {
+			const prefix = storeKey(canvas);
+			for (let i = 0; i < (storage as Storage).length; i++) {
+				const key = (storage as Storage).key(i);
+				if (key?.startsWith(prefix)) stored[key.slice(prefix.length)] = storage.getItem(key) ?? "";
+			}
+		}
+		const start: Start = {
+			protocol: PROTOCOL,
+			canvas: { name: canvas, role: options.frame.role?.(canvas) ?? "owner" },
+			drawing: { text: doc ? serialize(doc) : options.text, base: pen?.base ?? "" },
+			pages: pagesNow(),
+			files: { base: ticket.files, expires: ticket.expires },
+			pictures: ticket.pictures,
+			look: { dark: darkNow, mode: modeNow, readOnly: options.readOnly === true, toolbar: options.toolbar !== false },
+			camera: localCamera,
+			...(pen?.writer ? { writer: pen.writer } : {}),
+			stored,
+			tools: toolsNow(),
+		};
+		const onHello = (event: MessageEvent) => {
+			if (event.source !== frame.contentWindow || event.data?.t !== "hello") return;
+			removeEventListener("message", onHello);
+			const channel = new MessageChannel();
+			const page = peer(channel.port1) as PageEnd;
+			wire(page, canvas);
+			setEnd(page);
+			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
+			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
+			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify(start)) as Start }, "*", [channel.port2]);
+		};
+		addEventListener("message", onHello);
+		onCleanup(() => removeEventListener("message", onHello));
+	};
+
+	const pagesNow = (): Page[] => (options.boards?.list?.() ?? []).map((board) => ({ ...board, trust: options.frame.trust?.(board.path) ?? (board.path.startsWith("shared/") ? "friend" : "own") }));
+
+	/** What the frame says, as the host's own callbacks and state. */
+	const wire = (page: PageEnd, canvas: string) => {
+		stopTools?.();
+		stopTools = syncTools((patch) => page.emit("ui", patch), (apply) => page.on("ui", apply));
+		page.on("started", () => options.boards?.onStarted?.());
+		page.on("step", (data) => options.document?.step(data.direction, data.edit));
+		page.on("selection", (data) => {
+			if (data.page !== undefined || data.ids.length === 0) {
+				fromFrame.selected = data.page;
+				state?.selected?.[1](data.page);
+				options.onSelect?.(data.page);
+			}
+			if (data.page === undefined) options.onSelection?.(data.ids);
+		});
+		page.on("tool", (data) => {
+			tool = data.tool;
+			options.onTool?.(data.tool);
+			if (data.tool === "select") options.onSelectTool?.();
+		});
+		page.on("camera", (data) => {
+			fromFrame.camera = data.camera;
+			localCamera = data.camera;
+			state?.camera?.[1](data.camera);
+			options.onCamera?.(data.camera);
+		});
+		page.on("viewport", (data) => options.onViewport?.(data));
+		page.on("refer", (data) => options.onRefer?.(data.pills));
+		page.on("comment", (data) => options.onComment?.({ path: data.path, title: data.title, quote: data.quote, ...(data.component ? { component: data.component } : {}), ...(data.items ? { items: data.items } : {}), anchor: () => onPage(data.at) }));
+		page.on("menu", (data) => {
+			const at = onPage(data.at);
+			if (at) options.onPillMore?.({ ...(data.path ? { path: data.path } : {}), ...(data.ids ? { ids: data.ids } : {}) }, at);
+		});
+		page.on("properties", () => options.onProperties?.());
+		page.on("export", (data) => options.onExport?.(data.ids));
+		page.on("ink", (data) => options.onInk?.(data));
+		page.on("hide", (data) => options.boards?.onHide?.(data.path));
+		page.on("seen", (data) => options.boards?.onRead?.(data.path));
+		page.on("extent", (data) => {
+			const { path, ...extent } = data;
+			options.boards?.onExtent?.(path, extent);
+		});
+		page.on("store", (data) => {
+			if (!storage) return;
+			if (data.value === null) storage.removeItem(storeKey(canvas) + data.key);
+			else storage.setItem(storeKey(canvas) + data.key, data.value);
+		});
+		// A shortcut the canvas did not take, played on this page as if typed here.
+		page.on("keys", (data) => dispatchEvent(new KeyboardEvent("keydown", { key: data.key, code: data.code, metaKey: data.meta, ctrlKey: data.ctrl, altKey: data.alt, shiftKey: data.shift, bubbles: true, cancelable: true })));
+		page.answer("send", async (data) => (options.document ? (await options.document.send(data.ops, data.edit)) !== false : false));
+		page.answer("remove", async (data) => (options.onDeleteBoard ? (await options.onDeleteBoard(data.path)) !== false : false));
+		page.answer("open", (data) => options.boards?.onOpenLink?.(data.path, data.from) ?? false);
+		page.answer("token", async (data) => options.boards?.mintBoardToken?.(data.path, canvas));
+		page.answer("decks", (data) => {
+			if (!options.frame.decks) throw new CallRefused("This page answers no card's calls.", "refused");
+			return options.frame.decks(data);
+		});
+		page.answer("upload", (data) => {
+			if (!options.frame.upload) throw new CallRefused("Files cannot be dropped on this canvas here.", "refused");
+			return options.frame.upload(data);
+		});
+	};
+
+	/*
+	 * The host's state, kept in step: the drawing as its server has it (the edits when it says them,
+	 * the whole drawing otherwise), the cards and boards, the camera an agent or the app moved, the
+	 * selected board, the mode, the scheme, ink, and what is going on around the canvas.
+	 */
+	const keepInStep = () => {
+		createEffect(
+			on(
+				() => state?.pen?.(),
+				(pen) => {
+					const page = end();
+					if (!page || !pen) return;
+					if (pen.edits && drawn && pen.edits.from === drawn) page.emit("edits", { edits: pen.edits.edits, base: pen.base, ...(pen.made ? { made: pen.made } : {}) });
+					else page.emit("drawing", { text: serialize(pen.doc), base: pen.base, ...(pen.made ? { made: pen.made } : {}) });
+					drawn = pen.doc;
+					if (pen.writer) page.emit("busy", { writer: pen.writer });
+				},
+				{ defer: true },
+			),
+		);
+		createEffect(() => {
+			const page = end();
+			const pages = pagesNow();
+			if (page) page.emit("pages", { pages });
+		});
+		createEffect(
+			on(
+				() => [state?.camera?.[0](), state?.glide?.()] as const,
+				([camera, glide]) => {
+					const page = end();
+					if (!page || !camera) return;
+					localCamera = camera;
+					if (camera === fromFrame.camera) return;
+					page.emit("camera", { camera, ...(glide ? { glide: glide.ms } : {}) });
+				},
+			),
+		);
+		createEffect(() => {
+			const page = end();
+			const selected = state?.selected?.[0]();
+			if (!page || selected === fromFrame.selected) return;
+			page.emit("select", { ids: [], ...(selected ? { page: selected } : {}) });
+		});
+		createEffect(() => {
+			const page = end();
+			const mode = state?.mode?.[0]();
+			if (!page || !mode || mode === modeNow) return;
+			modeNow = mode;
+			page.emit("look", { mode });
+		});
+		createEffect(() => {
+			const page = end();
+			const inking = state?.inking?.();
+			if (page && inking !== undefined) page.emit("tool", { ink: { on: inking } });
+		});
+		createEffect(() => {
+			const page = end();
+			if (!page) return;
+			page.emit("busy", { switching: options.boards?.switching?.() ?? false, mayStart: options.boards?.mayStart?.() ?? true });
+		});
+		createEffect(() => {
+			const page = end();
+			if (page && options.boards?.news) page.emit("news", { glow: options.boards.news() });
+		});
+		createEffect(() => {
+			const page = end();
+			if (!page || !options.boards?.marks) return;
+			for (const board of options.boards.list?.() ?? []) page.emit("marks", { path: board.path, marks: options.boards.marks(board.path) });
+		});
+	};
+
+	/** The frame for the canvas on screen, made again when the host moves to another canvas. */
+	const surface = (): JSX.Element => {
+		keepInStep();
+		return (
+			<Show when={options.canvasName?.()} keyed>
+				{(canvas) => {
+					let cancelled = false;
+					onCleanup(() => {
+						cancelled = true;
+						stopTools?.();
+						stopTools = undefined;
+						end()?.close();
+						setEnd(undefined);
+						setFrameAt(undefined);
+					});
+					return (
+						<iframe
+							ref={(frame) => {
+								setFrameAt(frame);
+								void startFrame(frame, canvas, () => cancelled);
+							}}
+							class="canvas-frame"
+							title="Canvas"
+							sandbox="allow-scripts allow-downloads"
+							allow="clipboard-read; clipboard-write; fullscreen"
+							src="/canvas-frame.html"
+							style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }}
+						/>
+					);
+				}}
+			</Show>
+		);
+	};
+
+	const handle: CanvasHandle = {
+		setDocument: (text, base, made) => end()?.emit("drawing", { text: typeof text === "string" ? text : serialize(text), base: base ?? "", ...(made ? { made } : {}) }),
+		applyEdits: (edits, base, made) => {
+			end()?.emit("edits", { edits, ...(base ? { base } : {}), ...(made ? { made } : {}) });
+			return true;
+		},
+		refused: (edit) => end()?.emit("refused", { edit }),
+		drawn: () => drawn ?? { version: "2.14", children: [] } as unknown as PenDocument,
+		glide: (camera, ms) => end()?.emit("camera", { camera, glide: ms ?? 400 }),
+		document: () => drawn ?? ({ version: "2.14", children: [] } as unknown as PenDocument),
+		text: () => (drawn ? serialize(drawn) : ""),
+		setDark: (dark) => {
+			darkNow = dark;
+			end()?.emit("look", { dark });
+		},
+		setMode: (mode) => {
+			modeNow = mode;
+			end()?.emit("look", { mode });
+		},
+		setDrawing: (onOff) => end()?.emit("tool", { ink: { on: onOff } }),
+		setTool: (next) => {
+			tool = next;
+			end()?.emit("tool", { tool: next });
+		},
+		tool: () => tool,
+		fit: () => end()?.emit("fit", {}),
+		select: (ids) => end()?.emit("select", { ids }),
+		edit: (ops) => void end()?.call("edit", { ops }),
+		undo: () => end()?.emit("step", { direction: "undo" }),
+		redo: () => end()?.emit("step", { direction: "redo" }),
+		camera: () => localCamera,
+		setCamera: (camera) => {
+			localCamera = camera;
+			end()?.emit("camera", { camera });
+		},
+		reloadBoard: (path) => end()?.emit("reload", { path }),
+		restored: false,
+		dispose: () => {
+			end()?.close();
+			setEnd(undefined);
+		},
+	};
+	return { handle, surface, root: surface, dispose: () => handle.dispose() };
+}

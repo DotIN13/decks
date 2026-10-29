@@ -4,6 +4,7 @@ import type { Board } from "@decks/protocol";
 import { createEditor, type Editor } from "../mount.tsx";
 import { setCanvasHost } from "../host.ts";
 import { setDrawing } from "../state/ink.ts";
+import { syncTools } from "./ui-sync.ts";
 import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "./protocol.ts";
 
 /**
@@ -34,7 +35,7 @@ function run(root: HTMLElement, start: Start, end: FrameEnd): void {
 	const [pages, setPages] = createSignal<Page[]>(start.pages);
 	const [news, setNews] = createSignal<Record<string, string>>({});
 	const [marks, setMarks] = createSignal<Record<string, Array<{ id: string; quote: string; component?: string }>>>({});
-	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name: string; color?: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
+	const [busy, setBusy] = createSignal<{ switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } }>({ mayStart: true, ...(start.writer ? { writer: start.writer } : {}) });
 	const trust = (path: string) => untrack(pages).find((page) => page.path === path)?.trust ?? (path.startsWith("shared/") ? "friend" : "own");
 	const kept = new Map(Object.entries(start.stored));
 	/** The page keeps what this frame cannot: it has no storage of its own. */
@@ -167,6 +168,14 @@ function run(root: HTMLElement, start: Start, end: FrameEnd): void {
 		if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
 		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
 	});
+
+	// The tools as the app's chrome has them, then kept in step both ways.
+	let applyTools: ((patch: Record<string, unknown>) => void) | undefined;
+	syncTools((patch) => end.emit("ui", patch), (apply) => {
+		applyTools = apply;
+		end.on("ui", apply);
+	});
+	if (start.tools) applyTools?.(start.tools);
 
 	render(() => (start.look.toolbar ? editor.root() : editor.surface()), root);
 }

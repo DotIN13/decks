@@ -51,9 +51,11 @@ export interface Start {
 	pictures: string;
 	look: { dark: boolean; mode: "edit" | "browse"; readOnly: boolean; toolbar: boolean };
 	camera?: Camera;
-	writer?: { name: string; color?: string };
+	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
 	stored: Record<string, string>;
+	/** The tools' state as the app's chrome has it (`ui-sync.ts`). */
+	tools?: Record<string, unknown>;
 }
 
 /** A card or a board on the canvas, as the frame draws it. */
@@ -77,7 +79,9 @@ export interface PageToFrame {
 	step: { direction: "undo" | "redo" };
 	news: { glow: Record<string, string> };
 	marks: { path: string; marks: Array<{ id: string; quote: string; component?: string }> };
-	busy: { switching?: boolean; mayStart?: boolean; writer?: { name: string; color?: string } };
+	busy: { switching?: boolean; mayStart?: boolean; writer?: { name?: string; color: string } };
+	/** The tools' state, what changed of it (`ui-sync.ts`). */
+	ui: Record<string, unknown>;
 }
 
 /** The calls the page makes of the frame, and what each answers. */
@@ -105,6 +109,8 @@ export interface FrameToPage {
 	extent: { path: string; rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	store: { key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
+	/** The tools' state, what changed of it (`ui-sync.ts`). */
+	ui: Record<string, unknown>;
 }
 
 /** The calls the frame makes of the page, and what each answers. */
@@ -142,6 +148,19 @@ export interface Peer<Out, OutCalls extends Record<string, { data: unknown; valu
 	close(): void;
 }
 
+/**
+ * Post a message, as a plain copy when it is not one already: a host's state is often a Solid store,
+ * whose proxies the structured clone refuses. A copy through JSON is what crosses then.
+ */
+function post(port: MessagePort, message: Message, transfer: Transferable[] = []): void {
+	try {
+		port.postMessage(message, transfer);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== "DataCloneError" || transfer.length) throw error;
+		port.postMessage(JSON.parse(JSON.stringify(message)) as Message);
+	}
+}
+
 export function peer<Out, OutCalls extends Record<string, { data: unknown; value: unknown }>, In, InCalls extends Record<string, { data: unknown; value: unknown }>>(port: MessagePort): Peer<Out, OutCalls, In, InCalls> {
 	let next = 1;
 	const waiting = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
@@ -159,7 +178,7 @@ export function peer<Out, OutCalls extends Record<string, { data: unknown; value
 			else one.reject(new CallRefused(message.error, message.code));
 		} else if (message.t === "call") {
 			const handler = answers.get(message.name);
-			const reply = (out: Message) => port.postMessage(out);
+			const reply = (out: Message) => post(port, out);
 			if (!handler) return reply({ t: "reply", id: message.id, ok: false, error: `Nothing here answers ${message.name}.`, code: "refused" });
 			Promise.resolve()
 				.then(() => handler(message.data))
@@ -170,12 +189,12 @@ export function peer<Out, OutCalls extends Record<string, { data: unknown; value
 		}
 	};
 	return {
-		emit: (name, data) => port.postMessage({ t: "event", name, data } satisfies Message),
+		emit: (name, data) => post(port, { t: "event", name, data } satisfies Message),
 		call: (name, data, transfer) =>
 			new Promise((resolve, reject) => {
 				const id = next++;
 				waiting.set(id, { resolve: resolve as (value: unknown) => void, reject });
-				port.postMessage({ t: "call", id, name, data } satisfies Message, transfer ?? []);
+				post(port, { t: "call", id, name, data } satisfies Message, transfer ?? []);
 			}),
 		on: (name, handler) => {
 			const list = listeners.get(name) ?? [];
