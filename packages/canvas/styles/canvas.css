@@ -340,7 +340,12 @@
  * held forever is memory nobody asked for — `Stage.tsx` turns the attribute off 300ms
  * after the last change of scale.
  */
-.stage[data-scaling="true"] .board-node iframe {
+/*
+ * The same for what is not a frame and is drawn in the stage's own page: a card's root (`card.ts`), a
+ * document's editor and an app's window (`item-surfaces.tsx`). Each is as much a page to redraw at every
+ * step of a zoom, and was redrawn at each one before it was named here.
+ */
+.stage[data-scaling="true"] .board-node :is(iframe, .card-host, .document-surface, .app-surface) {
 	will-change: transform;
 }
 	/*
