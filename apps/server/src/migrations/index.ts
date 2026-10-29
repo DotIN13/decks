@@ -3,6 +3,7 @@ import { describe, migrated, migrateStandalone } from "./2026-10-20-standalone-c
 import { migrated as isolationMigrated, migrateIsolation } from "./2026-10-21-isolation-removed.ts";
 import { migrated as markdownCardsMigrated, migrateMarkdownCards } from "./2026-10-28-markdown-cards.ts";
 import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from "./2026-10-29-documents-and-apps.ts";
+import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-10-29-boards-to-cards.ts";
 
 /**
  * Every change to how a deck is kept on disk, oldest first, and when each one runs.
@@ -25,6 +26,7 @@ import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from ".
  * | 2026-10-21-isolation-removed.ts            | at open | `runAtOpen`, below; once, after a backup of what it changes, and recorded there too |
  * | 2026-10-28-markdown-cards.ts               | at open | `runAtOpen`, below; the same way |
  * | 2026-10-29-documents-and-apps.ts           | at open | `runAtOpen`, below; the same way |
+ * | 2026-10-29-boards-to-cards.ts              | at open | `runAtOpen`, below; the same way, after documents and apps |
  *
  * `DECKS_MIGRATE_DRY_RUN=1` on a harness's start (or `npm run migrate -- --dry-run <deck>`) prints
  * what the migrations still to run would move, and stops before anything is written.
@@ -50,7 +52,8 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 		if (!isolationMigrated(deck)) migrateIsolation(deck, { dryRun: true, log: (line) => lines.push(line) });
 		if (!markdownCardsMigrated(deck)) migrateMarkdownCards(deck, { dryRun: true, log: (line) => lines.push(line) });
 		if (!documentsAndAppsMigrated(deck)) migrateDocumentsAndApps(deck, { dryRun: true, log: (line) => lines.push(line) });
-		if (migrated(deck) && isolationMigrated(deck) && markdownCardsMigrated(deck) && documentsAndAppsMigrated(deck)) lines.push(`${deck} is migrated already: nothing to do.`);
+		if (!boardsToCardsMigrated(deck)) migrateBoardsToCards(deck, { dryRun: true, log: (line) => lines.push(line) });
+		if (migrated(deck) && isolationMigrated(deck) && markdownCardsMigrated(deck) && documentsAndAppsMigrated(deck) && boardsToCardsMigrated(deck)) lines.push(`${deck} is migrated already: nothing to do.`);
 		throw new DryRun(lines);
 	}
 	const moved = migrateStages(deck);
@@ -72,6 +75,11 @@ export function runAtOpen(deck: string, options: { dataDir?: string; dryRun?: bo
 		const { plan, ran, backup } = migrateDocumentsAndApps(deck, { log: (line) => said.push(line) });
 		const items = plan.files.reduce((sum, file) => sum + file.items.length, 0);
 		if (ran && items) said.push(`document and app boards are items now: ${items} in ${plan.files.length} canvas(es)`, ...(backup ? [`the drawings as they were are in ${backup}`] : []));
+	}
+	if (!boardsToCardsMigrated(deck)) {
+		const { plan, ran, backup } = migrateBoardsToCards(deck, { log: (line) => said.push(line) });
+		const cards = plan.canvases.reduce((sum, one) => sum + one.cards.length, 0);
+		if (ran && cards) said.push(`boards are cards now: ${cards} in ${plan.canvases.filter((one) => one.cards.length).length} canvas(es)`, ...(backup ? [`the boards and drawings as they were are in ${backup}`] : []));
 	}
 	return said;
 }

@@ -201,6 +201,8 @@ function addressesFromCard(fragment: DocumentFragment, base: string): void {
 			else if (key === "style" && /url\(/i.test(attr.value)) node.setAttribute(attr.name, cssFromCard(attr.value, base));
 		}
 		if (node.localName === "style") node.textContent = cssFromCard(node.textContent ?? "", base);
+		// A template's content is a fragment of its own, which `querySelectorAll` does not enter; what is stamped from it is the card's too.
+		if (node instanceof HTMLTemplateElement) addressesFromCard(node.content, base);
 	}
 }
 
