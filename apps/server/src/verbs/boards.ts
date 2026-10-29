@@ -1,3 +1,4 @@
+import { isCardPath } from "../deck/layout.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { boardWidth } from "../boards/templates.ts";
 import { withBox } from "./context.ts";
@@ -159,7 +160,7 @@ export async function fitOn(ctx: VerbContext, asked: string, named: string | und
 	// A board from elsewhere is the canvas's own copy of it (`StagePens.copyOf`): that is what is fitted.
 	const path = on && pens ? pens.copyOf(on, asked) : asked;
 	const held = on && pens ? pens.boards(on).find((one) => one.path === path) : undefined;
-	if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your canvas"}, so there is no width to fit it at. Put it there first (decks canvas insert '{"type":"board","board":"${path}"}'), or name a canvas that holds it with --canvas.`);
+	if (!on || !held) throw new Error(`${path} is not on ${named ? `the canvas "${pens!.titleOf(named)}"` : "your canvas"}, so there is no width to fit it at. Put it there first (${isCardPath(path) ? `decks canvas insert --type card --card ${path}` : `decks canvas insert '{"type":"board","board":"${path}"}'`}), or name a canvas that holds it with --canvas.`);
 	const own = !named || named === agent.stageName?.();
 	const before = notes.length;
 	const { board, content, reading, views } = await service.fit(path, { ...(margin === undefined || margin === null ? {} : { margin }), w: held.w });

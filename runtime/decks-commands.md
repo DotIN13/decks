@@ -1,7 +1,7 @@
 <!-- Generated from packages/api by scripts/gen-sdk.mjs. Edit the table there, then run the script. -->
 
 ```ts
-type Item = { type: string; id?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
+type Item = { type: string; id?: string; card?: string; html?: string; title?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
 type Box = { x1: number; y1: number; x2: number; y2: number };
 type Corner = { x1: number; y1: number } | { x: number; y: number };
 type Size = { w?: number; h?: number };

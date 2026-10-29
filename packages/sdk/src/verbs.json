@@ -150,6 +150,15 @@
       "id": {
        "type": "string"
       },
+      "card": {
+       "type": "string"
+      },
+      "html": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
       "board": {
        "type": "string"
       },
@@ -187,7 +196,7 @@
       "type"
      ],
      "additionalProperties": true,
-     "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+     "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own pen.dev fields and its `box`. A card is { type: \"card\", card: <path>, width? }, or { type: \"card\", html, title? } to write one; an old board reads as { type: \"board\", board: <path> }."
     }
    },
    {
@@ -401,6 +410,15 @@
       "id": {
        "type": "string"
       },
+      "card": {
+       "type": "string"
+      },
+      "html": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
       "board": {
        "type": "string"
       },
@@ -438,7 +456,7 @@
       "type"
      ],
      "additionalProperties": true,
-     "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+     "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own pen.dev fields and its `box`. A card is { type: \"card\", card: <path>, width? }, or { type: \"card\", html, title? } to write one; an old board reads as { type: \"board\", board: <path> }."
     }
    },
    {
@@ -780,6 +798,15 @@
              "id": {
               "type": "string"
              },
+             "card": {
+              "type": "string"
+             },
+             "html": {
+              "type": "string"
+             },
+             "title": {
+              "type": "string"
+             },
              "board": {
               "type": "string"
              },
@@ -817,7 +844,7 @@
              "type"
             ],
             "additionalProperties": true,
-            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own pen.dev fields and its `box`. A card is { type: \"card\", card: <path>, width? }, or { type: \"card\", html, title? } to write one; an old board reads as { type: \"board\", board: <path> }."
            },
            "at": {
             "anyOf": [
@@ -975,6 +1002,15 @@
              "id": {
               "type": "string"
              },
+             "card": {
+              "type": "string"
+             },
+             "html": {
+              "type": "string"
+             },
+             "title": {
+              "type": "string"
+             },
              "board": {
               "type": "string"
              },
@@ -1012,7 +1048,7 @@
              "type"
             ],
             "additionalProperties": true,
-            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own pen.dev fields and its `box`. A board is { type: \"board\", board: <path>, width? }."
+            "description": "Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own pen.dev fields and its `box`. A card is { type: \"card\", card: <path>, width? }, or { type: \"card\", html, title? } to write one; an old board reads as { type: \"board\", board: <path> }."
            }
           },
           "required": [

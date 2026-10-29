@@ -33,7 +33,7 @@ export function CardSurface(props: {
 	/** The card's token for its buttons, when the host gives cards one. */
 	token?: (() => Promise<string | undefined>) | undefined;
 	/** The card's content height, for a host that grows a board to fit it (`extent.ts`): its file's height stays the floor. */
-	onExtent?: ((extent: { w: number; h: number; at: number; page: number }) => void) | undefined;
+	onExtent?: ((extent: { w: number; h: number; at: number; page: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void) | undefined;
 }) {
 	let host!: HTMLDivElement;
 	/*
@@ -72,9 +72,11 @@ export function CardSurface(props: {
 			size: untrack(props.size),
 		});
 		listen(mounted.root, fresh);
+		// What fit reads, as a board's frame says it (`extent.ts`): the height, and how the card reads at it.
+		const card = mounted;
 		mounted.onHeight((h) => {
 			const w = untrack(props.size).w;
-			props.onExtent?.({ w, h, at: w, page: h });
+			props.onExtent?.({ w, h, at: w, page: h, ...card.reading() });
 		});
 		props.onShown();
 	};

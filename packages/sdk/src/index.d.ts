@@ -1,9 +1,10 @@
 // Generated from packages/api by scripts/gen-sdk.mjs. Edit the table there, then run the script.
 /**
- * Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a board, with its own
- * pen.dev fields and its `box`. A board is { type: "board", board: <path>, width? }.
+ * Anything on a canvas: a note, text, a shape, an arrow, a frame, a ref, or a card, with its own
+ * pen.dev fields and its `box`. A card is { type: "card", card: <path>, width? }, or { type:
+ * "card", html, title? } to write one; an old board reads as { type: "board", board: <path> }.
  */
-export type Item = { type: string; id?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
+export type Item = { type: string; id?: string; card?: string; html?: string; title?: string; board?: string; box?: Box; children?: unknown[]; [key: string]: unknown };
 /** A box on a canvas: both corners, so an edge is never a sum. */
 export type Box = { x1: number; y1: number; x2: number; y2: number };
 /** A top-left corner on a canvas: { x1, y1 }, or { x, y }. */

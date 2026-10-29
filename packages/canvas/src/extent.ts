@@ -52,16 +52,31 @@ export function countWords(text: string): number {
 
 export function readingOf(doc: Document): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
 	const view = doc.defaultView;
-	const words = countWords(doc.body?.innerText ?? "");
-	if (!view || !doc.body) return { words };
+	if (!view || !doc.body) return { words: countWords(doc.body?.innerText ?? "") };
+	return readingIn(doc.body, view, doc.documentElement.scrollWidth - doc.documentElement.clientWidth);
+}
+
+/**
+ * The same reading of a card (`card.ts`), whose content is a block in the stage's own page rather than
+ * a document: its words, its smallest type, how far it spills past its width, the boxes that cut off
+ * their own content, and the labels in a drawing that sit on each other.
+ */
+export function readingOfCard(body: HTMLElement): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
+	const view = body.ownerDocument.defaultView;
+	if (!view) return { words: countWords(body.innerText ?? "") };
+	return readingIn(body, view, body.scrollWidth - body.clientWidth);
+}
+
+function readingIn(body: HTMLElement, view: Window, spill: number): { words: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
+	const doc = body.ownerDocument;
+	const words = countWords(body.innerText ?? "");
 	// Content wider than the board: a table or a long line pushing past the right edge, which
 	// a board cannot scroll to. Two pixels of slack for rounding.
-	const spill = doc.documentElement.scrollWidth - doc.documentElement.clientWidth;
 	const overflowX = spill > 2 ? { overflowX: spill } : {};
 	// Boxes that cut off their own words: a fixed-height panel that turned out too short. A
 	// board cannot scroll, so what is past the edge of such a box is simply not there.
 	let cutBoxes = 0;
-	for (const element of doc.body.querySelectorAll<HTMLElement>("*")) {
+	for (const element of body.querySelectorAll<HTMLElement>("*")) {
 		if (element.scrollHeight - element.clientHeight <= 4 || !element.innerText?.trim()) continue;
 		const overflow = view.getComputedStyle(element).overflowY;
 		if (overflow !== "visible" && element.clientHeight > 0) cutBoxes++;
@@ -69,7 +84,7 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
 	const cut = cutBoxes ? { cut: cutBoxes } : {};
 	// Labels in a drawing that sit on top of each other. Nothing else here can see inside an
 	// <svg>: its text does not wrap or push, so two labels placed by arithmetic collide in silence.
-	const labels = [...doc.body.querySelectorAll<SVGGraphicsElement>("svg text")]
+	const labels = [...body.querySelectorAll<SVGGraphicsElement>("svg text")]
 		.filter((label) => label.textContent?.trim())
 		.map((label) => label.getBoundingClientRect())
 		.filter((box) => box.width > 0 && box.height > 0);
@@ -85,7 +100,7 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
 	}
 	const overlaps = collisions ? { overlaps: collisions } : {};
 	let minFont: number | undefined;
-	const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+	const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT);
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
 		if (!node.nodeValue || !/\S{2,}/.test(node.nodeValue)) continue;
 		const element = node.parentElement;
