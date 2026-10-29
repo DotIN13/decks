@@ -2,7 +2,7 @@ import tailwind from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { get } from "node:http";
-import { defineConfig, type Plugin } from "vite";
+import { defaultAllowedOrigins, defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 // The alerts' cues at /sounds/, from @decks/canvas (they were public/sounds).
 import { decksSounds } from "@decks/agent-ui/vite";
@@ -106,6 +106,11 @@ export default defineConfig({
 		port: WEB_PORT,
 		strictPort: true,
 		...(ALLOWED_HOSTS ? { allowedHosts: ALLOWED_HOSTS } : {}),
+		/*
+		 * The canvas frame (`canvas-frame.html`) is sandboxed, so its origin is "null": its modules and
+		 * styles are fetched cross-origin, and Vite answers only the origins it allows (loopback by default).
+		 */
+		cors: { origin: [defaultAllowedOrigins, "null"] },
 		proxy: {
 			/*
 			 * `ws: true` on `/api` as well: `/api/web/relay` is the Decks extension's websocket
@@ -118,8 +123,8 @@ export default defineConfig({
 			 */
 			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true, xfwd: true },
-			// Another server passed through this one, for a page with no service worker (`share/relay.ts`).
-			"/c": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, xfwd: true },
+			// Another server passed through this one, for a page with no service worker (`share/relay.ts`): `/c/…`, not `/canvas-frame.html`.
+			"^/c/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, xfwd: true },
 			// Forwarded ports (`server/ports.ts`), which the server answers for, websockets and all.
 			"/node/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
 			"/rnode/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true, xfwd: true },
