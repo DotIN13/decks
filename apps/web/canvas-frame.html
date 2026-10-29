@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+		<title>Canvas</title>
+		<!--
+			The canvas frame (`@decks/canvas`, `frame/`): the canvas, its engine and its cards, sandboxed
+			by the app's page that holds it, and talking to it on one message port. The libraries a card
+			imports by name, as on the app's own page.
+		-->
+		<script type="importmap">
+			{
+				"imports": {
+					"d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+					"three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+					"gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+					"chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+				}
+			}
+		</script>
+		<!--
+			Before any module: the frame is sandboxed with an origin of its own, and a sandboxed page has no
+			storage (merely reading localStorage throws). Code shared with the app's page reads it as it
+			loads, so the frame gets one in memory; what must outlive it the page keeps (`frame/`, `store`).
+		-->
+		<script>
+			(function () {
+				function memory() {
+					var values = new Map();
+					return {
+						get length() { return values.size; },
+						clear: function () { values.clear(); },
+						getItem: function (key) { return values.has(key) ? values.get(key) : null; },
+						key: function (index) { return Array.from(values.keys())[index] ?? null; },
+						removeItem: function (key) { values.delete(key); },
+						setItem: function (key, value) { values.set(key, String(value)); },
+					};
+				}
+				["localStorage", "sessionStorage"].forEach(function (name) {
+					var works = false;
+					try { works = !!window[name]; } catch (e) { works = false; }
+					if (!works) Object.defineProperty(window, name, { value: memory(), configurable: true });
+				});
+			})();
+		</script>
+		<style>
+			html, body, #canvas { margin: 0; height: 100%; overflow: hidden }
+		</style>
+	</head>
+	<body>
+		<div id="canvas"></div>
+		<script type="module" src="/src/canvas-frame.tsx"></script>
+	</body>
+</html>

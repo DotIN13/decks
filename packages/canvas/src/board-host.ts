@@ -117,7 +117,12 @@ export function createBoardHost(options: BoardHostOptions): BoardHost {
 			const to = frame.contentWindow;
 			const origin = frameOrigin(frame, spec.page?.());
 			if (!to || !origin || gone) return;
-			to.postMessage(message, origin);
+			/*
+			 * Inside the canvas frame (`frame/`), which is sandboxed, every frame in it is sandboxed too and has
+			 * no origin to name: the message goes to this frame's own window, the one place it can arrive.
+			 */
+			const sandboxed = typeof self !== "undefined" && self.origin === "null";
+			to.postMessage(message, sandboxed ? "*" : origin);
 		};
 
 		const schedule = () => {

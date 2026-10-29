@@ -1,3 +1,4 @@
+import renderWorkerUrl from "./render.worker.ts?worker&url";
 /**
  * The stage's engine, on the page: the Rust page engine (`@decks/stage`) and its render worker.
  *
@@ -363,7 +364,7 @@ export class StageEngine {
 	 */
 	private async open(over: HTMLCanvasElement): Promise<void> {
 		this.prefetchFonts();
-		this.worker = new Worker(new URL("./render.worker.ts", import.meta.url), { type: "module" });
+		this.worker = startWorker(renderWorkerUrl);
 		this.posted = 0;
 		this.postedContent = 0;
 		this.worker.onmessage = ({ data }: MessageEvent<FromWorker>) => this.receive(data);
@@ -2122,5 +2123,21 @@ export class StageEngine {
 		this.page?.free();
 		this.page = undefined;
 		this.hits?.replaceChildren();
+	}
+}
+
+/**
+ * A module worker at its address, or, where the page may not start one from there, from a script of
+ * its own that imports it. The canvas frame is sandboxed with an origin of its own, and a page may start
+ * a worker only from its own origin; a worker made from a `blob:` the page wrote is its own, and its
+ * `import` of the real script crosses with CORS like any other module (`frame/`).
+ */
+function startWorker(url: string): Worker {
+	try {
+		return new Worker(url, { type: "module" });
+	} catch {
+		const absolute = new URL(url, location.href).href;
+		const shim = URL.createObjectURL(new Blob([`import ${JSON.stringify(absolute)};`], { type: "text/javascript" }));
+		return new Worker(shim, { type: "module" });
 	}
 }

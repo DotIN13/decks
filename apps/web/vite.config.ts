@@ -137,6 +137,6 @@ export default defineConfig({
 	build: {
 		target: "es2022",
 		sourcemap: true,
-		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)), measure: fileURLToPath(new URL("./measure.html", import.meta.url)) } },
+		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)), measure: fileURLToPath(new URL("./measure.html", import.meta.url)), frame: fileURLToPath(new URL("./canvas-frame.html", import.meta.url)) } },
 	},
 });
