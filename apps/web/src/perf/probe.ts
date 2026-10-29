@@ -103,6 +103,27 @@ if (target) {
 	nativeFrame(tick);
 	const note = (kind: string) => (event: Event) => inputs.push({ t: Math.round(performance.now()), kind, ...("scale" in event ? { scale: Math.round((event as { scale: number }).scale * 1000) / 1000 } : {}) });
 	for (const kind of ["touchstart", "touchend", "gesturestart", "gestureend", "scrollend"]) window.addEventListener(kind, note(kind), { passive: true, capture: true });
+	// Every wheel event as the page gets it, for a trackpad's direction: its deltas, and whether anyone cancelled it.
+	// [time, dx, dy, mode, ctrl, where it landed, cancelled by the time it bubbled back, cancelable]; a board page's forwarded wheel is "frame".
+	const wheels: Array<[number, number, number, number, number, string, number, number]> = [];
+	const describe = (node: EventTarget | null) => {
+		const el = node instanceof Element ? node : null;
+		if (!el) return String(node?.constructor?.name ?? "?");
+		const board = el.closest(".board-node");
+		return `${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 2).join(".")}${board ? " in board" : ""}${el.isConnected ? "" : " DETACHED"}`;
+	};
+	const seen = new WeakMap<Event, number>();
+	window.addEventListener("wheel", (event) => {
+		seen.set(event, wheels.push([Math.round(event.timeStamp), Math.round(event.deltaX * 100) / 100, Math.round(event.deltaY * 100) / 100, event.deltaMode, event.ctrlKey ? 1 : 0, describe(event.target), 0, event.cancelable ? 1 : 0]) - 1);
+	}, { passive: true, capture: true });
+	window.addEventListener("wheel", (event) => {
+		const i = seen.get(event);
+		if (i !== undefined && wheels[i]) wheels[i][6] = event.defaultPrevented ? 1 : 0;
+	}, { passive: true });
+	window.addEventListener("message", (event) => {
+		const m = event.data as { t?: string; dx?: number; dy?: number; zooming?: boolean } | null;
+		if (m && typeof m === "object" && m.t === "decks:wheel") wheels.push([Math.round(event.timeStamp), Number(m.dx) || 0, Number(m.dy) || 0, 0, m.zooming ? 1 : 0, "frame", 1, 1]);
+	});
 	let moves = 0;
 	window.addEventListener("touchmove", () => moves++, { passive: true, capture: true });
 	window.addEventListener("gesturechange", note("gesturechange"), { passive: true, capture: true });
@@ -114,8 +135,8 @@ if (target) {
 			work.clear();
 			return;
 		}
-		if (frames.length === 0 && inputs.length === 0) return;
-		const batch = { at: Date.now(), ua: navigator.userAgent.slice(0, 60), w: innerWidth, h: innerHeight, dpr: devicePixelRatio, moves, frames: frames.splice(0), inputs: inputs.splice(0), marks: marks.splice(0), work: Object.fromEntries([...work].map(([k, [n, ms, max]]) => [k, [n, Math.round(ms * 10) / 10, Math.round(max * 10) / 10]])) };
+		if (frames.length === 0 && inputs.length === 0 && wheels.length === 0) return;
+		const batch = { at: Date.now(), ua: navigator.userAgent.slice(0, 60), w: innerWidth, h: innerHeight, dpr: devicePixelRatio, moves, frames: frames.splice(0), inputs: inputs.splice(0), marks: marks.splice(0), wheels: wheels.splice(0), work: Object.fromEntries([...work].map(([k, [n, ms, max]]) => [k, [n, Math.round(ms * 10) / 10, Math.round(max * 10) / 10]])) };
 		work.clear();
 		moves = 0;
 		void fetch(target, { method: "POST", body: JSON.stringify(batch), keepalive: true }).catch(() => {});
