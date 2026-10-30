@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CARD, MARKDOWN, SHAPE, type PenDocument, type PenNode } from "@decks/pen";
 import { FILE } from "../../model/file-kinds.ts";
-import { cancelOps, cardInner, cardLook, cardOf, commitOf, emptyVanishes, enclosing, fileOf, labelBox, legacyCard, pictureUrls, shapeOf, textLook, type TextSession } from "./text.ts";
+import { cancelOps, cardInner, escapeKeeps, cardLook, cardOf, commitOf, emptyVanishes, enclosing, fileOf, labelBox, legacyCard, pictureUrls, shapeOf, textLook, type TextSession } from "./text.ts";
 
 const font = (family: string, weight: number, italic: boolean) => `${family}/${weight}/${italic}`;
 const palette = { paper: "#fff", fg: "#111" };
@@ -96,6 +96,14 @@ test("what putting the typing away writes", () => {
 	assert.deepEqual(cancelOps(text), []);
 	assert.deepEqual(cancelOps(session({ kind: "note", fresh: true })), []);
 	assert.deepEqual(cancelOps(undefined), []);
+	// …but a note, a card or a text just made keeps what was typed into it: Escape puts it away as a click elsewhere does.
+	assert.equal(escapeKeeps(session({ kind: "note", fresh: true })), true);
+	assert.equal(escapeKeeps(session({ card: true, fresh: true })), true);
+	assert.equal(escapeKeeps(session({ kind: "text", fresh: true })), true);
+	assert.equal(escapeKeeps(session({ kind: "note" })), false);
+	assert.equal(escapeKeeps(undefined), false);
+	// Kept, a fresh note's words are written, and a fresh text left empty still goes.
+	assert.deepEqual(commitOf(session({ kind: "note", fresh: true }), "hello", "", true), { do: "update", ops: [{ op: "update", id: "t", set: { content: "hello" } }] });
 	assert.equal(emptyVanishes({ kind: "text" }), true);
 	assert.equal(emptyVanishes({ kind: "text", card: true }), false);
 });

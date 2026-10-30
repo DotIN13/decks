@@ -22,7 +22,7 @@ import type { Pt, Rect } from "../core/model.ts";
 import type { NextId } from "../core/ops.ts";
 import type { Picked } from "../core/pick.ts";
 import type { EngineSeam, SceneQuery } from "../core/scene.ts";
-import { cancelOps, cardInner as cardInnerOf, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
+import { cancelOps, cardInner as cardInnerOf, escapeKeeps, cardLook as cardLookOf, cardOf as cardOfIn, commitOf, emptyVanishes, fileOf, labelBox, legacyCard, pictureUrls, shapeOf as shapeOfIn, textLook, type TextLook, type TextSession } from "../core/text.ts";
 import type { Editor } from "./controller.ts";
 import { openInTab, pictureAddress } from "../../host.ts";
 
@@ -286,9 +286,13 @@ export function createTextEditing(editor: Editor, host: TextHost) {
 			host.edit(ops);
 		});
 	};
-	/** Escape: the words go back as they were, and a fresh text never typed into goes. */
-	const cancel = () => {
+	/**
+	 * Escape: the words go back as they were, and a fresh text never typed into goes. An item a tool
+	 * has just made keeps what was typed (`escapeKeeps`), given as `value`.
+	 */
+	const cancel = (value?: string) => {
 		const now = open();
+		if (value !== undefined && escapeKeeps(now)) return commitPenText(value);
 		setOpen(undefined);
 		unmuteNow();
 		dropTyped();
@@ -461,7 +465,7 @@ export function TextEditor(props: { text: TextEditing; zoom: number }) {
 							}
 							if (event.key === "Escape") {
 								event.preventDefault();
-								cancel();
+								cancel(event.currentTarget.value);
 							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 								event.preventDefault();
 								event.currentTarget.blur();

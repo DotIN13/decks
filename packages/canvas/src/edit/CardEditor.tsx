@@ -55,7 +55,8 @@ export interface CardEditorProps {
 	style: JSX.CSSProperties;
 	onInput(markdown: string): void;
 	onCommit(markdown: string): void;
-	onCancel(): void;
+	/** Escape: with the words as they are now, for a card just made, which keeps them. */
+	onCancel(markdown: string): void;
 }
 
 const ZW = "​";
@@ -1220,7 +1221,7 @@ export function CardEditor(props: CardEditorProps) {
 			event.preventDefault();
 			if (dragging) return endDrag(true);
 			done = true;
-			props.onCancel();
+			props.onCancel(serialise());
 		} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 			event.preventDefault();
 			commit();

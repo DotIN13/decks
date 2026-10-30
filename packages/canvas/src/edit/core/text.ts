@@ -160,6 +160,13 @@ export function cancelOps(open: TextSession | undefined): Op[] {
 }
 
 /**
+ * What Escape does with the words typed: an item a tool has just made (`fresh`) keeps them, as
+ * clicking away does, since there is nothing from before to go back to and a note typed into and
+ * left with Escape used to be left empty; any other item's words go back as they were.
+ */
+export const escapeKeeps = (open: TextSession | undefined): boolean => !!open?.fresh;
+
+/**
  * What putting the typing away does with `value`, the words as typed, against `was`, the item's
  * words as the server has them:
  * - `close`: nothing can be written (no typing open, or a drawing that is read-only here);
