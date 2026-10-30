@@ -37,8 +37,8 @@ export interface FrameHostOptions {
 	agents?(): Record<string, { name: string; color: string }>;
 	/** The conversation on screen, whose `decks view …` the frame carries out on its canvas. */
 	focused?(): string | undefined;
-	/** A view the frame kept for another conversation: the harness hears it, to answer that agent's `view.camera`. */
-	viewFor?(agent: string, camera: Camera): void;
+	/** A view for another conversation, from an agent's `decks view …` on this canvas: the page keeps it for when that chat opens, and the harness hears it, to answer that agent's `view.camera`. */
+	viewFor?(agent: string, camera: Camera, selected?: string): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
 	upload?(drop: { files: File[]; at: { x: number; y: number }; card?: CardSlot }): void;
 }
@@ -177,7 +177,7 @@ export function createFramedEditor(options: Options): Editor {
 			}
 		});
 		page.on("camera", (data) => {
-			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera);
+			if (data.agent) return options.frame.viewFor?.(data.agent, data.camera, data.selected);
 			fromFrame.camera = data.camera;
 			localCamera = data.camera;
 			state?.camera?.[1](data.camera);

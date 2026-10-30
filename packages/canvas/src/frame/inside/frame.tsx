@@ -143,7 +143,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			end.emit("store", { key, value });
 		},
 	};
-	const kept_ = (key: string) => kept.get(key) || undefined;
 	/** A deck path's address, read on the canvas's ticket. */
 	const address = (path: string) => `${start.files.base}${path.split("/").map(encodeURIComponent).join("/")}`;
 	let restUntil: ReturnType<typeof setTimeout> | undefined;
@@ -372,8 +371,6 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	}
 	follower.at(first.rev);
 
-	/** A view kept for a conversation not on screen, in what the page keeps for this frame: it arrives when that chat opens. */
-	const viewKey = (id: string) => `view:${id}`;
 	/** Select a card by its path; `asPress`, as a press on it would, the card itself selected too (what the page restores as a frame starts). */
 	const selectCard = (path: string | undefined, asPress = false) => {
 		if (!path) return;
@@ -402,10 +399,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 					selectCard(selected);
 					setOffer(undefined);
 				} }),
-				rememberView: (id, to, selected) => {
-					storage.setItem(viewKey(id), JSON.stringify({ camera: to, ...(selected ? { selected } : {}) }));
-					end.emit("camera", { camera: to, agent: id });
-				},
+				// Kept by the page with the views it parks (`camera/landing.ts`): it arrives when that chat opens.
+				rememberView: (id, to, selected) => end.emit("camera", { camera: to, agent: id, ...(selected ? { selected } : {}) }),
 				select: selectCard,
 				reload: (path) => handle.reloadBoard(path),
 				cursor: (at) => setCursor(at),
@@ -437,26 +432,9 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		}
 		follower.hear(message);
 	});
-	// A conversation opened that an agent kept a view for while it was not on screen: it arrives framed as meant.
-	const arrive = (id: string | undefined) => {
-		if (!id) return;
-		const kept = kept_(viewKey(id));
-		if (!kept) return;
-		storage.setItem(viewKey(id), "");
-		try {
-			const view = JSON.parse(kept) as { camera: Camera; selected?: string };
-			moveTo(view.camera, true);
-			selectCard(view.selected);
-		} catch {
-			/* a view that does not read is no view */
-		}
-	};
 	end.on("reload", (data) => handle.reloadBoard(data.path));
 	end.on("look", (data) => {
-		if (data.agent !== undefined && data.agent !== untrack(agent)) {
-			setAgent(data.agent);
-			arrive(data.agent);
-		}
+		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
 		if (data.insets) useInsets(data.insets);
 		if (data.agents) setAgents(data.agents);
 		if (data.dock !== undefined) setDock(data.dock);

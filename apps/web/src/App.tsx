@@ -14,7 +14,7 @@ import type { InkRequest } from "@decks/canvas";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import { createAlerts } from "./app/alerts.ts";
 import { camera, glide, moveCamera } from "./state/camera.ts";
-import { handleFrame, type FrameHooks } from "./app/frames.ts";
+import { handleFrame, rememberView, type FrameHooks } from "./app/frames.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
@@ -56,7 +56,7 @@ import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import type { CanvasItem } from "./panel/canvas-items.ts";
 import { boxOf, fitInto } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
-import { type CameraOwner, frames as showsAny, landingCamera, sameOwner, viewToPark } from "@decks/canvas/camera";
+import { createLanding, type CameraOwner } from "@decks/canvas/camera";
 import { agentViews } from "./camera/agent-views.ts";
 import { closeHistory } from "./state/edge.ts";
 import { canvasBox, insets, insetsMoving, watchInsets } from "@decks/canvas/camera";
@@ -542,7 +542,7 @@ export function App() {
 		onCleanup(off);
 	});
 
-	/** How many deck frames have arrived: a landing waits for one sent after it began (`landOn`). */
+	/** How many deck frames have arrived: a landing with no canvas waits for one sent after it began (`landing`). */
 	const [deckSeen, setDeckSeen] = createSignal(0);
 	const landed = () => setDeckSeen((n) => n + 1);
 
@@ -879,7 +879,7 @@ export function App() {
 		const leaving = state.focused;
 		if (leaving === id) return;
 
-		// The camera and the selection follow by themselves: the view is kept and taken by its owner (`landOn`).
+		// The camera and the selection follow by themselves: the view is kept and taken by its owner (`landing`).
 		setState("focused", id);
 		setUnread(id, 0);
 		ensureHistory(id);
@@ -997,106 +997,41 @@ export function App() {
 	};
 
 	/*
-	 * The camera, and whose it is (`camera/land.ts`).
-	 *
-	 * A view is kept per agent and canvas on this device. The camera on screen has an **owner**, the
-	 * agent and canvas it last landed for, and it is kept only under that owner: when the agent on
-	 * screen changes, when its canvas changes, and when the page goes. Between a switch and its
-	 * landing there is no owner, so nothing is kept. Before, whatever camera was on screen was kept
-	 * under the agent being left, and a canvas with no boards kept the last agent's camera: one round
-	 * trip gave an agent another agent's view, for good.
-	 *
-	 * One path for every arrival, an agent picked, its canvas changed by anyone, the page opened: a
-	 * view this device left there comes back at once and exactly; with none, the landing waits for
-	 * that canvas's drawing and a deck frame sent after it began, then goes to the middle of
-	 * everything on it (`landingCamera`). A later arrival calls an earlier one off.
+	 * The camera, and whose it is (`camera/landing.ts`, shared with the canvas frame's views for other
+	 * conversations, which it hands here to keep): a view kept per agent and canvas on this device,
+	 * taken back exactly on arriving there, else the middle of everything on the canvas once its
+	 * drawing is on screen. An agent with no canvas waits for a deck frame sent after it began, since
+	 * its boards are the deck's.
 	 */
-	const [owner, setOwner] = createSignal<CameraOwner>();
-	/** Keep the view on screen under its owner, if it has one. */
-	const park = () => {
-		const who = untrack(owner);
-		if (who) views().keep(who.scope, who.canvas, viewToPark(untrack(camera), untrack(selected)));
-	};
-	/** The landing still waiting for its canvas, if any. */
-	let arriving: (CameraOwner & { stop: () => void }) | undefined;
-	const stopArriving = () => {
-		arriving?.stop();
-		arriving = undefined;
-	};
-	onCleanup(stopArriving);
-	/** A landing has happened since the page opened: until then there is no earlier canvas whose deck frame could be mistaken for this one's. */
-	let landedOnce = false;
-	const settle = (to: CameraOwner, next: Camera, chosen?: string) => {
-		landedOnce = true;
-		stopArriving();
-		moveCamera(next);
-		setSelected(chosen);
-		setOwner(to);
-		reportCamera(next, to.scope);
-	};
-	const landOn = (to: CameraOwner) => {
-		stopArriving();
-		const view = views().of(to.scope, to.canvas);
-		if (view) return settle(to, view.camera, view.selected);
-		/*
-		 * A switch waits for a deck frame sent after it began: the one on hand may still be the canvas
-		 * being left. The page's first landing has no canvas being left, and its deck frame usually came
-		 * before it began, so it took any frame at all: waiting for a later one held every page's opening
-		 * on the 3 s cap, the camera at the origin over nothing until it ran out.
-		 */
-		const deckAt = landedOnce ? untrack(deckSeen) : 0;
-		const asked = Date.now();
-		const timer = setInterval(() => {
-			// Called off by the next arrival; this is only a canvas changing under it without one.
-			if (state.focused !== to.scope || stageOf(to.scope)?.name !== to.canvas) return stopArriving();
-			// The first landing also waits for the canvas's boards themselves: the deck frame on hand may not have put them in play yet, and a landing on the drawing alone framed the wrong place.
-			const ready = (!to.canvas || stagePen()?.scope === to.canvas) && deckSeen() > deckAt && (landedOnce || stageBoards().length > 0);
-			if (!ready && Date.now() - asked < 3000) return;
-			const first = !landedOnce;
-			const size = { width: window.innerWidth, height: window.innerHeight };
-			settle(to, landingCamera({ view: undefined, boxes: canvasBoxes(), viewport: size, region: canvasBox(size) }));
-			if (first && canvasBoxes().length === 0) landLate(to);
-		}, 100);
-		arriving = { ...to, stop: () => clearInterval(timer) };
-	};
-	/**
-	 * The page's first landing ran out of time before its canvas's boards came (a slow server, a
-	 * busy machine) and landed on nothing: when they come, it lands on them, unless the person has
-	 * moved the camera since. Left alone, the page sat at the empty origin until they went looking.
-	 */
-	const landLate = (to: CameraOwner) => {
-		const landed = untrack(camera);
-		const moved = () => {
-			const now = untrack(camera);
-			return Math.abs(now.x - landed.x) > 0.5 || Math.abs(now.y - landed.y) > 0.5 || Math.abs(now.zoom - landed.zoom) > 1e-4;
-		};
-		const asked = Date.now();
-		const timer = setInterval(() => {
-			if (state.focused !== to.scope || stageOf(to.scope)?.name !== to.canvas || moved() || Date.now() - asked > 30000) return stopArriving();
-			if (canvasBoxes().length === 0) return;
-			stopArriving();
-			const size = { width: window.innerWidth, height: window.innerHeight };
-			const next = landingCamera({ view: undefined, boxes: canvasBoxes(), viewport: size, region: canvasBox(size) });
+	const landing = createLanding({
+		views: () => views(),
+		camera: () => untrack(camera),
+		selected: () => untrack(selected),
+		boxes: () => untrack(canvasBoxes),
+		viewport: () => ({ width: window.innerWidth, height: window.innerHeight }),
+		region: canvasBox,
+		current: (to) => state.focused === to.scope && stageOf(to.scope)?.name === to.canvas,
+		onScreen: (to) => !to.canvas || untrack(stagePen)?.scope === to.canvas,
+		waitFor: (to, first) => {
+			/*
+			 * The page's first landing has no canvas being left, and its deck frame usually came before it
+			 * began, so it takes any frame at all; it also waits for the canvas's boards themselves, the deck
+			 * frame on hand may not have put them in play yet. A canvas's boards are in its drawing, so a
+			 * switch to a canvas waits for nothing more: a switch by `agent.update` is followed by no deck frame.
+			 */
+			const deckAt = first ? 0 : untrack(deckSeen);
+			return () => (to.canvas && !first ? true : untrack(deckSeen) > deckAt) && (!first || untrack(stageBoards).length > 0);
+		},
+		land: (next, to) => {
 			moveCamera(next);
 			reportCamera(next, to.scope);
-		}, 100);
-		arriving = { ...to, stop: () => clearInterval(timer) };
-	};
-	/**
-	 * The person moved the camera themselves (a pan, a pinch, a wheel: the stage's own setter), so a
-	 * landing still waiting is called off and the view they made is theirs, kept under the canvas it
-	 * was arriving at. Left waiting, it landed up to 3 s later on whatever deck frame came next, a
-	 * drop's answer among them, and threw the view they had made away. Only once that canvas's
-	 * drawing is on screen, and only a move that shows something of it: a move made over the canvas
-	 * being left is not a view of the new one, and one over the empty canvas a page opens on (its
-	 * origin, before the landing) is a person looking for it, whom the landing still brings there.
-	 */
+		},
+		select: (path) => setSelected(path),
+	});
+	onCleanup(landing.stop);
+	const park = landing.park;
 	const personMoved = (next: Camera) => {
-		const to = arriving;
-		if (to && (!to.canvas || untrack(stagePen)?.scope === to.canvas) && showsAny(next, { width: window.innerWidth, height: window.innerHeight }, untrack(canvasBoxes))) {
-			stopArriving();
-			setOwner({ scope: to.scope, ...(to.canvas ? { canvas: to.canvas } : {}) });
-		}
+		landing.personMoved(next);
 		setCameraAndReport(next);
 	};
 	createEffect(() => {
@@ -1105,18 +1040,7 @@ export function App() {
 		// Not before the canvases are known: an agent's canvas read as none would land once for no canvas, then again.
 		if (!agent || (!canvas && stages().length === 0)) return;
 		const to: CameraOwner = { scope: agent, ...(canvas ? { canvas } : {}) };
-		untrack(() => {
-			const was = owner();
-			if (sameOwner(was, to) || sameOwner(arriving, to)) return;
-			// The same canvas in a new folder (its first name chose the folder): the view stays, kept under the new name.
-			if (was?.scope === agent && was.canvas && stageOf(agent)?.formerly?.includes(was.canvas)) {
-				setOwner(to);
-				return park();
-			}
-			park();
-			setOwner(undefined);
-			landOn(to);
-		});
+		untrack(() => landing.arrive(to, stageOf(agent)?.formerly));
 	});
 
 	/**
@@ -1304,7 +1228,7 @@ export function App() {
 				upload: ({ files: dropped, at, card }) => files.dropAt(at, dropped, card),
 				focused: () => state.focused,
 				agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])),
-				viewFor: (agentId, camera) => reportCamera(camera, agentId),
+				viewFor: rememberView,
 			},
 		});
 		setEditorHandle(editor.handle);

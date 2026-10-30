@@ -2,7 +2,7 @@ import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
 import { handsOn } from "@decks/canvas/camera";
-import type { AgentState, ServerMessage } from "@decks/protocol";
+import type { AgentState, Camera, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
@@ -25,6 +25,19 @@ import { watchedBeingNamed } from "./watching.ts";
 
 import { forgetPen, receivePen, receivePenDelta } from "../state/pens.ts";
 import { receiveStages } from "../state/stages.ts";
+
+/**
+ * Keep a view for an agent that is not the one on screen, from its `decks view …`: here, or on the
+ * canvas frame for the canvas it shows (`viewFor`). On this device, like every other view
+ * (`camera/agent-views.ts`): an agent that moved a canvas nobody is looking at is remembered for the
+ * browser that was told, in the same store the landing parks views in and takes them from when that
+ * chat opens (`camera/landing.ts`).
+ */
+export function rememberView(agentId: string, camera: Camera, selected?: string): void {
+	agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
+	// So `decks.view.camera()` answers for that agent's stage rather than falling back to wherever the last person to look at anything was.
+	reportCamera(camera, agentId);
+}
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -462,16 +475,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 										reportCamera(camera, agentId);
 									},
 								}, "agent-view"),
-							rememberView: (agentId, camera, selected) => {
-								// On this device, like every other view (`camera/agent-views.ts`): an
-								// agent that moved a canvas nobody is looking at is remembered for the
-								// browser that was told, which is the same scope as the ones parked on
-								// a switch.
-								agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
-								// So `decks.view.camera()` answers for that agent's stage rather than falling
-								// back to wherever the last person to look at anything was.
-								reportCamera(camera, agentId);
-							},
+							rememberView,
 							select: (path) => setSelected(path),
 							// A card or a cursor on a canvas that is not on screen: nothing here shows it.
 							reload: () => {},

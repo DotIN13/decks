@@ -118,8 +118,8 @@ export interface FrameToPage {
 	"open-link": { href: string };
 	/** Open one of the app's own panels, beside the canvas (the apps list), or its file picker (`files`): the file chosen there is put in the middle of the view. */
 	panel: { name: "apps" | "files" };
-	/** Once the camera rests; or a view kept for another conversation (`agent`), for the harness to answer that agent's `view.camera` by. */
-	camera: { camera: Camera; agent?: string };
+	/** Once the camera rests; or a view kept for another conversation (`agent`), for the page to keep as that agent's view and the harness to answer its `view.camera` by. */
+	camera: { camera: Camera; agent?: string; selected?: string };
 	viewport: { width: number; height: number };
 	comment: { path: string; title: string; quote: string; component?: string; items?: string[]; at?: Rect };
 	export: { ids: string[] };

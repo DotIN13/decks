@@ -2,6 +2,7 @@
 export { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "../camera/agent-view.ts";
 export { createAgentViews, type AgentViews, type ViewStorage } from "../camera/agent-views.ts";
 export { landingCamera, sameOwner, type CameraOwner } from "../camera/land.ts";
+export { createLanding, type Landing, type LandingHost } from "../camera/landing.ts";
 export { boxOf, fitInto, frames } from "../camera/camera.ts";
 export type { Camera } from "@decks/protocol";
 // For a host that drives the camera itself (the Decks app): the camera's maths, its animation, and the panels' insets.
