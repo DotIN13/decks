@@ -374,11 +374,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 
 	/** A view kept for a conversation not on screen, in what the page keeps for this frame: it arrives when that chat opens. */
 	const viewKey = (id: string) => `view:${id}`;
-	const selectCard = (path: string | undefined) => {
+	/** Select a card by its path; `asPress`, as a press on it would, the card itself selected too (what the page restores as a frame starts). */
+	const selectCard = (path: string | undefined, asPress = false) => {
 		if (!path) return;
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"));
-		if (child?.id) handle.select([child.id], child.metadata!.path);
+		if (child?.id) handle.select([child.id], asPress ? child.metadata!.path : undefined);
 	};
+	// The card the page had selected on this canvas when the frame was made again (an agent switch and back).
+	selectCard(start.selected, true);
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
 	/*
 	 * An agent's `decks view …` on this canvas, from the stream: carried out as the page carries it out

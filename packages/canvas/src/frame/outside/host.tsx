@@ -107,15 +107,16 @@ export function createFramedEditor(options: Options): Editor {
 			removeEventListener("message", onHello);
 			const channel = new MessageChannel();
 			const page = peer(channel.port1) as PageEnd;
-			// A new frame has said nothing yet: what the last one said is no reason to keep the page's selection from it.
-			fromFrame = {};
+			// A new frame has said nothing yet, and starts with the page's selection (`start.selected`), so it is not sent again.
+			const selected = untrack(() => state?.selected?.[0]());
+			fromFrame = selected ? { selected } : {};
 			wire(page, canvas);
 			setEnd(page);
 			renew(page, canvas, backend.idle, cancelled);
 			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
 			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
 			// The camera as it is now: the page may have landed while the frame was loading.
-			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: localCamera })) as Start }, "*", [channel.port2]);
+			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: localCamera, ...(selected ? { selected } : {}) })) as Start }, "*", [channel.port2]);
 		};
 		addEventListener("message", onHello);
 		onCleanup(() => removeEventListener("message", onHello));

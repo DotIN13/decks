@@ -60,6 +60,8 @@ export interface Start {
 	writer?: { name?: string; color: string };
 	/** What the frame keeps between visits, kept for it by the page (`store`). */
 	stored: Record<string, string>;
+	/** The card or board the page has selected on this canvas, selected again as the frame starts. */
+	selected?: string;
 }
 
 /** A card or a board on the canvas, as the frame draws it. */
