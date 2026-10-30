@@ -73,6 +73,7 @@ const CHECKS = [
 	/* The pill over a selected board: its actions, and its Comment on the whole board. */
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
+	{ file: "layers-webkit.mjs", needsAgent: false },
 	/*
 	 * Where a board lands when nobody said where, and whether the camera goes with it. Beside
 	 * `camera.mjs` because the two halves are one experience: a board placed near what you have

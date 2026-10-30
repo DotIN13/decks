@@ -339,6 +339,10 @@
  * Only while it is moving. A layer is a texture that has to be kept, and a deck of them
  * held forever is memory nobody asked for — `Stage.tsx` turns the attribute off 300ms
  * after the last change of scale.
+ *
+ * Not in WebKit: `data-scaling` and `data-sliding` below are set only where `LAYERS` in
+ * `render/device.ts` says the engine takes them. WebKit paints cards inside a frame, so building and
+ * dropping these layers only cost it a long frame at each end of a zoom.
  */
 /*
  * The same for what is not a frame and is drawn in the stage's own page: a card's root (`card.ts`), a

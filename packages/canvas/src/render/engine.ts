@@ -27,7 +27,7 @@ import { setStageWords, type Words } from "./measure.ts";
 import { GLIDE_MS, glideAt, glideShifts } from "../camera/glide.ts";
 import type { CardGeometry, DocEdits, FromWorker, LiveInk, PenPreview, SceneCard, TileFromWorker, ToWorker } from "./types.ts";
 import { detect, type Detected, type StageModule } from "./backends/detect.ts";
-import { PICTURES, readGpuClass } from "./device.ts";
+import { ENGINE, PICTURES, readGpuClass } from "./device.ts";
 import { upgrades } from "./picture-ladder.ts";
 import { noticeFor } from "./backends/notice.ts";
 
@@ -113,10 +113,9 @@ export function pixelsFirst(): boolean {
 	return webKit();
 }
 
-/** WebKit (Safari, and every browser on iOS and iPadOS), by its user agent, as `pixelsFirst` tells it. */
+/** WebKit (Safari, and every browser on iOS and iPadOS), as `render/device.ts` tells it. */
 function webKit(): boolean {
-	const agent = typeof navigator === "undefined" ? "" : navigator.userAgent;
-	return /AppleWebKit\//.test(agent) && !/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(agent);
+	return ENGINE === "webkit";
 }
 
 /**

@@ -37,6 +37,57 @@ export const DEVICE: DeviceKind =
 			});
 
 /**
+ * Which browser engine draws the page: WebKit (Safari, and every browser on iOS and iPadOS), Chromium
+ * (Chrome, Edge, and Chrome on a Mac, which says AppleWebKit too), or another (Firefox).
+ *
+ * Told by the user agent: AppleWebKit without Chrome's, Chromium's or Edge's name is WebKit. Chrome on
+ * iOS says CriOS, not Chrome/, and is WebKit, as it should be.
+ */
+export type BrowserEngine = "webkit" | "chromium" | "other";
+
+export interface EngineFacts {
+	userAgent: string;
+	/** `?engine=webkit`, `chromium` or `other` in the page's address, for testing one on another. */
+	forced?: string | null | undefined;
+}
+
+export function browserEngine(facts: EngineFacts): BrowserEngine {
+	if (facts.forced === "webkit" || facts.forced === "chromium" || facts.forced === "other") return facts.forced;
+	if (/(Chrome|Chromium|Edg|HeadlessChrome)\//.test(facts.userAgent)) return "chromium";
+	if (/AppleWebKit\//.test(facts.userAgent)) return "webkit";
+	return "other";
+}
+
+/** This page's engine, read once. */
+export const ENGINE: BrowserEngine =
+	typeof navigator === "undefined"
+		? "other"
+		: browserEngine({
+				userAgent: navigator.userAgent ?? "",
+				forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("engine"),
+			});
+
+/**
+ * Which items an engine puts on layers of their own while the camera moves (`canvas.css`, set by
+ * `stage/Stage.tsx`): `scaling`, each awake card, document and app while the zoom changes, so it is
+ * stretched rather than painted at every step; `sliding`, the whole world while the camera pans at one
+ * zoom, so it is slid as one picture.
+ *
+ * WebKit gets neither. Measured with a test page of 60 to 240 cards (light, with pictures and shadows,
+ * and with blurred glass) zoomed 3×, on an iPad and in WebKit on a Mac: with no layers every zoom frame
+ * held 17 ms and the frame at rest was 15 to 17 ms, while either layer setup cost a frame of 100 to 230
+ * ms as the layers were built and 50 to 115 ms as they went. WebKit paints these cards inside a frame,
+ * so a layer saves nothing it needs and costs both ends. Chromium keeps both: with no layers, 240 heavy
+ * cards showed 164 of 288 frames on an M4, against 276 with a layer per card. Another engine (Firefox)
+ * is unmeasured and keeps what Chromium does.
+ */
+export const LAYERS: Record<BrowserEngine, { scaling: boolean; sliding: boolean }> = {
+	webkit: { scaling: false, sliding: false },
+	chromium: { scaling: true, sliding: true },
+	other: { scaling: true, sliding: true },
+};
+
+/**
  * How much a device's GPU can hold, as far as a page can tell: no browser says how much memory its
  * GPU has, so it is read from what they do say. A phone or tablet is small, and so is a computer whose
  * WebGPU allows buffers under 1 GB or that says it has 4 GB of memory or less; any other is big.
