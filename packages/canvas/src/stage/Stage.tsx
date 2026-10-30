@@ -14,6 +14,7 @@ import { penLive, penTool, setPenLive, setPenTool, type PenTool } from "../edit/
 import { scheme } from "../lib/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
 import { StageEngine } from "../render/engine.ts";
+import { ENGINE, LAYERS } from "../render/device.ts";
 import {
 	createStageEditor,
 	dropSlot as dropSlotIn,
@@ -664,15 +665,16 @@ export function Stage(props: StageProps) {
 			data-engine="true"
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
-			data-scaling={items.layered()}
+			/* The scale is moving and the awake items go on layers (`canvas.css`), where this engine takes them (`LAYERS` in `render/device.ts`). */
+			data-scaling={LAYERS[ENGINE].scaling && items.layered()}
 			/* A pinch on pictures (`?card-pictures=1`): the awake cards are hidden and the sheet draws their pictures (`items-layer.tsx`). */
 			data-card-pictures={items.cardsHidden() ? "true" : undefined}
 			data-gliding={gliding()}
 			/* The camera rests at or above this device's live zoom: items near the window have their slots. */
 			data-live={items.liveNow() ? "true" : undefined}
 			data-moving={moving() || panning() || gliding() ? "true" : undefined}
-			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`). Off in the frame a zoom starts, so the layer is never stretched. */
-			data-sliding={(moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
+			/* Moving at one zoom: the world is held as one layer and slid (`canvas.css`), where this engine takes it (`LAYERS`). Off in the frame a zoom starts, so the layer is never stretched. */
+			data-sliding={LAYERS[ENGINE].sliding && (moving() || panning() || gliding()) && !scaling() ? "true" : undefined}
 			/* A board being moved or sized: its title bars and news glows step aside until it lands (`canvas.css`). */
 			data-carrying={editor.carrying() ? "true" : undefined}
 			ref={element}
