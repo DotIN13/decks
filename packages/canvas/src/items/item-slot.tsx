@@ -203,7 +203,6 @@ export function ItemSlot(props: StageBoardProps & ItemSlotExtras) {
 						reload={props.reload}
 						size={size}
 						selected={props.selected}
-						fixedHeight={props.board.fixedHeight === true}
 						onSelect={() => props.view.select()}
 						onOpenBoard={(path) => props.onOpenBoard?.(path, props.board.path)}
 						onExtent={props.onExtent ? (extent) => props.onExtent?.({ rev: props.board.rev, ...extent }) : undefined}

@@ -12,7 +12,7 @@ Boards are retired: everything that used to be a board is now a card. Old boards
 - A card is read in about ten seconds. One idea, the title is the finding as a sentence, one main
   visual (diagram, chart, table, or two to four large numbers), about 120 words, five blocks at most.
 - No section headings (Summary, Method, Next), no background, no recap. About 1000 by 700 or smaller.
-  What does not fit is cut; a real second idea is a second card, linked with `<a href="../other/index.html">`.
+  What does not fit scrolls inside the card, out of sight; a real second idea is a second card, linked with `<a href="../other/index.html">`.
 - Body text 17px or larger, nothing under 14px, the title on one or two full-width lines.
 - Say each thing once. The title carries the finding and its number, so the body does not restate them: it shows what stands behind them. If the title already has the headline number, the large figures under it are other numbers. A caption never repeats a label, and a detail view never repeats the row that opened it. Write for a smart reader from outside the project. The first time a term of art, an abbreviation or an internal name appears (a KV cache, a t value, a file or variable name, an arm of an experiment), either replace it with plain words or say in a few words what it is. A statistic says how to read it, for example "t 2.3, where above 2 is unlikely to be chance". Before you finish, reread the card as someone who has never seen this project or paper: every name that came from its files (an arm, a scheme, a clause, a metric, a model's nickname, a statistic) is either replaced by what it does or explained once. The cheapest way costs no space: give the term a dotted underline and put its meaning in a hover or tap note, `<abbr title="what it means, in plain words">term</abbr>` with `abbr { text-decoration: underline dotted; cursor: help }`. A chart labels both axes with their units and says in its own title what to see in it; small multiples each carry their scale.
 - Plain words, no em dashes. Every axis, column and number says what it measures, with its unit.
@@ -22,9 +22,10 @@ Boards are retired: everything that used to be a board is now a card. Old boards
 - Depth goes behind a click, not below the fold.
   At rest the card shows the finding and its one visual.
   What a reader may want next (the numbers behind a bar, the method, the runner-up, a definition, the second paper) is one click or hover away on the same screen: tabs, a row that opens its detail in a fixed panel, a toggle between two views, a value on hover, a filter on a table. Swap content in place rather than appending it, so an opened card is still one screen, and give each hidden view about the same word budget as the resting one. Controls are real <button> elements, look pressable, work offline, and the card makes sense before anything is pressed. Never hide the finding itself. If the person asked for several parts (say the claim, the method, the result and why it matters), none is dropped: the finding is what shows at rest and each other part is a view one click away.
-- **A card does not grow.** It is as tall as its box on the canvas, which `decks canvas fit` sets.
-  A panel that opens must open into space the card already reserves (a fixed height and
-  `overflow: auto`), or over the content; anything taller is cut at the card's foot.
+- **A card does not grow.** It is as tall as its box on the canvas, which `decks canvas fit` sets;
+  nothing on the canvas changes that height on its own. A panel that opens must open into space the
+  card already reserves (a fixed height and `overflow: auto`), or over the content; anything taller
+  makes the whole card scroll inside its box, below the fold.
 - A pattern that works: a table whose rows are buttons, and one detail panel of fixed height beside
   or under it that shows the chosen row. Another: two or three tabs over one chart area.
 - When the person asks for something to use as it stands (a message to send, a section of a protocol, a full list, code), the card holds that thing in full and nothing else. The one-screen rule limits what you add, not what they asked for.

@@ -113,6 +113,9 @@ export interface MountedCard {
 	dispose(): void;
 }
 
+/** How far a card's content has to be taller than its box before the card scrolls: a fitted card reads a pixel or two apart in another browser. */
+export const OVERFLOW_SLACK = 2;
+
 /** A script's type that is JavaScript a card runs: none, a module, or a plain script. The server counts the same ones. */
 const RUNS = /^(?:|module|text\/javascript|application\/javascript)$/i;
 const runs = (script: HTMLScriptElement) => RUNS.test(script.getAttribute("type") ?? "");
@@ -252,12 +255,15 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				.replace(/(^|[\s,}])html,\s*body\s*\{/g, "$1.card-body {")
 				// The card is as wide as its box, and as tall as the box at least: board.css sizes a board's body by its meta.
 				/*
-				 * As tall as what is in it, so the card can be measured and grow (`onHeight`); the paper is the
-				 * host's, so a card shorter than its box still fills it.
+				 * As tall as what is in it, so the card can be measured (`onHeight`, what `decks canvas fit` reads);
+				 * the paper is the host's, so a card shorter than its box still fills it.
 				 */
 				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }"
-				// A card is as tall as its content (`withContentHeights`) unless its height is the person's: then what does not fit scrolls.
-				+ "\n:host([data-fixed-height]) { overflow-y: auto }";
+				/*
+				 * Nothing is hidden: a card whose content is taller than its box scrolls inside it (`OVERFLOW_SLACK`
+				 * decides when, so a fitted card a pixel or two over shows no bar), with a thin bar in the card's ink.
+				 */
+				+ "\n:host([data-scrolls]) { overflow-y: auto; overscroll-behavior: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--b-fg, currentColor) 28%, transparent) transparent }";
 			const sheet = new CSSStyleSheet();
 			sheet.replaceSync(css);
 			cardSheets.add(sheet);
@@ -619,12 +625,19 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	const heightListeners = new Set<(h: number) => void>();
 	let lastHeight = 0;
 	const sizes = new ResizeObserver(() => {
+		// The card's height is its box's, whatever its content measures: what is over scrolls inside it.
+		const over = body.offsetHeight > host.clientHeight + OVERFLOW_SLACK;
+		if (over !== host.hasAttribute("data-scrolls")) {
+			host.toggleAttribute("data-scrolls", over);
+			if (!over) host.scrollTop = 0;
+		}
 		const h = Math.ceil(body.offsetHeight);
 		if (h === lastHeight || h === 0) return;
 		lastHeight = h;
 		for (const listener of heightListeners) listener(h);
 	});
 	sizes.observe(body);
+	sizes.observe(host);
 	return {
 		root,
 		reading: () => readingOfCard(body),
@@ -659,16 +672,16 @@ export function mountCard(host: HTMLElement, source: CardSource): MountedCard {
 	};
 }
 
-/** Whether something in a card can scroll the way a wheel goes, from the element under it out to the card. */
+/** Whether something in a card can scroll the way a wheel goes, from the element under it out to the card, the card's own box too. */
 export function scrollsInside(path: EventTarget[], host: HTMLElement, dx: number, dy: number): boolean {
 	for (const target of path) {
-		if (target === host) return false;
 		if (!(target instanceof Element)) continue;
 		const style = getComputedStyle(target);
 		const y = /(auto|scroll)/.test(style.overflowY) && target.scrollHeight > target.clientHeight + 1;
 		const x = /(auto|scroll)/.test(style.overflowX) && target.scrollWidth > target.clientWidth + 1;
 		if (y && dy !== 0 && (dy < 0 ? target.scrollTop > 0 : target.scrollTop + target.clientHeight < target.scrollHeight - 1)) return true;
 		if (x && dx !== 0 && (dx < 0 ? target.scrollLeft > 0 : target.scrollLeft + target.clientWidth < target.scrollWidth - 1)) return true;
+		if (target === host) return false;
 	}
 	return false;
 }

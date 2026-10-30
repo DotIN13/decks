@@ -35,7 +35,6 @@ import { Cameras } from "./deck/cameras.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
-import { canvasOfPath } from "./deck/layout.ts";
 import { Forwards } from "./ports.ts";
 import { Apps } from "./apps/service.ts";
 import { checkApp } from "./apps/check.ts";
@@ -180,8 +179,6 @@ export class App {
 			 */
 			state: () => this.stageState(),
 			removed: (path) => this.agents.boardRemoved(path),
-			// A card is never cut: one its frame measured taller than its item grows to its content, on its own canvas.
-			measured: (path, extent) => this.raiseCard(path, extent),
 		});
 		this.stage = new StageService(deck, {
 			/*
@@ -1055,24 +1052,6 @@ export class App {
 			}
 			default:
 				return message;
-		}
-	}
-
-	/**
-	 * A card measured taller than its item on its canvas grows to its content (`StagePens.raiseCard`):
-	 * a reading of the revision on disk, of a card that is not one box filling it. Its canvas is the one
-	 * whose folder holds it. A card converted from a board kept the board's old height, which its content
-	 * often outgrew; this is what puts that right on the canvases opened since, with no migration.
-	 */
-	private raiseCard(path: string, extent: { rev: number; w: number; h: number }): void {
-		const board = this.deck.board(path);
-		if (!board?.card || board.fills || board.rev !== extent.rev) return;
-		const canvas = canvasOfPath(path)?.name;
-		if (!canvas) return;
-		try {
-			this.pens.raiseCard(canvas, path, extent);
-		} catch (error) {
-			console.log(`[decks] ${path} could not grow to its content: ${(error as Error).message}`);
 		}
 	}
 

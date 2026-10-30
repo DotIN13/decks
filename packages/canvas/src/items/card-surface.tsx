@@ -37,8 +37,6 @@ export function CardSurface(props: {
 	reload?: number | undefined;
 	size: () => { w: number; h: number };
 	selected: boolean;
-	/** Its height is the person's own (`Board.fixedHeight`): what does not fit scrolls inside it rather than being cut. */
-	fixedHeight?: boolean | undefined;
 	onSelect: () => void;
 	onShown: () => void;
 	/** Open a board or card the card links to, beside it (`Stage`'s `onOpenBoard`), by its deck path. */
@@ -56,7 +54,6 @@ export function CardSurface(props: {
 	 */
 	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);
 	let mounted: MountedCard | undefined;
-	let shadowHost: HTMLElement | undefined;
 	let forget = () => {};
 	const cardCall = canvasHost().cardCall;
 	/*
@@ -82,8 +79,6 @@ export function CardSurface(props: {
 		fresh.className = "card-host";
 		// Sized here, not by the card's sheet: a root contained in size with no size of its own is nothing tall.
 		fresh.style.cssText = "width: 100%; height: 100%";
-		fresh.toggleAttribute("data-fixed-height", untrack(() => !!props.fixedHeight));
-		shadowHost = fresh;
 		host.replaceChildren(fresh);
 		mounted = mountCard(fresh, {
 			html,
@@ -121,10 +116,6 @@ export function CardSurface(props: {
 	createEffect(() => {
 		const size = props.size();
 		mounted?.setSize(size);
-	});
-	createEffect(() => {
-		const fixed = !!props.fixedHeight;
-		shadowHost?.toggleAttribute("data-fixed-height", fixed);
 	});
 	onCleanup(() => {
 		loader.stop();

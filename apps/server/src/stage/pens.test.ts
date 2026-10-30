@@ -374,38 +374,3 @@ test("an edit whose own variables op already defines them (as the canvas sends o
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
-
-test("a card grows to what its frame measured at its own width, follows it back down to the height it had before, and not when its height is the person's; the person's undo still works", () => {
-	const dir = deck();
-	const pens = new StagePens(dir, () => {});
-	try {
-		const name = pens.claim("s");
-		const path = `canvases/${name}/cards/c/index.html`;
-		mkdirSync(join(dir, "canvases", name, "cards", "c"), { recursive: true });
-		writeFileSync(join(dir, path), "<h1>Hi</h1>");
-		pens.edit(name, [{ op: "insert", node: { type: "browser", id: "c", url: "cards/c/index.html", width: 1040, height: 240, metadata: { type: "decks.card", path } }, box: { x1: 0, y1: 0 } }]);
-		pens.edit(name, [{ op: "insert", node: { type: "note", id: "n", content: "hi" }, box: { x1: 2000, y1: 0 } }], undefined, { undoable: true });
-		const height = () => pens.get(name).doc.children.find((one) => one.id === "c")?.height;
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 599.2 }), true);
-		assert.equal(height(), 600);
-		assert.equal(pens.get(name).doc.children.find((one) => one.id === "c")?.metadata?.grownFrom, 240, "the height it had is kept as its floor");
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 597 }), false, "a pixel or two less is left: two browsers do not answer each other");
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 3000 }), true);
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 580 }), true, "a height read while it settled does not stay");
-		assert.equal(height(), 580);
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 100 }), true);
-		assert.equal(height(), 240, "and it goes no lower than it was before it grew");
-		assert.equal(pens.get(name).doc.children.find((one) => one.id === "c")?.metadata?.grownFrom, undefined);
-		pens.raiseCard(name, path, { w: 1040, h: 600 });
-		assert.equal(pens.raiseCard(name, path, { w: 900, h: 900 }), false, "a reading at another width is not this card's");
-		assert.equal(height(), 600);
-		pens.step(name, "undo");
-		assert.equal(pens.get(name).doc.children.some((one) => one.id === "n"), false, "the person's step is still theirs to undo");
-		pens.edit(name, [{ op: "update", id: "c", set: { height: 300, metadata: { type: "decks.card", path, fixedHeight: true } } }]);
-		assert.equal(pens.raiseCard(name, path, { w: 1040, h: 900 }), false, "a height the person chose is kept");
-		assert.equal(height(), 300);
-	} finally {
-		pens.close();
-		rmSync(dir, { recursive: true, force: true });
-	}
-});

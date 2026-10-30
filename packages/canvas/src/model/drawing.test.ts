@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { apply as applyOps, applyEdits, baseTheme, DECKS_COLORS, resolve, type PenDocument, type PenEdit } from "@decks/pen";
-import { boardsAhead, boardsOf, createDrawing, PENDING_MS, together, withContentHeights, cardHeightOp } from "./drawing.ts";
+import { boardsAhead, boardsOf, createDrawing, PENDING_MS, together } from "./drawing.ts";
 
 const sample = (): PenDocument => ({
 	version: "2.14",
@@ -454,64 +454,4 @@ test("a colour picked in the panel: an adaptive one is written as its variable a
 	const fill = drawing.doc().children.find((node) => node.id === "r")?.fill;
 	assert.equal(fill, "#12ab34");
 	assert.equal(resolve(drawing.doc(), fill, baseTheme(drawing.doc(), "dark")), "#12ab34", "and is the same in the dark");
-});
-
-const withCard = (metadata: Record<string, unknown> = {}): PenDocument => ({
-	version: "2.14",
-	children: [
-		{ type: "note", id: "a", content: "one", x: 0, y: 0, width: 200, height: 100 },
-		{ type: "browser", id: "c", name: "Card", url: "cards/c/index.html", x: 400, y: 10, width: 1040, height: 240, metadata: { type: "decks.card", path: "cards/c/index.html", ...metadata } },
-	],
-});
-
-test("a card is drawn as tall as its content at least, measured at its own width, unless its height is the person's", () => {
-	const doc = withCard();
-	const [card] = boardsOf(doc).filter((one) => one.card);
-	assert.equal(withContentHeights([card!], doc, { "cards/c/index.html": { w: 1040, h: 600.4 } })[0]?.h, 601, "raised to its content, cut by nothing");
-	assert.equal(withContentHeights([card!], doc, { "cards/c/index.html": { w: 1040, h: 180 } })[0]?.h, 240, "the drawing's height is the floor");
-	const grown = withCard({ grownFrom: 240 });
-	const tall = { ...boardsOf(grown).find((one) => one.card)!, h: 3000 };
-	assert.equal(withContentHeights([tall], grown, { "cards/c/index.html": { w: 1040, h: 700 } })[0]?.h, 700, "grown to a height read while it settled, it comes back to its content");
-	assert.equal(withContentHeights([tall], grown, { "cards/c/index.html": { w: 1040, h: 100 } })[0]?.h, 240, "and no lower than it was before it grew");
-	assert.equal(withContentHeights([{ ...tall, h: 702 }], grown, { "cards/c/index.html": { w: 1040, h: 700 } })[0]?.h, 702, "a pixel or two is left as it is");
-	assert.equal(withContentHeights([card!], doc, { "cards/c/index.html": { w: 800, h: 900 } })[0]?.h, 240, "a reading at another width is a resize reflowing it");
-	assert.equal(withContentHeights([{ ...card!, fills: true }], doc, { "cards/c/index.html": { w: 1040, h: 900 } })[0]?.h, 240, "a card that is one box filling it keeps its size");
-	const fixed = withCard({ fixedHeight: true });
-	const [kept] = withContentHeights(boardsOf(fixed).filter((one) => one.card), fixed, { "cards/c/index.html": { w: 1040, h: 900 } });
-	assert.equal(kept?.h, 240);
-	assert.equal(kept?.fixedHeight, true, "and it says so, so the card scrolls what does not fit");
-});
-
-test("a card resized by hand to cut its content keeps that height; resized past it, it grows again", () => {
-	const drawing = createDrawing(withCard());
-	drawing.resizeBoard("cards/c/index.html", { w: 1040, h: 200 }, true);
-	assert.equal(drawing.doc().children[1]?.height, 200);
-	assert.deepEqual(drawing.doc().children[1]?.metadata, { type: "decks.card", path: "cards/c/index.html", fixedHeight: true });
-	drawing.resizeBoard("cards/c/index.html", { w: 1040, h: 700 }, false);
-	assert.deepEqual(drawing.doc().children[1]?.metadata, { type: "decks.card", path: "cards/c/index.html" });
-	drawing.resizeBoard("cards/c/index.html", { w: 900, h: 700 });
-	assert.equal(drawing.doc().children[1]?.width, 900, "no choice said, the flag is left as it was");
-	const grown = createDrawing(withCard({ grownFrom: 240 }));
-	grown.resizeBoard("cards/c/index.html", { w: 1040, h: 500 });
-	assert.deepEqual(grown.doc().children[1]?.metadata, { type: "decks.card", path: "cards/c/index.html" }, "a height given by hand is its floor, not one it grew to");
-});
-
-test("a card settled to its content is reported, and is nobody's edit: undo takes back the person's step and keeps the height", () => {
-	const heard: PenEdit[][] = [];
-	const drawing = createDrawing(withCard(), { onEdits: (edits) => heard.push(edits) });
-	drawing.edit([{ op: "update", id: "a", set: { x: 50 } }]);
-	const op = cardHeightOp(drawing.doc().children[1]!, 1040, 600.2);
-	assert.deepEqual(op, { op: "update", id: "c", set: { height: 601, metadata: { type: "decks.card", path: "cards/c/index.html", grownFrom: 240 } } }, "its floor is kept on it");
-	assert.equal(drawing.settle([{ op: "update", id: "c", set: { height: 601 } }]), true);
-	assert.equal(drawing.doc().children[1]?.height, 601);
-	assert.deepEqual(heard[1], [{ op: "set", id: "c", key: "height", value: 601 }]);
-	drawing.step("undo");
-	assert.equal(drawing.doc().children[0]?.x, 0, "the person's own step is undone");
-	assert.equal(drawing.doc().children[1]?.height, 601, "the card stays whole");
-	drawing.step("undo");
-	assert.equal(drawing.doc().children[1]?.height, 601, "there was nothing else to undo");
-	// A drawing its host owns is the host's to settle (its server grows the card).
-	const hosted = createDrawing(withCard(), { host: { send: () => {}, step: () => {} } });
-	assert.equal(hosted.settle([{ op: "update", id: "c", set: { height: 601 } }]), false);
-	assert.equal(hosted.doc().children[1]?.height, 240);
 });
