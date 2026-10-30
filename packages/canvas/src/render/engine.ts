@@ -2133,15 +2133,21 @@ export class StageEngine {
  * `import` of the real script crosses with CORS like any other module (`frame/`).
  */
 function startWorker(url: string): Worker {
-	try {
-		return new Worker(url, { type: "module" });
-	} catch {
-		/*
-		 * A page of opaque origin (the canvas frame's sandbox) may not start a worker from its server's
-		 * address, and a `blob:` worker made there fails to load its import too; a `data:` module worker,
-		 * which takes an origin of its own, imports the real file as any cross-origin module.
-		 */
-		const absolute = new URL(url, location.href).href;
-		return new Worker(`data:text/javascript,${encodeURIComponent(`import ${JSON.stringify(absolute)};`)}`, { type: "module" });
+	/*
+	 * A page of opaque origin (the canvas frame's sandbox) may not start a worker from its server's
+	 * address, and a `blob:` worker made there fails to load its import too; a `data:` module worker,
+	 * which takes an origin of its own, imports the real file as any cross-origin module. Chrome throws
+	 * at the first; Safari makes the worker and fails it a moment later with an `error` event, so an
+	 * opaque origin goes to the `data:` worker without trying.
+	 */
+	const opaque = (globalThis as { origin?: string }).origin === "null";
+	if (!opaque) {
+		try {
+			return new Worker(url, { type: "module" });
+		} catch {
+			/* below */
+		}
 	}
+	const absolute = new URL(url, location.href).href;
+	return new Worker(`data:text/javascript,${encodeURIComponent(`import ${JSON.stringify(absolute)};`)}`, { type: "module" });
 }
