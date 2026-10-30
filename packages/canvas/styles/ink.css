@@ -186,6 +186,16 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		min-width: 0;
+	}
+	/* The row never runs past the card: a button gives up its words' end before it overflows. */
+	.comment-acts > .comment-act {
+		min-width: 0;
+		flex-shrink: 1;
+	}
+	.comment-acts > .comment-act span {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	/*
