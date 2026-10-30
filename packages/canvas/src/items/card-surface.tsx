@@ -104,8 +104,19 @@ export function CardSurface(props: {
 		props.onShown();
 	};
 	createEffect(on(() => [props.page.replace(/[?#].*$/, ""), props.rev, props.reload] as const, () => loader.load()));
-	createEffect(() => mounted?.setTheme(scheme()));
-	createEffect(() => mounted?.setSize(props.size()));
+	/*
+	 * The scheme and the size are read before the card is asked: a card mounts later than these run
+	 * first, and `mounted?.setTheme(scheme())` reads nothing while `mounted` is unset, so the effect
+	 * would never run again and a card would keep the scheme it woke in.
+	 */
+	createEffect(() => {
+		const theme = scheme();
+		mounted?.setTheme(theme);
+	});
+	createEffect(() => {
+		const size = props.size();
+		mounted?.setSize(size);
+	});
 	onCleanup(() => {
 		loader.stop();
 		forget();
