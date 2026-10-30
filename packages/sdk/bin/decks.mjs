@@ -266,11 +266,12 @@ export function argsOf(verb, words) {
 	const asJson = flags.find(([key]) => key === "args");
 	if (asJson) return JSON.parse(asJson[1] === "-" ? readStdin() : asJson[1]);
 
-	// Flags fill the first object parameter that has the key.
+	// Flags fill the first object parameter that has the key, else the first that takes any key (a record such as canvas.variables' set).
 	const objects = verb.params.map((param, index) => [param, index]).filter(([param]) => param.schema.type === "object" || param.schema.anyOf?.some((one) => one.type === "object"));
+	const open = (schema) => (schema.anyOf ?? [schema]).some((one) => one?.type === "object" && one.additionalProperties !== undefined && one.additionalProperties !== false);
 	for (const [key, raw] of flags) {
 		const keys = key.split(".");
-		const home = objects.find(([param]) => schemaAt(param.schema, keys.slice(0, 1)));
+		const home = objects.find(([param]) => schemaAt(param.schema, keys.slice(0, 1))) ?? objects.find(([param]) => open(param.schema));
 		if (!home) throw new DecksError(`decks ${verb.command.join(" ")} has no flag --${key}.\n\n${help(verb)}`);
 		const [param, index] = home;
 		args[index] ??= {};

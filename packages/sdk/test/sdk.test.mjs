@@ -152,6 +152,8 @@ test("the decks command turns words, flags and JSON into the verb's arguments", 
 	assert.deepEqual(of(["canvas", "insert", "--type", "board", "--board", "boards/a.html", "--beside", "n1", "--canvas", "plan"]), ["canvas.insert", [{ type: "board", board: "boards/a.html" }, { beside: "n1", canvas: "plan" }]]);
 	assert.deepEqual(of(["canvas", "insert", '{"type":"note","content":"hi"}', "--at.x1", "0", "--at.y1", "160"]), ["canvas.insert", [{ type: "note", content: "hi" }, { at: { x1: 0, y1: 160 } }]]);
 	assert.deepEqual(of(["canvas", "fit", "boards/a.html", "--canvas", "plan"]), ["canvas.fit", ["boards/a.html", { canvas: "plan" }]]);
+	// A record takes any key: a variable's light and dark as flags, --canvas still the option.
+	assert.deepEqual(of(["canvas", "variables", "--brand.light", "#4f46e5", "--brand.dark", "#818cf8", "--canvas", "plan"]), ["canvas.variables", [{ brand: { light: "#4f46e5", dark: "#818cf8" } }, { canvas: "plan" }]]);
 	// --frame points an item call at a frame file instead.
 	assert.deepEqual(of(["canvas", "update", "t1", "--set.content", "Hi", "--frame", "frames/card"]), ["canvas.update", ["t1", { set: { content: "Hi" } }, { frame: "frames/card" }]]);
 	assert.deepEqual(of(["canvas", "read", "--frame", "frames/card"]), ["canvas.read", [{ frame: "frames/card" }]]);

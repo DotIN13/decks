@@ -426,15 +426,15 @@ test("an edit routes again only the arrows it touches; the others stay as the se
 test("a tool's item comes with the Decks colours it uses, defined once, and reads dark in the dark", () => {
 	const sent: unknown[][] = [];
 	const drawing = createDrawing(sample(), { host: { send: (ops) => void sent.push(ops), step: () => {} } });
-	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-shape", cornerRadius: 8 }, box: { x1: 0, y1: 0, x2: 160, y2: 100 } }]);
+	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-fill-slate", cornerRadius: 8 }, box: { x1: 0, y1: 0, x2: 160, y2: 100 } }]);
 	assert.equal((sent[0]![0] as { op: string }).op, "variables", "the variables come first, in the same edit");
 	const doc = drawing.doc();
 	assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
-	assert.equal(doc.children.find((node) => node.id === "r")?.fill, "$decks-shape");
-	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "s", fill: "$decks-shape" }, box: { x1: 200, y1: 0, x2: 360, y2: 100 } }]);
+	assert.equal(doc.children.find((node) => node.id === "r")?.fill, "$decks-fill-slate");
+	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "s", fill: "$decks-fill-slate" }, box: { x1: 200, y1: 0, x2: 360, y2: 100 } }]);
 	assert.equal(sent[1]!.length, 1, "a second one defines nothing");
-	assert.equal(resolve(doc, "$decks-shape", baseTheme(doc, "light")), "#dbe4f0");
-	assert.equal(resolve(doc, "$decks-shape", baseTheme(doc, "dark")), DECKS_COLORS["decks-shape"]!.dark);
+	assert.equal(resolve(doc, "$decks-fill-slate", baseTheme(doc, "light")), "#dbe4f0");
+	assert.equal(resolve(doc, "$decks-fill-slate", baseTheme(doc, "dark")), DECKS_COLORS["decks-fill-slate"]!.dark);
 });
 
 test("a colour picked in the panel: an adaptive one is written as its variable and defined with it, a custom hex stays as it is", () => {
@@ -442,13 +442,13 @@ test("a colour picked in the panel: an adaptive one is written as its variable a
 	const drawing = createDrawing(sample(), { host: { send: (ops) => void sent.push(ops), step: () => {} } });
 	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "r", fill: "#ff0000" }, box: { x1: 0, y1: 0, x2: 160, y2: 100 } }]);
 	assert.equal(sent[0]!.length, 1, "a fixed colour defines nothing");
-	drawing.edit([{ op: "update", id: "r", set: { fill: "$decks-blue", stroke: "$decks-ink" } }]);
+	drawing.edit([{ op: "update", id: "r", set: { fill: "$decks-accent-blue", stroke: "$decks-text" } }]);
 	const [vars] = sent[1] as Array<{ op: string; set: Record<string, unknown> }>;
 	assert.equal(vars!.op, "variables");
-	assert.deepEqual(Object.keys(vars!.set).sort(), ["decks-blue", "decks-ink"]);
+	assert.deepEqual(Object.keys(vars!.set).sort(), ["decks-accent-blue", "decks-text"]);
 	const doc = drawing.doc();
-	assert.equal(resolve(doc, "$decks-blue", baseTheme(doc, "light")), DECKS_COLORS["decks-blue"]!.light);
-	assert.equal(resolve(doc, "$decks-blue", baseTheme(doc, "dark")), DECKS_COLORS["decks-blue"]!.dark);
+	assert.equal(resolve(doc, "$decks-accent-blue", baseTheme(doc, "light")), DECKS_COLORS["decks-accent-blue"]!.light);
+	assert.equal(resolve(doc, "$decks-accent-blue", baseTheme(doc, "dark")), DECKS_COLORS["decks-accent-blue"]!.dark);
 	drawing.edit([{ op: "update", id: "r", set: { fill: "#12ab34" } }]);
 	assert.equal(sent[2]!.length, 1, "a custom hex is just the update");
 	const fill = drawing.doc().children.find((node) => node.id === "r")?.fill;

@@ -214,12 +214,11 @@ heading or a list. Keep it short: a note is read on the canvas, and a long docum
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",
 colors: [{ color, position }], rotation }`, `{ type: "image", url: "./pic.png", mode: "fill" }`).
-The stage is light or dark with the app, and a hex is the same in both, so **prefer Decks's
-adaptive colours**: `"$decks-ink"` for words, `"$decks-line"` for arrows, `"$decks-shape"` and the
-soft fills (`"$decks-blue-fill"`, …) for areas, the accents (`"$decks-red"`, …) for emphasis. Every
-edit defines any `$decks-*` it uses. For a colour they lack, define your own with a light and a dark
-value through `canvas.variables`. Use a bare hex only for a colour that must never change. The
-palette with its values, and how to define your own, is in [colors.md](colors.md).
+The stage is light or dark with the app, and a hex is the same in both, so **use Decks's
+adaptive colours**, `$decks-<role>`: text for words (`"$decks-text"`), line for arrows and edges
+(`"$decks-line"`), surface for paper (`"$decks-surface"`), fill for areas (`"$decks-fill-blue"`),
+accent for emphasis (`"$decks-accent-red"`). An edit defines any it uses. Your own colour:
+`decks canvas variables '{"brand":{"light":"#4f46e5","dark":"#818cf8"}}'`. The table is in [colors.md](colors.md).
 
 **Stroke.** `stroke` is a colour (or fills), `strokeWidth` a number or `{ top, right, bottom, left }`,
 `strokeAlignment` `"inner" | "center" | "outer"`, `strokeLinecap` `"butt" | "round" | "square"`.
@@ -276,9 +275,9 @@ the path's box alone. Fill and line go on the outline.
   alignItems: "center", padding: 10, clip: false, metadata: { type: "decks.shape", kind: "Decision" },
   children: [
     { type: "path", id: "check-o", layoutPosition: "absolute", x: 0, y: 0, viewBox: [0, 0, 100, 100],
-      geometry: "M50 0L100 50L50 100L0 50Z", fill: "$decks-figure", stroke: "$decks-figure-line", strokeWidth: 1.5, strokeAlignment: "center" },
+      geometry: "M50 0L100 50L50 100L0 50Z", fill: "$decks-surface", stroke: "$decks-line-strong", strokeWidth: 1.5, strokeAlignment: "center" },
     { type: "text", id: "check-t", content: "Signed in?", fontSize: 14, fontWeight: 500,
-      textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "$decks-ink" },
+      textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "$decks-text" },
   ] } }
 ```
 

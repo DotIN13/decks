@@ -1,6 +1,6 @@
 import { copySharedCanvas } from "../stage/copy-shared.ts";
 import { basename, dirname } from "node:path";
-import { apply, ARROW, baseTheme, ids, placements, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, expandVariables, ids, placements, shortVariables, updateWarnings, walk, warnings, type Op, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { canvasFile } from "../stage/canvas-files.ts";
 import { boardOf, pageTag, type ReadMore } from "../stage/pens.ts";
 import { canvasFolder, isCardPath, pageName } from "../deck/layout.ts";
@@ -18,7 +18,7 @@ import { resolveInDeck } from "../deck/roots.ts";
 
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
- * own light/dark Decks variables (`$decks-shape`, … : `@decks/pen` colors.ts, defined in the same
+ * own light/dark Decks variables (`$decks-fill-slate`, … : `@decks/pen` colors.ts, defined in the same
  * edit by `StagePens.edit`), so it reads on a dark canvas too. Only an item at the top level with
  * neither a fill nor a stroke: a rectangle, an ellipse, an icon or an arrow, and a frame with nothing in it
  * and no metadata (a frame holding items is a layout as often as a box, and a card or a library
@@ -26,13 +26,13 @@ import { resolveInDeck } from "../deck/roots.ts";
  */
 function colourDefaults(node: Record<string, unknown>): void {
 	if (node.fill !== undefined || node.stroke !== undefined) return;
-	if (node.type === "rectangle") node.fill = "$decks-shape";
-	else if (node.type === "ellipse") node.fill = "$decks-shape-2";
-	else if (node.type === "icon") node.fill = "$decks-ink";
+	if (node.type === "rectangle") node.fill = "$decks-fill-slate";
+	else if (node.type === "ellipse") node.fill = "$decks-fill-sky";
+	else if (node.type === "icon") node.fill = "$decks-text";
 	else if ((node.metadata as { type?: unknown } | undefined)?.type === ARROW) node.stroke = "$decks-line";
 	else if (node.type === "frame" && node.metadata === undefined && !(Array.isArray(node.children) && node.children.length)) {
-		node.fill = "$decks-frame";
-		node.stroke = "$decks-frame-line";
+		node.fill = "$decks-surface";
+		node.stroke = "$decks-line-subtle";
 		node.strokeWidth ??= 1;
 	}
 }
@@ -50,6 +50,9 @@ function colourDefaults(node: Record<string, unknown>): void {
  * `{ frame: "frames/<name>" }` instead to act on a frame file, with the same items and answers; the
  * change shows on every canvas placing the frame. A frame holds drawn items, never a board.
  */
+
+/** A read's variables also short (`shortVariables`: `"#hex"`, `16`, `{ light, dark }`), as `canvas.variables` takes them, under `values`. */
+const withValues = (read: { variables?: unknown; themes?: unknown }) => (read.variables ? { values: shortVariables(read as Pick<PenDocument, "variables" | "themes">) } : {});
 
 /** How far clear of another item `beside` and `below` put one. */
 export const GAP = 160;
@@ -344,9 +347,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 						pen = { op: "copy", id, ...(op.as !== undefined ? { as: op.as } : {}), ...(op.parent !== undefined ? { parent: op.parent } : {}), ...(box ? { box } : {}) };
 						break;
 					}
-					case "variables":
-						pen = { op: "variables", set: op.set as never, ...(op.themes !== undefined ? { themes: op.themes } : {}) };
+					case "variables": {
+						// Short values (`"#hex"`, `16`, `{ light, dark }`) in pen's form, the dark one keyed to the drawing's own light/dark axis.
+						const given = op.themes === null ? undefined : (op.themes ?? doc.themes);
+						const expanded = expandVariables(op.set ?? {}, given as Record<string, string[]> | undefined);
+						const themes = expanded.themes ?? op.themes;
+						pen = { op: "variables", set: expanded.set as never, ...(themes !== undefined ? { themes } : {}) };
 						break;
+					}
 					default:
 						throw new Error(`there is no op "${(op as { op?: unknown })?.op}": insert, update, replace, delete, move, copy or variables.`);
 				}
@@ -435,14 +443,14 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 					...(theme ? { theme } : {}),
 				};
 				if (target.frame !== undefined) {
-					const { file, children, ...rest } = pens.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string };
+					const { file, children, ...rest } = pens.readFile(target.frame, more) as { file: string; children: unknown[]; ref?: string; stage?: string; variables?: unknown; themes?: unknown };
 					delete rest.ref;
 					delete rest.stage;
-					return { frame: target.frame, file, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
+					return { frame: target.frame, file, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 				}
 				const name = target.canvas;
 				const { stage: _stage, file: _file, children, ...rest } = pens.read(name, more);
-				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
+				return { canvas: name, title: pens.titleOf(name), rev: pens.get(name).rev, ...rest, ...withValues(rest), items: (children as unknown as Record<string, unknown>[]).map(toItem) } as never;
 			},
 			space: async (size: { w: number; h: number }, options?: On & { near?: string; side?: Side; margin?: number }) => {
 				const { near, side, margin, ...on } = options ?? {};
@@ -511,7 +519,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				const target = targetOf(options);
 				one(target, { op: "variables", set, ...(options?.themes !== undefined ? { themes: options.themes } : {}) });
 				const doc = target.frame !== undefined ? needPens().framePen(target.frame).doc : needPens().get(target.canvas).doc;
-				return { variables: (doc.variables ?? {}) as Record<string, unknown>, ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
+				return { variables: (doc.variables ?? {}) as Record<string, unknown>, values: shortVariables(doc), ...(doc.themes ? { themes: doc.themes as Record<string, unknown> } : {}) };
 			},
 			batch: async (ops: readonly unknown[], options?: On) => change(targetOf(options), ops as readonly CanvasOpIn[]) as never,
 			/** Undo and redo of the person's own edits (`StagePens.step`), as the socket's `stage.pen.step` does them. */

@@ -1,4 +1,5 @@
 import { DECKS_COLORS, decksColorOf } from "@decks/pen";
+import { ADAPTIVE, adaptiveTitle, swatchPaint } from "./adaptive.ts";
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -11,7 +12,7 @@ import { scheme } from "../lib/theme.ts";
  * colour as hex, a dropper where the browser has one, the adaptive colours, and the panel's own swatches.
  *
  * The adaptive colours are the drawing's own light/dark variables (`@decks/pen` `DECKS_COLORS`): a
- * pick writes `"$decks-ink"`, which the drawing's edit defines when it lacks it, and the colour
+ * pick writes `"$decks-text"`, which the drawing's edit defines when it lacks it, and the colour
  * follows the canvas between light and dark. Anything picked in the square, the strip, the hex or
  * the dropper is that colour, written as hex, and stays it in both.
  *
@@ -54,29 +55,10 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 	return `#${to(r)}${to(g)}${to(b)}`;
 }
 
-/** The adaptive colours on offer, by name: one of each look, without the tools' near-twins (figure, card). */
-export const ADAPTIVE = [
-	"decks-ink", "decks-muted", "decks-line", "decks-frame-line", "decks-frame", "decks-shape", "decks-shape-2",
-	"decks-red", "decks-orange", "decks-yellow", "decks-green", "decks-blue", "decks-purple",
-	"decks-red-fill", "decks-orange-fill", "decks-yellow-fill", "decks-green-fill", "decks-blue-fill", "decks-purple-fill", "decks-gray-fill",
-];
-
-/** A swatch's paint: an adaptive colour split corner to corner, light over dark; any other colour as it is. */
-export function swatchPaint(color: string): string {
-	const decks = DECKS_COLORS[decksColorOf(color) ?? ""];
-	return decks ? `linear-gradient(135deg, ${decks.light} 0 50%, ${decks.dark} 50% 100%)` : color;
-}
-
-/** An adaptive colour's tooltip: its name and its two values. */
-export function adaptiveTitle(name: string): string {
-	const decks = DECKS_COLORS[name]!;
-	return `${decks.name} (adaptive): ${decks.light} in light, ${decks.dark} in dark`;
-}
-
 const PALETTE = ["#ffffff", "#f3f4f6", "#9ca3af", "#57606a", "#1f2328", "#fecaca", "#fde68a", "#bbf7d0", "#bfdbfe", "#e9d5ff", "#dc2626", "#d97706", "#16a34a", "#2563eb", "#7c3aed"];
 
 export function ColorPicker(props: {
-	/** The field's colour: a hex, or a variable (`"$decks-ink"`). */
+	/** The field's colour: a hex, or a variable (`"$decks-text"`). */
 	value: string | undefined;
 	/** What a variable comes to on the canvas now, for the square and the hex; a hex is itself. */
 	shown?: string | undefined;
@@ -214,21 +196,28 @@ export function ColorPicker(props: {
 				<div class="color-palette" role="group" aria-label="Adaptive colours">
 					<span class="color-caption text-faint">Adaptive</span>
 					<For each={ADAPTIVE}>
-						{(name) => (
-							<button
-								type="button"
-								class="props-swatch"
-								data-adaptive={name}
-								style={{ "--swatch": swatchPaint(`$${name}`) }}
-								data-on={props.value === `$${name}` ? "true" : undefined}
-								aria-pressed={props.value === `$${name}`}
-								aria-label={adaptiveTitle(name)}
-								title={adaptiveTitle(name)}
-								onClick={() => {
-									setHsv(hexToHsv(DECKS_COLORS[name]![scheme()]));
-									if (props.value !== `$${name}`) props.onCommit(`$${name}`);
-								}}
-							/>
+						{(row) => (
+							<>
+								<span class="color-row" style={{ "flex-basis": "100%", height: 0 }} />
+								<For each={row}>
+									{(name) => (
+										<button
+											type="button"
+											class="props-swatch"
+											data-adaptive={name}
+											style={{ "--swatch": swatchPaint(`$${name}`) }}
+											data-on={decksColorOf(props.value) === name ? "true" : undefined}
+											aria-pressed={decksColorOf(props.value) === name}
+											aria-label={adaptiveTitle(name)}
+											title={adaptiveTitle(name)}
+											onClick={() => {
+												setHsv(hexToHsv(DECKS_COLORS[name]![scheme()]));
+												if (props.value !== `$${name}`) props.onCommit(`$${name}`);
+											}}
+										/>
+									)}
+								</For>
+							</>
 						)}
 					</For>
 				</div>

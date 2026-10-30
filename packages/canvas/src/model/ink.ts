@@ -22,7 +22,7 @@ import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
 export const INK = "decks.ink";
 
 /** The Decks colour each ink colour is written as. */
-const VARIABLE: Record<InkColor, string> = { ink: "decks-ink", red: "decks-red", blue: "decks-blue", green: "decks-green", yellow: "decks-yellow" };
+const VARIABLE: Record<InkColor, string> = { ink: "decks-text", red: "decks-accent-red", blue: "decks-accent-blue", green: "decks-accent-green", yellow: "decks-accent-yellow" };
 const PAINT = Object.fromEntries(Object.entries(VARIABLE).map(([color, name]) => [color, `$${name}`])) as Record<InkColor, string>;
 
 /** An ink colour as the stage draws it in a scheme: what its variable comes to there, for a stroke still under the pen and the tray's swatches. */

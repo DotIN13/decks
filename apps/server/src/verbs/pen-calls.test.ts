@@ -258,18 +258,64 @@ test("an agent's shape with no colour is coloured as the tools colour theirs, li
 			{ op: "insert", item: { type: "path", id: "blue-link", stroke: "#2563eb", metadata: { type: "decks.arrow", from: "round", to: "box" } } },
 		]])).value;
 		const by = Object.fromEntries((made as Array<Record<string, any>>).map((one) => [one.id, one]));
-		assert.equal(by.plain.fill, "$decks-shape");
-		assert.equal(by.round.fill, "$decks-shape-2");
-		assert.equal(by.box.fill, "$decks-frame");
-		assert.equal(by.box.stroke, "$decks-frame-line");
-		assert.equal(by.star.fill, "$decks-ink");
+		assert.equal(by.plain.fill, "$decks-fill-slate");
+		assert.equal(by.round.fill, "$decks-fill-sky");
+		assert.equal(by.box.fill, "$decks-surface");
+		assert.equal(by.box.stroke, "$decks-line-subtle");
+		assert.equal(by.star.fill, "$decks-text");
 		assert.equal(by.red.fill, "#ff0000", "a colour given is kept");
 		assert.equal(by.row.fill, undefined, "a frame holding items is a layout, left as it is");
 		assert.equal(by.row.children[0].fill, undefined, "nor what is inside one");
 		assert.equal(by.link.stroke, "$decks-line", "an arrow's line is the tools' grey, light and dark");
 		assert.equal(by["blue-link"].stroke, "#2563eb");
 		const vars = (await must("canvas.read", [])).value.variables ?? {};
-		for (const name of ["decks-shape", "decks-shape-2", "decks-frame", "decks-frame-line", "decks-ink", "decks-line"]) assert.ok(vars[name], `${name} is defined`);
+		for (const name of ["decks-fill-slate", "decks-fill-sky", "decks-surface", "decks-line-subtle", "decks-text", "decks-line"]) assert.ok(vars[name], `${name} is defined`);
+	} finally {
+		cleanup();
+	}
+});
+
+test("canvas.variables takes values short: { light, dark } keyed to the canvas's own axis, a hex, a number; pen's full form as it is", async () => {
+	const { must, cleanup } = await open();
+	try {
+		// A canvas with no axis: mode: ["light", "dark"] is added.
+		let answer = (await must("canvas.variables", [{ brand: { light: "#4f46e5", dark: "#818cf8" }, mark: "#ff0000", space: 16 }])).value;
+		assert.deepEqual(answer.variables.brand, { type: "color", value: [{ value: "#4f46e5" }, { value: "#818cf8", theme: { mode: "dark" } }] });
+		assert.deepEqual(answer.variables.mark, { type: "color", value: "#ff0000" }, "a plain hex is the same in both");
+		assert.deepEqual(answer.variables.space, { type: "number", value: 16 });
+		assert.deepEqual(answer.themes, { mode: ["light", "dark"] });
+		assert.deepEqual(answer.values, { brand: { light: "#4f46e5", dark: "#818cf8" }, mark: "#ff0000", space: 16 }, "read back short as set");
+		// Again: the axis is there, nothing added.
+		answer = (await must("canvas.variables", [{ other: { light: "#000000", dark: "#ffffff" } }])).value;
+		assert.deepEqual(answer.themes, { mode: ["light", "dark"] });
+		assert.deepEqual((await must("canvas.read", [])).value.values.other, { light: "#000000", dark: "#ffffff" });
+		// The full form, unchanged.
+		const full = { type: "color", value: [{ value: "#111111" }, { value: "#eeeeee", theme: { mode: "dark" } }] };
+		answer = (await must("canvas.variables", [{ ink: full }])).value;
+		assert.deepEqual(answer.variables.ink, full);
+	} finally {
+		cleanup();
+	}
+	const older = await open();
+	try {
+		// An older canvas's Mode: ["Light", "Dark"] is used as it is.
+		await older.must("canvas.variables", [{ x: "#000000" }, { themes: { Mode: ["Light", "Dark"] } }]);
+		const answer = (await older.must("canvas.variables", [{ brand: { light: "#4f46e5", dark: "#818cf8" } }])).value;
+		assert.deepEqual(answer.variables.brand, { type: "color", value: [{ value: "#4f46e5" }, { value: "#818cf8", theme: { Mode: "Dark" } }] });
+		assert.deepEqual(answer.themes, { Mode: ["Light", "Dark"] });
+		assert.deepEqual(answer.values.brand, { light: "#4f46e5", dark: "#818cf8" });
+	} finally {
+		older.cleanup();
+	}
+});
+
+test("an old Decks colour name an agent still writes is defined, with its new colour's values", async () => {
+	const { must, cleanup } = await open();
+	try {
+		await must("canvas.insert", [{ type: "rectangle", id: "old", width: 100, height: 60, fill: "$decks-ink" }]);
+		const vars = (await must("canvas.read", [])).value.variables ?? {};
+		assert.deepEqual(vars["decks-ink"], { type: "color", value: [{ value: "#1f2328" }, { value: "#e6e6e6", theme: { mode: "dark" } }] });
+		assert.equal(vars["decks-text"], undefined, "only the name the item uses");
 	} finally {
 		cleanup();
 	}

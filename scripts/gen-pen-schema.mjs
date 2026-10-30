@@ -76,9 +76,9 @@ Every item on a canvas is one of the types below, with the fields its type has. 
 type does not have is kept in the file and does nothing; the canvas calls say so in their notes.
 Every number, colour, string and boolean can also be a variable, \`"$name"\`, set with
 \`decks canvas variables\`. A colour is best one with a light and a dark value: Decks's own
-(\`$decks-ink\`, \`$decks-muted\`, \`$decks-line\`, \`$decks-shape\`, \`$decks-frame\`, \`$decks-red\`,
-\`$decks-blue\`, … listed in canvas-authoring) are defined by any edit that uses them; a hex stays
-the same in light and dark.
+(\`$decks-text\`, \`$decks-line\`, \`$decks-surface\`, \`$decks-fill-blue\`, \`$decks-accent-red\`, …
+listed in canvas-authoring's colors.md) are defined by any edit that uses them; one of your own is
+\`{ "brand": { "light": "#4f46e5", "dark": "#818cf8" } }\`. A hex stays the same in light and dark.
 
 ## Values
 

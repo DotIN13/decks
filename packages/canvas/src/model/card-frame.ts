@@ -49,8 +49,8 @@ export function fileItem(path: string, fresh: () => string): PenNode {
 		type: "frame", id: fresh(), name, layout: "horizontal", gap: 8, padding: [8, 12], alignItems: "center", cornerRadius: 8, fill: "#8080801f",
 		metadata: { type: FILE, path },
 		children: [
-			{ type: "icon", id: fresh(), library: "lucide", icon: /\.(mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ? "file-video" : "file-text", width: 16, height: 16, fill: "$decks-muted" },
-			{ type: "text", id: fresh(), content: name, fontSize: 14, fill: "$decks-ink" },
+			{ type: "icon", id: fresh(), library: "lucide", icon: /\.(mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ? "file-video" : "file-text", width: 16, height: 16, fill: "$decks-text-muted" },
+			{ type: "text", id: fresh(), content: name, fontSize: 14, fill: "$decks-text" },
 		],
 	} as PenNode;
 }
@@ -82,20 +82,20 @@ export function fileCard(path: string, fresh: () => string, facts: { preview?: s
 	const sub = [kind.label, facts.pages ? `${facts.pages} ${facts.pages === 1 ? "page" : "pages"}` : "", facts.title && facts.title !== name ? facts.title : ""].filter(Boolean).join(", ");
 	const tall = facts.w && facts.h ? Math.round(Math.min(420, (FILE_CARD_W * facts.h) / Math.max(1, facts.w))) : 0;
 	return {
-		type: "frame", id: fresh(), name, layout: "vertical", gap: 0, padding: 0, width: FILE_CARD_W, cornerRadius: 12, clip: true, fill: "$decks-card", stroke: "$decks-card-line", strokeWidth: 1,
+		type: "frame", id: fresh(), name, layout: "vertical", gap: 0, padding: 0, width: FILE_CARD_W, cornerRadius: 12, clip: true, fill: "$decks-surface", stroke: "$decks-line-subtle", strokeWidth: 1,
 		effect: { type: "shadow", shadowType: "outer", offset: { x: 0, y: 2 }, blur: 10, spread: 0, color: "#0000001a" },
 		metadata: { type: FILE, path, ...(facts.preview ? { preview: facts.preview } : {}) },
 		children: [
 			...(facts.preview && tall ? [{ type: "rectangle", id: fresh(), name: "Preview", width: "fill_container", height: tall, fill: { type: "image", url: facts.url ? facts.url(facts.preview) : facts.preview, mode: "fill" } }] : []),
 			{
-				type: "frame", id: fresh(), name: "Label", layout: "horizontal", gap: 10, padding: [10, 12], alignItems: "center", width: "fill_container", ...(tall ? { stroke: "$decks-card-line", strokeWidth: { top: 1 } } : {}),
+				type: "frame", id: fresh(), name: "Label", layout: "horizontal", gap: 10, padding: [10, 12], alignItems: "center", width: "fill_container", ...(tall ? { stroke: "$decks-line-subtle", strokeWidth: { top: 1 } } : {}),
 				children: [
 					{ type: "frame", id: fresh(), name: "Kind", width: 30, height: 30, cornerRadius: 7, fill: `${kind.tone}21`, layout: "horizontal", justifyContent: "center", alignItems: "center", children: [{ type: "icon", id: fresh(), library: "lucide", icon: kind.icon, width: 16, height: 16, fill: kind.tone }] },
 					{
 						type: "frame", id: fresh(), name: "Words", layout: "vertical", gap: 2, width: "fill_container",
 						children: [
-							{ type: "text", id: fresh(), content: name, fontSize: 14, fontWeight: "600", fill: "$decks-ink", textGrowth: "fixed-width", width: "fill_container" },
-							{ type: "text", id: fresh(), content: sub, fontSize: 12, fill: "$decks-muted", textGrowth: "fixed-width", width: "fill_container" },
+							{ type: "text", id: fresh(), content: name, fontSize: 14, fontWeight: "600", fill: "$decks-text", textGrowth: "fixed-width", width: "fill_container" },
+							{ type: "text", id: fresh(), content: sub, fontSize: 12, fill: "$decks-text-muted", textGrowth: "fixed-width", width: "fill_container" },
 						],
 					},
 				],

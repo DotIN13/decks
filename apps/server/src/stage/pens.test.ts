@@ -329,11 +329,11 @@ test("a canvas stands alone: a board placed from the library is copied in, and a
 
 /** A file card as `fileCard` (`@decks/canvas` card-frame.ts) makes one: its paper, edge and words in Decks colours. */
 const fileCardNode = (id: string) => ({
-	type: "frame", id, name: "notes.pdf", layout: "vertical", width: 320, fill: "$decks-card", stroke: "$decks-card-line", strokeWidth: 1,
+	type: "frame", id, name: "notes.pdf", layout: "vertical", width: 320, fill: "$decks-surface", stroke: "$decks-line-subtle", strokeWidth: 1,
 	metadata: { type: "decks.file", path: "files/notes.pdf" },
 	children: [{ type: "frame", id: `${id}-label`, layout: "horizontal", width: "fill_container", children: [
-		{ type: "text", id: `${id}-name`, content: "notes.pdf", fill: "$decks-ink" },
-		{ type: "text", id: `${id}-kind`, content: "PDF", fill: "$decks-muted" },
+		{ type: "text", id: `${id}-name`, content: "notes.pdf", fill: "$decks-text" },
+		{ type: "text", id: `${id}-kind`, content: "PDF", fill: "$decks-text-muted" },
 	] }],
 });
 
@@ -345,7 +345,7 @@ test("an edit sent with no variables op (a file card dropped with no canvas show
 		const { results } = pens.edit(name, [{ op: "insert", node: fileCardNode("card") as never, box: { x1: 0, y1: 0 } }]);
 		assert.deepEqual(results, [{ op: "insert", id: "card" }], "the results answer the caller's ops, not the variables op");
 		const doc = pens.get(name).doc;
-		assert.deepEqual(Object.keys(doc.variables ?? {}).sort(), ["decks-card", "decks-card-line", "decks-ink", "decks-muted"]);
+		assert.deepEqual(Object.keys(doc.variables ?? {}).sort(), ["decks-line-subtle", "decks-surface", "decks-text", "decks-text-muted"]);
 		assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
 		// A second card: the drawing has them, so nothing new.
 		const before = JSON.stringify({ variables: doc.variables, themes: doc.themes });
@@ -363,11 +363,11 @@ test("an edit whose own variables op already defines them (as the canvas sends o
 	const pens = new StagePens(dir, () => {});
 	try {
 		const name = pens.claim("both");
-		const own = { op: "variables", set: { "decks-shape": { type: "color", value: [{ value: "#123456" }, { value: "#654321", theme: { mode: "dark" } }] } }, themes: { mode: ["light", "dark"] } };
-		const { results } = pens.edit(name, [own as never, { op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-shape", width: 10, height: 10 } as never }]);
+		const own = { op: "variables", set: { "decks-fill-slate": { type: "color", value: [{ value: "#123456" }, { value: "#654321", theme: { mode: "dark" } }] } }, themes: { mode: ["light", "dark"] } };
+		const { results } = pens.edit(name, [own as never, { op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-fill-slate", width: 10, height: 10 } as never }]);
 		assert.equal(results.length, 2);
 		const doc = pens.get(name).doc;
-		assert.deepEqual(doc.variables, { "decks-shape": own.set["decks-shape"] }, "the caller's own values, nothing added beside them");
+		assert.deepEqual(doc.variables, { "decks-fill-slate": own.set["decks-fill-slate"] }, "the caller's own values, nothing added beside them");
 		assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
 	} finally {
 		pens.close();

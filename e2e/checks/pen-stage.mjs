@@ -225,11 +225,11 @@ if (spot) {
 	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
 	const handles = await until(() => canvas.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length === 8));
 	say("…and it is selected, with eight handles", !!handles);
-	await canvas.locator('.props-panel [aria-label="Fill #fde68a"]').click();
-	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
+	await canvas.locator('.props-panel .props-swatches [data-adaptive="decks-fill-yellow"]').first().click();
+	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "$decks-fill-yellow");
 	say("the properties panel's fill colours the selected item in the file", !!filled);
 	await page.keyboard.press("Control+z");
-	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "$decks-shape");
+	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "$decks-fill-slate");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
 
 	// A card is pen's own note with a mark that says its words are markdown, and it opens for typing.

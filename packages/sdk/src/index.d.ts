@@ -164,7 +164,7 @@ export interface Verbs {
 		 * with ids "ref/child"; `geometry` adds a path's or shape's `outline`, an SVG path in its own space
 		 * (0,0 its top-left corner).
 		 */
-		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
+		read(options?: { canvas?: string; frame?: string; of?: string; depth?: number; resolve?: { variables?: boolean; instances?: boolean; geometry?: boolean }; theme?: Record<string, string> }): Promise<{ canvas?: string; frame?: string; title?: string; file?: string; version: string; rev?: number; error?: string; variables?: Record<string, unknown>; values?: Record<string, unknown>; themes?: Record<string, unknown>; items: Item[] }>;
 		/**
 		 * Where a box of `size` fits: the top-left corner nearest the middle of everything on the canvas
 		 * where the box, grown by `margin` (160) on every side, touches no top-level item (arrows aside).
@@ -181,14 +181,13 @@ export interface Verbs {
 		 * tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no
 		 * `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children
 		 * too; the answer has every id. Colour it with Decks's adaptive colours so it reads in light and
-		 * dark: "$decks-ink" (words, icons), "$decks-muted", "$decks-line" (arrows), "$decks-shape",
-		 * "$decks-shape-2", "$decks-frame" and "$decks-frame-line", "$decks-figure" and
-		 * "$decks-figure-line", "$decks-card" and "$decks-card-line", "$decks-red", "$decks-orange",
-		 * "$decks-yellow", "$decks-green", "$decks-blue", "$decks-purple" (accents), and soft fills
-		 * "$decks-yellow-fill", "$decks-orange-fill", "$decks-red-fill", "$decks-purple-fill",
-		 * "$decks-blue-fill", "$decks-green-fill", "$decks-gray-fill"; the insert defines any the canvas
-		 * lacks. A hex stays the same in both; a top-level rectangle, ellipse, icon, empty frame or arrow
-		 * given no colour gets the tools' $decks-* colours.
+		 * dark, named by role: text ("$decks-text", "$decks-text-muted"), line ("$decks-line" for arrows,
+		 * "$decks-line-strong", "$decks-line-subtle" for edges), surface ("$decks-surface", paper), fill
+		 * ("$decks-fill-slate", "$decks-fill-sky", "$decks-fill-gray", and soft "$decks-fill-red", -orange,
+		 * -yellow, -green, -blue, -purple) and accent ("$decks-accent-red", -orange, -yellow, -green,
+		 * -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a
+		 * top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-*
+		 * colours.
 		 */
 		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
@@ -208,14 +207,16 @@ export interface Verbs {
 		/** Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`. */
 		copy(id: string, options?: { canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null }): Promise<Item>;
 		/**
-		 * Set the canvas's colour tokens, per theme such as light and dark: { accent: { type: "color",
-		 * value: [{ value: "#e5484d" }, { value: "#ff6369", theme: { mode: "dark" } }] } }, with { themes:
-		 * { mode: ["light", "dark"] } } when the canvas has no light/dark axis yet (one it has, such as
-		 * Mode: ["Light", "Dark"], is keyed as it is); then use it as "$accent". null removes one. Decks's
-		 * own adaptive colours ($decks-ink, $decks-line, … see canvas.insert) need no call: an edit that
-		 * uses one defines it.
+		 * Set the canvas's colour tokens and other variables, each then used as "$name" in any field. {
+		 * brand: { light: "#4f46e5", dark: "#818cf8" } } follows the canvas between light and dark,
+		 * "#4f46e5" is the same in both, a number is a number variable, null removes one. The dark value is
+		 * keyed to the canvas's own light/dark axis (added when it has none), so `themes` is not needed;
+		 * pen's full form ({ type: "color", value: [{ value }, { value, theme: { mode: "dark" } }] }) still
+		 * works. The answer gives each variable in pen's form under `variables` and short under `values`.
+		 * Decks's own adaptive colours ($decks-text, $decks-line, … see canvas.insert) need no call: an
+		 * edit that uses one defines it.
 		 */
-		variables(set: Record<string, unknown>, options?: { canvas?: string; frame?: string; themes?: Record<string, string[]> | null }): Promise<{ variables: Record<string, unknown>; themes?: Record<string, unknown> }>;
+		variables(set: Record<string, unknown>, options?: { canvas?: string; frame?: string; themes?: Record<string, string[]> | null }): Promise<{ variables: Record<string, unknown>; values: Record<string, unknown>; themes?: Record<string, unknown> }>;
 		/**
 		 * Several of the changes above in one call, applied together or not at all. Each op is the call of
 		 * that name with its item or id inside: { op: "insert", item, beside }, { op: "update", id, set },

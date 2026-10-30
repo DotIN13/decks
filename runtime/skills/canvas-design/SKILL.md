@@ -111,16 +111,19 @@ change with the scheme. Put the palette in variables once, each with a light and
 use `$name` everywhere, so a change is one edit and the design follows light and dark:
 
 ```json
-{ "op": "variables", "themes": { "mode": ["light", "dark"] }, "set": {
-  "ink":    { "type": "color", "value": [{ "value": "#111827" }, { "value": "#f3f4f6", "theme": { "mode": "dark" } }] },
-  "muted":  { "type": "color", "value": [{ "value": "#6b7280" }, { "value": "#9ca3af", "theme": { "mode": "dark" } }] },
-  "paper":  { "type": "color", "value": [{ "value": "#ffffff" }, { "value": "#111827", "theme": { "mode": "dark" } }] },
-  "line":   { "type": "color", "value": [{ "value": "#e5e7eb" }, { "value": "#374151", "theme": { "mode": "dark" } }] },
-  "accent": { "type": "color", "value": "#4f46e5" },
-  "space":  { "type": "number", "value": 16 } } }
+{ "op": "variables", "set": {
+  "ink":    { "light": "#111827", "dark": "#f3f4f6" },
+  "muted":  { "light": "#6b7280", "dark": "#9ca3af" },
+  "paper":  { "light": "#ffffff", "dark": "#111827" },
+  "line":   { "light": "#e5e7eb", "dark": "#374151" },
+  "accent": "#4f46e5",
+  "space":  16 } }
 ```
 
-Decks's adaptive colours (`$decks-ink`, `$decks-line`, …; see canvas-authoring's
+The dark value is keyed to the canvas's own light/dark axis; pen's full form
+(`{ "type": "color", "value": [...] }`) works too.
+
+Decks's adaptive colours (`$decks-text`, `$decks-line`, …; see canvas-authoring's
 [colors.md](../canvas-authoring/colors.md)) are for what sits around a design; the design's own
 variables are for the design.
 

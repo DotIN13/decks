@@ -492,7 +492,7 @@ export class StagePens {
 		const theme = baseTheme(current.doc, "light");
 		/*
 		 * Every edit of a canvas comes through here, whoever sends it: an item coloured by a Decks
-		 * colour (`$decks-card`, what the tools make) has it defined in the drawing, light and dark,
+		 * colour (`$decks-surface`, what the tools make) has it defined in the drawing, light and dark,
 		 * when the drawing lacks it. The canvas adds them itself as it edits; an edit sent while no
 		 * canvas shows the drawing (a file card dropped then) is the one this catches.
 		 */
