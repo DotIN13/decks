@@ -16,7 +16,7 @@ import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
-import { ThumbService } from "./boards/thumbs.ts";
+import { SMALL_WIDTHS, ThumbService } from "./boards/thumbs.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
 import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./verbs/router.ts";
@@ -315,21 +315,21 @@ export class App {
 		 */
 		const apiOrigin = () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`;
 		/*
-		 * Stage pictures are drawn natively over each board's picture of its current revision: a 192 or
-		 * 480 px copy when the board is drawn that small, the whole picture otherwise. A board with none
-		 * sends the shot to the browser, and is pictured in the background for the next one.
+		 * Stage pictures are drawn natively over each card's picture of its current revision: the
+		 * ladder's rung (`SMALL_WIDTHS`) when the card is drawn no wider, the whole picture otherwise. A
+		 * card with none sends the shot to the browser, and is pictured in the background for the next one.
 		 */
 		this.nativeShots = new NativeShots({
-			boardPicture: (path, scheme, px) => {
+			cardPicture: (path, scheme, px) => {
 				const board = deck.board(path);
-				if (!board) return { why: `there is no board ${path}` };
-				const size = px <= 192 ? 192 : px <= 480 ? 480 : "whole";
+				if (!board) return { why: `there is no card ${path}` };
+				const size = SMALL_WIDTHS.find((width) => px <= width) ?? "whole";
 				for (const want of size === "whole" ? (["whole"] as const) : [size, "whole" as const]) {
 					const found = this.thumbs.nearest(board, scheme, want);
 					if (found?.exact) return { file: found.file };
 				}
 				void this.thumbs.picture(board, scheme, size, () => false, true).catch(() => {});
-				return { why: `the board ${path} has no picture of its current revision yet (one is being taken)` };
+				return { why: `the card ${path} has no picture of its current revision yet (one is being taken)` };
 			},
 		});
 		this.stage.shots = new StageShots({
@@ -348,7 +348,7 @@ export class App {
 		this.stage.boardPicture = async (path, scheme) => {
 			const board = deck.board(path);
 			if (!board) throw new Error(`There is no board ${path}.`);
-			return readFileSync(await this.thumbs.get(board, scheme, () => false, "whole"));
+			return readFileSync(await this.thumbs.get(board, scheme, () => false));
 		};
 		this.stage.pairCode = () => {
 			const made = this.codes.newCode();

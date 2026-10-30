@@ -15,7 +15,7 @@ interface Progress {
 const EVERY_MS = 1000;
 
 /**
- * How far the server has got keeping a picture of every board, at every size the canvas draws:
+ * How far the server has got keeping the far rungs of every card on a canvas:
  * a row in the ⋯ menu. The server takes what is missing in the background (`ThumbService.index`);
  * this asks how far it has got each second, and only while the menu is open, since the menu's
  * contents exist only then.
@@ -41,7 +41,7 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 	});
 	const done = () => {
 		const p = progress();
-		// Every board has its pictures: a picture being retaken for a board just edited is not a sweep.
+		// Every card has its pictures: a picture being retaken for a card just edited is not a sweep.
 		return !!p && p.ready >= p.total;
 	};
 	const share = () => {
@@ -63,7 +63,7 @@ export function PictureProgress(props: { quietWhenDone?: boolean } = {}) {
 			data-keep-open
 			class="picture-progress"
 			role="status"
-			title={done() ? "Every board has its pictures at every size" : "Pictures of the boards are being made in the background"}
+			title={done() ? "Every card has its pictures" : "Pictures of the cards are being made in the background"}
 		>
 			<span class="row-icon">
 				<Icon of={Images} size={15} />

@@ -57,10 +57,10 @@ export type NativeOutcome = { ok: true; width: number; height: number; ms: Recor
 
 export interface NativeHost {
 	/**
-	 * A board's picture of its current revision, at least `px` wide when there is one that size, or
+	 * A card's picture of its current revision, at least `px` wide when there is one that size, or
 	 * why there is none (and it is asked for, so a later shot has it).
 	 */
-	boardPicture: (path: string, scheme: "light" | "dark", px: number) => { file: string } | { why: string };
+	cardPicture: (path: string, scheme: "light" | "dark", px: number) => { file: string } | { why: string };
 }
 
 /** The stage's own paper (`--stage` in `apps/web/src/index.css`), straight RGB 0 to 1. */
@@ -118,7 +118,7 @@ export class NativeShots {
 		const inBox = request.boards.filter((b) => b.x < request.box.x2 && b.x + b.w > request.box.x1 && b.y < request.box.y2 && b.y + b.h > request.box.y1);
 		const boards: Array<{ x: number; y: number; w: number; h: number; picture: string }> = [];
 		for (const board of inBox) {
-			const found = this.host.boardPicture(board.path, request.scheme, board.w * s);
+			const found = this.host.cardPicture(board.path, request.scheme, board.w * s);
 			if ("why" in found) return { ok: false, why: found.why };
 			boards.push({ x: board.x, y: board.y, w: board.w, h: board.h, picture: found.file });
 		}
@@ -132,7 +132,7 @@ export class NativeShots {
 			width: request.width,
 			height: request.height,
 			paper: PAPER[request.scheme],
-			boards,
+			cards: boards,
 			out: request.out,
 			format: request.format,
 			quality: 90,

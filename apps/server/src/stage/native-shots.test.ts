@@ -29,21 +29,21 @@ function request(dir: string, box: NativeRequest["box"], extra: Partial<NativeRe
 }
 
 test("without the binary built, it says how to build it", async () => {
-	const shots = new NativeShots({ boardPicture: () => ({ why: "none" }) }, () => undefined);
+	const shots = new NativeShots({ cardPicture: () => ({ why: "none" }) }, () => undefined);
 	const outcome = await shots.take(request(tmpdir(), { x1: 0, y1: 0, x2: 10, y2: 10 }));
 	assert.equal(outcome.ok, false);
 	assert.match(!outcome.ok ? outcome.why : "", /cargo build --release -p stage-shot/);
 });
 
 test("a board with no picture of its revision is said, before anything is drawn", async () => {
-	const shots = new NativeShots({ boardPicture: (path) => ({ why: `the board ${path} has no picture` }) }, () => "/nonexistent/stage-shot");
+	const shots = new NativeShots({ cardPicture: (path) => ({ why: `the board ${path} has no picture` }) }, () => "/nonexistent/stage-shot");
 	const outcome = await shots.take(request(tmpdir(), { x1: 0, y1: 0, x2: 400, y2: 200 }, { boards: [{ path: "boards/b.html", x: 200, y: 20, w: 120, h: 90 }] }));
 	assert.deepEqual(outcome, { ok: false, why: "the board boards/b.html has no picture" });
 });
 
 test("drawn natively: a PNG of the box's size; math in the box sends it elsewhere", { skip: built ? false : "stage-shot is not built" }, async () => {
 	const dir = mkdtempSync(join(tmpdir(), "native-shots-"));
-	const shots = new NativeShots({ boardPicture: () => ({ why: "no pictures here" }) });
+	const shots = new NativeShots({ cardPicture: () => ({ why: "no pictures here" }) });
 	try {
 		const outcome = await shots.take(request(dir, { x1: 0, y1: 0, x2: 160, y2: 100 }));
 		assert.equal(outcome.ok, true, !outcome.ok ? outcome.why : "");

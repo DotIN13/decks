@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Board } from "@decks/protocol";
-import { THUMB_WIDTH, thumbClip, thumbName, ThumbService } from "./thumbs.ts";
+import { pageClip, THUMB_WIDTH, thumbName, ThumbService } from "./thumbs.ts";
 
 /**
  * The picture service, with a browser that is a list of what it was asked.
@@ -56,16 +56,15 @@ function fake() {
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
-test("a card shows the board's full width and as much height as 4:3 allows", () => {
-	assert.deepEqual(thumbClip({ w: 1000, h: 3000 }), { width: 1000, height: 750, scale: THUMB_WIDTH / 1000 });
-	assert.equal(THUMB_WIDTH, 720);
-	// A slide is shorter than 4:3, and is not padded out to it.
-	assert.deepEqual(thumbClip({ w: 960, h: 540 }), { width: 960, height: 540, scale: THUMB_WIDTH / 960 });
+test("a card is laid out and pictured at its full width and its own height, up to a limit", () => {
+	assert.deepEqual(pageClip({ w: 1000, h: 3000 }), { width: 1000, height: 3000 });
+	assert.deepEqual(pageClip({ w: 960, h: 50_000 }), { width: 960, height: 12_000 });
+	assert.equal(THUMB_WIDTH, 720, "in every picture's name: changing it remakes every picture");
 });
 
 test("a picture's name is safe for a file system and changes with the revision and the scheme", () => {
 	const name = thumbName("boards/深海/plan one.html", 7, "light");
-	assert.match(name, /^[0-9a-f]{16}-7-light-720-l\d+\.jpg$/);
+	assert.match(name, /^[0-9a-f]{16}-7-light-720-whole-l\d+\.webp$/);
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 8, "light"));
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 7, "dark"));
 });
@@ -88,8 +87,8 @@ test("two at a time, the newest request first, and the picture is kept on disk",
 	assert.equal(chrome.most(), 2);
 	assert.ok(files.every((file) => existsSync(file) && readFileSync(file, "utf8") === "jpeg"));
 	assert.equal(chrome.opened[0]?.scheme, "light");
-	assert.deepEqual(chrome.opened[0]?.viewport, { width: 1000, height: 750 });
-	assert.deepEqual(chrome.clips, [750, 750, 750, 750], "a component board is clipped to its own height, at most 4:3");
+	assert.deepEqual(chrome.opened[0]?.viewport, { width: 1000, height: 2000 });
+	assert.deepEqual(chrome.clips, [2000, 2000, 2000, 2000], "a card is pictured at its own height");
 
 	// Asked again: answered from the disk, with no page.
 	const before = chrome.opened.length;
@@ -113,7 +112,9 @@ test("everybody asking for one picture shares one page, and a newer revision rem
 	await tick();
 	await chrome.release();
 	await next;
-	assert.deepEqual(readdirSync(dir), [thumbName("boards/a.html", 2, "dark")]);
+	// The whole picture of revision 2, and the rungs cut from it; nothing of revision 1.
+	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("boards/a.html", 2, "dark")]);
+	assert.ok(readdirSync(dir).every((name) => name.includes("-2-dark-")));
 	thumbs.dispose();
 });
 
@@ -171,7 +172,8 @@ test("a changed board is pictured again once it settles, in the schemes somebody
 	await new Promise((resolve) => setTimeout(resolve, 30));
 	await chrome.release();
 	await tick();
-	assert.deepEqual(readdirSync(dir), [thumbName("boards/a.html", 4, "dark")]);
+	// Retaken as its far rungs, of revision 4; the whole picture of revision 1 stays to stand in until a whole one is asked for.
+	assert.deepEqual(readdirSync(dir).sort(), [thumbName("boards/a.html", 1, "dark"), ...[192, 480].map((width) => thumbName("boards/a.html", 4, "dark", "small", width))].sort());
 	assert.equal(chrome.opened.length, 2);
 	assert.equal(chrome.opened[1]?.scheme, "dark");
 
@@ -207,7 +209,7 @@ test("a deleted board's pictures are deleted with it", async () => {
 	await chrome.release();
 	await Promise.all(both);
 	thumbs.forget("boards/a.html");
-	assert.deepEqual(readdirSync(dir), [thumbName("boards/b.html", 1, "dark")]);
+	assert.deepEqual(readdirSync(dir).filter((name) => !/-whole-w\d+/.test(name)), [thumbName("boards/b.html", 1, "dark")]);
 	thumbs.dispose();
 });
 
@@ -221,20 +223,17 @@ test("a flow document is measured in the page and pictured to that height, witho
 	await tick();
 	await chrome.release();
 	await asked;
-	assert.deepEqual(chrome.opened[0]?.viewport, { width: 720, height: 540 }, "laid out in the tallest window a picture can be");
-	assert.deepEqual(chrome.clips, [540], "1234 is taller than 4:3 allows, so the picture is 4:3");
+	assert.deepEqual(chrome.opened[0]?.viewport, { width: 720, height: 540 }, "laid out in a window no shorter than three quarters of its width");
+	assert.deepEqual(chrome.clips, [1234], "pictured to the height its page measured");
 	assert.equal(flow.h, 240, "the board keeps the size its file states");
 	thumbs.dispose();
 });
 
-test("the two kinds of picture have names of their own, and neither is taken for the other's older revision", async () => {
-	const { thumbName: name } = await import("./thumbs.ts");
-	const card = name("boards/a.html", 3, "light");
-	const whole = name("boards/a.html", 3, "light", "whole");
-	assert.equal(new Set([card, whole]).size, 2);
-	// The card's pattern for "any revision of this picture" must not reach the whole one.
-	const cardAny = new RegExp(`^${card.slice(0, 16)}-\\d+-light(-\\d+)?(-l\\d+)?\\.jpg$`);
-	assert.ok(cardAny.test(card) && !cardAny.test(whole));
+test("each rung of the ladder has a name of its own beside the whole picture", async () => {
+	const whole = thumbName("boards/a.html", 3, "light", "whole");
+	const rungs = [192, 480, 800].map((width) => thumbName("boards/a.html", 3, "light", "small", width));
+	assert.equal(new Set([whole, ...rungs]).size, 4);
+	assert.match(rungs[2]!, /-whole-w800-l\d+\.webp$/);
 });
 
 test("what stands in for a picture: this revision at the nearest size, else the newest earlier revision", () => {

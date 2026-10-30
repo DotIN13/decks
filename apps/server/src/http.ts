@@ -24,7 +24,7 @@ import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
 import { boardOnCanvas, verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
-import { pictureType, smallWidthFor, squeezed, wireEncoding } from "./boards/thumbs.ts";
+import { keptWidth, pictureType, squeezed, wireEncoding } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 import type { ServerMessage } from "@decks/protocol";
 import { buildBundle, bundleFileName } from "./share/bundle.ts";
@@ -680,14 +680,13 @@ export function createHttpApp(app: App): Express {
 	});
 
 	/**
-	 * A picture of a board, for the panel's thumbnails (`boards/thumbs.ts`).
+	 * A picture of a card (`boards/thumbs.ts`): `whole=1`, and `w=` one of the ladder's rungs
+	 * (`SMALL_WIDTHS`) or none for the whole picture; `astc=1` for it compressed for the GPU.
 	 *
-	 * The answer waits for the picture: an `<img>` has no way to be told "later", and a
-	 * request that is held is what lets the newest-first queue know who is still looking.
-	 * `v` is the revision the browser knows, and it is only there to make the URL a new one
-	 * when the board changes, which is what allows the year of caching: the picture served is
-	 * always of the board as it is now. 503 when there is no Chromium here, 404 for no such
-	 * board; the gallery draws its plain tile for either.
+	 * `v` is the revision the canvas knows, and it is only there to make the URL a new one when the
+	 * card changes, which is what allows the year of caching: the picture served is always of the
+	 * card as it is now. 400 for a width the ladder does not have, 503 when there is no Chromium
+	 * here, 404 for no such card.
 	 */
 	api.get(
 		"/thumb/*path",
@@ -697,35 +696,30 @@ export function createHttpApp(app: App): Express {
 				res.status(404).end();
 				return;
 			}
+			// A rung of the ladder, or the whole picture; any other width is refused.
+			const small = req.query.w === undefined ? undefined : keptWidth(Number(req.query.w));
+			if (req.query.whole !== "1" || (req.query.w !== undefined && small === undefined)) {
+				res.status(400).type("text").send("a card's picture is asked for with whole=1, and w= one of the ladder's widths or none");
+				return;
+			}
 			let gone = false;
 			res.on("close", () => (gone = !res.writableEnded));
 			try {
 				const scheme = req.query.scheme === "dark" ? "dark" : "light";
-				const kind = req.query.whole === "1" ? "whole" : "card";
-				// A smaller copy of a whole picture, for a canvas zoomed out (`SMALL_WIDTHS`): another width is sent the nearest kept.
-				const small = kind === "whole" ? smallWidthFor(Number(req.query.w)) : undefined;
 				const wantsPacked = req.query.astc === "1" && small !== undefined;
 				if (wantsPacked) app.thumbs.wantCompressed();
 				const send = async (file: string) => {
 					res.type(file.endsWith(".webp") ? "webp" : "jpeg");
 					await sendFile(res, file);
 				};
-				if (kind === "card") {
-					const file = await app.thumbs.get(board, scheme, () => gone, kind);
-					if (gone) return;
-					res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
-					await send(file);
-					return;
-				}
 				/*
-				 * A board's picture for the canvas: the one asked for when it is on disk; otherwise
-				 * whatever the board has that is nearest (another size, an earlier revision) at once,
-				 * not cached and said to be a stand-in so the canvas asks again (`pen/scene.ts`), with
-				 * the one asked for made ahead of the background's work. Only a board with no picture at
-				 * all waits. Not for a gallery card: an `<img>` would keep the stand-in.
+				 * The picture asked for when it is on disk; otherwise whatever the card has that is
+				 * nearest (another rung, an earlier revision) at once, not cached and said to be a
+				 * stand-in so the canvas asks again (`render/engine.ts`), with the one asked for made
+				 * ahead of the background's work. Only a card with no picture at all waits.
 				 */
 				const size = small ?? "whole";
-				app.thumbs.asked(scheme, "whole");
+				app.thumbs.asked(scheme);
 				const near = app.thumbs.nearest(board, scheme, size);
 				if (near && !near.exact) {
 					app.thumbs.picture(board, scheme, size).catch(() => {});
@@ -819,7 +813,7 @@ export function createHttpApp(app: App): Express {
 					if (near) return near.file;
 					const left = until - Date.now();
 					if (left <= 0) return undefined;
-					return Promise.race([app.thumbs.get(board, scheme, () => false, "whole"), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);
+					return Promise.race([app.thumbs.get(board, scheme, () => false), new Promise<undefined>((done) => setTimeout(() => done(undefined), left))]).catch(() => undefined);
 				},
 			});
 			const file = bundleFileName(pens.titleOf(name));

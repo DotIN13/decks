@@ -3,7 +3,7 @@ import { type ThumbService, wholeScale, wholeShot } from "./thumbs.ts";
 
 /**
  * A picture of a board as a reader left it, drawn by the server's Chrome from a snapshot of the
- * page the reader's browser had (`canvas/shots/adaptors.ts`, the `snapshot` adaptor).
+ * page the reader's browser had (the `snapshot` adaptor).
  *
  * The browser sends the document as it stood: its markup after every script had run, with the
  * values typed into fields, each scrolled box's position and each canvas's pixels written into it,

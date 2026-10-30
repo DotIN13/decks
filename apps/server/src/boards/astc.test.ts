@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import { compress, encoder, MAGIC, type Level } from "./astc.ts";
-import { compressedName, SMALL_WIDTHS, smallWidthFor, squeezed, wireEncoding, wireName } from "./thumbs.ts";
+import { compressedName, SMALL_WIDTHS, keptWidth, squeezed, wireEncoding, wireName } from "./thumbs.ts";
 
 /** A picture's sizes, top half red and bottom half blue, each half the one before down to one pixel. */
 function levels(width: number, height: number): Level[] {
@@ -36,15 +36,10 @@ test("a picture's compressed sizes sit beside it", () => {
 	assert.equal(compressedName("/d/ab-3-light-2-whole-w1024.webp"), "/d/ab-3-light-2-whole-w1024.astc");
 });
 
-test("pictures are kept at 192 and 480 px only, and another width asked for is sent the nearest", () => {
-	assert.deepEqual(SMALL_WIDTHS, [192, 480]);
-	assert.equal(smallWidthFor(192), 192);
-	assert.equal(smallWidthFor(256), 480);
-	assert.equal(smallWidthFor(480), 480);
-	assert.equal(smallWidthFor(1024), 480);
-	assert.equal(smallWidthFor(100), 192);
-	assert.equal(smallWidthFor(Number("")), undefined);
-	assert.equal(smallWidthFor(Number.NaN), undefined);
+test("pictures are kept at the ladder's widths only, and no other width is answered", () => {
+	assert.deepEqual(SMALL_WIDTHS, [192, 480, 800]);
+	for (const width of [192, 480, 800]) assert.equal(keptWidth(width), width);
+	for (const width of [256, 512, 1024, 100, Number(""), Number.NaN]) assert.equal(keptWidth(width), undefined);
 });
 
 test("a compressed picture is squeezed for the wire once, beside it, and comes back the same", async () => {

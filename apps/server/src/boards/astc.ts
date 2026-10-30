@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 /**
- * Board pictures compressed for the GPU: ASTC in 4 × 4 blocks, a byte a pixel, every size of the
- * picture down to one pixel, so the canvas writes them straight to its GPU (`stage/engine.ts`,
+ * Card pictures compressed for the GPU: ASTC in 4 × 4 blocks, a byte a pixel, every size of the
+ * picture down to one pixel, so the canvas writes them straight to its GPU (`render/engine.ts`,
  * `putCompressedPicture`) with nothing decoded and nothing copied by the page, and holds them in a
  * quarter of the memory. Encoded by ARM's `astcenc` (the `astcenc` package's binary for this
  * machine); with none, pictures stay WebP.
