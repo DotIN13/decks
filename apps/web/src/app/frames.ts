@@ -1,7 +1,6 @@
 import { setBackend, setPairing } from "../connections/backend.ts";
 import { receiveQueued } from "../state/queued.ts";
 import { stageOf } from "../state/stages.ts";
-import { handsOn } from "@decks/canvas/camera";
 import type { AgentState, Camera, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend } from "../chat/history-page.ts";
@@ -10,13 +9,11 @@ import { viewToPark } from "@decks/canvas/camera";
 import { agentViews } from "../camera/agent-views.ts";
 import { runStageCall } from "@decks/canvas/host";
 import { scratch } from "../state/agent.ts";
-import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { notice, offer } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
-import { setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
@@ -464,19 +461,14 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							goto: (agentId) => hooks.focusAgent?.(agentId),
 							offerGoto: (agentId, stage, target) =>
 								offer(`${nameOf(agentId)} wants to show you the canvas ${stage}`, { label: "Go", run: () => hooks.focusAgent?.(target) }, "agent-view"),
-							setCamera: (next, options) => moveCamera(next, options),
-							handsOn,
-							offerView: (agentId, camera, selected, what) =>
-								offer(`${nameOf(agentId)} ${what === "board" ? "wants to show a board" : "wants to move the view"}`, {
-									label: "Go",
-									run: () => {
-										moveCamera(camera, { animate: true });
-										if (selected) setSelected(selected);
-										reportCamera(camera, agentId);
-									},
-								}, "agent-view"),
+							/*
+							 * What reaches this page is never for the canvas on screen, whose frame carries out its own
+							 * calls (above): a view for another conversation is remembered for it, and nothing on this
+							 * page draws a canvas to move or select on, so no view is offered or moved here.
+							 */
+							setCamera: () => {},
 							rememberView,
-							select: (path) => setSelected(path),
+							select: () => {},
 							// A card or a cursor on a canvas that is not on screen: nothing here shows it.
 							reload: () => {},
 							cursor: () => {},
