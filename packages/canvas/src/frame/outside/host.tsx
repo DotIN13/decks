@@ -76,6 +76,43 @@ export function createFramedEditor(options: Options): Editor {
 		return new DOMRect(box.x + at.x, box.y + at.y, at.w, at.h);
 	};
 
+	/*
+	 * Whether you are using the canvas: the frame has focus, or had it a moment ago (the popover's Enter
+	 * moves focus out to the composer as the comment is handed over). Drafts for the composer are taken
+	 * only then: a card's script runs as the frame's own code, and could otherwise slip one in at any time.
+	 */
+	let frameLeftAt = 0;
+	let frameHadFocus = false;
+	const FOCUS_GRACE = 2000;
+	const frameFocused = () => {
+		const frame = frameAt();
+		return !!frame && document.activeElement === frame && document.hasFocus();
+	};
+	/*
+	 * And only just after a press or a key of yours: a script in the frame can focus it without one
+	 * (Chrome lets a sandboxed frame take focus from a timer), but cannot make one, and a press or a key
+	 * in the frame counts on this page too (`navigator.userActivation`, a few seconds long).
+	 */
+	const pressed = () => (typeof navigator === "undefined" || !navigator.userActivation ? true : navigator.userActivation.isActive);
+	const frameInUse = () => (frameFocused() || (frameLeftAt > 0 && Date.now() - frameLeftAt < FOCUS_GRACE)) && pressed();
+	if (typeof window !== "undefined") {
+		const noteFocus = () => {
+			const now = frameFocused();
+			if (frameHadFocus && !now) frameLeftAt = Date.now();
+			frameHadFocus = now;
+		};
+		// Focus going into the frame blurs this window; focus coming out lands on something here.
+		const onBlur = () => setTimeout(noteFocus, 0);
+		window.addEventListener("blur", onBlur);
+		window.addEventListener("focus", noteFocus);
+		document.addEventListener("focusin", noteFocus, true);
+		onCleanup(() => {
+			window.removeEventListener("blur", onBlur);
+			window.removeEventListener("focus", noteFocus);
+			document.removeEventListener("focusin", noteFocus, true);
+		});
+	}
+
 	/** Start the frame on the canvas on screen: the ticket first, then everything it begins with. */
 	const startFrame = async (frame: HTMLIFrameElement, canvas: string, cancelled: () => boolean) => {
 		const [ticket, backend] = await Promise.all([options.frame.ticket(canvas), options.frame.backend(canvas)]);
@@ -154,6 +191,12 @@ export function createFramedEditor(options: Options): Editor {
 					options.onSelect?.(selection.page);
 				}
 				if (selection.page === undefined) options.onSelection?.(selection.ids);
+			}
+			if (!data.pills && !data.comment && !data.ink) return;
+			// Drafts only while you are using the canvas: it has focus, and you just pressed or typed.
+			if (!frameInUse()) {
+				console.warn("[decks] a draft from the canvas frame was dropped: the canvas was not in use (no focus, or no press or key just now)", Object.keys(data));
+				return;
 			}
 			if (data.pills) options.onRefer?.(data.pills);
 			if (data.comment) options.frame.comment?.(data.comment);

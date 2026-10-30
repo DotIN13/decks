@@ -205,6 +205,11 @@
 		-webkit-user-select: all;
 		user-select: all;
 	}
+	/* A comment from the canvas shows its whole text (`Composer.tsx`, `pillFor`), so it wraps. */
+	[data-slot="composer-input"] [data-component="mention-pill"][data-mention-label^="from the canvas ·"] {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
 	[data-slot="composer-input"] [data-component="mention-pill"] [data-slot="pill-icon"] {
 		display: inline;
 		margin-inline-end: 3px;

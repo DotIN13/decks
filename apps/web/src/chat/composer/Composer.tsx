@@ -13,7 +13,7 @@ import { ScribbleCatch } from "@decks/ui";
 import { joinHeard, micMissing, startRecording, type Recording } from "./voice.ts";
 import { notice } from "../../state/notices.ts";
 import { carriesFiles } from "../../board/file-drop.ts";
-import type { BoardComment } from "../../markup/comments.ts";
+import type { WaitingComment } from "../../state/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
 import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftText, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
 import { Icon } from "../../ui/icons.tsx";
@@ -25,6 +25,9 @@ import { ContextDial } from "./ContextDial.tsx";
 import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
 import { filterMentionables, MentionMenu, type Mentionable } from "./MentionMenu.tsx";
 import { Recipient, type RecipientProps } from "./Recipient.tsx";
+
+/** What a pill for a comment from the canvas starts with (`pillFor`); `ink.css` lets such a pill wrap. */
+export const FROM_CANVAS = "from the canvas ·";
 
 /**
  * The input bar, floating over the canvas.
@@ -82,7 +85,7 @@ export function Composer(props: {
 	 * the field; this list is what a pill's id stands for, and what puts the pills back after a
 	 * reload, when the field's own draft is gone and the comments are not.
 	 */
-	comments?: BoardComment[];
+	comments?: WaitingComment[];
 	/** Pills the person deleted: their comments are no longer going anywhere. */
 	onCommentsGone?: (ids: string[]) => void;
 	onAbort: () => void;
@@ -175,7 +178,17 @@ export function Composer(props: {
 		props.onText?.(draftText(next));
 		if (held !== undefined) parked.set(held, next);
 	};
-	const pillFor = (comment: BoardComment): DraftMention => ({ type: "mention", kind: "comment", id: comment.id, label: comment.quote ? commentLabel(comment.quote) : comment.board.split("/").pop() ?? comment.board });
+	/*
+	 * A comment from the canvas shows its whole text in its pill, not only on hover, marked as from the
+	 * canvas: anything there can hand one over, a card's script too, and it goes with your next message,
+	 * so you read all of what goes (`state/comments.ts`, `cleanFrameComment`, cut it at 2,000 characters).
+	 */
+	const pillFor = (comment: WaitingComment): DraftMention => {
+		const where = comment.quote ? commentLabel(comment.quote) : comment.board.split("/").pop() ?? comment.board;
+		if (comment.from !== "canvas") return { type: "mention", kind: "comment", id: comment.id, label: where };
+		const quote = comment.quote ? `“${comment.quote}”` : where;
+		return { type: "mention", kind: "comment", id: comment.id, label: `${FROM_CANVAS} ${quote}${comment.text ? ` — ${comment.text}` : ""}` };
+	};
 	const describe = (node: DraftMention) => {
 		const comment = props.comments?.find((candidate) => candidate.id === node.id);
 		return comment ? (comment.quote ? `“${comment.quote}”\n${comment.text}` : `${comment.board}\n${comment.text}`) : undefined;

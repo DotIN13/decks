@@ -34,7 +34,7 @@ import { isNews } from "./panel/board-news.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
 import { commentBlock, withComments } from "./markup/comments.ts";
-import { addComment, removeComment, takeComments, waitingComments } from "./state/comments.ts";
+import { addComment, cleanFrameComment, cleanFrameInk, cleanFramePills, removeComment, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "@decks/canvas/tools";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { createFramedEditor, type CanvasHandle } from "@decks/canvas";
@@ -817,12 +817,15 @@ export function App() {
 	/*
 	 * What the canvas frame hands the composer (`@decks/canvas`, `frame/`): a comment, a sketch. Drafts,
 	 * shown in the composer and sent only when you press Send there: anything in the frame can hand
-	 * these over, a card's script too, so nothing from it goes to an agent on its word alone.
+	 * these over, a card's script too, so nothing from it goes to an agent on its word alone. Every text
+	 * in them is cleaned of what cannot be seen and cut at 2,000 characters (`cleanFrame*`), and a
+	 * comment's pill shows its whole text, marked as from the canvas: what is sent is what you can read.
 	 */
-	const frameComment = (comment: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
+	const frameComment = (handed: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
 		const agentId = state.focused;
 		if (!agentId) return;
-		const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
+		const comment = cleanFrameComment(handed);
+		const note = { id: `c${Date.now().toString(36)}`, board: comment.path, quote: comment.quote, text: comment.text, at: Date.now(), from: "canvas" as const, ...(comment.component ? { component: comment.component } : {}), ...(comment.items?.length ? { items: comment.items } : {}) };
 		if (comment.send) setDraft({ text: commentBlock([note]), at: Date.now(), insert: true, agentId });
 		else {
 			addComment(agentId, note);
@@ -831,7 +834,7 @@ export function App() {
 	};
 	const frameInk = (request: InkRequest) => {
 		const agentId = state.focused;
-		const text = inkAsked(request);
+		const text = inkAsked(cleanFrameInk(request));
 		if (agentId && text) setDraft({ text, at: Date.now(), insert: true, agentId });
 	};
 	/** A picture of these drawn items to download, taken by the server. */
@@ -1210,7 +1213,7 @@ export function App() {
 			onRefer: (pills) =>
 				setDraft({
 					text: "",
-					pills,
+					pills: cleanFramePills(pills),
 					at: Date.now(),
 					insert: true,
 					...(state.focused ? { agentId: state.focused } : {}),

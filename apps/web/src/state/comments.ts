@@ -39,11 +39,11 @@ const write = (next: Record<string, BoardComment[]>) => {
 	saveComments(storage(), next);
 };
 
-export function waitingComments(agentId: string | undefined): BoardComment[] {
+export function waitingComments(agentId: string | undefined): WaitingComment[] {
 	return agentId ? waiting()[agentId] ?? [] : [];
 }
 
-export function addComment(agentId: string, comment: BoardComment): void {
+export function addComment(agentId: string, comment: WaitingComment): void {
 	write({ ...waiting(), [agentId]: [...(waiting()[agentId] ?? []), comment] });
 }
 
@@ -56,4 +56,73 @@ export function takeComments(agentId: string): BoardComment[] {
 	const taken = waiting()[agentId] ?? [];
 	if (taken.length > 0) write({ ...waiting(), [agentId]: [] });
 	return taken;
+}
+
+// --- what the canvas frame hands over -------------------------------------------------
+
+/**
+ * A comment the canvas frame handed over: marked, so its pill says where it came from. Anything in the
+ * frame can hand one over, a card's script too, so its whole text is shown in the composer, never only
+ * on hover: what goes with your next message is what you can read there.
+ */
+export type WaitingComment = BoardComment & { from?: "canvas" };
+
+/** The most of any one text a frame draft may carry: longer is cut, with an ellipsis, and the cut is what is sent. */
+export const FRAME_TEXT_LIMIT = 2000;
+/** The most ids a sketch handed over may name. */
+export const FRAME_IDS_LIMIT = 500;
+
+/**
+ * Characters that show nothing: zero-width spaces and joiners, bidi controls, word joiners and invisible
+ * operators, the byte-order mark, soft hyphen, variation selectors, Unicode tags (which can spell out
+ * text no font draws), and control characters other than tab and newline.
+ */
+const INVISIBLE =
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u2028-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFFB]|[\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}]/gu;
+
+/** A text from the frame, cleaned of what cannot be seen and cut at `limit` characters. */
+export function frameText(value: unknown, limit = FRAME_TEXT_LIMIT): string {
+	const clean = (typeof value === "string" ? value : "").replace(INVISIBLE, "");
+	const chars = Array.from(clean);
+	return chars.length <= limit ? clean : `${chars.slice(0, limit - 1).join("")}…`;
+}
+
+/** A list of texts from the frame: each cleaned and cut, the empty ones gone, at most `count`. */
+export function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
+	return (Array.isArray(values) ? values : []).slice(0, count).map((value) => frameText(value)).filter((value) => value !== "");
+}
+
+type FrameComment = { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
+type FramePill = { kind: "board" | "item"; id: string; label: string };
+type FrameInk = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
+
+/** A comment from the frame, every text in it cleaned and cut. */
+export function cleanFrameComment(comment: FrameComment): FrameComment {
+	const component = frameText(comment.component);
+	const items = frameTexts(comment.items);
+	return {
+		path: frameText(comment.path),
+		title: frameText(comment.title),
+		quote: frameText(comment.quote),
+		text: frameText(comment.text),
+		...(comment.send === true ? { send: true } : {}),
+		...(component ? { component } : {}),
+		...(items.length ? { items } : {}),
+	};
+}
+
+/** Pills from the frame, their ids and labels cleaned and cut. */
+export function cleanFramePills(pills: readonly FramePill[]): FramePill[] {
+	return pills
+		.slice(0, FRAME_IDS_LIMIT)
+		.filter((pill) => pill && (pill.kind === "board" || pill.kind === "item"))
+		.map((pill) => ({ kind: pill.kind, id: frameText(pill.id), label: frameText(pill.label) }))
+		.filter((pill) => pill.id !== "");
+}
+
+/** A sketch from the frame, its ids and canvas cleaned and cut, its box plain numbers. */
+export function cleanFrameInk<T extends FrameInk>(ink: T): T {
+	const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
+	const action = ink.action === "drawing" || ink.action === "board" ? ink.action : "send";
+	return { ...ink, action, ids: frameTexts(ink.ids), canvas: frameText(ink.canvas), box: { x: num(ink.box?.x), y: num(ink.box?.y), w: num(ink.box?.w), h: num(ink.box?.h) } };
 }
