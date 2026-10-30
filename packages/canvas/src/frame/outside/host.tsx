@@ -110,7 +110,8 @@ export function createFramedEditor(options: Options): Editor {
 			renew(page, canvas, backend.idle, cancelled);
 			// To this frame's window alone: a sandboxed page has no origin to name, so "*", and the port beside it.
 			// A plain copy: the pages come from the host's store, whose proxies the structured clone refuses.
-			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify(start)) as Start }, "*", [channel.port2]);
+			// The camera as it is now: the page may have landed while the frame was loading.
+			frame.contentWindow?.postMessage({ t: "start", start: JSON.parse(JSON.stringify({ ...start, camera: localCamera })) as Start }, "*", [channel.port2]);
 		};
 		addEventListener("message", onHello);
 		onCleanup(() => removeEventListener("message", onHello));
@@ -221,10 +222,11 @@ export function createFramedEditor(options: Options): Editor {
 			on(
 				() => [state?.camera?.[0](), state?.glide?.()] as const,
 				([camera, glide]) => {
-					const page = end();
-					if (!page || !camera) return;
+					if (!camera) return;
+					// Kept with no frame yet too: a frame starting for another canvas opens on the camera it landed on.
 					localCamera = camera;
-					if (camera === fromFrame.camera) return;
+					const page = end();
+					if (!page || camera === fromFrame.camera) return;
 					page.emit("camera", { camera, ...(glide ? { glide: glide.ms } : {}) });
 				},
 			),
