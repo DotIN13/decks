@@ -255,7 +255,9 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				 * As tall as what is in it, so the card can be measured and grow (`onHeight`); the paper is the
 				 * host's, so a card shorter than its box still fills it.
 				 */
-				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }";
+				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }"
+				// A card is as tall as its content (`withContentHeights`) unless its height is the person's: then what does not fit scrolls.
+				+ "\n:host([data-fixed-height]) { overflow-y: auto }";
 			const sheet = new CSSStyleSheet();
 			sheet.replaceSync(css);
 			cardSheets.add(sheet);

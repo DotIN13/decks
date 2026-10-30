@@ -78,6 +78,12 @@ export interface Board {
 	 */
 	card?: true;
 	/**
+	 * A card whose height is the person's own (its item's `metadata.fixedHeight`): it keeps the height
+	 * it was given and scrolls what does not fit. Every other card is at least as tall as its content,
+	 * the stage raising it to what it measured and the server writing that to its canvas.
+	 */
+	fixedHeight?: true;
+	/**
 	 * An item of the drawing with no file of its own, drawn in a board's place: a document (`decks.document`,
 	 * the file it edits in `file`) or an app (`decks.app`, its name in `app`). Its `path` is its item's.
 	 */

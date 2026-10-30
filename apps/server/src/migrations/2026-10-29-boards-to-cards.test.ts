@@ -3,7 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { boardToCard, migrated, migrateBoardsToCards, notACard, restyle } from "./2026-10-29-boards-to-cards.ts";
+import { boardToCard, measuredHeight, migrated, migrateBoardsToCards, notACard, restyle } from "./2026-10-29-boards-to-cards.ts";
+import { revisionOf } from "../deck/loader.ts";
+import { thumbName } from "../boards/thumbs.ts";
 
 const BOARD = `<!doctype html>
 <html lang="en">
@@ -72,6 +74,37 @@ test("the migration writes the cards, rewrites the drawing, removes the boards i
 		assert.ok(!existsSync(join(canvas, "boards", "sales.html")) && existsSync(join(canvas, "boards", "tab.html")));
 		assert.ok(migrated(deck));
 		assert.equal(migrateBoardsToCards(deck).ran, false, "once");
+	} finally {
+		rmSync(deck, { recursive: true, force: true });
+	}
+});
+
+test("a card is given the height its board's page measured, when that is more than its item had: a browser's reading of that revision, or its picture's", () => {
+	const deck = mkdtempSync(join(tmpdir(), "decks-boards-cards-h-"));
+	try {
+		const canvas = join(deck, "canvases", "plan");
+		mkdirSync(join(canvas, "boards"), { recursive: true });
+		const short = BOARD.replace(`{"w":1000,"bg":"plain"}`, `{"w":1000,"bg":"plain","h":240}`);
+		writeFileSync(join(canvas, "boards", "read.html"), short);
+		writeFileSync(join(canvas, "boards", "pictured.html"), short.replace("Sales rose", "Costs fell"));
+		writeFileSync(join(canvas, "boards", "tall.html"), short.replace("Sales rose", "Tall"));
+		writeFileSync(join(canvas, "boards", "wide.html"), short.replace("Sales rose", "Wide"));
+		const html = (name: string) => readFileSync(join(canvas, "boards", name), "utf8");
+		mkdirSync(join(deck, ".decks", "thumbs"), { recursive: true });
+		writeFileSync(join(deck, ".decks", "heights.json"), JSON.stringify({ "canvases/plan/boards/read.html": { rev: revisionOf(html("read.html")), h: 612 }, "canvases/plan/boards/tall.html": { rev: revisionOf(html("tall.html")), h: 300 } }));
+		// A whole picture 720 wide and 1080 tall: 1500 px tall at the board's 1000.
+		const webp = Buffer.alloc(64);
+		webp.write("RIFF", 0, "ascii");
+		webp.write("WEBPVP8X", 8, "ascii");
+		webp.writeUIntLE(719, 24, 3);
+		webp.writeUIntLE(1079, 27, 3);
+		writeFileSync(join(deck, ".decks", "thumbs", thumbName("canvases/plan/boards/pictured.html", revisionOf(html("pictured.html")), "light", "whole")), webp);
+		const board = (id: string, path: string, width = 1000, height = 240) => ({ type: "browser", id, x: 0, y: 0, width, height, url: path, metadata: { type: "decks.board", path } });
+		writeFileSync(join(canvas, "canvas.pen"), JSON.stringify({ version: "2.14", children: [board("r", "boards/read.html"), board("p", "boards/pictured.html"), board("t", "boards/tall.html", 1000, 800), board("w", "boards/wide.html", 1200)] }));
+		migrateBoardsToCards(deck);
+		const heights = Object.fromEntries((JSON.parse(readFileSync(join(canvas, "canvas.pen"), "utf8")) as { children: Array<{ id: string; height: number }> }).children.map((one) => [one.id, one.height]));
+		assert.deepEqual(heights, { r: 612, p: 1500, t: 800, w: 240 }, "read, pictured, already taller, and measured at another width");
+		assert.equal(measuredHeight(deck, "canvases/plan/boards/none.html", short, 1000), undefined);
 	} finally {
 		rmSync(deck, { recursive: true, force: true });
 	}

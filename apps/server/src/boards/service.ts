@@ -38,6 +38,8 @@ export interface BoardHooks {
 	state(): DeckState;
 	/** A board is gone: every agent must drop it, or a dead path empties the rail. */
 	removed(path: string): void;
+	/** A frame measured a board: a card shorter than its content grows to it (`StagePens.raiseCard`). */
+	measured?(path: string, extent: { rev: number; w: number; h: number }): void;
 }
 
 /**
@@ -179,6 +181,7 @@ export class BoardService {
 	 */
 	noteExtent(path: string, extent: { rev: number; w: number; h: number; at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
 		this.extents.set(path, extent);
+		this.hooks.measured?.(path, extent);
 		for (const waiter of [...this.extentWaiters]) {
 			if (waiter.path !== path || waiter.rev !== extent.rev || !atWidth(extent, waiter.at)) continue;
 			this.extentWaiters.delete(waiter);

@@ -31,6 +31,21 @@ import { toDisk, toMemory, type Adopt } from "./canvas-refs.ts";
 export const BOARD_ITEM = "decks.board";
 /** A card's tag: a board in `cards/`, drawn in a shadow root of the stage's page (`deck/layout.ts`). */
 export const CARD_ITEM = "decks.card";
+/** The tallest a card is grown to its content (`raiseCard`): past this, a reading is a runaway, not a page. */
+export const MAX_RAISED_H = 20000;
+/** How far below its height a card's content has to be before it is taken back down: browsers read a pixel or two apart. */
+const SHRINK_SLACK = 4;
+
+/**
+ * The height a card's item should have for content `h` tall: its content, rounded up, never under the
+ * height it had before it grew (`grownFrom`, or its height when it has not grown), and left as it is
+ * for a few pixels less (`SHRINK_SLACK`).
+ */
+export function cardHeight(height: number, grownFrom: unknown, h: number): number {
+	const floor = typeof grownFrom === "number" ? grownFrom : height;
+	const want = Math.max(floor, Math.ceil(h));
+	return want > height || want < height - SHRINK_SLACK ? want : height;
+}
 /** The tag a page item takes for its path: a card's in a canvas's `cards/`, a board's anywhere else. */
 export const pageTag = (path: string): string => (isCardPath(path) ? CARD_ITEM : BOARD_ITEM);
 
@@ -485,7 +500,7 @@ export class StagePens {
 	 * Arrows are redrawn after the edits, so one that joins something that moved follows it
 	 * (`@decks/pen`'s `reroute`). `boards` finds a board by path, for an arrow that ends on one.
 	 */
-	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
+	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined, options?: { undoable?: boolean; settle?: boolean }): { entry: PenEntry; results: OpResult[] } {
 		this.mayWrite(name);
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
@@ -506,8 +521,45 @@ export class StagePens {
 			history.undo.push({ before, after: entry.text! });
 			if (history.undo.length > HISTORY) history.undo.shift();
 			history.redo = [];
+		} else if (options?.settle) {
+			/*
+			 * A change that is nobody's edit (a card grown to its content, `raiseCard`): the person's
+			 * last step is taken as having made it too, so it does not stop them undoing it. An undo
+			 * then puts back the height from before, which the card's next reading raises again.
+			 */
+			const history = this.history.get(name);
+			const last = history?.undo[history.undo.length - 1];
+			if (last && last.after === before) last.after = entry.text!;
+			const next = history?.redo[history.redo.length - 1];
+			if (next && next.before === before) next.before = entry.text!;
 		}
 		return { entry, results };
+	}
+
+	/**
+	 * A card on a canvas as tall as its content: what a frame measured of it (`h`, laid out at width
+	 * `w`). Its height before it first grew is kept on its item (`metadata.grownFrom`) and is the floor:
+	 * the card follows its content above it, and back down to it, so a height read while a picture or
+	 * a script was still settling does not stay. Back down only by more than a few pixels, so two
+	 * browsers a pixel apart do not answer each other. Never a card whose height is the person's
+	 * (`metadata.fixedHeight`, set by a resize that cut it), nor a reading taken at another width. Not
+	 * the person's edit: their undo is left as it was (`settle`). True when its height changed.
+	 */
+	raiseCard(name: string, path: string, size: { w: number; h: number }): boolean {
+		if (!this.has(name) || this.sharing(name)?.role === "view") return false;
+		const entry = this.get(name);
+		if (entry.error) return false;
+		const node = this.boardItems(name).get(this.copyOf(name, path));
+		if (!node || node.metadata?.type !== CARD_ITEM || node.metadata.fixedHeight === true) return false;
+		const width = typeof node.width === "number" ? node.width : undefined;
+		const height = typeof node.height === "number" ? node.height : undefined;
+		if (width === undefined || height === undefined || Math.abs(width - size.w) > 1 || !(size.h > 0) || size.h > MAX_RAISED_H) return false;
+		const target = cardHeight(height, node.metadata.grownFrom, size.h);
+		if (target === height) return false;
+		const { grownFrom: _was, ...metadata } = node.metadata;
+		const floor = typeof node.metadata.grownFrom === "number" ? node.metadata.grownFrom : height;
+		this.edit(name, [{ op: "update", id: node.id, set: { height: target, metadata: target > floor ? { ...metadata, grownFrom: floor } : metadata } }], undefined, { settle: true });
+		return true;
 	}
 
 	/**
@@ -999,6 +1051,11 @@ export class StagePens {
 		const set: Record<string, unknown> = {};
 		if (size.w !== undefined && node.width !== Math.round(size.w)) set.width = Math.round(size.w);
 		if (size.h !== undefined && node.height !== Math.round(size.h)) set.height = Math.round(size.h);
+		// A height said for it is its floor now, not one it grew to.
+		if (set.height !== undefined && node.metadata && "grownFrom" in node.metadata) {
+			const { grownFrom: _was, ...metadata } = node.metadata;
+			set.metadata = metadata;
+		}
 		if (Object.keys(set).length) this.edit(name, [{ op: "update", id: node.id, set }]);
 		return true;
 	}

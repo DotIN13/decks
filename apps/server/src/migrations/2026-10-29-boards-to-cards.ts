@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
+import { revisionOf } from "../deck/loader.ts";
+import { SMALL_TAKEN, smallName, thumbName, webpSize } from "../boards/thumbs.ts";
+import { BOARD_W } from "../boards/templates.ts";
 
 /**
  * 2026-10-29: every board on a canvas becomes a card.
@@ -203,6 +206,42 @@ export function boardToCard(html: string, links: Map<string, string>, placed?: {
 		})}\n`;
 }
 
+/**
+ * How tall a board's page last measured, laid out at width `w`, when the deck knows: a browser's
+ * reading of this revision (`.decks/heights.json`, from when browsers sized boards), or the height of
+ * its picture of this revision, which was taken at the height its page measured (`boards/thumbs.ts`).
+ * A board's item kept the height somebody once gave it, often the 240 px a new board starts at, while
+ * its page grew past it; the card it becomes is given the page's height, so it opens whole.
+ */
+export function measuredHeight(deck: string, path: string, html: string, w: number): number | undefined {
+	let meta: { w?: unknown } = {};
+	try {
+		meta = JSON.parse(/<meta\s+name=["']board["']\s+content='([^']*)'/i.exec(html)?.[1] ?? "{}") as { w?: unknown };
+	} catch {
+		/* no size of its own */
+	}
+	// Both were laid out at the board's own width: a reading at another is not this item's.
+	const own = typeof meta.w === "number" && meta.w > 0 ? meta.w : BOARD_W;
+	if (Math.abs(own - w) > 1) return undefined;
+	const rev = revisionOf(html);
+	const read = readJson<Record<string, { rev?: unknown; h?: unknown }>>(join(deck, ".decks", "heights.json"))?.[path];
+	const heights: number[] = [];
+	if (read && read.rev === rev && typeof read.h === "number" && read.h > 0) heights.push(read.h);
+	for (const scheme of ["light", "dark"] as const) {
+		const whole = join(deck, ".decks", "thumbs", thumbName(path, rev, scheme, "whole"));
+		for (const file of [whole, smallName(whole, SMALL_TAKEN)]) {
+			if (!existsSync(file)) continue;
+			try {
+				const size = webpSize(readFileSync(file).subarray(0, 64));
+				if (size && size.w > 0) heights.push(Math.round((size.h * own) / size.w));
+			} catch {
+				/* unreadable: not a size */
+			}
+		}
+	}
+	return heights.length ? Math.max(...heights) : undefined;
+}
+
 /** The deck's own canvases' drawings. */
 function drawings(deck: string): Array<{ canvas: string; file: string }> {
 	const canvases = join(deck, "canvases");
@@ -291,16 +330,20 @@ export function migrateBoardsToCards(deck: string, options: { dryRun?: boolean; 
 		const byBoard = new Map(one.cards.map((c) => [c.board, c.card]));
 		const links = new Map(one.cards.map((c) => [posix.basename(c.board), c.card]));
 		const sizes = new Map<string, { w?: number; h?: number }>();
+		const pages = new Map(one.cards.map((c) => [c.board, readFileSync(join(folder, c.board), "utf8")]));
 		walk(doc.children, (node) => {
 			const board = node.type === "browser" && node.metadata?.type === "decks.board" && typeof node.metadata.path === "string" ? ownBoard(one.canvas, node.metadata.path) : undefined;
 			if (!board || !byBoard.has(board)) return;
+			// As tall as its page measured, at least: an item shorter than its page would cut the card.
+			const measured = typeof node.width === "number" ? measuredHeight(deck, `canvases/${one.canvas}/${board}`, pages.get(board) ?? "", node.width) : undefined;
+			if (measured !== undefined && (typeof node.height !== "number" || node.height < measured)) node.height = measured;
 			if (!sizes.has(board)) sizes.set(board, { ...(typeof node.width === "number" ? { w: node.width } : {}), ...(typeof node.height === "number" ? { h: node.height } : {}) });
 			const path = `cards/${byBoard.get(board)}/index.html`;
 			node.metadata = { ...node.metadata, type: "decks.card", path };
 			if (typeof node.url === "string") node.url = path;
 		});
 		for (const { board, card } of one.cards) {
-			const html = readFileSync(join(folder, board), "utf8");
+			const html = pages.get(board) ?? readFileSync(join(folder, board), "utf8");
 			mkdirSync(join(folder, "cards", card), { recursive: true });
 			writeFileSync(join(folder, "cards", card, "index.html"), boardToCard(html, links, sizes.get(board)));
 		}

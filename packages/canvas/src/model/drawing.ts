@@ -40,7 +40,17 @@ export interface Drawing {
 	editsTo(doc: PenDocument): DocEdits | undefined;
 	/** A board on the drawing (by its deck path) moved or resized: its item moved or resized. */
 	moveBoard(path: string, x: number, y: number): void;
-	resizeBoard(path: string, size: { w: number; h: number }): void;
+	/**
+	 * `fixed`, for a card: whether the height it is given is the person's own, kept even when it cuts
+	 * its content (`Board.fixedHeight`); undefined leaves it as it was.
+	 */
+	resizeBoard(path: string, size: { w: number; h: number }, fixed?: boolean): void;
+	/**
+	 * Pen operations that are nobody's edit (a card grown to its content): applied and reported as an
+	 * edit is, but kept out of the undo, so the person's last step is still theirs. A drawing the host
+	 * owns is left alone: its host makes such changes itself.
+	 */
+	settle(ops: unknown[]): boolean;
 	/** A board taken off the drawing (its file is the host's business): its item deleted. */
 	removeBoard(path: string): void;
 }
@@ -114,10 +124,72 @@ export function boardsOf(doc: PenDocument): Board[] {
 			rev: 0,
 			inContext: [],
 			...(isCardItem(node) ? { card: true as const } : {}),
+			...(isCardItem(node) && fixedHeightOf(node) ? { fixedHeight: true as const } : {}),
 			...itemFields(node),
 		});
 	}
 	return boards;
+}
+
+/** Whether a card's item keeps the height the person gave it (`Board.fixedHeight`). */
+const fixedHeightOf = (node: PenNode) => (node.metadata as { fixedHeight?: unknown } | undefined)?.fixedHeight === true;
+
+/** A card's content as a frame last measured it: its height, laid out at width `w`. */
+export interface CardHeight {
+	w: number;
+	h: number;
+}
+
+/** How far below its height a card's content has to be before it is taken back down: browsers read a pixel or two apart. */
+const SHRINK_SLACK = 4;
+
+/**
+ * The height a card's item should have for content `h` tall, as the Decks server works it out
+ * (`StagePens.raiseCard`): its content, rounded up, never under the height it had before it grew
+ * (`grownFrom`, or its height when it has not grown), and left as it is for a few pixels less.
+ */
+export function cardHeight(height: number, grownFrom: unknown, h: number): number {
+	const floor = typeof grownFrom === "number" ? grownFrom : height;
+	const want = Math.max(floor, Math.ceil(h));
+	return want > height || want < height - SHRINK_SLACK ? want : height;
+}
+
+/** A card item's height updated for content `h` tall (`cardHeight`), with its floor kept on it: the op, or nothing when it stays. */
+export function cardHeightOp(node: PenNode, w: number, h: number): { op: "update"; id: string; set: Record<string, unknown> } | undefined {
+	const meta = (node.metadata ?? {}) as Record<string, unknown>;
+	if (!isCardItem(node) || meta.fixedHeight === true || typeof node.width !== "number" || typeof node.height !== "number" || Math.abs(node.width - w) > 1 || !(h > 0)) return undefined;
+	const target = cardHeight(node.height, meta.grownFrom, h);
+	if (target === node.height) return undefined;
+	const floor = typeof meta.grownFrom === "number" ? meta.grownFrom : node.height;
+	const { grownFrom: _was, ...rest } = meta;
+	return { op: "update", id: node.id, set: { height: target, metadata: target > floor ? { ...rest, grownFrom: floor } : rest } };
+}
+
+/**
+ * The boards as the stage draws them: each card as tall as its content (`heights`, what its frame
+ * measured), never under the height its item had before it grew (`grownFrom`), unless its height is
+ * the person's (`fixedHeight`, read off the drawing). A reading taken at another width is not this
+ * card's yet (a resize is reflowing it), and a board that is one box filling it (`fills`) is the size
+ * it was given.
+ */
+export function withContentHeights(list: readonly Board[], doc: PenDocument, heights: Readonly<Record<string, CardHeight>>): Board[] {
+	const fixed = new Set<string>();
+	const floors = new Map<string, number>();
+	for (const node of walk(doc.children ?? [])) {
+		if (!isCardItem(node)) continue;
+		if (fixedHeightOf(node)) fixed.add(boardPath(node));
+		const from = (node.metadata as { grownFrom?: unknown } | undefined)?.grownFrom;
+		if (typeof from === "number") floors.set(boardPath(node), from);
+	}
+	return list.map((board) => {
+		if (!board.card) return board;
+		if (fixed.has(board.path)) return board.fixedHeight ? board : { ...board, fixedHeight: true as const };
+		const { fixedHeight: _fixed, ...rest } = board;
+		const measured = heights[board.path];
+		const h = measured && !board.fills && Math.abs(measured.w - board.w) <= 1 ? cardHeight(board.h, floors.get(board.path), measured.h) : board.h;
+		if (h === board.h) return board.fixedHeight ? rest : board;
+		return { ...rest, h };
+	});
 }
 
 /**
@@ -570,9 +642,37 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 			const id = boardId(path);
 			if (id) edit([{ op: "delete", id }]);
 		},
-		resizeBoard(path, size) {
-			const id = boardId(path);
-			if (id) edit([{ op: "update", id, set: { width: Math.round(size.w), height: Math.round(size.h) } }]);
+		resizeBoard(path, size, fixed) {
+			const node = untrack(doc).children?.find((one) => isBoard(one) && boardPath(one) === path);
+			if (!node) return;
+			const set: Record<string, unknown> = { width: Math.round(size.w), height: Math.round(size.h) };
+			// A card's height given by hand is its floor (or, cutting it, kept): not one it grew to.
+			const meta = (node.metadata ?? {}) as Record<string, unknown>;
+			if (isCardItem(node) && ((fixed !== undefined && fixedHeightOf(node) !== fixed) || "grownFrom" in meta)) {
+				const { fixedHeight: _was, grownFrom: _from, ...metadata } = meta;
+				const keep = fixed ?? fixedHeightOf(node);
+				set.metadata = keep ? { ...metadata, fixedHeight: true } : metadata;
+			}
+			edit([{ op: "update", id: node.id, set }]);
+		},
+		settle(ops) {
+			if (host || options.readOnly || ops.length === 0) return false;
+			const prev = untrack(doc);
+			let next: PenDocument;
+			try {
+				next = applied(prev, ops);
+			} catch {
+				return false;
+			}
+			if (!commit(prev, next)) return false;
+			// The person's last step is taken as having made it too: undoing that step keeps it.
+			const last = undoStack[undoStack.length - 1];
+			try {
+				if (last) undoStack[undoStack.length - 1] = applied(last, ops);
+			} catch {
+				/* not in the drawing that step began from: undoing it puts back what it had */
+			}
+			return true;
 		},
 	};
 }

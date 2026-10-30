@@ -551,7 +551,7 @@ function autoPlace(boards: Board[], existing: Board[]): void {
  * board in one process, and the file has already been read to parse its `<meta>`,
  * so it costs nothing. Kept positive so it reads as an id in a URL.
  */
-function revisionOf(html: string): number {
+export function revisionOf(html: string): number {
 	let hash = 0x811c9dc5;
 	for (let index = 0; index < html.length; index++) {
 		hash ^= html.charCodeAt(index);

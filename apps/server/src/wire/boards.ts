@@ -61,10 +61,12 @@ export const boards = {
 			...(typeof message.overlaps === "number" ? { overlaps: message.overlaps } : {}),
 		});
 		/*
-		 * Kept for the agent who asks (`decks.canvas.fit`, and what it reports) and nothing else. A browser's
-		 * reading never sizes a board: the size is the stage file's, set by `decks.canvas.fit`, `decks.canvas.update` or a drag.
+		 * Kept for the agent who asks (`decks.canvas.fit`, and what it reports), and a card shorter than
+		 * its content grows to it (`StagePens.raiseCard`). Otherwise a browser's reading never sizes a
+		 * board: the size is the stage file's, set by `decks.canvas.fit`, `decks.canvas.update` or a drag.
 		 * Two browsers with different fonts read the same board a pixel or two apart, and when both
-		 * readings sized it, each answered the other's for ever.
+		 * readings sized it, each answered the other's for ever; a card only ever grows, so they settle
+		 * on the taller.
 		 */
 	},
 

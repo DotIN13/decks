@@ -8,7 +8,7 @@ import { topBoxes } from "./model/boxes.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { boardsAhead, boardsOf, createDrawing } from "./model/drawing.ts";
+import { boardsAhead, boardsOf, cardHeightOp, createDrawing, withContentHeights, type CardHeight } from "./model/drawing.ts";
 import { stageMeasure } from "./render/measure.ts";
 import type { DocEdits, DrawingWriter } from "./render/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
@@ -29,6 +29,11 @@ export function fitAll(doc: PenDocument, view: { width: number; height: number }
 }
 
 let insetsWatched = false;
+
+/** How long a card's height is let settle (fonts, pictures) before this page writes it to a drawing it keeps. */
+const SETTLE_MS = 600;
+/** How many times a card grows at one revision before its readings stop raising it: past that, it is chasing its own height. */
+const MAX_GROWS = 8;
 
 /** The empty picture: a board with no picture source is drawn as a blank sheet. */
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/%3E";
@@ -151,6 +156,55 @@ export function createEditor(
 	if (firstView?.selected) setPenSelection([firstView.selected]);
 
 	const editable = !options.readOnly;
+
+	/*
+	 * Each card's content height, as its frame measured it (`CardSurface`'s `onExtent`): the stage draws
+	 * a card at least that tall (`withContentHeights`), so none is ever cut, whatever height its item
+	 * has. Where the drawing is the host's, the host's server writes the height to it from the same
+	 * reading (`board-extent`, `StagePens.raiseCard`); where it is this page's (Studio), it is settled
+	 * here, as nobody's edit.
+	 */
+	const [heights, setHeights] = createSignal<Record<string, CardHeight>>({});
+	/** How many times each card has grown at its revision: a card whose script lays out to its own height would grow for ever. */
+	const grown = new Map<string, { rev: number; times: number }>();
+	const settling = new Map<string, ReturnType<typeof setTimeout>>();
+	const measured = (path: string, extent: { rev: number; w: number; h: number }): boolean => {
+		const was = untrack(heights)[path];
+		if (was && was.w === extent.w && extent.h > was.h) {
+			const count = grown.get(path);
+			const times = count && count.rev === extent.rev ? count.times + 1 : 1;
+			grown.set(path, { rev: extent.rev, times });
+			// Not shown, nor passed on to the host, whose server would grow it the same way.
+			if (times > MAX_GROWS) return false;
+		}
+		if (was?.w === extent.w && was.h === extent.h) return true;
+		setHeights((all) => ({ ...all, [path]: { w: extent.w, h: extent.h } }));
+		if (options.document || !editable) return true;
+		clearTimeout(settling.get(path));
+		settling.set(
+			path,
+			setTimeout(() => {
+				settling.delete(path);
+				const node = untrack(doc).children?.find((one) => (one.metadata as { type?: unknown; path?: unknown } | undefined)?.type === "decks.card" && (one.metadata as { path?: unknown }).path === path);
+				const board = untrack(() => boards.find((one) => one.path === path));
+				const op = node && board && !board.fills ? cardHeightOp(node, extent.w, extent.h) : undefined;
+				if (op) drawing.settle([op]);
+			}, SETTLE_MS),
+		);
+		return true;
+	};
+	/*
+	 * A card resized by hand: a height that cuts its content, at the width it was measured at, is the
+	 * person's choice and is kept (`fixedHeight`), the card scrolling what does not fit; any other
+	 * height lets it grow to its content again.
+	 */
+	const resized = (path: string, size: { w: number; h: number }) => {
+		const board = untrack(() => boards.find((one) => one.path === path));
+		if (!board?.card) return resizeBoard(path, size);
+		const content = untrack(heights)[path];
+		const cuts = !!content && Math.abs(content.w - size.w) <= 1 && size.h < content.h - 1;
+		resizeBoard(path, size, cuts);
+	};
 	/* Fixed for the canvas's life: plain objects, so no prop of the stage is a computation of its own. */
 	/*
 	 * The board pill's Hide takes the board off this drawing (its file stays), and Delete, when the host
@@ -159,7 +213,7 @@ export function createEditor(
 	const editing = editable
 		? {
 				onPenEdit: edit,
-				onResize: resizeBoard,
+				onResize: resized,
 				onHide: (path: string) => (options.boards?.onHide ? options.boards.onHide(path) : removeBoard(path)),
 				...(options.onDeleteBoard
 					? {
@@ -203,14 +257,17 @@ export function createEditor(
 	createComputed(() => {
 		const given = options.boards?.list ? options.boards.list().map((board) => ({ ...board })) : boardsOf(doc());
 		// The host's own list is its server's: a board the person moved, sized or took off is shown so until the server has it.
-		setBoards(reconcile(options.boards?.list && drawing.waiting() ? boardsAhead(given, drawing.given(), doc()) : given, { key: "path" }));
+		const listed = options.boards?.list && drawing.waiting() ? boardsAhead(given, drawing.given(), doc()) : given;
+		setBoards(reconcile(withContentHeights(listed, doc(), heights()), { key: "path" }));
 	});
 	/* Memos rather than `a() && b()` in the props: the stage reads them in its pointer handlers, outside any owner. */
 	const inking = createMemo(() => (options.state?.inking ? options.state.inking() : inkOn()) && mode() === "browse");
 	const stageView = () => (
 		<Stage
 			mode={mode()}
-			{...(options.boards?.onExtent ? { onExtent: options.boards.onExtent } : {})}
+			onExtent={(path, extent) => {
+				if (measured(path, extent)) options.boards?.onExtent?.(path, extent);
+			}}
 			{...(options.boards?.onOpenLink ? { onOpenBoard: options.boards.onOpenLink } : {})}
 			news={options.boards?.news?.() ?? {}}
 			{...(options.boards?.onRead ? { onRead: options.boards.onRead } : {})}
