@@ -210,21 +210,15 @@
 	.stream-bubble [data-component="mention-pill"] {
 		-webkit-user-select: text;
 		user-select: text;
-		/* A bubble is narrow: a long pill wraps, its wash drawn round each line. */
-		white-space: normal;
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
 	}
 	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"]:is(:hover, [aria-expanded="true"]) {
 		background: color-mix(in srgb, var(--pill, #f2b200) 36%, transparent);
 	}
 	/*
-	 * A comment from the canvas shows its whole text (`pill-about.ts`, `commentPill`), so it wraps, and
-	 * a dashed amber edge says a card handed it over rather than you.
+	 * A comment from the canvas is as short as any comment's pill (`pillWords`); a dashed amber edge says a
+	 * card handed it over rather than you (`data-from`, kept with the sent message in its parts).
 	 */
-	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-mention-label^="from the canvas ·"] {
-		white-space: pre-wrap;
-		overflow-wrap: anywhere;
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-from="canvas"] {
 		outline: 1.5px dashed #d97706;
 		outline-offset: -1px;
 	}
@@ -284,15 +278,16 @@
 		align-items: center;
 		gap: 6px;
 		min-width: 0;
+		overflow: hidden;
 		font-weight: 600;
 		text-align: left;
 	}
-	/* A long title in two lines at most: the card is about the quote and the note. */
+	/* The name on one line, cut with an ellipsis; the whole of it is in the button's title. */
 	.pill-card-label {
-		display: -webkit-box;
 		overflow: hidden;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 2;
+		min-width: 0;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.pill-card .pill-card-name:not(:disabled):hover {
 		text-decoration: underline;
@@ -333,19 +328,28 @@
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
+	/* The quote and the note a few lines each: all of it is in Exact text. */
 	.pill-card-body blockquote {
+		display: -webkit-box;
 		margin: 0 0 4px;
 		padding-left: 8px;
+		overflow: hidden;
 		border-left: 2px solid #f2b200;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
 	}
 	.pill-card-body > div {
-		max-height: 160px;
-		overflow: auto;
+		display: -webkit-box;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 4;
 	}
+	/* Exact text, the one place a pill's whole text is: a field of about ten lines that scrolls. */
 	.pill-card-body pre {
-		max-height: 160px;
+		max-height: calc(10 * 1.45em);
 		margin: 0;
 		overflow: auto;
+		overscroll-behavior: contain;
 		color: var(--muted);
 		font: var(--type-copy) / 1.45 var(--font-mono);
 		white-space: pre-wrap;

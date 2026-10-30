@@ -160,7 +160,7 @@ export type StageProps = {
 	 * dragged is the only thing that knows what to call it, a board by its title and an item by
 	 * its name on the stage.
 	 */
-	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
+	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>) => void;
 };
 
 /*

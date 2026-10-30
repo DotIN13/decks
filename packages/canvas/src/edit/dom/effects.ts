@@ -14,7 +14,8 @@ import type { Pt, Rect } from "../core/model.ts";
 type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;
 
 /** A mention of something dropped on the composer. */
-export type ReferPill = { kind: "board" | "item"; id: string; label: string };
+/** `label` is what the pill shows; `name` what it is called in full, for its card and the sent message. */
+export type ReferPill = { kind: "board" | "item"; id: string; label: string; name?: string };
 
 export type EffectHost = {
 	/** The stage's element: what the ghost's attribute goes on. */
@@ -75,16 +76,15 @@ export function createEffects(host: EffectHost) {
 		const pen = host.pen();
 		if (pen) for (const node of walk(pen.doc.children)) named.set(node.id, node);
 		return [
-			...boards.map((path) => ({
-				kind: "board" as const,
-				id: path,
-				label: shortLabel(host.boards().find((board) => board.path === path)?.title || (path.split("/").pop() ?? path)),
-			})),
+			...boards.map((path) => {
+				const name = host.boards().find((board) => board.path === path)?.title || (path.split("/").pop() ?? path);
+				return { kind: "board" as const, id: path, label: shortLabel(name), name };
+			}),
 			...ids.map((id) => {
 				const node = named.get(id);
 				const content = (node as { content?: unknown } | undefined)?.content;
-				const words = node?.name || (typeof content === "string" ? content : "");
-				return { kind: "item" as const, id, label: shortLabel(words) || id };
+				const words = (node?.name || (typeof content === "string" ? content : "")).replace(/\s+/g, " ").trim();
+				return { kind: "item" as const, id, label: shortLabel(words) || id, name: words || id };
 			}),
 		];
 	};

@@ -1,4 +1,4 @@
-import type { ChatItem } from "@decks/protocol";
+import type { ChatItem, MessagePart } from "@decks/protocol";
 import { floatRows } from "./float-rows.ts";
 import { toolSlots, type ToolSlot } from "./tool-groups.ts";
 
@@ -22,7 +22,8 @@ export type AgentPart =
  * burying it in a reply's card is how it gets missed.
  */
 export type TurnCard =
-	| { kind: "mine"; id: string; at?: number; text: string; entryId?: string }
+	/** `parts`: the message as written, its pills as data, when it was sent with them (`MessagePart`). */
+	| { kind: "mine"; id: string; at?: number; text: string; entryId?: string; parts?: MessagePart[] }
 	| { kind: "agent"; id: string; at?: number; parts: AgentPart[] }
 	| { kind: "notice"; id: string; at?: number; level: "info" | "warn" | "error"; text: string };
 
@@ -60,6 +61,7 @@ export function turnCards(items: readonly ChatItem[]): TurnCard[] {
 				// Only once the server has paired it with the session entry it became, which is
 				// what there would be to rewind to.
 				...(item?.kind === "user" && item.entryId ? { entryId: item.entryId } : {}),
+				...(item?.kind === "user" && item.parts?.length ? { parts: item.parts } : {}),
 			});
 			continue;
 		}

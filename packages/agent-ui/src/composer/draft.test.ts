@@ -81,7 +81,7 @@ test("a label is cut to fit a sentence, whatever it is a label for", () => {
 
 test("an attached file is a pill that the agent still reads as @path", () => {
 	const file = fileMention("assets/plan.pdf");
-	assert.deepEqual(file, { type: "mention", kind: "file", id: "assets/plan.pdf", label: "plan.pdf" });
+	assert.deepEqual(file, { type: "mention", kind: "file", id: "assets/plan.pdf", label: "plan.pdf", name: "plan.pdf" });
 	assert.equal(mentionAddress(file), "@assets/plan.pdf");
 	const draft: Draft = [{ type: "text", text: "The numbers are in " }, file, { type: "text", text: "." }];
 	// What `@path` typed into the text used to send.

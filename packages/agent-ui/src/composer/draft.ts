@@ -42,6 +42,14 @@ export type DraftNode =
 			id: string;
 			/** What the pill shows after its icon: the quoted words, the board's title, the item's name. */
 			label: string;
+			/**
+			 * What it is called, in full: the board or card a comment is on, a board's title, an item's
+			 * name or its words, a file's name. The pill's card and the stored message name it by this;
+			 * the label is what fits in a sentence.
+			 */
+			name?: string;
+			/** A comment the canvas handed over (a card's script can): drawn with a dashed edge. */
+			from?: "canvas";
 	  };
 
 export type Draft = DraftNode[];
@@ -132,7 +140,8 @@ export function draftForAgent(draft: Draft): string {
 
 /** A file's pill: its name, standing for its path in the deck. */
 export function fileMention(path: string): DraftMention {
-	return { type: "mention", kind: "file", id: path, label: path.split("/").pop() || path };
+	const name = path.split("/").pop() || path;
+	return { type: "mention", kind: "file", id: path, label: name, name };
 }
 
 /** The comments the draft carries, in the order their pills sit in it — not the other pills. */
@@ -174,7 +183,14 @@ export function parseDraft(raw: string): Draft | null {
 				typeof value.id === "string" &&
 				typeof value.label === "string"
 			) {
-				draft.push({ type: "mention", kind: value.kind, id: value.id, label: value.label });
+				draft.push({
+					type: "mention",
+					kind: value.kind,
+					id: value.id,
+					label: value.label,
+					...(typeof value.name === "string" && value.name ? { name: value.name } : {}),
+					...(value.from === "canvas" ? { from: "canvas" as const } : {}),
+				});
 			} else return null;
 		}
 		return normalize(draft);

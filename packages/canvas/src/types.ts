@@ -118,7 +118,7 @@ export interface CanvasOptions {
 	/** How big the canvas is on screen, when it changes: a host whose agents ask what the person sees. */
 	onViewport?: (viewport: { width: number; height: number }) => void;
 	/** Boards or items dragged onto the host's composer, to talk about them. */
-	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
+	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>) => void;
 	/**
 	 * A drawing the host owns (its server): edits go to `send` as pen operations, each with a name
 	 * (`edit`) the host's server sends back with the drawing that has it (`setDocument`'s `made`); undo and redo are `step`'s. Each edit is shown at once and kept on top of

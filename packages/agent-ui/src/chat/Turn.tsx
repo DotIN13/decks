@@ -3,6 +3,7 @@ import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { clockTime } from "@decks/ui";
 import { createEffect, createSignal, Index, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import type { MessagePart } from "@decks/protocol";
 import type { Draft } from "../composer/draft.ts";
 import { closePillCard, pillElement, pillNode, wirePills, type PillHost } from "../composer/pill-card.ts";
 import { Markdown } from "./MarkdownView.tsx";
@@ -111,23 +112,27 @@ export interface MineReading {
 	pills: PillHost;
 }
 
-let mineReader: ((text: string) => MineReading | undefined) | undefined;
+/** Reads a sent message into its pills: from its stored `parts` when it has them, else from its text. */
+export type MineReader = (text: string, parts?: MessagePart[]) => MineReading | undefined;
+
+let mineReader: MineReader | undefined;
 /**
- * How the host reads a message you sent back into its pills (`MineReading`): the Decks app knows how
- * comments, boards, items and files are written into a message, and reads them out of the stored text,
- * so a message loaded from history after a reload shows the same pills. Without a reader, or for a
- * message it does not read, the bubble is the text as it was sent.
+ * How the host reads a message you sent back into its pills (`MineReading`). A message is stored with
+ * its parts (`MessagePart`: each pill as data, who put it in, what its card shows), so a message loaded
+ * from history after a reload, or on another device, shows the same pills; an older message without
+ * them the Decks app reads out of its text. Without a reader, or for a message it does not read, the
+ * bubble is the text as it was sent.
  */
-export function setMineReader(reader: ((text: string) => MineReading | undefined) | undefined): void {
+export function setMineReader(reader: MineReader | undefined): void {
 	mineReader = reader;
 }
 
 /** A message's words with its pills in them, as the field drew them. */
-function MineWords(props: { text: string }) {
+function MineWords(props: { text: string; parts?: MessagePart[] }) {
 	let el!: HTMLSpanElement;
 	let host: PillHost | undefined;
 	createEffect(() => {
-		const reading = mineReader?.(props.text);
+		const reading = mineReader?.(props.text, props.parts);
 		host = reading?.pills;
 		if (!reading) {
 			el.textContent = props.text;
@@ -192,7 +197,7 @@ function Mine(props: {
 			 * pills you wrote it with (`MineWords`), each with its exact text one press away.
 			 */}
 			<div class="stream-bubble" title={props.when}>
-				<MineWords text={props.card.text} />
+				<MineWords text={props.card.text} parts={props.card.parts} />
 			</div>
 			{/* Studio's way: the two acts as icon buttons under the bubble, once the message has an entry to address. */}
 			<Show when={props.timeMachine === "buttons" && props.card.entryId}>

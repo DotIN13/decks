@@ -55,8 +55,18 @@ const PILL_ICONS: Record<MentionKind, string> = {
 	file: svg(BODIES.file, 11, "pill-icon"),
 };
 
-/** What a comment pill handed over by the canvas starts with; `ink.css` gives such a pill its dashed edge. */
-export const FROM_CANVAS = "from the canvas ·";
+/** The most of a name a pill shows: a long board title would otherwise wrap a sent message over lines. */
+export const PILL_LIMIT = 30;
+
+/** A pill's words, cut to `PILL_LIMIT` with an ellipsis. The whole name is in its tooltip and its card. */
+export function pillWords(label: string): string {
+	const flat = label.replace(/\s+/g, " ").trim();
+	if (flat.length <= PILL_LIMIT) return flat;
+	// A quotation keeps its closing mark, so it still reads as one.
+	const quoted = flat.startsWith("“") && flat.endsWith("”");
+	const cut = flat.slice(0, PILL_LIMIT - (quoted ? 2 : 1)).trimEnd();
+	return quoted ? `${cut.replace(/…$/, "")}…”` : `${cut}…`;
+}
 
 /** A mention, as the DOM holds it. Atomic in an editable field because the browser is told it is. */
 export function pillElement(node: DraftMention): HTMLElement {
@@ -66,16 +76,27 @@ export function pillElement(node: DraftMention): HTMLElement {
 	span.dataset.kind = node.kind;
 	span.dataset.mentionId = node.id;
 	span.dataset.mentionLabel = node.label;
-	span.textContent = draftLabel(node);
+	if (node.name) span.dataset.mentionName = node.name;
+	// A comment the canvas handed over: `ink.css` gives it a dashed edge.
+	if (node.from === "canvas") span.dataset.from = "canvas";
+	span.textContent = pillWords(draftLabel(node));
 	// In front of the label, and no part of it: an icon contributes no text.
 	span.insertAdjacentHTML("afterbegin", PILL_ICONS[node.kind] ?? PILL_ICONS.comment);
 	return span;
 }
 
-/** The tooltip's words for a pill: the quote and the note, then where it came from. */
+/** The most of a quote or a note the tooltip shows; the card shows a few lines, Exact text all of it. */
+const TIP_LIMIT = 160;
+const clip = (words: string) => {
+	const flat = words.replace(/\s+/g, " ").trim();
+	return flat.length > TIP_LIMIT ? `${flat.slice(0, TIP_LIMIT - 1).trimEnd()}…` : flat;
+};
+
+/** The tooltip's words for a pill: the quote and the note, then its whole name and where it came from. */
 export function pillTip(about: PillAbout): { tip: string; sub: string } {
-	const said = [about.quote ? `“${about.quote}”` : "", about.note ?? ""].filter(Boolean).join(" · ") || about.name;
-	return { tip: said, sub: `${about.source} · click to read all` };
+	const said = [about.quote ? `“${clip(about.quote)}”` : "", clip(about.note ?? "")].filter(Boolean).join(" · ");
+	if (!said) return { tip: about.name, sub: `${about.source} · click to read all` };
+	return { tip: said, sub: `${about.name} · ${about.source} · click to read all` };
 }
 
 let open: { pill: HTMLElement; card: HTMLElement; close: () => void } | undefined;
@@ -123,7 +144,8 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	label.className = "pill-card-label";
 	label.textContent = about.name;
 	name.append(label);
-	name.title = about.of === "file" ? "Open the file" : "Show it on the canvas";
+	// One line, cut with an ellipsis (`ink.css`); the whole name is in the title.
+	name.title = `${about.name} — ${about.of === "file" ? "open the file" : "show it on the canvas"}`;
 	if (about.canvas) name.dataset.canvas = "true";
 	if (host.show) name.onclick = () => host.show!(node);
 	else name.disabled = true;
@@ -153,8 +175,10 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	exact.onclick = () => {
 		const showing = exact.textContent === "Exact text";
 		if (showing) {
+			// The one place the whole of it is: a field of its own that scrolls (`ink.css`).
 			const pre = document.createElement("pre");
 			pre.textContent = about.exact;
+			pre.tabIndex = 0;
 			body.replaceChildren(pre);
 		} else shown();
 		exact.textContent = showing ? "As shown" : "Exact text";
@@ -274,7 +298,7 @@ export function wirePills(root: HTMLElement, host: () => PillHost | undefined, n
 
 /** A pill's mention, read back from its element. */
 export function pillNode(el: HTMLElement): DraftMention | null {
-	const { mentionId: id, mentionLabel: label, kind } = el.dataset;
+	const { mentionId: id, mentionLabel: label, mentionName: name, kind } = el.dataset;
 	if (!id || !label || !kind || !(kind in PILL_ICONS)) return null;
-	return { type: "mention", kind: kind as MentionKind, id, label };
+	return { type: "mention", kind: kind as MentionKind, id, label, ...(name ? { name } : {}), ...(el.dataset.from === "canvas" ? { from: "canvas" as const } : {}) };
 }
