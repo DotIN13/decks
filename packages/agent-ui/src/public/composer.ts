@@ -4,3 +4,4 @@ export { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftLabel, d
 export * from "../composer/DraftField.tsx";
 export * from "../composer/draft.ts";
 export * from "../composer/mention.ts";
+export * from "../composer/pill-card.ts";

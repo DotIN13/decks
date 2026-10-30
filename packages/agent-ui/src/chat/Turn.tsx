@@ -2,7 +2,9 @@ import { Icon } from "@decks/ui";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { clockTime } from "@decks/ui";
-import { createSignal, Index, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, Index, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import type { Draft } from "../composer/draft.ts";
+import { closePillCard, pillElement, pillNode, wirePills, type PillHost } from "../composer/pill-card.ts";
 import { Markdown } from "./MarkdownView.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";
 import { ToolGroup } from "./ToolGroup.tsx";
@@ -103,6 +105,43 @@ export function Turn(props: {
 	);
 }
 
+/** A sent message read back into the words and pills it was written as, and what each pill is about. */
+export interface MineReading {
+	draft: Draft;
+	pills: PillHost;
+}
+
+let mineReader: ((text: string) => MineReading | undefined) | undefined;
+/**
+ * How the host reads a message you sent back into its pills (`MineReading`): the Decks app knows how
+ * comments, boards, items and files are written into a message, and reads them out of the stored text,
+ * so a message loaded from history after a reload shows the same pills. Without a reader, or for a
+ * message it does not read, the bubble is the text as it was sent.
+ */
+export function setMineReader(reader: ((text: string) => MineReading | undefined) | undefined): void {
+	mineReader = reader;
+}
+
+/** A message's words with its pills in them, as the field drew them. */
+function MineWords(props: { text: string }) {
+	let el!: HTMLSpanElement;
+	let host: PillHost | undefined;
+	createEffect(() => {
+		const reading = mineReader?.(props.text);
+		host = reading?.pills;
+		if (!reading) {
+			el.textContent = props.text;
+			return;
+		}
+		el.replaceChildren(...reading.draft.map((node) => (node.type === "text" ? document.createTextNode(node.text) : pillElement(node))));
+		// Not editable here: the attribute is the field's, for its caret.
+		for (const pill of el.querySelectorAll<HTMLElement>("[contenteditable]")) pill.removeAttribute("contenteditable");
+	});
+	onMount(() => onCleanup(wirePills(el, () => host, pillNode)));
+	onCleanup(closePillCard);
+	return <span ref={el} />;
+}
+
 /**
  * Your own message, and the way back to it.
  *
@@ -149,10 +188,11 @@ function Mine(props: {
 			 * A reply is *written* as markdown and showing its asterisks makes the reader do
 			 * the parsing. A message you typed is different: it is the literal text that was
 			 * sent, and quietly transforming it would leave you unable to see what the agent
-			 * actually received.
+			 * actually received. The one exception is what you put in, which is drawn as the
+			 * pills you wrote it with (`MineWords`), each with its exact text one press away.
 			 */}
 			<div class="stream-bubble" title={props.when}>
-				{props.card.text}
+				<MineWords text={props.card.text} />
 			</div>
 			{/* Studio's way: the two acts as icon buttons under the bubble, once the message has an entry to address. */}
 			<Show when={props.timeMachine === "buttons" && props.card.entryId}>

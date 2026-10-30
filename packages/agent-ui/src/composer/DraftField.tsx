@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from "solid-js";
-import { DRAFT_MIME, draftLabel, draftText, normalize, parseDraft, serializeDraft, textDraft, type Draft, type DraftMention, type DraftNode, type MentionKind } from "./draft.ts";
+import { DRAFT_MIME, draftText, normalize, parseDraft, serializeDraft, textDraft, type Draft, type DraftMention, type DraftNode } from "./draft.ts";
 import { withMention } from "./mention.ts";
+import { closePillCard, pillElement, pillNode, wirePills, type PillHost } from "./pill-card.ts";
 
 /**
  * The composer's field: a small rich text editor whose only rich thing is a
@@ -28,8 +29,10 @@ export interface DraftFieldProps {
 	onKeyDown: (event: KeyboardEvent) => void;
 	/** An IME has the keys, or has just let go of them: the composer asks before it sends. */
 	onComposing?: (composing: boolean) => void;
-	/** The words a pill shows on hover: the whole quotation and the comment under it. */
+	/** The words a pill shows on hover, as a `title`: for a host without `pills`. */
 	describe?: (node: DraftMention) => string | undefined;
+	/** What each pill is about: its tooltip, and the card a press on it opens (`pill-card.ts`). */
+	pills?: PillHost;
 	placeholder: string;
 	/** The field's accessible name. The placeholder is a hint, not a name. */
 	label?: string;
@@ -52,47 +55,23 @@ export interface DraftFieldApi {
 	appendWords(text: string): void;
 	/** Redraw the pills' hover words, after what they describe has changed. */
 	retitle(): void;
+	/** Put a pill where the caret is when the field has it, else at the end: a file attached or dropped. */
+	insertPill(node: DraftMention): void;
+	/** Take a pill out: the Remove on its card. */
+	remove(node: DraftMention): void;
 	focus(): void;
 }
 
-/*
- * One icon per kind of mention, as markup: a pill is made outside JSX, where a component cannot
- * go. Lucide's `message-square`, `layout-template` and `shapes` — a comment, a board, a thing
- * drawn on the stage. The wash behind each is its own colour too (`styles/ink.css`), because
- * three kinds of pill in one sentence should be told apart at a glance rather than read.
- */
-const ICON = (body: string) =>
-	`<svg data-slot="pill-icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-const ICONS: Record<MentionKind, string> = {
-	comment: ICON('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
-	board: ICON('<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/>'),
-	item: ICON(
-		'<path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/>',
-	),
-};
-
-/** A mention, as the DOM holds it. Atomic because the browser is told it is. */
+/** A mention, as the DOM holds it (`pill-card.ts`), with the host's `title` when it has no cards. */
 function mentionElement(node: DraftMention, describe?: (node: DraftMention) => string | undefined): HTMLElement {
-	const span = document.createElement("span");
-	span.contentEditable = "false";
-	span.dataset.component = "mention-pill";
-	span.dataset.kind = node.kind;
-	span.dataset.mentionId = node.id;
-	span.dataset.mentionLabel = node.label;
-	span.textContent = draftLabel(node);
-	// In front of the label, and no part of it: an icon contributes no text.
-	span.insertAdjacentHTML("afterbegin", ICONS[node.kind] ?? ICONS.comment);
+	const span = pillElement(node);
 	const words = describe?.(node);
 	if (words) span.title = words;
 	return span;
 }
 
 function nodeOf(el: Element): DraftNode | null {
-	const id = (el as HTMLElement).dataset?.mentionId;
-	const label = (el as HTMLElement).dataset?.mentionLabel;
-	const kind = (el as HTMLElement).dataset?.kind;
-	if (!id || !label || (kind !== "comment" && kind !== "board" && kind !== "item")) return null;
-	return { type: "mention", kind, id, label };
+	return el instanceof HTMLElement ? pillNode(el) : null;
 }
 
 /** The model the DOM currently represents. */
@@ -313,6 +292,26 @@ export function DraftField(props: DraftFieldProps) {
 				if (node?.type === "mention") (child as HTMLElement).title = props.describe(node) ?? "";
 			}
 		},
+		insertPill(node) {
+			if (!el) return;
+			const selection = window.getSelection();
+			const inside = !!selection && selection.rangeCount > 0 && el.contains(selection.getRangeAt(0).startContainer);
+			if (inside) api.insertMention(node, 0);
+			else api.append(node);
+		},
+		remove(node) {
+			if (!el) return;
+			const pill = Array.from(el.children).find((child) => {
+				const at = nodeOf(child);
+				return at?.type === "mention" && at.kind === node.kind && at.id === node.id;
+			});
+			if (!pill) return;
+			// The space after it goes with it, so no double space is left behind.
+			const next = pill.nextSibling;
+			if (next?.nodeType === Node.TEXT_NODE && next.textContent?.startsWith(" ")) next.textContent = next.textContent.slice(1);
+			pill.remove();
+			sync();
+		},
 		focus() {
 			if (!el) return;
 			// At the end of what is there, unless the caret was already somewhere inside. Asked
@@ -456,12 +455,15 @@ export function DraftField(props: DraftFieldProps) {
 			);
 		};
 
+		const unwire = wirePills(el, () => props.pills, (pill) => pillNode(pill));
 		el.addEventListener("beforeinput", onBeforeInput);
 		el.addEventListener("copy", onCopy);
 		el.addEventListener("cut", onCopy);
 		el.addEventListener("dragstart", onDragStart);
 		el.addEventListener("paste", onPaste);
 		onCleanup(() => {
+			unwire();
+			closePillCard();
 			el?.removeEventListener("beforeinput", onBeforeInput);
 			el?.removeEventListener("copy", onCopy);
 			el?.removeEventListener("cut", onCopy);

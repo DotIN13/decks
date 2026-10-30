@@ -189,28 +189,46 @@
 	}
 
 	/*
-	 * A comment going with the message: a pill, an icon and the words, in the input bar's own text. Picone's pill
-	 * (its `markdown.css`), in this app's colours: one object, selected whole or not at all,
-	 * never broken across two lines, and sized by the sentence it sits in.
+	 * What goes with the message, as a pill in the words: a comment, a board or card, a drawn item, a
+	 * file. Picone's pill (its `markdown.css`), in this app's colours: one object, selected whole or not
+	 * at all, never broken across two lines, and sized by the sentence it sits in. The same pill in the
+	 * input bar and in a message you sent (`.stream-bubble`), and a press on either opens its card.
 	 */
-	[data-slot="composer-input"] [data-component="mention-pill"] {
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"] {
 		display: inline;
 		padding: 1px 4px;
 		border-radius: var(--radius-inline);
 		background: color-mix(in srgb, var(--pill, #f2b200) 22%, transparent);
-		color: var(--fg);
+		color: inherit;
 		font-weight: 500;
 		white-space: nowrap;
-		cursor: text;
+		cursor: pointer;
 		-webkit-user-select: all;
 		user-select: all;
 	}
-	/* A comment from the canvas shows its whole text (`Composer.tsx`, `pillFor`), so it wraps. */
-	[data-slot="composer-input"] [data-component="mention-pill"][data-mention-label^="from the canvas ·"] {
+	/* In a sent message a pill is read and pressed, not edited: selected with its words, never alone. */
+	.stream-bubble [data-component="mention-pill"] {
+		-webkit-user-select: text;
+		user-select: text;
+		/* A bubble is narrow: a long pill wraps, its wash drawn round each line. */
+		white-space: normal;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+	}
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"]:is(:hover, [aria-expanded="true"]) {
+		background: color-mix(in srgb, var(--pill, #f2b200) 36%, transparent);
+	}
+	/*
+	 * A comment from the canvas shows its whole text (`pill-about.ts`, `commentPill`), so it wraps, and
+	 * a dashed amber edge says a card handed it over rather than you.
+	 */
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-mention-label^="from the canvas ·"] {
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+		outline: 1.5px dashed #d97706;
+		outline-offset: -1px;
 	}
-	[data-slot="composer-input"] [data-component="mention-pill"] [data-slot="pill-icon"] {
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"] [data-slot="pill-icon"] {
 		display: inline;
 		margin-inline-end: 3px;
 		vertical-align: -0.1em;
@@ -218,16 +236,127 @@
 	}
 
 	/*
-	 * A colour per kind, so three pills in one sentence are told apart before they are read:
-	 * amber for a comment, the app's own blue for a board, violet for something drawn on the
-	 * stage. The icon in front of each says the same thing again, for anyone who cannot use the
-	 * difference in colour.
+	 * A colour per kind, so pills in one sentence are told apart before they are read: amber for a
+	 * comment, the app's own blue for a board, violet for something drawn on the stage, a plainer
+	 * blue for a file. The icon in front of each says the same thing again, for anyone who cannot use
+	 * the difference in colour.
 	 */
-	[data-slot="composer-input"] [data-component="mention-pill"][data-kind="board"] {
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-kind="board"] {
 		--pill: var(--color-accent);
 	}
 
-	[data-slot="composer-input"] [data-component="mention-pill"][data-kind="item"] {
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-kind="item"] {
 		--pill: #8b5cf6;
+	}
+
+	:is([data-slot="composer-input"], .stream-bubble) [data-component="mention-pill"][data-kind="file"] {
+		--pill: #2563eb;
+	}
+
+	/*
+	 * The card a press on a pill opens (`@decks/agent-ui` `pill-card.ts`), in `.floatcard`'s look: what it
+	 * is about by name, which shows it; the quote and the note; Exact text, and Remove in the composer.
+	 */
+	.floatcard.pill-card {
+		width: 340px;
+		max-width: calc(100vw - 16px);
+		padding: 10px 12px;
+		border-radius: 10px;
+		font-size: var(--type-body);
+		line-height: 1.45;
+	}
+	.pill-card button {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+	.pill-card-head {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: 6px;
+	}
+	.pill-card .pill-card-name {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		font-weight: 600;
+		text-align: left;
+	}
+	/* A long title in two lines at most: the card is about the quote and the note. */
+	.pill-card-label {
+		display: -webkit-box;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+	}
+	.pill-card .pill-card-name:not(:disabled):hover {
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	.pill-card .pill-card-name:disabled {
+		cursor: default;
+	}
+	.pill-card .pill-card-name[data-canvas="true"] {
+		color: #b45309;
+	}
+	[data-color-scheme="dark"] .pill-card .pill-card-name[data-canvas="true"] {
+		color: #f59e0b;
+	}
+	.pill-card-name [data-slot="pill-card-icon"] {
+		flex: none;
+		stroke-width: 1.8;
+		opacity: 0.8;
+	}
+	.pill-card .pill-card-x {
+		display: grid;
+		flex: none;
+		width: 24px;
+		height: 24px;
+		margin-left: auto;
+		place-items: center;
+		border-radius: 6px;
+		color: var(--muted);
+	}
+	.pill-card .pill-card-x:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+	.pill-card-x [data-slot="pill-card-icon"] {
+		stroke-width: 2;
+	}
+	.pill-card-body {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.pill-card-body blockquote {
+		margin: 0 0 4px;
+		padding-left: 8px;
+		border-left: 2px solid #f2b200;
+	}
+	.pill-card-body > div {
+		max-height: 160px;
+		overflow: auto;
+	}
+	.pill-card-body pre {
+		max-height: 160px;
+		margin: 0;
+		overflow: auto;
+		color: var(--muted);
+		font: var(--type-copy) / 1.45 var(--font-mono);
+		white-space: pre-wrap;
+	}
+	.pill-card-acts {
+		display: flex;
+		gap: 14px;
+		margin-top: 8px;
+		color: var(--muted);
+	}
+	.pill-card .pill-card-acts button:hover {
+		color: var(--fg);
 	}
 }

@@ -5,8 +5,9 @@
  * next follows the pointer at once, sliding along the bar, until the pointer has been off every
  * control for 400 ms. A press hides it, and it never shows over an open menu.
  *
- * Any element with `data-tip` takes part; `data-key` adds the key and `data-side` ("right", "top",
- * "bottom", the default) says where the tip stands. The native `title` is left to everything else.
+ * Any element with `data-tip` takes part; `data-key` adds the key, `data-tip-sub` a quieter second line
+ * (a pill's: where it came from), and `data-side` ("right", "top", "bottom", the default) says where the
+ * tip stands. The native `title` is left to everything else.
  */
 const WAIT = 450;
 const WARM = 400;
@@ -21,10 +22,17 @@ export function installTooltips(): () => void {
 	let current: HTMLElement | null = null;
 
 	const show = (el: HTMLElement) => {
-		if (document.querySelector(".popover, .v3-menu[data-open='true']")) return;
+		if (document.querySelector(".popover, .pill-card, .v3-menu[data-open='true']")) return;
 		const text = el.dataset.tip;
 		if (!text) return;
 		tip.replaceChildren(text);
+		tip.toggleAttribute("data-wrap", !!el.dataset.tipSub);
+		if (el.dataset.tipSub) {
+			const sub = document.createElement("span");
+			sub.className = "v3-tip-sub";
+			sub.textContent = el.dataset.tipSub;
+			tip.appendChild(sub);
+		}
 		if (el.dataset.key) {
 			const key = document.createElement("span");
 			key.className = "v3-tip-key";

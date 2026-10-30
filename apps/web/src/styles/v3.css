@@ -1868,6 +1868,20 @@ body {
 			left 120ms var(--v3-ease),
 			top 120ms var(--v3-ease);
 	}
+	/* A pill's tip: its quote and note, wrapping, and where it came from under them. */
+	.v3-tip[data-wrap] {
+		display: block;
+		max-width: 300px;
+		white-space: normal;
+		overflow-wrap: anywhere;
+		font-size: 12.5px;
+		line-height: 1.4;
+	}
+	.v3-tip-sub {
+		display: block;
+		margin-top: 2px;
+		opacity: 0.7;
+	}
 	.v3-tip-key {
 		color: var(--v3-ink-key);
 		font: 11px var(--font-mono);
