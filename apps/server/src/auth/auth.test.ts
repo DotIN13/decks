@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { bearerOf, fromAnotherSite, harnessReads, isDoor, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
 import { fromPrivateNetwork, isPrivateAddress, isTopNavigation, PairCodes, pairWithoutCode, withSession } from "./issue.ts";
-import { Tickets } from "./tickets.ts";
+import { Passes } from "./passes.ts";
 import { TOKEN_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
 
 const DAY = 86_400_000;
@@ -28,7 +28,6 @@ test("a harness token is one kind whoever its subject, is kept only as its hash,
 	const text = readFileSync(file, "utf8");
 	assert.ok(!text.includes(person.token) && !text.includes(site.token), "no token in the clear");
 	assert.equal(statSync(file).mode & 0o777, 0o600);
-	assert.throws(() => tokens.issue({ kind: "page", path: "/api/board/boards/a.html" }));
 });
 
 test("verify answers the principal a token was given for, and why it refuses one", () => {
@@ -236,14 +235,17 @@ test("the socket takes the person's token or a site's, from its address or a hea
 	assert.equal(socketPrincipal(gate, request("/ws?decks_key=anything")), undefined, "the old person key is nothing");
 });
 
-test("a ticket is good only while the token it was made with is", () => {
+test("a pass is good only while the token it was made with is", () => {
 	const { tokens } = store();
 	const site = tokens.issue({ kind: "site", label: "Studio" });
-	const tickets = new Tickets((id) => tokens.live(id));
-	const ticket = tickets.make("/api/board/boards/a.html", site.id);
-	assert.ok(tickets.admits(ticket, "/api/board/boards/a.html"));
+	const passes = new Passes({ live: (id) => tokens.live(id), role: () => "edit" });
+	const { pass } = passes.canvas("main", "edit", site.id);
+	assert.ok(passes.openCanvas(pass));
+	const tab = passes.appTab("notes", site.id).pass;
+	assert.ok(passes.openApp(tab));
 	tokens.revoke(site.id);
-	assert.ok(!tickets.admits(ticket, "/api/board/boards/a.html"));
+	assert.equal(passes.openCanvas(pass), undefined);
+	assert.equal(passes.openApp(tab), undefined);
 });
 
 test("only a tab of its own is a top-level navigation, and the page is given its token in a tag", () => {

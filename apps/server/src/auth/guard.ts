@@ -2,8 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { NextFunction, Request, Response } from "express";
 import type { Principal } from "./principal.ts";
 import type { Refusal, TokenStore, Verified } from "./tokens.ts";
-import { decodedPath, splitPathTicket, ticketOf, type Tickets } from "./tickets.ts";
-import { HARNESS_ID, isAppPass, isCanvasPass, passCovers, type Passes } from "./passes.ts";
+import { decodedPath, HARNESS_ID, isAppPass, isCanvasPass, passCovers, splitPathPass, type Passes } from "./passes.ts";
 
 /**
  * The one gate: every request to the harness, and every socket, is let in on a credential, and who is
@@ -160,7 +159,6 @@ export const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and 
 /** What the gate needs of the harness. */
 export interface Gate {
 	tokens: Pick<TokenStore, "verify">;
-	tickets: Pick<Tickets, "admits">;
 	passes: Pick<Passes, "openCanvas" | "openApp">;
 	/** Whether a card or board at this deck path is placed on a canvas (`verbs/router.ts`, `boardOnCanvas`): a canvas pass reads it too. */
 	placedOn?(path: string, canvas: string): boolean;
@@ -259,33 +257,22 @@ export function guard(gate: Gate) {
 			return;
 		}
 		/*
-		 * A friend's board, sandboxed, loading what it is made of on the folder ticket in its address
-		 * (`tickets.ts`): the ticket taken out, and the request goes on as the route's own path.
+		 * A canvas pass in the address: one of its canvas's files or pictures, or a card placed on it, for
+		 * an image, a module or a sheet that cannot send a header. Checked as a header's would be, the pass
+		 * taken out, and the request goes on as the route's own path.
 		 */
-		const carried = splitPathTicket(req.url);
+		const carried = splitPathPass(req.url);
 		if (carried && (req.method === "GET" || req.method === "HEAD")) {
 			const path = decodedPath(carried.rest);
-			/*
-			 * A canvas pass in the address: one of its canvas's files or pictures, or a card placed on it,
-			 * for an image, a module or a sheet that cannot send a header. Checked as a header's would be.
-			 */
-			const pass = isCanvasPass(carried.ticket) ? gate.passes.openCanvas(carried.ticket) : undefined;
+			const pass = gate.passes.openCanvas(carried.pass);
 			if (pass && path !== undefined && passCovers(pass.canvas, path, (deckPath) => gate.placedOn?.(deckPath, pass.canvas) ?? false)) {
 				req.url = carried.rest;
 				req.principal = { kind: "canvas", canvas: pass.canvas, role: pass.role };
-				res.setHeader("Referrer-Policy", "no-referrer");
-				res.setHeader("Access-Control-Allow-Origin", "*");
-				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
-				next();
-				return;
-			}
-			if (path !== undefined && !isCanvasPass(carried.ticket) && gate.tickets.admits(carried.ticket, path)) {
-				req.url = carried.rest;
-				req.principal = { kind: "page", path } satisfies Principal;
+				// The pass in the page's address is not sent on as the Referer of what it loads.
 				res.setHeader("Referrer-Policy", "no-referrer");
 				/*
 				 * Readable by a sandboxed page: the canvas frame fetches its cards and imports their modules
-				 * with `Origin: null`. The ticket in the address is the credential, and what it admits is the
+				 * with `Origin: null`. The pass in the address is the credential, and what it admits is the
 				 * canvas's own files, which that frame shows anyway. A board picture's stand-in mark too, or the
 				 * frame keeps the stand-in and never asks again for the picture (`render/engine.ts`).
 				 */
@@ -294,19 +281,8 @@ export function guard(gate: Gate) {
 				next();
 				return;
 			}
-			res.status(401).type("text").send("This page's ticket has run out, or is not for this file. Reload the canvas.");
+			res.status(401).type("text").send(PASS_REFUSED);
 			return;
-		}
-		// One page another site opened in a frame or a tab, by its ticket; it sends no Referer on.
-		const ticket = ticketOf(req.originalUrl);
-		if ((req.method === "GET" || req.method === "HEAD") && ticket !== undefined) {
-			const path = decodedPath(req.originalUrl);
-			if (path !== undefined && gate.tickets.admits(ticket, path)) {
-				req.principal = { kind: "page", path } satisfies Principal;
-				res.setHeader("Referrer-Policy", "no-referrer");
-				next();
-				return;
-			}
 		}
 		// Every file and picture is read on a pass or a token: nothing but the doors and the public page without.
 		if (door || isPublic(req.method, req.path)) {

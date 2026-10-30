@@ -18,8 +18,7 @@ import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { codeRequired, PairCodes } from "./auth/issue.ts";
-import { HARNESS_TICKET, ticketSecret, Tickets } from "./auth/tickets.ts";
-import { HARNESS_ID, Passes } from "./auth/passes.ts";
+import { HARNESS_ID, passSecret, Passes } from "./auth/passes.ts";
 import { boardOnCanvas } from "./verbs/router.ts";
 import { TokenStore } from "./auth/tokens.ts";
 import { StageShots } from "./stage/shots.ts";
@@ -111,8 +110,6 @@ export class App {
 	cliTokenId: string | undefined;
 	/** The code `decks pair code` makes, for pairing and `decks login` (`auth/issue.ts`). */
 	readonly codes: PairCodes;
-	/** One page's admission for another site's frame or tab (`auth/tickets.ts`). */
-	readonly tickets: Tickets;
 	/** Canvas passes, signed and checked on every use (`auth/passes.ts`). */
 	readonly passes: Passes;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
@@ -155,9 +152,6 @@ export class App {
 		// Kept with the deck it was opened with: a deck opened later keeps the same callers.
 		this.tokens = new TokenStore(join(deck.path, ".decks", "tokens.json"));
 		this.codes = new PairCodes(this.tokens, { required: codeRequired() });
-		// A ticket made by the harness for its own pages (`HARNESS_TICKET`) works as long as the harness does.
-		const secret = ticketSecret(config.dataDir);
-		this.tickets = new Tickets((id) => id === HARNESS_TICKET || this.tokens.live(id), secret);
 		this.passes = new Passes(
 			{
 				live: (id) => this.tokens.live(id),
@@ -169,7 +163,7 @@ export class App {
 				},
 				appRun: (name) => this.apps?.runOf(name),
 			},
-			secret,
+			passSecret(config.dataDir),
 		);
 		this.bridge = new StageBridge(this.tokens);
 		this.evalTrust = new EvalTrust(config.dataDir);

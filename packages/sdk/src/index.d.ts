@@ -599,16 +599,10 @@ export interface Decks extends Verbs {
 	 * the canvas's drawing it is `files/<name>`. A canvas shared with you to view refuses.
 	 */
 	upload(file: Blob, options?: { name?: string; canvas?: string }): Promise<string>;
-	/** Five-minute tickets for pages a frame or tab opens, by decoded request path (`/api/board/boards/a.html`, `/api/f/…`, `/app/<name>/`). Held by this connection too. */
-	tickets(paths: string[]): Promise<{ tickets: Record<string, string>; expires: number }>;
-	/** The ticket held for a page, while it has a little time left. */
-	ticketFor(path: string): string | undefined;
-	/** A page's address on the harness, with `ticket` (default: the one held) in it. */
-	pageUrl(path: string, ticket?: string): string;
-	/** A page's address with a fresh ticket, for a tab about to open it. */
-	ticketedUrl(path: string): Promise<string>;
-	/** Keep tickets for pages that stay shown: asked at once when wanted, again every four minutes and when the page comes back into view. */
-	keepTickets(onChange?: (tickets: Record<string, string>) => void, options?: { every?: number }): { want(paths: string[]): void; stop(): void };
+	/** A page's address on the harness, `path` decoded: one a frame or a tab opens carries a pass in it (`/api/t/<pass>/…`). */
+	pageUrl(path: string): string;
+	/** Keep a canvas pass for a canvas while it is shown: asked for at once, again at half its life, when a page comes back into view past that, and thirty seconds after one that failed. */
+	keepCanvasPass(canvas: string, onPass: (pass: { pass: string; role: "edit" | "view"; expires: number }) => void): { stop(): void };
 	/**
 	 * Every change as Decks broadcasts it (`GET /api/v1/events`), as in `{ type: "board.changed", path, board }`.
 	 * `types` keeps only some. With `reconnect` it is opened again after it ends or fails, until a

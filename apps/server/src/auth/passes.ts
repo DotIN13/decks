@@ -1,4 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Passes: signed, short, kept nowhere. A pass reaches one thing, a canvas, and is checked on every use.
@@ -19,8 +21,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * token, bound to it, for a day.
  *
  * A pass is `<prefix><payload>.<mac>`, the payload base64url JSON and the mac its HMAC-SHA256, over
- * the prefix and the payload, under the harness's ticket secret (`<dataDir>/ticket-secret`,
- * `tickets.ts`), so a restart ends no pass. Nothing about it is stored: it is taken back by taking
+ * the prefix and the payload, under the harness's secret (`<dataDir>/ticket-secret`, `passSecret`), so
+ * a restart ends no pass. Nothing about it is stored: it is taken back by taking
  * back the token it was made with, or by the canvas's sharing.
  */
 
@@ -186,4 +188,52 @@ export function passCovers(canvas: string, path: string, placed: (deckPath: stri
 	if (!rest.split("/").every((part) => part !== "" && !part.startsWith("."))) return false;
 	if (rest.startsWith(canvasFolder(canvas))) return true;
 	return placed(rest);
+}
+
+/**
+ * The secret passes are signed with, kept in `<dataDir>/ticket-secret` (mode 0600, the name from when
+ * it signed tickets; never in the deck, which syncs): made the first time, read every time after, so a
+ * pass made before a restart still works after it. A file that is not 32 bytes of hex is made again
+ * (every pass made on it ends).
+ */
+export function passSecret(dataDir: string): Buffer {
+	const file = join(dataDir, "ticket-secret");
+	try {
+		if (existsSync(file)) {
+			const kept = readFileSync(file, "utf8").trim();
+			if (/^[0-9a-f]{64}$/.test(kept)) return Buffer.from(kept, "hex");
+		}
+	} catch {
+		/* made again below */
+	}
+	const made = randomBytes(32);
+	try {
+		mkdirSync(dataDir, { recursive: true });
+		writeFileSync(file, made.toString("hex"), { mode: 0o600 });
+		chmodSync(file, 0o600);
+	} catch (error) {
+		// Not kept: passes work until the next restart.
+		console.warn(`[decks] the pass secret could not be kept in ${file}: ${(error as Error).message}`);
+	}
+	return made;
+}
+
+/**
+ * A pass carried in the path rather than a header, `/api/t/<pass>/board/<path>`: what a canvas frame's
+ * files, pictures, modules and sheets are read at, so every relative address they load carries it too.
+ * Answers the pass and the path as the route sees it.
+ */
+export function splitPathPass(url: string | undefined): { pass: string; rest: string } | undefined {
+	const match = /^\/api\/t\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)(\/[^?]*)(\?.*)?$/.exec(url ?? "");
+	return match ? { pass: match[1]!, rest: `/api${match[2]}${match[3] ?? ""}` } : undefined;
+}
+
+/** A request's path as the route will see it: percent-decoded, without its query. */
+export function decodedPath(url: string | undefined): string | undefined {
+	const raw = (url ?? "/").split("?")[0] ?? "/";
+	try {
+		return decodeURIComponent(raw);
+	} catch {
+		return undefined;
+	}
 }

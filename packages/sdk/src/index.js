@@ -22,9 +22,9 @@
  *
  * A page on another site (Decks Studio) talks to a harness with this file alone: `connectStudio` or
  * `pairSite` for its site token, the verbs, `request` for the harness's other doors, `events` for its
- * changes, `canvasPass` for each canvas frame it shows, and `appUrl`/`tickets`/`pageUrl` for the tabs
- * it opens on the harness's own address. The token only ever goes in a header; a frame or a tab carries
- * a ticket instead.
+ * changes, `canvasPass` for each canvas frame it shows, and `appUrl`/`pageUrl` for the tabs it opens
+ * on the harness's own address. The token only ever goes in a header; a frame or a tab carries a pass
+ * instead.
  *
  * The list of verbs below is generated from the table by `scripts/gen-sdk.mjs`; the rest is not.
  */
@@ -298,33 +298,18 @@ export function connect(options = {}) {
 	}
 
 	/**
-	 * Tickets for pages this connection opens in a frame or a tab, which cannot send the token in a
-	 * header: by request path, decoded (`/api/board/boards/a.html`, `/api/f/…`, `/app/<name>/`).
+	 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to
+	 * this connection's token. Its calls send it as the bearer; its files are read at
+	 * `pageUrl("/api/t/<pass>/board/<deck path>")`. Ask again at half its life (`keepCanvasPass`).
 	 */
-	const held = new Map();
-	/** The most paths one ask may name (the harness's `MAX_TICKETS`). */
-	const PER_ASK = 200;
-	async function tickets(paths) {
-		const made = {};
-		let expires = Date.now();
-		for (let at = 0; at < paths.length; at += PER_ASK) {
-			const got = await request("/api/tickets", { body: { paths: paths.slice(at, at + PER_ASK) } });
-			for (const [path, ticket] of Object.entries(got.tickets ?? {})) {
-				made[path] = ticket;
-				held.set(path, { ticket, expires: got.expires });
-			}
-			expires = got.expires;
-		}
-		return { tickets: made, expires };
+	async function canvasPass(canvas) {
+		const said = await request("/api/passes", { body: { canvas } });
+		if (typeof said?.pass !== "string") throw new DecksError(`Decks gave no pass for the canvas ${canvas}.`);
+		return { pass: said.pass, role: said.role === "view" ? "view" : "edit", expires: Number(said.expires) };
 	}
-	/** The ticket held for a page, while it has a little time left. */
-	const ticketFor = (path) => {
-		const one = held.get(path);
-		return one && one.expires - Date.now() > 10_000 ? one.ticket : undefined;
-	};
-	/** A page's address on the harness, with its ticket when there is one. `path` is decoded. */
-	const pageUrl = (path, ticket = ticketFor(path)) =>
-		`${base}${path.split("/").map(encodeURIComponent).join("/")}${ticket ? `?decks_ticket=${encodeURIComponent(ticket)}` : ""}`;
+
+	/** A page's address on the harness, `path` decoded: one a frame or a tab opens carries a pass in it (`/api/t/<pass>/…`). */
+	const pageUrl = (path) => `${base}${path.split("/").map(encodeURIComponent).join("/")}`;
 
 	/** The verbs as functions, `pen.edit` under `pen`. */
 	const tree = {};
@@ -379,16 +364,7 @@ export function connect(options = {}) {
 		connectStudio(given) {
 			return request("/api/pair", { body: { studio: given.studio, key: given.key, label: given.label ?? "Decks Studio", ...(given.code ? { code: given.code } : {}) } });
 		},
-		/**
-		 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to
-		 * this connection's token. Its calls send it as the bearer; its files are read at
-		 * `pageUrl("/api/t/<pass>/board/<deck path>", "")`. Ask again at half its life.
-		 */
-		async canvasPass(canvas) {
-			const said = await request("/api/passes", { body: { canvas } });
-			if (typeof said?.pass !== "string") throw new DecksError(`Decks gave no pass for the canvas ${canvas}.`);
-			return { pass: said.pass, role: said.role === "view" ? "view" : "edit", expires: Number(said.expires) };
-		},
+		canvasPass,
 		/**
 		 * An app's address for a tab of its own, with an app pass in it (`POST /api/passes { app }`): what
 		 * another site opens an app with. The pass is good for a day, while this connection's token is.
@@ -410,49 +386,37 @@ export function connect(options = {}) {
 			if (typeof said?.path !== "string") throw new DecksError(`Could not upload ${name}.`);
 			return said.path;
 		},
-		tickets,
-		ticketFor,
 		pageUrl,
-		/** A page's address with a fresh ticket, for a tab about to open it. Throws if the harness will not open it. */
-		async ticketedUrl(path) {
-			const ticket = (await tickets([path])).tickets[path];
-			if (!ticket) throw new DecksError("Decks would not open that page.");
-			return pageUrl(path, ticket);
-		},
 		/**
-		 * Keep tickets for pages that stay shown: `want(paths)` asks for any not held at once, and every
-		 * path wanted is asked for again every four minutes (a ticket lasts five), and when a page in a
-		 * browser comes back into view. `onChange` hears each batch that came. `stop()` ends it.
+		 * Keep a canvas pass for a canvas while it is shown (`canvasPass`): asked for at once, again at half
+		 * its life, when a page comes back into view past that, and thirty seconds after one that failed.
+		 * `onPass` hears each one. `stop()` ends it.
 		 */
-		keepTickets(onChange, given = {}) {
-			let wanted = [];
-			const asking = new Set();
-			const ask = async (paths) => {
-				const fresh = paths.filter((one) => !asking.has(one));
-				if (!fresh.length) return;
-				for (const one of fresh) asking.add(one);
+		keepCanvasPass(canvas, onPass) {
+			let timer;
+			let stopped = false;
+			let due = 0;
+			const ask = async () => {
+				clearTimeout(timer);
+				if (stopped) return;
 				try {
-					const got = await tickets(fresh);
-					if (Object.keys(got.tickets).length) onChange?.(got.tickets);
+					const got = await canvasPass(canvas);
+					if (stopped) return;
+					const now = Date.now();
+					due = now + (got.expires - now) / 2;
+					onPass(got);
+					timer = setTimeout(ask, Math.max(1000, due - now));
 				} catch {
-					// Out of reach, or a harness from before tickets: asked again at the next round.
-				} finally {
-					for (const one of fresh) asking.delete(one);
+					if (!stopped) timer = setTimeout(ask, 30_000);
 				}
 			};
-			const again = () => wanted.length && void ask(wanted);
-			const timer = setInterval(again, given.every ?? 4 * 60_000);
-			// A tab back from the background, or a laptop from sleep, may hold tickets that ran out meanwhile.
-			const back = () => typeof document !== "undefined" && document.visibilityState === "visible" && again();
+			const back = () => typeof document !== "undefined" && document.visibilityState === "visible" && Date.now() >= due && void ask();
 			if (typeof document !== "undefined") document.addEventListener("visibilitychange", back);
+			void ask();
 			return {
-				want(paths) {
-					wanted = [...new Set(paths)];
-					const missing = wanted.filter((one) => !ticketFor(one));
-					if (missing.length) void ask(missing);
-				},
 				stop() {
-					clearInterval(timer);
+					stopped = true;
+					clearTimeout(timer);
 					if (typeof document !== "undefined") document.removeEventListener("visibilitychange", back);
 				},
 			};

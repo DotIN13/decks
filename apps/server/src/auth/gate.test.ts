@@ -132,8 +132,7 @@ test("a board has no token: the routes that made one are gone, and a person's to
 		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/a.html" })).status, 404);
 		assert.equal((await post("/api/v1/board-token", person, { path: "boards/a.html" })).status, 404);
 		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: person })).status, 200);
-		const ticket = await post("/api/tickets", person, { paths: ["/api/board/boards/a.html"] });
-		assert.deepEqual(ticket.body.tickets, {}, "no ticket for one board's page");
+		assert.equal((await post("/api/tickets", person, { paths: ["/api/board/boards/a.html"] })).status, 404, "no tickets at all");
 	} finally {
 		cleanup();
 	}

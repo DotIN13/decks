@@ -64,25 +64,28 @@ export interface CanvasHost {
 	freshAddress?(url: string): string;
 }
 
-/** A pass in an address's path (`/api/t/<pass>/`), as a canvas frame's files carry it (`server/src/auth/passes.ts`). */
-const PASS_IN_PATH = /\/api\/t\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\//;
+/**
+ * A pass in an address's path, as a canvas frame's files carry it: a harness's `/api/t/<pass>/`
+ * (`server/src/auth/passes.ts`), or Studio's `/api/live/<pass>/`.
+ */
+const PASS_IN_PATH = /\/api\/(t|live)\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\//;
 
 /**
  * An address with its pass taken out: the same file whatever pass it was read on. What a page keeps
  * things by (an import map, a stylesheet, a module), so a renewed pass is not a second copy of each.
  */
 export function passless(url: string): string {
-	return url.replace(PASS_IN_PATH, "/api/t/-/");
+	return url.replace(PASS_IN_PATH, "/api/$1/-/");
 }
 
 /** An address with the pass in it put in its place now: the host's answer, or the address as it is. */
 export function withPass(url: string, pass: string): string {
-	return PASS_IN_PATH.test(url) ? url.replace(PASS_IN_PATH, `/api/t/${pass}/`) : url;
+	return url.replace(PASS_IN_PATH, (_all, where: string) => `/api/${where}/${pass}/`);
 }
 
 /** The pass an address carries in its path, if any. */
 export function passOf(url: string): string | undefined {
-	return PASS_IN_PATH.exec(url)?.[0].slice("/api/t/".length, -1);
+	return PASS_IN_PATH.exec(url)?.[2];
 }
 
 const fallback: CanvasHost = {

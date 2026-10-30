@@ -108,13 +108,10 @@ export function createHttpApp(app: App): Express {
 	server.use((req, res, next) => {
 		if (!forwardRequest(req, res, app.forwards)) next();
 	});
-	// A tab another site opens an app in: an app pass for that app (`auth/passes.ts`), or a ticket from before (`auth/tickets.ts`).
-	const ticketed = (ticket: string | undefined, path: string | undefined, opening?: { pass: string | undefined; name: string }) => {
-		if (opening) {
-			const pass = app.passes.openApp(opening.pass);
-			return pass?.holder === "tab" && pass.app === opening.name;
-		}
-		return app.tickets.admits(ticket, path);
+	// A tab another site opens an app in: an app pass for that app (`auth/passes.ts`).
+	const ticketed = (pass: string | undefined, name: string) => {
+		const opened = app.passes.openApp(pass);
+		return opened?.holder === "tab" && opened.app === name;
 	};
 	// A token that is the person's or a paired site's, from the page it came with (`auth/tokens.ts`).
 	const paired = (token: string | undefined, origin?: string) => {

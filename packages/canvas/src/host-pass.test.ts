@@ -19,3 +19,10 @@ test("a card loaded on an older pass reads on the current one", () => {
 	assert.equal(withPass(a, now), `http://h/api/t/${now}/board/canvases/one/cards/a/data.json`);
 	assert.equal(withPass("http://elsewhere/x.json", now), "http://elsewhere/x.json");
 });
+
+test("Studio's files carry its canvas pass the same way, under /api/live/", () => {
+	const a = "https://studio.test/api/live/dsc_eyJhIjoxfQ.c2ln/cards/a/index.html";
+	assert.equal(passOf(a), "dsc_eyJhIjoxfQ.c2ln");
+	assert.equal(passless(a), "https://studio.test/api/live/-/cards/a/index.html");
+	assert.equal(withPass(a, "dsc_bmV3.c2lnMg"), "https://studio.test/api/live/dsc_bmV3.c2lnMg/cards/a/index.html");
+});

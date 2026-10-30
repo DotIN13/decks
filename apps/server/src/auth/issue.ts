@@ -4,7 +4,6 @@ import type { App } from "../app.ts";
 import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
-import { FOLDER_TICKET_MS, isFolderTicket, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
 import type { TokenStore } from "./tokens.ts";
 import { bearerOf, originOf } from "./guard.ts";
 
@@ -26,7 +25,6 @@ import { bearerOf, originOf } from "./guard.ts";
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
  *   opens an app in, `POST /api/passes { app }`, for a day.
- * - **A page**: `POST /api/tickets`, five-minute tickets for another site's frames and tabs.
  */
 
 // --- codes ---------------------------------------------------------------------------
@@ -383,32 +381,6 @@ export function doorRoutes(app: App): express.Router {
 			return;
 		}
 		res.set("cache-control", "no-store").json({ token: app.bridge.issue(agentId), agent: agentId });
-	});
-
-	/**
-	 * Tickets for another site's frames and tabs (`tickets.ts`): `{ paths }`, board request paths
-	 * (`/api/board/boards/a.html`, or `boards/a.html`), files (`/api/f/…`) or app addresses
-	 * (`/app/<name>/`), and back `{ tickets, expires }`, a ticket for each path that can have one. Only
-	 * for the person or a site, in the `Authorization` header.
-	 */
-	api.post("/tickets", (req: Request, res: Response) => {
-		const id = actsAsPerson(req.principal) ? req.tokenId : undefined;
-		if (!id) {
-			res.status(401).type("text").send("Tickets are made only for the person's or a paired site's token, in the Authorization header.");
-			return;
-		}
-		const paths = (req.body as { paths?: unknown } | undefined)?.paths;
-		if (!Array.isArray(paths) || paths.length > MAX_TICKETS || !paths.every((one) => typeof one === "string")) {
-			res.status(400).json({ error: `Send paths, a list of at most ${MAX_TICKETS} board or app paths.` });
-			return;
-		}
-		const now = Date.now();
-		const made: Record<string, string> = {};
-		for (const given of paths as string[]) {
-			const path = ticketPath(given);
-			if (path) made[given] = app.tickets.make(path, id, now);
-		}
-		res.json({ tickets: made, expires: now + TICKET_MS, ...(Object.values(made).length && Object.keys(made).some((one) => isFolderTicket(ticketPath(one) ?? "")) ? { folderExpires: now + FOLDER_TICKET_MS } : {}) });
 	});
 
 	return api;

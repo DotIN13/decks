@@ -253,8 +253,6 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 		}
 		case "app":
 			return appCaller(app, principal.name, allowedOnce);
-		case "page":
-			return { status: 403, error: "A ticket opens one page; it calls no verbs." };
 		case "canvas":
 			return canvasCaller(app, principal, header("x-decks-edit")?.slice(0, 80));
 		default:

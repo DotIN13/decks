@@ -12,7 +12,6 @@
  *   acts as the person. `origin` is the site it was given to, when there was one.
  * - `agent`: one agent, by id: what its shell's `decks` command and its tools carry.
  * - `app`: one app's server, by name, from its app pass (`passes.ts`).
- * - `page`: one page's GET and nothing else: a ticket for another site's frame or tab (`tickets.ts`).
  * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
  *   role there now (`view` reads only): the editor in its sandboxed page, and the cards it runs. From a
  *   canvas pass (`passes.ts`), not a token.
@@ -22,7 +21,6 @@ export type Principal =
 	| { kind: "site"; origin?: string; label: string }
 	| { kind: "agent"; id: string }
 	| { kind: "app"; name: string }
-	| { kind: "page"; path: string }
 	| { kind: "canvas"; canvas: string; role: "edit" | "view" };
 
 export type PrincipalKind = Principal["kind"];
@@ -43,8 +41,6 @@ export function describe(principal: Principal): string {
 			return `agent ${principal.id}`;
 		case "app":
 			return `app ${principal.name}`;
-		case "page":
-			return `a ticket for ${principal.path}`;
 		case "canvas":
 			return `the canvas frame for ${principal.canvas}`;
 	}
@@ -54,7 +50,7 @@ declare module "express-serve-static-core" {
 	interface Request {
 		/** Who is calling, from the token the request carried (`auth/guard.ts`); undefined for an open door. */
 		principal?: Principal;
-		/** The id of that token, for "this browser" on a settings page and for the tickets it makes. */
+		/** The id of that token, for "this browser" on a settings page and for the passes it asks for. */
 		tokenId?: string;
 	}
 }

@@ -20,7 +20,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * Tokens slide: each use pushes back the moment they stop working, and one left unused that long is
  * forgotten. Every one lasts a day unused, except the `decks` command's own in a terminal, which
  * lasts `DECKS_TOKEN_DAYS` (30 unless set); an agent's lasts as long as its agent runs, with no idle
- * limit. Passes are not here: they are signed, short and kept nowhere (`passes.ts`, `tickets.ts`).
+ * limit. Passes are not here: they are signed, short and kept nowhere (`passes.ts`).
  *
  * Tokens made before there was one kind (`dk_p_` a tab's or a terminal's, `dk_s_` a site's) are read
  * as harness tokens of the same subject: they are found by their hash, as any is, and given the new
@@ -110,7 +110,7 @@ export class TokenStore {
 	 * down and are taken back when their process stops (`revoke`).
 	 */
 	issue(principal: Principal, options: { label?: string; idle?: number; terminal?: boolean; now?: number } = {}): { token: string; id: string } {
-		if (!SUBJECTS.has(principal.kind)) throw new Error(`A harness token is the person's, a paired site's or an agent's; ${principal.kind === "page" ? "a page is let in by a ticket" : `a ${principal.kind} holds a pass (\`passes.ts\`)`}.`);
+		if (!SUBJECTS.has(principal.kind)) throw new Error(`A harness token is the person's, a paired site's or an agent's; a ${principal.kind} holds a pass (\`passes.ts\`).`);
 		const now = options.now ?? Date.now();
 		const token = `${HARNESS_PREFIX}${randomBytes(32).toString("base64url")}`;
 		const hash = hashOf(token);
@@ -166,7 +166,7 @@ export class TokenStore {
 		return token ? this.byHash.get(hashOf(token))?.id : undefined;
 	}
 
-	/** Whether the token with this id still works: what a ticket made with it asks (`tickets.ts`). */
+	/** Whether the token with this id still works: what a pass made with it asks (`passes.ts`). */
 	live(id: string, now = Date.now()): boolean {
 		for (const one of this.byHash.values()) if (one.id === id) return one.idle === undefined || now - one.last <= one.idle;
 		return false;

@@ -255,7 +255,7 @@ test("a token works only from the site it was given to, or from a caller that se
 		const stolen = await post("/v1/now", { args: [] }, { ...evil, authorization: `Bearer ${token}` });
 		assert.equal(stolen.status, 401);
 		assert.match(String(stolen.body.text), /another site/);
-		assert.equal((await post("/tickets", { paths: ["boards/a.html"] }, { ...evil, authorization: `Bearer ${token}` })).status, 401, "no tickets for it either");
+		assert.equal((await post("/passes", { canvas: "main" }, { ...evil, authorization: `Bearer ${token}` })).status, 401, "no passes for it either");
 		assert.equal((await fetch(`${base}/v1/events?decks_token=${encodeURIComponent(token)}`, { headers: evil })).status, 401, "nor in the address");
 		assert.equal((await post("/v1/now", { args: [] }, { ...STUDIO, "x-decks-person": "studio", authorization: `Bearer ${token}` })).status, 200, "from Studio's own page");
 		assert.equal((await post("/v1/now", { args: [] }, { "content-type": "application/json", "x-decks-person": "studio", authorization: `Bearer ${token}` })).status, 200, "a program, with no Origin");

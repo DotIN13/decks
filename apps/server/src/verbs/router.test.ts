@@ -202,7 +202,7 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	}
 });
 
-test("each principal calls as itself: an app as the app, a page not at all, a site as the person, whatever board it names", async () => {
+test("each principal calls as itself: an app as the app, a site as the person, whatever board it names", async () => {
 	const { callerOf } = await import("./router.ts");
 	const { app, call, bearer, cleanup } = await open();
 	try {
@@ -229,8 +229,6 @@ test("each principal calls as itself: an app as the app, a page not at all, a si
 		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("boards/tall.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
 		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
 
-		const page = await callerOf(app, { headers: {}, principal: { kind: "page", path: "/api/board/boards/tall.html" } }, new Set());
-		assert.ok("error" in page && page.status === 403);
 		const none = await callerOf(app, { headers: { "x-decks-person": "1" } }, new Set());
 		assert.ok("error" in none && none.status === 401, "a header is nobody");
 	} finally {

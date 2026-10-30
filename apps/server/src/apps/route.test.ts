@@ -102,7 +102,7 @@ test("only decks_token leaves the query", () => {
 	assert.equal(withoutToken("?decks_token=x&q=a%20b"), "?q=a+b");
 });
 
-test("another site opens an app with a ticket for it, which the app never sees, and a token copied to another site is refused", async () => {
+test("another site opens an app with an app pass for it, which the app never sees, and a token copied to another site is refused", async () => {
 	let seen: { url?: string } = {};
 	const app = createServer((req, res) => {
 		seen = { url: req.url };
@@ -111,7 +111,7 @@ test("another site opens an app with a ticket for it, which the app never sees, 
 	const appPort = await listen(app);
 	const apps = { exists: () => true, manifest: () => ({ kind: "server" }), seen: () => {}, portFor: async () => appPort } as unknown as Apps;
 	const paired = (token: string | undefined, origin?: string) => token === "paired" && (!origin || origin === "https://studio.test");
-	const ticketed = (ticket: string | undefined, path: string | undefined) => ticket === "good" && !!path?.startsWith("/app/x/");
+	const ticketed = (pass: string | undefined, name: string) => pass === "good" && name === "x";
 	const decks = createServer((req, res) => void appRequest(req, res as Parameters<typeof appRequest>[1], apps, paired, ticketed));
 	const decksPort = await listen(decks);
 	const ask = async (path: string, headers: Record<string, string>, method = "GET") => {
@@ -120,13 +120,13 @@ test("another site opens an app with a ticket for it, which the app never sees, 
 		return { status: response.status, referrer: response.headers.get("referrer-policy") };
 	};
 	try {
-		const opened = await ask("/app/x/page?a=1&decks_ticket=good", { "sec-fetch-site": "cross-site" });
-		assert.equal(opened.status, 200, "a frame with a ticket for the app");
-		assert.equal(opened.referrer, "no-referrer", "its address, ticket and all, is not sent on");
+		const opened = await ask("/app/x/page?a=1&decks_pass=good", { "sec-fetch-site": "cross-site" });
+		assert.equal(opened.status, 200, "a tab with a pass for the app");
+		assert.equal(opened.referrer, "no-referrer", "its address, pass and all, is not sent on");
 		assert.equal(seen.url, "/page?a=1");
-		assert.equal((await ask("/app/y/?decks_ticket=good", { "sec-fetch-site": "cross-site" })).status, 403, "another app");
-		assert.equal((await ask("/app/x/?decks_ticket=bad", { "sec-fetch-site": "cross-site" })).status, 403, "a ticket that does not check out");
-		assert.equal((await ask("/app/x/?decks_ticket=good", { "sec-fetch-site": "cross-site" }, "POST")).status, 403, "a ticket admits a GET only");
+		assert.equal((await ask("/app/y/?decks_pass=good", { "sec-fetch-site": "cross-site" })).status, 403, "another app");
+		assert.equal((await ask("/app/x/?decks_pass=bad", { "sec-fetch-site": "cross-site" })).status, 403, "a pass that does not check out");
+		assert.equal((await ask("/app/x/?decks_pass=good", { "sec-fetch-site": "cross-site" }, "POST")).status, 403, "a pass admits a GET only");
 		assert.equal((await ask("/app/x/", { "sec-fetch-site": "cross-site", origin: "https://studio.test", authorization: "Bearer paired" })).status, 200);
 		assert.equal((await ask("/app/x/", { "sec-fetch-site": "cross-site", origin: "https://evil.test", authorization: "Bearer paired" })).status, 403, "the token, from a page on another site");
 	} finally {
@@ -137,7 +137,7 @@ test("another site opens an app with a ticket for it, which the app never sees, 
 	}
 });
 
-test("a ticket leaves the query as the token does", () => {
-	assert.equal(withoutToken("?decks_ticket=t"), "");
-	assert.equal(withoutToken("?a=1&decks_ticket=t&decks_token=x"), "?a=1");
+test("a pass leaves the query as the token does", () => {
+	assert.equal(withoutToken("?decks_pass=t"), "");
+	assert.equal(withoutToken("?a=1&decks_pass=t&decks_token=x"), "?a=1");
 });

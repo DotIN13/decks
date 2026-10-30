@@ -249,14 +249,10 @@ function fakeFetch(answer) {
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
-test("a page's doors: hello, tickets are asked in batches and held, a canvas pass and an app's address, an upload as it is", async () => {
+test("a page's doors: hello, a canvas pass and an app's address, a page's address, an upload as it is", async () => {
 	const { fetch, seen } = fakeFetch((url, init) => {
 		const path = new URL(url).pathname;
 		if (path === "/api/hello") return json({ decks: true, name: "Lab", paired: true });
-		if (path === "/api/tickets") {
-			const { paths } = JSON.parse(init.body);
-			return json({ tickets: Object.fromEntries(paths.map((one) => [one, `t-${one.length}`])), expires: Date.now() + 300_000 });
-		}
 		if (path === "/api/passes") {
 			const body = JSON.parse(init.body);
 			return json(body.app ? { pass: "dk_ap_x.y", expires: 1, url: `/app/${body.app}/?decks_pass=dk_ap_x.y` } : { pass: "dk_cp_x.y", role: "edit", expires: 2 });
@@ -267,13 +263,7 @@ test("a page's doors: hello, tickets are asked in batches and held, a canvas pas
 	});
 	const decks = connect({ url: "http://127.0.0.1:4830", token: "dk_s_site", fetch });
 	assert.equal((await decks.hello()).name, "Lab");
-	const paths = Array.from({ length: 250 }, (_, i) => `/api/board/boards/b${i}.html`);
-	const got = await decks.tickets(paths);
-	assert.equal(Object.keys(got.tickets).length, 250);
-	assert.equal(seen.filter((one) => one.url.endsWith("/api/tickets")).length, 2, "at most 200 paths an ask");
-	assert.equal(decks.ticketFor(paths[0]), got.tickets[paths[0]]);
-	assert.equal(decks.pageUrl("/api/board/boards/a b.html", "T"), "http://127.0.0.1:4830/api/board/boards/a%20b.html?decks_ticket=T");
-	assert.match(await decks.ticketedUrl("/api/f/assets/x.png"), /^http:\/\/127\.0\.0\.1:4830\/api\/f\/assets\/x\.png\?decks_ticket=/);
+	assert.equal(decks.pageUrl("/api/t/dk_cp_x.y/board/a b.html"), "http://127.0.0.1:4830/api/t/dk_cp_x.y/board/a%20b.html");
 	assert.deepEqual(await decks.canvasPass("plan"), { pass: "dk_cp_x.y", role: "edit", expires: 2 });
 	assert.deepEqual(JSON.parse(seen.at(-1).body), { canvas: "plan" });
 	assert.equal(await decks.appUrl("notes"), "http://127.0.0.1:4830/app/notes/?decks_pass=dk_ap_x.y");
