@@ -191,7 +191,7 @@ export function setOnScreen(read: () => string | undefined): void {
 }
 
 /** The frames that act on a canvas, and so name the one they act on (the canvas on screen). */
-const CANVAS_CHANGES = new Set<ClientMessage["type"]>(["board.move", "board.resize", "board.play", "board.hide", "board.create", "stage.pen.edit", "stage.pen.step"]);
+const CANVAS_CHANGES = new Set<ClientMessage["type"]>(["board.move", "board.resize", "board.play", "board.hide", "document.create", "stage.pen.edit", "stage.pen.step"]);
 
 /** Send a frame. Queued by the socket itself if the connection is down. */
 export function send(message: ClientMessage): void {

@@ -668,7 +668,7 @@ export function App() {
 	 * Everything else the handler uses it imports — the camera, the store.
 	 */
 	const frames: FrameHooks = {
-		hearBoard: (request, path) => files.hearBoard(request, path),
+		hearCreated: (request, path) => files.hearCreated(request, path),
 		setAtTurn,
 		raise,
 		landed,
@@ -1524,14 +1524,12 @@ export function App() {
 					onAppsOpen={loadApps}
 					onApp={async (app, action) => {
 						const running = app.status === "running" || app.status === "asleep";
-						/* Its board, made now if the app's folder was written by hand and has none yet. */
+						/* The item that shows it: the one on the canvas already, or a new one beside the newest thing there. */
 						const show = async () => {
-							const own = `boards/apps/${app.name}.html`;
-							const here = stageBoards().find((one) => one.path === own || one.path.endsWith(`/${own}`));
+							const here = stageBoards().find((one) => one.app === app.name);
 							if (here) return frameWhenPlaced(here.path);
-							const made = (await act<string>("apps.board", [app.name])) ?? app.board;
-							const placed = await act<{ board?: string }>("canvas.insert", [{ type: "board", board: made }]);
-							frameWhenPlaced(placed?.board ?? made);
+							const placed = await act<{ id?: string }>("canvas.insert", [{ type: "app", app: app.name }]);
+							if (placed?.id) frameWhenPlaced(`item:${placed.id}`);
 						};
 						if (action === "show") return show();
 						if (action === "run-show") {
@@ -1540,7 +1538,7 @@ export function App() {
 							return show();
 						}
 						if (action === "delete") {
-							const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and its boards are deleted.`, yes: "Delete", no: "Cancel" });
+							const yes = await ask({ title: `Delete ${app.title}?`, body: `Its folder, apps/${app.name}, moves to the deck's trash, and the items showing it leave the canvases.`, yes: "Delete", no: "Cancel" });
 							if (!yes) return;
 							await act("apps.delete", [app.name]);
 							return loadApps();
@@ -1694,10 +1692,6 @@ export function App() {
 						web={state.web}
 						onWebRepair={() => send({ type: "web.repair" })}
 						onWebStop={() => send({ type: "web.stop" })}
-						onWebBoard={() => {
-							send({ type: "web.board" });
-							setSettings(false);
-						}}
 						phone={phone()}
 						onClose={() => setSettings(false)}
 					/>

@@ -12,10 +12,10 @@ test("the table has every call of the redesign, each named once, and the old nam
 		"agent.me", "agent.update", "here", "agent.claim", "agent.inbox", "agent.list", "agent.get", "agent.send", "agent.queue", "agent.create",
 		"view.goto", "view.focus", "view.camera", "view.move", "view.viewport", "view.cursor", "view.reload",
 		"apps.list", "apps.status", "apps.create", "apps.repo", "apps.clone", "apps.board", "apps.build", "apps.run", "apps.stop", "apps.restart", "apps.delete", "apps.logs", "apps.check",
-		"web.status", "web.pairing", "web.repair", "web.board", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
+		"web.status", "web.pairing", "web.repair", "web.open", "web.read", "web.screenshot", "web.fill", "web.select", "web.click", "web.press", "web.submit", "web.stop",
 		"ports", "now", "pair.code", "studio.connect", "studio.status", "studio.disconnect",
 	]) assert.ok(names.has(name), `${name} is in the table`);
-	assert.equal(VERBS.length, 78);
+	assert.equal(VERBS.length, 77);
 	assert.ok(VERBS.every((verb) => !verb.alias), "no new call is an alias");
 	assert.ok(ALIASES.every((verb) => verb.alias && !names.has(verb.name)), "every old name says its new call and is not a new name");
 });
@@ -32,7 +32,7 @@ test("every call says what it touches and whether it changes it, in the redesign
 	assert.equal(count("screen", "read"), 2, "camera and viewport only read the screen");
 	assert.equal(count("screen", "change"), 5);
 	assert.ok(VERBS.filter((verb) => verb.group === "view").every((verb) => verb.touches === "screen"), "view calls never write files");
-	assert.equal(VERB_BY_NAME.get("web.board")!.touches, "deck");
+	assert.equal(VERB_BY_NAME.get("web.board"), undefined, "the shared tab has no board: its status is web.status");
 });
 
 test("every canvas call takes an optional canvas, last", () => {

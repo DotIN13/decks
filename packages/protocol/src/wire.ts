@@ -115,34 +115,19 @@ export type ClientMessage =
 	| { type: "board.seen"; path: string }
 	| { type: "board.hide"; path: string; /** The stage on screen. */ stage?: string }
 	/**
-	 * A new, empty board, put on the canvas.
-	 *
-	 * The server has been able to write one from a template since agents needed it; this is
-	 * the same call reached from a button, because "I want somewhere to put this" is a thing
-	 * a person has as often as an agent does, and asking for it in words was the only way.
-	 *
-	 * No title. A board named by a dialog before it has anything on it is a naming decision
-	 * taken at the worst possible moment — it arrives as `Untitled`, and its heading is a
-	 * field you can retype like any other.
-	 *
-	 * `kind` is a template name and the server owns the list (`boards/templates.ts` validates
-	 * it); it is a bare `string` here because the protocol package cannot depend on the
-	 * server, and an unknown one falls back to `blank` rather than failing — the worst
-	 * outcome of a typo should be an empty board.
+	 * A document put on the canvas from the file picker: an item that opens the file as a page you type
+	 * into (`{ type: "browser", metadata: { type: "decks.document", path } }`), at `at` (its top-left
+	 * corner) or beside the newest thing on the canvas. `document` names a file the deck can open;
+	 * `google` a Google Doc, which is linked first and opened from its mirror. `request` asks for a
+	 * `document.created` naming the item.
 	 */
-	/**
-	 * A new board. `title`, `size` and `at` are for a board made to hold something — a file
-	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
-	 */
-	/** `document` names a file to open as a page you type into; the board made for it opens it. */
-	| { type: "board.create"; /** The stage on screen, which the new board joins. */ stage?: string; kind?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string; document?: string; google?: string; /** A board that is this one file, edge to edge: a PDF or a web page. */ file?: string }
+	| { type: "document.create"; /** The stage on screen, which the item joins. */ stage?: string; at?: { x: number; y: number }; request?: string; document?: string; google?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *
 	 * The one message in this protocol that destroys something a person wrote, so it is worth
 	 * being exact about what it is not. It is **not** `board.hide`, which takes a board off
-	 * the canvas and leaves the agent holding it; and it is not the opposite of
-	 * `board.create`, which is only ever "a new file appeared". This unlinks the HTML.
+	 * the canvas and leaves the agent holding it. This unlinks the HTML.
 	 *
 	 * What survives is the content-addressed copy in `.decks/revisions` — every version the
 	 * server has seen of that path, including the last one, is still on disk under its sha.
@@ -291,8 +276,6 @@ export type ClientMessage =
 	| { type: "web.stop" }
 	/** Choose the deck's timezone, or `null` to go back to the machine's. */
 	| { type: "settings.set"; timezone?: string | null; sttModel?: string | null }
-	/** Make (or find) the status board and put it on the canvas. */
-	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
 	| { type: "web.repair" }
 	/** A fresh code another Decks can pair with. Answered with `pairing`. */
@@ -387,8 +370,8 @@ export type ServerMessage =
 	| { type: "chat.earlier"; agentId: string; before: string; items: ChatItem[]; more: boolean }
 	/** Answering `chat.tool`: the whole output, or empty when the call is no longer anywhere. */
 	| { type: "chat.tool"; agentId: string; itemId: string; result: string }
-	/** Answering a `board.create` that carried a `request`: the path the new board was given. */
-	| { type: "board.created"; request: string; path: string }
+	/** Answering a `document.create` that carried a `request`: the new item's path on the stage (`item:<id>`). */
+	| { type: "document.created"; request: string; path: string }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**

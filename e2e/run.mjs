@@ -84,6 +84,8 @@ const CHECKS = [
 	{ file: "placement-views.mjs", needsAgent: false },
 	/* An agent says where: newBoard and show with at, driven through a board's own code. */
 	{ file: "placement-at.mjs", needsAgent: false },
+	/* What a drop, the file picker and apps create put on the canvas: a file card, a document item, an app item, never a board. */
+	{ file: "items-made.mjs", needsAgent: false },
 	/*
 	 * A camera that *arrives*. Its own check rather than a section of `camera.mjs`, because that
 	 * one is about the camera's arithmetic and this one is about a clock: it samples the world

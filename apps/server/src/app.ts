@@ -212,8 +212,6 @@ export class App {
 			 */
 			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
-			newBoard: (options) => this.boards.newBoard(options),
-			newAppBoard: (name, title) => this.boards.newAppBoard(name, title),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
 			deleteBoard: (path) => {
 				let refused: string | undefined;
@@ -289,11 +287,11 @@ export class App {
 		this.claudeAccounts.sweep();
 		/*
 		 * The shared browser, on the install like the accounts are: the pairing code is a
-		 * property of this server, not of a deck. Every change is broadcast, so the status
-		 * board and the extension's popup say the same thing at the same time.
+		 * property of this server, not of a deck. Every change is broadcast, so the settings'
+		 * Your Chrome and the extension's popup say the same thing at the same time.
 		 */
 		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
-		this.stage.web = Object.assign(this.web, { board: () => this.boards.newWebBoard() }) as typeof this.web & { board: () => string };
+		this.stage.web = this.web;
 		/*
 		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
 		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.

@@ -660,7 +660,7 @@ export function createHttpApp(app: App): Express {
 				return;
 			}
 			/*
-			 * `?guest=1` is a board that is this web page (`data-bare`, `renderFileBoard`) asking for it
+			 * `?guest=1` is a board that is this web page (`data-bare`, an old file board) asking for it
 			 * with `lib/embed-guest.js` in it: the page then takes the scrolls it can use and hands the
 			 * rest, and every pinch, to the canvas, as a board's own page does, with no click first.
 			 * Still the asset's headers, so still sandboxed; the script is ours and reads nothing back.

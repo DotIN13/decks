@@ -6,9 +6,9 @@ description: Build an app the person can use on the canvas, as a folder in apps/
 # Building an app
 
 An app is a folder, `apps/<name>/`, that you write with your own tools. Decks serves it at
-`/app/<name>/` and shows it on the canvas as the app's own item (`app.board`, a small page Decks
-writes for it): a bar (Running, Building, Asleep, Broken; Reload, Restart, Open, Log) over the app
-itself. It reloads the app by itself when you
+`/app/<name>/` and shows it on the canvas as an app item, `{ type: "app", app: "<name>" }`, which
+`decks canvas insert` places: a bar (Running, Building, Asleep, Broken; Reload, Restart, Open, Log)
+over the app itself. It reloads the app by itself when you
 change a file, finish a build or restart the server.
 
 ## Pick the lowest rung that does the job
@@ -23,7 +23,8 @@ change a file, finish a build or restart the server.
 
 ## The loop
 
-As commands (`decks apps create polls --starter node`, `decks apps run polls`, `decks apps check polls`), or in a
+As commands (`decks apps create polls --starter node`, `decks apps run polls`, `decks apps check polls`,
+`decks canvas insert '{"type":"app","app":"polls"}'`), or in a
 node script, where `const { decks } = await import(process.env.DECKS_SDK)` gives the same calls:
 
 ```js
@@ -31,7 +32,7 @@ const app = await decks.apps.create("polls", { starter: "node", title: "Polls" }
 // Write the files in app.folder with your own tools, then:
 await decks.apps.run("polls");          // a server app; a built one: decks.apps.build
 const seen = await decks.apps.check("polls");   // read seen.verdict; seen.file is a picture
-await decks.canvas.insert({ type: "board", board: app.board }, { at: { x1: 0, y1: 0 } });  // an app is still placed by its page
+await decks.canvas.insert(app.item, { at: { x1: 0, y1: 0 } });  // app.item is { type: "app", app: "polls" }
 ```
 
 - **`check` is to an app what `decks canvas fit` is to a card.** It opens the app in the server's browser and
@@ -50,7 +51,7 @@ await decks.canvas.insert({ type: "board", board: app.board }, { at: { x1: 0, y1
 `decks apps repo <name>` does the same for a folder you wrote by hand, and says its branch, last
 commit and changed files. To share an app, push it:
 `git -C apps/<name> remote add origin <url> && git -C apps/<name> push -u origin main`. To take
-one in, `decks apps clone <url>` (https:// or git@host:path) adds it with its page on the canvas; read its files
+one in, `decks apps clone <url>` (https:// or git@host:path) adds it, and `decks canvas insert '{"type":"app","app":"<name>"}'` shows it; read its files
 before you run it. Keep secrets in `.env`, which the repo ignores.
 
 ## Rules that are easy to break

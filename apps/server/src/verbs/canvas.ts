@@ -173,6 +173,26 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			service.writeCard(path, `${head}${head ? "\n" : ""}${html.trim()}\n`);
 			item = { ...others, type: "card", card: path, ...(typeof width === "number" ? { width } : {}), ...(typeof height === "number" ? { height } : {}) };
 		}
+		/*
+		 * An app or a document, by name: `{ type: "app", app: "<name>" }` and `{ type: "document", path }` are
+		 * the items that show one (`browser` items tagged `decks.app` and `decks.document`, `@decks/canvas`
+		 * `itemKind`), with no file of their own; sized as their boards were.
+		 */
+		if (item.type === "app" || item.type === "document") {
+			if (frame) throw new Error(`${frame} is a frame, and a frame holds drawn items: place the ${item.type} on a canvas, beside the frame.`);
+			const { type: kind, app, path, title, width, height, ...others } = item as Record<string, unknown>;
+			const named = typeof title === "string" && title.trim() ? title.trim() : undefined;
+			if (kind === "app") {
+				const name = typeof app === "string" ? app.trim() : "";
+				if (!name) throw new Error('An app item names its app: { type: "app", app: "<name>" }. decks apps list names them.');
+				if (service.apps && !service.apps.exists(name)) throw new Error(`There is no app called ${JSON.stringify(name)}. decks apps list names them.`);
+				const label = named ?? (service.apps ? service.apps.state(name).title : name);
+				return { ...others, type: "browser", name: label, width: typeof width === "number" ? width : 1100, height: typeof height === "number" ? height : 760, metadata: { type: "decks.app", name } };
+			}
+			const file = typeof path === "string" ? path.trim() : "";
+			if (!file) throw new Error('A document item names its file: { type: "document", path: "docs/plan.md" }.');
+			return { ...others, type: "browser", name: named ?? basename(file), width: typeof width === "number" ? width : 1000, height: typeof height === "number" ? height : 1100, metadata: { type: "decks.document", path: file } };
+		}
 		// A card is placed as a board is, by its file in a canvas's `cards/`: `{ type: "card", card: "cards/sales.html" }`.
 		if (item.type === "card") {
 			const { card: named, ...others } = item;

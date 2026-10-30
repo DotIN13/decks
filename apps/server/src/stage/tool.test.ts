@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
@@ -56,23 +56,9 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** Every `stage.move`, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
-		newAppBoard: () => "boards/apps/x.html",
-		newBoard: (options) => {
-			// Every board is one HTML file, as the real service writes it.
-			const extension = ".html";
-			// In the folder it is asked for, as the real service does: a canvas's own boards/ (`deck/layout.ts`).
-			const path = `${options.folder ?? "boards"}/${options.title.toLowerCase().replace(/\W+/g, "-")}${extension}`;
-			mkdirSync(join(root, options.folder ?? "boards"), { recursive: true });
-			// The size it was asked for goes into the file, because the file is the only
-			// place a size lives — a stub that dropped it would make every width assertion
-			// below a reading of the loader's fallback instead.
-			const meta = `<meta name="board" content='{"w":${options.size?.w ?? 1000},"h":${options.size?.h ?? 700}}' />`;
-			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title>${meta}<body class="board"></body>`);
-			// Known to the deck at once, as the real service's is, so a stage can say where it went.
-			if (stageful) deck.refresh(path);
-			return path;
-		},
 		writeBoard: (path, html) => {
+			// A card in its own folder, as the real service writes it (`newBoard` writes a card now).
+			mkdirSync(dirname(join(root, path)), { recursive: true });
 			writeFileSync(join(root, path), html);
 			const board = deck.refresh(path);
 			if (!board) throw new Error(`no board at ${path}`);
@@ -189,7 +175,7 @@ test("newBoard says how much room the canvas has, after the path it returns", as
 
 	assert.equal(result.isError, false);
 	const lines = result.text.split("\n");
-	assert.match(lines[0] ?? "", /boards\/sizing\.html/, "the path is still the value, so `const path = await …` keeps working");
+	assert.match(lines[0] ?? "", /cards\/sizing\/index\.html/, "the path is still the value, so `const path = await …` keeps working");
 	assert.equal(lines[1], "viewport 1440×900 px");
 	cleanup();
 });
@@ -221,20 +207,20 @@ test("a default width is the board's own, or the screen when the screen is small
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
 	const onWide = await runCode(wide.tool, `return await stage.newBoard({ title: "Wide" })`);
-	assert.equal(widthOf(wide.read("canvases/ada/boards/wide.html")), 1000, "the board's own width, on a screen with room to spare");
-	assert.match(onWide.text, /board width 1000/);
+	assert.equal(widthOf(wide.read("canvases/ada/cards/wide/index.html")), 1000, "the board's own width, on a screen with room to spare");
+	assert.match(onWide.text, /card width 1000/);
 	wide.cleanup();
 
 	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
 	const onPhone = await runCode(phone.tool, `return await stage.newBoard({ title: "Phone" })`);
-	assert.equal(widthOf(phone.read("canvases/ada/boards/phone.html")), 390, "the screen, when the screen is smaller");
-	assert.match(onPhone.text, /board width 390\. One screen/);
+	assert.equal(widthOf(phone.read("canvases/ada/cards/phone/index.html")), 390, "the screen, when the screen is smaller");
+	assert.match(onPhone.text, /card width 390\. One screen/);
 	phone.cleanup();
 
 	// A huge screen is not an invitation: the board's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
 	await runCode(huge.tool, `return await stage.newBoard({ title: "Huge" })`);
-	assert.equal(widthOf(huge.read("canvases/ada/boards/huge.html")), 1000);
+	assert.equal(widthOf(huge.read("canvases/ada/cards/huge/index.html")), 1000);
 	huge.cleanup();
 
 	/*
@@ -244,7 +230,7 @@ test("a default width is the board's own, or the screen when the screen is small
 	 */
 	const asked = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
 	await runCode(asked.tool, `return await stage.newBoard({ title: "Asked", w: 1800 })`);
-	assert.equal(widthOf(asked.read("canvases/ada/boards/asked.html")), 1800);
+	assert.equal(widthOf(asked.read("canvases/ada/cards/asked/index.html")), 1800);
 	asked.cleanup();
 });
 
@@ -290,29 +276,29 @@ test("a board is the agent's once it is named: newBoard, fit, a one-board show a
 	const { tool, hold, worked, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
 
 	await runCode(tool, `await stage.newBoard({ title: "One" }); await stage.newBoard({ title: "Two" });`);
-	assert.deepEqual(worked, ["canvases/ada/boards/one.html", "canvases/ada/boards/two.html"]);
+	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]);
 	worked.length = 0;
 	// The stub writes the file and no more; the watcher is what would tell the deck.
-	deck.refresh("canvases/ada/boards/one.html");
-	deck.refresh("canvases/ada/boards/two.html");
+	deck.refresh("canvases/ada/cards/one/index.html");
+	deck.refresh("canvases/ada/cards/two/index.html");
 
 	// Arranging the canvas and reading are not authorship.
-	const arranged = await runCode(tool, `await stage.show(["canvases/ada/boards/one.html", "canvases/ada/boards/two.html"]); await stage.boards(); await stage.hide("canvases/ada/boards/two.html");`);
+	const arranged = await runCode(tool, `await stage.show(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]); await stage.boards(); await stage.hide("canvases/ada/cards/two/index.html");`);
 	assert.equal(arranged.isError, false, arranged.text);
 	assert.deepEqual(worked, []);
 
-	const shown = await runCode(tool, `await stage.show("canvases/ada/boards/one.html", { highlight: "x" });`);
+	const shown = await runCode(tool, `await stage.show("canvases/ada/cards/one/index.html", { highlight: "x" });`);
 	assert.equal(shown.isError, false, shown.text);
-	assert.deepEqual(worked, ["canvases/ada/boards/one.html"]);
+	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html"]);
 
-	const rev = deck.board("canvases/ada/boards/two.html")!.rev;
-	extents.set("canvases/ada/boards/two.html", { rev, w: 900, h: 1200 });
-	hold("canvases/ada/boards/two.html");
-	const fitted = await runCode(tool, `return await stage.fit("canvases/ada/boards/two.html")`);
+	const rev = deck.board("canvases/ada/cards/two/index.html")!.rev;
+	extents.set("canvases/ada/cards/two/index.html", { rev, w: 900, h: 1200 });
+	hold("canvases/ada/cards/two/index.html");
+	const fitted = await runCode(tool, `return await stage.fit("canvases/ada/cards/two/index.html")`);
 	assert.equal(fitted.isError, false, fitted.text);
-	assert.deepEqual(worked, ["canvases/ada/boards/one.html", "canvases/ada/boards/two.html"]);
+	assert.deepEqual(worked, ["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"]);
 
-	const reported = await runCode(tool, `return await stage.report(["canvases/ada/boards/one.html", "canvases/ada/boards/two.html"])`);
+	const reported = await runCode(tool, `return await stage.report(["canvases/ada/cards/one/index.html", "canvases/ada/cards/two/index.html"])`);
 	assert.match(reported.text, /"reported"/);
 	assert.equal(worked.length, 4);
 	assert.match((await runCode(tool, `return await stage.report("boards/none.html")`)).text, /No such board/);
@@ -547,15 +533,15 @@ test("a fit of a wide board leaves it wide and says nothing about width", async 
 	cleanup();
 });
 
-// Every new board is one HTML page: there is no format to ask for, and a slide deck is not one.
+// Every new board is a card now, one HTML page: there is no format to ask for, and a slide deck is not one.
 test("a new board is an .html page, whatever format an old caller asks for", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
 	const board = await runCode(tool, `return await stage.newBoard({ title: "Ordinary" })`);
-	assert.match(board.text.split("\n")[0] ?? "", /boards\/ordinary\.html/);
-	assert.match(board.text, /board width 1000/);
+	assert.match(board.text.split("\n")[0] ?? "", /cards\/ordinary\/index\.html/);
+	assert.match(board.text, /card width 1000/);
 	// An old caller still saying `format: "slides"` gets an ordinary board.
 	const deck = await runCode(tool, `return await stage.newBoard({ title: "Talk", format: "slides" })`);
-	assert.match(deck.text.split("\n")[0] ?? "", /boards\/talk\.html/);
+	assert.match(deck.text.split("\n")[0] ?? "", /cards\/talk\/index\.html/);
 	cleanup();
 });
 
@@ -598,7 +584,6 @@ test("stage.web says so when this server has no shared browser, and reaches the 
 		click: async (what) => (calls.push(`click ${name(what)}`), { clicked: name(what) }),
 		press: async (key) => ({ pressed: key }),
 		submit: async (what) => (calls.push(`submit ${what === undefined ? "Enter" : name(what)}`), { submitted: what === undefined ? "Enter" : name(what), allowed: true }),
-		board: () => "boards/your-chrome.html",
 	};
 	const pairing = await runCode(tool, `return await stage.web.pairing()`);
 	assert.equal(pairing.isError, false);
@@ -611,13 +596,12 @@ test("stage.web says so when this server has no shared browser, and reaches the 
 		await stage.web.click("Next");
 		const page = await stage.web.read();
 		const done = await stage.web.submit("Create account");
-		return { page: page.snapshot, done, board: await stage.web.board() };
+		return { page: page.snapshot, done };
 	`);
 	assert.equal(drove.isError, false, drove.text);
 	assert.deepEqual(calls, ["open https://x.example/join", "fill Email=ada@example.org", "click Next", "submit Create account"]);
 	assert.match(drove.text, /textbox \\"Email\\"/);
 	assert.match(drove.text, /"allowed": true/);
-	assert.match(drove.text, /boards\/your-chrome\.html/);
 
 	// A screenshot is handed back as an image block beside the text, and the text names the file.
 	const looked = await runCode(tool, `return await stage.web.screenshot()`);
@@ -732,8 +716,6 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 	}
 	const deck = Deck.open(root);
 	const service = new StageService(deck, {
-		newAppBoard: () => "boards/apps/x.html",
-		newBoard: () => "",
 		writeBoard: () => {
 			throw new Error("not used here");
 		},
@@ -913,11 +895,11 @@ test("newBoard says where a board went when it was not told, and what a named pl
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { stageful: true });
 	await runCode(tool, `return await stage.show("${PLAN}", { at: { x1: 0, y1: 0 } })`);
 	const unnamed = await runCode(tool, `return await stage.newBoard({ title: "Somewhere" })`);
-	assert.match(unnamed.text, /No at was given, so canvases\/ada\/boards\/somewhere\.html went beside your newest board, at x1 5000, y1 0/);
+	assert.match(unnamed.text, /No at was given, so canvases\/ada\/cards\/somewhere\/index\.html went beside your newest board, at x1 5000, y1 0/);
 	const clear = await runCode(tool, `return await stage.newBoard({ title: "Clear", at: { x1: 20000, y1: 0 } })`);
 	assert.doesNotMatch(clear.text, /No at was given|sits on/, "a place given and clear says nothing");
 	const onTop = await runCode(tool, `return await stage.newBoard({ title: "On top", at: { x1: 100, y1: 100 } })`);
-	assert.match(onTop.text, /canvases\/ada\/boards\/on-top\.html is at x1 100, y1 100, as asked, and sits on canvases\/ada\/boards\/plan\.html/);
+	assert.match(onTop.text, /canvases\/ada\/cards\/on-top\/index\.html is at x1 100, y1 100, as asked, and sits on canvases\/ada\/boards\/plan\.html/);
 	cleanup();
 });
 

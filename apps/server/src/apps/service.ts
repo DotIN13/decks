@@ -11,7 +11,7 @@ export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../
 /**
  * Apps an agent builds, each a folder in the deck's `apps/` (DESIGN: the app ladder).
  *
- * An app climbs a ladder only as far as it has to. A **board** is one HTML file and needs none
+ * An app climbs a ladder only as far as it has to. A **card** is one HTML file and needs none
  * of this. A **static** app is a folder of files served as they are. A **build** app has a
  * `package.json` whose build writes a folder of files, which are then served the same way. A
  * **server** app is any program that listens on the `PORT` it is given; Decks starts it, sends it
@@ -19,7 +19,8 @@ export const SDK_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../
  * again on the next request.
  *
  * Every app is reached at `/app/<name>/` on Decks' own address (`http.ts`), and shown on the canvas
- * as a board that is the app (`boards/apps/<name>.html`, drawn by `lib/live-app.js`). The folder is
+ * by an app item (`{ type: "browser", metadata: { type: "decks.app", name } }`, which
+ * `decks canvas insert '{"type":"app","app":"<name>"}'` places). The folder is
  * the agent's: it writes the files with its own tools. `app.json` says which rung it is on:
  *
  *     { "title": "Trip planner", "kind": "server", "start": "node server.js" }
@@ -59,7 +60,10 @@ export interface AppState {
 	status: AppStatus;
 	/** Where it is reached, on Decks' own address. */
 	url: string;
-	/** The board that shows it. */
+	/**
+	 * Old: the board an app used to be shown by (`boards/apps/<name>.html`), which names no file now.
+	 * Kept one release because Studio's app list (`@decks/sync-protocol`'s `HarnessApp`) requires it.
+	 */
 	board: string;
 	port?: number;
 	/** What went wrong, in a line, when it is broken. */

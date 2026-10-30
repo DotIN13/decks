@@ -1,11 +1,10 @@
 import type { WirePart } from "./context.ts";
 
 /**
- * The shared Chrome, from the status board.
+ * The shared Chrome, from the settings' Your Chrome.
  *
- * The user's own browser is attached by the extension (`browser/bridge.ts`), and the board at
- * `boards/your-chrome.html` is its control panel: the answer to a submit the agent is
- * waiting on, a Stop, a fresh pairing code, and the card itself. Four frames, all of them
+ * The user's own browser is attached by the extension (`browser/bridge.ts`): the answer to a
+ * submit the agent is waiting on, a Stop and a fresh pairing code. Three frames, each of them
  * one call into the bridge and a republish of its status.
  */
 export const web = {
@@ -20,11 +19,5 @@ export const web = {
 	"web.repair": (_message, _reply, wire) => {
 		const code = wire.web.repair();
 		wire.send({ type: "web.status", status: wire.web.status(), code });
-	},
-
-	"web.board": (_message, _reply, wire) => {
-		const path = wire.boards.newWebBoard();
-		const agent = wire.target();
-		agent.setInPlay([...agent.inPlay.filter((shown) => shown !== path), path], { place: true });
 	},
 } satisfies WirePart;

@@ -70,7 +70,6 @@ export function Settings(props: {
 	web?: { status: WebStatus; code?: string };
 	onWebRepair: () => void;
 	onWebStop: () => void;
-	onWebBoard: () => void;
 	/** The phone's layout: a bottom sheet with tabs instead of a window. */
 	phone?: boolean;
 	onClose: () => void;
@@ -116,7 +115,7 @@ export function Settings(props: {
 					<Connections />
 				</Match>
 				<Match when={section() === "chrome"}>
-					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
+					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} />
 				</Match>
 			</Switch>
 		</div>
@@ -503,7 +502,7 @@ function Connections() {
  * it. The address is `location.origin`: the server sees loopback behind a proxy, and the address
  * this page was loaded from is the one certainly right.
  */
-function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepair: () => void; onStop: () => void; onBoard: () => void }) {
+function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepair: () => void; onStop: () => void }) {
 	const { copied, copy } = useCopy();
 	const status = () => props.web?.status;
 	const note = () => {
@@ -528,7 +527,6 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 					<Show when={status()?.connected}>
 						<Btn onClick={props.onStop}>Stop sharing</Btn>
 					</Show>
-					<Btn onClick={props.onBoard}>Status board</Btn>
 				</SetRow>
 				<For each={status()?.tabs ?? []}>{(tab) => <SetRow title={<span class="truncate">{tab.title || "(untitled)"}</span>} sub={<span class="sw-mono truncate">{tab.url}</span>} />}</For>
 			</SetGroup>

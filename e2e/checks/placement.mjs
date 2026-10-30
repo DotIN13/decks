@@ -13,7 +13,8 @@
  *
  * The rail is gone (the panel's Canvas tab lists only what is on the canvas), so a board put back
  * is put back over the wire, `board.play`, as an agent's `show` does; nothing flies the camera to
- * it, so whether it is on screen is not asserted, only where it lands.
+ * it, so whether it is on screen is not asserted, only where it lands. A document from the file
+ * picker, with no point named, lands by the same rule.
  */
 import { canvasFrame, open, resetStage, say, settle, socket } from "../harness.mjs";
 
@@ -87,24 +88,34 @@ say(
 	`${back ? Math.round(nearest(back, others)) : "?"} px to the nearest, on a board ${back?.w} wide`,
 );
 
-// --- a new board, asked for over the wire (people no longer make boards from the UI) ------
+// --- a document from the file picker, with no point named (the toolbar's button) --------------
 
+/*
+ * Nobody makes a board any more: what the picker puts on the canvas is an item, a document opened as
+ * a page (`document.create`, an item tagged `decks.document`). With no point named it takes the open
+ * slot beside the newest card, by the stage's own rule (`deck/place.ts`), and the server answers with
+ * its path on the stage, `item:<id>`, which is what the page selects and flies to.
+ */
 const before = new Set((await onScreen()).map((board) => board.path));
-link.send({ type: "board.create" });
-await settle(page, 2500);
+link.send({ type: "document.create", document: "docs/notes.md", request: "placement-1" });
+const answered = await (async () => {
+	for (let i = 0; i < 60; i++) {
+		const heard = link.received.find((m) => m.type === "document.created" && m.request === "placement-1");
+		if (heard) return heard;
+		await settle(page, 150);
+	}
+})();
+say("document.create is answered with the item's path on the stage", /^item:/.test(answered?.path ?? ""), JSON.stringify(answered));
+await (await canvasFrame(page)).waitForFunction((path) => (window.__decksBoards?.() ?? []).some((one) => one.path === path), answered?.path, { timeout: 8000 }).catch(() => {});
+await settle(page, 600);
 
 const made = (await onScreen()).find((board) => !before.has(board.path));
-say("board.create makes a board on the canvas", made !== undefined, JSON.stringify((await onScreen()).map((b) => b.path)));
-/*
- * Not asserted: that the new board is in the view. The server places it by the stage's own rule
- * (`deck/place.ts`, which ignores every camera) and nothing flies the view to it any more, so
- * whether it happens to be on screen is not the rule. What is: it lands beside its neighbours.
- */
+say("…and the document is on the canvas, as an item and not a board", made !== undefined && made.path === answered?.path, JSON.stringify((await onScreen()).map((b) => b.path)));
 const neighbours = (await onScreen()).filter((board) => board.path !== made?.path);
 say(
 	"…beside the boards that were already on the canvas",
 	made !== undefined && nearest(made, neighbours) < made.w,
-	`${made ? Math.round(nearest(made, neighbours)) : "?"} px to the nearest, on a board ${made?.w} wide`,
+	`${made ? Math.round(nearest(made, neighbours)) : "?"} px to the nearest, on a document ${made?.w} wide`,
 );
 
 say("no page errors", errors.length === 0, errors.join("; "));

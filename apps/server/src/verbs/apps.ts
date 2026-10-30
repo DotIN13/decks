@@ -6,9 +6,12 @@ import type { AppKind } from "../apps/service.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
-/** What to do with a new app before its board is worth showing, by its kind. */
-function nextSteps(name: string, kind: AppKind, board: string, first = "Edit the files"): string {
-	const insert = `decks apps check ${name} and decks canvas insert '{"type":"board","board":"${board}"}'`;
+/** The item that shows an app on a canvas, as `canvas.insert` takes it (`verbs/canvas.ts`). */
+const appItem = (name: string) => ({ type: "app" as const, app: name });
+
+/** What to do with a new app before the item showing it is worth placing, by its kind. */
+function nextSteps(name: string, kind: AppKind, first = "Edit the files"): string {
+	const insert = `decks apps check ${name} and decks canvas insert '{"type":"app","app":"${name}"}'`;
 	if (kind === "static") return `${first}, then ${insert}.`;
 	if (kind === "build") return `${first}, decks apps build ${name}, then ${insert}.`;
 	return `${first}, decks apps run ${name}, then ${insert}.`;
@@ -41,11 +44,27 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				if (!apps.exists(text)) throw new Error(`There is no app called ${JSON.stringify(text)}. decks apps list names them; decks apps create <name> --starter … makes one.`);
 				return text;
 			};
+			/** Take every item showing an app off the deck's own canvases; answers them as `<canvas>/<id>`. */
+			const takeOff = (name: string): string[] => {
+				const pens = service.pens;
+				if (!pens) return [];
+				const gone: string[] = [];
+				for (const canvas of pens.names()) {
+					if (pens.isShared(canvas)) continue;
+					const ids = (pens.get(canvas).doc.children ?? [])
+						.filter((node) => node.type === "browser" && (node.metadata as { type?: unknown; name?: unknown } | undefined)?.type === "decks.app" && (node.metadata as { name?: unknown }).name === name)
+						.map((node) => node.id);
+					if (!ids.length) continue;
+					pens.edit(canvas, ids.map((id) => ({ op: "delete" as const, id })));
+					gone.push(...ids.map((id) => `${canvas}/${id}`));
+				}
+				return gone;
+			};
 			return {
 				list: async () => service_().list(),
 				status: async (name: string) => service_().state(known(name)),
 				/**
-				 * A new app from a starter, and the board that shows it. `static` is files served as they
+				 * A new app from a starter, and the item that shows it (placing it is the canvas's job). `static` is files served as they
 				 * are; `node` a server with no packages; `solid` and `react` built with Vite; `next` a
 				 * Next.js server. Take the lowest that does the job.
 				 */
@@ -68,16 +87,15 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					} catch (error) {
 						unkept = ` Its git repository was not made (${(error as Error).message}); decks apps repo ${text} tries again.`;
 					}
-					const board = service.appBoard(text, title);
 					return {
 						name: text,
 						kind: STARTER_KIND[starter],
 						folder: `apps/${text}`,
 						files,
-						board,
+						item: appItem(text),
 						url: `/app/${text}/`,
 						...(repo ? { repo } : {}),
-						next: nextSteps(text, STARTER_KIND[starter], board) + unkept,
+						next: nextSteps(text, STARTER_KIND[starter]) + unkept,
 					};
 				},
 				/**
@@ -93,7 +111,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					}
 					return repoState(folder);
 				},
-				/** An app taken in from a git address, with its board. Nothing is installed or run. */
+				/** An app taken in from a git address, and the item that shows it. Nothing is installed or run. */
 				clone: async (url: string, options?: { name?: string; title?: string }) => {
 					agentOnly("clone");
 					const apps = service_();
@@ -114,23 +132,18 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 						rmSync(folder, { recursive: true, force: true });
 						throw error;
 					}
-					const title = options?.title?.trim() || manifest.title || text;
-					const board = service.appBoard(text, title);
 					return {
 						name: text,
 						kind: manifest.kind,
 						folder: `apps/${text}`,
-						board,
+						item: appItem(text),
 						url: `/app/${text}/`,
 						repo: { branch: cloned.branch, head: cloned.head, ...(cloned.remote ? { remote: cloned.remote } : {}) },
-						next: nextSteps(text, manifest.kind, board, "Read its files first, since it is someone else's code"),
+						next: nextSteps(text, manifest.kind, "Read its files first, since it is someone else's code"),
 					};
 				},
-				/** The board for an app whose folder was written by hand. */
-				board: async (name: string) => {
-					const text = known(name);
-					return service.appBoard(text, service_().state(text).title);
-				},
+				/** The item that shows an app whose folder was written by hand; nothing is written. */
+				board: async (name: string) => appItem(known(name)),
 				build: async (name: string) => {
 					agentOnly("build");
 					return service_().build(known(name));
@@ -152,8 +165,9 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 				},
 				/**
 				 * Delete an app, from the person's ⋯ menu or an agent: stop it, move its folder to the deck's
-				 * trash rather than erase it (a whole app is too much to lose to one press), and delete the
-				 * boards that show it, which would only show an app that is not there.
+				 * trash rather than erase it (a whole app is too much to lose to one press), and take the
+				 * items that show it off the deck's own canvases, which would only show an app that is not
+				 * there. A friend's canvas is theirs, and left alone.
 				 */
 				delete: async (name: string) => {
 					agentOnly("delete");
@@ -164,7 +178,7 @@ export function appsVerbs(ctx: VerbContext): Pick<Stage, "apps"> {
 					const trash = join(".decks", "trash", "apps", `${text}-${stamp}`);
 					mkdirSync(join(service.deckPath(), ".decks", "trash", "apps"), { recursive: true });
 					renameSync(apps.folder(text), join(service.deckPath(), trash));
-					return { deleted: text, trash: trash.split("\\").join("/"), boards: service.deleteAppBoards(text) };
+					return { deleted: text, trash: trash.split("\\").join("/"), items: takeOff(text) };
 				},
 				logs: async (name: string, options?: { tail?: number }) => service_().log(known(name), options?.tail ?? 80),
 				/** The app opened in the server's own browser: errors, failed requests and a picture, as `decks.canvas.fit` is for a board. */

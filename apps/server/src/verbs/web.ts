@@ -4,7 +4,7 @@ import type { VerbContext } from "./context.ts";
 
 /** The person's own Chrome, shared through the Decks extension. */
 export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
-	const { agent, images, needWeb, needTarget } = ctx;
+	const { images, needWeb, needTarget } = ctx;
 	return {
 		/**
 		 * The user's own Chrome, shared with the deck through the Decks extension.
@@ -16,18 +16,12 @@ export function webVerbs(ctx: VerbContext): Pick<Stage, "web"> {
 		 * label and value.
 		 */
 		web: {
-			/** Connected or not, which tab, what the agent did; the status board draws this. */
+			/** Connected or not, which tab, what the agent did; the settings show this. */
 			status: async () => needWeb().status(),
 			/** What to put in the extension: the address is the one the browser uses for Decks. */
 			pairing: async () => ({ code: needWeb().code(), path: "/api/web/relay", note: "Paste the Decks address and this code into the Decks extension's popup, then share a tab." }),
 			/** A fresh code; the extension has to be paired again. */
 			repair: async () => ({ code: needWeb().repair() }),
-			/** Make (or find) the status board, and put it on this agent's stage. */
-			board: async () => {
-				const path = needWeb().board();
-				agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
-				return path;
-			},
 			open: async (url: string) => {
 				if (!url?.trim()) throw new Error("open needs a URL");
 				return needWeb().open(url.trim());

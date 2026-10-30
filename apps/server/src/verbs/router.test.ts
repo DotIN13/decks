@@ -104,7 +104,7 @@ test("a change goes to the deck, and its notes come back beside the value", asyn
 		const made = await call("newBoard", [{ title: "The finding", at: { x1: 0, y1: 0 } }]);
 		assert.ok(made.body.ok, made.body.error);
 		const path = made.body.value as string;
-		assert.match(path, /^canvases\/[^/]+\/boards\/the-finding/, "made in the caller's canvas");
+		assert.match(path, /^canvases\/[^/]+\/cards\/the-finding\//, "made in the caller's canvas");
 		assert.ok(existsSync(join(deck, path)), "the board's file was written");
 		assert.ok(made.body.notes.length > 0, "newBoard tells the caller about the viewport, as a run does");
 	} finally {
@@ -151,7 +151,7 @@ test("an agent's shell, as a runtime sets it up, reaches its own stage with the 
 		const listed = await run("sh", ["-c", "decks boards | head -c 2000"], { env });
 		assert.ok(JSON.parse(listed.stdout).some((board: { path: string }) => board.path === "boards/tall.html"));
 		const made = await run("sh", ["-c", 'p=$(decks new-board --title "From the shell" --at.x1 0 --at.y1 900) && echo "$p"'], { env });
-		assert.match(made.stdout.trim(), /^canvases\/[^/]+\/boards\/from-the-shell/);
+		assert.match(made.stdout.trim(), /^canvases\/[^/]+\/cards\/from-the-shell\//);
 		assert.ok(made.stderr.trim().length > 0, `the notes reach the shell on stderr: ${made.stderr}`);
 		await assert.rejects(run("sh", ["-c", "decks move boards/tall.html"], { env }), (error: { code: number; stderr: string }) => error.code === 1 && /move needs at/.test(error.stderr));
 	} finally {
@@ -197,6 +197,31 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 		assert.ok(answer.ok);
 		assert.deepEqual([answer.value?.box.x1, answer.value?.box.y1], [40, 80]);
 		assert.deepEqual(answer.notes, [], "the person hears no agent's reminders");
+	} finally {
+		cleanup();
+	}
+});
+
+test("an app is shown by an item: apps.board names it, canvas.insert places it, apps.delete takes it off", async () => {
+	const { app, call, cleanup } = await open();
+	try {
+		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
+		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static", title: "Notes" }));
+		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
+		const item = await call("apps.board", ["notes"]);
+		assert.deepEqual(item.body.value, { type: "app", app: "notes" }, "the item to insert, and no file written");
+		assert.equal(existsSync(join(app.deck.path, "boards", "apps", "notes.html")), false);
+		const placed = await call("canvas.insert", [item.body.value, { at: { x1: 0, y1: 0 } }]);
+		assert.ok(placed.body.ok, placed.body.error);
+		const value = placed.body.value as { id: string; type: string; name: string; metadata: unknown; width: number; height: number };
+		assert.deepEqual([value.type, value.name, value.metadata, value.width, value.height], ["browser", "Notes", { type: "decks.app", name: "notes" }, 1100, 760]);
+		const missing = await call("canvas.insert", [{ type: "app", app: "nothing" }, { at: { x1: 0, y1: 2000 } }]);
+		assert.match(String(missing.body.error), /There is no app called "nothing"/);
+		const deleted = await call("apps.delete", ["notes"]);
+		assert.ok(deleted.body.ok, deleted.body.error);
+		const items = (deleted.body.value as { items: string[] }).items;
+		assert.equal(items.length, 1, JSON.stringify(deleted.body.value));
+		assert.match(items[0]!, new RegExp(`/${value.id}$`), "the item that showed it is off the canvas");
 	} finally {
 		cleanup();
 	}

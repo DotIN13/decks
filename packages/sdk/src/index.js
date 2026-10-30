@@ -105,7 +105,6 @@ export const VERBS = [
 	["web.status",[]],
 	["web.pairing",[]],
 	["web.repair",[]],
-	["web.board",[]],
 	["web.open",["url"]],
 	["web.read",[]],
 	["web.screenshot",["options?"]],

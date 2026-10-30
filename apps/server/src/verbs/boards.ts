@@ -1,74 +1,37 @@
 import { isCardPath } from "../deck/layout.ts";
-import { stageBoardsDir } from "../deck/stage-boards.ts";
-import { boardWidth } from "../boards/templates.ts";
+import { makeCard } from "./board.ts";
 import { withBox } from "./context.ts";
 import type { Verbs as Stage } from "../../../../packages/sdk/src/index.d.ts";
 import type { VerbContext } from "./context.ts";
 
-/** Board files: list them, make one, size one on the canvas and in its file, and say which ones are yours. */
+/** Board files: list them, make one (a card now), size one on the canvas and in its file, and say which ones are yours. */
 export function boardsVerbs(ctx: VerbContext): Pick<Stage, "boards" | "newBoard" | "resize" | "fit" | "report"> {
-	const { service, agent, notes, asList, viewport, here, cornerOf, reportPlace } = ctx;
+	const { service, agent, notes, asList, here, cornerOf, reportPlace } = ctx;
 	return {
 		/** Every board in the deck, placed as this agent's stage has them, with its box's two corners. */
 		boards: async () => here().map(withBox),
 		/**
-		 * Start a board: the shell, written for you, so you write only the content.
+		 * The old name for starting a board, kept one release: it writes a card now, as `card.create`
+		 * does, in the caller's own canvas, and places it there at `at` (or beside what is there), as it
+		 * always placed what it made. Returns the card's path.
 		 *
-		 * Attaches it and puts it on the canvas — without moving the camera, which stays
-		 * where the user left it until `show` is called. Returns the deck-relative path to
-		 * edit.
+		 * `template` and `kind` are still accepted rather than refused: this signature is in the
+		 * `stage.d.ts` agents have already read, and a card is blank however it was asked for.
 		 */
 		newBoard: async (options: { title: string; template?: string; kind?: string; w?: number; h?: number; at?: { x1: number; y1: number } | { x: number; y: number } }) => {
-			const title = options?.title?.trim();
-			if (!title) throw new Error("A board needs a title");
+			if (!options?.title?.trim()) throw new Error("A board needs a title");
 			const named = cornerOf(options.at);
-			/*
-			 * There are no templates any more — every board starts blank — but the arguments
-			 * are still accepted rather than refused. This signature is in the `stage.d.ts`
-			 * every agent has already read: an agent mid-turn is working from the contract as
-			 * it was when its session opened, and breaking that costs somebody a turn to save
-			 * a deprecation. What used to be a shape is now nothing shaped; the board is blank
-			 * however it was asked for.
-			 */
 			if (options.template ?? options.kind) {
-				notes.push("new boards are blank — there are no templates any more, so the shape asked for was ignored.");
+				notes.push("new cards are blank — there are no templates any more, so the shape asked for was ignored.");
 			}
-
-			/*
-			 * The width, when nobody said one: the default, held inside the screen.
-			 *
-			 * A phone is what makes it worth doing rather than suggesting: at a 390px
-			 * viewport every default is wider than the screen, and the board has to fit the
-			 * room it is read in. There is no ceiling of ours in it any more — a width that
-			 * *was* asked for is used at any size, and 1200 is advice in the note below.
-			 */
-			const view = viewport();
-			const width = boardWidth(options.w, view?.width);
-			// A new board is made in the canvas it lands on, the caller's own (`deck/layout.ts`).
 			const stageName = agent.stageName?.();
-			const path = service.newBoard({
-				title,
-				size: { w: width, ...(options.h ? { h: options.h } : {}) },
-				...(stageName ? { folder: stageBoardsDir(stageName) } : {}),
-			});
+			if (!stageName) throw new Error("A card is made in a canvas, and you are on none: decks card create '{\"title\":\"…\",\"canvas\":\"<name>\"}' names one.");
+			const { path, width } = makeCard(ctx, options, stageName);
 			agent.setInPlay([...agent.inPlay(), path], named ? { [path]: named } : undefined);
 			reportPlace(path, named);
-			agent.worked?.(path);
 			agent.acted?.("new", path);
-			/*
-			 * The size of the thing you are about to fill, and the advice that goes with it.
-			 *
-			 * The number used to be the whole of it, on the reasoning that an agent that
-			 * knows the canvas is 1400×900 does not need telling how wide a board should be.
-			 * It did: knowing the room and choosing 1900 anyway is exactly what kept
-			 * happening, because nothing joined the two. So the advice goes beside the
-			 * number, at the moment it would be used — **as advice**, since the clamp that
-			 * used to enforce it is gone and a board wider than this is now allowed to
-			 * exist.
-			 */
-			if (view) notes.push(`viewport ${view.width}×${view.height} px`);
 			notes.push(
-				`board width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. stage.fit will say which of these a board is over.`,
+				`card width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. decks canvas fit will say which of these a card is over.`,
 			);
 			return path;
 		},

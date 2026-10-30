@@ -39,7 +39,7 @@ export function rememberView(agentId: string, camera: Camera, selected?: string)
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
 	/** A board asked for by a drop heard its path. */
-	hearBoard(request: string, path: string): void;
+	hearCreated(request: string, path: string): void;
 	/**
 	 * The deck has arrived for the conversation we just switched to.
 	 *
@@ -524,8 +524,8 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setDraft({ text: message.text, at: Date.now(), ...(state.focused ? { agentId: state.focused } : {}) });
 					return;
 
-				case "board.created":
-					hooks.hearBoard(message.request, message.path);
+				case "document.created":
+					hooks.hearCreated(message.request, message.path);
 					return;
 
 				case "claude.accounts": {

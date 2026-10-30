@@ -28,10 +28,6 @@ import type { AppCheck } from "../apps/check.ts";
  */
 
 export interface StageHost {
-	/** Write a new blank board and return its deck-relative path. */
-	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string;
-	/** The board that shows an app, `boards/apps/<name>.html`; the one it has if it has one. */
-	newAppBoard(name: string, title: string): string;
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Board;
 	/** Delete a board's file, keeping its last revision, and tell everyone; the refusal's words, if it is refused. */
@@ -115,8 +111,6 @@ export interface WebHost {
 	click(what: WebTarget): Promise<{ clicked: string }>;
 	press(key: string): Promise<{ pressed: string }>;
 	submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
-	/** Make or find the status board, and return its path. */
-	board(): string;
 }
 
 /** The room `decks.canvas.fit` leaves under the content — the margin a board's own components start at. */
@@ -267,29 +261,6 @@ export class StageService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
 		return board;
-	}
-
-	/** The board that shows an app (`apps/service.ts`). */
-	appBoard(name: string, title: string): string {
-		return this.host.newAppBoard(name, title);
-	}
-
-	/** Delete every board that shows an app, in the library and in each canvas's own folder; the paths deleted. */
-	deleteAppBoards(name: string): string[] {
-		const own = new RegExp(`(^|/)boards/apps/${name.replace(/[^a-z0-9-]/g, "")}\\.html$`);
-		const gone: string[] = [];
-		for (const board of this.deck.boards) {
-			if (!own.test(board.path) || !this.host.deleteBoard) continue;
-			const refused = this.host.deleteBoard(board.path);
-			if (refused) throw new Error(refused);
-			gone.push(board.path);
-		}
-		return gone;
-	}
-
-	/** A new blank board — the shell, so the agent writes only the content. */
-	newBoard(options: { title: string; size?: { w?: number; h?: number }; folder?: string }): string {
-		return this.host.newBoard(options);
 	}
 
 	/** Write a card's file (a canvas's `cards/`), recorded and announced as a board's write is. */

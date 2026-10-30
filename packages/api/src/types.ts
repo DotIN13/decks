@@ -145,6 +145,7 @@ export const AppState = named(
 		kind: AppKind,
 		status: AppStatus,
 		url: str(),
+		/** Old: the board apps used to be shown by, which names no file now; kept one release for Studio's app list. */
 		board: str(),
 		port: opt(num()),
 		error: opt(str()),
@@ -153,6 +154,8 @@ export const AppState = named(
 		version: opt(num()),
 	}),
 );
+/** The item that shows an app on a canvas, as `canvas.insert` takes it. */
+export const AppItem = named("AppItem", obj({ type: lit("app"), app: str() }), 'The item that shows an app, as decks.canvas.insert takes it: { type: "app", app: <name> }.');
 export const AppOutcome = named("AppOutcome", obj({ ok: bool(), status: AppStatus, ms: num(), errors: arr(str()), pending: opt(lit(true)) }));
 
 export const AgentKind = lit("pi", "claude", "opencode", "opencode2", "antigravity");

@@ -1,7 +1,7 @@
 import { ALL_VERBS, cardCalls, checkArgs, signature, VERB_BY_NAME } from "@decks/api";
 import express, { type Request, type Response } from "express";
 import type { App } from "../app.ts";
-import { callerTool, conversationFor } from "../stage/caller-run.ts";
+import { appActor, callerTool, conversationFor } from "../stage/caller-run.ts";
 import { fromThisMachine } from "../auth/issue.ts";
 import { bearerOf } from "../auth/guard.ts";
 import type { Principal } from "../auth/principal.ts";
@@ -285,6 +285,8 @@ const PLACE_ONLY = new Set(["x", "y", "width", "height"]);
 function touchesTrustedItems(app: Pick<App, "stage">, verb: string, args: readonly unknown[], canvas: string): boolean {
 	if (!["canvas.insert", "canvas.replace", "canvas.update", "canvas.batch", "canvas.copy"].includes(verb)) return false;
 	if (TRUSTED_ITEMS.some((tag) => JSON.stringify(args).includes(tag))) return true;
+	// The short forms that become one (`{ type: "app", app }`, `{ type: "document", path }`, `verbs/canvas.ts`).
+	if (/"type":"(?:app|document)"/.test(JSON.stringify(args))) return true;
 	const trusted = new Set<string>();
 	try {
 		const walk = (nodes: unknown[] | undefined) => {
@@ -385,12 +387,13 @@ export function boardOnCanvas(app: Pick<App, "stage">, path: string, canvas: str
  */
 async function appCaller(app: App, name: string, allowedOnce: Set<string>): Promise<Caller> {
 	if (!app.apps.exists(name)) return { status: 404, error: `There is no app called ${name}.` };
+	// Trusted under `apps/<name>` as it always was, so an "Always allow" given before still holds.
 	const key = `apps/${name}`;
-	const board = app.apps.state(name).board;
+	const board = appActor(name);
 	if (!app.evalTrust.allows(key) && !allowedOnce.has(key)) {
 		const answer = await conversationFor(app, { board }).bridge.choose({
 			title: "Let this app use the stage?",
-			message: `The app ${name} wants to call stage verbs: write boards, move the canvas, message agents.`,
+			message: `The app ${name} wants to call stage verbs: write cards, move the canvas, message agents.`,
 			options: [
 				{ label: "Allow until Decks restarts" },
 				{ label: "Always allow this app", description: `Remember ${name}, and stop asking` },

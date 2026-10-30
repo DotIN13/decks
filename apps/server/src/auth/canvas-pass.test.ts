@@ -328,7 +328,13 @@ test("a document or an app item is placed by the person, not the frame, and the 
 		const doc = { type: "browser", id: "paper", width: 800, height: 600, metadata: { type: "decks.document", path: "notes.md" } };
 		assert.equal((await post("/api/v1/canvas.insert", frame, { args: [doc, { at: { x1: 0, y1: 0 } }] })).status, 403, "the frame may not place one");
 		assert.equal((await post("/api/v1/canvas.batch", frame, { args: [[{ op: "insert", item: { ...doc, id: "p2", metadata: { type: "decks.app", name: "terminal" } }, at: { x1: 0, y1: 0 } }]] })).status, 403, "nor an app, in a batch");
+		assert.equal((await post("/api/v1/canvas.insert", frame, { args: [{ type: "document", path: "deck.json" }, { at: { x1: 0, y1: 0 } }] })).status, 403, "nor by its short form");
+		assert.equal((await post("/api/v1/canvas.insert", frame, { args: [{ type: "app", app: "terminal" }, { at: { x1: 0, y1: 0 } }] })).status, 403, "an app's short form neither");
 		assert.equal((await post("/api/v1/canvas.insert", person, { args: [doc, { canvas: one, at: { x1: 0, y1: 0 } }] })).status, 200, "the person may");
+		const short = await post("/api/v1/canvas.insert", person, { args: [{ type: "document", path: "plan.md" }, { canvas: one, at: { x1: 2000, y1: 0 } }] });
+		assert.equal(short.status, 200, "and by its short form, which becomes the item");
+		const made = (short.body as unknown as { value: { id: string; type: string; metadata: { type: string; path: string }; width: number; height: number } }).value;
+		assert.deepEqual([made.type, made.metadata, made.width, made.height], ["browser", { type: "decks.document", path: "plan.md" }, 1000, 1100]);
 		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { set: { metadata: { type: "decks.document", path: "secret.md" } } }] })).status, 403, "the frame may not point it elsewhere");
 		assert.equal((await post("/api/v1/canvas.update", frame, { args: ["paper", { at: { x1: 40, y1: 40 } }] })).status, 200, "but may move it");
 		assert.deepEqual([...app.documentsOn(one)].includes("notes.md"), true);

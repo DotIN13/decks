@@ -24,7 +24,7 @@ export interface CallerRun {
 }
 
 export interface CallerSpec {
-	/** The board the actor is: a board's own path, or an app's board (`boards/apps/<name>.html`). */
+	/** The board the actor is: a board's own path, or an app's name as `app:<name>` (`appActor`). */
 	board: string;
 	/** What cursors and notices call it, as in `board plan.html` or `app polls`. */
 	name: string;
@@ -37,19 +37,39 @@ export interface CallerSpec {
 	stage?: string;
 }
 
+/** An app's actor's path: what its cursors, notices and conversation are keyed by. */
+export const appActor = (name: string) => `app:${name}`;
+
+/**
+ * Whether a canvas holds what an actor is: its board, or for an app (`app:<name>`) an item showing it.
+ * Top-level items only, as a canvas places its boards.
+ */
+export function canvasHolds(pens: StageService["pens"], canvas: string | undefined, board: string): boolean {
+	if (!pens || !canvas) return false;
+	try {
+		if (!board.startsWith("app:")) return pens.boards(canvas).some((one) => one.path === board);
+		const name = board.slice(4);
+		return (pens.get(canvas).doc.children ?? []).some((node) => node.type === "browser" && (node.metadata as { type?: unknown; name?: unknown } | undefined)?.type === "decks.app" && (node.metadata as { name?: unknown }).name === name);
+	} catch {
+		return false;
+	}
+}
+
 /**
  * The conversation a run acts for: one on the board's own canvas. That is the canvas the press came
  * from when the browser names it, or else one holding the board, the agent on screen first; only a
  * board on no agent's canvas falls back to the focused conversation, minted if nobody has spoken yet.
  * Never simply the last agent any browser touched, which may be on another canvas entirely.
  */
-export function conversationFor(context: Pick<CallerRun, "agents">, on: { board: string; stage?: string }): DeckAgent {
+export function conversationFor(context: Pick<CallerRun, "agents"> & { stage?: Pick<StageService, "pens"> }, on: { board: string; stage?: string }): DeckAgent {
 	const looking = context.agents.looking();
 	const all = looking ? [looking, ...context.agents.all().filter((one) => one !== looking)] : [...context.agents.all()];
 	if (on.stage) {
 		const there = all.find((one) => one.stageName() === on.stage);
 		if (there) return there;
 	}
+	// An app is on a canvas by an item, not in anyone's context: the conversation on a canvas showing it.
+	if (on.board.startsWith("app:")) return all.find((one) => canvasHolds(context.stage?.pens, one.stageName(), on.board)) ?? context.agents.focused();
 	return all.find((one) => one.inPlay.includes(on.board)) ?? context.agents.focused();
 }
 
@@ -74,9 +94,9 @@ export function callerTool(context: CallerRun, spec: CallerSpec): { tool: StageT
 		// The board's canvas: the one the press came from, else the conversation's when it holds the board, else any that does.
 		here: () => {
 			if (spec.stage) return spec.stage;
-			if (focused.inPlay.includes(spec.board)) return focused.stageName?.();
+			if (focused.inPlay.includes(spec.board) || canvasHolds(context.stage.pens, focused.stageName?.(), spec.board)) return focused.stageName?.();
 			const pens = context.stage.pens;
-			return pens?.names().find((name) => pens.boards(name).some((one) => one.path === spec.board)) ?? focused.stageName?.();
+			return pens?.names().find((name) => canvasHolds(pens, name, spec.board)) ?? focused.stageName?.();
 		},
 		...(spec.mayCreate ? { create: (fromId: string, made: Parameters<Registry["createFor"]>[1]) => context.agents.createFor(fromId, made) } : {}),
 		recordRevision: (board: string) => context.boards.recordRevision(board),

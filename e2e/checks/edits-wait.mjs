@@ -14,7 +14,7 @@
  *
  * The person's edits are shown at once and kept on top of the server's drawings until the one that
  * has them arrives (`packages/canvas/src/model/drawing.ts`), so every case asks for no frame of the old
- * state. A board made from a file is the server's to make (`board.create`) and is not driven here.
+ * state. A document put on the canvas from the picker is the server's to make (`document.create`) and is not driven here.
  *
  *   node e2e/run.mjs edits-wait                       # Chromium, then WebKit for a few
  *   EDITS_WAIT_TABLE=1 node e2e/run.mjs edits-wait    # and the table, as JSON, for a report

@@ -103,21 +103,20 @@ function sizeLabel(bytes: number): string {
  * where the caret is.
  */
 export function createFileDrops() {
-	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
+	/** Documents asked for with a `request`, waiting to hear their items' paths (`document.created`). */
 	const created = new Map<string, (path: string) => void>();
 
 	/**
-	 * Ask the server for a board and hear back which path it got.
+	 * Ask the server for a document item and hear back which path it got on the stage.
 	 *
-	 * The server mints the name, so every caller that wants to *do* something with a board it
-	 * asked for — fill it with the file that was dropped, select it, fly to it — has to wait to
-	 * be told what it is called. `ask` is handed the request id to put on its own message, which
-	 * is what lets one registry serve every request that makes a board.
+	 * The server mints the item's id, so a caller that wants to *do* something with the item it
+	 * 	 * asked for — select it, fly to it — has to wait to be told what it is called. `ask` is handed the
+	 * request id to put on its own message.
 	 *
 	 * Ten seconds, then `undefined`: a promise that never settles is a button that never comes
 	 * back, and the caller can say so in a sentence.
 	 */
-	const askForBoard = (ask: (request: string) => void): Promise<string | undefined> => {
+	const askFor = (ask: (request: string) => void): Promise<string | undefined> => {
 		const request = `ask-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 		return new Promise<string | undefined>((resolve) => {
 			created.set(request, resolve);
@@ -204,30 +203,12 @@ export function createFileDrops() {
 		report.done([paths.length ? `${paths.length === 1 ? files[0]?.name : `${paths.length} files`} put on the canvas` : "", ...failures].filter(Boolean).join("; ") || undefined, failures.length ? "warn" : "info");
 	};
 
-	/**
-	 * A PDF or a web page as a board that is the file, edge to edge (`newFileBoard` on the server):
-	 * a PDF in its first page's shape, its other pages scrolling inside; a page at a laptop's shape,
-	 * live. Centred on `middle`. Answers the board's path.
-	 */
-	const fileBoard = async (path: string, middle: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
-		const pdf = /\.pdf$/i.test(path);
-		// A PDF's first page gives the board its shape; a web page needs no picture to be a page.
-		const where = pdf ? ((await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { w: number; h: number } }) : {};
-		const w = pdf ? 816 : 1200;
-		// The file's own shape, under the 40px bar that names it and reloads it (`board.css`, `data-bare`).
-		const h = (pdf && where.preview ? Math.round((w * where.preview.h) / Math.max(1, where.preview.w)) : pdf ? 1056 : 750) + 40;
-		return askForBoard((request) =>
-			send({ type: "board.create", file: path, size: { w, h }, ...(aimed ? { at: { x: Math.round(middle.x - w / 2), y: Math.round(middle.y - h / 2) } } : {}), request }),
-		);
-	};
-	/** A PDF or a web page is a board that is the file; an SVG is a picture shown live on the canvas (`liveFileItem`). */
-	const FULL = /\.(pdf|html?)$/i;
+	/** An SVG is a picture shown live on the canvas (`liveFileItem`). */
 	const LIVE = /\.svg$/i;
 
-	/** Deck files as file cards in a row centred on `middle`, each with the picture the server makes of it (`/api/where`); a PDF or a web page as a board of its own. */
+	/** Deck files as file cards in a row centred on `middle`, each with the picture the server makes of it (`/api/where`): a PDF's first page, a web page's. */
 	const placeFileCards = async (all: string[], middle: { x: number; y: number }) => {
 		const agentId = state.focused;
-		for (const path of all.filter((one) => FULL.test(one))) await fileBoard(path, middle);
 		const stamp = Date.now().toString(36);
 		let n = 0;
 		const fresh = () => `file-${stamp}-${n++}`;
@@ -239,7 +220,7 @@ export function createFileDrops() {
 			for (const path of live) files.push({ path, preview: await previewOf(path) });
 			void editDrawing(agentId, liveFileOps(files, middle, fresh, fromStage));
 		}
-		const paths = all.filter((one) => !FULL.test(one) && !LIVE.test(one));
+		const paths = all.filter((one) => !LIVE.test(one));
 		if (!agentId || paths.length === 0) return;
 		const files = [];
 		// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
@@ -329,78 +310,13 @@ export function createFileDrops() {
 	};
 
 	/**
-	 * A blank board, centred on a point of the canvas.
-	 *
-	 * The double-click on empty canvas. Nothing is filled in afterwards — a blank board *is* the
-	 * whole act — so this is the drop path's request mechanism without a file: ask with a
-	 * `request`, hear the path back (`board.created`), and give up quietly if no path arrives.
-	 *
-	 * Centred rather than hung from the pointer's top-left corner, because a double-click names
-	 * the place somebody wants the board and the place is the board, not its corner. The size is
-	 * the blank board's own (880×400), sent for that arithmetic and not to choose anything.
-	 */
-	const boardAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return undefined;
-		// `at` is already in stage pixels — the stage is the viewport (`camera/coords.ts`).
-		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
-		const size = { w: 880, h: 400 };
-		return askForBoard((request) =>
-			send({
-				type: "board.create",
-				title: "Untitled",
-				size,
-				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
-				request,
-			}),
-		);
-	};
-
-	/**
-	 * A document opened as a page you type into, centred where the Add menu was opened.
-	 *
-	 * The file comes from the picker the app already has: anything in the deck or a root it
-	 * declares, or a file from the computer copied into the deck first. The server makes the
-	 * board (`newDocBoard`); the file is edited where it is, and its history is kept in `docs/`.
-	 */
-	const documentAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
-		const stage = document.querySelector(".stage, iframe.canvas-frame");
-		if (!stage) return undefined;
-		const picked = await new Promise<string | undefined>((resolve) =>
-			setPicking({
-				resolve: (path) => {
-					setPicking(undefined);
-					resolve(path);
-				},
-				google: true,
-			}),
-		);
-		if (!picked) return undefined;
-		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
-		const size = { w: 1000, h: 1100 };
-		// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the board.
-		const google = picked.startsWith("google:") ? picked.slice(7) : undefined;
-		return askForBoard((request) =>
-			send({
-				type: "board.create",
-				...(google ? { google } : { document: picked }),
-				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
-				request,
-			}),
-		);
-	};
-
-	/**
 	 * A file put on the canvas from the File button, centred where it was asked for. It is chosen in
 	 * the picker — anything in the deck or a root it declares, a file from this device copied in, or
 	 * a Google Doc — and placed by what it is: a document opens as a page edited where it is, a
 	 * picture, a film or a sound is an item on the canvas itself, and anything else (a PDF, a web
-	 * page, a spreadsheet) gets a board holding it, as a dropped file does. Answers the board made, if any.
-	 */
-	/**
-	 * A file from the picker, placed by what it is. `aimed` is false from the toolbar's button, which names
-	 * no point: a board then takes the nearest open slot beside the newest board, as the Board button's does,
-	 * rather than landing on whatever is in the middle of the screen.
+	 * page, a spreadsheet) a file card, as a dropped file is. Answers the document item made, if any.
+	 * `aimed` is false from the toolbar's button, which names no point: a document then goes beside
+	 * the newest thing on the canvas rather than on whatever is in the middle of the screen.
 	 */
 	const fileAt = async (at: { x: number; y: number }, aimed = true): Promise<string | undefined> => {
 		const stage = document.querySelector(".stage, iframe.canvas-frame");
@@ -421,10 +337,10 @@ export function createFileDrops() {
 		const google = picked.startsWith("google:") ? picked.slice(7) : undefined;
 		if (google || DOCUMENTS.has(extension)) {
 			const size = { w: 1000, h: 1100 };
-			// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the board.
-			return askForBoard((request) =>
+			// A Google Doc comes back from the picker as `google:<address>`; the server links it before it makes the item.
+			return askFor((request) =>
 				send({
-					type: "board.create",
+					type: "document.create",
 					...(google ? { google } : { document: picked }),
 					...(aimed ? { at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) } } : {}),
 					request,
@@ -460,8 +376,7 @@ export function createFileDrops() {
 				return undefined;
 			}
 		}
-		// A PDF or a web page: a board that is the file. Anything else in the deck, an SVG among it: an item on the canvas, the file used where it is.
-		if (FULL.test(name)) return fileBoard(inDeck ? deckPath : picked, middle, aimed);
+		// Anything else in the deck (a PDF, a web page, an SVG): a file card or an item on the canvas, the file used where it is.
 		if (inDeck) {
 			await placeFileCards([deckPath], middle);
 			return undefined;
@@ -477,8 +392,8 @@ export function createFileDrops() {
 		return undefined;
 	};
 
-	/** A board asked for by a drop heard its path — see `board.created` in the frame switch. */
-	const hearBoard = (request: string, path: string): boolean => {
+	/** A document asked for from the picker heard its item's path — see `document.created` in the frame switch. */
+	const hearCreated = (request: string, path: string): boolean => {
 		const waiting = created.get(request);
 		if (!waiting) return false;
 		created.delete(request);
@@ -547,5 +462,5 @@ export function createFileDrops() {
 		if (files.length > 0) void onEmptyCanvas(files, at, card);
 	};
 
-	return { addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install, dropAt };
+	return { addFile, intoComposer, paste, fileAt, hearCreated, install, dropAt };
 }

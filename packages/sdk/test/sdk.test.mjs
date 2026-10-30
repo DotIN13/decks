@@ -200,10 +200,10 @@ test("the decks command prints the value to stdout and notes to stderr, and fail
 		await assert.rejects(run(BIN, ["fit", "boards/x.html"], { env }), (error) => error.code === 1 && /not on your stage/.test(error.stderr));
 		const help = await run(BIN, ["--help"], { env });
 		assert.match(help.stdout, /canvas insert +Add an item to the canvas\./);
-		assert.match(help.stdout, /Old names, for one release: new-board, /);
+		assert.match(help.stdout, /Old names, for one release: .*\bnew-board, /);
 		assert.doesNotMatch(help.stdout, /\n  new-board /, "old names are not listed as commands");
 		const old = await run(BIN, ["help", "new-board"], { env });
-		assert.match(old.stdout, /An old name, kept for one release: use decks\.board\.create, then decks\.canvas\.insert/);
+		assert.match(old.stdout, /An old name, kept for one release: use decks\.card\.create, then decks\.canvas\.insert/);
 	} finally {
 		await fake.close();
 	}

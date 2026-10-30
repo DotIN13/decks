@@ -53,6 +53,8 @@ export type Message = { from: string; task: string; boards: string[]; at: number
 export type Camera = { x: number; y: number; zoom: number };
 export type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
 export type AppKind = "static" | "build" | "server";
+/** The item that shows an app, as decks.canvas.insert takes it: { type: "app", app: <name> }. */
+export type AppItem = { type: "app"; app: string };
 export type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; ms: number; errors: string[]; pending?: true };
 /** A field or button: its label, { ref: "e42" } from read, or { name, nth }. */
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
@@ -74,8 +76,8 @@ export interface Verbs {
 	/** The time where the person is. */
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number; [key: string]: unknown }>;
 	/**
-	 * Old name: write a blank board and place it on your canvas at `at`. @deprecated Use
-	 * decks.board.create, then decks.canvas.insert.
+	 * Old name: now writes a card. Write a blank card and place it on your canvas at `at`; returns its
+	 * path. @deprecated Use decks.card.create, then decks.canvas.insert.
 	 */
 	newBoard(options: { title: string; w?: number; h?: number; at?: Corner }): Promise<string>;
 	/** Old name: size a board's height to its content on a canvas. @deprecated Use decks.canvas.fit. */
@@ -175,19 +177,19 @@ export interface Verbs {
 		space(size: { w: number; h: number }, options?: { canvas?: string; frame?: string; near?: string; side?: "right" | "below" | "left" | "above"; margin?: number }): Promise<{ x1: number; y1: number }>;
 		/**
 		 * Add an item to the canvas. A card is { type: "card", card: <its folder or index.html> }, or {
-		 * type: "card", html, title?, width?, height? } to write one and place it; anything else is a
-		 * pen.dev item (note, text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left
-		 * corner; `beside` or `below` (an item's id or a card's path) puts it 160 px clear of that item,
-		 * tops or lefts aligned; `parent` and `index` put it inside a frame. An item with a `name` and no
-		 * `id` takes its name as its id ("Pricing card" → pricing-card, then pricing-card-2), its children
-		 * too; the answer has every id. Colour it with Decks's adaptive colours so it reads in light and
-		 * dark, named by role: text ("$decks-text", "$decks-text-muted"), line ("$decks-line" for arrows,
-		 * "$decks-line-strong", "$decks-line-subtle" for edges), surface ("$decks-surface", paper), fill
-		 * ("$decks-fill-slate", "$decks-fill-sky", "$decks-fill-gray", and soft "$decks-fill-red", -orange,
-		 * -yellow, -green, -blue, -purple) and accent ("$decks-accent-red", -orange, -yellow, -green,
-		 * -blue, -purple); the insert defines any the canvas lacks. A hex stays the same in both; a
-		 * top-level rectangle, ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-*
-		 * colours.
+		 * type: "card", html, title?, width?, height? } to write one and place it; an app is { type: "app",
+		 * app: <name> } and a document { type: "document", path }; anything else is a pen.dev item (note,
+		 * text, frame, rectangle, ellipse, arrow, ref). Say where: `at` is its top-left corner; `beside` or
+		 * `below` (an item's id or a card's path) puts it 160 px clear of that item, tops or lefts aligned;
+		 * `parent` and `index` put it inside a frame. An item with a `name` and no `id` takes its name as
+		 * its id ("Pricing card" → pricing-card, then pricing-card-2), its children too; the answer has
+		 * every id. Colour it with Decks's adaptive colours so it reads in light and dark, named by role:
+		 * text ("$decks-text", "$decks-text-muted"), line ("$decks-line" for arrows, "$decks-line-strong",
+		 * "$decks-line-subtle" for edges), surface ("$decks-surface", paper), fill ("$decks-fill-slate",
+		 * "$decks-fill-sky", "$decks-fill-gray", and soft "$decks-fill-red", -orange, -yellow, -green,
+		 * -blue, -purple) and accent ("$decks-accent-red", -orange, -yellow, -green, -blue, -purple); the
+		 * insert defines any the canvas lacks. A hex stays the same in both; a top-level rectangle,
+		 * ellipse, icon, empty frame or arrow given no colour gets the tools' $decks-* colours.
 		 */
 		insert(item: Item, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/**
@@ -409,35 +411,38 @@ export interface Verbs {
 		/** One app's state. */
 		status(name: string): Promise<AppState>;
 		/**
-		 * A new app folder from a starter ("static" default, "node", "solid", "react", "next"), with its
-		 * board.
+		 * A new app folder from a starter ("static" default, "node", "solid", "react", "next"), and the
+		 * item that shows it on a canvas: decks.canvas.insert(item) places it.
 		 */
-		create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; files: string[]; board: string; url: string; repo?: { branch: string; head: string }; next: string }>;
+		create(name: string, options?: { starter?: "static" | "node" | "solid" | "react" | "next"; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; files: string[]; item: AppItem; url: string; repo?: { branch: string; head: string }; next: string }>;
 		/**
 		 * Its git repository, made now with everything committed if the folder is not one yet: branch, last
 		 * commit, changed files, origin.
 		 */
 		repo(name: string): Promise<{ branch: string; head: string; dirty?: number; remote?: string }>;
 		/**
-		 * Take in an app from an https:// or git@host:path address, with its board. Nothing is installed or
-		 * run.
+		 * Take in an app from an https:// or git@host:path address, and the item that shows it on a canvas.
+		 * Nothing is installed or run.
 		 */
-		clone(url: string, options?: { name?: string; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; board: string; url: string; repo: { branch: string; head: string; remote?: string }; next: string }>;
-		/** The board for an app whose folder you wrote yourself. */
-		board(name: string): Promise<string>;
+		clone(url: string, options?: { name?: string; title?: string }): Promise<{ name: string; kind: AppKind; folder: string; item: AppItem; url: string; repo: { branch: string; head: string; remote?: string }; next: string }>;
+		/**
+		 * The item that shows an app, { type: "app", app: name }, for an app whose folder you wrote
+		 * yourself: decks.canvas.insert(item) places it.
+		 */
+		board(name: string): Promise<AppItem>;
 		/** Build it, waiting up to 15 s; `pending` means ask its status later. */
 		build(name: string): Promise<AppOutcome>;
 		/** Start it, waiting up to 15 s. */
 		run(name: string): Promise<AppOutcome>;
 		/** Stop it. */
 		stop(name: string): Promise<{ stopped: boolean }>;
-		/** Stop and start again after a code change. Its board reloads by itself. */
+		/** Stop and start again after a code change. The items showing it reload by themselves. */
 		restart(name: string): Promise<AppOutcome>;
 		/**
-		 * Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and delete its
-		 * boards. The folder can be moved back by hand.
+		 * Delete an app: stop it, move its folder to the deck's trash (.decks/trash/apps), and take the
+		 * items showing it off your canvases. The folder can be moved back by hand.
 		 */
-		delete(name: string): Promise<{ deleted: string; trash: string; boards: string[] }>;
+		delete(name: string): Promise<{ deleted: string; trash: string; items: string[] }>;
 		/** Its recent output. */
 		logs(name: string, options?: { tail?: number }): Promise<string[]>;
 		/**
@@ -453,8 +458,6 @@ export interface Verbs {
 		pairing(): Promise<{ code: string; path: string; note: string }>;
 		/** Pair the extension again: a fresh code. */
 		repair(): Promise<{ code: string }>;
-		/** A board showing the shared tab. */
-		board(): Promise<string>;
 		/** Go to an address in the shared tab. */
 		open(url: string): Promise<{ url: string; title: string }>;
 		/**
@@ -500,11 +503,10 @@ export interface Verbs {
 		/** Every board file in the deck, placed or not. @deprecated Use decks.card.list. */
 		list(): Promise<Board[]>;
 		/**
-		 * Old name: now writes a card. Write a blank board in a canvas's own boards/ (`canvas`, or your own
-		 * canvas) and return it; placing it is the canvas's job (decks.canvas.insert({ type: "board",
-		 * board: path }, { beside })). The title is the finding, as a sentence; the board is one HTML page
-		 * you design. A canvas is a folder that stands alone (canvases/<name>/boards/…), and a board from
-		 * anywhere else placed on it is copied in. @deprecated Use decks.card.create.
+		 * Old name: now writes a card, as decks.card.create does, in a canvas's own cards/ (`canvas`, or
+		 * your own canvas), and returns it; placing it is the canvas's job (decks.canvas.insert({ type:
+		 * "card", card: path }, { beside })). The title is the finding, as a sentence. @deprecated Use
+		 * decks.card.create.
 		 */
 		create(options: { title: string; w?: number; h?: number; canvas?: string }): Promise<Board>;
 		/**

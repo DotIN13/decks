@@ -1,13 +1,18 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import type { WireContext, WirePart } from "./context.ts";
-import { asPerson } from "../verbs/person.ts";
+import { isAbsolute, relative } from "node:path";
+import { asPerson, personAgent } from "../verbs/person.ts";
 import { putOn } from "../stage/canvas-ops.ts";
+import { joinSpot } from "../deck/place.ts";
+
+/** A document item's size when it is made: a page and its bar (`verbs/canvas.ts`). */
+const DOCUMENT_SIZE = { w: 1000, h: 1100 };
 
 /**
  * The board frames: the user's half of the canvas, and the two ways the past comes back.
  *
- * This is where the *user* touches a board — move, play, hide, create, delete. A board's
- * own page is never edited from the canvas. The agent's writes do not come through
+ * This is where the *user* touches a board — move, play, hide, delete — and puts a document on
+ * the canvas. A board's own page is never edited from the canvas. The agent's writes do not come through
  * here at all: it edits the file with its own tools, and the watcher tells everyone.
  */
 /**
@@ -92,76 +97,67 @@ export const boards = {
 	},
 
 	/*
-	 * A new board, and it goes straight onto the canvas.
-	 *
-	 * Created *and* played, because the two are one act: nobody asks for a board in
-	 * order to leave it in the deck. Attached too — `setInPlay` puts it in the focused
-	 * agent's context — so the agent you are talking to can see the thing you just
-	 * made without being told about it.
-	 *
-	 * An unknown `kind` is no refusal: the worst outcome of a bad name should be an empty board,
-	 * and every board is blank anyway — the `kind` left over from when there were templates is
-	 * ignored, whatever it says.
+	 * A document put on the canvas from the file picker: an item that opens the file as a page you type
+	 * into (`decks.document`), with no file of its own, at the point asked for or beside the newest thing
+	 * on the canvas. Inserted as the person's own `canvas.insert` on the stage on screen. The file is named
+	 * as the deck names it: from the deck when it is inside, else absolute; a Google Doc by its mirror.
 	 */
-	"board.create": (message, reply, wire) => {
-		/*
-		 * A title, a size and a place when the browser has something to put on the board: a
-		 * file dropped on empty canvas, which gets a board of its own where it was dropped.
-		 * Clamped rather than trusted, like everything a browser sends about a file.
-		 */
-		const bounded = (value: unknown, low: number, high: number) =>
-			typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
-		const title = typeof message.title === "string" && message.title.trim() !== "" ? message.title.trim().slice(0, 120) : "Untitled";
-		const w = bounded(message.size?.w, 320, 2400);
-		const h = bounded(message.size?.h, 240, 4000);
-		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-		let path: string;
-		// A Google Doc: linked first, which asks Google, so the board is made when the answer is in.
+	"document.create": (message, reply, wire) => {
+		const place = (file: string, title?: string) => {
+			// Real paths both, since a deck under a link (macOS's /var is /private/var) names its files either way.
+			const real = (one: string) => {
+				try {
+					return realpathSync(one);
+				} catch {
+					return one;
+				}
+			};
+			const inside = relative(real(wire.deck.path), real(file));
+			const path = !inside.startsWith("..") && !isAbsolute(inside) ? inside.split("\\").join("/") : file;
+			const { name } = stageFor(message, wire);
+			if (!name) return reply({ type: "notice", level: "warn", text: "There is no canvas on screen to put the document on." });
+			const asked = message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y) ? { x1: Math.round(message.at.x), y1: Math.round(message.at.y) } : undefined;
+			// No point named (the toolbar's button): the open slot beside the canvas's newest card, as a card joins it (`deck/place.ts`).
+			const at = asked ?? joined(name);
+			void personAgent({ agents: wire.agents, pens: wire.stage.pens }, { stage: name })
+				.personTool()
+				.call("canvas.insert", [{ type: "document", path, ...(title ? { title } : {}) }, { canvas: name, ...(at ? { at } : {}) }])
+				.then((answer) => {
+					if (!answer.ok) return reply({ type: "notice", level: "warn", text: answer.error ?? "The document could not be put on the canvas." });
+					const id = (answer.value as { id?: unknown } | undefined)?.id;
+					if (typeof message.request === "string" && typeof id === "string") reply({ type: "document.created", request: message.request, path: `item:${id}` });
+				});
+		};
+		const joined = (name: string) => {
+			const pens = wire.stage.pens;
+			if (!pens) return undefined;
+			try {
+				const boards = pens.boards(name);
+				const spot = joinSpot(DOCUMENT_SIZE, boards.at(-1), [...boards, ...pens.drawn(name)]);
+				return { x1: spot.x, y1: spot.y };
+			} catch {
+				return undefined;
+			}
+		};
+		// A Google Doc: linked first, which asks Google, so the item is made when the answer is in.
 		if (typeof message.google === "string" && message.google.trim()) {
+			// Named as the Doc is in Google, as its board was; the item opens its mirror.
 			void wire.google.link(message.google.trim()).then(
-				(mirror) => place(wire.boards.newDocBoard(mirror, wire.google.remote(mirror)?.title)),
+				(mirror) => place(mirror, wire.google.remote(mirror)?.title),
 				(error: Error) => reply({ type: "notice", level: "warn", text: error.message }),
 			);
 			return;
 		}
-		if (typeof message.file === "string" && message.file.trim()) {
-			// One file, the whole board: a PDF or a web page put on the canvas from the file picker or a drop.
-			path = wire.boards.newFileBoard(message.file.trim(), { w: w ?? 1000, h: h ?? 750 }, typeof message.title === "string" && message.title.trim() ? title : undefined);
-		} else if (typeof message.document === "string" && message.document.trim()) {
-			// A document: refused here, in a sentence, for a file a document page could not open.
-			try {
-				path = wire.boards.newDocBoard(wire.docs.openable(message.document.trim()));
-			} catch (error) {
-				reply({ type: "notice", level: "warn", text: (error as Error).message });
-				return;
-			}
-		} else path = wire.boards.newBoard({ title, ...(size ? { size } : {}) });
-		place(path);
-		function place(path: string) {
-			const { name, agent: onStage } = stageFor(message, wire);
-			if (!onStage) {
-				const at = message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y) ? { [path]: { x: Math.round(message.at.x), y: Math.round(message.at.y) } } : undefined;
-				if (name && wire.stage.pens) putOn(wire.stage.pens, wire.deck, name, [path], at ? { at } : {});
-				if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
-				return;
-			}
-			const agent = onStage;
-			/*
-			 * The place first, then the canvas. A drop and a double-click name the point themselves, and
-			 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
-			 * the board being put beside the newest board for one frame and then moved to the cursor.
-			 * With no point named — the ＋ in the corner — there is nothing to keep and the board takes
-			 * the nearest open slot beside the stage's newest board (`deck/place.ts`).
-			 */
-			if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
-				agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
-			}
-			agent.setInPlay([...agent.inPlay, path], { place: true });
-			const placed = wire.stageState(agent).boards.find((one) => one.path === path);
-			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
-			// After the board is announced, so the asker already holds it when it hears the path.
-			if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
+		if (typeof message.document !== "string" || !message.document.trim()) return;
+		// Refused here, in a sentence, for a file a document item could not open.
+		let file: string;
+		try {
+			file = wire.docs.openable(message.document.trim());
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			return;
 		}
+		place(file);
 	},
 
 	"board.delete": (message, reply, wire) => {
