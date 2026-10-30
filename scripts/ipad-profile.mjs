@@ -10,7 +10,7 @@
  *
  * Opens Safari on the plugged-in iPad at `url` with the probe on (`apps/web/src/perf/probe.ts`),
  * reaches its Web Inspector through ios_webkit_debug_proxy (brew install ios-webkit-debug-proxy),
- * and records four phases, each on its own: at rest at 30%, panning below the live zoom, panning
+ * runs everything in the canvas frame (through the page's `__probeEval` relay), and records four phases, each on its own: at rest at 30%, panning below the live zoom, panning
  * above it with its pages up, and zooming across it and back. The gestures are the page's own
  * (`__pilot`): pans are smooth scrolls, which Safari runs as it runs a finger's, and pinches go
  * through the stage's pinch handler. Safari's WebDriver cannot stand in: on this canvas it never
@@ -82,8 +82,12 @@ const send = (method, params = {}, ms = 120_000) =>
 		}),
 		sleep(ms).then(() => ({ error: `${method} took longer than ${ms} ms` })),
 	]);
-/** Run an expression in the page; a promise is waited for. */
-const run = async (expression) => {
+/**
+ * Run an expression in the canvas frame, where the stage and the probe are, through the page's relay
+ * (`apps/web/src/perf/probe-relay.ts`; the page alone, on an app from before the frame); a promise is waited for.
+ */
+const run = async (inFrame) => {
+	const expression = `globalThis.__probeEval ? __probeEval(${JSON.stringify(inFrame)}) : (${inFrame})`;
 	const made = (await send("Runtime.evaluate", { expression, returnByValue: false })).result?.result;
 	if (made?.className !== "Promise" && made?.subtype !== "promise") return made?.value ?? made?.description;
 	return (await send("Runtime.awaitPromise", { promiseObjectId: made.objectId, returnByValue: true })).result?.result?.value;

@@ -1,6 +1,6 @@
 /* @refresh reload */
 // First, before anything else runs: the tab's person token is read and its tag taken out of the page.
-import "./perf/probe.ts";
+import "./perf/probe-relay.ts";
 import "./lib/session.ts";
 import { App } from "./App.tsx";
 import { active, PUBLIC } from "./connections/connection.ts";

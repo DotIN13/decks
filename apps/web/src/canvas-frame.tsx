@@ -1,4 +1,6 @@
 /* @refresh reload */
+// First: the frame probe (`?probe=<collector>`, passed on by the page), before anything adds a listener it may time.
+import "./perf/probe.ts";
 import { bootFrame } from "@decks/canvas";
 import "./index.css";
 import { DecksFrameChrome } from "./frame/chrome.tsx";

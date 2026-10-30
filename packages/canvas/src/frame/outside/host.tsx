@@ -6,6 +6,19 @@ import type { PenTool } from "../../edit/pen-tools.ts";
 import { insets } from "../../camera/insets.ts";
 import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
 
+/**
+ * The frame's address, with the page's measuring parameters passed on: the frame probe (`?probe=<collector>`,
+ * the app's `perf/probe.ts`) and its companions run in the frame, where the stage is.
+ */
+const PASSED_ON = ["probe", "handlers", "autopilot", "pictures-per-frame", "picture-mb", "skip-levels"];
+const frameAddress = (): string => {
+	const page = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
+	const passed = new URLSearchParams();
+	for (const name of PASSED_ON) if (page.has(name)) passed.set(name, page.get(name)!);
+	const query = passed.toString();
+	return query ? `/canvas-frame.html?${query}` : "/canvas-frame.html";
+};
+
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
 	/** A ticket for one canvas's folder: the address its files are read at, and its pictures'. */
@@ -372,7 +385,7 @@ export function createFramedEditor(options: Options): Editor {
 							title="Canvas"
 							sandbox="allow-scripts allow-downloads"
 							allow="clipboard-read; clipboard-write; fullscreen"
-							src="/canvas-frame.html"
+							src={frameAddress()}
 							style={{ position: "absolute", inset: "0", width: "100%", height: "100%", border: "0", display: "block" }}
 						/>
 					);

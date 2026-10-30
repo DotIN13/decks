@@ -3,6 +3,10 @@
  * the pages and the engine's tiles, and the touches and pinches that moved it, sent to `<url>` once a
  * second as one JSON line; and the gestures themselves, as `__pilot` for an inspector to call
  * (`scripts/ipad-profile.mjs`). Nothing runs without the parameter.
+ *
+ * It runs in the canvas frame, where the stage is: the app's page passes `?probe` and its companions on
+ * to the frame's address (`@decks/canvas`, `frame/outside/host.tsx`), and keeps only a relay
+ * (`probe-relay.ts`) through which an inspector of the page runs an expression here.
  */
 const target = new URLSearchParams(location.search).get("probe");
 
@@ -223,6 +227,21 @@ if (target) {
 		if (new URLSearchParams(location.search).get("autopilot")) void autopilot(12000);
 	}
 	window.addEventListener("pagehide", send);
+	// The page's relay (`probe-relay.ts`): an expression from an inspector of the page, run here and its value (awaited) sent back.
+	window.addEventListener("message", (event) => {
+		const m = event.data as { t?: string; id?: number; expression?: string } | null;
+		if (event.source !== window.parent || m?.t !== "decks:probe-eval" || typeof m.expression !== "string") return;
+		const answer = (reply: { value?: unknown; error?: string }) => window.parent.postMessage({ t: "decks:probe-result", id: m.id, ...reply }, "*");
+		Promise.resolve()
+			.then(() => (0, eval)(m.expression!))
+			.then((value) => {
+				try {
+					answer({ value: value === undefined ? undefined : JSON.parse(JSON.stringify(value)) });
+				} catch {
+					answer({ value: String(value) });
+				}
+			}, (error) => answer({ error: String(error) }));
+	});
 }
 
 export {};
