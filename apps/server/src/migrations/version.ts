@@ -6,20 +6,21 @@ import { dirname, join } from "node:path";
  * `.decks/migrations.json` beside what each migration recorded when it ran.
  *
  * Each at-open migration carries the version a deck is at once it has run (`MIGRATIONS` in
- * `migrations/index.ts`), and a deck's version is that of the last one run on it:
+ * `migrations/index.ts`), and a deck's version is that of the last one run on it. The deck format is
+ * not settled, so it stays below 1.0.0, where semantic versioning moves the minor for a breaking change:
  *
- * - **major**: an older Decks would misread the deck: folders moved, an item kind renamed or added,
- *   a file format changed.
- * - **minor**: an older Decks still reads it correctly: leftovers removed, something added that older
- *   builds ignore.
- * - **patch**: data fixed in place, the shape unchanged.
+ * - **minor** (0.3.0 → 0.4.0): an older Decks would misread the deck: folders moved, an item kind
+ *   renamed or added, a file format changed.
+ * - **patch** (0.4.0 → 0.4.1): an older Decks still reads it correctly: leftovers removed, data fixed
+ *   in place, something added that older builds ignore.
+ * - **major** goes to 1 only when the format is declared stable; from then on it is the breaking part.
  *
  * A deck at the latest is opened after reading this one small file: no migration looks at its folders.
  * A deck made by this build starts at the latest, since there is nothing old in it to move. A deck from
  * before versions has one worked out from what its file already recorded (`derivedVersion`), written
- * back, and is then treated like any other. A deck whose major is newer than this build's was written
- * by a newer Decks, which this one may misread, and is left alone with a line in the log; a newer minor
- * or patch is read as it is.
+ * back, and is then treated like any other. A deck with a newer breaking change than this build knows
+ * was written by a newer Decks, which this one may misread, and is left alone with a line in the log;
+ * a newer patch is read as it is.
  */
 export type Semver = string;
 
@@ -36,6 +37,15 @@ export function compareSemver(a: Semver, b: Semver): number {
 	const x = parseSemver(a) ?? [0, 0, 0];
 	const y = parseSemver(b) ?? [0, 0, 0];
 	return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+
+/**
+ * The part of a version a breaking change moves: the major from 1.0.0 on, the minor below it, so
+ * 0.4.3 and 0.4.0 share `0.4.0`, and 1.2.0 and 1.7.1 share `1.0.0`.
+ */
+export function breakingPart(version: Semver): Semver {
+	const [major, minor] = parseSemver(version) ?? [0, 0, 0];
+	return major > 0 ? `${major}.0.0` : `0.${minor}.0`;
 }
 
 /** The version of a deck no migration has run on. */

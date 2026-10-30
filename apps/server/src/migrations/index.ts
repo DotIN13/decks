@@ -6,7 +6,7 @@ import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from ".
 import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-10-29-boards-to-cards.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecord, writeVersion, type Semver } from "./version.ts";
+import { breakingPart, compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecord, writeVersion, type Semver } from "./version.ts";
 
 /**
  * Every change to how a deck is kept on disk, oldest first, and when each one runs.
@@ -32,8 +32,7 @@ import { compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecor
  * | 2026-10-29-boards-to-cards.ts              | at open | `runAtOpen`, below; the same way, after documents and apps |
  *
  * Each at-open migration carries a semantic version, the deck's once it has run, and the deck keeps
- * the last one run on it in `.decks/migrations.json` (`version.ts`, which says when a change is major,
- * minor or patch). A deck at `LATEST` opens without any migration looking at it; one behind runs only
+ * the last one run on it in `.decks/migrations.json` (`version.ts`, which says which part a change moves). A deck at `LATEST` opens without any migration looking at it; one behind runs only
  * the migrations after its version, oldest first, and moves its version on after each, so a start cut
  * short goes on from where it stopped. A new deck starts at `LATEST`. A new migration goes at the end
  * of `MIGRATIONS`, with a version above the last.
@@ -68,8 +67,8 @@ export interface Migration {
 /** Every at-open migration, oldest first. */
 export const MIGRATIONS: readonly Migration[] = [
 	{
-		// Major: canvases moved from stages/ to canvases/.
-		version: "1.0.0",
+		// Breaking: canvases moved from stages/ to canvases/.
+		version: "0.1.0",
 		id: "2026-10-16-stages-to-canvases",
 		done: (deck) => !existsSync(join(deck, "stages")) || existsSync(join(deck, "canvases")),
 		run: (deck, _options, say) => {
@@ -81,8 +80,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		},
 	},
 	{
-		// Major: each canvas holds its own boards, frames and files.
-		version: "2.0.0",
+		// Breaking: each canvas holds its own boards, frames and files.
+		version: "0.2.0",
 		id: "2026-10-20-standalone-canvases",
 		migrated,
 		run: (deck, options, say) => {
@@ -92,8 +91,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateStandalone(deck, { dryRun: true, log }),
 	},
 	{
-		// Minor: only isolated mode's leftovers go; an older build reads the canvases as before.
-		version: "2.1.0",
+		// Not breaking: only isolated mode's leftovers go; an older build reads the canvases as before.
+		version: "0.2.1",
 		id: "2026-10-21-isolation-removed",
 		migrated: isolationMigrated,
 		run: (deck, _options, say) => {
@@ -103,8 +102,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateIsolation(deck, { dryRun: true, log }),
 	},
 	{
-		// Major: markdown cards get a new item type an older build does not draw.
-		version: "3.0.0",
+		// Breaking: markdown cards get a new item type an older build does not draw.
+		version: "0.3.0",
 		id: "2026-10-28-markdown-cards",
 		migrated: markdownCardsMigrated,
 		run: (deck, _options, say) => {
@@ -115,8 +114,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateMarkdownCards(deck, { dryRun: true, log }),
 	},
 	{
-		// Major: document and app boards become item kinds an older build does not know.
-		version: "4.0.0",
+		// Breaking: document and app boards become item kinds an older build does not know.
+		version: "0.4.0",
 		id: "2026-10-29-documents-and-apps",
 		migrated: documentsAndAppsMigrated,
 		run: (deck, _options, say) => {
@@ -127,8 +126,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateDocumentsAndApps(deck, { dryRun: true, log }),
 	},
 	{
-		// Major: boards become cards and the board files go.
-		version: "5.0.0",
+		// Breaking: boards become cards and the board files go.
+		version: "0.5.0",
 		id: "2026-10-29-boards-to-cards",
 		migrated: boardsToCardsMigrated,
 		run: (deck, _options, say) => {
@@ -184,8 +183,8 @@ export function runAtOpen(deck: string, options: Options = {}): string[] {
 		throw new DryRun(lines);
 	}
 	const said: string[] = [];
-	// A newer major was written by a newer Decks, which this build may misread; a newer minor or patch it reads as it is.
-	if (parseSemver(from)![0] > parseSemver(LATEST)![0]) said.push(`this deck is at version ${from}, written by a newer Decks than this build (${LATEST}), which may misread it`);
+	// A newer breaking change was made by a newer Decks, which this build may misread; anything else it reads as it is.
+	if (compareSemver(breakingPart(from), breakingPart(LATEST)) > 0) said.push(`this deck is at version ${from}, written by a newer Decks than this build (${LATEST}), which may misread it`);
 	for (const one of pending) {
 		if (!one.migrated?.(deck)) one.run(deck, options, (line) => said.push(line));
 		writeVersion(deck, one.version);

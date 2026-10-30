@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { deckVersion, DryRun, LATEST, MIGRATIONS, runAtOpen } from "./index.ts";
-import { compareSemver, derivedVersion, parseSemver } from "./version.ts";
+import { breakingPart, compareSemver, derivedVersion, parseSemver } from "./version.ts";
 
 const write = (deck: string, path: string, text: string) => {
 	mkdirSync(dirname(join(deck, path)), { recursive: true });
@@ -77,18 +77,24 @@ test("a deck from before numbers that is up to date is given its number and noth
 	assert.equal(record(deck).version, LATEST);
 });
 
-test("a deck at a newer major is left alone, with a line saying so; a newer minor is read as it is", () => {
-	const major = parseSemver(LATEST)![0];
+test("a deck with a newer breaking change is left alone, with a line saying so; a newer patch is read as it is", () => {
+	const [, minor] = parseSemver(LATEST)!;
 	const deck = fresh();
 	write(deck, "canvases/plan/canvas.pen", JSON.stringify({ version: "2.14", children: [] }));
-	write(deck, ".decks/migrations.json", JSON.stringify({ version: `${major + 1}.0.0` }));
+	write(deck, ".decks/migrations.json", JSON.stringify({ version: `0.${minor + 1}.0` }));
 	const said = runAtOpen(deck);
 	assert.equal(said.length, 1);
 	assert.match(said[0]!, /newer Decks/);
-	assert.equal(record(deck).version, `${major + 1}.0.0`);
-	write(deck, ".decks/migrations.json", JSON.stringify({ version: `${major}.4.2` }));
+	assert.equal(record(deck).version, `0.${minor + 1}.0`);
+	write(deck, ".decks/migrations.json", JSON.stringify({ version: `0.${minor}.7` }));
 	assert.deepEqual(runAtOpen(deck), []);
-	assert.equal(record(deck).version, `${major}.4.2`);
+	assert.equal(record(deck).version, `0.${minor}.7`);
+});
+
+test("below 1.0.0 the minor is the breaking part; from 1.0.0 on, the major", () => {
+	assert.equal(breakingPart("0.4.3"), "0.4.0");
+	assert.equal(breakingPart("1.7.1"), "1.0.0");
+	assert.ok(LATEST.startsWith("0."), "the deck format is not declared stable yet");
 });
 
 test("a plain number from the build that counted migrations is read as that many in, and rewritten", () => {
