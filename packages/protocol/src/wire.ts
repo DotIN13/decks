@@ -71,7 +71,7 @@ export interface StageRow {
 	 */
 	formerly?: string[];
 }
-import type { ChatItem } from "./transcript.ts";
+import type { ChatItem, MessagePart } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { WebStatus } from "./web.ts";
 import type { PenDocument, PenEdit } from "@decks/pen";
@@ -211,13 +211,14 @@ export type ClientMessage =
 	 * workspace is a location, so there is one value and whoever wrote last owns it.
 	 */
 	| { type: "agent.workspace"; id: string; workspace: string | null }
-	| { type: "agent.prompt"; id: string; text: string }
+	/** `parts`: the message as written, its pills as data, kept with it for the conversation (`MessagePart`); the agent gets `text`. */
+	| { type: "agent.prompt"; id: string; text: string; parts?: MessagePart[] }
 	| { type: "agent.abort"; id: string }
 	/**
 	 * Your own queue for an agent that is working (`DeckAgent.queueMine`): `add` a message to send when
 	 * this turn ends, `remove` one, `send` one now as a steer, or `release` a queue that Stop held.
 	 */
-	| { type: "agent.queue"; id: string; action: "add" | "remove" | "send" | "release"; text?: string; item?: string }
+	| { type: "agent.queue"; id: string; action: "add" | "remove" | "send" | "release"; text?: string; parts?: MessagePart[]; item?: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }

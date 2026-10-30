@@ -1,4 +1,4 @@
-import type { AgentState, ChatItem, ServerMessage } from "@decks/protocol";
+import type { AgentState, ChatItem, MessagePart, ServerMessage } from "@decks/protocol";
 
 /**
  * What a transcript *is*, in one place.
@@ -245,8 +245,9 @@ export class Translator {
 		this.emit({ type: "agent.state", id: this.agentId, state });
 	}
 
-	user(text: string): ChatItem {
-		return this.push({ kind: "user", id: this.id("u"), text, at: Date.now() });
+	/** `parts`: the message as it was written, its pills as data, for the conversation to draw (`MessagePart`). */
+	user(text: string, parts?: MessagePart[]): ChatItem {
+		return this.push({ kind: "user", id: this.id("u"), text, at: Date.now(), ...(parts?.length ? { parts } : {}) });
 	}
 
 	// --- the assistant ------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type { WirePart } from "./context.ts";
+import { cleanParts } from "../agents/message-parts.ts";
 
 /**
  * The conversation frames: the chat list, a turn, and the three ways to go back through one.
@@ -126,7 +127,7 @@ export const agents = {
 		 * where work an agent gave itself ends too. A prompt that *makes* an agent still
 		 * publishes, from `create`, because then the list really is different.
 		 */
-		void agent.prompt(message.text);
+		void agent.prompt(message.text, cleanParts(message.parts));
 		agent.sayRow();
 	},
 
@@ -137,7 +138,7 @@ export const agents = {
 	"agent.queue": (message, _reply, wire) => {
 		const agent = wire.agents.get(message.id);
 		if (!agent) return;
-		if (message.action === "add" && typeof message.text === "string") agent.queueMine(message.text);
+		if (message.action === "add" && typeof message.text === "string") agent.queueMine(message.text, cleanParts(message.parts));
 		else if (message.action === "remove" && typeof message.item === "string") agent.unqueueMine(message.item);
 		else if (message.action === "send" && typeof message.item === "string") agent.sendMineNow(message.item);
 		else if (message.action === "release") agent.releaseMine();

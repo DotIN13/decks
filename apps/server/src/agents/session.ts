@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { recordedBoardsToAdopt } from "../migrations/2026-10-16-board-lists-into-canvas-files.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { ActBox, ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, MessagePart, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { boardsOn, putOn, takeOff, type OnStage } from "../stage/canvas-ops.ts";
 import { joinPlaces } from "../deck/place.ts";
@@ -265,7 +265,7 @@ export class DeckAgent {
 	 * each as the turn before it ends, and before any work another agent handed over. `mineHeld` is
 	 * Stop's: a stopped turn holds the queue until you send it.
 	 */
-	private mine: Array<{ id: string; text: string }> = [];
+	private mine: Array<{ id: string; text: string; parts?: MessagePart[] }> = [];
 	private mineHeld = false;
 
 	constructor(
@@ -1334,7 +1334,8 @@ export class DeckAgent {
 		}
 	}
 
-	async prompt(text: string): Promise<void> {
+	/** `parts`: the message as written (`MessagePart`), kept with it in the conversation; the agent gets `text`. */
+	async prompt(text: string, parts?: MessagePart[]): Promise<void> {
 		// Before anything is appended: a restored chat's stored rows belong under the new
 		// message, not after it.
 		this.transcript();
@@ -1343,7 +1344,7 @@ export class DeckAgent {
 			this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
 			return;
 		}
-		this.translator.user(text);
+		this.translator.user(text, parts);
 		this.translator.setState("thinking");
 		/*
 		 * Anything the user did to a board since the last turn rides along with this
@@ -1507,17 +1508,17 @@ export class DeckAgent {
 	/** Queue a message for when this turn ends; with no turn running, it is simply sent. */
 	/** The person's own messages waiting for this turn to end, and whether Stop is holding them. */
 	queuedMine(): { items: Array<{ id: string; text: string }>; held: boolean } {
-		return { items: this.mine.map((one) => ({ ...one })), held: this.mineHeld };
+		return { items: this.mine.map((one) => ({ id: one.id, text: one.text })), held: this.mineHeld };
 	}
 
-	queueMine(text: string): void {
+	queueMine(text: string, parts?: MessagePart[]): void {
 		const said = text.trim();
 		if (!said) return;
 		if (this.state === "idle" && this.mine.length === 0) {
-			void this.prompt(said);
+			void this.prompt(said, parts);
 			return;
 		}
-		this.mine.push({ id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, text: said });
+		this.mine.push({ id: `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, text: said, ...(parts?.length ? { parts } : {}) });
 		this.sayMine();
 	}
 
@@ -1533,7 +1534,7 @@ export class DeckAgent {
 		const found = this.mine.find((one) => one.id === item);
 		if (!found) return;
 		this.unqueueMine(item);
-		void this.prompt(found.text);
+		void this.prompt(found.text, found.parts);
 	}
 
 	/** A queue Stop held, let go: the next message goes now if nothing is running. */
@@ -1548,12 +1549,12 @@ export class DeckAgent {
 		if (this.mineHeld || this.mine.length === 0) return false;
 		const next = this.mine.shift()!;
 		this.sayMine();
-		void this.prompt(next.text);
+		void this.prompt(next.text, next.parts);
 		return true;
 	}
 
 	private sayMine(): void {
-		this.emit({ type: "agent.queued", agentId: this.id, items: this.mine.map((one) => ({ ...one })), held: this.mineHeld });
+		this.emit({ type: "agent.queued", agentId: this.id, items: this.mine.map((one) => ({ id: one.id, text: one.text })), held: this.mineHeld });
 	}
 
 	private armDrain(): void {
