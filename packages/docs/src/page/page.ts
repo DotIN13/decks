@@ -372,6 +372,8 @@ html[data-decks-focus] .dp-tools { background: transparent; border-bottom-color:
 .lv strong.lv-b { font-weight: 700; }
 .lv code.lv-code { font-family: var(--b-mono, ui-monospace, monospace); font-size: .86em; background: var(--b-bg-layer, #f2f2f2); padding: .1em .35em; border-radius: 4px; }
 .lv .lv-mark { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px; }
+/* A dark page (the host sets data-theme, as the canvas's document item does): the highlighter a dark board's sticky amber. */
+.dp[data-theme="dark"] .lv .lv-mark { background: #4a3d1c; }
 .lv a.lv-a { color: var(--b-accent, #2563eb); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--b-accent, #2563eb) 40%, transparent); text-underline-offset: 2px; cursor: text; }
 .lv .lv-tag, .lv .lv-cmd, .lv .lv-brace { color: var(--b-faint, #999); font-family: var(--b-mono, ui-monospace, monospace); font-size: .85em; }
 .lv .lv-fn { color: var(--b-accent, #2563eb); font-size: .9em; }

@@ -1,7 +1,8 @@
 import { mountDocPage } from "@decks/docs/page";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { INTERACTIVE, scrollsInside } from "./card.ts";
 import { canvasHost } from "../host.ts";
+import { scheme } from "../lib/theme.ts";
 
 /**
  * The two items with no file of their own that the stage places as it places a card (`drawing.ts`'s
@@ -28,8 +29,34 @@ function ownEvents(host: HTMLElement, selected: () => boolean, onSelect: () => v
  * canvas's token, which answers them only for files a document item on that canvas names. Plain
  * elements, not a shadow root: it is the canvas's own code, and the text selection it follows is the page's.
  */
+/**
+ * The board tokens a dark board has (`board-host/lib/theme.css`, `[data-theme="dark"]`), as values: the
+ * document editor draws in `--b-*`, with light values as its fallbacks, and the frame's page defines none.
+ */
+const DARK_TOKENS: Record<string, string> = {
+	"--b-bg": "#161616",
+	"--b-bg-deep": "#0f0f0f",
+	"--b-bg-layer": "#242424",
+	"--b-fg": "#fafafa",
+	"--b-muted": "#aeaeae",
+	"--b-faint": "#808080",
+	"--b-border": "rgb(255 255 255 / 12%)",
+	"--b-border-strong": "rgb(255 255 255 / 24%)",
+	"--b-accent-soft": "#1e2a52",
+};
+
 export function DocumentSurface(props: { file: string; selected: boolean; onSelect: () => void; ref?: () => void }) {
 	let host!: HTMLDivElement;
+	// In the canvas's scheme, as a card is (`card-surface.tsx`): its tokens on the item, dark or left to the light fallbacks.
+	createEffect(() => {
+		const dark = scheme() === "dark";
+		for (const [name, value] of Object.entries(DARK_TOKENS)) {
+			if (dark) host.style.setProperty(name, value);
+			else host.style.removeProperty(name);
+		}
+		host.style.colorScheme = dark ? "dark" : "light";
+		host.dataset.theme = dark ? "dark" : "light";
+	});
 	onMount(() => {
 		props.ref?.();
 		ownEvents(host, () => props.selected, props.onSelect);
