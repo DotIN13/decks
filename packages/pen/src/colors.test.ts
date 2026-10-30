@@ -38,3 +38,8 @@ test("an exported page carries the Decks colours, dark under prefers-color-schem
 	assert.match(html, new RegExp(`prefers-color-scheme: dark\\) \\{\\n:root \\{\\n  --decks-shape: ${DECKS_COLORS["decks-shape"]!.dark};`));
 	assert.match(html, /var\(--decks-shape\)/);
 });
+
+test("an edit that already carries its Decks colours (run twice, by the canvas and then the server) gets nothing more", () => {
+	const once = withDecksColors(emptyDocument(), [rect("r")]);
+	assert.deepEqual(withDecksColors(emptyDocument(), once), once);
+});

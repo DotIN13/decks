@@ -6,7 +6,7 @@ import { CANVAS_DIR, CANVAS_FILE, CANVAS_META } from "./canvas-files.ts";
 import { runAtOpen } from "../migrations/index.ts";
 import { movedPath } from "../migrations/2026-10-16-stages-to-canvases.ts";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
-import { apply, ARROW, baseTheme, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, themeFrom, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
+import { apply, ARROW, baseTheme, withDecksColors, clone, emptyDocument, ids, IMPORTED, indexOf, parse, PEN_VERSION, PenError, placements, read, reroute, serialize, themeFrom, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed, type ReadOptions, diff } from "@decks/pen";
 
 /** What a read may ask for beyond the whole file: one item, a depth, values worked out, in a theme such as { mode: "dark" } (`read.ts`). */
 export type ReadMore = Omit<ReadOptions, "theme" | "measure"> & { theme?: Record<string, string> };
@@ -490,7 +490,13 @@ export class StagePens {
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
 		const theme = baseTheme(current.doc, "light");
-		const { doc, results } = apply(current.doc, ops, { theme, measure });
+		/*
+		 * Every edit of a canvas comes through here, whoever sends it: an item coloured by a Decks
+		 * colour (`$decks-card`, what the tools make) has it defined in the drawing, light and dark,
+		 * when the drawing lacks it. The canvas adds them itself as it edits; an edit sent while no
+		 * canvas shows the drawing (a file card dropped then) is the one this catches.
+		 */
+		const { doc, results } = apply(withColors(current.doc, ops), ops, { theme, measure });
 		const placed = placements(this.withImported(name, doc), { theme, measure });
 		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path), rustRouter);
 		const before = current.text ?? serialize(current.doc);
@@ -786,7 +792,7 @@ export class StagePens {
 			return { file: target.shown, results: results.map((result) => withBox(result, placed)) };
 		}
 		const current = this.loadPen(target.file, target.shown);
-		const { doc, results } = apply(current, ops, { theme: theme(current), measure });
+		const { doc, results } = apply(withColors(current, ops), ops, { theme: theme(current), measure });
 		this.writePen(target.file, doc);
 		if (target.ref) this.resendFrame(target.ref, target.canvas);
 		const placed = placements(this.withImportedAt(dirname(target.file), doc), { theme: theme(doc), measure });
@@ -1205,6 +1211,17 @@ export class StagePens {
 }
 
 /** A board's box on this stage, found by path, for an arrow that ends on it. */
+/**
+ * `doc` with the Decks colours `ops` use and it lacks defined (`withDecksColors`), as a document of
+ * its own, so the edit's results and an error's "Edit 2" still count the caller's ops. `doc` itself
+ * when nothing is wanted.
+ */
+function withColors(doc: PenDocument, ops: readonly Op[]): PenDocument {
+	const colored = withDecksColors(doc, ops);
+	if (colored.length === ops.length) return doc;
+	return apply(doc, [colored[0] as Op], { theme: baseTheme(doc, "light"), measure }).doc;
+}
+
 function boardBox(doc: PenDocument, placed: ReadonlyMap<string, Placed>, path: string): Frame | undefined {
 	for (const node of walk(doc.children)) if (boardOf(node) === path) return placed.get(node.id)?.box;
 	return undefined;

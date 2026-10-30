@@ -326,3 +326,51 @@ test("a canvas stands alone: a board placed from the library is copied in, and a
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+/** A file card as `fileCard` (`@decks/canvas` card-frame.ts) makes one: its paper, edge and words in Decks colours. */
+const fileCardNode = (id: string) => ({
+	type: "frame", id, name: "notes.pdf", layout: "vertical", width: 320, fill: "$decks-card", stroke: "$decks-card-line", strokeWidth: 1,
+	metadata: { type: "decks.file", path: "files/notes.pdf" },
+	children: [{ type: "frame", id: `${id}-label`, layout: "horizontal", width: "fill_container", children: [
+		{ type: "text", id: `${id}-name`, content: "notes.pdf", fill: "$decks-ink" },
+		{ type: "text", id: `${id}-kind`, content: "PDF", fill: "$decks-muted" },
+	] }],
+});
+
+test("an edit sent with no variables op (a file card dropped with no canvas showing it) has its Decks colours defined; one that has them adds nothing", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		const name = pens.claim("drop");
+		const { results } = pens.edit(name, [{ op: "insert", node: fileCardNode("card") as never, box: { x1: 0, y1: 0 } }]);
+		assert.deepEqual(results, [{ op: "insert", id: "card" }], "the results answer the caller's ops, not the variables op");
+		const doc = pens.get(name).doc;
+		assert.deepEqual(Object.keys(doc.variables ?? {}).sort(), ["decks-card", "decks-card-line", "decks-ink", "decks-muted"]);
+		assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
+		// A second card: the drawing has them, so nothing new.
+		const before = JSON.stringify({ variables: doc.variables, themes: doc.themes });
+		pens.edit(name, [{ op: "insert", node: fileCardNode("card-2") as never, box: { x1: 400, y1: 0 } }]);
+		const again = pens.get(name).doc;
+		assert.equal(JSON.stringify({ variables: again.variables, themes: again.themes }), before);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("an edit whose own variables op already defines them (as the canvas sends one) is taken as it is", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		const name = pens.claim("both");
+		const own = { op: "variables", set: { "decks-shape": { type: "color", value: [{ value: "#123456" }, { value: "#654321", theme: { mode: "dark" } }] } }, themes: { mode: ["light", "dark"] } };
+		const { results } = pens.edit(name, [own as never, { op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-shape", width: 10, height: 10 } as never }]);
+		assert.equal(results.length, 2);
+		const doc = pens.get(name).doc;
+		assert.deepEqual(doc.variables, { "decks-shape": own.set["decks-shape"] }, "the caller's own values, nothing added beside them");
+		assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

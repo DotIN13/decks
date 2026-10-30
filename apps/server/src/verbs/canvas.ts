@@ -17,6 +17,26 @@ import { exportPage } from "./export.ts";
 import { resolveInDeck } from "../deck/roots.ts";
 
 /**
+ * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
+ * own light/dark Decks variables (`$decks-shape`, … : `@decks/pen` colors.ts, defined in the same
+ * edit by `StagePens.edit`), so it reads on a dark canvas too. Only an item at the top level with
+ * neither a fill nor a stroke: a rectangle, an ellipse or an icon, and a frame with nothing in it
+ * and no metadata (a frame holding items is a layout as often as a box, and a card or a library
+ * shape is drawn its own way). Anything given a colour keeps it.
+ */
+function colourDefaults(node: Record<string, unknown>): void {
+	if (node.fill !== undefined || node.stroke !== undefined) return;
+	if (node.type === "rectangle") node.fill = "$decks-shape";
+	else if (node.type === "ellipse") node.fill = "$decks-shape-2";
+	else if (node.type === "icon") node.fill = "$decks-ink";
+	else if (node.type === "frame" && node.metadata === undefined && !(Array.isArray(node.children) && node.children.length)) {
+		node.fill = "$decks-frame";
+		node.stroke = "$decks-frame-line";
+		node.strokeWidth ??= 1;
+	}
+}
+
+/**
  * The canvas calls: everything on one canvas, boards included, read and changed as items.
  *
  * A board on a canvas is pen's own `browser` item tagged `{ type: "decks.board", path }`
@@ -239,6 +259,7 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 				switch (op?.op) {
 					case "insert": {
 						const node = fromItem(op.item, ids(doc), frame);
+						if (!agent.person && (op.parent === undefined || op.parent === null)) colourDefaults(node);
 						const path = boardOf(node as unknown as PenNode);
 						if (path) {
 							const there = [...walk(doc.children)].find((one) => boardOf(one) === path || boardOf(one) === ownOn(path));

@@ -39,11 +39,17 @@ const REF = /"\$(decks-[a-z0-9-]+)"/g;
  */
 export function withDecksColors(doc: PenDocument, ops: readonly unknown[]): unknown[] {
 	const wanted = new Set<string>();
+	// What a `variables` op in the same edit sets counts as there: run again on an edit that already
+	// has them (the canvas adds them, then the server does), nothing is added twice.
+	const given = new Set<string>();
+	for (const op of ops) {
+		if (op && typeof op === "object" && (op as { op?: unknown }).op === "variables") for (const name of Object.keys((op as { set?: object }).set ?? {})) given.add(name);
+	}
 	for (const op of ops) {
 		if (op && typeof op === "object" && (op as { op?: unknown }).op === "variables") continue;
 		for (const match of JSON.stringify(op ?? null).matchAll(REF)) {
 			const name = match[1]!;
-			if (DECKS_COLORS[name] && !doc.variables?.[name]) wanted.add(name);
+			if (DECKS_COLORS[name] && !doc.variables?.[name] && !given.has(name)) wanted.add(name);
 		}
 	}
 	if (wanted.size === 0) return [...ops];

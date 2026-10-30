@@ -243,3 +243,30 @@ test("canvas.export writes a frame as one HTML page in the deck, as flexbox or a
 		cleanup();
 	}
 });
+
+test("an agent's shape with no colour is coloured as the tools colour theirs, light and dark; one given colours keeps them", async () => {
+	const { must, cleanup } = await open();
+	try {
+		const made = (await must("canvas.batch", [[
+			{ op: "insert", item: { type: "rectangle", id: "plain", width: 100, height: 60 }, at: { x1: 0, y1: 0 } },
+			{ op: "insert", item: { type: "ellipse", id: "round", width: 60, height: 60 }, at: { x1: 200, y1: 0 } },
+			{ op: "insert", item: { type: "frame", id: "box", width: 200, height: 100 }, at: { x1: 400, y1: 0 } },
+			{ op: "insert", item: { type: "icon", id: "star", library: "lucide", icon: "star" }, at: { x1: 700, y1: 0 } },
+			{ op: "insert", item: { type: "rectangle", id: "red", width: 100, height: 60, fill: "#ff0000" }, at: { x1: 0, y1: 200 } },
+			{ op: "insert", item: { type: "frame", id: "row", layout: "horizontal", children: [{ type: "rectangle", id: "spacer", width: 10, height: 10 }] }, at: { x1: 200, y1: 200 } },
+		]])).value;
+		const by = Object.fromEntries((made as Array<Record<string, any>>).map((one) => [one.id, one]));
+		assert.equal(by.plain.fill, "$decks-shape");
+		assert.equal(by.round.fill, "$decks-shape-2");
+		assert.equal(by.box.fill, "$decks-frame");
+		assert.equal(by.box.stroke, "$decks-frame-line");
+		assert.equal(by.star.fill, "$decks-ink");
+		assert.equal(by.red.fill, "#ff0000", "a colour given is kept");
+		assert.equal(by.row.fill, undefined, "a frame holding items is a layout, left as it is");
+		assert.equal(by.row.children[0].fill, undefined, "nor what is inside one");
+		const vars = (await must("canvas.read", [])).value.variables ?? {};
+		for (const name of ["decks-shape", "decks-shape-2", "decks-frame", "decks-frame-line", "decks-ink"]) assert.ok(vars[name], `${name} is defined`);
+	} finally {
+		cleanup();
+	}
+});
