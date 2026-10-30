@@ -79,7 +79,20 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	/** Where the page's composer is on this frame's screen, as the page last said. */
 	let composerBox: Rect | null = null;
 	const [narrow, setNarrow] = createSignal(innerWidth < 600);
-	addEventListener("resize", () => setNarrow(innerWidth < 600));
+	/*
+	 * On the frame's root, for its styles: a phone's width (`data-phone`, the properties rise as a sheet, as on
+	 * the app's page), and how far up the page's composer reaches (`--frame-dock`), which the sheet stands on.
+	 */
+	const reflect = () => {
+		if (untrack(narrow)) root.dataset.phone = "true";
+		else delete root.dataset.phone;
+		root.style.setProperty("--frame-dock", `${untrack(dock)}px`);
+	};
+	addEventListener("resize", () => {
+		setNarrow(innerWidth < 600);
+		reflect();
+	});
+	reflect();
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
 	const [cursor, setCursor] = createSignal<{ path: string; x: number; y: number; label: string; color: string } | null>(null);
 	/** When the person last pressed, scrolled or typed here: an agent's view waits while they are at it. */
@@ -467,7 +480,10 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		if (data.agent !== undefined && data.agent !== untrack(agent)) setAgent(data.agent);
 		if (data.insets) useInsets(data.insets);
 		if (data.agents) setAgents(data.agents);
-		if (data.dock !== undefined) setDock(data.dock);
+		if (data.dock !== undefined) {
+			setDock(data.dock);
+			reflect();
+		}
 		if (data.composer !== undefined) composerBox = data.composer;
 		if (data.dark !== undefined) {
 			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
