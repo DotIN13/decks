@@ -21,7 +21,7 @@ import { browse } from "./files/browse.ts";
 import { filePreview, previewKind } from "./files/preview.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { storeAssetStream, UploadRefused, withMedia } from "./files/upload.ts";
-import { verbRoutes } from "./verbs/router.ts";
+import { boardOnCanvas, verbRoutes } from "./verbs/router.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
 import { pictureType, SMALL_WIDTHS } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
@@ -1038,20 +1038,23 @@ export function createHttpApp(app: App): Express {
 	 * not a truncated file.
 	 */
 	/**
-	 * A board drawn from a snapshot of the reader's page (`boards/snapshot.ts`): the page's markup
-	 * as it stood, drawn by the server's Chrome at the board's own address. The answer is the picture.
+	 * A board or card drawn from a snapshot of the reader's page (`boards/snapshot.ts`): the page's markup
+	 * as it stood, drawn by the server's Chrome at its own address. The answer is the picture. A card's
+	 * comes from the canvas frame showing it (`packages/canvas/src/items/card-snapshot.ts`).
 	 */
 	api.post(
 		"/snapshot",
 		express.text({ type: () => true, limit: "24mb" }),
 		asyncRoute(async (req, res) => {
-			// The person's, in a Decks tab or a terminal, or a paired front end's (Studio).
-			if (!actsAsPerson(req.principal)) throw new UploadRefused("Only the person, or a front end paired with this harness, sends this.", 403);
+			// The person's, in a Decks tab or a terminal, a paired front end's (Studio), or a canvas frame's for a card on its canvas.
+			const principal = req.principal;
+			if (!actsAsPerson(principal) && principal?.kind !== "canvas") throw new UploadRefused("Only the person, a front end paired with this harness, or a canvas frame sends this.", 403);
 			const path = normalizeBoardPath(typeof req.query.path === "string" ? req.query.path : "");
 			if (!app.deck.board(path)) {
 				res.status(404).type("text").send("No such board.");
 				return;
 			}
+			if (principal?.kind === "canvas" && !boardOnCanvas(app, path, principal.canvas)) throw new UploadRefused(`${path} is not on this canvas.`, 403);
 			const shot = await renderSnapshot(app.thumbs, `http://127.0.0.1:${req.socket.localPort}`, {
 				path,
 				html: typeof req.body === "string" ? req.body : "",

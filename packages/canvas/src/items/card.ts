@@ -219,6 +219,9 @@ function cssInDeck(css: string, base: string): boolean {
  * `@font-face` is not used.
  */
 const sheets = new Map<string, Promise<CSSStyleSheet | undefined>>();
+const cardSheets = new WeakSet<CSSStyleSheet>();
+/** Whether a sheet is the one every card adopts (board.css as the card's): a card's snapshot loads board.css instead (`card-snapshot.ts`). */
+export const isCardSheet = (sheet: CSSStyleSheet): boolean => cardSheets.has(sheet);
 const fontsSaid = new Set<string>();
 function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 	let made = sheets.get(lib);
@@ -250,6 +253,7 @@ function cardSheet(lib: string): Promise<CSSStyleSheet | undefined> {
 				+ "\n.card-body { width: 100%; min-height: 0; height: auto; overflow: hidden; display: flow-root }\n:host { display: block; contain: strict; overflow: hidden; background: var(--b-bg) }";
 			const sheet = new CSSStyleSheet();
 			sheet.replaceSync(css);
+			cardSheets.add(sheet);
 			return sheet;
 		} catch {
 			return undefined;

@@ -375,8 +375,8 @@ function canvasCaller(app: App, principal: Extract<Principal, { kind: "canvas" }
  */
 export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, message: { type: string; [key: string]: unknown }, canvas: string): boolean {
 	/*
-	 * An agent's `decks view …` that moves or marks this canvas: the frame showing it answers. Showing
-	 * another canvas, and a board's picture, stay the page's.
+	 * An agent's `decks view …` that moves or marks this canvas, and a picture of a card on it (`shot`):
+	 * the frame showing it answers. Showing another canvas stays the page's.
 	 */
 	// A document's messages, for a file a document item on this canvas names.
 	if (message.type.startsWith("doc.")) {
@@ -385,9 +385,10 @@ export function onCanvas(app: Pick<App, "stage" | "agents" | "documentsOn">, mes
 	}
 	if (message.type === "stage.call") {
 		const call = message.call as { op?: string; agentId?: string; args?: { stage?: unknown; path?: unknown } } | undefined;
-		if (!call || !["show", "camera", "reload", "cursor"].includes(call.op ?? "")) return false;
-		// A cursor or a reload names a card: the frame showing the canvas it is on answers, whoever's home that is.
-		if ((call.op === "cursor" || call.op === "reload") && typeof call.args?.path === "string") return boardOnCanvas(app, call.args.path, canvas);
+		if (!call || !["show", "camera", "reload", "cursor", "shot"].includes(call.op ?? "")) return false;
+		// A cursor, a reload or a card's picture names a card: the frame showing the canvas it is on answers, whoever's home that is.
+		if ((call.op === "cursor" || call.op === "reload" || call.op === "shot") && typeof call.args?.path === "string") return boardOnCanvas(app, call.args.path, canvas);
+		if (call.op === "shot") return false;
 		const named = typeof call.args?.stage === "string" ? call.args.stage : undefined;
 		if (named !== undefined) return named === canvas;
 		return !!call.agentId && app.agents.get(call.agentId)?.stageName() === canvas;

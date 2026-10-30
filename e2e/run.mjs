@@ -114,6 +114,8 @@ const CHECKS = [
 	{ file: "card-editor.mjs", needsAgent: false },
 	/* The same card on a phone, by touch: a double tap opens it, taps accept, the sheet stands aside. */
 	{ file: "card-phone.mjs", needsAgent: false },
+	/* An agent's screenshot of a card is the person's: what they typed, and what its script drew. */
+	{ file: "card-shot.mjs", needsAgent: false },
 	/*
 	 * The stage's gestures against a design tool's and a notes app's: tools and a marquee in browse
 	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.

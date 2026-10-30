@@ -1,7 +1,16 @@
 import { createEffect, on, onCleanup, untrack } from "solid-js";
-import { INTERACTIVE, mountCard, scrollsInside, type MountedCard } from "./card.ts";
+import { INTERACTIVE, isCardSheet, mountCard, scrollsInside, type MountedCard } from "./card.ts";
+import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
 import { scheme } from "../lib/theme.ts";
 import { canvasHost, openInTab } from "../host.ts";
+
+/** The cards mounted on this page, by path: how each is written out for an agent's screenshot (`card-snapshot.ts`). */
+const shots = new Map<string, () => CardShot | undefined>();
+
+/** A card on this page as it stands now, as a page the server's Chrome draws; nothing when it is not mounted (asleep, or not here). */
+export function cardShot(path: string): CardShot | undefined {
+	return shots.get(path)?.();
+}
 
 /**
  * A card's surface in its slot on the stage (`item-slot.tsx`): a host element whose shadow root holds the
@@ -44,6 +53,7 @@ export function CardSurface(props: {
 	 */
 	const stamped = () => new URL(props.page, location.href).href.replace(/[?#].*$/, "").replace(/\/cards\/([^/@]+)\/index\.html$/i, `/cards/$1@${(props.rev >>> 0).toString(36)}/index.html`);
 	let mounted: MountedCard | undefined;
+	let forget = () => {};
 	const cardCall = canvasHost().cardCall;
 	let asked = 0;
 	const load = async () => {
@@ -75,6 +85,11 @@ export function CardSurface(props: {
 			...(cardCall ? { call: (verb: string, args: unknown[]) => cardCall(verb, args, props.path) } : {}),
 		});
 		listen(mounted.root, fresh);
+		const root = mounted.root;
+		const url = stamped();
+		const shot = () => snapshotOfCard(root, { ...untrack(props.size), scheme: untrack(scheme), url, skip: isCardSheet });
+		shots.set(props.path, shot);
+		forget = () => shots.get(props.path) === shot && shots.delete(props.path);
 		// What fit reads (`card-reading.ts`): the height, and how the card reads at it.
 		const card = mounted;
 		mounted.onHeight((h) => {
@@ -88,6 +103,7 @@ export function CardSurface(props: {
 	createEffect(() => mounted?.setSize(props.size()));
 	onCleanup(() => {
 		asked++;
+		forget();
 		mounted?.dispose();
 	});
 

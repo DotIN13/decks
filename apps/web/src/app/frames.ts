@@ -414,11 +414,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * The canvas in its frame answers an agent's view on the canvas it shows, from its own stream
 					 * (`@decks/canvas`, `frame/frame.tsx`): this page leaves those to it, and answers the rest.
 					 */
-					if (["show", "camera", "reload", "cursor"].includes(message.call.op)) {
+					if (["show", "camera", "reload", "cursor", "shot"].includes(message.call.op)) {
 						const args = message.call.args as { stage?: unknown; path?: unknown } | undefined;
 						const screen = stageOf(state.focused)?.name;
-						// A cursor or a reload names a card: the frame answers when that card is on the canvas it shows.
-						if ((message.call.op === "cursor" || message.call.op === "reload") && typeof args?.path === "string") {
+						// A cursor, a reload or a card's picture names a card: the frame answers when that card is on the canvas it shows.
+						if ((message.call.op === "cursor" || message.call.op === "reload" || message.call.op === "shot") && typeof args?.path === "string") {
 							if (state.boards.some((board) => board.path === args.path) || (screen && args.path.startsWith(`canvases/${screen}/`))) return;
 						} else {
 							const on = typeof args?.stage === "string" ? args.stage : stageOf(message.call.agentId)?.name;
@@ -426,11 +426,15 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						}
 					}
 					/*
-					 * A picture of a board as this browser has it, for an agent's screenshot: the canvas runs no
-					 * board's page, so there is none, and the server's picture is the one.
+					 * A picture of a card as this browser has it, for an agent's screenshot: the canvas frame writes
+					 * out a card on the canvas it shows (above, `items/card-snapshot.ts`). For a card on a canvas not
+					 * on screen, or a board, which the canvas draws as its picture, there is none, and the server's
+					 * picture is the one.
 					 */
 					if (message.call.op === "shot") {
-						send({ type: "stage.result", result: { id: message.call.id, value: { how: "none", why: "the canvas draws a board as its picture, not its page" } } });
+						// A moment later: the first answer is the one taken, and another tab's frame may have the card.
+						const id = message.call.id;
+						setTimeout(() => send({ type: "stage.result", result: { id, value: { how: "none", why: "it is not on the canvas on the person's screen" } } }), 1500);
 						return;
 					}
 					/*

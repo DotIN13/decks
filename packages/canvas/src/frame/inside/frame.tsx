@@ -15,6 +15,7 @@ import { runStageCall } from "../../camera/stage-ops.ts";
 import type { ViewOffer } from "../chrome.ts";
 import { AgentCursor } from "../../ui/AgentCursor.tsx";
 import { isNews } from "../../items/news.ts";
+import { cardShot } from "../../items/card-surface.tsx";
 import { boardsOf } from "../../model/drawing.ts";
 import { pageItems, placedItems } from "../../model/boxes.ts";
 import { handsOn } from "../../camera/touched.ts";
@@ -385,6 +386,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	 * for a canvas it holds (`stage-ops.ts`), and answered to the harness.
 	 */
 	const stageCall = (call: import("@decks/protocol").StageCall) => {
+		if (call.op === "shot") return void shootCard(call);
 		let value: unknown;
 		try {
 			value = runStageCall(call, {
@@ -407,6 +409,34 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			});
 		} catch (error) {
 			value = { error: error instanceof Error ? error.message : String(error) };
+		}
+		backend.answer(call.id, value);
+	};
+	/*
+	 * A card as the person has it now, for an agent's `decks canvas screenshot` of it (`stage.call` op
+	 * `shot`): its live root written out (`card-snapshot.ts`) and drawn by the harness's Chrome, so the
+	 * picture has what they typed, scrolled and drew in it. `none` when the card is not mounted here, and
+	 * the harness takes its own picture from the file.
+	 */
+	const NONE_AFTER = 1500;
+	const shootCard = async (call: import("@decks/protocol").StageCall) => {
+		const path = (call.args as { path?: unknown } | undefined)?.path;
+		let value: unknown;
+		try {
+			const shot = typeof path === "string" ? cardShot(path) : undefined;
+			if (typeof path !== "string" || !shot) {
+				/*
+				 * Said a moment later: the first answer is the one taken, and another tab showing this canvas
+				 * may have the card awake.
+				 */
+				await new Promise((done) => setTimeout(done, NONE_AFTER));
+				value = { how: "none", why: "the card is not awake on the person's canvas" };
+			} else {
+				const drawn = await backend.snapshot(path, shot);
+				value = "data" in drawn ? { how: "snapshot", ...drawn } : { how: "none", why: drawn.why };
+			}
+		} catch (error) {
+			value = { how: "none", why: error instanceof Error ? error.message : String(error) };
 		}
 		backend.answer(call.id, value);
 	};

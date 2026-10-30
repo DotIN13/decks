@@ -1,5 +1,6 @@
 import type { PenDocument, PenEdit } from "@decks/pen";
 import type { Board, StageCall } from "@decks/protocol";
+import type { CardShot } from "../../items/card-snapshot.ts";
 
 /**
  * The canvas frame's own line to the harness: its drawing, the canvas's stream, and the calls it makes
@@ -19,6 +20,8 @@ export interface Backend {
 	post(route: string, body: unknown): Promise<Record<string, unknown>>;
 	/** The answer to an agent's call on this canvas (`stage.call`), as a tab answers it on the socket. */
 	answer(id: string, value: unknown): void;
+	/** A card written out as a page (`card-snapshot.ts`), drawn by the harness's Chrome (`/api/snapshot`): the picture, or why not. */
+	snapshot(path: string, shot: CardShot): Promise<{ mime: string; data: string } | { why: string }>;
 	/** A renewed token, for every request from now on. */
 	setToken(token: string): void;
 }
@@ -113,6 +116,21 @@ export function createBackend(api: string, canvas: string, firstToken: string): 
 				headers: headers({ "content-type": "application/json" }),
 				body: JSON.stringify(error ? { id, error } : { id, value }),
 			}).catch(() => undefined);
+		},
+
+		async snapshot(path, shot) {
+			try {
+				const query = new URLSearchParams({ path, w: String(shot.w), h: String(shot.h), scheme: shot.scheme });
+				const response = await fetch(`${base}/snapshot?${query}`, { method: "POST", headers: headers({ "content-type": "text/html" }), body: shot.html });
+				if (!response.ok) return { why: `the harness could not draw it (${response.status} ${(await response.text().catch(() => "")).slice(0, 200)})`.trim() };
+				const blob = await response.blob();
+				const bytes = new Uint8Array(await blob.arrayBuffer());
+				let binary = "";
+				for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+				return { mime: blob.type || "image/png", data: btoa(binary) };
+			} catch (error) {
+				return { why: error instanceof Error ? error.message : String(error) };
+			}
 		},
 
 		setToken(next) {

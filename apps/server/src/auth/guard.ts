@@ -148,6 +148,8 @@ export function canvasMay(method: string, path: string, canvas: string): boolean
 	if ((method === "GET" || method === "HEAD") && (path === "/api/v1" || path === "/api/v1/events")) return true;
 	if ((method === "GET" || method === "HEAD") && path.startsWith("/api/stage-pen/")) return decodedSegment(path.slice("/api/stage-pen/".length)) === canvas;
 	if (path === "/api/session") return true;
+	// A card on its canvas written out for the harness's Chrome to draw (`/api/snapshot`, which checks the card is on it).
+	if (method === "POST" && path === "/api/snapshot") return true;
 	if (path.startsWith("/c/")) return false;
 	return isPublic(method, path) || isPageRead(method, path);
 }
