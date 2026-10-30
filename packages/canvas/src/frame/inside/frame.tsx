@@ -75,6 +75,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const [agent, setAgent] = createSignal<string | undefined>(start.look.agent);
 	const [offer, setOffer] = createSignal<ViewOffer>();
 	const [dock, setDock] = createSignal(0);
+	/** Where the page's composer is on this frame's screen, as the page last said. */
+	let composerBox: Rect | null = null;
 	const [narrow, setNarrow] = createSignal(innerWidth < 600);
 	addEventListener("resize", () => setNarrow(innerWidth < 600));
 	/** An agent's cursor on a card (`decks view cursor`), at a point of that card. */
@@ -200,6 +202,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		},
 		// So is any other tab a link opens: this sandbox may not open one.
 		openLink: (href) => end.emit("open-link", { href }),
+		// The composer is the page's, where the page said it is: a drag let go over it is a mention, sent as a draft.
+		composer: {
+			at: (x, y) => {
+				const box = composerBox;
+				return !!box && x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
+			},
+			mark: (on) => end.emit("refer", { over: on }),
+		},
 		// A card's `card.decks` calls: here, on this canvas by the harness, or the page's (`card-calls.ts`).
 		cardCall: cardCalls({
 			canvas: start.canvas.name,
@@ -447,6 +457,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		if (data.insets) useInsets(data.insets);
 		if (data.agents) setAgents(data.agents);
 		if (data.dock !== undefined) setDock(data.dock);
+		if (data.composer !== undefined) composerBox = data.composer;
 		if (data.dark !== undefined) {
 			document.documentElement.dataset.colorScheme = data.dark ? "dark" : "light";
 			setDark(data.dark);

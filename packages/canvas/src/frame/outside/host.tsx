@@ -29,6 +29,8 @@ export interface FrameHostOptions {
 	panel?(name: "apps" | "files"): void;
 	/** Open an app in a tab of its own (`decks.app`), outside the canvas's sandbox. */
 	openApp?(name: string): void;
+	/** The page's composer: the frame is told where it is, so a drag let go over it mentions what it carries. */
+	composer?(): HTMLElement | undefined;
 	/** How far up from the bottom the page's dock reaches, in pixels: a phone's tool row goes above it. */
 	dock?(): number;
 	/** Each agent's name and colour, for what is new on the canvas. */
@@ -157,6 +159,12 @@ export function createFramedEditor(options: Options): Editor {
 			if (data.ink) options.frame.ink?.(data.ink);
 		});
 		page.on("panel", (data) => options.frame.panel?.(data.name));
+		page.on("refer", (data) => {
+			const composer = options.frame.composer?.();
+			if (!composer) return;
+			if (data.over) composer.dataset.refer = "true";
+			else delete composer.dataset.refer;
+		});
 		page.on("open-app", (data) => options.frame.openApp?.(data.name));
 		// A link the frame may not open: an http(s) address alone, in a tab that cannot reach back to this page.
 		page.on("open-link", (data) => {
@@ -264,6 +272,30 @@ export function createFramedEditor(options: Options): Editor {
 			const page = end();
 			const dock = options.frame.dock?.();
 			if (page && dock !== undefined) page.emit("look", { dock });
+		});
+		/*
+		 * Where the composer is, on the frame's screen: said as the frame starts, as the composer or the
+		 * frame changes size, and each time the pointer comes into the frame, since the composer is moved
+		 * only from the page, by a hand that has to come back to the canvas to drag anything onto it.
+		 */
+		createEffect(() => {
+			const page = end();
+			const frame = frameAt();
+			const composer = page && frame ? options.frame.composer?.() : undefined;
+			if (!page || !frame || !composer) return;
+			const say = () => {
+				const at = frame.getBoundingClientRect();
+				const box = composer.getBoundingClientRect();
+				page.emit("look", { composer: box.width && box.height ? { x: box.x - at.x, y: box.y - at.y, w: box.width, h: box.height } : null });
+			};
+			const sized = new ResizeObserver(say);
+			sized.observe(composer);
+			sized.observe(frame);
+			frame.addEventListener("pointerenter", say);
+			onCleanup(() => {
+				sized.disconnect();
+				frame.removeEventListener("pointerenter", say);
+			});
 		});
 		// Each agent's name and colour, when they change: the frame works out what is new itself.
 		createEffect(() => {

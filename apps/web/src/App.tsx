@@ -1299,6 +1299,7 @@ export function App() {
 				panel: (name) => (name === "files" ? openFileAtMiddle() : openAppsPanel()),
 				agent: cardAgentCall,
 				dock: dockCover,
+				composer: () => dockEl?.querySelector<HTMLElement>(".composer-box") ?? undefined,
 				openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"),
 				upload: ({ files: dropped, at, card }) => files.dropAt(at, dropped, card),
 				focused: () => state.focused,

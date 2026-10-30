@@ -76,7 +76,7 @@ export interface PageToFrame {
 	token: { token: string };
 	reload: { path: string };
 	/** The page's scheme and mode, and what of the frame its own chrome covers (the side panel, the top bar). */
-	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number };
+	look: { dark?: boolean; mode?: "edit" | "browse"; readOnly?: boolean; insets?: Insets; /** The conversation on screen, whose `decks view …` moves this canvas; another agent's waits for its chat. */ agent?: string; /** Each agent's name and colour, said when they change: what is new on the canvas glows in the colour of who wrote it. */ agents?: Record<string, { name: string; color: string }>; /** How far up from the bottom the page's dock (the composer) reaches, in pixels: on a phone the tools are a row just above it. */ dock?: number; /** Where the page's composer is on the frame's screen (null: not shown): a drag let go over it mentions what it carries. */ composer?: Rect | null };
 	tool: { tool?: PenTool; ink?: { on: boolean } };
 	camera: { camera: Camera; glide?: number };
 	fit: Record<string, never>;
@@ -110,6 +110,8 @@ export interface FrameToPage {
 	composer: ComposerPart;
 	/** Open an app in a tab of its own: the page's, outside the canvas's sandbox (`decks.app`). */
 	"open-app": { name: string };
+	/** A drag is over the page's composer, or no longer: it is marked as where what is dragged would be mentioned. */
+	refer: { over: boolean };
 	/** Open an address in a tab: the page's to open, an http(s) one alone, since the sandbox has no popups. */
 	"open-link": { href: string };
 	/** Open one of the app's own panels, beside the canvas (the apps list), or its file picker (`files`): the file chosen there is put in the middle of the view. */

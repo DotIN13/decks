@@ -5,10 +5,13 @@
  * sized, and when the camera was last dragged.
  */
 import { walk, type MediaItem, type PenDocument, type PenNode } from "@decks/pen";
-import { canvasHost, openInTab } from "../../host.ts";
+import { canvasHost, openInTab, type CanvasHost } from "../../host.ts";
 import { shortLabel } from "@decks/ui";
 import type { Effect } from "../core/gesture.ts";
 import type { Pt, Rect } from "../core/model.ts";
+
+/** The composer a drag is over: its element, or the host's word for one outside this document. */
+type ReferTarget = HTMLElement | NonNullable<CanvasHost["composer"]>;
 
 /** A mention of something dropped on the composer. */
 export type ReferPill = { kind: "board" | "item"; id: string; label: string };
@@ -51,10 +54,14 @@ export function createEffects(host: EffectHost) {
 	 * target a hand has to aim at, so a board parked at the bottom of the canvas is parked *beside*
 	 * it rather than on it; and a board is the thing most worth saying "this one" about.
 	 */
-	const composerUnder = (at: Pt, ids: readonly string[], boards: readonly string[]): HTMLElement | undefined => {
+	const composerUnder = (at: Pt, ids: readonly string[], boards: readonly string[]): ReferTarget | undefined => {
 		if (!host.onRefer || ids.length + boards.length === 0) return undefined;
 		const element = document.elementFromPoint(at.x, at.y) as HTMLElement | null;
-		return element?.closest<HTMLElement>(".composer-box") ?? undefined;
+		const own = element?.closest<HTMLElement>(".composer-box");
+		if (own) return own;
+		// In the canvas frame the composer is the page's: the host knows where it is.
+		const outside = canvasHost().composer;
+		return outside?.at(at.x, at.y) ? outside : undefined;
 	};
 	/**
 	 * What to call each thing that was dropped on the composer.
@@ -83,12 +90,17 @@ export function createEffects(host: EffectHost) {
 	};
 
 	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
-	let referTarget: HTMLElement | undefined;
-	const markComposer = (element: HTMLElement | undefined) => {
-		if (referTarget === element) return;
-		if (referTarget) delete referTarget.dataset.refer;
-		referTarget = element;
-		if (element) element.dataset.refer = "true";
+	let referTarget: ReferTarget | undefined;
+	const mark = (target: ReferTarget, on: boolean) => {
+		if (!(target instanceof HTMLElement)) return target.mark(on);
+		if (on) target.dataset.refer = "true";
+		else delete target.dataset.refer;
+	};
+	const markComposer = (target: ReferTarget | undefined) => {
+		if (referTarget === target) return;
+		if (referTarget) mark(referTarget, false);
+		referTarget = target;
+		if (target) mark(target, true);
 	};
 
 	/*

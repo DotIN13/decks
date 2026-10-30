@@ -49,6 +49,12 @@ export interface CanvasHost {
 		status(name: string): Promise<{ title?: string; status?: string } | undefined>;
 		open(name: string): void;
 	};
+	/**
+	 * The composer, when it is outside the canvas's document (the canvas frame's is in the page): whether
+	 * a point of this window is over it, and marking it as where a drag would be mentioned. Absent: the
+	 * composer is found in this document (`.composer-box`).
+	 */
+	composer?: { at(x: number, y: number): boolean; mark(on: boolean): void };
 	/** Open an address in a tab of its own, for a canvas that may not open one (the frame's sandbox has no popups). Absent: `window.open`. */
 	openLink?(href: string): void;
 }
