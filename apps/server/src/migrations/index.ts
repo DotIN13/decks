@@ -6,7 +6,7 @@ import { migrated as documentsAndAppsMigrated, migrateDocumentsAndApps } from ".
 import { migrated as boardsToCardsMigrated, migrateBoardsToCards } from "./2026-10-29-boards-to-cards.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { derivedVersion, holdsADeck, readRecord, writeVersion } from "./version.ts";
+import { compareSemver, derivedVersion, holdsADeck, NONE, parseSemver, readRecord, writeVersion, type Semver } from "./version.ts";
 
 /**
  * Every change to how a deck is kept on disk, oldest first, and when each one runs.
@@ -31,11 +31,12 @@ import { derivedVersion, holdsADeck, readRecord, writeVersion } from "./version.
  * | 2026-10-29-documents-and-apps.ts           | at open | `runAtOpen`, below; the same way |
  * | 2026-10-29-boards-to-cards.ts              | at open | `runAtOpen`, below; the same way, after documents and apps |
  *
- * Each at-open migration has a version, its place in `MIGRATIONS`, and the deck keeps the last one run
- * on it in `.decks/migrations.json` (`version.ts`). A deck at `LATEST` opens without any migration
- * looking at it; one behind runs only the migrations after its version, oldest first, and moves its
- * version on after each, so a start cut short goes on from where it stopped. A new deck starts at
- * `LATEST`. A new migration goes at the end of `MIGRATIONS` with the next version.
+ * Each at-open migration carries a semantic version, the deck's once it has run, and the deck keeps
+ * the last one run on it in `.decks/migrations.json` (`version.ts`, which says when a change is major,
+ * minor or patch). A deck at `LATEST` opens without any migration looking at it; one behind runs only
+ * the migrations after its version, oldest first, and moves its version on after each, so a start cut
+ * short goes on from where it stopped. A new deck starts at `LATEST`. A new migration goes at the end
+ * of `MIGRATIONS`, with a version above the last.
  *
  * `DECKS_MIGRATE_DRY_RUN=1` on a harness's start (or `npm run migrate -- --dry-run <deck>`) prints
  * what the migrations still to run would move, and stops before anything is written.
@@ -50,8 +51,8 @@ export class DryRun extends Error {
 type Options = { dataDir?: string; dryRun?: boolean };
 
 export interface Migration {
-	/** Its place in the order, from 1; never reused or renumbered. */
-	version: number;
+	/** The deck's version once it has run: above the one before it, and never changed once shipped. */
+	version: Semver;
 	/** The file's name, and its key in `.decks/migrations.json` where it records itself. */
 	id: string;
 	/** Done already without a record, for one that writes none: its old shape is not on disk. */
@@ -67,7 +68,8 @@ export interface Migration {
 /** Every at-open migration, oldest first. */
 export const MIGRATIONS: readonly Migration[] = [
 	{
-		version: 1,
+		// Major: canvases moved from stages/ to canvases/.
+		version: "1.0.0",
 		id: "2026-10-16-stages-to-canvases",
 		done: (deck) => !existsSync(join(deck, "stages")) || existsSync(join(deck, "canvases")),
 		run: (deck, _options, say) => {
@@ -79,7 +81,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		},
 	},
 	{
-		version: 2,
+		// Major: each canvas holds its own boards, frames and files.
+		version: "2.0.0",
 		id: "2026-10-20-standalone-canvases",
 		migrated,
 		run: (deck, options, say) => {
@@ -89,7 +92,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateStandalone(deck, { dryRun: true, log }),
 	},
 	{
-		version: 3,
+		// Minor: only isolated mode's leftovers go; an older build reads the canvases as before.
+		version: "2.1.0",
 		id: "2026-10-21-isolation-removed",
 		migrated: isolationMigrated,
 		run: (deck, _options, say) => {
@@ -99,7 +103,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateIsolation(deck, { dryRun: true, log }),
 	},
 	{
-		version: 4,
+		// Major: markdown cards get a new item type an older build does not draw.
+		version: "3.0.0",
 		id: "2026-10-28-markdown-cards",
 		migrated: markdownCardsMigrated,
 		run: (deck, _options, say) => {
@@ -110,7 +115,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateMarkdownCards(deck, { dryRun: true, log }),
 	},
 	{
-		version: 5,
+		// Major: document and app boards become item kinds an older build does not know.
+		version: "4.0.0",
 		id: "2026-10-29-documents-and-apps",
 		migrated: documentsAndAppsMigrated,
 		run: (deck, _options, say) => {
@@ -121,7 +127,8 @@ export const MIGRATIONS: readonly Migration[] = [
 		dryRun: (deck, log) => void migrateDocumentsAndApps(deck, { dryRun: true, log }),
 	},
 	{
-		version: 6,
+		// Major: boards become cards and the board files go.
+		version: "5.0.0",
 		id: "2026-10-29-boards-to-cards",
 		migrated: boardsToCardsMigrated,
 		run: (deck, _options, say) => {
@@ -134,12 +141,22 @@ export const MIGRATIONS: readonly Migration[] = [
 ];
 
 /** The version a deck is at once every migration has run, and the one a new deck starts at. */
-export const LATEST = MIGRATIONS.at(-1)!.version;
+export const LATEST: Semver = MIGRATIONS.at(-1)!.version;
 
-/** The deck's version: its number, or for a deck from before numbers, the one its record implies. */
-export function deckVersion(deck: string): number {
+/**
+ * The version the record says, if it says one: a semantic version as written, or a plain number from
+ * the build that counted migrations 1, 2, 3 (the version of that many migrations in).
+ */
+function recordedVersion(value: unknown): Semver | undefined {
+	if (parseSemver(value)) return value as Semver;
+	if (typeof value === "number" && Number.isInteger(value) && value >= 0) return value === 0 ? NONE : (MIGRATIONS[Math.min(value, MIGRATIONS.length) - 1]!.version);
+	return undefined;
+}
+
+/** The deck's version: as its record says, or for a deck from before versions, the one its record implies. */
+export function deckVersion(deck: string): Semver {
 	const record = readRecord(deck);
-	return typeof record.version === "number" ? record.version : derivedVersion(record, MIGRATIONS, deck);
+	return recordedVersion(record.version) ?? derivedVersion(record, MIGRATIONS, deck);
 }
 
 /**
@@ -156,9 +173,9 @@ export function runAtOpen(deck: string, options: Options = {}): string[] {
 		return [];
 	}
 	const record = readRecord(deck);
-	const numbered = typeof record.version === "number";
-	const from = numbered ? (record.version as number) : derivedVersion(record, MIGRATIONS, deck);
-	const pending = MIGRATIONS.filter((one) => one.version > from);
+	const written = recordedVersion(record.version);
+	const from = written ?? derivedVersion(record, MIGRATIONS, deck);
+	const pending = MIGRATIONS.filter((one) => compareSemver(one.version, from) > 0);
 	if (dryRun) {
 		const lines: string[] = [];
 		for (const one of pending) if (!one.migrated?.(deck)) one.dryRun(deck, (line) => lines.push(line));
@@ -167,12 +184,13 @@ export function runAtOpen(deck: string, options: Options = {}): string[] {
 		throw new DryRun(lines);
 	}
 	const said: string[] = [];
-	if (from > LATEST) said.push(`this deck is at version ${from}, newer than this build knows (${LATEST}): it was opened by a newer Decks`);
+	// A newer major was written by a newer Decks, which this build may misread; a newer minor or patch it reads as it is.
+	if (parseSemver(from)![0] > parseSemver(LATEST)![0]) said.push(`this deck is at version ${from}, written by a newer Decks than this build (${LATEST}), which may misread it`);
 	for (const one of pending) {
 		if (!one.migrated?.(deck)) one.run(deck, options, (line) => said.push(line));
 		writeVersion(deck, one.version);
 	}
-	// A deck from before numbers, already up to date: given its number, so the next start reads only it.
-	if (!numbered && !pending.length) writeVersion(deck, from);
+	// A deck from before versions, or with a plain number, already up to date: given its version, so the next start reads only it.
+	if (record.version !== from && !pending.length) writeVersion(deck, from);
 	return said;
 }
