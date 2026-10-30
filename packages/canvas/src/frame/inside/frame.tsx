@@ -187,6 +187,21 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	};
 	setCanvasHost({
 		fileUrl: (path, rev) => `${address(inFolder(path))}${rev === undefined ? "" : `?rev=${rev}`}`,
+		/*
+		 * A picture the drawing names (`./files/a.jpg`) is read against the drawing's own address, which
+		 * the server gives as the file on disk (`/api/f/…/canvases/<name>/`): a read the frame has no
+		 * credential for. One inside this canvas's folder is read on the canvas pass instead.
+		 */
+		...(studio
+			? {}
+			: {
+					pictureUrl: (url: string, base: string) => {
+						const found = new URL(url, new URL(base || "/", location.href));
+						const path = decodeURIComponent(found.pathname);
+						const at = path.lastIndexOf(`/${folder}`);
+						return at < 0 ? found.href : `${address(path.slice(at + 1))}${found.search}`;
+					},
+				}),
 		canWrite: () => start.canvas.role !== "view" && !start.look.readOnly,
 		// A card loaded on an older pass reads its files on the current one.
 		freshAddress: (url) => {
