@@ -44,6 +44,12 @@ body.board {
 	font-size: 15px;
 	line-height: 1.5;
 	-webkit-font-smoothing: antialiased;
+	/*
+	 * A size container named `card`: a card is as wide as its item on the canvas, not as the screen,
+	 * so its content adapts with `@container card (width < 600px)` rather than `@media`.
+	 * (In a card this rule is the card's own element, `.card-body`.)
+	 */
+	container: card / inline-size;
 }
 
 /*

@@ -65,6 +65,12 @@ before you run it. Keep secrets in `.env`, which the repo ignores.
   out of view on the canvas, and the next request starts it again.
 - **Keys never go in a page.** A server app reads them from a file in its folder.
 - Do not write in `node_modules/`, `dist/` or `.decks/`; they are generated.
+- **Every app works on a phone and on a desktop.** Keep the starter's
+  `<meta name="viewport" content="width=device-width, initial-scale=1">`; lay out with grid and flex
+  that wrap and widths in `%`, `fr` or `max-width`, never a fixed pixel page; add a
+  `@media (max-width: 600px)` rule where the layout changes for a narrow tab (one column, a menu that
+  folds, a table that scrolls in `overflow-x: auto`). Controls are 44 px tall at least, and nothing is
+  reachable only by hover. Look at it at 390 by 844 as well as at a desktop width.
 
 ## An app can call Decks' verbs
 

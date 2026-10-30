@@ -44,6 +44,14 @@ Boards are retired: everything that used to be a board is now a card. Old boards
   grid. The content flows, and its order in the file is its order on the card.
 - The width comes from `<meta name="card">` (`"w"`). The height is the card's box on the canvas:
   `decks canvas fit <path>` measures the content and sets it.
+- **Fit any width.** The meta's `w` is only where the card starts: a person can resize its item, and
+  the canvas shows on phones. Columns are `grid` or `flex` that wraps (`repeat(auto-fit, minmax(220px,
+  1fr))`), never a block of fixed pixel width; type and padding shrink with `clamp()`; `img`, `video`
+  and `svg` get `max-width: 100%`; a wide table scrolls in an `overflow-x: auto` box. The card's element
+  is a size container named `card`, so narrow rules are `@container card (width < 640px) { … }`,
+  not `@media` (the card's width is its item's, not the screen's); a chart redraws on
+  `card.on("size", () => draw(card.size.w))`. Buttons a finger presses are 40 px or taller. Check it at about
+  360 px wide as well as at its own width.
 - The tokens follow the app's light and dark mode: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
   --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger
   --b-radius --b-font --b-mono`. Never hardcode a colour the tokens cover.

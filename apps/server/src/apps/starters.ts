@@ -30,9 +30,15 @@ ${body}
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Fits a phone and a desktop tab: a fluid column, type and padding that shrink with the tab, controls a finger can press.
 const STYLE = `:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-body { margin: 0; padding: 32px; line-height: 1.5; }
-h1 { font-size: 24px; margin: 0 0 12px; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 960px; padding: clamp(16px, 4vw, 32px); line-height: 1.5; }
+h1 { font-size: clamp(22px, 5vw, 28px); margin: 0 0 12px; }
+img, video, canvas, svg { max-width: 100%; height: auto; }
+button, input, select, textarea { font: inherit; min-height: 44px; }
+button { padding: 0 16px; }
+@media (max-width: 600px) { form { display: flex; flex-direction: column; gap: 8px; } button, input, select { width: 100%; } }
 `;
 
 function files(starter: Starter, title: string): Record<string, string> {
@@ -177,16 +183,20 @@ createRoot(document.getElementById("root")).render(<App />);
 				"next.config.mjs": `// Decks serves the app under /app/<name>/ and says so in BASE_PATH, at build time and at start.
 export default { basePath: process.env.BASE_PATH ?? "" };
 `,
-				"app/layout.jsx": `export const metadata = { title: ${JSON.stringify(title)} };
+				"app/layout.jsx": `import "./globals.css";
+
+export const metadata = { title: ${JSON.stringify(title)} };
+export const viewport = { width: "device-width", initialScale: 1 };
 
 export default function Layout({ children }) {
 	return (
 		<html lang="en">
-			<body style={{ fontFamily: "system-ui, sans-serif", padding: 32 }}>{children}</body>
+			<body>{children}</body>
 		</html>
 	);
 }
 `,
+				"app/globals.css": STYLE,
 				"app/page.jsx": `export default function Page() {
 	return (
 		<main>

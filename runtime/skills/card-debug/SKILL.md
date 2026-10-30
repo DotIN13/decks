@@ -95,6 +95,9 @@ await page.emulateMedia({ colorScheme: "dark" });
 
 - Screenshot after you build something visual, not after every edit. It costs real
   tokens; the source is free.
+- Look at it narrow too: before the screenshot, `await page.evaluate(() => (document.body.style.width = "360px"))`
+  (the card's element is its container, so its `@container card` rules apply), or set its item to
+  360 wide with `decks canvas update <id> --size.w 360` and take `decks canvas screenshot --of <path>`.
 - Fix from the source. A screenshot tells you *that* something is wrong and roughly
   where; the HTML tells you why.
 - If `__boardReady` never arrives, the console output in the same run usually says
