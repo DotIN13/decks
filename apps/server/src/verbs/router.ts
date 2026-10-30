@@ -315,7 +315,8 @@ export function refusedForCanvas(app: Pick<App, "stage">, verb: string, args: re
 	if (role === "view" && VERB_BY_NAME.get(verb)?.effect !== "read") return `${canvas} was shared with you to view, so ${verb} is not yours to call on it.`;
 	if (touchesTrustedItems(app, verb, args, canvas)) return "A document or an app item is placed by the person or an agent: the canvas frame may move, size or delete one, not make one or change what it names.";
 	const pens = app.stage.pens;
-	for (const arg of args) {
+	// A paste's clip names the canvas the items were copied on, which the harness checks itself (`paste.ts`): only where they go is held to this one.
+	for (const arg of verb === "canvas.paste" ? args.slice(1) : args) {
 		const asked = arg && typeof arg === "object" && !Array.isArray(arg) ? (arg as { canvas?: unknown }).canvas : undefined;
 		if (asked === undefined || asked === null || asked === "") continue;
 		const raw = String(asked).trim().replace(/^canvases\//, "").replace(/\/canvas(\.pen)?$/, "");

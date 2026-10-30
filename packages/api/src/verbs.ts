@@ -187,6 +187,26 @@ export const VERBS: readonly Verb[] = [
 		result: Item,
 	},
 	{
+		name: "canvas.clip",
+		card: "canvas",
+		group: "canvas",
+		...deckRead,
+		summary:
+			"Hold a copy of items for a paste on another canvas of this harness: the items with these ids (or cards' paths), whole, as they are now, kept by the harness under `id` (a fresh random one you choose) for a day. Nothing changes; canvas.paste puts them in. A canvas's ⌘C does this.",
+		params: [p("ids", arr(str())), onCanvas({ id: str() })],
+		result: obj({ id: str(), canvas: str(), box: obj({ x: num(), y: num(), w: num(), h: num() }), items: num() }),
+	},
+	{
+		name: "canvas.paste",
+		card: "canvas",
+		group: "canvas",
+		...deckChange,
+		summary:
+			"Put in a copy canvas.clip holds (`clip`: { id, canvas } at least, as the clipboard has it), its top-left corner `at`, as one edit the person can undo. The items get new ids, arrows stay joined to the copies, and what they need comes along from the canvas they were copied on: each card's folder (as cards/<name>-2/ when the name is taken), each picture and document in its folder. Cards copied from a friend's canvas land with their scripts off. Answers the items as they are now.",
+		params: [p("clip", obj({ id: str(), canvas: str() }, true)), onCanvas({ at: opt(Point) })],
+		result: arr(Item),
+	},
+	{
 		name: "canvas.variables",
 		card: "canvas",
 		group: "canvas",

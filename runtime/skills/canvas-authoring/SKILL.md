@@ -68,6 +68,10 @@ same shape as yours. What the share lets you do is its `role`:
   copy's `files/`, links re-pointed), titled "Copy of …". The copy syncs as your canvas and never
   changes theirs; an app in it stays a picture, since the app runs on its owner's harness.
 
+To bring a few items from one canvas to another with their files (a card's folder, pictures), not
+the whole canvas: `decks.canvas.clip(ids, { canvas: from, id })` then
+`decks.canvas.paste({ id, canvas: from }, { canvas: to, at })`, which is what the person's ⌘C and ⌘V do.
+
 ## The calls
 
 ```ts

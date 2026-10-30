@@ -702,6 +702,116 @@
   ]
  },
  {
+  "name": "canvas.clip",
+  "command": [
+   "canvas",
+   "clip"
+  ],
+  "group": "canvas",
+  "touches": "deck",
+  "effect": "read",
+  "summary": "Hold a copy of items for a paste on another canvas of this harness: the items with these ids (or cards' paths), whole, as they are now, kept by the harness under `id` (a fresh random one you choose) for a day. Nothing changes; canvas.paste puts them in. A canvas's ⌘C does this.",
+  "signature": "canvas.clip(ids: string[], options?: { canvas?: string; id: string })",
+  "returns": "{ id: string; canvas: string; box: { x: number; y: number; w: number; h: number }; items: number }",
+  "params": [
+   {
+    "name": "ids",
+    "type": "string[]",
+    "schema": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string; id: string }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      },
+      "id": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id"
+     ],
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
+  "name": "canvas.paste",
+  "command": [
+   "canvas",
+   "paste"
+  ],
+  "group": "canvas",
+  "touches": "deck",
+  "effect": "change",
+  "summary": "Put in a copy canvas.clip holds (`clip`: { id, canvas } at least, as the clipboard has it), its top-left corner `at`, as one edit the person can undo. The items get new ids, arrows stay joined to the copies, and what they need comes along from the canvas they were copied on: each card's folder (as cards/<name>-2/ when the name is taken), each picture and document in its folder. Cards copied from a friend's canvas land with their scripts off. Answers the items as they are now.",
+  "signature": "canvas.paste(clip: { id: string; canvas: string; [key: string]: unknown }, options?: { canvas?: string; at?: Point })",
+  "returns": "Item[]",
+  "params": [
+   {
+    "name": "clip",
+    "type": "{ id: string; canvas: string; [key: string]: unknown }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "canvas": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "canvas"
+     ],
+     "additionalProperties": true
+    }
+   },
+   {
+    "name": "options",
+    "optional": true,
+    "type": "{ canvas?: string; at?: Point }",
+    "schema": {
+     "type": "object",
+     "properties": {
+      "canvas": {
+       "type": "string"
+      },
+      "at": {
+       "type": "object",
+       "properties": {
+        "x": {
+         "type": "number"
+        },
+        "y": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "x",
+        "y"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  ]
+ },
+ {
   "name": "canvas.variables",
   "command": [
    "canvas",

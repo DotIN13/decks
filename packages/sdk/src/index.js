@@ -51,6 +51,8 @@ export const VERBS = [
 	["canvas.delete",["id","options?"]],
 	["canvas.move",["id","options?"]],
 	["canvas.copy",["id","options?"]],
+	["canvas.clip",["ids","options?"]],
+	["canvas.paste",["clip","options?"]],
 	["canvas.variables",["set","options?"]],
 	["canvas.batch",["ops","options?"]],
 	["canvas.step",["direction","options?"]],

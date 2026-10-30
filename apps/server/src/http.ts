@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { sttReady, transcribe } from "./stt.ts";
@@ -839,7 +840,7 @@ export function createHttpApp(app: App): Express {
 			const board = app.deck.board(path);
 			return board ? [{ ...board, x, y, w, h }] : [];
 		});
-		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
+		res.json({ doc: frame.doc, base: frame.base, rev: frame.rev, harness: harnessId(app.deck.path), ...(frame.by ? { by: frame.by } : {}), boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })), cards });
 	});
 
 	/**
@@ -1391,4 +1392,12 @@ function harnessVersion(): string {
 		version = "";
 	}
 	return version;
+}
+
+/**
+ * Which harness this is, as a copy on the clipboard says it (`canvas.clip`): a paste within the same
+ * harness is its to make. Its deck folder, hashed, so it is the same across restarts and says nothing of where.
+ */
+function harnessId(deck: string): string {
+	return `h_${createHash("sha256").update(deck).digest("hex").slice(0, 16)}`;
 }

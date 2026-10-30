@@ -15,6 +15,7 @@ import type { VerbContext } from "./context.ts";
 import { freeSpot, type Side } from "./space.ts";
 import { exportPage } from "./export.ts";
 import { resolveInDeck } from "../deck/roots.ts";
+import { heldClip, holdClip, pasteItems } from "./paste.ts";
 
 /**
  * An agent's shape with no colour given gets the colours the canvas tools give theirs, the drawing's
@@ -514,6 +515,46 @@ export function canvasVerbs(ctx: VerbContext): Pick<Stage, "canvas"> {
 			copy: async (id: string, options?: On & { as?: string; at?: Corner; parent?: string | null }) => {
 				const { canvas, frame, ...rest } = options ?? {};
 				return one(targetOf({ canvas, frame }), { op: "copy", id, ...rest }) as never;
+			},
+			/** A copy of items held for a paste (`paste.ts`): read off this canvas's drawing now, whatever the clipboard later says. */
+			clip: async (itemIds: string[], options?: { canvas?: string; id?: string }) => {
+				const name = canvasOf(options?.canvas);
+				const pens = needPens();
+				onCanvas = name;
+				const doc = pens.get(name).doc;
+				const wanted = (Array.isArray(itemIds) ? itemIds : []).map((one) => idIn(doc, one));
+				return holdClip(options?.id, name, doc, wanted, pens.placedOf(name)) as never;
+			},
+			/**
+			 * A held copy put in here, its files first and its items as one edit of the person's (`paste.ts`):
+			 * from a canvas they can read, onto one they can change.
+			 */
+			paste: async (clip: { id?: unknown; canvas?: unknown }, options?: { canvas?: string; at?: { x: number; y: number } }) => {
+				const name = canvasOf(options?.canvas);
+				const pens = needPens();
+				if (pens.sharing(name)?.role === "view") throw new Error(`${pens.titleOf(name)} was shared with you to view, so nothing can be pasted on it. Make your own copy of it first.`);
+				const copy = heldClip(clip?.id);
+				if (clip?.canvas !== copy.canvas) throw new Error("That copy was made on another canvas than the clip says: copy the items again.");
+				if (!pens.has(copy.canvas)) throw new Error("The canvas those items were copied from is not one you can read any more.");
+				const at = options?.at;
+				if (at !== undefined && (typeof at?.x !== "number" || typeof at?.y !== "number" || !Number.isFinite(at.x) || !Number.isFinite(at.y))) throw new Error("at is a point on the canvas, { x, y }.");
+				const deck = service.deckPath();
+				const target = pens.get(name);
+				if (target.error) throw new Error(`${target.error}. Fix the file, or replace it whole, before pasting on it.`);
+				const { items, notes: said } = pasteItems(
+					{
+						deck,
+						writePage: (path, html) => void service.writeCard(path, html),
+						placedPages: (canvas) => new Set(pens.boards(canvas).map((one) => one.path)),
+					},
+					copy,
+					name,
+					ids(target.doc),
+					at,
+				);
+				notes.push(...said);
+				if (!items.length) return [] as never;
+				return change({ canvas: name }, items.map((node) => ({ op: "insert", node }) as unknown as CanvasOpIn)) as never;
 			},
 			variables: async (set: Record<string, unknown>, options?: On & { themes?: Record<string, string[]> | null }) => {
 				const target = targetOf(options);

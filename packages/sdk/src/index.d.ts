@@ -11,6 +11,7 @@ export type Box = { x1: number; y1: number; x2: number; y2: number };
 export type Corner = { x1: number; y1: number } | { x: number; y: number };
 /** A width, a height, or both. */
 export type Size = { w?: number; h?: number };
+export type Point = { x: number; y: number };
 /** One change in a batch: the same as the call of that name, with the item or id in the op. */
 export type CanvasOp = { op: "insert"; item: Item; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "update"; id: string; set?: Record<string, unknown>; at?: Corner; size?: Size } | { op: "replace"; id: string; item: Item } | { op: "delete"; id: string } | { op: "move"; id: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number } | { op: "copy"; id: string; as?: string; at?: Corner; parent?: string | null } | { op: "variables"; set: Record<string, unknown>; themes?: Record<string, string[]> | null };
 /**
@@ -50,7 +51,6 @@ export type Agent = { id?: string; name: string; avatar?: string; color?: string
 export type Message = { from: string; task: string; boards: string[]; at: number; reply?: boolean };
 /** Where a screen looks on a canvas, and its zoom (1 is life size). */
 export type Camera = { x: number; y: number; zoom: number };
-export type Point = { x: number; y: number };
 export type AppState = { name: string; title: string; kind: AppKind; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; url: string; board: string; port?: number; error?: string; seenAt?: number; at?: number; version?: number };
 export type AppKind = "static" | "build" | "server";
 export type AppOutcome = { ok: boolean; status: "stopped" | "installing" | "building" | "starting" | "running" | "asleep" | "broken"; ms: number; errors: string[]; pending?: true };
@@ -206,6 +206,21 @@ export interface Verbs {
 		move(id: string, options?: { canvas?: string; frame?: string; at?: Corner; beside?: string; below?: string; parent?: string | null; index?: number }): Promise<Item>;
 		/** Duplicate an item, with a new id or the one in `as`, at `at` or in `parent`. */
 		copy(id: string, options?: { canvas?: string; frame?: string; as?: string; at?: Corner; parent?: string | null }): Promise<Item>;
+		/**
+		 * Hold a copy of items for a paste on another canvas of this harness: the items with these ids (or
+		 * cards' paths), whole, as they are now, kept by the harness under `id` (a fresh random one you
+		 * choose) for a day. Nothing changes; canvas.paste puts them in. A canvas's ⌘C does this.
+		 */
+		clip(ids: string[], options?: { canvas?: string; id: string }): Promise<{ id: string; canvas: string; box: { x: number; y: number; w: number; h: number }; items: number }>;
+		/**
+		 * Put in a copy canvas.clip holds (`clip`: { id, canvas } at least, as the clipboard has it), its
+		 * top-left corner `at`, as one edit the person can undo. The items get new ids, arrows stay joined
+		 * to the copies, and what they need comes along from the canvas they were copied on: each card's
+		 * folder (as cards/<name>-2/ when the name is taken), each picture and document in its folder.
+		 * Cards copied from a friend's canvas land with their scripts off. Answers the items as they are
+		 * now.
+		 */
+		paste(clip: { id: string; canvas: string; [key: string]: unknown }, options?: { canvas?: string; at?: Point }): Promise<Item[]>;
 		/**
 		 * Set the canvas's colour tokens and other variables, each then used as "$name" in any field. {
 		 * brand: { light: "#4f46e5", dark: "#818cf8" } } follows the canvas between light and dark,
