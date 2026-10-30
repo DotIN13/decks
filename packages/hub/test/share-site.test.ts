@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { parse, serialize } from "@decks/pen";
 import { HarnessSync } from "@decks/sync-client";
 import { WebSocketServer } from "ws";
-import { Live, MemoryStore, syncHandler, type Who } from "../src/index.ts";
+import { Live, MemoryStore, NotConnected, syncHandler, type Who } from "../src/index.ts";
 import { nodeHandler } from "../src/node.ts";
 
 /*
@@ -112,4 +112,57 @@ test("the handler refuses what a harness may not do", async () => {
 	assert.equal((await call(`/sync/v1/canvases/${id}/edits`, "friend", { method: "POST", body: JSON.stringify({ base: 1, edits: [] }) })).status, 403);
 	assert.equal((await call("/sync/v1/canvases", "mini", { method: "POST", body: JSON.stringify({ name: "../x" }) })).status, 400);
 	assert.equal((await call("/sync/v1/canvases/nope", "mini")).status, 404);
+});
+
+/** Until `ready()` holds, looking every 20 ms, for at most two seconds. */
+async function until(ready: () => boolean): Promise<void> {
+	for (let i = 0; i < 100 && !ready(); i++) await new Promise((r) => setTimeout(r, 20));
+	assert.ok(ready(), "in time");
+}
+
+test("a harness gives a token only when asked over its own key's socket, and an ask of a harness with none open fails at once", async () => {
+	harness("asked", "ada", "Ada Lovelace");
+	harness("quiet", "ada", "Ada Lovelace");
+	harness("refuses", "ada", "Ada Lovelace");
+	const asks: { user: { id: string; name: string }; origin: string }[] = [];
+	const sa = new HarnessSync({ deck: deck("asked"), studio: url, key: "asked", log: quiet, issueToken: (ask) => (asks.push(ask), { token: "dk_h_given", expires: 1234 }) });
+	const sr = new HarnessSync({ deck: deck("refuses"), studio: url, key: "refuses", log: quiet });
+	const open = () => live.size;
+	const before = open();
+	await sa.start();
+	await sr.start();
+	try {
+		await until(() => open() === before + 2);
+		assert.deepEqual(await live.askToken("h-asked", { id: "ada", name: "Ada Lovelace" }, "https://studio.test"), { token: "dk_h_given", expires: 1234 });
+		assert.deepEqual(asks, [{ user: { id: "ada", name: "Ada Lovelace" }, origin: "https://studio.test" }], "the harness heard who and where");
+		await assert.rejects(live.askToken("h-refuses", { id: "ada", name: "Ada" }, "https://studio.test"), /gives no tokens through Studio/, "a harness without issueToken says why");
+		await assert.rejects(live.askToken("h-quiet", { id: "ada", name: "Ada" }, "https://studio.test"), NotConnected, "no socket, no token");
+	} finally {
+		await sa.stop();
+		await sr.stop();
+	}
+});
+
+test("an answer counts only from the harness that was asked, and an ask nobody answers runs out", async () => {
+	const local = new Live(store);
+	const sockets: { sent: string[]; message?: (data: unknown) => void; close?: () => void }[] = [];
+	const socket = (key: string) => {
+		const one: (typeof sockets)[number] = { sent: [] };
+		sockets.push(one);
+		local.add({ send: (text) => one.sent.push(text), close: () => {}, on: ((event: string, listener: (data?: unknown) => void) => void (event === "message" ? (one.message = listener) : (one.close = listener as () => void))) as never }, keys.get(key)!);
+		return one;
+	};
+	const asked = socket("mini");
+	const other = socket("laptop");
+	const answer = local.askToken("h-mini", { id: "ada", name: "Ada" }, "https://studio.test", 200);
+	const ask = JSON.parse(asked.sent.at(-1)!) as { type: string; id: string };
+	assert.equal(ask.type, "token.ask");
+	assert.ok(!other.sent.some((text) => text.includes("token.ask")), "only the harness asked hears the ask");
+	other.message!(JSON.stringify({ type: "token", id: ask.id, token: "dk_h_forged", expires: 1 }));
+	asked.message!(JSON.stringify({ type: "token", id: ask.id, token: "dk_h_real", expires: 2 }));
+	assert.deepEqual(await answer, { token: "dk_h_real", expires: 2 }, "another harness's answer to it is ignored");
+	await assert.rejects(local.askToken("h-mini", { id: "ada", name: "Ada" }, "https://studio.test", 30), NotConnected, "no answer in time");
+	const gone = local.askToken("h-mini", { id: "ada", name: "Ada" }, "https://studio.test", 5000);
+	asked.close!();
+	await assert.rejects(gone, /went away/, "its socket closing fails the ask at once");
 });

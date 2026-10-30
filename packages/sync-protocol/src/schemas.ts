@@ -108,8 +108,26 @@ export const LiveEvent = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("harnesses") }),
 	z.object({ type: z.literal("cursor"), canvas: z.string(), user: z.string(), name: z.string(), x: z.number(), y: z.number() }),
 	z.object({ type: z.literal("cursor.gone"), canvas: z.string(), user: z.string() }),
+	/**
+	 * To a harness alone, over the socket its key opened: Studio asks it for a harness token for one
+	 * signed-in Studio person's browser, at Studio's `origin`, under ask `id`. Studio asks only for a person
+	 * who may use this harness there; the harness trusts the ask because it came on its key's own socket,
+	 * and answers with `TokenGiven` on the same socket.
+	 */
+	z.object({ type: z.literal("token.ask"), id: z.string().max(100), user: z.object({ id: z.string().max(100), name: z.string().max(200) }), origin: z.string().max(300) }),
 ]);
 export type LiveEvent = z.infer<typeof LiveEvent>;
+
+/**
+ * A harness's answer to `token.ask`, on its live socket: the token and when it lapses unused
+ * (`expires`, ms since the epoch), or a sentence saying why not (`error`).
+ */
+export const TokenGiven = z.object({ type: z.literal("token"), id: z.string().max(100), token: z.string().max(200).optional(), expires: z.number().optional(), error: z.string().max(500).optional() });
+export type TokenGiven = z.infer<typeof TokenGiven>;
+
+/** What a harness may send on its live socket: only answers to Studio's asks. */
+export const HarnessSend = TokenGiven;
+export type HarnessSend = z.infer<typeof HarnessSend>;
 
 /** What a browser may send on its live socket: where its pointer is on a canvas, in canvas units. */
 export const LiveSend = z.object({ type: z.literal("cursor"), canvas: z.string(), x: z.number(), y: z.number() });

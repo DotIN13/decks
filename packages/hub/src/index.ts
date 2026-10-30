@@ -7,7 +7,7 @@
  */
 export { merge, type MergeResult } from "./merge.ts";
 export { changesNothing, changesSince, commitEdits, mayEdit } from "./commit.ts";
-export { INLINE_MAX, Live, type LiveSocket } from "./live.ts";
+export { ASK_MS, INLINE_MAX, Live, NotConnected, type LiveSocket } from "./live.ts";
 export { HubError, syncHandler, type SyncHandlerOptions } from "./handlers.ts";
 export { MemoryStore } from "./memory-store.ts";
 export type { HubStore, Stored, Who } from "./store.ts";

@@ -6,7 +6,7 @@ import WebSocket from "ws";
 import { canvasFolder, ownerFolderBase, plainSegment, servedAs, SHARED_CANVASES, sharedName, sharedParts } from "@decks/hub/layout";
 import { HashCache, RECHECK_MS, sha256 as hashOf } from "./hash-cache.ts";
 
-import { LiveEvent, OWN_PARTS, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
+import { LiveEvent, OWN_PARTS, type TokenGiven, MIRRORED_PARTS, PICTURES, safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking, type SyncCanvas, type SyncFile } from "@decks/sync-protocol";
 
 // The rules a harness checks what a service sends against, from @decks/sync-protocol.
 export { safeCanvasFolder, safeCanvasName, safeSyncPath, secretLooking };
@@ -57,6 +57,18 @@ export interface SyncOptions {
 	 * canvases. Absent: nothing is told.
 	 */
 	inventory?: () => Array<{ name: string; title: string; kind: string; board: string }>;
+	/**
+	 * A harness token for a Studio person's browser, when Studio asks for one over the live socket
+	 * (`token.ask`): issued by the harness for that person, bound to Studio's origin, with when it lapses
+	 * unused. It may throw, with a sentence Studio is told. Absent: every ask is refused.
+	 */
+	issueToken?: (ask: { user: { id: string; name: string }; origin: string }) => { token: string; expires: number };
+	/**
+	 * The key stopped being Studio's link: `revoked`, Studio closed the socket because the key was revoked
+	 * there (the harness removed in Studio); `changed`, the harness's own key was removed or replaced
+	 * (`apps/server/src/studio`). What was given through it should go.
+	 */
+	unlinked?: (why: "revoked" | "changed") => void;
 }
 
 interface CanvasState {
@@ -1062,8 +1074,9 @@ export class HarnessSync {
 		let first = true;
 		const connect = () => {
 			if (this.stopped) return;
-			this.ws = new WebSocket(live, { headers: { Authorization: `Bearer ${this.o.key}` } });
-			this.ws.on("message", (m) => {
+			const ws = new WebSocket(live, { headers: { Authorization: `Bearer ${this.o.key}` } });
+			this.ws = ws;
+			ws.on("message", (m) => {
 				let e: LiveEvent;
 				try {
 					// A message this harness does not know (from a newer Studio) is nothing to sync.
@@ -1073,6 +1086,7 @@ export class HarnessSync {
 				} catch {
 					return;
 				}
+				if (e.type === "token.ask") return this.giveToken(e, ws);
 				// The first hello follows the first full pass at once: nothing can have been missed but a moment.
 				if (e.type === "hello" && first) {
 					first = false;
@@ -1080,13 +1094,33 @@ export class HarnessSync {
 				}
 				this.heard(e);
 			});
-			this.ws.on("close", () => setTimeout(connect, 2000));
-			this.ws.on("error", () => {});
+			ws.on("close", (code) => {
+				// 4001: Studio revoked this harness's key. What was given through it goes too (`unlinked`).
+				if (code === 4001) this.o.unlinked?.("revoked");
+				setTimeout(connect, 2000);
+			});
+			ws.on("error", () => {});
 		};
 		connect();
 		this.started = true;
 		this.watchFolders();
 		this.timer = setInterval(() => this.sync(), FULL_PASS_MS);
+	}
+
+	/**
+	 * Studio asking, on the socket this harness's key opened, for a token for one of its people's
+	 * browsers: issued here (`issueToken`), or refused with a sentence, and answered on the same socket.
+	 */
+	private giveToken(ask: Extract<LiveEvent, { type: "token.ask" }>, ws: WebSocket) {
+		let answer: TokenGiven;
+		try {
+			if (!this.o.issueToken) throw new Error("This harness gives no tokens through Studio; it needs updating.");
+			const { token, expires } = this.o.issueToken({ user: ask.user, origin: ask.origin });
+			answer = { type: "token", id: ask.id, token, expires };
+		} catch (error) {
+			answer = { type: "token", id: ask.id, error: (error as Error).message };
+		}
+		ws.send(JSON.stringify(answer));
 	}
 
 	/** Which of the deck's synced folders are watched: one that comes later (a friend's first share, the first canvas) is watched from then on. */

@@ -141,3 +141,44 @@ test("a sync state from before keeps working: each canvas's drawing moves to .de
 		rmSync(deck, { recursive: true, force: true });
 	}
 });
+
+test("Studio closing the live socket for a revoked key says so (unlinked), and an ask is answered on the socket it came on", async () => {
+	const { WebSocketServer } = await import("ws");
+	const deck = mkdtempSync(join(tmpdir(), "decks-sync-unlinked-"));
+	const studio = await emptyStudio(200);
+	const wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+	await new Promise<void>((done) => wss.once("listening", () => done()));
+	const answers: unknown[] = [];
+	wss.on("connection", (ws) => {
+		ws.on("message", (raw) => answers.push(JSON.parse(String(raw))));
+		ws.send(JSON.stringify({ type: "hello", user: "u1", harness: "h1" }));
+		ws.send(JSON.stringify({ type: "token.ask", id: "a1", user: { id: "u1", name: "Ada" }, origin: "https://studio.test" }));
+		setTimeout(() => ws.close(4001, "revoked"), 100);
+	});
+	const why: string[] = [];
+	const sync = new HarnessSync({
+		deck,
+		studio: studio.url,
+		key: "dsk_x",
+		log: () => {},
+		issueToken: (ask) => ({ token: `dk_h_for_${ask.user.name}`, expires: 9 }),
+		unlinked: (reason) => why.push(reason),
+	});
+	// One full pass against the HTTP Studio; then the live socket on the little ws server, with no more passes.
+	await sync.sync();
+	const live = new URL(studio.url);
+	live.port = String((wss.address() as AddressInfo).port);
+	(sync as unknown as { o: { studio: string } }).o.studio = live.origin;
+	(sync as unknown as { sync: () => Promise<void> }).sync = async () => {};
+	try {
+		await sync.start();
+		for (let i = 0; i < 100 && !why.length; i++) await new Promise((r) => setTimeout(r, 20));
+		assert.deepEqual(answers, [{ type: "token", id: "a1", token: "dk_h_for_Ada", expires: 9 }]);
+		assert.equal(why[0], "revoked");
+	} finally {
+		await sync.stop();
+		wss.close();
+		studio.close();
+		rmSync(deck, { recursive: true, force: true });
+	}
+});
