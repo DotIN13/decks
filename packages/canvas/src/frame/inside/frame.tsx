@@ -367,7 +367,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	const selectCard = (path: string | undefined) => {
 		if (!path) return;
 		const child = ((handle.drawn().children ?? []) as unknown as Array<{ id?: string; metadata?: { path?: string } }>).find((one) => one.metadata?.path === path || path.endsWith(one.metadata?.path ?? "\u0000"));
-		if (child?.id) handle.select([child.id]);
+		if (child?.id) handle.select([child.id], child.metadata!.path);
 	};
 	const moveTo = (to: Camera, animate?: boolean) => (animate ? handle.glide(to, 400) : handle.setCamera(to));
 	/*

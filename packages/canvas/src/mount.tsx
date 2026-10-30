@@ -292,7 +292,12 @@ export function createEditor(
 			setPenTool(tool);
 		},
 		tool: () => untrack(penTool),
-		select: (ids) => setPenSelection(ids),
+		select: (ids, page) => {
+			setPenSelection(ids);
+			if (page === undefined) return;
+			setSelected(page);
+			options.onSelect?.(page);
+		},
 		fit: () => setCamera(fitAll(untrack(doc), size(), look())),
 		edit,
 		undo: () => step("undo"),

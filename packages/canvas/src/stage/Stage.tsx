@@ -580,7 +580,6 @@ export function Stage(props: {
 
 	/** More than one thing picked together, boards among them or not: the pill goes over the whole group (`calloutItems`). */
 	const groupPicked = () => editor.boardPicks().length + editor.items().length > 1;
-	const calloutBoard = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
 	/**
 	 * Cards whose surfaces are showing, by how many of their slots say so: the sheet is a hole over each
 	 * of them, and the card's picture everywhere else. A count and not a set, so a slot that goes as
@@ -697,6 +696,8 @@ export function Stage(props: {
 			idsBut: (id) => freshIds(id),
 		},
 	});
+	// After the editor, which it reads: a stage made with a board already selected reads it at once.
+	const calloutBoard = createMemo(() => (props.selected && !groupPicked() ? props.boards.find((board) => board.path === props.selected) : undefined));
 	/** The file items whose holes the sheet is showing, as of the frame on screen (`liveFiles`): their elements show then and not before. */
 	const [holesShown, setHolesShown] = createSignal<ReadonlySet<string>>(new Set());
 	let holesAsked: { ids: ReadonlySet<string>; mark: number } | undefined;

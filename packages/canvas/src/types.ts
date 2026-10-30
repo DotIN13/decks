@@ -192,8 +192,8 @@ export interface CanvasHandle {
 	tool(): PenTool;
 	/** Fit everything on the drawing in the host. */
 	fit(): void;
-	/** Select these drawn items (a host's list of layers), or none. */
-	select(ids: readonly string[]): void;
+	/** Select these drawn items (a host's list of layers), or none; with `page`, that card or board is the one selected, as a press on it makes it. */
+	select(ids: readonly string[], page?: string): void;
 	/** Apply pen operations as the person's edit (`@decks/pen`'s `Op`s): `onEdits` hears it. */
 	edit(ops: unknown[]): void;
 	undo(): void;
