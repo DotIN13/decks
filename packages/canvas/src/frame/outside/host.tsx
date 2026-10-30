@@ -4,7 +4,7 @@ import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } fr
 import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../../types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import { insets } from "../../camera/insets.ts";
-import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type PageEnd, type Rect, type Start } from "../protocol.ts";
+import { CallRefused, PROTOCOL, peer, type ComposerPart, type FrameCalls, type CardSlot, type PageEnd, type Rect, type Start } from "../protocol.ts";
 
 /** What the page answers for its frame beyond the editor's own options. */
 export interface FrameHostOptions {
@@ -38,7 +38,7 @@ export interface FrameHostOptions {
 	/** A view the frame kept for another conversation: the harness hears it, to answer that agent's `view.camera`. */
 	viewFor?(agent: string, camera: Camera): void;
 	/** A file dropped on the canvas, its bytes, for the page to upload and place. */
-	upload?(drop: { files: File[]; at: { x: number; y: number } }): void;
+	upload?(drop: { files: File[]; at: { x: number; y: number }; card?: CardSlot }): void;
 }
 
 type Options = CanvasOptions & { state?: EditorState; frame: FrameHostOptions };
@@ -194,7 +194,7 @@ export function createFramedEditor(options: Options): Editor {
 			// The point on this page: where the frame sits, plus where in it they landed.
 			const box = frameAt()?.getBoundingClientRect();
 			const at = { x: (box?.x ?? 0) + data.at.x, y: (box?.y ?? 0) + data.at.y };
-			options.frame.upload({ files: data.files.map((one) => new File([one.bytes], one.name, { type: one.type })), at });
+			options.frame.upload({ files: data.files.map((one) => new File([one.bytes], one.name, { type: one.type })), at, ...(data.card ? { card: data.card } : {}) });
 			return true;
 		});
 	};

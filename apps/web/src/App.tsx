@@ -1300,7 +1300,7 @@ export function App() {
 				agent: cardAgentCall,
 				dock: dockCover,
 				openApp: (name) => window.open(`/app/${encodeURIComponent(name)}/`, "_blank", "noopener"),
-				upload: ({ files: dropped, at }) => files.dropAt(at, dropped),
+				upload: ({ files: dropped, at, card }) => files.dropAt(at, dropped, card),
 				focused: () => state.focused,
 				agents: () => Object.fromEntries(Object.entries(state.identities).map(([id, one]) => [id, { name: one.name, color: one.color }])),
 				viewFor: (agentId, camera) => reportCamera(camera, agentId),

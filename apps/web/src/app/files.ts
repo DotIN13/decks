@@ -176,15 +176,15 @@ export function createFileDrops() {
 	 * films and sounds as items of their own (`ontoStage`), anything else — a PDF, an SVG, a web page
 	 * — as a file card (`asFileCards`).
 	 */
-	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }) => {
+	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }, over?: { card: string; index: number; inner: number }) => {
 		const stage = document.querySelector(".stage, iframe.canvas-frame");
 		if (!stage || refusedOn(stageOnScreen())) return;
 		// Asked first, before anything is made for them: a big file said no to leaves no board behind.
 		const files: File[] = [];
 		for (const file of dropped) if (await mayUpload(file)) files.push(file);
 		if (files.length === 0) return;
-		// Over a card, every file goes into it, between the blocks where it lands.
-		const card = (globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt?.(at.x, at.y);
+		// Over a card, every file goes into it, between the blocks where it lands: the canvas frame says which.
+		const card = over ?? (globalThis as { __decksCardAt?: (x: number, y: number) => { card: string; index: number; inner: number } | undefined }).__decksCardAt?.(at.x, at.y);
 		if (card) return intoCard(files, card);
 		const direct = files.filter(onStage);
 		const rest = files.filter((file) => !onStage(file));
@@ -604,7 +604,7 @@ export function createFileDrops() {
 	};
 	let dropPreview: () => unknown = () => undefined;
 	/** Files dropped at a point of the window: on the canvas here, or handed over by the canvas frame (`frame/`). */
-	const dropAt = (at: { x: number; y: number }, files: File[]) => {
+	const dropAt = (at: { x: number; y: number }, files: File[], card?: { card: string; index: number; inner: number }) => {
 		// A canvas file opens as a canvas, wherever it lands (`connections/`).
 		const bundle = files.find((file) => /\.decks$/i.test(file.name));
 		if (bundle) {
@@ -619,7 +619,7 @@ export function createFileDrops() {
 			notice("info", "That is the canvas as it used to be. Let go of the timeline first.");
 			return;
 		}
-		if (files.length > 0) void onEmptyCanvas(files, at);
+		if (files.length > 0) void onEmptyCanvas(files, at, card);
 	};
 
 	return { addFile, intoComposer, paste, boardAt, documentAt, fileAt, askForBoard, hearBoard, install, dropAt };

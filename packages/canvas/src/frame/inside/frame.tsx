@@ -20,7 +20,7 @@ import { pageItems, placedItems } from "../../model/boxes.ts";
 import { handsOn } from "../../camera/touched.ts";
 import { createBackend, drawingFollower } from "./backend.ts";
 import { createStudioLine } from "./studio-line.ts";
-import { PROTOCOL, peer, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "../protocol.ts";
+import { PROTOCOL, peer, type CardSlot, type FrameEnd, type Hello, type Page, type Rect, type Start, type StartMessage } from "../protocol.ts";
 
 /**
  * The canvas, run inside its frame: says `hello` to its parent, takes `start` and the port, reads its
@@ -484,9 +484,11 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		if (!carries(event)) return;
 		event.preventDefault();
 		const at = { x: event.clientX, y: event.clientY };
+		// Over a card they go into it, between its blocks where they land: only the stage here knows what is under the point.
+		const card = (globalThis as { __decksCardAt?: (x: number, y: number) => CardSlot | undefined }).__decksCardAt?.(at.x, at.y);
 		const files = Array.from(event.dataTransfer?.files ?? []);
 		void Promise.all(files.map(async (file) => ({ name: file.name, type: file.type, bytes: await file.arrayBuffer() }))).then((read) =>
-			end.call("upload", { files: read, at }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
+			end.call("upload", { files: read, at, ...(card ? { card } : {}) }, read.map((one) => one.bytes)).catch((error: unknown) => console.warn(error)),
 		);
 	});
 

@@ -67,6 +67,8 @@ export type Page = Board & { trust?: "own" | "friend" };
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };
+/** A place in a card: the card's id, the slot between its blocks, and its inner width. */
+export type CardSlot = { card: string; index: number; inner: number };
 
 /** What the page sends the frame: events, and the calls it makes of it. */
 export interface PageToFrame {
@@ -126,8 +128,11 @@ export type FrameCalls = {
 	open: { data: { path: string; from: string }; value: boolean };
 	/** A card's agent call, or showing another canvas: the page's, with your token, and your OK before a message goes to an agent. */
 	agent: { data: { verb: string; args: unknown[]; card: string }; value: unknown };
-	/** Files dropped on the canvas, at a point of the frame: the page uploads them into the canvas's folder and places them, as it does a drop of its own. */
-	upload: { data: { files: Array<{ name: string; type: string; bytes: ArrayBuffer }>; at: Point }; value: boolean };
+	/**
+	 * Files dropped on the canvas, at a point of the frame: the page uploads them into the canvas's folder and places them, as it does a drop of its own;
+	 * over a card, into it (`card`: its id, the slot between its blocks there, and its inner width).
+	 */
+	upload: { data: { files: Array<{ name: string; type: string; bytes: ArrayBuffer }>; at: Point; card?: CardSlot }; value: boolean };
 };
 
 /** A call refused, with why: what a promise from `call` rejects with. */
