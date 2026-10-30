@@ -1217,7 +1217,7 @@ export class DeckAgent {
 			// Minted here rather than in the backend, because the token is the *agent's* and
 			// outlives any one runtime process: a rewind reopens the session and the tool on
 			// the other side must not be left holding a token nobody answers.
-			...(this.stageBridge ? { canvasToken: this.stageBridge.issue(this.id) } : {}),
+			...(this.stageBridge ? { agentToken: this.stageBridge.issue(this.id) } : {}),
 			// …and the bridge itself, for the one runtime that shares a process and so names
 			// its calls by session id rather than by a token of its own (opencode).
 			...(this.stageBridge ? { stageBridge: this.stageBridge } : {}),

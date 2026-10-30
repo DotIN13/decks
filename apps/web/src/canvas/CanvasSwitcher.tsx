@@ -7,6 +7,7 @@ import { api } from "../connections/connection.ts";
 import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 import { searchStages } from "../state/stages.ts";
+import { AuthedImg } from "../lib/authed.tsx";
 
 /** How many canvases the switcher lists before a search: the recent few. All canvases has the rest. */
 const RECENT = 5;
@@ -64,7 +65,7 @@ export function CanvasSwitcher(props: {
 						<button type="button" role="menuitem" data-row data-flat="true" class="switcher-canvas" data-current={stage.name === props.here ? "true" : undefined} onClick={() => pick(() => props.onPick(stage.name))}>
 							<span class="switcher-thumb" aria-hidden="true">
 								<Show when={stage.boards > 0}>
-									<img alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.rev}&scheme=${props.scheme}`)} />
+									<AuthedImg alt="" loading="lazy" src={api(`/stage-thumb/${encodeURIComponent(stage.name)}?v=${stage.rev}&scheme=${props.scheme}`)} />
 								</Show>
 							</span>
 							<span class="row-label min-w-0 flex-1 truncate">{stage.title}</span>

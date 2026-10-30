@@ -89,16 +89,16 @@ test("revoking the token a ticket was made with ends the ticket", () => {
 	}
 });
 
-test("tickets are only for board pages, files and apps, named by their request path or the board's deck path", () => {
-	assert.equal(ticketPath("boards/a.html"), "/api/board/boards/a.html");
-	assert.equal(ticketPath("/api/board/boards/my board.html"), "/api/board/boards/my board.html");
+test("tickets are only for files and apps, by their request path; one board's page has none", () => {
+	assert.equal(ticketPath("boards/a.html"), undefined);
+	assert.equal(ticketPath("/api/board/boards/my board.html"), undefined);
 	assert.equal(ticketPath("/app/todo"), "/app/todo/");
 	assert.equal(ticketPath("/app/todo/api/items"), "/app/todo/");
 	assert.equal(ticketPath("/api/f/Users/me/decks/exports/a.png"), "/api/f/Users/me/decks/exports/a.png");
 	assert.equal(ticketPath("/api/v1/agent.list"), undefined);
 	assert.equal(ticketPath("/api/board/boards/../x.html"), undefined);
 	assert.equal(ticketPath("/api/board/boards/a.html?x=1"), undefined);
-	assert.ok(covers("/api/board/boards/a.html", "/api/board/boards/a.html"));
+	assert.ok(covers("/api/f/x.png", "/api/f/x.png"));
 });
 
 test("a token is refused from a page on a site other than the one it was given to", () => {

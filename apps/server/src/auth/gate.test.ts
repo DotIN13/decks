@@ -83,15 +83,18 @@ test("with no token, a command from this machine is refused, and so is a read of
 	}
 });
 
-test("the doors and the public files are open without a token; the pages a frame loads too, but not to another site", async () => {
+test("the doors and the public files are open without a token; no page, file or picture of the deck is, from anywhere", async () => {
 	const { origin, cleanup } = await open();
 	try {
 		const hello = (await (await fetch(`${origin}/api/hello`)).json()) as { decks: boolean; paired: boolean };
 		assert.equal(hello.decks, true);
 		assert.equal(hello.paired, false);
 		assert.equal((await fetch(`${origin}/api/sdk/decks.mjs`)).status, 200);
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: { "sec-fetch-site": "same-origin", "sec-fetch-dest": "iframe" } })).status, 200, "a board in the Decks page's frame");
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: { "sec-fetch-site": "cross-site", "sec-fetch-dest": "iframe" } })).status, 401, "another site's frame needs a ticket");
+		for (const site of ["same-origin", "cross-site", "none"]) {
+			for (const path of ["/api/board/boards/a.html", "/api/f/boards/a.html", "/api/thumb/boards/a.html", "/api/avatar/a1", "/api/stage-thumb/main", "/api/file?path=boards/a.html", "/api/revision/abc/boards/a.html"]) {
+				assert.equal((await fetch(`${origin}${path}`, { headers: { "sec-fetch-site": site, "sec-fetch-dest": "image" } })).status, 401, `${path} from ${site}: every read carries a pass or a token`);
+			}
+		}
 		assert.equal((await fetch(`${origin}/api/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: "123456" }) })).status, 403, "a door, but the code is wrong");
 	} finally {
 		cleanup();
@@ -122,54 +125,31 @@ test("decks login trades a code from decks pair code for a person token, which c
 	}
 });
 
-test("a board's token is made only for the person or a site, and calls as that board", async () => {
-	const { app, post, bearer, cleanup } = await open();
+test("a board has no token: the routes that made one are gone, and a person's token reads a board's page", async () => {
+	const { app, origin, post, bearer, cleanup } = await open();
 	try {
 		const person = bearer(app.tokens.issue({ kind: "person" }).token);
-		const agent = bearer(app.bridge.issue(app.agents.focused().id));
-		assert.equal((await post("/api/tokens", agent, { kind: "board", path: "boards/a.html" })).status, 403, "not an agent");
-		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/none.html" })).status, 404);
-		assert.equal((await post("/api/tokens", person, { kind: "agent", path: "boards/a.html" })).status, 400);
-		const made = await post("/api/tokens", person, { kind: "board", path: "boards/a.html", stage: "home" });
-		assert.equal(made.status, 200);
-		const token = String(made.body.token);
-		assert.match(token, /^dk_b_/);
-		const seen = app.tokens.verify(token);
-		assert.ok(seen.ok);
-		assert.deepEqual(seen.principal, { kind: "board", path: "boards/a.html", stage: "home" });
-		app.evalTrust.allow("boards/a.html");
-		assert.equal((await post("/api/v1/boards", bearer(token))).status, 200);
+		assert.equal((await post("/api/tokens", person, { kind: "board", path: "boards/a.html" })).status, 404);
+		assert.equal((await post("/api/v1/board-token", person, { path: "boards/a.html" })).status, 404);
+		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: person })).status, 200);
+		const ticket = await post("/api/tickets", person, { paths: ["/api/board/boards/a.html"] });
+		assert.deepEqual(ticket.body.tickets, {}, "no ticket for one board's page");
 	} finally {
 		cleanup();
 	}
 });
 
-test("a board's token calls verbs as that board and nothing else: no person's route, no other token, nothing passed on", async () => {
+test("the harness's own Chromium reads what it draws on a pass it made for no canvas, and nothing else on it", async () => {
 	const { app, origin, post, bearer, cleanup } = await open();
 	try {
-		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/a.html" }).token);
-		app.evalTrust.allow("boards/a.html");
-		assert.equal((await post("/api/v1/boards", board)).status, 200, "its verbs");
-		assert.equal((await fetch(`${origin}/api/v1`, { headers: board })).status, 200, "the list of them");
-		assert.equal((await post("/api/session", board)).body.kind, "board");
-		// Tokens of any kind, tickets, uploads, the deck, settings, agents, another server: refused at the gate.
-		for (const [path, body] of [
-			["/api/tokens", { kind: "board", path: "boards/a.html" }],
-			["/api/tickets", { paths: ["/api/board/boards/a.html"] }],
-			["/api/upload?name=x.txt", {}],
-			["/api/relay", { id: "abcd", base: "http://127.0.0.1:1", token: "x" }],
-			["/c/abcd/api/v1/boards", { args: [] }],
-		] as const) {
-			const refused = await post(path, board, body);
-			assert.equal(refused.status, 403, `${path}: ${refused.text}`);
-			assert.match(refused.text, /board's token/);
-		}
-		for (const path of ["/api/deck", "/api/agents", "/api/settings", "/api/v1/events"]) assert.equal((await fetch(`${origin}${path}`, { headers: board })).status, 403, path);
-		// What a frame loads anyway is still read.
-		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: board })).status, 200);
-		// A verb that hands out a code is the person's too, refused by the verb.
-		const code = await post("/api/v1/pair.code", board);
-		assert.notEqual(code.status, 200);
+		const { HARNESS_ID } = await import("./passes.ts");
+		const own = bearer(app.passes.canvas("", "view", HARNESS_ID).pass);
+		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: own })).status, 200);
+		assert.equal((await post("/api/v1/boards", own)).status, 403, "no verb");
+		assert.equal((await fetch(`${origin}/api/deck`, { headers: own })).status, 403, "nothing of the person's");
+		// Made by anyone else, a pass for no canvas is nothing.
+		const person = app.tokens.issue({ kind: "person" });
+		assert.equal((await fetch(`${origin}/api/board/boards/a.html`, { headers: bearer(app.passes.canvas("", "view", person.id).pass) })).status, 401);
 	} finally {
 		cleanup();
 	}

@@ -82,9 +82,8 @@ const harness = connect({ url: "http://127.0.0.1:4329" });
 const { token } = await harness.connectStudio({ studio: location.origin, key }); // or pairSite({ code })
 const decks = connect({ url: "http://127.0.0.1:4329", token });
 await decks.hello();                                     // its name, and whether the token works
-const t = await decks.boardToken("boards/a.html", "plan"); // a board frame's own token
-await decks.tickets(["/api/board/boards/a.html"]);        // five-minute tickets for frames and tabs
-frame.src = decks.pageUrl("/api/board/boards/a.html");    // the harness's address, with its ticket
+const { pass } = await decks.canvasPass("plan");         // a canvas frame's pass, an hour
+open(await decks.appUrl("notes"));                        // an app in a tab, with an app pass
 const path = await decks.upload(file);                    // into assets/
 const settings = await decks.request("/api/harness");     // any other door, with the token
 ```

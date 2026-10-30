@@ -125,6 +125,13 @@ export interface ThumbHost {
 	boards?: () => Board[];
 	/** The boards on any canvas: the indexer takes these first, since they are the ones looked at. */
 	placed?: () => ReadonlySet<string>;
+	/**
+	 * The harness's own pass for what its Chromium reads of it (`auth/passes.ts`): none of the pages it
+	 * draws carries anyone's token, so every GET this browser makes of the harness's `/api/` is given
+	 * this, made fresh each time. The other addresses the harness is reached at, `extraOrigins` (Vite's, in development).
+	 */
+	reader?: () => string;
+	extraOrigins?: () => string[];
 }
 
 /** How far the indexer has got (`ThumbService.progress`), for the app's ⋯ menu. */
@@ -374,7 +381,8 @@ export class ThumbService {
 	 * "browser has been closed" until the server restarted, and the canvas had no pictures.
 	 */
 	private started(): Promise<Browser> {
-		const launched = this.launch();
+		const reader = this.host.reader;
+		const launched = reader ? this.launch().then((browser) => withOwnReads(browser, () => [this.host.origin(), ...(this.host.extraOrigins?.() ?? [])], reader)) : this.launch();
 		void launched.then(
 			(browser) =>
 				(browser as Partial<Pick<Browser, "on">>).on?.("disconnected", () => {
@@ -1061,6 +1069,29 @@ const PRESS_EVERY_CONTROL = `(async () => {
  * picture (`stage/shots.ts`). On a Mac through Metal; elsewhere SwiftShader stands in for a card.
  */
 const WEBGPU = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
+
+/**
+ * A browser whose every new context gives the harness's own GETs of its `/api/` (`origins`) the
+ * harness's own pass (`auth/passes.ts`), unless the request already says who it is. Only GETs and
+ * HEADs, and only to the harness: a page's script may not call verbs on it, and nothing goes elsewhere.
+ */
+export function withOwnReads(browser: Browser, origins: () => string[], pass: () => string): Browser {
+	const plain = browser.newContext.bind(browser);
+	browser.newContext = async (...args: Parameters<Browser["newContext"]>) => {
+		const context = await plain(...args);
+		await context.route(
+			(url) => url.pathname.startsWith("/api/") && origins().includes(url.origin),
+			(route) => {
+				const request = route.request();
+				const headers = request.headers();
+				if ((request.method() !== "GET" && request.method() !== "HEAD") || headers.authorization) return route.continue();
+				return route.continue({ headers: { ...headers, authorization: `Bearer ${pass()}` } });
+			},
+		);
+		return context;
+	};
+	return browser;
+}
 
 async function launchChromium(): Promise<Browser> {
 	const playwright: Playwright = await import("playwright");

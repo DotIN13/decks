@@ -68,7 +68,7 @@ test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and t
 	const { base, post, linked, deck, cleanup } = await open(false);
 	try {
 		assert.equal(((await (await fetch(`${base}/hello`, { headers: STUDIO })).json()) as { needsCode: boolean }).needsCode, false);
-		const done = await post("/studio/connect", { url: "https://studio.test/anything", key: KEY });
+		const done = await post("/pair", { studio: "https://studio.test/anything", key: KEY });
 		assert.equal(done.status, 200);
 		assert.equal(done.body.url, "https://studio.test");
 		assert.ok(linked());
@@ -88,20 +88,20 @@ test("a Studio listed in DECKS_STUDIO_ORIGINS connects with its key alone, and t
 test("without a code, only a Studio beside the harness or a listed one connects; any other site is asked for one", async () => {
 	const { app, post, linked, cleanup } = await open(false);
 	try {
-		const elsewhere = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		const elsewhere = await post("/pair", { studio: "https://studio.test", key: KEY });
 		assert.equal(elsewhere.status, 403, "an unlisted site");
 		assert.equal(elsewhere.body.needsCode, true);
 		assert.ok(!linked());
 		assert.equal(app.tokens.paired().length, 0);
 
 		const json = { "content-type": "application/json" };
-		const local = await post("/studio/connect", { url: "http://localhost:4800", key: KEY }, { ...json, origin: "http://localhost:4800", "sec-fetch-site": "same-site" });
+		const local = await post("/pair", { studio: "http://localhost:4800", key: KEY }, { ...json, origin: "http://localhost:4800", "sec-fetch-site": "same-site" });
 		assert.equal(local.status, 200, "a Studio on this machine");
-		const tailnet = await post("/studio/connect", { url: "https://mac.tail1.ts.net:8444", key: KEY }, { ...json, origin: "https://mac.tail1.ts.net:8444", "x-forwarded-host": "mac.tail1.ts.net:8443", "sec-fetch-site": "same-site" });
+		const tailnet = await post("/pair", { studio: "https://mac.tail1.ts.net:8444", key: KEY }, { ...json, origin: "https://mac.tail1.ts.net:8444", "x-forwarded-host": "mac.tail1.ts.net:8443", "sec-fetch-site": "same-site" });
 		assert.equal(tailnet.status, 200, "a Studio on the name the harness was reached at, another port");
-		const noOrigin = await post("/studio/connect", { url: "https://studio.test", key: KEY }, json);
+		const noOrigin = await post("/pair", { studio: "https://studio.test", key: KEY }, json);
 		assert.equal(noOrigin.status, 200, "no page at all, from this machine");
-		const proxied = await post("/studio/connect", { url: "https://studio.test", key: KEY }, { ...json, "x-forwarded-for": "100.101.102.103" });
+		const proxied = await post("/pair", { studio: "https://studio.test", key: KEY }, { ...json, "x-forwarded-for": "100.101.102.103" });
 		assert.equal(proxied.status, 403, "no page, passed on by a proxy");
 	} finally {
 		cleanup();
@@ -111,7 +111,7 @@ test("without a code, only a Studio beside the harness or a listed one connects;
 test("a malformed key is refused before any token is given", () => listing("https://studio.test", async () => {
 	const { app, post, linked, cleanup } = await open(false);
 	try {
-		const bad = await post("/studio/connect", { url: "https://studio.test", key: "nope" });
+		const bad = await post("/pair", { studio: "https://studio.test", key: "nope" });
 		assert.equal(bad.status, 400);
 		assert.ok(!linked());
 		assert.equal(app.tokens.paired().length, 0);
@@ -124,7 +124,7 @@ test("with the code required, every connect and pairing without one is refused, 
 	const { app, base, post, linked, cleanup } = await open(true);
 	try {
 		assert.equal(((await (await fetch(`${base}/hello`, { headers: STUDIO })).json()) as { needsCode: boolean }).needsCode, true);
-		const without = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		const without = await post("/pair", { studio: "https://studio.test", key: KEY });
 		assert.equal(without.status, 403);
 		assert.equal(without.body.needsCode, true);
 		assert.ok(!linked());
@@ -140,30 +140,23 @@ test("with the code required, every connect and pairing without one is refused, 
 		assert.match(code, /^\d{6}$/);
 		assert.ok(!JSON.stringify(app.pairingMessage()).includes(code), "the code never goes to a browser");
 
-		const wrong = await post("/studio/connect", { url: "https://studio.test", key: KEY, code: code === "000000" ? "111111" : "000000" });
+		const wrong = await post("/pair", { studio: "https://studio.test", key: KEY, code: code === "000000" ? "111111" : "000000" });
 		assert.equal(wrong.status, 403);
 		assert.ok(!linked());
-		const right = await post("/studio/connect", { url: "https://studio.test", key: KEY, code });
+		const right = await post("/pair", { studio: "https://studio.test", key: KEY, code });
 		assert.equal(right.status, 200);
 		assert.ok(typeof right.body.token === "string");
 		assert.ok(linked());
-		assert.equal((await post("/studio/connect", { url: "https://studio.test", key: KEY, code })).status, 403, "spent");
+		assert.equal((await post("/pair", { studio: "https://studio.test", key: KEY, code })).status, 403, "spent");
 	} finally {
 		cleanup();
 	}
 });
 
-test("a board's own button cannot make a pairing code", async () => {
-	const { app, post, cleanup } = await open(true);
+test("the old second door is gone: Studio pairs at /api/pair", async () => {
+	const { post, cleanup } = await open(true);
 	try {
-		const tool = app.agents.focused().stageTool();
-		assert.ok(tool);
-		writeFileSync(join(app.deck.path, "boards", "x.html"), "<p>x</p>");
-		app.evalTrust.allow("boards/x.html");
-		const token = app.tokens.issue({ kind: "board", path: "boards/x.html" }).token;
-		const board = await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", authorization: `Bearer ${token}` });
-		assert.notEqual(board.status, 200);
-		assert.notEqual((await post("/v1/pair.code", { args: [] }, { "content-type": "application/json", "x-decks-board": encodeURIComponent("boards/x.html") })).status, 200);
+		assert.equal((await post("/studio/connect", { url: "https://studio.test", key: KEY })).status, 401, "not a door any more");
 	} finally {
 		cleanup();
 	}
@@ -216,39 +209,38 @@ test("a page on another site cannot pair with a harness on this machine without 
 	}
 });
 
-test("Studio trades its token for tickets, and a board opened in a frame from Studio loads by its ticket alone and only that board", () => listing("https://studio.test", async () => {
+test("Studio trades its token for a canvas pass, and a frame from Studio reads that canvas's files by the pass alone, and only them", () => listing("https://studio.test", async () => {
 	const { app, base, post, deck, cleanup } = await open(false);
 	try {
-		const done = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		const done = await post("/pair", { studio: "https://studio.test", key: KEY });
 		assert.equal(done.status, 200);
 		const token = String(done.body.token);
-		writeFileSync(join(deck, "boards", "a.html"), "<p>a</p>");
-		writeFileSync(join(deck, "boards", "b.html"), "<p>b</p>");
-		const paths = ["boards/a.html", "/api/board/boards/b.html", "/api/v1/agent.list"];
-
-		assert.equal((await post("/tickets", { paths })).status, 401, "another site without a token");
-		assert.equal((await post("/tickets", { paths }, { "content-type": "application/json" })).status, 401, "even this server's own page needs a token in the header");
-		const made = await post("/tickets", { paths }, { ...STUDIO, authorization: `Bearer ${token}` });
+		const pens = app.stage.pens!;
+		const one = pens.claim("One");
+		const two = pens.claim("Two");
+		for (const name of [one, two]) {
+			mkdirSync(join(deck, "canvases", name, "files"), { recursive: true });
+			writeFileSync(join(deck, "canvases", name, "files", "a.txt"), name);
+		}
+		assert.equal((await post("/passes", { canvas: one })).status, 401, "another site without a token");
+		const made = await post("/passes", { canvas: one }, { ...STUDIO, authorization: `Bearer ${token}` });
 		assert.equal(made.status, 200);
-		const tickets = made.body.tickets as Record<string, string>;
-		assert.deepEqual(Object.keys(tickets).sort(), ["/api/board/boards/b.html", "boards/a.html"], "no ticket for the API");
+		const pass = String(made.body.pass);
 		assert.ok(Number(made.body.expires) > Date.now());
-		assert.equal((await post("/tickets", { paths: Array.from({ length: 201 }, () => "boards/a.html") }, { ...STUDIO, authorization: `Bearer ${token}` })).status, 400);
 
-		// A frame's navigation: another site, and no Origin.
-		const frame = { "sec-fetch-site": "cross-site", "sec-fetch-dest": "iframe" };
-		const a = await fetch(`${base}/board/boards/a.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame });
+		// A frame's reads: another site, and no Origin.
+		const frame = { "sec-fetch-site": "cross-site", "sec-fetch-dest": "image" };
+		const a = await fetch(`${base}/t/${pass}/board/canvases/${one}/files/a.txt`, { headers: frame });
 		assert.equal(a.status, 200);
-		assert.equal(await a.text(), "<p>a</p>");
-		assert.equal(a.headers.get("referrer-policy"), "no-referrer", "the ticket in its address is not sent on");
-		assert.equal((await fetch(`${base}/board/boards/a.html`, { headers: frame })).status, 401, "no ticket");
-		assert.equal((await fetch(`${base}/board/boards/b.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401, "a's ticket, for b");
-		assert.equal((await fetch(`${base}/v1/events?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401, "a's ticket, for the API");
-		assert.equal((await fetch(`${base}/board/boards/b.html?decks_ticket=${encodeURIComponent(tickets["/api/board/boards/b.html"]!)}`, { headers: frame })).status, 200);
+		assert.equal(await a.text(), one);
+		assert.equal(a.headers.get("referrer-policy"), "no-referrer", "the pass in its address is not sent on");
+		assert.equal((await fetch(`${base}/board/canvases/${one}/files/a.txt`, { headers: frame })).status, 401, "no pass");
+		assert.equal((await fetch(`${base}/t/${pass}/board/canvases/${two}/files/a.txt`, { headers: frame })).status, 401, "one's pass, for two");
+		assert.equal((await fetch(`${base}/t/${pass}/v1/events`, { headers: frame })).status, 401, "a pass in an address reads files, not the API");
 
-		// Revoking the token ends its tickets.
+		// Revoking the token ends its passes.
 		app.tokens.revoke(app.tokens.idOf(token)!);
-		assert.equal((await fetch(`${base}/board/boards/a.html?decks_ticket=${encodeURIComponent(tickets["boards/a.html"]!)}`, { headers: frame })).status, 401);
+		assert.equal((await fetch(`${base}/t/${pass}/board/canvases/${one}/files/a.txt`, { headers: frame })).status, 401);
 	} finally {
 		cleanup();
 	}
@@ -257,7 +249,7 @@ test("Studio trades its token for tickets, and a board opened in a frame from St
 test("a token works only from the site it was given to, or from a caller that sends no Origin", () => listing("https://studio.test", async () => {
 	const { post, base, cleanup } = await open(false);
 	try {
-		const done = await post("/studio/connect", { url: "https://studio.test", key: KEY });
+		const done = await post("/pair", { studio: "https://studio.test", key: KEY });
 		const token = String(done.body.token);
 		const evil = { origin: "https://evil.test", "sec-fetch-site": "cross-site", "content-type": "application/json" };
 		const stolen = await post("/v1/now", { args: [] }, { ...evil, authorization: `Bearer ${token}` });

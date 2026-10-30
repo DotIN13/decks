@@ -202,16 +202,15 @@ test("the person's verbs act on the stage on screen, and draw no agent cursor", 
 	}
 });
 
-test("each principal calls as itself: an app as the app, a board as the board, a page not at all, a site as the person, whatever board it names", async () => {
+test("each principal calls as itself: an app as the app, a page not at all, a site as the person, whatever board it names", async () => {
 	const { callerOf } = await import("./router.ts");
 	const { app, call, bearer, cleanup } = await open();
 	try {
 		mkdirSync(join(app.deck.path, "apps", "notes"), { recursive: true });
 		writeFileSync(join(app.deck.path, "apps", "notes", "app.json"), JSON.stringify({ kind: "static" }));
 		writeFileSync(join(app.deck.path, "apps", "notes", "index.html"), "<p>notes</p>");
-		// Let both in ahead, so no question waits on a person.
+		// Let it in ahead, so no question waits on a person.
 		app.evalTrust.allow("apps/notes");
-		app.evalTrust.allow("boards/tall.html");
 
 		// An app's server holds a pass for its run; a run that is not the app's (it stopped) is nobody.
 		const runs: Record<string, string> = { notes: "run1", nothing: "run2" };
@@ -225,51 +224,15 @@ test("each principal calls as itself: an app as the app, a board as the board, a
 		const tab = await call("boards", [], bearer(app.passes.appTab("notes", app.tokens.issue({ kind: "person" }).id).pass));
 		assert.equal(tab.status, 401, "a tab's pass opens the app's page, and calls nothing");
 
-		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/tall.html" }).token);
-		assert.equal((await call("boards", [], board)).status, 200);
-		const made = await call("agent.create", [{ name: "From a board" }], board);
-		assert.equal(made.body.ok, false, "a board's code makes no agents");
-
 		const site = bearer(app.tokens.issue({ kind: "site", label: "Studio" }).token);
 		assert.equal((await call("boards", [], site)).status, 200);
 		const named = await callerOf(app, { headers: { "x-decks-board": encodeURIComponent("boards/tall.html") }, principal: { kind: "site", label: "Studio" } }, new Set());
-		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person: a board is only ever a board's token");
+		assert.ok(!("error" in named) && named.announce === undefined, "a site naming a board is still the person");
 
 		const page = await callerOf(app, { headers: {}, principal: { kind: "page", path: "/api/board/boards/tall.html" } }, new Set());
 		assert.ok("error" in page && page.status === 403);
 		const none = await callerOf(app, { headers: { "x-decks-person": "1" } }, new Set());
 		assert.ok("error" in none && none.status === 401, "a header is nobody");
-	} finally {
-		cleanup();
-	}
-});
-
-test("a board's token is asked of the person once, by the token's board: refused on No, and let through on Allow", async () => {
-	const { app, agent, call, bearer, cleanup } = await open();
-	try {
-		const asked: string[] = [];
-		let answer: string | undefined = "No";
-		// The person's answer, as the conversation's question would get it.
-		agent.bridge.choose = (async (question: { title: string; message?: string }) => {
-			asked.push(`${question.title} ${question.message ?? ""}`);
-			return answer;
-		}) as typeof agent.bridge.choose;
-		const board = bearer(app.tokens.issue({ kind: "board", path: "boards/tall.html" }).token);
-		const refused = await call("boards", [], board);
-		assert.equal(refused.status, 403);
-		assert.match(String(refused.body.error), /did not let boards\/tall\.html/);
-		assert.equal(asked.length, 1);
-		assert.match(asked[0]!, /boards\/tall\.html/);
-
-		answer = "Allow until Decks restarts";
-		assert.equal((await call("boards", [], board)).status, 200);
-		assert.equal((await call("boards", [], board)).status, 200);
-		assert.equal(asked.length, 2, "asked once more, then not again");
-
-		// The header from the old relay makes a person's call no board's, and asks nothing.
-		const person = bearer(app.tokens.issue({ kind: "person" }).token);
-		assert.equal((await call("boards", [], { ...person, "x-decks-board": encodeURIComponent("boards/other.html") })).status, 200);
-		assert.equal(asked.length, 2);
 	} finally {
 		cleanup();
 	}

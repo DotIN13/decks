@@ -25,9 +25,8 @@ import type { StageCallResult, StageTool } from "../stage/tool.ts";
  * through the person's tool; they may say what they are acting on, as parameters and not as who
  * they are: `X-Decks-Stage`, the canvas on screen, and `X-Decks-Agent`, the agent they are talking
  * to; `X-Decks-Edit` names an edit to the drawing, which comes back in the `made` of the revision
- * that has it. An agent's token calls as that agent, an app's as that app, and a board's as that board: a
- * board's page is handed its own token by the page that framed it (`@decks/canvas/internal/board-host.ts`),
- * and that is the only way a call is a board's. Naming a board in a header makes nobody that board.
+ * that has it. An agent's token calls as that agent, an app's pass as that app, and a canvas pass as
+ * the person on its one canvas. Naming anyone in a header makes nobody them.
  */
 
 /** The answer to one call, as the SDK reads it. */
@@ -116,9 +115,8 @@ export function verbRoutes(app: App): express.Router {
 
 	/**
 	 * What the canvas frame says about a card on its canvas, which a tab says on the socket: that you
-	 * read it (`board-seen`), how it measured (`board-extent`, kept for `decks canvas fit` to report),
-	 * and a token for an old board's own buttons (`board-token`). Each for a card or board on the
-	 * caller's own canvas; the person and a paired site may say them for any.
+	 * read it (`board-seen`) and how it measured (`board-extent`, kept for `decks canvas fit` to report).
+	 * Each for a card or board on the caller's own canvas; the person and a paired site may say them for any.
 	 */
 	const onItsCanvas = (req: Request, res: Response): string | undefined => {
 		const path = String((req.body as { path?: unknown } | undefined)?.path ?? "");
@@ -183,19 +181,6 @@ export function verbRoutes(app: App): express.Router {
 		app.boards.noteExtent(path, { rev, w, h, ...extra });
 		res.json({ ok: true });
 	});
-	router.post("/board-token", (req: Request, res: Response) => {
-		const path = onItsCanvas(req, res);
-		if (!path) return;
-		// A friend's board runs sandboxed with no token: it is someone else's code on this machine.
-		if (/^shared\//.test(path)) {
-			res.status(403).json({ ok: false, error: "A board on a canvas shared with you runs without a token." });
-			return;
-		}
-		const stage = req.principal?.kind === "canvas" ? req.principal.canvas : undefined;
-		const { token } = app.tokens.issue({ kind: "board", path, ...(stage ? { stage } : {}) });
-		res.set("cache-control", "no-store").json({ ok: true, token });
-	});
-
 	router.post("/:verb", async (req: Request, res: Response) => {
 		const name = String(req.params.verb ?? "");
 		const verb = VERB_BY_NAME.get(name);
@@ -268,8 +253,6 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 		}
 		case "app":
 			return appCaller(app, principal.name, allowedOnce);
-		case "board":
-			return boardCaller(app, principal.path, principal.stage ?? header("x-decks-stage"), allowedOnce);
 		case "page":
 			return { status: 403, error: "A ticket opens one page; it calls no verbs." };
 		case "canvas":
@@ -277,39 +260,6 @@ export async function callerOf(app: App, req: Pick<Request, "headers"> & { princ
 		default:
 			return { status: 401, error: "Say who is calling with a token: Authorization: Bearer <token>. An agent's shell and an app's server have DECKS_TOKEN; a terminal gets one with decks login." };
 	}
-}
-
-/**
- * A board's button: its code runs in the board's own page, with its board's token, and each verb it
- * calls comes here. Once the person has let that board (asked once, by the token's path), it acts for the conversation on the
- * board's canvas under the board's name, as its code always did; it may not make agents.
- */
-async function boardCaller(app: App, path: string, stage: string | undefined, allowedOnce: Set<string>): Promise<Caller> {
-	if (!app.deck.board(path)) return { status: 404, error: `There is no board at ${path}.` };
-	const on = { board: path, ...(stage ? { stage } : {}) };
-	if (!app.evalTrust.allows(path) && !allowedOnce.has(path)) {
-		const answer = await conversationFor(app, on).bridge.choose({
-			title: "Let this board use the stage?",
-			message: `${path} has a button whose code calls stage verbs: it can write boards, move the canvas and message agents.`,
-			options: [
-				{ label: "Allow until Decks restarts" },
-				{ label: "Always allow this board", description: `Remember ${path}, and stop asking` },
-				{ label: "No", description: "Refuse its calls" },
-			],
-		});
-		if (answer === "Always allow this board") app.evalTrust.allow(path);
-		else if (answer === "Allow until Decks restarts") allowedOnce.add(path);
-		else return { status: 403, error: `The person did not let ${path} use the stage.` };
-	}
-	const { tool, focused } = callerTool({ agents: app.agents, cameras: app.cameras, boards: app.boards, stage: app.stage, port: app.port }, { ...on, name: path });
-	return {
-		tool,
-		on: stage ? { stage } : {},
-		announce: (verb, answer) => {
-			if (answer.ok) focused.translator.notice("info", `${path} called ${verb}`);
-			else focused.translator.notice("error", `${path} called ${verb} and failed: ${answer.error}`);
-		},
-	};
 }
 
 /**

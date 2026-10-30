@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import type { PairedRow } from "@decks/protocol";
 import type { Principal, PrincipalKind } from "./principal.ts";
 
@@ -12,7 +12,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * tab, in a terminal (`decks login`, and the file `decks login` reads on this machine) or through
  * Studio's sync; a site the person paired (Decks Studio, a second Decks), bound to that site's
  * origin; or one agent, with that agent's reach. Its subject is the principal it is issued for. A
- * board (`dk_b_`) still has a token of its own here. A token is 32 random bytes after its prefix, so one found in a log can be told apart. Only
+ * token is 32 random bytes after its prefix, so one found in a log can be told apart. Only
  * its sha256 is kept. The person's and a site's are written to `<deck>/.decks/tokens.json`, readable
  * by this user alone, and outlive a restart; an agent's lives in memory, made when the agent starts
  * and taken back when it stops, so it ends with the harness too. An app's server holds an app pass.
@@ -25,8 +25,7 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  * Tokens made before there was one kind (`dk_p_` a tab's or a terminal's, `dk_s_` a site's) are read
  * as harness tokens of the same subject: they are found by their hash, as any is, and given the new
  * lives once, from the moment the harness that knows them first starts, so nobody is signed out by
- * the change. The pairing tokens from before this store (`.decks/pairing.json`) are read in once, as
- * site tokens with the same id and the same site.
+ * the change. A board's token (`dk_b_`), which nothing asks for any more, is dropped.
  */
 
 /** Days the `decks` command's token in a terminal may go unused before it stops working (`DECKS_TOKEN_DAYS`, 30 unless set). */
@@ -37,15 +36,15 @@ export function tokenDays(env: NodeJS.ProcessEnv = process.env): number {
 
 /** How long a harness token may go unused: a day, for all but a terminal's (`tokenDays`). */
 export const TOKEN_IDLE_MS = 24 * 3_600_000;
-/** How long a board's token may go unused: a day. */
-export const BOARD_IDLE_MS = 24 * 3_600_000;
 
 /** The prefix of every harness token, whoever its subject. */
 export const HARNESS_PREFIX = "dk_h_";
 /** The prefixes harness tokens had before (a tab's or a terminal's, a site's, an agent's), still read by their hash. */
 export const OLD_PREFIXES = ["dk_p_", "dk_s_", "dk_a_"] as const;
 
-const PREFIX: Record<Exclude<PrincipalKind, "page" | "canvas" | "app">, string> = { person: HARNESS_PREFIX, site: HARNESS_PREFIX, agent: HARNESS_PREFIX, board: "dk_b_" };
+/** The subjects a harness token is issued for: the person, a site the person paired, an agent. */
+type Subject = Extract<PrincipalKind, "person" | "site" | "agent">;
+const SUBJECTS: ReadonlySet<string> = new Set<Subject>(["person", "site", "agent"]);
 
 /** The labels of the person's tokens that are not a terminal's: a tab's, Studio's sync, the file `decks login` reads. */
 const NOT_A_TERMINAL = new Set(["Decks tab", "Studio sync", "decks login on this machine"]);
@@ -111,15 +110,13 @@ export class TokenStore {
 	 * down and are taken back when their process stops (`revoke`).
 	 */
 	issue(principal: Principal, options: { label?: string; idle?: number; terminal?: boolean; now?: number } = {}): { token: string; id: string } {
-		if (principal.kind === "page") throw new Error("A page is let in by a ticket, not a token.");
-		if (principal.kind === "canvas") throw new Error("A canvas frame holds a canvas pass (`passes.ts`), not a token.");
-		if (principal.kind === "app") throw new Error("An app holds an app pass (`passes.ts`), not a token.");
+		if (!SUBJECTS.has(principal.kind)) throw new Error(`A harness token is the person's, a paired site's or an agent's; ${principal.kind === "page" ? "a page is let in by a ticket" : `a ${principal.kind} holds a pass (\`passes.ts\`)`}.`);
 		const now = options.now ?? Date.now();
-		const token = `${PREFIX[principal.kind]}${randomBytes(32).toString("base64url")}`;
+		const token = `${HARNESS_PREFIX}${randomBytes(32).toString("base64url")}`;
 		const hash = hashOf(token);
 		const processBound = principal.kind === "agent";
 		const terminal = options.terminal === true && principal.kind === "person";
-		const idle = processBound ? undefined : (options.idle ?? (principal.kind === "board" ? BOARD_IDLE_MS : terminal ? this.terminalMs : TOKEN_IDLE_MS));
+		const idle = processBound ? undefined : (options.idle ?? (terminal ? this.terminalMs : TOKEN_IDLE_MS));
 		const stored: Stored = {
 			id: hash.slice(0, 10),
 			hash,
@@ -210,16 +207,16 @@ export class TokenStore {
 	}
 
 	private load(now: number): void {
-		let migrated = false;
 		let version = 0;
 		try {
 			if (existsSync(this.file)) {
-				const parsed = JSON.parse(readFileSync(this.file, "utf8")) as { tokens?: Stored[]; requireCode?: boolean; migrated?: boolean; v?: number };
+				const parsed = JSON.parse(readFileSync(this.file, "utf8")) as { tokens?: Stored[]; requireCode?: boolean; v?: number };
 				this.chosen = parsed.requireCode === true;
-				migrated = parsed.migrated === true;
 				version = typeof parsed.v === "number" ? parsed.v : 0;
 				for (const one of parsed.tokens ?? []) {
 					if (typeof one?.hash !== "string" || typeof one.id !== "string" || !one.principal) continue;
+					// A board's token from before, or an app's: nothing is given one any more.
+					if (!SUBJECTS.has(one.principal.kind)) continue;
 					if (one.idle !== undefined && now - one.last > one.idle) continue;
 					this.byHash.set(one.hash, { ...one, kept: true });
 				}
@@ -227,9 +224,10 @@ export class TokenStore {
 		} catch {
 			/* an unreadable file is no tokens: everyone signs in again, which is the safe way to be wrong */
 		}
-		if (!migrated) this.migrate(now);
-		if (version < VERSION) this.relive(now);
-		if (!migrated || version < VERSION) this.save(now, true);
+		if (version < VERSION) {
+			this.relive(now);
+			this.save(now);
+		}
 	}
 
 	/**
@@ -248,41 +246,10 @@ export class TokenStore {
 		}
 	}
 
-	/**
-	 * The pairing tokens from before this store (`.decks/pairing.json` beside it), as site tokens with
-	 * the same ids, sites and labels. The old file is left where it is, and read only once.
-	 */
-	private migrate(now: number): void {
-		const old = join(dirname(this.file), "pairing.json");
-		if (!existsSync(old)) return;
-		try {
-			const parsed = JSON.parse(readFileSync(old, "utf8")) as { tokens?: Array<{ id?: unknown; hash?: unknown; label?: unknown; origin?: unknown; at?: unknown; last?: unknown }>; requireCode?: boolean };
-			if (parsed.requireCode === true) this.chosen = true;
-			for (const one of parsed.tokens ?? []) {
-				if (typeof one.hash !== "string" || typeof one.id !== "string" || this.byHash.has(one.hash)) continue;
-				const at = typeof one.at === "number" ? one.at : now;
-				const last = typeof one.last === "number" ? one.last : now;
-				if (now - last > this.terminalMs) continue;
-				const origin = typeof one.origin === "string" && one.origin ? one.origin : undefined;
-				this.byHash.set(one.hash, {
-					id: one.id,
-					hash: one.hash,
-					principal: { kind: "site", label: typeof one.label === "string" && one.label ? one.label : "Another Decks", ...(origin ? { origin } : {}) },
-					at,
-					last,
-					idle: TOKEN_IDLE_MS,
-					kept: true,
-				});
-			}
-		} catch {
-			/* a pairing file that does not parse paired no one */
-		}
-	}
-
-	private save(now = Date.now(), migrated = true): void {
+	private save(now = Date.now()): void {
 		const tokens = [...this.byHash.values()].filter((one) => one.kept && (one.idle === undefined || now - one.last <= one.idle)).map(({ kept: _kept, ...rest }) => rest);
 		mkdirSync(dirname(this.file), { recursive: true });
-		writeFileSync(this.file, `${JSON.stringify({ v: VERSION, migrated, ...(this.chosen ? { requireCode: true } : {}), tokens }, null, "\t")}\n`, { mode: 0o600 });
+		writeFileSync(this.file, `${JSON.stringify({ v: VERSION, ...(this.chosen ? { requireCode: true } : {}), tokens }, null, "\t")}\n`, { mode: 0o600 });
 		try {
 			chmodSync(this.file, 0o600);
 		} catch {
@@ -296,8 +263,6 @@ function clean(principal: Principal): Principal {
 	switch (principal.kind) {
 		case "site":
 			return { kind: "site", label: principal.label.slice(0, 80) || "Another Decks", ...(principal.origin ? { origin: principal.origin.slice(0, 200) } : {}) };
-		case "board":
-			return { kind: "board", path: principal.path, ...(principal.stage ? { stage: principal.stage } : {}) };
 		default:
 			return { ...principal };
 	}

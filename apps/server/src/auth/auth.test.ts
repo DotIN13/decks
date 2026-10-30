@@ -4,10 +4,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bearerOf, fromAnotherSite, isDoor, isPageRead, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
+import { bearerOf, fromAnotherSite, harnessReads, isDoor, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
 import { fromPrivateNetwork, isPrivateAddress, isTopNavigation, PairCodes, pairWithoutCode, withSession } from "./issue.ts";
 import { Tickets } from "./tickets.ts";
-import { BOARD_IDLE_MS, TOKEN_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
+import { TOKEN_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
 
 const DAY = 86_400_000;
 
@@ -23,8 +23,8 @@ test("a harness token is one kind whoever its subject, is kept only as its hash,
 	assert.match(person.token, /^dk_h_[\w-]{43}$/);
 	assert.match(site.token, /^dk_h_/);
 	assert.match(tokens.issue({ kind: "agent", id: "a1" }).token, /^dk_h_/);
-	assert.throws(() => tokens.issue({ kind: "app", name: "notes" }), /app pass/);
-	assert.match(tokens.issue({ kind: "board", path: "boards/a.html" }).token, /^dk_b_/);
+	assert.throws(() => tokens.issue({ kind: "app", name: "notes" }), /holds a pass/);
+	assert.throws(() => tokens.issue({ kind: "board", path: "boards/a.html" } as never), "a board has no token any more");
 	const text = readFileSync(file, "utf8");
 	assert.ok(!text.includes(person.token) && !text.includes(site.token), "no token in the clear");
 	assert.equal(statSync(file).mode & 0o777, 0o600);
@@ -61,15 +61,13 @@ test("tokens slide: every one lasts a day unused but the decks command's in a te
 	const tab = tokens.issue({ kind: "person" }, { label: "Decks tab", now: t0 });
 	const site = tokens.issue({ kind: "site", label: "Studio", origin: "https://studio.test" }, { now: t0 });
 	const file2 = tokens.issue({ kind: "person" }, { label: "decks login on this machine", now: t0 });
-	const board = tokens.issue({ kind: "board", path: "boards/a.html" }, { now: t0 });
 	const agent = tokens.issue({ kind: "agent", id: "a1" }, { now: t0 });
 	assert.ok(tokens.verify(terminal.token, { now: t0 + 20 * DAY }).ok, "a terminal's, used on day 20");
 	assert.ok(tokens.verify(terminal.token, { now: t0 + 45 * DAY }).ok, "45 days in, 25 since it was last used");
 	assert.deepEqual(tokens.verify(left.token, { now: t0 + 31 * DAY }), { ok: false, reason: "expired" });
 	assert.deepEqual(tokens.verify(left.token, { now: t0 }), { ok: false, reason: "unknown" }, "and forgotten");
 	assert.equal(TOKEN_IDLE_MS, DAY);
-	assert.equal(BOARD_IDLE_MS, DAY);
-	for (const [name, one] of [["a tab's", tab], ["a site's", site], ["the file decks login reads", file2], ["a board's", board]] as const) {
+	for (const [name, one] of [["a tab's", tab], ["a site's", site], ["the file decks login reads", file2]] as const) {
 		assert.ok(tokens.verify(one.token, { now: t0 + 23 * 3_600_000, origin: "https://studio.test" }).ok, `${name}, used within the day`);
 		assert.ok(!tokens.verify(one.token, { now: t0 + 23 * 3_600_000 + DAY + 1, origin: "https://studio.test" }).ok, `${name} left a day`);
 	}
@@ -134,37 +132,14 @@ test("revoke takes one token back by id, revokeWhere every token of a principal"
 	assert.ok(!tokens.revoke(site.id), "gone already");
 });
 
-test("the pairing tokens from before become site tokens with the same id and site, and the old file is read once", () => {
-	const dir = mkdtempSync(join(tmpdir(), "decks-migrate-"));
-	const decks = join(dir, ".decks");
+test("a board's token from before is dropped: nothing asks for one any more", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-boards-gone-"));
+	const file = join(dir, ".decks", "tokens.json");
+	mkdirSync(join(dir, ".decks"), { recursive: true });
 	const now = Date.now();
-	// A token "studio-token" as the old store kept it: its sha256, an id from it, the site it was given to.
-	const hash = createHash("sha256").update("studio-token").digest("hex");
-	const stale = createHash("sha256").update("stale").digest("hex");
-	mkdirSync(decks, { recursive: true });
-	writeFileSync(
-		join(decks, "pairing.json"),
-		JSON.stringify({
-			requireCode: true,
-			tokens: [
-				{ id: hash.slice(0, 10), hash, label: "Decks Studio", origin: "https://studio.test", at: now - DAY, last: now - DAY },
-				{ id: stale.slice(0, 10), hash: stale, label: "Old", origin: "", at: now - 400 * DAY, last: now - 400 * DAY },
-			],
-		}),
-	);
-	const tokens = new TokenStore(join(decks, "tokens.json"));
-	const seen = tokens.verify("studio-token", { origin: "https://studio.test" });
-	assert.ok(seen.ok);
-	assert.deepEqual(seen.principal, { kind: "site", label: "Decks Studio", origin: "https://studio.test" });
-	assert.equal(seen.id, hash.slice(0, 10));
-	assert.deepEqual(tokens.verify("studio-token", { origin: "https://evil.test" }), { ok: false, reason: "elsewhere" }, "still bound to its site");
-	assert.ok(!tokens.verify("stale").ok, "one unused past its days is not brought over");
-	assert.ok(tokens.requireCode, "the code asked for in Settings is still asked for");
-	assert.equal(tokens.paired().length, 1);
-	assert.ok(existsSync(join(decks, "pairing.json")), "the old file is left where it was");
-	// Taken back after the move, it stays taken back: the old file is not read again.
-	tokens.revoke(hash.slice(0, 10));
-	assert.ok(!new TokenStore(join(decks, "tokens.json")).verify("studio-token").ok);
+	const hash = createHash("sha256").update("dk_b_old").digest("hex");
+	writeFileSync(file, JSON.stringify({ v: 2, tokens: [{ id: hash.slice(0, 10), hash, principal: { kind: "board", path: "boards/a.html" }, at: now, last: now, idle: DAY }] }));
+	assert.deepEqual(new TokenStore(file).verify("dk_b_old"), { ok: false, reason: "unknown" });
 });
 
 test("a code works once, dies after five wrong tries, and is asked for when Settings says so", () => {
@@ -216,9 +191,9 @@ test("pairing without a code: a web page must be on this machine, on the harness
 	assert.ok(!pairWithoutCode("203.0.113.9", {}), "the internet still needs a code");
 });
 
-test("the gate's open list: the doors, the Decks page and its files, and for now the pages a frame loads; no command", () => {
-	for (const path of ["/api/hello", "/api/pair", "/api/studio/connect", "/api/login", "/api/web/relay"]) assert.ok(isDoor(path), path);
-	for (const path of ["/api/v1/now", "/api/tokens", "/api/tickets", "/api/harness", "/api/person-key"]) assert.ok(!isDoor(path), path);
+test("the gate's open list: the doors and the Decks page and its files; no command, no file or picture of the deck", () => {
+	for (const path of ["/api/hello", "/api/pair", "/api/login", "/api/web/relay"]) assert.ok(isDoor(path), path);
+	for (const path of ["/api/studio/connect", "/api/v1/now", "/api/tokens", "/api/passes", "/api/tickets", "/api/harness", "/api/person-key"]) assert.ok(!isDoor(path), path);
 	assert.ok(isPublic("GET", "/"));
 	assert.ok(isPublic("GET", "/assets/index-abc.js"));
 	assert.ok(isPublic("GET", "/api/lib/board.css"));
@@ -226,14 +201,13 @@ test("the gate's open list: the doors, the Decks page and its files, and for now
 	assert.ok(!isPublic("POST", "/"));
 	assert.ok(!isPublic("GET", "/api/deck"));
 	assert.ok(!isPublic("GET", "/api/v1/events"));
-	assert.ok(isPageRead("GET", "/api/board/boards/a.html"));
-	assert.ok(isPageRead("GET", "/c/abc123/api/board/boards/a.html"));
-	assert.ok(isPageRead("GET", "/api/thumb/boards/a.html"));
-	assert.ok(isPageRead("GET", "/api/apps/notes/seen"));
-	assert.ok(!isPageRead("POST", "/api/board/boards/a.html"));
-	assert.ok(!isPageRead("GET", "/api/agents/a1/history"));
-	assert.ok(!isPageRead("GET", "/api/harness"));
-	assert.ok(!isPageRead("GET", "/api/stage-pen/x"), "shot.html reads a stage with a ticket");
+	for (const path of ["/api/board/boards/a.html", "/api/thumb/boards/a.html", "/api/f/x.png", "/api/avatar/a1", "/api/stage-thumb/plan", "/c/abc123/api/board/boards/a.html"]) assert.ok(!isPublic("GET", path), path);
+	// What the harness's own Chromium reads, on its own pass: reads alone.
+	assert.ok(harnessReads("GET", "/api/board/boards/a.html"));
+	assert.ok(harnessReads("GET", "/api/stage-pen/x"));
+	assert.ok(!harnessReads("POST", "/api/board/boards/a.html"));
+	assert.ok(!harnessReads("GET", "/api/agents/a1/history"));
+	assert.ok(!harnessReads("GET", "/api/harness"));
 });
 
 test("a person's, an agent's or an app's token from another site's page is refused; a site's is not", () => {

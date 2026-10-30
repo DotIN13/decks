@@ -15,7 +15,7 @@ import { decksServerEnv } from "../decks-env.ts";
  *
  * That secret does two jobs here. It is OpenCode 2's server password (`OPENCODE_PASSWORD`,
  * HTTP Basic as user `opencode`), so only Decks can drive the server; and it is the token
- * Decks' own tools send back to Decks (`DECKS_STAGE_TOKEN`), so only this server's tools can
+ * Decks' own tools send back to Decks (`DECKS_OPENCODE_SECRET`), so only this server's tools can
  * reach the canvas.
  */
 
@@ -146,7 +146,7 @@ export class Opencode2Manager {
 			// under a running deck.
 			OPENCODE_DISABLE_AUTOUPDATE: "1",
 			DECKS_STAGE_URL: spec.stageUrl,
-			DECKS_STAGE_TOKEN: secret,
+			DECKS_OPENCODE_SECRET: secret,
 			// The `decks` command and where Decks is, for every session's shell; the plugin trades the
 			// session for its agent's token (`runtimes/decks-env.ts`).
 			...(spec.decksPort ? decksServerEnv(spec.decksPort, this.baseEnv.PATH) : {}),

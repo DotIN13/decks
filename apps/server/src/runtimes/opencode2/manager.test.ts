@@ -72,7 +72,7 @@ test("the URL is read from OpenCode 2's own line, and the secret is its password
 	assert.deepEqual(argv.slice(1), ["serve", "--hostname=127.0.0.1", "--port=0"]);
 	assert.equal(cwd, "/deck");
 	assert.equal(env.OPENCODE_PASSWORD, handle.secret);
-	assert.equal(env.DECKS_STAGE_TOKEN, handle.secret);
+	assert.equal(env.DECKS_OPENCODE_SECRET, handle.secret);
 	assert.deepEqual(JSON.parse(env.OPENCODE_CONFIG_CONTENT!), SPEC.config);
 });
 

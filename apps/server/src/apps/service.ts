@@ -487,7 +487,7 @@ export class Apps {
 		const env: NodeJS.ProcessEnv = { ...process.env };
 		for (const key of Object.keys(env)) if (secretEnv(key)) delete env[key];
 		// Who an app calls Decks as is its own, never inherited from whoever started Decks (an agent's shell sets these).
-		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_URL", "DECKS_AGENT", "DECKS_APP", "DECKS_TOKEN", "DECKS_SESSION"]) delete env[key];
+		for (const key of ["DECKS_STAGE_URL", "DECKS_STAGE_TOKEN", "DECKS_OPENCODE_SECRET", "DECKS_URL", "DECKS_AGENT", "DECKS_APP", "DECKS_TOKEN", "DECKS_SESSION"]) delete env[key];
 		Object.assign(env, extra);
 		if (env.NODE_ENV === "production") delete env.NODE_ENV;
 		delete env.DECKS_DATA_DIR;

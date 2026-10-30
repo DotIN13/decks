@@ -11,8 +11,7 @@
  * - `site`: another front end the person paired with this harness (Decks Studio, a second Decks), which
  *   acts as the person. `origin` is the site it was given to, when there was one.
  * - `agent`: one agent, by id: what its shell's `decks` command and its tools carry.
- * - `app`: one app's server, by name.
- * - `board`: one board's own code, by path, acting on the canvas it is on (`stage`).
+ * - `app`: one app's server, by name, from its app pass (`passes.ts`).
  * - `page`: one page's GET and nothing else: a ticket for another site's frame or tab (`tickets.ts`).
  * - `canvas`: the canvas frame for one canvas, acting as the person on that canvas alone, with their
  *   role there now (`view` reads only): the editor in its sandboxed page, and the cards it runs. From a
@@ -23,7 +22,6 @@ export type Principal =
 	| { kind: "site"; origin?: string; label: string }
 	| { kind: "agent"; id: string }
 	| { kind: "app"; name: string }
-	| { kind: "board"; path: string; stage?: string }
 	| { kind: "page"; path: string }
 	| { kind: "canvas"; canvas: string; role: "edit" | "view" };
 
@@ -45,8 +43,6 @@ export function describe(principal: Principal): string {
 			return `agent ${principal.id}`;
 		case "app":
 			return `app ${principal.name}`;
-		case "board":
-			return `board ${principal.path}`;
 		case "page":
 			return `a ticket for ${principal.path}`;
 		case "canvas":

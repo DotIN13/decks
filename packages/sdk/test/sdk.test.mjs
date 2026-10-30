@@ -249,7 +249,7 @@ function fakeFetch(answer) {
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
-test("a page's doors: hello, tickets are asked in batches and held, a board's token, an upload as it is", async () => {
+test("a page's doors: hello, tickets are asked in batches and held, a canvas pass and an app's address, an upload as it is", async () => {
 	const { fetch, seen } = fakeFetch((url, init) => {
 		const path = new URL(url).pathname;
 		if (path === "/api/hello") return json({ decks: true, name: "Lab", paired: true });
@@ -257,7 +257,10 @@ test("a page's doors: hello, tickets are asked in batches and held, a board's to
 			const { paths } = JSON.parse(init.body);
 			return json({ tickets: Object.fromEntries(paths.map((one) => [one, `t-${one.length}`])), expires: Date.now() + 300_000 });
 		}
-		if (path === "/api/tokens") return json({ token: `dk_b_${JSON.parse(init.body).path}` });
+		if (path === "/api/passes") {
+			const body = JSON.parse(init.body);
+			return json(body.app ? { pass: "dk_ap_x.y", expires: 1, url: `/app/${body.app}/?decks_pass=dk_ap_x.y` } : { pass: "dk_cp_x.y", role: "edit", expires: 2 });
+		}
 		if (path === "/api/upload") return json({ path: `assets/${new URL(url).searchParams.get("name")}` });
 		if (path === "/api/pair") return json({ needsCode: true, error: "This harness asks for a code." }, 403);
 		return json({ error: "no" }, 404);
@@ -271,8 +274,9 @@ test("a page's doors: hello, tickets are asked in batches and held, a board's to
 	assert.equal(decks.ticketFor(paths[0]), got.tickets[paths[0]]);
 	assert.equal(decks.pageUrl("/api/board/boards/a b.html", "T"), "http://127.0.0.1:4830/api/board/boards/a%20b.html?decks_ticket=T");
 	assert.match(await decks.ticketedUrl("/api/f/assets/x.png"), /^http:\/\/127\.0\.0\.1:4830\/api\/f\/assets\/x\.png\?decks_ticket=/);
-	assert.equal(await decks.boardToken("boards/a.html", "plan"), "dk_b_boards/a.html");
-	assert.deepEqual(JSON.parse(seen.at(-1).body), { kind: "board", path: "boards/a.html", stage: "plan" });
+	assert.deepEqual(await decks.canvasPass("plan"), { pass: "dk_cp_x.y", role: "edit", expires: 2 });
+	assert.deepEqual(JSON.parse(seen.at(-1).body), { canvas: "plan" });
+	assert.equal(await decks.appUrl("notes"), "http://127.0.0.1:4830/app/notes/?decks_pass=dk_ap_x.y");
 	const picture = new File([new Uint8Array([1, 2, 3])], "cat.png", { type: "image/png" });
 	assert.equal(await decks.upload(picture), "assets/cat.png");
 	assert.equal(seen.at(-1).body, picture, "the file itself, not JSON");

@@ -88,7 +88,7 @@ export class PiBackend implements AgentBackend {
 			// come from here, and where they came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.canvasToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id, this.context.canvasToken) } }), this.commandReader()],
+			extensionFactories: [decksStage({ agent: this.context.stageAgent, gdocs: gdocsCaller(this.context.port, this.context.agentToken), shell: { cwd, env: decksEnv(this.context.port, this.context.stageAgent.id, this.context.agentToken) } }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of

@@ -1268,20 +1268,6 @@ export function createHttpApp(app: App): Express {
 	api.post("/apps/:name/seen", seen);
 
 	/**
-	 * Stage code run by an app (`stage/caller-run.ts`): the same `stage` an agent has, acting for the
-	 * conversation in front of the person, under the app's own name.
-	 *
-	 * Two callers. An app's **server** sends the secret Decks put in its environment
-	 * (`DECKS_STAGE_TOKEN`, `apps/service.ts`), which says which app it is. An app's **page** has no
-	 * secret to keep, and is let in only from this origin (`Sec-Fetch-Site: same-origin`), which every
-	 * app page is: there is no authentication anywhere in Decks (see the top of this file), and a page
-	 * on this origin can already reach `/ws`, which runs tool calls for whoever asks.
-	 *
-	 * What makes it the person's decision is the question, once per app, like a board's code: the code
-	 * runs inside the Decks server and can do anything it can. Answered 200 even when the code fails,
-	 * as `/stage/eval` is, so the caller reads `error` instead of guessing at a status.
-	 */
-	/**
 	 * The SDK, for an app's page: `import { decks } from "../../api/sdk/decks.mjs"`. It is one file
 	 * with no dependencies (`packages/sdk`), and a server app is told its path on disk instead.
 	 */

@@ -200,7 +200,7 @@ export class OpencodeManager {
 				// …and what the Google Docs tools call back with. One token for the whole server,
 				// and the session id does the rest of the naming.
 				DECKS_STAGE_URL: spec.stageUrl,
-				DECKS_STAGE_TOKEN: this.token,
+				DECKS_OPENCODE_SECRET: this.token,
 				// The `decks` command and where Decks is, for every session's shell; the plugin in
 				// `runtime/opencode/plugin/` trades the session for its agent's token (`runtimes/decks-env.ts`).
 				...(spec.decksPort ? decksServerEnv(spec.decksPort) : {}),

@@ -65,9 +65,8 @@ interface Payload {
 }
 
 /**
- * The path a ticket is for, from what a front end asked one for: a board's request path
- * (`/api/board/boards/a.html`, or the deck path `boards/a.html` alone), a file's (`/api/f/…`), or an
- * app's, which is widened to the app's whole address (`/app/<name>/`). Undefined for anything else: a ticket
+ * The path a ticket is for, from what a front end asked one for: a canvas's folder, a file's
+ * (`/api/f/…`), or an app's, which is widened to the app's whole address (`/app/<name>/`). Undefined for anything else: a ticket
  * admits a page, not the API.
  */
 export function ticketPath(given: string): string | undefined {
@@ -83,7 +82,8 @@ export function ticketPath(given: string): string | undefined {
 	}
 	// One of your own canvases' folders, for the canvas frame.
 	if (OWN_FOLDER.test(path)) return path;
-	if (!/^\/api\/(?:board|f)\/[^/]/.test(path)) return undefined;
+	// One file opened in a tab (`/api/f/…`); one board's page has none any more: boards are gone.
+	if (!/^\/api\/f\/[^/]/.test(path)) return undefined;
 	// No `..` or `.` segment: a ticket names the page it is for, and that page only.
 	if (path.split("/").some((segment) => segment === ".." || segment === ".")) return undefined;
 	return path;

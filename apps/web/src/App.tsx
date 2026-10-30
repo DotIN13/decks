@@ -69,6 +69,7 @@ import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./settings/UsageModal.tsx";
 import { ask } from "./state/confirm.ts";
 import { act, editDrawing, setDrawingEditor, setPersonStage } from "./state/decks.ts";
+import { openAuthed } from "./lib/authed.tsx";
 
 /**
  * The shell: a title bar, the stage, and the panels floating over it.
@@ -1180,7 +1181,8 @@ export function App() {
 	 * item, or what a comment is on, is found on the canvas and framed as the side panel's rows do.
 	 */
 	const showPill = (node: DraftMention, comment?: WaitingComment) => {
-		if (node.kind === "file") return void window.open(api(`/file?path=${encodeURIComponent(node.id)}`), "_blank", "noopener");
+		// Read with this tab's token, as every file is (`lib/authed.tsx`).
+		if (node.kind === "file") return void openAuthed(api(`/file?path=${encodeURIComponent(node.id)}`)).catch((error: unknown) => notice("warn", `${node.id} could not be opened: ${(error as Error).message}`));
 		const target = comment ? (comment.items?.[0] ?? comment.board) : node.id;
 		const name = stageOf(state.focused)?.name;
 		const item = canvasItems(stagePen()?.doc).items.find(

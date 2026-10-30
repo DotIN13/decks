@@ -264,7 +264,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * `commands/`, `agents/` or `hooks/` beside them to pick up.
 			 */
 			plugins: [{ type: "local", path: runtimeDir() }],
-			mcpServers: { [stageServerName()]: decksMcpServer(gdocsCaller(this.context.port, this.context.canvasToken)) },
+			mcpServers: { [stageServerName()]: decksMcpServer(gdocsCaller(this.context.port, this.context.agentToken)) },
 			// Pre-approved: the `decks` command is how the agent answers, and a confirm in
 			// front of it would be a confirm in front of every reply.
 			allowedTools: [...DECKS_COMMAND_RULES, ...gdocsToolNames()],
@@ -292,7 +292,7 @@ export class ClaudeBackend implements AgentBackend {
 			 * token from. `accounts.ts` has the measurement.
 			 */
 			// …and, whichever it is, the `decks` command and who this agent is, for its shell (`runtimes/decks-env.ts`).
-			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, this.context.canvasToken, (accountEnv ?? process.env).PATH) },
+			env: { ...(accountEnv ?? process.env), ...decksEnv(this.context.port, this.context.stageAgent.id, this.context.agentToken, (accountEnv ?? process.env).PATH) },
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");

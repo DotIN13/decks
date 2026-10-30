@@ -15,6 +15,7 @@ import { switchTo } from "../connections/connection.ts";
 import { ensureWorker } from "../connections/worker.ts";
 import { editDrawing, stageOnScreen } from "../state/decks.ts";
 import { viewOnly } from "../state/stages.ts";
+import { authedSrc } from "../lib/authed.tsx";
 
 /** A `.decks` file dropped on the app: unpacked into this browser and opened, read only. */
 async function openDroppedBundle(file: File): Promise<void> {
@@ -444,7 +445,10 @@ export function createFileDrops() {
 				const image = new Image();
 				image.onload = () => resolve({ width: image.naturalWidth || 480, height: image.naturalHeight || 360 });
 				image.onerror = () => resolve({ width: 480, height: 360 });
-				image.src = api(`/file?path=${encodeURIComponent(deckPath)}`);
+				void authedSrc(api(`/file?path=${encodeURIComponent(deckPath)}`)).then(
+					(src) => (image.src = src),
+					() => resolve({ width: 480, height: 360 }),
+				);
 			});
 			place(pictureItem(name, fromStage(deckPath), natural));
 			return undefined;

@@ -17,6 +17,7 @@ import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
 import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
+import { AuthedImg } from "../lib/authed.tsx";
 
 /**
  * The top-left cluster: the panel, the agent, the tools, undo.
@@ -76,7 +77,7 @@ export function AgentFace(props: {
 			aria-hidden="true"
 		>
 			<Show when={avatar()} fallback={(props.identity?.name ?? props.chat.name).slice(0, 1).toUpperCase()}>
-				{(src) => <img src={src()} alt="" />}
+				{(src) => <AuthedImg src={src()} alt="" />}
 			</Show>
 		</span>
 	);

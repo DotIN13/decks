@@ -60,7 +60,7 @@ export interface AgentBackendContext {
 	 * inside its SDK's, so for those two the tool body is an HTTP call and this is what it
 	 * authenticates with. Absent for the in-process runtimes, which have no use for it.
 	 */
-	canvasToken?: string;
+	agentToken?: string;
 	/**
 	 * The stage bridge, for a runtime whose canvas tool is an HTTP call back here.
 	 *

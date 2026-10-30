@@ -308,6 +308,9 @@ export class App {
 			dir: join(deck.path, ".decks", "thumbs"),
 			boards: () => this.deck.boards,
 			placed: () => new Set(this.pens.names().flatMap((name) => this.pens.boards(name).map((one) => one.path))),
+			// Its own reads of the harness, on a pass it makes for no canvas (`auth/guard.ts`, `harnessReads`).
+			reader: () => this.passes.canvas("", "view", HARNESS_ID).pass,
+			extraOrigins: () => (process.env.DECKS_WEB_PORT ? [`http://127.0.0.1:${process.env.DECKS_WEB_PORT}`] : []),
 		});
 		this.thumbs.indexLater();
 		/*

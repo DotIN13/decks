@@ -8,33 +8,39 @@ Everything below follows from a single fact, so it comes first.
 
 ---
 
-## 1. Every request carries a token
+## 1. Every request carries a token or a pass
 
-Every request to the harness, and its socket, carries a token, and who is calling is that token
-alone (`apps/server/src/auth/`): not an `X-Decks-*` header, not coming from loopback, not being a
-page on the harness's own address. A request with none is answered `401`, apart from the doors
-that hand tokens out, the Decks page and its files, and (until boards and files move to their own
-address) the pages a frame or a picture loads.
+Every request to the harness, and its socket, carries a credential, and who is calling is that
+credential alone (`apps/server/src/auth/`): not an `X-Decks-*` header, not coming from loopback, not
+being a page on the harness's own address. A request with none is answered `401`, apart from the
+doors that hand tokens out and the Decks page and its files; every file, picture and page of the deck
+is read with one. There are three kinds:
 
-- **A Decks tab** is written a fresh person token when a person opens the page in a tab of its own;
-  it lasts twelve hours unused.
-- **A terminal**: `decks login` keeps a person token in `~/.decks/token`; it lasts
-  `DECKS_TOKEN_DAYS` (30) unused. On the harness's own machine, as the user it runs as, no code is
-  needed: at every start the harness writes a person token to `<data dir>/.decks/cli-token`
-  (`DECKS_DATA_DIR`, else `~/.decks`; mode 0600, a new one each start, taken back at stop), and
-  `decks login` reads it and trades it for the terminal's own. Being able to read that file is the
-  proof; nothing is opened on the network for it. Set `DECKS_DATA_DIR` (and `DECKS_PORT` or
-  `DECKS_URL`) when the harness is not the default one. Anywhere else, `decks login <code>` with a
-  code from `decks pair code` run on the harness's machine.
-- **A board's buttons**: the page that frames a board (the Decks tab, Studio) asks for a token that
-  is that board alone (`POST /api/tokens { kind: "board", path }`) and hands it to that frame only.
-  It calls verbs as that board, after the person allows the board once, and nothing else: not the
-  person's routes, not another token.
-- **Agents and server apps** get their own token as `DECKS_TOKEN` when their process starts; it is
-  taken back when it stops.
-- **Another site** (Studio, a second Decks) pairs for a site token, bound to that site.
+- **A harness token** (`dk_h_`), for whoever acts on the harness as a whole. Kept only as its hash, in
+  `<deck>/.decks/tokens.json` (mode 0600). Each lasts a day unused, except the `decks` command's in a
+  terminal, which lasts `DECKS_TOKEN_DAYS` (30) unused.
+  - **A Decks tab** is written a fresh one when a person opens the page in a tab of its own.
+  - **A terminal**: `decks login` keeps one in `~/.decks/token`. On the harness's own machine, as the
+    user it runs as, no code is needed: at every start the harness writes a token to
+    `<data dir>/.decks/cli-token` (`DECKS_DATA_DIR`, else `~/.decks`; mode 0600, a new one each start,
+    taken back at stop), and `decks login` reads it and trades it for the terminal's own. Being able
+    to read that file is the proof; nothing is opened on the network for it. Set `DECKS_DATA_DIR` (and
+    `DECKS_PORT` or `DECKS_URL`) when the harness is not the default one. Anywhere else,
+    `decks login <code>` with a code from `decks pair code` run on the harness's machine.
+  - **Another site** (Studio, a second Decks) pairs at `POST /api/pair` for one bound to that site;
+    Studio sends its key there too, which is kept for syncing.
+  - **An agent** gets one as `DECKS_TOKEN` in its shell: it calls as that agent, has no idle limit while
+    the agent is there, and is taken back when the agent stops.
+- **A canvas pass** (`dk_cp_`), for the canvas frame on one canvas, with your role there: signed with
+  `<data dir>/ticket-secret` and kept nowhere, it lasts an hour and the page asks for the next one
+  unseen. It is sent as the `Authorization` header for calls, and in the address for files and
+  pictures (`/api/t/<pass>/…`, served with no referrer). Every use checks the token that asked for it
+  still works and your role on the canvas now, so signing out or unsharing ends it at once.
+- **An app pass** (`dk_ap_`), for one app: its server is given one as `DECKS_TOKEN` for that run of it,
+  and a tab another site opens the app in carries one in its address for a day
+  (`/app/<name>/?decks_pass=…`).
 
-Tokens are kept only as their hashes, in `<deck>/.decks/tokens.json` (mode 0600).
+Tokens made before (`dk_p_`, `dk_s_`) are still read, as harness tokens of the same subject.
 
 The Decks tab's door is still "whoever can load the page": anyone who reaches the port can load it
 as a tab and is then the person. So the rest of this section stands.

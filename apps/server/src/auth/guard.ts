@@ -6,32 +6,30 @@ import { decodedPath, splitPathTicket, ticketOf, type Tickets } from "./tickets.
 import { HARNESS_ID, isAppPass, isCanvasPass, passCovers, type Passes } from "./passes.ts";
 
 /**
- * The one gate: every request to the harness, and every socket, is let in on its token, and who is
- * calling is that token's principal (`principal.ts`), put on the request as `req.principal`.
+ * The one gate: every request to the harness, and every socket, is let in on a credential, and who is
+ * calling is its principal (`principal.ts`), put on the request as `req.principal`.
  *
- * Where the token is: `Authorization: Bearer <token>`; for a socket, which cannot set headers,
- * `decks_token` in its address; for one page another site opens in a frame or a tab, a ticket
- * (`decks_ticket`, GET only, for its one path). Nothing else says who is calling: not an
- * `X-Decks-*` header, not reaching the harness from this machine, not being a page on its own address.
+ * Three kinds of credential: a harness token (`tokens.ts`), whoever acts on the harness as a whole, the
+ * person, a paired site or an agent; a canvas pass (`passes.ts`), the canvas frame on one canvas; and an
+ * app pass, one app's server, or a tab another site opens the app in (`apps/route.ts`). Where it is:
+ * `Authorization: Bearer <credential>`; for a socket, which cannot set headers, `decks_token` in its
+ * address; for what an image, a module or a frame loads, a canvas pass in the path,
+ * `/api/t/<pass>/board/…`. Nothing else says who is calling: not an `X-Decks-*` header, not reaching the
+ * harness from this machine, not being a page on its own address.
  *
  * In front of the gate, in `http.ts`: the names the harness answers to (`hosts.ts`), which goes
  * first, then a forwarded port's and an app's own requests, which are those servers' to answer.
  *
- * What is let in without a token:
- * - the doors (`issue.ts`), where tokens are handed out: `/api/hello`, `/api/pair`,
- *   `/api/studio/connect`, `/api/login`; the opencode plugin's `/api/tokens/session` and the
- *   Google Docs tools' `/api/gdocs/call`, which check opencode's own secret themselves; Google's
- *   sign-in coming back (`/api/google/callback`); and the Decks extension (`/api/web/`), which has
- *   its own pairing;
+ * What is let in without one:
+ * - the doors (`issue.ts`), where tokens are handed out: `/api/hello`, `/api/pair`, `/api/login`; the
+ *   opencode plugin's `/api/tokens/session` and the Google Docs tools' `/api/gdocs/call`, which check
+ *   opencode's own secret themselves; Google's sign-in coming back (`/api/google/callback`); and the
+ *   Decks extension (`/api/web/`), which has its own pairing;
  * - the Decks page and its files, `lib/` and the SDK file: the same for everyone, and the page is
- *   given a person token only when it is a tab of its own (`issue.ts`);
- * - until boards and files move to their own address (step 4 of the token redesign), the pages a
- *   frame or a picture loads, which cannot carry a header: a board, a file, a picture, an avatar, a
- *   revision, and the app status a board's bar reads. Only to a request that does not come from
- *   another site, as before; they name no caller and give no commands.
+ *   given a harness token only when it is a tab of its own (`issue.ts`).
  *
- * Everything else without a token is refused with 401, and so is every token that does not check
- * out.
+ * Every file, picture and page of the deck is read on a pass or a token. Everything else without one
+ * is refused with 401, and so is every credential that does not check out.
  */
 
 /** The bearer token a request carries in its `Authorization` header. */
@@ -79,7 +77,7 @@ export function fromAnotherSite(headers: Record<string, string | string[] | unde
 }
 
 /** The routes a caller with no token yet must reach to get one, or that check a secret of their own. */
-const DOORS = new Set(["/api/hello", "/api/pair", "/api/studio/connect", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback"]);
+const DOORS = new Set(["/api/hello", "/api/pair", "/api/login", "/api/tokens/session", "/api/gdocs/call", "/api/google/callback"]);
 
 export function isDoor(path: string): boolean {
 	return DOORS.has(path) || path.startsWith("/api/web/");
@@ -100,13 +98,14 @@ export function isPublic(method: string, path: string): boolean {
 }
 
 /**
- * The pages a frame, a picture or a board's own script loads, which cannot carry a header: let in
- * without a token until they are served from their own address (step 4).
+ * The pages and pictures the harness's own Chromium reads, drawing a board, a card or a canvas for a
+ * picture (`boards/thumbs.ts`, `stage/shots.ts`): what its own pass reaches (`passes.ts`, made for no
+ * canvas by the harness), GETs alone. No one else reads any of these without a pass or a token.
  */
-const PAGES = /^\/api\/(?:(?:board|f|thumb|stage-thumb|avatar|revision|google\/image)\/.+|file|apps\/[^/]+(?:\/log|\/seen)?)$/;
+const OWN_READS = /^\/api\/(?:(?:board|f|thumb|stage-thumb|stage-pen|avatar|revision|google\/image)\/.+|file|pen-file|apps\/[^/]+(?:\/log|\/seen)?)$/;
 
-export function isPageRead(method: string, path: string): boolean {
-	return (method === "GET" || method === "HEAD") && PAGES.test(inner(path));
+export function harnessReads(method: string, path: string): boolean {
+	return (method === "GET" || method === "HEAD") && OWN_READS.test(path);
 }
 
 /** What a refused request is told, by why. */
@@ -124,35 +123,27 @@ export function refusal(reason: Refusal | "none"): string {
 }
 
 /**
- * What a board's token may ask for: its verbs (`POST /api/v1/<verb>`, which act as that board,
- * `verbs/router.ts`), the list of them, whether it still works (`/api/session`), and the pages
- * anyone's frame may read. Nothing that is the person's (settings, uploads, agents, tickets, other
- * tokens), and nothing passed on to another server (`/c/<id>/`): a board's page is handed its token
- * by the page that framed it (`@decks/canvas/internal/board-host.ts`), and that token is the board and no more.
- */
-export function boardMay(method: string, path: string): boolean {
-	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return true;
-	if ((method === "GET" || method === "HEAD") && path === "/api/v1") return true;
-	if (path === "/api/session") return true;
-	if (path.startsWith("/c/")) return false;
-	return isPublic(method, path) || isPageRead(method, path);
-}
-
-/**
  * What a canvas pass may ask for (`passes.ts`): the verbs (`POST /api/v1/<verb>`, which the router keeps
  * to that canvas's own calls, `verbs/router.ts`), their list, the canvas's stream (`/api/v1/events`,
- * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, and the
- * pages anyone's frame may read. Nothing of the person's, no other canvas, nothing passed on.
+ * kept to that canvas), its drawing (`/api/stage-pen/<canvas>`), whether it still works, its files and
+ * pictures (`passCovers`), and what an app item on it shows of its app (`/api/apps/<name>`). Nothing
+ * of the person's, no other canvas, nothing passed on.
  */
-export function canvasMay(method: string, path: string, canvas: string): boolean {
+export function canvasMay(method: string, path: string, canvas: string, placed: (deckPath: string) => boolean = () => false): boolean {
+	const read = method === "GET" || method === "HEAD";
 	if (method === "POST" && /^\/api\/v1\/[^/]+$/.test(path)) return path !== "/api/v1/events";
-	if ((method === "GET" || method === "HEAD") && (path === "/api/v1" || path === "/api/v1/events")) return true;
-	if ((method === "GET" || method === "HEAD") && path.startsWith("/api/stage-pen/")) return decodedSegment(path.slice("/api/stage-pen/".length)) === canvas;
+	if (read && (path === "/api/v1" || path === "/api/v1/events")) return true;
+	if (read && path.startsWith("/api/stage-pen/")) return decodedSegment(path.slice("/api/stage-pen/".length)) === canvas;
 	if (path === "/api/session") return true;
 	// A card on its canvas written out for the harness's Chrome to draw (`/api/snapshot`, which checks the card is on it).
 	if (method === "POST" && path === "/api/snapshot") return true;
+	if (read && /^\/api\/apps\/[^/]+$/.test(path)) return true;
 	if (path.startsWith("/c/")) return false;
-	return isPublic(method, path) || isPageRead(method, path);
+	if (read) {
+		const decoded = decodedSegment(path);
+		if (decoded !== undefined && passCovers(canvas, decoded, placed)) return true;
+	}
+	return isPublic(method, path);
 }
 
 function decodedSegment(segment: string): string | undefined {
@@ -165,14 +156,6 @@ function decodedSegment(segment: string): string | undefined {
 
 /** What a canvas pass is told when it asks for anything else. */
 export const CANVAS_ONLY = "A canvas pass reads and changes its one canvas, and nothing else.";
-
-/** What a board's token is told when it asks for anything else. */
-export const BOARD_ONLY = "A board's token calls verbs as that board, and nothing else: not the person's routes, and not another token.";
-
-/** A board's token another server gave out, on its way there through this one (`share/relay.ts`). */
-export function relayedBoardToken(path: string, token: string): boolean {
-	return path.startsWith("/c/") && token.startsWith("dk_b_");
-}
 
 /** What the gate needs of the harness. */
 export interface Gate {
@@ -193,7 +176,7 @@ export const PASS_REFUSED = "This canvas pass has run out, was signed out, or no
  */
 export function verifyOn(gate: Pick<Gate, "tokens">, token: string | undefined, headers: Record<string, string | string[] | undefined>): Verified | { ok: false; reason: "kind" } {
 	const seen = gate.tokens.verify(token, { origin: originOf(headers) });
-	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site" && seen.principal.kind !== "board") return { ok: false, reason: "kind" };
+	if (seen.ok && fromAnotherSite(headers) && seen.principal.kind !== "site") return { ok: false, reason: "kind" };
 	return seen;
 }
 
@@ -235,9 +218,9 @@ export function guard(gate: Gate) {
 				res.status(401).type("text").send(PASS_REFUSED);
 				return;
 			}
-			// The harness's own picture-taking page draws a saved frame by its file too (`stage/shots.ts`).
-			const ownShot = pass.by === HARNESS_ID && (req.method === "GET" || req.method === "HEAD") && req.path === "/api/pen-file";
-			if (!ownShot && !canvasMay(req.method, req.path, pass.canvas)) {
+			// The harness's own Chromium, reading what it draws for a picture (`harnessReads`): a pass it made for no canvas.
+			const own = pass.by === HARNESS_ID && pass.canvas === "" && harnessReads(req.method, req.path);
+			if (!own && !canvasMay(req.method, req.path, pass.canvas, (deckPath) => gate.placedOn?.(deckPath, pass.canvas) ?? false)) {
 				res.status(403).type("text").send(CANVAS_ONLY);
 				return;
 			}
@@ -262,21 +245,8 @@ export function guard(gate: Gate) {
 		if (token) {
 			const seen = verifyOn(gate, token, req.headers);
 			if (seen.ok) {
-				if (seen.principal.kind === "board" && !boardMay(req.method, req.path)) {
-					res.status(403).type("text").send(BOARD_ONLY);
-					return;
-				}
 				req.principal = seen.principal;
 				req.tokenId = seen.id;
-				next();
-				return;
-			}
-			/*
-			 * A board on another server this page reaches through this one, calling that server with the
-			 * token it gave: passed on as itself, not as this server's connection (`share/relay.ts`), so it
-			 * is that board there and nobody here.
-			 */
-			if (relayedBoardToken(req.path, token)) {
 				next();
 				return;
 			}
@@ -338,7 +308,8 @@ export function guard(gate: Gate) {
 				return;
 			}
 		}
-		if (door || isPublic(req.method, req.path) || (!cross && isPageRead(req.method, req.path))) {
+		// Every file and picture is read on a pass or a token: nothing but the doors and the public page without.
+		if (door || isPublic(req.method, req.path)) {
 			next();
 			return;
 		}

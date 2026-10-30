@@ -15,15 +15,14 @@
  * (`newBoard`, `show`, `pen.edit`, …) still work for one release, and say their new call.
  *
  * Who is calling is the token each call carries (`Authorization: Bearer`), and nothing else: an
- * agent's (`DECKS_TOKEN`, which Decks sets in each agent's shell), an app server's (the same, set
- * when Decks starts it), the person's at a terminal (`decks login` keeps it in `~/.decks/token`), or
- * one passed as `{ token }`. A board's button calls with its board's own token, which the page around
- * it hands it (`lib/board.js`).
+ * agent's harness token (`DECKS_TOKEN`, which Decks sets in each agent's shell), an app server's (the
+ * same variable, set when Decks starts it), the person's at a terminal (`decks login` keeps it in `~/.decks/token`), or
+ * one passed as `{ token }`. An app server's is an app pass, good while that run of it goes.
  * The `decks` command (`bin/decks.mjs`) and the MCP server (`mcp/server.mjs`) are this file.
  *
  * A page on another site (Decks Studio) talks to a harness with this file alone: `connectStudio` or
  * `pairSite` for its site token, the verbs, `request` for the harness's other doors, `events` for its
- * changes, `boardToken` for each board frame it shows, and `tickets`/`pageUrl` for the frames and tabs
+ * changes, `canvasPass` for each canvas frame it shows, and `appUrl`/`tickets`/`pageUrl` for the tabs
  * it opens on the harness's own address. The token only ever goes in a header; a frame or a tab carries
  * a ticket instead.
  *
@@ -373,20 +372,12 @@ export function connect(options = {}) {
 			return request("/api/pair", { body: { label: given.label ?? "Another Decks", ...(given.code ? { code: given.code } : {}) } });
 		},
 		/**
-		 * Decks Studio connecting this harness in one call (`POST /api/studio/connect`): Studio's address
-		 * and the key to sync with, and a site token back. `needsCode` as for `pairSite`.
+		 * Decks Studio connecting this harness in one call, at the one pairing door (`POST /api/pair`):
+		 * Studio's address and the key to sync with, and a harness token as that site back. `needsCode` as
+		 * for `pairSite`.
 		 */
 		connectStudio(given) {
-			return request("/api/studio/connect", { body: { url: given.studio, key: given.key, label: given.label ?? "Decks Studio", ...(given.code ? { code: given.code } : {}) } });
-		},
-		/**
-		 * A board's own token, for its buttons: the page around a board's frame hands it to that frame
-		 * alone, and the board calls as itself; the person is asked once whether it may use the stage.
-		 */
-		async boardToken(path, stage) {
-			const said = await request("/api/tokens", { body: { kind: "board", path, ...(stage ? { stage } : {}) } });
-			if (typeof said?.token !== "string") throw new DecksError("Decks gave no token for that board.");
-			return said.token;
+			return request("/api/pair", { body: { studio: given.studio, key: given.key, label: given.label ?? "Decks Studio", ...(given.code ? { code: given.code } : {}) } });
 		},
 		/**
 		 * A canvas pass for one canvas (`POST /api/passes`): what a canvas frame holds, an hour, bound to

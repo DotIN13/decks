@@ -81,7 +81,7 @@ test("two agents starting at once share one server", async () => {
 test("the spawn env carries the token the handle reports", async () => {
 	const { manager, spawned } = managerWith(() => fakeChild());
 	const handle = await manager.acquire(spec);
-	assert.equal(spawned[0]!.env.DECKS_STAGE_TOKEN, handle.token);
+	assert.equal(spawned[0]!.env.DECKS_OPENCODE_SECRET, handle.token);
 	assert.equal(spawned[0]!.env.DECKS_STAGE_URL, spec.stageUrl);
 	assert.equal(spawned[0]!.env.OPENCODE_CONFIG_CONTENT, JSON.stringify(spec.config));
 	assert.equal(spawned[0]!.cwd, spec.cwd);

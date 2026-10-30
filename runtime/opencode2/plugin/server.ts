@@ -32,7 +32,7 @@ const gdocs = JSON.parse(readFileSync(resolve(runtime, "gdocs-tools.json"), "utf
 /** One call back to Decks; a failed answer is thrown, so it reads as a failed tool call. */
 async function callDecks(path: string, body: Record<string, unknown>, what: string): Promise<string> {
   const url = process.env.DECKS_STAGE_URL
-  const token = process.env.DECKS_STAGE_TOKEN
+  const token = process.env.DECKS_OPENCODE_SECRET
   if (!url || !token) throw new Error(`This OpenCode session was not started by Decks, so there is no ${what} to reach.`)
   const response = await fetch(url.replace(/\/stage\/eval$/, path), {
     method: "POST",
@@ -56,7 +56,7 @@ function agentToken(session: string): Promise<string | undefined> {
   if (!held) {
     held = (async () => {
       const url = process.env.DECKS_URL
-      const secret = process.env.DECKS_STAGE_TOKEN
+      const secret = process.env.DECKS_OPENCODE_SECRET
       if (!url || !secret) return undefined
       const response = await fetch(`${url}/api/tokens/session`, {
         method: "POST",
@@ -97,7 +97,7 @@ export default Plugin.define({
       }
       delete command.env.DECKS_OPENCODE2_RESTORE
       // The server's secret is never a command's: it could ask for any session's token.
-      delete command.env.DECKS_STAGE_TOKEN
+      delete command.env.DECKS_OPENCODE_SECRET
       // The session a command runs for is one agent's: the command runs with that agent's token.
       const session = (command as { sessionID?: unknown }).sessionID
       if (typeof session === "string" && session) {

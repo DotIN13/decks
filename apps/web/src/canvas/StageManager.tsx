@@ -11,6 +11,7 @@ import type { StageRow } from "@decks/protocol";
 import { Icon } from "@decks/ui";
 import { searchStages } from "../state/stages.ts";
 import { AgentFace } from "../agents/AgentPill.tsx";
+import { AuthedImg } from "../lib/authed.tsx";
 
 /**
  * The stage manager: every stage in the deck, as cards, in a panel over the canvas.
@@ -370,7 +371,7 @@ function StageCard(props: {
 						</span>
 					}
 				>
-					<img
+					<AuthedImg
 						class="stage-shot"
 						src={api(`/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`)}
 						alt=""

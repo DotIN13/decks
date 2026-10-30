@@ -20,7 +20,7 @@ const DEFAULT_URL = "https://studio.decks.app";
 
 /**
  * Save Studio's address and this harness's key to `.decks/studio.json`, which `startStudio` watches,
- * so the deck starts syncing at once. Both the `studio.connect` verb and `POST /api/studio/connect`
+ * so the deck starts syncing at once. Both the `studio.connect` verb and `POST /api/pair` with Studio's key
  * come here; neither checks the key with Studio first.
  */
 export function saveStudioLink(deck: string, url: string, key: string): { connected: true; url: string } {

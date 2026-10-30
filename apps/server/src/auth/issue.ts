@@ -20,10 +20,8 @@ import { bearerOf, originOf } from "./guard.ts";
  *   (30 days unless set), the one token that lasts longer than a day.
  * - **Agents**: made when the agent first starts and taken back when it stops (`stage/bridge.ts`); no
  *   request asks for one.
- * - **Pairing**: `POST /api/pair` and `POST /api/studio/connect` trade a code, or a site this harness
- *   can place, for a harness token as that site, bound to the page's site, lasting a day unused.
- * - **A board**: `POST /api/tokens { kind: "board", path, stage? }`, asked by the person or a site for
- *   a board it is about to show.
+ * - **Pairing**: `POST /api/pair` trades a code, or a site this harness can place, for a harness token
+ *   as that site, bound to the page's site, lasting a day unused; Decks Studio sends its key with it.
  * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
  *   editor it is about to show, and again at half its hour to renew it (`passes.ts`).
  * - **An app pass**: an app's server is given one when it starts (`apps/service.ts`); a tab another site
@@ -117,7 +115,7 @@ export function fromThisMachine(remote: string | undefined, headers: Record<stri
 }
 
 /**
- * Whether a Studio may connect this harness without a code (`POST /api/studio/connect`): a page
+ * Whether a Studio may pair with this harness without a code (`POST /api/pair` with its key): a page
  * served by the same machine or tailnet name the request was addressed to (Studio beside the
  * harness), one on loopback, or one whose origin the owner lists in `DECKS_STUDIO_ORIGINS`
  * (comma-separated, `https://studio.example.com`). A call with no `Origin` is not a page, and is let
@@ -249,66 +247,54 @@ export function doorRoutes(app: App): express.Router {
 	});
 
 	/**
-	 * Trade a pairing code for a site token: the door another site uses. Answered with the deck's
-	 * name, which is what the other front end will call this server.
+	 * Pairing, the one door another front end uses: a harness token as that site, bound to the page's
+	 * origin, for a pairing code or, without one, from where this harness can place it. Answered with the
+	 * deck's name, which is what the other front end will call this server.
+	 *
+	 * Decks Studio connects here too, sending its address and this harness's Studio key (`studio`,
+	 * `key`), which are kept for syncing (`saveStudioLink`). Without a code, a page may pair only from
+	 * this machine or a private network and only from a site a Studio may be (`pairWithoutCode`); a
+	 * Studio sending its key may from wherever it is placed (`studioWithoutCode`): on this machine, on the
+	 * address the harness was reached at, or listed in `DECKS_STUDIO_ORIGINS`. A harness deployed where
+	 * others can reach it sets `DECKS_REQUIRE_PAIR_CODE=1`, and then nothing pairs without a working code.
 	 */
 	api.post("/pair", (req, res) => {
-		const body = (req.body ?? {}) as { code?: unknown; label?: unknown };
+		const body = (req.body ?? {}) as { code?: unknown; label?: unknown; studio?: unknown; key?: unknown };
 		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
 		const origin = String(req.headers.origin ?? "");
-		const label = typeof body.label === "string" ? body.label : "";
+		const studio = body.studio !== undefined || body.key !== undefined;
+		const label = typeof body.label === "string" && body.label.trim() ? body.label : studio ? "Decks Studio" : "Another Decks";
+		if (studio && (typeof body.studio !== "string" || typeof body.key !== "string")) {
+			res.status(400).json({ error: "Send Studio's address as studio and this harness's key as key." });
+			return;
+		}
 		if (!code && app.codes.required) {
 			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
 			return;
 		}
-		if (!code && !pairWithoutCode(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine." });
+		if (!code && !(studio ? studioWithoutCode(req.socket.remoteAddress, req.headers) : pairWithoutCode(req.socket.remoteAddress, req.headers))) {
+			res.status(403).json({
+				needsCode: true,
+				error: studio
+					? "Only a Studio on this machine, on the address you reached the harness at, or listed in DECKS_STUDIO_ORIGINS connects without a code. Run decks pair code in a shell on the harness's machine."
+					: "This page is on another site or reaches the server over the internet, so it needs a pairing code. Run decks pair code in a shell on the server's machine.",
+			});
 			return;
 		}
-		if (code && !app.codes.redeem(code)) {
-			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the server's machine." });
-			return;
-		}
-		const { token } = app.tokens.issue({ kind: "site", label: label || "Another Decks", ...(origin ? { origin } : {}) });
-		app.send(app.pairingMessage());
-		res.json({ token, name: app.deck.name });
-	});
-
-	/**
-	 * Decks Studio connecting this harness in one call: the Studio key to sync with, and a site token
-	 * back for the page to call this harness with. Without a code only from a Studio the harness can
-	 * place (`studioWithoutCode`); a harness deployed where others can reach it sets
-	 * `DECKS_REQUIRE_PAIR_CODE=1`, and then a connect without a working code is refused from anywhere.
-	 */
-	api.post("/studio/connect", (req, res) => {
-		const body = (req.body ?? {}) as { url?: unknown; key?: unknown; code?: unknown; label?: unknown };
-		const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
-		const origin = String(req.headers.origin ?? "");
-		const label = typeof body.label === "string" && body.label.trim() ? body.label : "Decks Studio";
-		if (typeof body.url !== "string" || typeof body.key !== "string") {
-			res.status(400).json({ error: "Send Studio's address as url and this harness's key as key." });
-			return;
-		}
-		if (app.codes.required && !code) {
-			res.status(403).json({ needsCode: true, error: NEEDS_CODE });
-			return;
-		}
-		if (!code && !studioWithoutCode(req.socket.remoteAddress, req.headers)) {
-			res.status(403).json({ needsCode: true, error: "Only a Studio on this machine, on the address you reached the harness at, or listed in DECKS_STUDIO_ORIGINS connects without a code. Run decks pair code in a shell on the harness's machine." });
-			return;
-		}
-		try {
-			studioOrigin(body.url, body.key);
-		} catch (error) {
-			res.status(400).json({ error: (error as Error).message });
-			return;
+		if (studio) {
+			try {
+				studioOrigin(body.studio as string, body.key as string);
+			} catch (error) {
+				res.status(400).json({ error: (error as Error).message });
+				return;
+			}
 		}
 		if (code && !app.codes.redeem(code)) {
 			res.status(403).json({ needsCode: true, error: "That code is wrong or has expired. Make a new one with decks pair code on the harness's machine." });
 			return;
 		}
 		const { token } = app.tokens.issue({ kind: "site", label, ...(origin ? { origin } : {}) });
-		const linked = saveStudioLink(app.deck.path, body.url, body.key);
+		const linked = studio ? saveStudioLink(app.deck.path, body.studio as string, body.key as string) : {};
 		app.send(app.pairingMessage());
 		res.json({ token, name: app.deck.name, ...linked });
 	});
@@ -382,35 +368,6 @@ export function doorRoutes(app: App): express.Router {
 		const role = pens.sharing(canvas)?.role === "view" ? "view" : "edit";
 		const { pass, expires } = app.passes.canvas(canvas, role, req.tokenId);
 		res.set("cache-control", "no-store").json({ pass, role, expires });
-	});
-
-	/**
-	 * A token for a board the person or a site is about to show: `{ kind: "board", path, stage? }`.
-	 * Its calls act as that board, and the person is asked once before it may use the stage
-	 * (`verbs/router.ts`).
-	 */
-	api.post("/tokens", (req, res) => {
-		if (!actsAsPerson(req.principal)) {
-			res.status(403).json({ error: "Only the person, or a front end paired with this harness, makes a board's token." });
-			return;
-		}
-		const body = (req.body ?? {}) as { kind?: unknown; path?: unknown; stage?: unknown };
-		if (body.kind !== "board" || typeof body.path !== "string" || !body.path) {
-			res.status(400).json({ error: 'Ask for { kind: "board", path, stage? }.' });
-			return;
-		}
-		if (!app.deck.board(body.path)) {
-			res.status(404).json({ error: `There is no board at ${body.path}.` });
-			return;
-		}
-		// A friend's board runs sandboxed with no token: it is someone else's code on this machine (`deck/layout.ts`).
-		if (/^shared\//.test(body.path)) {
-			res.status(403).json({ error: "A board on a canvas shared with you runs without a token: it is its owner's page, and acts on nothing here." });
-			return;
-		}
-		const stage = typeof body.stage === "string" && body.stage ? body.stage : undefined;
-		const { token } = app.tokens.issue({ kind: "board", path: body.path, ...(stage ? { stage } : {}) });
-		res.set("cache-control", "no-store").json({ token });
 	});
 
 	/**

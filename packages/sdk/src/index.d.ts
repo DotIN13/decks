@@ -583,10 +583,8 @@ export interface Decks extends Verbs {
 	hello(): Promise<Hello>;
 	/** Pair a page on another site (`POST /api/pair`): a site token bound to the page's origin. `needsCode` on the error wants a code. */
 	pairSite(options?: { code?: string; label?: string }): Promise<{ token: string; name: string }>;
-	/** Decks Studio connecting this harness (`POST /api/studio/connect`): Studio's address and its key, and a site token back. */
+	/** Decks Studio connecting this harness (`POST /api/pair` with its address and key): a harness token as that site back, the key kept for syncing. */
 	connectStudio(options: { studio: string; key: string; code?: string; label?: string }): Promise<{ token: string; name: string; [key: string]: unknown }>;
-	/** A board's own token for its frame, on canvas `stage`: its calls act as that board. */
-	boardToken(path: string, stage?: string): Promise<string>;
 	/**
 	 * A canvas pass for one canvas (`POST /api/passes`): an hour, bound to this connection's token, with
 	 * your role there. A frame's calls send it as the bearer; its files are read at
