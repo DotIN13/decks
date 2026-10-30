@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, untrack } from "solid-js";
 import { INTERACTIVE, isCardSheet, mountCard, scrollsInside, type MountedCard } from "./card.ts";
 import { snapshotOfCard, type CardShot } from "./card-snapshot.ts";
+import { cardLoader } from "./card-load.ts";
 import { scheme } from "../lib/theme.ts";
 import { canvasHost, openInTab } from "../host.ts";
 
@@ -55,19 +56,23 @@ export function CardSurface(props: {
 	let mounted: MountedCard | undefined;
 	let forget = () => {};
 	const cardCall = canvasHost().cardCall;
-	let asked = 0;
-	const load = async () => {
-		const ask = ++asked;
-		let html = "";
-		try {
+	/*
+	 * Mounted only once its file has come: a file refused (a ticket run out) or not reached leaves the
+	 * card's picture shown, and is asked for once more a moment later (`card-load.ts`).
+	 */
+	const loader = cardLoader({
+		url: () => {
 			const url = new URL(stamped());
 			url.searchParams.set("raw", "1");
-			const response = await fetch(url, { cache: "no-cache" });
-			html = response.ok ? await response.text() : "";
-		} catch {
-			html = "";
-		}
-		if (ask !== asked || !host) return;
+			return url.href;
+		},
+		read: (url) => fetch(url, { cache: "no-cache" }),
+		mount: (html) => {
+			if (!host) return;
+			mount(html);
+		},
+	});
+	const mount = (html: string) => {
 		mounted?.dispose();
 		// A closed root is made once per element: a new file gets a new element.
 		const fresh = document.createElement("div");
@@ -98,11 +103,11 @@ export function CardSurface(props: {
 		});
 		props.onShown();
 	};
-	createEffect(on(() => [props.page.replace(/[?#].*$/, ""), props.rev, props.reload] as const, () => void load()));
+	createEffect(on(() => [props.page.replace(/[?#].*$/, ""), props.rev, props.reload] as const, () => loader.load()));
 	createEffect(() => mounted?.setTheme(scheme()));
 	createEffect(() => mounted?.setSize(props.size()));
 	onCleanup(() => {
-		asked++;
+		loader.stop();
 		forget();
 		mounted?.dispose();
 	});
