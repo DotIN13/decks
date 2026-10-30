@@ -13,7 +13,7 @@ import { bearerOf, originOf } from "./guard.ts";
  * answered with one.
  *
  * - **A Decks tab.** The Decks page, loaded by a person into a tab of its own (a top-level navigation),
- *   is written a fresh person token for that tab (`withSession`), which lasts twelve hours unused.
+ *   is written a fresh person token for that tab (`withSession`), which lasts a day unused.
  *   Never a frame's copy of the page or a script's fetch of it: those are answered without.
  * - **`decks login`**, in a terminal: `POST /api/login { code }`, the code from `decks pair code` on
  *   the harness's own machine (`PairCodes`), for a person token that lasts `DECKS_TOKEN_DAYS` unused.
@@ -209,7 +209,7 @@ export function isTopNavigation(headers: Record<string, string | string[] | unde
 	return headers["sec-fetch-dest"] === "document" && headers["sec-fetch-mode"] === "navigate";
 }
 
-/** A person token for one Decks tab, which lasts twelve hours unused. */
+/** A person token for one Decks tab, which lasts a day unused. */
 export function tabToken(store: TokenStore): string {
 	return store.issue({ kind: "person" }, { label: "Decks tab", idle: TAB_IDLE_MS }).token;
 }
@@ -315,7 +315,7 @@ export function doorRoutes(app: App): express.Router {
 	 * `~/.decks/token`. A terminal is the person only by proving it: with a code, from anywhere; or, on
 	 * this machine, with the token the harness wrote at start where only its own user can read it
 	 * (`cli-token.ts`), sent as the bearer. That one token, and no other person's: a Decks tab's, which
-	 * lasts twelve hours, is not traded here for one that lasts for weeks.
+	 * lasts a day, is not traded here for one that lasts for weeks.
 	 */
 	api.post("/login", (req, res) => {
 		const code = String(((req.body ?? {}) as { code?: unknown }).code ?? "").replace(/\D/g, "");

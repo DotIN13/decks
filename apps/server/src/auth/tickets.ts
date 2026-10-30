@@ -12,7 +12,7 @@ import { join } from "node:path";
  * put its pairing token in a board's address, and every script on that board could read the token
  * out of its own `location` and keep it. A ticket is what goes in the address instead: it admits one
  * GET of one path, the board page (`/api/board/<path>`), one file (`/api/f/<path>`, an export opened
- * in a tab) or an app (`/app/<name>/`, its whole address), for five minutes, and nothing else. What the page then asks for is on its own origin and
+ * in a tab) or an app (`/app/<name>/`, its whole address), for a day, and nothing else. What the page then asks for is on its own origin and
  * needs no ticket.
  *
  * A ticket is `<payload>.<mac>`, both base64url: the payload is `{ p: path, e: expires, k: token id }`
@@ -22,15 +22,16 @@ import { join } from "node:path";
  * works only while that token does, so revoking the token ends its tickets too.
  */
 
-/** How long a ticket admits its page: enough to load it, too short to be worth stealing. */
-export const TICKET_MS = 5 * 60_000;
+/** How long a ticket admits its page: a day, as every token and pass of the app's lasts. */
+export const TICKET_MS = 24 * 3_600_000;
 
 /**
  * How long a shared canvas's folder ticket lasts: a friend's board runs sandboxed, with no token,
  * and loads what it is made of (and what it fetches later) on the ticket in its address, so it is
- * good for a working day. It reads only that canvas's folder, which the board could read anyway.
+ * good for a day; the canvas frame's page asks for a new one at half that (`@decks/canvas`, `frame/outside/host.tsx`).
+ * It reads only that canvas's folder, which the board could read anyway.
  */
-export const FOLDER_TICKET_MS = 12 * 3_600_000;
+export const FOLDER_TICKET_MS = 24 * 3_600_000;
 
 /**
  * A friend's canvas's folder, as a ticket admits it: `/api/board/shared/canvases/<owner>/<canvas>/`.

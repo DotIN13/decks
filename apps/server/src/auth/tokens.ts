@@ -17,8 +17,8 @@ import type { Principal, PrincipalKind } from "./principal.ts";
  *
  * Most tokens slide: each use pushes back the moment they stop working, and one left unused that long
  * is forgotten. A terminal's or a paired site's lasts `DECKS_TOKEN_DAYS` (30 unless set) unused; a
- * Decks tab's and a board's twelve hours. Page tickets are not here: they are signed, last five
- * minutes and are kept nowhere (`tickets.ts`).
+ * Decks tab's, a board's and a canvas frame's a day. Page tickets are not here: they are signed, last a
+ * day and are kept nowhere (`tickets.ts`).
  *
  * The pairing tokens from before (`.decks/pairing.json`) are read in once, as site tokens with the
  * same id and the same site, so Studio and the browsers already paired keep working.
@@ -30,14 +30,15 @@ export function tokenDays(env: NodeJS.ProcessEnv = process.env): number {
 	return Number.isFinite(days) && days > 0 ? days : 30;
 }
 
-/** How long a Decks tab's token and a board's may go unused. */
-export const TAB_IDLE_MS = 12 * 3_600_000;
-export const BOARD_IDLE_MS = 12 * 3_600_000;
+/** How long a Decks tab's token and a board's may go unused: a day. */
+export const TAB_IDLE_MS = 24 * 3_600_000;
+export const BOARD_IDLE_MS = 24 * 3_600_000;
 /**
- * How long a canvas frame's token may go unused: minutes, since a card's script beside it can read it.
- * The page that made the frame renews it well before (`@decks/canvas/frame`); it lives in memory.
+ * How long a canvas frame's token may go unused: a day, as every token of the app's. A card's script
+ * beside it can read it, and it reaches its one canvas and nothing else. The page that made the frame
+ * renews it well before (`@decks/canvas/frame`); it lives in memory.
  */
-export const CANVAS_IDLE_MS = 15 * 60_000;
+export const CANVAS_IDLE_MS = 24 * 3_600_000;
 
 const PREFIX: Record<Exclude<PrincipalKind, "page">, string> = { person: "dk_p_", site: "dk_s_", agent: "dk_a_", app: "dk_x_", board: "dk_b_", canvas: "dk_c_" };
 
@@ -91,7 +92,7 @@ export class TokenStore {
 
 	/**
 	 * A new token for a principal. `idle` is how long it may go unused; left out it is the person's
-	 * or a site's days, a Decks tab's or a board's twelve hours, and none for an agent or an app, which
+	 * or a site's days, a Decks tab's or a board's a day, and none for an agent or an app, which
 	 * are not written down and are taken back when their process stops (`revoke`).
 	 */
 	issue(principal: Principal, options: { label?: string; idle?: number; now?: number } = {}): { token: string; id: string } {

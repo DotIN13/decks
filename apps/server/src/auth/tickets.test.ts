@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { TokenStore } from "./tokens.ts";
-import { covers, isFolderTicket, TICKET_MS, ticketPath, ticketSecret, Tickets } from "./tickets.ts";
+import { covers, FOLDER_TICKET_MS, isFolderTicket, TICKET_MS, ticketPath, ticketSecret, Tickets } from "./tickets.ts";
 
 /** A token store in a fresh folder, a token in it, and tickets that ask it whether the token still works. */
 function setUp() {
@@ -43,7 +43,9 @@ test("an app's ticket admits everything inside that app, and nothing in another"
 	}
 });
 
-test("a ticket runs out after five minutes", () => {
+test("a ticket runs out after a day", () => {
+	assert.equal(TICKET_MS, 24 * 3_600_000);
+	assert.equal(FOLDER_TICKET_MS, 24 * 3_600_000);
 	const { id, tickets, cleanup } = setUp();
 	try {
 		const now = Date.now();

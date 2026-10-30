@@ -179,9 +179,13 @@ export function createFramedEditor(options: Options): Editor {
 		onCleanup(() => removeEventListener("message", onHello));
 	};
 
-	/** The canvas token, asked for again at a third of its life, for as long as the frame is there. */
+	/**
+	 * The canvas token, asked for again at a third of its life and at least every five minutes, for as
+	 * long as the frame is there: a harness keeps it in memory, so one restarted forgets it, and a day's
+	 * token renewed at a third of a day left the frame without its canvas for hours.
+	 */
 	const renew = (page: PageEnd, canvas: string, idle: number, cancelled: () => boolean) => {
-		const every = Math.max(30_000, Math.floor(idle / 3));
+		const every = Math.min(5 * 60_000, Math.max(30_000, Math.floor(idle / 3)));
 		const timer = setInterval(() => {
 			if (cancelled()) return clearInterval(timer);
 			options.frame
