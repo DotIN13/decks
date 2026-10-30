@@ -168,7 +168,7 @@ export function ToolColumn(props: {
 			];
 		if (family === "board")
 			return [
-				{ id: "document", label: "Document", icon: FileText, key: "D", pick: () => arm("card") },
+				{ id: "document", label: "Markdown card", icon: FileText, key: "D", pick: () => arm("card") },
 				{ id: "app", label: "App", icon: AppWindow, pick: () => props.onApps() },
 			];
 		if (family === "arrow")
