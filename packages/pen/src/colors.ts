@@ -8,25 +8,37 @@ import type { PenDocument, PenVariable } from "./types.ts";
  * what the tools always made; dark ones sit on the dark canvas (`#242424`) beside the app's dark
  * palette (`canvas/render/look.ts`).
  */
-export const DECKS_COLORS: Readonly<Record<string, { light: string; dark: string }>> = {
+export const DECKS_COLORS: Readonly<Record<string, { light: string; dark: string; /** What a picker's tooltip calls it. */ name: string }>> = {
 	/** A rectangle's fill. */
-	"decks-shape": { light: "#dbe4f0", dark: "#34404f" },
+	"decks-shape": { light: "#dbe4f0", dark: "#34404f", name: "Shape" },
 	/** An ellipse's fill. */
-	"decks-shape-2": { light: "#c7ddf7", dark: "#2b4766" },
+	"decks-shape-2": { light: "#c7ddf7", dark: "#2b4766", name: "Shape, second" },
 	/** A frame's fill and its edge. */
-	"decks-frame": { light: "#ffffff", dark: "#2b2b2b" },
-	"decks-frame-line": { light: "#d0d7de", dark: "#ffffff29" },
-	/** Ink: an icon, a shape's label, a file card's name. */
-	"decks-ink": { light: "#1f2328", dark: "#e6e6e6" },
+	"decks-frame": { light: "#ffffff", dark: "#2b2b2b", name: "Paper" },
+	"decks-frame-line": { light: "#d0d7de", dark: "#ffffff29", name: "Edge" },
+	/** Ink: an icon, a shape's label, a file card's name, the pen's black-or-white. */
+	"decks-ink": { light: "#1f2328", dark: "#e6e6e6", name: "Ink" },
 	/** Quieter words: a file card's kind. */
-	"decks-muted": { light: "#6b7280", dark: "#a3a3a3" },
+	"decks-muted": { light: "#6b7280", dark: "#a3a3a3", name: "Muted" },
 	/** A library shape's fill and line (`makeShape`). */
-	"decks-figure": { light: "#ffffff", dark: "#2e2e2e" },
-	"decks-figure-line": { light: "#1f2328", dark: "#d4d4d4" },
+	"decks-figure": { light: "#ffffff", dark: "#2e2e2e", name: "Figure" },
+	"decks-figure-line": { light: "#1f2328", dark: "#d4d4d4", name: "Figure line" },
 	/** A file card's paper and edge. */
-	"decks-card": { light: "#ffffff", dark: "#2e2e2e" },
-	"decks-card-line": { light: "#0000001f", dark: "#ffffff24" },
+	"decks-card": { light: "#ffffff", dark: "#2e2e2e", name: "Card" },
+	"decks-card-line": { light: "#0000001f", dark: "#ffffff24", name: "Card edge" },
+	/** An arrow's line. */
+	"decks-line": { light: "#8a8f98", dark: "#9ba1a9", name: "Line" },
+	/** The pen's and the marker's colours (`canvas/model/ink.ts`), and accents that read on both grounds. */
+	"decks-red": { light: "#e5484d", dark: "#ff6369", name: "Red" },
+	"decks-blue": { light: "#3b82f6", dark: "#60a5fa", name: "Blue" },
+	"decks-green": { light: "#2f9e62", dark: "#3dd68c", name: "Green" },
+	"decks-yellow": { light: "#f2b200", dark: "#ffc53d", name: "Yellow" },
 };
+
+/** Whether a colour value is a Decks colour (`"$decks-ink"`), and which. */
+export function decksColorOf(value: unknown): string | undefined {
+	return typeof value === "string" && value.startsWith("$") && DECKS_COLORS[value.slice(1)] ? value.slice(1) : undefined;
+}
 
 const REF = /"\$(decks-[a-z0-9-]+)"/g;
 

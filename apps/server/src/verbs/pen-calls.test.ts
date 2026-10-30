@@ -254,6 +254,8 @@ test("an agent's shape with no colour is coloured as the tools colour theirs, li
 			{ op: "insert", item: { type: "icon", id: "star", library: "lucide", icon: "star" }, at: { x1: 700, y1: 0 } },
 			{ op: "insert", item: { type: "rectangle", id: "red", width: 100, height: 60, fill: "#ff0000" }, at: { x1: 0, y1: 200 } },
 			{ op: "insert", item: { type: "frame", id: "row", layout: "horizontal", children: [{ type: "rectangle", id: "spacer", width: 10, height: 10 }] }, at: { x1: 200, y1: 200 } },
+			{ op: "insert", item: { type: "path", id: "link", metadata: { type: "decks.arrow", from: "plain", to: "round" } } },
+			{ op: "insert", item: { type: "path", id: "blue-link", stroke: "#2563eb", metadata: { type: "decks.arrow", from: "round", to: "box" } } },
 		]])).value;
 		const by = Object.fromEntries((made as Array<Record<string, any>>).map((one) => [one.id, one]));
 		assert.equal(by.plain.fill, "$decks-shape");
@@ -264,8 +266,10 @@ test("an agent's shape with no colour is coloured as the tools colour theirs, li
 		assert.equal(by.red.fill, "#ff0000", "a colour given is kept");
 		assert.equal(by.row.fill, undefined, "a frame holding items is a layout, left as it is");
 		assert.equal(by.row.children[0].fill, undefined, "nor what is inside one");
+		assert.equal(by.link.stroke, "$decks-line", "an arrow's line is the tools' grey, light and dark");
+		assert.equal(by["blue-link"].stroke, "#2563eb");
 		const vars = (await must("canvas.read", [])).value.variables ?? {};
-		for (const name of ["decks-shape", "decks-shape-2", "decks-frame", "decks-frame-line", "decks-ink"]) assert.ok(vars[name], `${name} is defined`);
+		for (const name of ["decks-shape", "decks-shape-2", "decks-frame", "decks-frame-line", "decks-ink", "decks-line"]) assert.ok(vars[name], `${name} is defined`);
 	} finally {
 		cleanup();
 	}

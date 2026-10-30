@@ -9,7 +9,7 @@ import type { StageBoardProps } from "../items/item-slot.tsx";
 import type { DocEdits, DrawingWriter } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { StageInk } from "../edit/StageInk.tsx";
-import { inkVariableEdit, strokeOf } from "../model/ink.ts";
+import { strokeOf } from "../model/ink.ts";
 import { penLive, penTool, setPenLive, setPenTool, type PenTool } from "../edit/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { isCard, ids as penIds, newId, type PenDocument } from "@decks/pen";
@@ -748,7 +748,6 @@ export function Stage(props: StageProps) {
 					strokes={inkStrokes}
 					layer={penLayer}
 					onEdit={(ops) => penEdit(ops)}
-					colourEdit={() => inkVariableEdit(props.pen?.doc)}
 					newId={freshId}
 					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
 					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}

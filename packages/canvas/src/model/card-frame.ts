@@ -40,6 +40,7 @@ export function markdownText(id: string, content: string): PenNode {
 /**
  * A file in the deck, as a piece: pen's own frame holding an icon and the file's name, marked
  * `metadata: { type: "decks.file", path }`, so pen.dev shows a chip and a card writes `![[path]]`.
+ * Its grey ground reads on light and dark; its icon and name are Decks colours (`@decks/pen` `DECKS_COLORS`).
  */
 export { FILE, isFile };
 export function fileItem(path: string, fresh: () => string): PenNode {
@@ -48,8 +49,8 @@ export function fileItem(path: string, fresh: () => string): PenNode {
 		type: "frame", id: fresh(), name, layout: "horizontal", gap: 8, padding: [8, 12], alignItems: "center", cornerRadius: 8, fill: "#8080801f",
 		metadata: { type: FILE, path },
 		children: [
-			{ type: "icon", id: fresh(), library: "lucide", icon: /\.(mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ? "file-video" : "file-text", width: 16, height: 16, fill: "#808080" },
-			{ type: "text", id: fresh(), content: name, fontSize: 14, fill: "#808080" },
+			{ type: "icon", id: fresh(), library: "lucide", icon: /\.(mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ? "file-video" : "file-text", width: 16, height: 16, fill: "$decks-muted" },
+			{ type: "text", id: fresh(), content: name, fontSize: 14, fill: "$decks-ink" },
 		],
 	} as PenNode;
 }

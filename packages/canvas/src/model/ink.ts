@@ -1,5 +1,5 @@
 import { strokeShape, type InkColor, type InkStroke } from "@decks/board-kit";
-import type { PenDocument, PenNode, Placed } from "@decks/pen";
+import { DECKS_COLORS, type PenNode, type Placed } from "@decks/pen";
 
 /**
  * Ink on the stage: a stroke drawn with the pen or the marker, kept in the stage's `.pen` file.
@@ -13,20 +13,22 @@ import type { PenDocument, PenNode, Placed } from "@decks/pen";
  *       "size": 4, "points": [x, y, pressure, …] } }
  *
  * The points are in the path's own box, from its top-left corner, so moving the path moves the
- * stroke with it. The `ink` colour follows the stage's light or dark look through a pen variable.
+ * stroke with it. Every colour follows the stage's light or dark look through a pen variable, one of
+ * Decks's own (`@decks/pen` `DECKS_COLORS`), which the stroke's edit defines when the drawing lacks
+ * it (`withDecksColors`, `model/drawing.ts`): `ink` is dark on a light stage and light on a dark one,
+ * and red, blue, green and yellow are a shade lighter on dark.
  */
 
 export const INK = "decks.ink";
-/** The pen variable the `ink` colour is written as: dark on a light stage, light on a dark one. */
-export const INK_VARIABLE = "decks-ink";
 
-const PAINT: Record<InkColor, string> = {
-	ink: `$${INK_VARIABLE}`,
-	red: "#e5484d",
-	blue: "#3b82f6",
-	green: "#2f9e62",
-	yellow: "#f2b200",
-};
+/** The Decks colour each ink colour is written as. */
+const VARIABLE: Record<InkColor, string> = { ink: "decks-ink", red: "decks-red", blue: "decks-blue", green: "decks-green", yellow: "decks-yellow" };
+const PAINT = Object.fromEntries(Object.entries(VARIABLE).map(([color, name]) => [color, `$${name}`])) as Record<InkColor, string>;
+
+/** An ink colour as the stage draws it in a scheme: what its variable comes to there, for a stroke still under the pen and the tray's swatches. */
+export function inkHex(color: InkColor, scheme: "light" | "dark"): string {
+	return DECKS_COLORS[VARIABLE[color]]![scheme];
+}
 
 export function isInk(node: PenNode): boolean {
 	return node.type === "path" && node.metadata?.type === INK;
@@ -88,30 +90,4 @@ export function strokeOf(placed: Placed): InkStroke | undefined {
 		size: typeof meta.size === "number" ? meta.size : 4,
 		points,
 	};
-}
-
-/**
- * The edit that defines the `ink` colour, when the document does not have it yet.
- *
- * Themed by light and dark when the document has no themes of its own, which is the usual stage;
- * a document with its own theme axes gets one colour rather than a new axis beside them.
- */
-export function inkVariableEdit(doc: PenDocument | undefined): unknown | undefined {
-	if (doc?.variables?.[INK_VARIABLE]) return undefined;
-	const light = "#1f2328";
-	const dark = "#e6e6e6";
-	if (!doc?.themes) {
-		return {
-			op: "variables",
-			themes: { Mode: ["Light", "Dark"] },
-			set: { [INK_VARIABLE]: { type: "color", value: [{ value: light, theme: { Mode: "Light" } }, { value: dark, theme: { Mode: "Dark" } }] } },
-		};
-	}
-	const axis = Object.entries(doc.themes).find(([, values]) => values.some((v) => v.toLowerCase() === "light") && values.some((v) => v.toLowerCase() === "dark"));
-	if (axis) {
-		const [name, values] = axis;
-		const named = (mode: string) => values.find((v) => v.toLowerCase() === mode)!;
-		return { op: "variables", set: { [INK_VARIABLE]: { type: "color", value: [{ value: light, theme: { [name]: named("light") } }, { value: dark, theme: { [name]: named("dark") } }] } } };
-	}
-	return { op: "variables", set: { [INK_VARIABLE]: { type: "color", value: light } } };
 }

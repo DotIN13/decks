@@ -1,8 +1,8 @@
-import { hitStroke, inkBounds, inkPaint, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
+import { hitStroke, inkBounds, inkShaper, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "./ink.ts";
-import { inkItem } from "../model/ink.ts";
+import { inkHex, inkItem } from "../model/ink.ts";
 import type { StageEngine } from "../render/engine.ts";
 import type { LiveInk, PenPreview } from "../render/types.ts";
 import { scheme } from "../lib/theme.ts";
@@ -39,10 +39,8 @@ export function StageInk(props: {
 	/** The ink on the stage now, each stroke in stage pixels. */
 	strokes: () => InkStroke[];
 	layer: StageEngine;
-	/** A new stroke's pen items, and the edits before it that it needs (the ink colour). */
+	/** A new stroke's pen item; the drawing's edit defines its colour's variable when it lacks it (`withDecksColors`). */
 	onEdit: (ops: unknown[]) => void;
-	/** The edit that defines the ink colour, when the stage does not have it yet. */
-	colourEdit: () => unknown | undefined;
 	newId: () => string;
 	/** Move items by this much, as every other move on the stage does. */
 	onShift: (ids: readonly string[], dx: number, dy: number) => void;
@@ -229,9 +227,6 @@ export function StageInk(props: {
 		loop?.setAttribute("d", "");
 	};
 
-	/** The `ink` colour as the pen variable resolves it (`inkVariableEdit`): dark on light, light on dark. */
-	const inkHex = () => (scheme() === "dark" ? "#e6e6e6" : "#1f2328");
-
 	/** The stroke under the pen has changed: it is shaped and drawn at the next frame. */
 	const paintLive = (drawn: Extract<Gesture, { kind: "draw" }>) => {
 		reshape = drawn;
@@ -250,7 +245,8 @@ export function StageInk(props: {
 			id: "live",
 			d: shape.d,
 			filled: shape.filled,
-			color: drawn.stroke.color === "ink" ? inkHex() : inkPaint(drawn.stroke.color),
+			// As its variable will resolve: dark ink on light, light on dark, the others a shade lighter on dark.
+			color: inkHex(drawn.stroke.color, scheme()),
 			size: drawn.stroke.size,
 			opacity: drawn.stroke.tool === "marker" ? 0.4 : 1,
 		};
@@ -540,8 +536,7 @@ export function StageInk(props: {
 		switch (done.kind) {
 			case "draw": {
 				const points = simplify(done.points);
-				const colour = done.stroke.color === "ink" ? props.colourEdit() : undefined;
-				props.onEdit([...(colour ? [colour] : []), { op: "insert", node: inkItem({ ...done.stroke, points }, done.id ?? props.newId()) }]);
+				props.onEdit([{ op: "insert", node: inkItem({ ...done.stroke, points }, done.id ?? props.newId()) }]);
 				return;
 			}
 			case "erase":

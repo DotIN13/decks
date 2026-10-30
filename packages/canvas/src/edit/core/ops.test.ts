@@ -207,7 +207,7 @@ test("a drag makes the box between press and release, at least 8 each way", () =
 test("an arrow is a curved grey path between its ends", () => {
 	assert.deepEqual(arrowInsertOp("ar2", "a", [300, 40]), {
 		op: "insert",
-		node: { type: "path", id: "ar2", stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from: "a", to: [300, 40], route: "curved" } },
+		node: { type: "path", id: "ar2", stroke: "$decks-line", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from: "a", to: [300, 40], route: "curved" } },
 	});
 });
 
@@ -251,4 +251,20 @@ test("deleting what an arrow joins lets that end go where it is drawn, so the ar
 	]);
 	// Without the scene, the plain deletes.
 	assert.deepEqual(deleteOps(["a"]), [{ op: "delete", id: "a" }]);
+});
+
+test("nothing a tool makes stores a fixed colour: its colours are the drawing's light/dark Decks variables, or the scheme's own", async () => {
+	const { newCard, fileItem } = await import("../../model/card-frame.ts");
+	const fixed = /"#[0-9a-fA-F]{3,8}"/;
+	for (const tool of ["rectangle", "ellipse", "frame", "text", "note", "card", "icon", "shape"] as const) {
+		for (const shape of tool === "shape" ? ["Rectangle", "Decision", "Ellipse", "Arrow"] : ["Rectangle"]) {
+			const node = makeAtOp(tool, "x", { x: 0, y: 0 }, options({ shape, card: newCard })).node;
+			assert.doesNotMatch(JSON.stringify(node), fixed, `${tool} ${shape}`);
+		}
+	}
+	const arrow = arrowInsertOp("a", "x", "y").node;
+	assert.equal(arrow.stroke, "$decks-line");
+	// A file's chip: a grey ground that reads on both, its icon and name Decks colours.
+	const chip = fileItem("notes/plan.md", counter("f"));
+	assert.deepEqual(chip.children!.map((child) => child.fill), ["$decks-muted", "$decks-ink"]);
 });

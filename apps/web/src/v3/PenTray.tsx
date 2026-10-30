@@ -1,9 +1,9 @@
-import { INK_COLORS, inkPaint, type InkColor } from "@decks/board-kit";
+import { INK_COLORS, type InkColor } from "@decks/board-kit";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import { createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
-import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/tools";
+import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/tools";
 import { Icon } from "../ui/icons.tsx";
 
 /**
@@ -41,7 +41,7 @@ export function PenTray(props: {
 		if (wrap && grip && props.onFloat) unstow = props.onFloat(wrap, grip).unstow;
 	});
 	const [widths, setWidths] = createSignal(false);
-	const paint = () => (inkColor() === "ink" ? "var(--fg)" : inkPaint(inkColor()));
+	const paint = () => inkSwatch(inkColor());
 	const deleteSelection = () => {
 		const held = inkSelection();
 		if (!held?.ids.length) return;
@@ -121,7 +121,7 @@ export function PenTray(props: {
 								disabled={!paints()}
 								data-tip={COLOR_NAMES[color].split(",")[0]}
 								aria-label={COLOR_NAMES[color]}
-								style={{ "--swatch": color === "ink" ? "var(--fg)" : inkPaint(color) }}
+								style={{ "--swatch": inkSwatch(color) }}
 								onClick={() => setInkColor(color)}
 							/>
 						)}

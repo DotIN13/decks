@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { layout, type PenDocument } from "@decks/pen";
-import { inkItem, inkVariableEdit, strokeOf } from "./ink.ts";
+import { apply, baseTheme, layout, resolve, withDecksColors, type PenDocument } from "@decks/pen";
+import { inkHex, inkItem, strokeOf } from "./ink.ts";
 
 test("a stroke becomes a pen path in its own box, and reads back as the same stroke where it is drawn", () => {
 	const node = inkItem({ tool: "pen", color: "red", size: 4, points: [100, 200, 0.5, 140, 230, 0.15000000596] }, "s1");
@@ -15,12 +15,16 @@ test("a stroke becomes a pen path in its own box, and reads back as the same str
 	assert.equal(stroke.color, "red");
 });
 
-test("the ink colour is a pen variable for light and dark, added once", () => {
-	const edit = inkVariableEdit({ version: "2.14", children: [] }) as { themes: unknown; set: Record<string, { value: unknown[] }> };
-	assert.deepEqual(edit.themes, { Mode: ["Light", "Dark"] });
-	assert.equal(edit.set["decks-ink"]!.value.length, 2);
-	assert.equal(inkVariableEdit({ version: "2.14", children: [], variables: { "decks-ink": { type: "color", value: "#000" } } }), undefined);
-	const themed = inkVariableEdit({ version: "2.14", children: [], themes: { Look: ["dark", "light"] } }) as { themes?: unknown; set: Record<string, { value: Array<{ theme: unknown }> }> };
-	assert.equal(themed.themes, undefined);
-	assert.deepEqual(themed.set["decks-ink"]!.value[0]!.theme, { Look: "light" });
+test("every ink colour is a Decks variable for light and dark, defined by the stroke's edit", () => {
+	for (const color of ["ink", "red", "blue", "green", "yellow"] as const) {
+		const node = inkItem({ tool: "pen", color, size: 2, points: [0, 0, 0.5, 20, 0, 0.5] }, "s");
+		const paint = (node.stroke ?? node.fill) as string;
+		assert.match(paint, /^\$decks-/, `${color} is a variable`);
+		const ops = withDecksColors({ version: "2.14", children: [] }, [{ op: "insert", node }]);
+		assert.equal(ops.length, 2, `${color}'s variable is defined with it`);
+		const doc = apply({ version: "2.14", children: [] }, ops as Parameters<typeof apply>[1], { theme: {} }).doc;
+		assert.equal(resolve(doc, paint, baseTheme(doc, "light")), inkHex(color, "light"));
+		assert.equal(resolve(doc, paint, baseTheme(doc, "dark")), inkHex(color, "dark"));
+		assert.notEqual(inkHex(color, "light"), inkHex(color, "dark"));
+	}
 });

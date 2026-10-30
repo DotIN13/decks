@@ -56,7 +56,8 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
 		if (node.geometry === next.geometry && node.x === next.x && node.y === next.y) continue;
 		Object.assign(node, next);
-		if (node.stroke === undefined) node.stroke = "#8a8f98";
+		// The tools' arrow grey, light and dark, where the drawing has it (`colors.ts`); the light one where not.
+		if (node.stroke === undefined) node.stroke = doc.variables?.["decks-line"] ? "$decks-line" : "#8a8f98";
 		if (node.strokeWidth === undefined) node.strokeWidth = 2;
 		if (node.strokeLinecap === undefined) node.strokeLinecap = "round";
 		if (node.strokeLinejoin === undefined) node.strokeLinejoin = "round";

@@ -1,5 +1,7 @@
 import type { InkColor } from "@decks/board-kit";
 import { createSignal } from "solid-js";
+import { scheme } from "../lib/theme.ts";
+import { inkHex } from "../model/ink.ts";
 
 /**
  * Drawing: the tool in hand, its colour and width, and what the lasso holds.
@@ -37,6 +39,9 @@ const setPenSeen = (seen: boolean) => {
 };
 
 export { drawing, setDrawing, inkTool, setInkTool, inkColor, setInkColor, inkWidth, setInkWidth, penSeen, setPenSeen };
+
+/** An ink colour's swatch in a tray: the colour a stroke in it is drawn in on the canvas now, light or dark (`model/ink.ts`). */
+export const inkSwatch = (color: InkColor): string => inkHex(color, scheme());
 
 export const INK_WIDTHS: Record<"pen" | "marker", [number, number, number]> = { pen: [2, 4, 8], marker: [12, 20, 32] };
 

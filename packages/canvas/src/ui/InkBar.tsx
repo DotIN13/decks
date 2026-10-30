@@ -1,4 +1,4 @@
-import { INK_COLORS, inkPaint } from "@decks/board-kit";
+import { INK_COLORS } from "@decks/board-kit";
 import type { LucideIcon } from "lucide-solid";
 import Eraser from "lucide-solid/icons/eraser";
 import Highlighter from "lucide-solid/icons/highlighter";
@@ -9,7 +9,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import Undo2 from "lucide-solid/icons/undo-2";
 import X from "lucide-solid/icons/x";
 import { For, onCleanup, onMount, Show } from "solid-js";
-import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../edit/ink.ts";
+import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../edit/ink.ts";
 import { Icon } from "@decks/ui";
 import { inkKey } from "../edit/ink-keys.ts";
 
@@ -104,7 +104,7 @@ export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" |
 								aria-pressed={inkColor() === color}
 								title={COLOR_NAMES[color]}
 								aria-label={COLOR_NAMES[color]}
-								style={{ "--swatch": color === "ink" ? "var(--fg)" : inkPaint(color) }}
+								style={{ "--swatch": inkSwatch(color) }}
 								onClick={() => setInkColor(color)}
 							/>
 						)}
