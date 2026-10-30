@@ -41,7 +41,7 @@ for (const target of TARGETS) {
 
 	const shownBefore = await canvas.evaluate(() => window.__decksSheet?.shown ?? 0);
 	await canvas.evaluate(() => window.__loseContext.restoreContext());
-	const back = await page
+	const back = await canvas
 		.waitForFunction(() => {
 			const s = window.__decksEngine.stats();
 			return s.restarts === 1 && !s.paused && s.workerBackend === "webgl2" && s.pictures > 0;
