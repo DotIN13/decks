@@ -40,6 +40,7 @@ import {
 	type ArrowStyle,
 	type PenTool,
 } from "@decks/canvas/tools";
+import { onDismiss } from "@decks/ui";
 import { Icon } from "../ui/icons.tsx";
 
 /**
@@ -420,7 +421,12 @@ function ToolMenu(props: { at: { left: number; top: number }; above: boolean; le
 			props.onClose();
 		};
 		document.addEventListener("pointerdown", away, true);
-		onCleanup(() => document.removeEventListener("pointerdown", away, true));
+		// A press in the page around the canvas frame, or Escape anywhere (`@decks/ui` dismiss).
+		const stopDismiss = onDismiss(() => props.onClose());
+		onCleanup(() => {
+			document.removeEventListener("pointerdown", away, true);
+			stopDismiss();
+		});
 		card?.querySelector<HTMLElement>("[data-on='true']")?.focus({ preventScroll: true });
 	});
 	return (

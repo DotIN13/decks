@@ -1,6 +1,7 @@
 import { serialize, type PenDocument } from "@decks/pen";
 import type { Camera } from "@decks/protocol";
 import { createEffect, createSignal, on, onCleanup, Show, untrack, type JSX } from "solid-js";
+import { dismissMenus } from "@decks/ui";
 import type { CanvasHandle, CanvasOptions, Editor, EditorState } from "../../types.ts";
 import type { PenTool } from "../../edit/pen-tools.ts";
 import { insets } from "../../camera/insets.ts";
@@ -271,6 +272,8 @@ export function createFramedEditor(options: Options): Editor {
 			else delete composer.dataset.refer;
 		});
 		page.on("open-app", (data) => options.frame.openApp?.(data.name));
+		// A press or Escape in the frame: this page's menus go, as on a press here (`@decks/ui` dismiss).
+		page.on("away", () => dismissMenus());
 		// A link the frame may not open: an http(s) address alone, in a tab that cannot reach back to this page.
 		page.on("open-link", (data) => {
 			try {
@@ -377,6 +380,22 @@ export function createFramedEditor(options: Options): Editor {
 			const page = end();
 			const dock = options.frame.dock?.();
 			if (page && dock !== undefined) page.emit("look", { dock });
+		});
+		/*
+		 * A press or Escape on this page, which the frame does not hear: its open menus go. A press in the
+		 * frame lands in the frame's document, so every press heard here is outside it.
+		 */
+		createEffect(() => {
+			const page = end();
+			if (!page) return;
+			const press = () => page.emit("away", {});
+			const key = (event: KeyboardEvent) => event.key === "Escape" && page.emit("away", {});
+			window.addEventListener("pointerdown", press, true);
+			window.addEventListener("keydown", key, true);
+			onCleanup(() => {
+				window.removeEventListener("pointerdown", press, true);
+				window.removeEventListener("keydown", key, true);
+			});
 		});
 		/*
 		 * Where the composer is, on the frame's screen: said as the frame starts, as the composer or the

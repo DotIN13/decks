@@ -5,6 +5,7 @@ import Send from "lucide-solid/icons/send";
 import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { setCommentDirty, type CommentTarget } from "../state/comments.ts";
+import { onDismiss } from "@decks/ui";
 import { Icon } from "../ui/icons.tsx";
 import { popupPlace } from "./comments.ts";
 
@@ -65,7 +66,10 @@ export function CommentPopup(props: {
 			});
 		window.addEventListener("pointerdown", away, true);
 		window.addEventListener("blur", intoFrame);
+		// A press in the page around the canvas frame this popup is drawn in (`@decks/ui` dismiss).
+		const stopDismiss = onDismiss(() => props.onClose());
 		onCleanup(() => {
+			stopDismiss();
 			setCommentDirty(false);
 			window.removeEventListener("resize", place);
 			window.removeEventListener("pointerdown", away, true);

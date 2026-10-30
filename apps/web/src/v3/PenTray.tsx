@@ -4,6 +4,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import { createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { INK_WIDTHS, inkColor, inkSwatch, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "@decks/canvas/tools";
+import { onDismiss } from "@decks/ui";
 import { Icon } from "../ui/icons.tsx";
 
 /**
@@ -70,7 +71,12 @@ export function PenTray(props: {
 			event.stopPropagation();
 		};
 		window.addEventListener("keydown", onKey, true);
-		onCleanup(() => window.removeEventListener("keydown", onKey, true));
+		// The widths open beside an instrument go with a press in the page around the canvas frame.
+		const stopDismiss = onDismiss(() => setWidths(false));
+		onCleanup(() => {
+			window.removeEventListener("keydown", onKey, true);
+			stopDismiss();
+		});
 	});
 
 	const sizes = () => INK_WIDTHS[inkTool() === "marker" ? "marker" : "pen"];

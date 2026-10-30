@@ -90,6 +90,8 @@ export interface PageToFrame {
 	step: { direction: "undo" | "redo" };
 	/** Who writes on the drawing now: what it is drawing is shown in their colour, with their name. */
 	busy: { writer?: { name?: string; color: string } };
+	/** A press or Escape on the page, which the frame does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
+	away: Record<string, never>;
 }
 
 /** The calls the page makes of the frame, and what each answers. */
@@ -129,6 +131,8 @@ export interface FrameToPage {
 	export: { ids: string[] };
 	store: { key: string; value: string | null };
 	keys: { key: string; code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
+	/** A press or Escape in the frame, which the page does not hear: its open menus and popovers go (`@decks/ui` dismiss). */
+	away: Record<string, never>;
 }
 
 /** The calls the frame makes of the page, and what each answers. */

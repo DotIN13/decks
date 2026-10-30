@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
+import { onDismiss } from "./dismiss.ts";
 import { portalLayer } from "./portal.ts";
 
 /**
@@ -61,10 +62,11 @@ export function Popover(props: {
 
 	const rows = () => (card ? [...card.querySelectorAll<HTMLElement>(props.rowSelector ?? "[data-row]")] : []);
 
-	const change = (next: boolean) => {
+	/** `refocus`: hand the keyboard back to the trigger; not when put away by a press in another document. */
+	const change = (next: boolean, refocus = true) => {
 		setOpen(next);
 		props.onOpenChange?.(next);
-		if (!next) trigger?.focus();
+		if (!next && refocus) trigger?.focus();
 	};
 
 	/*
@@ -237,11 +239,14 @@ export function Popover(props: {
 			}
 		};
 		document.addEventListener("pointerdown", away);
+		// A press or Escape in the other document of the canvas frame (`dismiss.ts`).
+		const stopDismiss = onDismiss(() => change(false, false));
 		document.addEventListener("keydown", keys);
 		document.addEventListener("click", picked);
 		window.addEventListener("resize", place);
 		onCleanup(() => {
 			document.removeEventListener("pointerdown", away);
+			stopDismiss();
 			document.removeEventListener("keydown", keys);
 			document.removeEventListener("click", picked);
 			window.removeEventListener("resize", place);

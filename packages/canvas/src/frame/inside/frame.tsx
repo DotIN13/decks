@@ -1,5 +1,6 @@
 import { baseTheme, placements, serialize, type PenEdit } from "@decks/pen";
 import { createSignal, untrack } from "solid-js";
+import { dismissMenus } from "@decks/ui";
 import { render } from "solid-js/web";
 import type { Board } from "@decks/protocol";
 import { createEditor } from "../../mount.tsx";
@@ -560,6 +561,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 		if (event.defaultPrevented || !(event.metaKey || event.ctrlKey || event.altKey)) return;
 		end.emit("keys", { key: event.key, code: event.code, meta: event.metaKey, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey });
 	});
+
+	/*
+	 * A press or Escape here puts away the page's menus, which hear nothing from this document; and one
+	 * there puts away this frame's (`@decks/ui` dismiss).
+	 */
+	addEventListener("pointerdown", () => end.emit("away", {}), true);
+	addEventListener("keydown", (event) => event.key === "Escape" && end.emit("away", {}), true);
+	end.on("away", () => dismissMenus());
 
 	/*
 	 * The agent's cursor, over the canvas on a layer that follows the camera: the card's place plus the

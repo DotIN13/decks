@@ -1,3 +1,4 @@
+import { onDismiss } from "@decks/ui";
 import { draftLabel, type DraftMention, type MentionKind } from "./draft.ts";
 
 /**
@@ -230,6 +231,7 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 		document.removeEventListener("scroll", moved, true);
 		removeEventListener("resize", resized);
 		removeEventListener("blur", away);
+		stopDismiss();
 		card.remove();
 		pill.setAttribute("aria-expanded", "false");
 		if (open?.card === card) open = undefined;
@@ -252,6 +254,8 @@ export function openPillCard(pill: HTMLElement, node: DraftMention, host: PillHo
 	const resized = () => close();
 	addEventListener("resize", resized);
 	addEventListener("blur", away);
+	// A press in the canvas frame, said by the frame (`@decks/ui` dismiss): the blur above misses one when the frame already had focus.
+	const stopDismiss = onDismiss(() => close());
 	open = { pill, card, close: () => close() };
 }
 

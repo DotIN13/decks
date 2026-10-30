@@ -3,7 +3,7 @@ import { ADAPTIVE, adaptiveTitle, swatchPaint } from "./adaptive.ts";
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { portalLayer } from "@decks/ui";
+import { onDismiss, portalLayer } from "@decks/ui";
 import { Icon } from "@decks/ui";
 import { scheme } from "../lib/theme.ts";
 
@@ -111,7 +111,9 @@ export function ColorPicker(props: {
 		window.addEventListener("pointerdown", away, true);
 		window.addEventListener("keydown", key, true);
 		window.addEventListener("resize", position);
+		const stopDismiss = onDismiss(() => props.onClose());
 		onCleanup(() => {
+			stopDismiss();
 			window.removeEventListener("pointerdown", away, true);
 			window.removeEventListener("keydown", key, true);
 			window.removeEventListener("resize", position);

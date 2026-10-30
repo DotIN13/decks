@@ -2,7 +2,7 @@ import { SHAPE_GROUPS, SHAPES } from "@decks/pen";
 import Search from "lucide-solid/icons/search";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { penIcon, penShape, setPenIcon, setPenShape, type InsertPanel } from "../edit/pen-tools.ts";
-import { Icon } from "@decks/ui";
+import { Icon, onDismiss } from "@decks/ui";
 import { iconsOf, ICON_LIBRARIES, noteRecentIcon, recentIcons, searchIcons } from "../render/icon-index.ts";
 import { iconUrl } from "../render/icons.ts";
 
@@ -105,7 +105,9 @@ export function Insert(props: { open: InsertPanel; onPick: (tool: "shape" | "ico
 		};
 		window.addEventListener("pointerdown", away, true);
 		window.addEventListener("keydown", key);
+		const stopDismiss = onDismiss(() => props.onClose());
 		onCleanup(() => {
+			stopDismiss();
 			window.removeEventListener("resize", position);
 			window.removeEventListener("pointerdown", away, true);
 			window.removeEventListener("keydown", key);
