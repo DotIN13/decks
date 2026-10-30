@@ -4,6 +4,7 @@ import { boxOf, INTERACT_ZOOM, toScreen, toWorld, type Viewport } from "../camer
 import type { CameraController } from "../camera/controller.ts";
 import { canvasHost, openInTab } from "../host.ts";
 import MediaPlayer from "../items/MediaPlayer.tsx";
+import { chooseLive, NO_LIVE_CARDS, sameLive, type LiveCards } from "../items/live-cards.ts";
 import type { StageBoardProps } from "../items/item-slot.tsx";
 import type { SceneBoard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
@@ -45,6 +46,8 @@ export type ItemsLayerDeps = {
 export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame, gestures } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
+	/** How many cards are awake at once besides the selected one, and how many let go are kept. */
+	const CARD_BUDGET = { live: Infinity, kept: 0 };
 
 	/**
 	 * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.
@@ -261,17 +264,21 @@ export function createItemsLayer(deps: ItemsLayerDeps) {
 		return { x: corner.x, y: corner.y, w: (3 * v.width) / cam.zoom, h: (3 * v.height) / cam.zoom };
 	};
 	/*
-	 * Cards near the window are awake, at any zoom: a card is a few elements in this page, not a
-	 * document (`card.ts`), and one further off sleeps as its picture. A board is never awake: the sheet
-	 * draws it as its picture, and the canvas runs no board's page. A document or an app item is always
-	 * awake (`item-surfaces.tsx`).
+	 * Which cards are awake (`items/live-cards.ts`): chosen from the camera at rest, so nothing mounts or
+	 * unmounts while a pinch, a pan or a glide moves it; the nearest the middle of the screen, cut to this
+	 * device's budget, none below `CARD_LIVE_ZOOM`, and the selected card at any zoom. Every other card
+	 * sleeps as its picture. A board is never awake: the sheet draws it as its picture, and the canvas
+	 * runs no board's page. A document or an app item is always awake (`item-surfaces.tsx`).
 	 */
-	const nearCards = createMemo<readonly string[]>(
-		() => [...nearPaths()].filter((path) => props.boards[boardSlot().get(path) ?? -1]?.card),
-		[],
-		{ equals: (a, b) => a.length === b.length && a.every((path, i) => b[i] === path) },
-	);
-	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(nearCards()));
+	const cardChoice = createMemo<LiveCards>((was) => {
+		const v = view();
+		if (v.width === 0) return was;
+		const next = chooseLive({ index: boardIndex(), items: props.boards, rest: ctl.rest(), view: v, selected: props.selected, budget: CARD_BUDGET, was });
+		return sameLive(was, next) ? was : next;
+	}, NO_LIVE_CARDS);
+	const livePaths = createMemo<ReadonlySet<string>>(() => new Set(cardChoice().live), new Set(), {
+		equals: (a, b) => a.size === b.size && [...a].every((path) => b.has(path)),
+	});
 	/** Whether a card is awake: each slot is told only when its own answer changes. */
 	const isLive = createSelector(livePaths, (path: string, paths) => paths.has(path));
 	/**

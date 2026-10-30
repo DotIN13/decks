@@ -15,20 +15,26 @@ export const MAX_ZOOM = 4;
 const LIVE_ZOOM = 0.5;
 
 /**
- * The zoom at which boards come alive: from here up a board has its page, and the page takes
- * the pointer; below it a board is its picture on the sheet, and dragging across it pans.
+ * The zoom from which the items near the window have slots of their own: a title bar to drag them by
+ * and an edge to size them by, and a press on one is the item's. Below it a sleeping card or a board is
+ * its picture on the sheet and nothing else, and the stage finds the one under a press itself.
  *
- * 50% on every device, and the one rule: below it every board is its picture, at it and above
- * every board in reach is its page, whatever the camera is doing and whichever board is selected.
- *
- * `device` is for a test, and kept so a device can differ again without changing the callers.
+ * 50% on every device. `device` is for a test, and kept so a device can differ again without changing
+ * the callers.
  */
 export function interactZoom(_device?: { coarse: boolean; short: number }): number {
 	return LIVE_ZOOM;
 }
 
-/** This device's live zoom (`interactZoom`). */
+/** This device's slot zoom (`interactZoom`). */
 export const INTERACT_ZOOM = interactZoom();
+
+/**
+ * The zoom below which no card is live, except the selected one: the engine draws every card as its
+ * picture (`items/live-cards.ts`). Under 40% a card's words are too small to read or press, and a live
+ * card is a root of elements the page lays out and paints at every step of a pinch.
+ */
+export const CARD_LIVE_ZOOM = 0.4;
 
 export interface Viewport {
 	width: number;
