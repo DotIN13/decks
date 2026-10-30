@@ -456,7 +456,7 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 	});
 	end.on("camera", (data) => (data.glide ? handle.glide(data.camera, data.glide) : handle.setCamera(data.camera)));
 	end.on("fit", () => handle.fit());
-	end.on("select", (data) => handle.select(data.ids));
+	end.on("select", (data) => (data.page ? selectCard(data.page) : handle.select(data.ids)));
 	end.on("step", (data) => (data.direction === "undo" ? handle.undo() : handle.redo()));
 	end.on("busy", (data) => setBusy({ ...untrack(busy), ...data }));
 	end.answer("edit", (data) => {

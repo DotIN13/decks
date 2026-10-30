@@ -105,6 +105,8 @@ export function createFramedEditor(options: Options): Editor {
 			removeEventListener("message", onHello);
 			const channel = new MessageChannel();
 			const page = peer(channel.port1) as PageEnd;
+			// A new frame has said nothing yet: what the last one said is no reason to keep the page's selection from it.
+			fromFrame = {};
 			wire(page, canvas);
 			setEnd(page);
 			renew(page, canvas, backend.idle, cancelled);
