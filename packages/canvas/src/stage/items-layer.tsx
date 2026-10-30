@@ -9,6 +9,7 @@ import type { StageBoardProps } from "../items/item-slot.tsx";
 import type { SceneBoard } from "../render/types.ts";
 import { docIndex } from "../model/doc-index.ts";
 import { BoxIndex } from "../render/spatial.ts";
+import { CARDS, DEVICE } from "../render/device.ts";
 import { drawing } from "../edit/ink.ts";
 import { scheme } from "../lib/theme.ts";
 import { mediaOf, type PenNode } from "@decks/pen";
@@ -46,8 +47,8 @@ export type ItemsLayerDeps = {
 export function createItemsLayer(deps: ItemsLayerDeps) {
 	const { props, Frame, ctl, view, editor, penLayer, penDrawn, resolveColour, frame, gestures } = deps;
 	const { moving, scaling, gliding, panning, push: pushCamera } = ctl;
-	/** How many cards are awake at once besides the selected one, and how many let go are kept. */
-	const CARD_BUDGET = { live: Infinity, kept: 0 };
+	/** How many cards are awake at once besides the selected one, and how many let go are kept: this device's (`render/device.ts`). */
+	const CARD_BUDGET = CARDS[DEVICE];
 
 	/**
 	 * How many awake items may be put on layers of their own while the scale moves before it stops being a saving.

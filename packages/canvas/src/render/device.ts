@@ -81,3 +81,14 @@ export async function readGpuClass(): Promise<GpuClass> {
 		forced: typeof location === "undefined" ? undefined : new URLSearchParams(location.search).get("pictures"),
 	});
 }
+
+/**
+ * A device's cards (`items/live-cards.ts`): how many are live at once besides the selected one, the
+ * nearest the middle of the screen, and how many let go keep their roots, asleep, so that coming back
+ * to one is instant. A live card is a root of elements this one page lays out, paints and runs the
+ * scripts of; an iPad or a phone has one thread and a hard memory ceiling for all of it.
+ */
+export const CARDS: Record<DeviceKind, { live: number; kept: number }> = {
+	computer: { live: 12, kept: 4 },
+	mobile: { live: 3, kept: 2 },
+};
