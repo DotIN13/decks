@@ -8,7 +8,7 @@ import { dirname, join, posix } from "node:path";
  * A board whose page is one document box (`data-live="doc"`, `data-path`) or one app (`data-live="app"`,
  * `data-app`) was a page of its own, framed on the canvas. In the canvas frame a page inherits the
  * frame's sandbox, with no storage and no app; and neither needs a page. So each becomes an item with
- * no file of its own (`packages/canvas/src/drawing.ts`, `itemKind`):
+ * no file of its own (`packages/canvas/src/model/drawing.ts`, `itemKind`):
  *
  * - `{ type: "browser", metadata: { type: "decks.document", path } }`, `path` as the deck names the file;
  * - `{ type: "browser", metadata: { type: "decks.app", name } }`.

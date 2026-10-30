@@ -88,7 +88,7 @@ export interface PenEntry {
  * request, `edit` on the socket's): set around the call that makes it, read when the drawing is written,
  * and sent back with the revision that has it (`made` on `stage.pen.delta` and `stage.pen`). The browser
  * shows its edit at once and keeps it on top of what the server sends until that revision comes
- * (`canvas/src/drawing.ts`), so it never draws the drawing as it was before for the round trip.
+ * (`canvas/src/model/drawing.ts`), so it never draws the drawing as it was before for the round trip.
  */
 export const penEditBy = new AsyncLocalStorage<string>();
 /** How many writes of each canvas are kept for the agents' notes (`changesSince`). */

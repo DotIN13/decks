@@ -9,4 +9,4 @@ export * from "../camera/camera.ts";
 export * from "../camera/morph.ts";
 export * from "../camera/touched.ts";
 export * from "../camera/insets.ts";
-export * from "../lib/spring.ts";
+export * from "../camera/spring.ts";

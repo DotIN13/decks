@@ -59,7 +59,7 @@ export async function act<T = unknown>(verb: string, args: unknown[], agent?: st
 /**
  * The person's edit to the drawing on screen, sent. `edit` names it: the server sends the name back
  * with the revision that has it (`made`), which is how the canvas, showing the edit already, knows when
- * the drawing it is sent has it (`canvas/src/drawing.ts`). Refused, the drawing is asked for again, so
+ * the drawing it is sent has it (`canvas/src/model/drawing.ts`). Refused, the drawing is asked for again, so
  * an edit the canvas drew ahead of the answer goes away; the answer says whether it was made.
  */
 export async function sendDrawingEdit(agentId: string, ops: unknown[], edit?: string): Promise<boolean> {

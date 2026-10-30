@@ -1,6 +1,6 @@
 import type { PenDocument } from "@decks/pen";
 import type { Board, Camera } from "@decks/protocol";
-import type { PenTool } from "../state/pen-tools.ts";
+import type { PenTool } from "../edit/pen-tools.ts";
 import type { Insets } from "../camera/insets.ts";
 
 /**

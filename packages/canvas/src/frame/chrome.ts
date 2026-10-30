@@ -1,7 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import type { Accessor, JSX, Setter } from "solid-js";
 import type { CanvasHandle } from "../mount.tsx";
-import type { StageComment } from "../Stage.tsx";
+import type { StageComment } from "../stage/Stage.tsx";
 import type { ComposerPart } from "./protocol.ts";
 
 /**

@@ -7,17 +7,17 @@ import { fitInto, frames } from "./camera/camera.ts";
 import { viewToPark } from "./camera/agent-view.ts";
 import { createAgentViews, type ViewStorage } from "./camera/agent-views.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { boardsAhead, boardsOf, createDrawing } from "./drawing.ts";
-import { stageMeasure } from "./stage/measure.ts";
-import type { DocEdits, DrawingWriter } from "./stage/types.ts";
+import { boardsAhead, boardsOf, createDrawing } from "./model/drawing.ts";
+import { stageMeasure } from "./render/measure.ts";
+import type { DocEdits, DrawingWriter } from "./render/types.ts";
 import { setCanvasHost, type CanvasHost } from "./host.ts";
-import { InkBar } from "./ink/InkBar.tsx";
+import { InkBar } from "./ui/InkBar.tsx";
 import { setCanvasScheme } from "./lib/theme.ts";
-import { PenBar } from "./pen/PenBar.tsx";
-import { ItemSlot } from "./item-slot.tsx";
-import { Stage, type InkRequest, type StageComment } from "./Stage.tsx";
-import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./state/ink.ts";
-import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./state/pen-tools.ts";
+import { PenBar } from "./ui/PenBar.tsx";
+import { ItemSlot } from "./items/item-slot.tsx";
+import { Stage, type InkRequest, type StageComment } from "./stage/Stage.tsx";
+import { drawing as inkOn, setDrawing, setInkTool, type InkTool } from "./edit/ink.ts";
+import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "./edit/pen-tools.ts";
 
 /** What a host gives `mountCanvas`. Only `text` is needed. */
 export interface CanvasOptions {

@@ -6,7 +6,7 @@ import { dirname, join, posix } from "node:path";
  * 2026-10-29: every board on a canvas becomes a card.
  *
  * A board was a page of its own, framed on the canvas; a card is a piece of HTML the stage draws in a
- * shadow root of its own page (`packages/canvas/src/card.ts`). Each board placed on one of the deck's
+ * shadow root of its own page (`packages/canvas/src/items/card.ts`). Each board placed on one of the deck's
  * own canvases (`canvases/<name>/canvas.pen`) is rewritten into `canvases/<name>/cards/<board>/index.html`,
  * and its item in the drawing becomes `decks.card`, keeping its id, place and size so arrows to it still
  * join. It is not lossless, and need not be:

@@ -3,13 +3,13 @@
  * bar and ink bar, what the canvas asks its host, the scheme, how a card reads, the agents' stage
  * calls and keys.
  */
-export { PenBar } from "../pen/PenBar.tsx";
-export { InkBar } from "../ink/InkBar.tsx";
+export { PenBar } from "../ui/PenBar.tsx";
+export { InkBar } from "../ui/InkBar.tsx";
 export * from "../host.ts";
-export * from "../stage-ops.ts";
-export * from "../card-reading.ts";
-export * from "../keycaps.ts";
+export * from "../camera/stage-ops.ts";
+export * from "../items/card-reading.ts";
+export * from "../ui/keycaps.ts";
 export * from "../lib/theme.ts";
-export * from "../stage/engine.ts";
+export * from "../render/engine.ts";
 
-export { isNews } from "../board-news.ts";
+export { isNews } from "../items/news.ts";

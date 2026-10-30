@@ -6,7 +6,7 @@ import { dirname, join, relative } from "node:path";
  * 2026-10-28: markdown cards take a tag of their own, `decks.markdown-card`.
  *
  * A markdown card is a pen frame tagged `decks.card`. That tag now names an HTML card, a `browser`
- * item drawn in a shadow root of the stage's page (`packages/canvas/src/card.ts`). The two never
+ * item drawn in a shadow root of the stage's page (`packages/canvas/src/items/card.ts`). The two never
  * clashed, one being a frame and the other a browser item, but one name for two things would, so the
  * frames are rewritten: every frame tagged `decks.card` in the deck's own drawings (`canvases/<name>/
  * canvas.pen`, their `frames/`, and the deck's `frames/`) becomes `decks.markdown-card`.

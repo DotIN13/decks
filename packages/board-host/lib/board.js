@@ -392,7 +392,7 @@
 	let stageClient;
 
 	/*
-	 * This board's own token, from the page around it (`packages/canvas/src/board-host.ts`): the Decks
+	 * This board's own token, from the page around it (`packages/canvas/src/items/card.ts`): the Decks
 	 * app, or Studio, asks the harness for a token that is this board and nothing else, and posts it to
 	 * this frame alone. It is asked for by `{ decks: "board.ready" }`, said once this script runs and
 	 * again on every load, and arrives as `{ decks: "board.token", token }` — taken only from the

@@ -1,8 +1,8 @@
 import type { Camera } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { between, pan, zoomAbout, type Viewport } from "./camera.ts";
-import { coastStep } from "../touch.ts";
-import { springCurve } from "../lib/spring.ts";
+import { coastStep } from "./touch.ts";
+import { springCurve } from "./spring.ts";
 
 /**
  * The camera of one stage: where it is, whether it is moving, and the one place that moves it.

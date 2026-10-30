@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Box } from "@decks/pen";
-import { fontFiles, type FontNeed } from "../../../../packages/canvas/src/pen/font-files.ts";
-import { iconUrl, parseIcon } from "../../../../packages/canvas/src/pen/icons.ts";
-import { cardReader } from "../../../../packages/canvas/src/stage/reader.ts";
+import { fontFiles, type FontNeed } from "../../../../packages/canvas/src/render/font-files.ts";
+import { iconUrl, parseIcon } from "../../../../packages/canvas/src/render/icons.ts";
+import { cardReader } from "../../../../packages/canvas/src/render/reader.ts";
 import { serverText } from "./text.ts";
 
 /**

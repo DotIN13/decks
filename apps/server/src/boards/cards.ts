@@ -5,7 +5,7 @@ const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 
 /**
  * A card: a piece of HTML in a canvas's `cards/`, which the stage puts in a shadow root of its own
- * page instead of a frame (`packages/canvas/src/card.ts`). Its scripts run as modules, each served at
+ * page instead of a frame (`packages/canvas/src/items/card.ts`). Its scripts run as modules, each served at
  * its own address beside the card (`sales.html.m0.js`), so a relative `import "./sales.js"` resolves
  * from the card's folder and an error names the card's file. A card opened by itself, or pictured by
  * the server's Chrome, is the same piece in a page of its own (`cardPage`).
