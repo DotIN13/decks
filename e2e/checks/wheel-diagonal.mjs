@@ -6,22 +6,23 @@
  * direction every step, so the pan went straight sideways until a step was big enough to move it.
  * The part below a pixel is carried to the next step now.
  */
-import { open, resetStage, rest, say, settle } from "../harness.mjs";
+import { canvasFrame, open, resetStage, rest, say, settle } from "../harness.mjs";
 
 await resetStage();
 const { browser, page, errors } = await open({ width: 1400, height: 900, boards: false, dpr: 2 });
 await rest(page, { start: 0 });
 await settle(page, 600);
+const canvas = await canvasFrame(page);
 
 const cameraNow = () =>
-	page.evaluate(() => {
+	canvas.evaluate(() => {
 		const m = /scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/.exec(globalThis.__decksCameraTransform());
 		return { zoom: Number(m[1]), x: -Number(m[2]), y: -Number(m[3]) };
 	});
 
 for (const [dx, dy] of [[1.3, 0.9], [3.2, 2.1], [0.4, 0.7]]) {
 	const before = await cameraNow();
-	await page.evaluate(
+	await canvas.evaluate(
 		({ dx, dy }) => {
 			const stage = document.querySelector(".stage");
 			for (let i = 0; i < 30; i++) stage.dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: 700, clientY: 450, bubbles: true, cancelable: true }));

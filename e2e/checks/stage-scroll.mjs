@@ -10,7 +10,7 @@
  *
  * Needs no model: a card goes in over the wire, and the rest is one double-click.
  */
-import { editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, editMode, firstOnCanvas, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -27,28 +27,35 @@ await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);
+const canvas = await canvasFrame(page);
 
 // Asked until it answers, with the camera at rest: on a busy machine the canvas is still landing at the first look.
-const clear = await page
-	.waitForFunction(() => {
-		if (document.querySelector(".stage")?.dataset.gliding === "true") return null;
+// The frame finds the places empty of the canvas's own things; the page says which are not under its chrome.
+const places = () =>
+	canvas.evaluate(() => {
+		if (document.querySelector(".stage")?.dataset.gliding === "true") return [];
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		const out = [];
 		for (let y = 140; y < window.innerHeight - 160; y += 30) {
 			for (let x = 320; x < window.innerWidth - 320; x += 30) {
 				// Room for the press and a little around it; the card itself may hang over anything below.
-				if ([0, 60].every((dy) => [0, 90].every((dx) => empty(x + dx, y + dy)))) return { screen: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, window: window.innerHeight };
+				const points = [0, 60].flatMap((dy) => [0, 90].map((dx) => [x + dx, y + dy]));
+				if (points.every(([px, py]) => empty(px, py))) out.push({ points, screen: { x, y }, world: { x: (x - m.e) / m.a, y: (y - m.f) / m.a }, window: window.innerHeight });
 			}
 		}
-		return null;
-	}, null, { timeout: 8000, polling: 200 })
-	.then((handle) => handle.jsonValue())
-	.catch(() => undefined);
-const why = clear ? "" : await page.evaluate(() => JSON.stringify({ cam: globalThis.__decksCameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live, at: [[400, 200], [600, 400], [800, 500]].map(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}.${[...e.classList].join(".")}` : null; }) }));
+		return out;
+	});
+let clear;
+for (const deadline = Date.now() + 8000; !clear && Date.now() < deadline; ) {
+	clear = await firstOnCanvas(page, await places());
+	if (!clear) await settle(page, 200);
+}
+const why = clear ? "" : await canvas.evaluate(() => JSON.stringify({ cam: globalThis.__decksCameraTransform(), gliding: document.querySelector(".stage")?.dataset.gliding, live: document.querySelector(".stage")?.dataset.live }));
 say("the canvas has a clear place for a tall card", !!clear, JSON.stringify(clear?.screen) + why);
 
-const scrolled = () => page.evaluate(() => {
+const scrolled = () => canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	return { top: stage.scrollTop, left: stage.scrollLeft, overflow: getComputedStyle(stage).overflow };
 });
@@ -61,7 +68,7 @@ if (clear) {
 	const many = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}: words enough to make this card taller than any window.`).join("\n\n");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "tall", content: many, metadata: { type: "decks.markdown" }, width: 320 }, box: { x1: Math.round(clear.world.x), y1: Math.round(clear.world.y) } }] });
 	const card = await until(async () => {
-		const box = await page.evaluate(() => globalThis.__decksPenBox?.("tall"));
+		const box = await canvas.evaluate(() => globalThis.__decksPenBox?.("tall"));
 		return box && box.height > clear.window * 1.5 ? box : undefined;
 	}, 12000);
 	say("the card is half again the window's height", !!card, JSON.stringify({ h: Math.round(card?.height ?? 0), window: clear.window, ...(await scrolled()) }));
@@ -72,7 +79,7 @@ if (clear) {
 		await page.mouse.dblclick(clear.screen.x + 40, clear.screen.y + 40);
 		await settle(page, 900);
 		// A markdown note opens the card editor; any other text, the plain one.
-		const typing = await page.evaluate(() => !!(document.activeElement?.closest(".pen-card-editor") || document.querySelector(".pen-text")));
+		const typing = await canvas.evaluate(() => !!(document.activeElement?.closest(".pen-card-editor") || document.querySelector(".pen-text")));
 		const during = await scrolled();
 		say("a double-click opens its words for typing", typing, JSON.stringify(during));
 		say("…and the stage does not scroll to show the caret", during.top === before.top && during.left === before.left, JSON.stringify({ before, during }));

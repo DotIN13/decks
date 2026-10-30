@@ -7,7 +7,7 @@
  * over a selected board offers exactly Fit, New tab, Comment and Hide, and its Comment opens a
  * focused box about the whole board whose Enter puts a pill over the composer.
  */
-import { open, pressBoardAction, say, selectBoard, settle, stagePath } from "../harness.mjs";
+import { canvasFrame, open, pressBoardAction, say, selectBoard, settle, stagePath } from "../harness.mjs";
 
 // The panel opens on Canvas, where a board on the canvas has its row (`panel/LeftPanel.tsx`, `itemRow`).
 const { browser, page, errors } = await open({ width: 1440, height: 1000, panelTab: "canvas" });
@@ -16,17 +16,24 @@ const { browser, page, errors } = await open({ width: 1440, height: 1000, panelT
 await page.locator('.panel-shell [title^="What the survey round found"]').first().click();
 await settle(page, 900);
 const NOTES = await stagePath(page, "boards/notes.html");
-const onCanvas = await page.locator(`.board-node[data-path="${NOTES}"]`).count();
-say("the flow board is on the canvas", onCanvas === 1, `${onCanvas} node(s) at ${NOTES}`);
+const canvas = await canvasFrame(page);
+const onCanvas = await canvas.evaluate((path) => (window.__decksBoards?.() ?? []).filter((one) => one.path === path).length, NOTES);
+say("the flow board is on the canvas", onCanvas === 1, `${onCanvas} at ${NOTES}`);
 
 await selectBoard(page, NOTES);
-const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
-say("the pill over the board offers fit, a tab, a comment and going away, in that order", bar.join(",") === "Fit,New tab,Comment,Hide", JSON.stringify(bar));
+const bar = await canvas.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] .acts > [data-act]:not([data-act=More])")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
+// Delete is there because the canvas frame can delete a card's or board's file (`frame/frame.tsx`, `onDeleteBoard`).
+say("the pill over the board offers fit, a tab, a comment, delete and going away, in that order", bar.join(",") === "Fit,New tab,Comment,Delete,Hide", JSON.stringify(bar));
 
 // Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
 await pressBoardAction(page, "Comment");
-await page.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
-const whole = await page.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
+await canvas.waitForSelector(".comment-popup", { timeout: 4000 });
+const straight = await canvas.locator(".comment-popup .comment-field").isVisible().catch(() => false);
+say("the pill's Comment opens the box straight away, not the small button", straight);
+// Opened by its button when it did not, so the rest is still checked.
+if (!straight) await canvas.locator(".comment-popup .comment-start").click().catch(() => {});
+await canvas.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
+const whole = await canvas.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
 say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole board"), JSON.stringify(whole));
 await page.keyboard.type("Shorter, please.");
 await page.keyboard.press("Enter");
@@ -36,6 +43,7 @@ const chip = await page
 	.catch(() => null);
 say("…and Enter puts it over the input bar, named by its board", chip?.trim() === NOTES.split("/").pop(), String(chip));
 await page.evaluate(() => localStorage.removeItem("decks.comments"));
+
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

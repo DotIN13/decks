@@ -10,7 +10,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, deckState, editMode, firstOnCanvas, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -62,21 +62,33 @@ say("the stage has a file to draw in", existsSync(file), file);
 
 await editMode(page, true);
 
-// Asked until it answers: on a busy machine the canvas is still landing, or its pages still loading over the bare canvas, at the first look.
-const spot = await page
-	.waitForFunction(() => {
+// Asked until it answers: on a busy machine the canvas is still landing at the first look. The canvas
+// frame finds the places bare of its own things; the page says which are not under its own chrome.
+const canvas = await canvasFrame(page);
+let spot;
+// Where the canvas lands may be all boards: after a few looks, the view is moved aside to bare canvas.
+for (let look = 0, deadline = Date.now() + 15000; !spot && Date.now() < deadline; look++) {
+	const places = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		const out = [];
 		for (let y = 170; y < 780; y += 40) {
 			for (let x = 380; x < 1300; x += 40) {
-				if (empty(x, y) && empty(x + 560, y) && empty(x, y + 340) && empty(x + 560, y + 340)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+				const points = [[x, y], [x + 560, y], [x, y + 340], [x + 560, y + 340]];
+				if (points.every(([px, py]) => empty(px, py))) out.push({ points, x: (x - m.e) / m.a, y: (y - m.f) / m.a });
 			}
 		}
-		return null;
-	}, null, { timeout: 8000, polling: 200 })
-	.then((handle) => handle.jsonValue())
-	.catch(() => undefined);
+		return out;
+	});
+	spot = await firstOnCanvas(page, places);
+	if (!spot && look >= 3) {
+		await page.mouse.move(800, 450);
+		await page.mouse.wheel(1500, 0);
+		await rest(page).catch(() => {});
+	}
+	if (!spot) await settle(page, 200);
+}
 say("the canvas has room for a frame and a note beside it", !!spot);
 
 if (spot) {
@@ -92,7 +104,7 @@ if (spot) {
 	const both = await until(() => (onDisk().children.some((n) => n.id === "f-box") && onDisk().children.some((n) => n.id === "f-note") ? true : undefined));
 	say("a frame and a loose item start side by side at the top of the file", !!both, JSON.stringify({ note: parentOf("f-note"), frame: parentOf("f-box"), layout: onDisk().children.find((n) => n.id === "f-box")?.layout, clip: onDisk().children.find((n) => n.id === "f-box")?.clip }));
 
-	const boxOf = (id) => page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const boxOf = (id) => canvas.evaluate((one) => globalThis.__decksPenBox?.(one), id);
 	const middleOf = async (id) => {
 		const box = await boxOf(id);
 		return box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : undefined;
@@ -106,20 +118,20 @@ if (spot) {
 	 */
 	const from = await until(() => middleOf("f-note"));
 	const into = await until(() => middleOf("f-box"));
-	const wouldTake = await page.evaluate(([x, y]) => globalThis.__decksFrameUnder?.(x, y), [into.x, into.y]);
+	const wouldTake = await canvas.evaluate(([x, y]) => globalThis.__decksFrameUnder?.(x, y), [into.x, into.y]);
 	say("both are on screen to drag between", !!from && !!into, JSON.stringify({ from, into, wouldTake }));
 	if (from && into) {
 		await page.mouse.move(from.x, from.y);
 		await page.mouse.down();
 		await page.mouse.move((from.x + into.x) / 2, (from.y + into.y) / 2, { steps: 6 });
 		await settle(page, 200);
-		const holding = await page.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length);
+		const holding = await canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length);
 		say("the press picked the item up rather than starting a marquee", holding === 1, `outlines ${holding}`);
 		// The frame says it would take it, before anything is let go: the gesture has to be legible.
-		const lit = await page.evaluate(() => document.querySelectorAll('.pen-join[data-drop="frame"]').length);
+		const lit = await canvas.evaluate(() => document.querySelectorAll('.pen-join[data-drop="frame"]').length);
 		await page.mouse.move(into.x, into.y, { steps: 6 });
 		await settle(page, 150);
-		const during = await page.evaluate(() => ({
+		const during = await canvas.evaluate(() => ({
 			joins: document.querySelectorAll(".pen-join").length,
 			drops: document.querySelectorAll('.pen-join[data-drop="frame"]').length,
 			carried: globalThis.__decksPenBox?.("f-note")?.x,
@@ -168,21 +180,21 @@ if (spot) {
 		// Its edge, not its middle, which is where the item it holds would be.
 		const box = await boxOf("f-box");
 		await page.mouse.click(box.x + 6, box.y + box.height / 2);
-		const panel = await until(() => page.evaluate(() => {
+		const panel = await until(() => canvas.evaluate(() => {
 			const section = document.querySelector('[data-section="layout"]');
 			return section ? { buttons: [...section.querySelectorAll("button")].map((b) => b.textContent?.trim()).filter(Boolean) } : undefined;
 		}));
 		say("a selected frame has a Layout section", !!panel, JSON.stringify(panel?.buttons?.slice(0, 6)));
 		if (panel) {
 			say("…whose words are CSS: a direction, a size that can fit its content, and overflow", ["none", "column", "row", "fit-content", "hidden"].every((word) => panel.buttons.includes(word)), JSON.stringify(panel.buttons));
-			await page.evaluate(() => {
+			await canvas.evaluate(() => {
 				const section = document.querySelector('[data-section="layout"]');
 				[...section.querySelectorAll("button")].find((b) => b.textContent?.trim() === "column")?.click();
 			});
 			const stacked = await until(() => (onDisk().children.find((n) => n.id === "f-box")?.layout === "vertical" ? true : undefined));
 			say("…and pressing column writes pen's own vertical layout to the file", !!stacked, JSON.stringify(onDisk().children.find((n) => n.id === "f-box")?.layout));
 			// A frame that follows its children keeps a floor, so emptying it leaves something to drop into.
-			await page.evaluate(() => {
+			await canvas.evaluate(() => {
 				const group = document.querySelector('[data-section="layout"] [aria-label="height"]');
 				[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
 			});
@@ -199,9 +211,9 @@ if (spot) {
 	 * frame is a column, so a drop into it is a place in an order rather than a pixel, and the line
 	 * between two children is what says which place.
 	 */
-	await page.click('.v3-tool[data-tool="shape"]');
-	await page.click('.v3-menu-row:has-text("Frame")');
-	const room = await page.evaluate(() => {
+	await canvas.click('.v3-tool[data-tool="shape"]');
+	await canvas.click('.v3-menu-row:has-text("Frame")');
+	const room = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
@@ -221,7 +233,7 @@ if (spot) {
 		say("…with the height it was drawn at as its floor, so an empty one is something to drop into", /^fit_content\(\d+(\.\d+)?\)$/.test(String(made?.height)) && Number(/\((.*)\)/.exec(made.height)[1]) > 0, JSON.stringify(made?.height));
 		if (made) {
 			// Its bottom edge dragged fixes a height; two presses on that handle make it hug again (`hugAgain`).
-			const south = await until(() => page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }));
+			const south = await until(() => canvas.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; }));
 			if (south) {
 				await page.mouse.move(south.x, south.y);
 				await page.mouse.down();
@@ -231,7 +243,7 @@ if (spot) {
 				const fixed = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "number" ? h : undefined; });
 				say("dragging its bottom edge fixes its height", typeof fixed === "number", String(fixed));
 				await settle(page, 500);
-				const again = await page.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
+				const again = await canvas.evaluate(() => { const r = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined; });
 				await page.mouse.click(again.x, again.y);
 				await page.mouse.click(again.x, again.y);
 				const hugs = await until(() => { const h = onDisk().children.find((n) => n.id === made.id)?.height; return typeof h === "string" ? h : undefined; });
@@ -266,7 +278,7 @@ if (spot) {
 				await page.mouse.move(gap.x + 40, gap.y - 20, { steps: 6 });
 				await page.mouse.move(gap.x, gap.y, { steps: 6 });
 				await settle(page, 200);
-				const line = await page.evaluate(() => {
+				const line = await canvas.evaluate(() => {
 					const one = document.querySelector(".pen-insert");
 					if (!one) return undefined;
 					const box = one.getBoundingClientRect();

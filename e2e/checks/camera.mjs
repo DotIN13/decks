@@ -1,17 +1,38 @@
-/** The camera, the embeds, and a file changed on disk reaching the frame. */
-import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, still, write, rest } from "../harness.mjs";
-
-const plan = await boardPath("plan.html");
-const original = read(plan);
+/**
+ * The camera, in the canvas frame: a zoom holds the point under the cursor, `0` and ⌘+ / ⌘− / ⌘0
+ * are the canvas's, and what a zoom does that a pan does not.
+ *
+ * What this checked of boards' pages (the focus inside a board, its embeds, a file changed on disk
+ * reaching its frame, documents kept for a board that left the screen, a middle-drag over one, a
+ * pan not reloading them) went with the pages themselves (d7906b45): a board is only its picture.
+ */
+import { canvasFrame, deckState, liveZoom, onCanvasAt, open, say, settle, still } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
+const canvas = await canvasFrame(page);
+/** A point on bare canvas, in the middle of it: no item under it in the frame, and none of the page's chrome over it. */
+const bareSpot = async () => {
+	const candidates = await canvas.evaluate(() => {
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		const out = [];
+		for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16)
+			for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) {
+				const hit = document.elementFromPoint(x, y);
+				if (!hit?.closest(".board-node, .v3-tools, .pen-tools, .board-callout, .v3-zoom, [class*='zoom']")) out.push({ x, y });
+				if (out.length > 40) return out;
+			}
+		return out;
+	});
+	for (const at of candidates) if (await onCanvasAt(page, at.x, at.y)) return at;
+	return null;
+};
 
 // 1. Zoom about a point keeps that point under the cursor.
 //
-// Measured from the camera rather than from an iframe's rendered size: a fractional zoom
+// Measured from the camera rather than from an item's rendered size: a fractional zoom
 // rounds the frame's layout to device pixels, which added a pixel or two of noise to what
 // is otherwise an exact property.
-const anchor = await page.evaluate(async () => {
+const anchor = await canvas.evaluate(async () => {
 	const stage = document.querySelector(".stage");
 	const rect = stage.getBoundingClientRect();
 	const cursor = { x: 420, y: 300 };
@@ -60,32 +81,18 @@ say(
  * it the failure surfaced as "nothing arrived" — about the key, three assertions later, saying
  * nothing about why.
  */
-const bare = await page.evaluate(() => {
-	const stage = document.querySelector(".stage").getBoundingClientRect();
-	/*
-	 * The middle of the canvas: clear of the floats by construction — the left panel is 276px
-	 * wide, the corner cluster runs along the top, the dock along the bottom — and hit-tested
-	 * anyway, because that is the one thing the geometry does not promise.
-	 */
-	const floats = ".board-node, .panel-shell, .dock, .pill, .stream";
-	for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16) {
-		for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) {
-			if (!document.elementFromPoint(x, y)?.closest(floats)) return { x, y };
-		}
-	}
-	return null;
-});
+const bare = await bareSpot();
 if (bare) await page.mouse.click(bare.x, bare.y);
 say(
 	"the canvas has the focus, not a board",
-	await page.evaluate(() => !document.querySelector(".board-node iframe")?.contentDocument?.hasFocus()),
+	await canvas.evaluate(() => document.activeElement === document.querySelector(".stage") || !document.activeElement?.closest(".board-node")),
 	`clicked ${JSON.stringify(bare)}`,
 );
 await page.keyboard.press("0");
 // The fit glides, and on a busy machine the glide outlasts a fixed wait.
 await still(page);
 await settle(page, 400);
-const fitted = await page.evaluate(() => {
+const fitted = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage").getBoundingClientRect();
 	// Every board, with a node or as a picture on the sheet (below the live zoom it has no node).
 	const nodes = window.__decksBoards().map((one) => one.rect);
@@ -115,7 +122,7 @@ say("0 fits every board on screen", fitted.inside && fitted.count === expected, 
  * labelled `+` is `=` unshifted, so a handler matching `"+"` never fired.
  */
 const zoomOf = () =>
-	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksCameraTransform())?.[1] ?? 0));
+	canvas.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(globalThis.__decksCameraTransform())?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
 await page.keyboard.press("Control+Equal");
@@ -141,14 +148,14 @@ say("…and ⌘0 fits everything again", Math.abs(refit - fittedZoom) < 0.01, `$
 /*
  * Installed and *confirmed* installed before the key is pressed.
  *
- * This started a `page.evaluate` and did not await it, because the promise it returns cannot
+ * This started an `evaluate` and did not await it, because the promise it returns cannot
  * settle until the key arrives — which left the keystroke free to beat the listener. It did, on
  * two runs of the whole suite out of three, and the verdict was the string "nothing arrived":
  * a failure that says nothing about whether the app declined the zoom. So the listener now
  * writes its verdict down and returns at once, the press follows an *awaited* install, and the
  * verdict is waited for rather than assumed.
  */
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	window.__declined = undefined;
 	addEventListener("keydown", (event) => {
 		// The modifier arrives as a keydown of its own and is nobody's shortcut, so the answer
@@ -158,98 +165,13 @@ await page.evaluate(() => {
 	});
 });
 await page.keyboard.press("Control+Equal");
-await page.waitForFunction(() => window.__declined !== undefined, null, { timeout: 3000 }).catch(() => {});
-const verdict = await page.evaluate(() => window.__declined);
+await canvas.waitForFunction(() => window.__declined !== undefined, null, { timeout: 3000 }).catch(() => {});
+const verdict = await canvas.evaluate(() => window.__declined);
 say("…and the browser's own page zoom is declined", verdict === true, String(verdict ?? "nothing arrived"));
 await page.keyboard.press("Control+Digit0");
 await settle(page, 400);
-// Fitted, the fixture is just under the live zoom (20% on a desktop), so the boards have no pages until it is zoomed back in.
 await liveZoom(page);
 
-/*
- * With the focus inside a board, which is where it goes the moment anybody clicks one. The
- * keystroke arrives in the board's own document and is handed back through
- * `frame-gestures.ts` — take the zoom in the stage and not there, and ⌘+ works on empty
- * canvas and stops working as soon as you touch a board.
- */
-await ready(page);
-await settle(page, 400);
-const focused = await page.evaluate(() => {
-	const frame = document.querySelector(".board-node iframe");
-	frame?.contentWindow?.focus();
-	const body = frame?.contentDocument?.body;
-	if (!body) return "no board frame";
-	body.tabIndex = -1;
-	body.focus();
-	// Asserted, not assumed: if the focus stayed in the top document this would pass through
-	// the window handler and prove nothing about the path it is meant to be testing.
-	return frame.contentDocument.activeElement === body ? "in the board" : "focus did not move";
-});
-say("the focus really is inside a board", focused === "in the board", String(focused));
-await settle(page, 300);
-const beforeInBoard = await zoomOf();
-await page.keyboard.press("Control+Equal");
-await settle(page, 500);
-const afterInBoard = await zoomOf();
-say("…and all of it still works with a board focused", afterInBoard > beforeInBoard * 1.1, `${beforeInBoard.toFixed(3)} → ${afterInBoard.toFixed(3)}`);
-await page.keyboard.press("Control+Digit0");
-await settle(page, 400);
-await liveZoom(page);
-
-// 3. The embeds on the sources board.
-// Zoomed in about that board until it is live: fitted, the fixture is just under the live zoom.
-for (let i = 0; i < 12; i++) {
-	const live = await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true" && !!document.querySelector('.board-node[data-path$="/boards/sources.html"] iframe'));
-	if (live) break;
-	await page.evaluate(() => {
-		const r = document.querySelector('.board-node[data-path$="/boards/sources.html"]').getBoundingClientRect();
-		document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, bubbles: true, cancelable: true }));
-	});
-	await settle(page, 350);
-}
-await ready(page);
-const embeds = await page.evaluate(() => {
-	const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => f.src.includes("sources"));
-	const doc = frame?.contentDocument;
-	return {
-		// Images, not canvases: a rendered page is swapped for a picture of itself, because a
-		// canvas is re-uploaded to the compositor on every frame of a gesture (`board.js`).
-		pages: doc?.querySelectorAll('[data-id="paper"] img.page').length ?? -1,
-		canvases: doc?.querySelectorAll('[data-id="paper"] canvas').length ?? -1,
-		note: doc?.querySelector('[data-id="paper"] .note')?.textContent ?? "",
-		md: (doc?.querySelector('[data-id="notes"] .embed-body h1')?.textContent ?? "").trim(),
-		nested: doc?.querySelector('[data-id="report"] iframe')?.getAttribute("sandbox") ?? null,
-		missing: doc?.querySelector('[data-id="missing"]')?.dataset?.kind ?? null,
-	};
-});
-say("pdf renders the requested pages", embeds.pages === 2, `${embeds.pages} pages, header "${embeds.note}"`);
-say("…as pictures, with no canvas left behind to re-upload on every frame", embeds.canvases === 0, `${embeds.canvases} canvases`);
-say("markdown embed renders", embeds.md === "Session notes", `h1 "${embeds.md}"`);
-say("foreign html is in a sandboxed nested frame", embeds.nested === "allow-scripts", `sandbox="${embeds.nested}"`);
-say("an unresolvable embed says so", embeds.missing === "missing", `kind=${embeds.missing}`);
-
-// 4. A file changed on disk reaches the frame, with nobody asking it to.
-const srcBefore = await page.evaluate(() => document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe').src);
-write(
-	plan,
-	original.replace(
-		'<div class="chip" data-id="status"',
-		'<div class="sticky" data-id="live-check" style="left: 1300px; top: 700px; width: 200px">written from outside</div>\n\t\t<div class="chip" data-id="status"',
-	),
-);
-await page.waitForFunction(
-	() => Boolean(document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe')?.contentDocument?.querySelector('[data-id="live-check"]')),
-	null,
-	{ timeout: 15000 },
-);
-const live = await page.evaluate(() => {
-	const frame = document.querySelector('.board-node[data-path$="/boards/plan.html"] iframe');
-	return { src: frame?.src, found: Boolean(frame?.contentDocument?.querySelector('[data-id="live-check"]')) };
-});
-say("an edit on disk reaches the frame unaided", live.found && live.src !== srcBefore, `new src ${live.src?.split("?")[1]}`);
-
-write(plan, original);
-await changed(plan, read(plan) === original ? "" : original).catch(() => {});
 // 5. What a zoom does that a pan does not, and what it now costs.
 /*
  * Moving the camera is a transform over pictures the compositor already holds. Changing
@@ -264,34 +186,25 @@ await changed(plan, read(plan) === original ? "" : original).catch(() => {});
  * screen does not draw a title bar at all.
  */
 /*
- * The focus is still in a board's page from the edit above, and from there the key reaches the canvas
- * as a message (`decks:key`), a moment after the press — too late for the read straight after it. A
- * click on bare canvas first, so the key lands in the stage and the flag is read in the same breath.
+ * A click on bare canvas first, so the key lands in the stage and the flag is read in the same breath.
  */
-const bareNow = await page.evaluate(() => {
-	// Found again as at the top (the camera has moved since): the middle of the canvas, hit-tested.
-	const stage = document.querySelector(".stage").getBoundingClientRect();
-	const floats = ".board-node, .panel-shell, .dock, .pill, .stream";
-	for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16)
-		for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) if (!document.elementFromPoint(x, y)?.closest(floats)) return { x, y };
-	return null;
-});
+const bareNow = await bareSpot();
 if (bareNow) await page.mouse.click(bareNow.x, bareNow.y);
 await settle(page, 200);
 await page.keyboard.press("Control+Equal");
-const whileZooming = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const whileZooming = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
 say("a zoom says the scale is moving, so the boards can go on layers", whileZooming === "true", `data-scaling=${whileZooming}`);
 await settle(page, 900);
-const atRest = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const atRest = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
 // Held only while it is moving: a layer is a texture kept in memory, and a deck of them
 // held for the life of the page is memory nobody asked for.
 say("…and gives the layers back once it stops", atRest === "false", `data-scaling=${atRest}`);
 
-const beforePan = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const beforePan = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
 await page.mouse.move(700, 400);
 await page.mouse.wheel(0, 120);
 await settle(page, 120);
-const whilePanning = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+const whilePanning = await canvas.evaluate(() => document.querySelector(".stage").dataset.scaling);
 say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
 
 /*
@@ -306,10 +219,7 @@ say("a scroll that only moves the camera does not ask for them", beforePan === "
  * scale; this one was recorded frame by frame for flashes, at 22% and 60%, and found none.
  */
 const promise = () =>
-	page.evaluate(() => ({
-		world: getComputedStyle(document.querySelector(".world")).willChange,
-		iframes: getComputedStyle(document.querySelector(".board-node iframe")).willChange,
-	}));
+	canvas.evaluate(() => ({ world: getComputedStyle(document.querySelector(".world")).willChange }));
 await settle(page, 400);
 const resting = await promise();
 say("at rest the world makes no promise, so a zoom is drawn at the size it is read at", resting.world === "auto", JSON.stringify(resting));
@@ -325,236 +235,6 @@ await page.keyboard.press("Control+Equal");
 await settle(page, 150);
 const onZoom = await promise();
 say("…and a zoom does not either", onZoom.world === "auto", JSON.stringify(onZoom));
-
-// Zoom in until the other boards leave the screen, and their bars should go with them.
-for (let step = 0; step < 10; step++) {
-	await page.keyboard.press("Control+Equal");
-	await settle(page, 60);
-}
-await settle(page, 900);
-/*
- * Bars are counted against the boards on screen or a quarter of a window from it, and wide
- * enough there for a bar (`Stage.barWorth`), rather than against the documents, because the
- * two are not the same set: a document outlives its board leaving the screen by a few seconds
- * (below), and a bar must not.
- */
-const barsNow = () =>
-	page.evaluate(() => {
-		// A bar is for a board on screen or a quarter of a window from it, and at least 64px wide there (`Stage.barWorth`).
-		const stage = document.querySelector(".stage").getBoundingClientRect();
-		const near = [...document.querySelectorAll(".board-node")].filter((node) => {
-			const r = node.getBoundingClientRect();
-			const mx = stage.width / 4;
-			const my = stage.height / 4;
-			return r.width >= 64 && r.right > stage.left - mx && r.left < stage.right + mx && r.bottom > stage.top - my && r.top < stage.bottom + my;
-		}).length;
-		return {
-			nodes: document.querySelectorAll(".board-node").length,
-			near,
-			documents: document.querySelectorAll(".board-node iframe").length,
-			bars: document.querySelectorAll(".bar-layer .chrome").length,
-		};
-	});
-const bars = await barsNow();
-// (Title bars were removed on purpose in 62f57b32, so they are no longer counted here.)
-/*
- * 6. A document outlives its board leaving the screen, by a moment.
- *
- * Zooming in puts every other board outside the margin within a few steps, and zooming out
- * brings them back: unloading on the way in and parsing again on the way out was 37ms per
- * step of `Document::shutdown` in the middle of the gesture, and every document rebuilt in
- * the middle of the next. So the boards that just left are still documents here. On a stage of
- * this size (up to `KEEP_ALL` in `board-admission.ts`) they stay documents: letting them go after a
- * few seconds made every pan back to one a white box that filled in. A large stage still lets go.
- */
-say("…while the boards that just left the screen keep their documents for now", bars.documents === bars.nodes, `${bars.documents} of ${bars.nodes}`);
-await settle(page, 3600);
-const later = await barsNow();
-say("…and, on a stage of seven, still have them seconds later, so panning back is not a white box", later.documents === later.nodes, JSON.stringify(later));
-
-/*
- * 7. A middle-drag over a board moves the canvas exactly as far as the mouse.
- *
- * The gesture runs inside the frame's own document, whose coordinate system is the one the
- * pan is moving. A mouse standing still reports a shrinking `clientX` in there, by every pan
- * that moves the frame under it — so a delta measured in those pixels is the mouse's movement
- * *minus* the pan just applied, and feeding that back as the next pan makes the camera advance
- * by `mouse − previous step`: half the distance, one event in two. That was "it lags and
- * jitters when I pan over a board", and it measured 120px of board for 240px of mouse with the
- * steps reading `20 0 20 0 …`.
- *
- * The per-step numbers are asserted, not only the total. A drag whose steps alternate between
- * twice the movement and none has the right total and is still the bug.
- */
-/*
- * Above `INTERACT_ZOOM`, or there is nothing to measure.
- *
- * Below it a board's frame is inert and takes no pointer events at all — the stage handles the
- * drag itself, in its own coordinates, which is a different code path and correct. The fit that
- * `0` gives lands under the threshold in this fixture, so the first version of this check
- * passed against the bug: it was measuring the stage's pan and calling it the frame's.
- */
-await page.keyboard.press("Control+Digit0");
-await settle(page, 400);
-for (let i = 0; i < 10; i++) {
-	const live = await page.evaluate(() =>
-		[...document.querySelectorAll(".board-node")].some((n) => n.dataset.inert !== "true" && n.querySelector("iframe") && n.getBoundingClientRect().width > 320 && n.getBoundingClientRect().height > 320),
-	);
-	if (live) break;
-	await page.keyboard.press("Control+Equal");
-	await settle(page, 350);
-}
-await ready(page);
-const grab = await page.evaluate(() => {
-	const nodes = [...document.querySelectorAll(".board-node")];
-	const offsets = [
-		[0, 0],
-		[140, 0],
-		[-140, 0],
-		[0, -120],
-		[0, 120],
-	];
-	for (const node of nodes) {
-		if (node.dataset.inert === "true") continue;
-		const r = node.getBoundingClientRect();
-		if (r.width < 320 || r.height < 320) continue;
-		const frame = node.querySelector("iframe");
-		if (!frame || getComputedStyle(frame).pointerEvents === "none") continue;
-		for (const [dx, dy] of offsets) {
-			const x = Math.min(Math.max(r.x + r.width / 2 + dx, 420), innerWidth - 340);
-			const y = Math.min(Math.max(r.y + r.height / 2 + dy, 140), innerHeight - 180);
-			if (document.elementFromPoint(x, y)?.closest(".board-node") !== node) continue;
-			return { x: Math.round(x), y: Math.round(y), path: node.dataset.path };
-		}
-	}
-	return null;
-});
-// A live frame is the condition for measuring the path this is about, so not finding one is a
-// failure rather than a quieter test of something else.
-say("a live board frame is under the cursor to be dragged on", grab !== null, JSON.stringify(grab));
-
-/*
- * The camera's own numbers are **world** units — `pan()` divides a screen movement by the
- * zoom before storing it — so a screen-pixel measurement is the world difference times the
- * zoom. Getting that wrong is how the first version of this check read 89px of canvas for
- * 20px of mouse and looked like a bug in the code rather than in the arithmetic.
- */
-const cameraAt = () =>
-	page.evaluate(() => {
-		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-			globalThis.__decksCameraTransform(),
-		);
-		return m ? { x: -Number(m[4]), y: -Number(m[5]), zoom: Number(m[3]) } : null;
-	});
-
-const STEP = 20;
-const STEPS = 8;
-await page.mouse.move(grab.x, grab.y);
-const before = await cameraAt();
-const cursorIn = (path) =>
-	page.evaluate((wanted) => {
-		/*
-		 * The board the hand is actually on, not the first large one.
-		 *
-		 * This read `[...document.querySelectorAll(".board-node iframe")].find((f) => big)`,
-		 * which is a different question: on a deck with two boards over 200px it reads
-		 * whichever comes first in the DOM, and the assertion below then compares the cursor of
-		 * one board with a drag performed on another. It passed for as long as the fixture had
-		 * exactly one board that large in view, and broke the moment the arrangement changed —
-		 * which is what `grab.path` is for, and it was already being computed.
-		 */
-		const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
-		return frame ? getComputedStyle(frame.contentDocument.documentElement).cursor : null;
-	}, path);
-say("the board's own cursor is not a grab hand to begin with", (await cursorIn(grab?.path)) !== "grabbing", String(await cursorIn(grab?.path)));
-await page.mouse.down({ button: "middle" });
-const steps = [];
-let at = before;
-for (let i = 1; i <= STEPS; i++) {
-	await page.mouse.move(grab.x + STEP * i, grab.y);
-	const now = await cameraAt();
-	// Panning right moves the camera left, so the board's travel is the camera's loss —
-	// in screen pixels, which is the world difference scaled back up.
-	steps.push(Math.round((at.x - now.x) * now.zoom));
-	at = now;
-	if (i === 4) {
-		/*
-		 * The feedback, which the stage's own cursor cannot give. `.stage[data-panning="true"]`
-		 * makes the cursor a grab hand for a pan on bare canvas, and an iframe's document has a
-		 * cursor of its own — so the identical gesture started over a board showed the board's
-		 * cursor while the canvas moved under it, which reads as nothing happening at all.
-		 */
-		say("…and the board under the hand says it is being dragged", (await cursorIn(grab.path)) === "grabbing", String(await cursorIn(grab.path)));
-	}
-}
-await page.mouse.up({ button: "middle" });
-await settle(page, 300);
-say("…and gives the board's own cursor back afterwards", (await cursorIn(grab?.path)) !== "grabbing", String(await cursorIn(grab?.path)));
-const travelled = Math.round((before.x - at.x) * at.zoom);
-const wanted = STEP * STEPS;
-say("a middle-drag over a board pans one for one", Math.abs(travelled - wanted) <= 2, `${travelled}px of canvas for ${wanted}px of mouse`);
-say(
-	"…and every step of it moves, rather than stalling on alternate events",
-	steps.every((d) => d >= STEP - 2),
-	steps.join(" "),
-);
-
-/*
- * A scroll that lands exactly on a board's outline pans. That pixel is the frame's border, which its
- * document does not cover, so the wheel used to reach neither document — and a trackpad latches a
- * whole gesture to where it began, so a pan that started there never moved at all. Probed across
- * the edge at half-pixel steps, since where the boundary falls depends on the zoom.
- */
-await page.keyboard.press("0");
-await rest(page);
-const surface = await page.locator(".board-node .surface").first().boundingBox();
-const camNow = () => page.evaluate(() => globalThis.__decksCameraTransform());
-const stuck = [];
-for (let d = -1; d <= 3; d += 0.5) {
-	for (const [side, x, y] of [["left", surface.x + d, surface.y + surface.height / 2], ["top", surface.x + surface.width / 2, surface.y + d]]) {
-		if (x < 1 || y < 1) continue;
-		const before = await camNow();
-		await page.mouse.move(x, y);
-		await page.mouse.wheel(0, 30);
-		await settle(page, 150);
-		if ((await camNow()) === before) stuck.push(`${side} ${d}`);
-		else {
-			await page.mouse.wheel(0, -30);
-			await settle(page, 150);
-		}
-	}
-}
-say("a scroll landing on a board's outline pans the canvas", stuck.length === 0, stuck.join(", ") || "every point panned");
-
-/*
- * A pan does not reload boards. A board that had been off screen for a few seconds used to be
- * given a document at the first step of a pan, had it taken away when the pan brought it into
- * view, and got a third at the end: a white box that filled in, twice. Now a stage this size keeps
- * every document it has loaded, and none is started or stopped by the pan itself.
- */
-await page.keyboard.press("0");
-await rest(page);
-await selectBoard(page, await page.evaluate(() => window.__decksBoards()[0].path));
-await page.keyboard.press("1");
-await settle(page, 5000);
-await page.evaluate(() => {
-	window.__frameChurn = [];
-	new MutationObserver((records) => {
-		for (const r of records) {
-			for (const n of r.addedNodes) if (n.nodeName === "IFRAME") window.__frameChurn.push("+");
-			for (const n of r.removedNodes) if (n.nodeName === "IFRAME") window.__frameChurn.push("-");
-		}
-	}).observe(document.querySelector(".world"), { subtree: true, childList: true });
-});
-await page.mouse.move(700, 450);
-for (let i = 0; i < 40; i++) {
-	await page.mouse.wheel(40, 0);
-	await page.waitForTimeout(20);
-}
-await settle(page, 1200);
-const churn = await page.evaluate(() => window.__frameChurn.join(""));
-say("a pan neither drops nor reloads a board's page", !churn.includes("-"), churn || "no frames added or removed");
-
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -11,7 +11,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, open, say, socket } from "../harness.mjs";
+import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
 
 const DIR = process.env.TEXT_SHOTS_DIR;
 const TAG = process.env.TEXT_SHOTS_TAG ?? "shot";
@@ -58,11 +58,13 @@ const on = await until(() => link.received.some((m) => m.type === "stage.pen" &&
 say("the agent is on the text canvas", !!on);
 
 const { browser, page } = await open({ width: W, height: H, dpr: DPR, boards: false });
-await page.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 6, null, { timeout: 30000 });
-await page.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
+// The stage and its engine are in the canvas frame.
+const canvas = await canvasFrame(page);
+await canvas.waitForFunction(() => (globalThis.__decksRust?.placed?.size ?? 0) >= 6, null, { timeout: 30000 });
+await canvas.waitForFunction(() => globalThis.__decksSheet?.sharpAt !== undefined, null, { timeout: 30000 }).catch(() => {});
 
 const quiet = () =>
-	page.evaluate(async () => {
+	canvas.evaluate(async () => {
 		let last = -1;
 		let at = performance.now();
 		const t0 = at;
@@ -78,7 +80,7 @@ const quiet = () =>
 
 /** Pinch to `zoom` (64 scroll units per e-fold, as `render-perf.mjs`), then put the origin at `ORIGIN`. */
 const show = (zoom) =>
-	page.evaluate(
+	canvas.evaluate(
 		async ({ zoom, W, H, ORIGIN }) => {
 			const stage = document.querySelector(".stage");
 			const r = stage.getBoundingClientRect();
@@ -109,7 +111,7 @@ if (DIR) mkdirSync(DIR, { recursive: true });
 for (const z of ZOOMS) {
 	const camera = await show(z / 100);
 	await quiet();
-	const box = await page.evaluate(() => {
+	const box = await canvas.evaluate(() => {
 		const r = document.querySelector(".stage").getBoundingClientRect();
 		return { x: r.left, y: r.top, width: r.width, height: r.height };
 	});

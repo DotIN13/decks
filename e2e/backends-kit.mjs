@@ -4,7 +4,7 @@
  * they tell the stage's canvas drew something.
  */
 import { join } from "node:path";
-import { settle } from "./harness.mjs";
+import { canvasFrame, settle } from "./harness.mjs";
 
 /** Chromium on a desktop, and WebKit as an iPhone: Safari's engine, a touch screen, a 3× screen. */
 export const TARGETS = [
@@ -12,7 +12,7 @@ export const TARGETS = [
 	{ label: "WebKit iPhone 15 Pro", slug: "webkit-iphone", open: { engine: "webkit", device: "iPhone 15 Pro" } },
 ];
 
-/** `packages/canvas/src/stage/backends/notice.ts`, word for word. */
+/** `packages/canvas/src/render/backends/notice.ts`, word for word. */
 export const NOTICE_TEXT = "This browser can't draw the stage: it needs WebGPU or WebGL 2.";
 
 /** No WebGPU on the page: the worker is told the page's backend and opens the same. */
@@ -44,7 +44,7 @@ export function noGpuNoWebgl() {
 
 /** A wheel step about the middle of the stage, with the zoom key: `dy` < 0 zooms in. */
 export async function zoomStep(page, dy) {
-	await page.evaluate((deltaY) => {
+	await (await canvasFrame(page)).evaluate((deltaY) => {
 		const stage = document.querySelector(".stage");
 		const rect = stage.getBoundingClientRect();
 		stage.dispatchEvent(new WheelEvent("wheel", { deltaY, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
@@ -53,9 +53,9 @@ export async function zoomStep(page, dy) {
 
 /** Zoom out until the boards are pictures rather than live pages. */
 export async function outOfLive(page) {
-	await page.waitForSelector(".stage", { timeout: 30000 });
+	const canvas = await canvasFrame(page);
 	await settle(page, 1200);
-	for (let i = 0; i < 16 && (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
+	for (let i = 0; i < 16 && (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -64,16 +64,18 @@ export async function outOfLive(page) {
 
 /**
  * Whether the stage's canvas shows anything: a screenshot with it and one with it hidden, compared
- * in the page on a grid of points. `changed` is the share of points that differ.
+ * in the page on a grid of points. `changed` is the share of points that differ. The stage's canvas is
+ * in the canvas frame; the screenshots are of the whole page.
  */
 export async function canvasDraws(page) {
+	const frame = await canvasFrame(page);
 	const withIt = (await page.screenshot()).toString("base64");
-	await page.evaluate(() => {
+	await frame.evaluate(() => {
 		for (const canvas of document.querySelectorAll("canvas.stage-engine")) canvas.style.visibility = "hidden";
 	});
-	await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+	await frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 	const without = (await page.screenshot()).toString("base64");
-	await page.evaluate(() => {
+	await frame.evaluate(() => {
 		for (const canvas of document.querySelectorAll("canvas.stage-engine")) canvas.style.visibility = "";
 	});
 	return page.evaluate(

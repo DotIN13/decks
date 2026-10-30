@@ -9,12 +9,15 @@
  * glides with it, frame by frame, rather than jumping ahead to where it lands.
  *
  * A board dragged and let go stays where it was dropped until the server's answer has it there
- * (`editor/core/gesture.ts`, `holdBoards`): its page and the engine's picture of it, sampled every
- * frame with the server's messages held back 400 ms, never go back to where it was picked up. A
- * live board and one shown as a picture, in Chromium and in WebKit.
+ * (`editor/core/gesture.ts`, `holdBoards`): the engine's picture of it, sampled every frame with the
+ * canvas frame's writes held back 400 ms, never goes back to where it was picked up. A board is only
+ * ever its picture; in Chromium and in WebKit.
+ *
+ * The canvas runs in its frame (`canvasFrame`), which reads and writes the canvas on its own line to
+ * the harness: the stage is read there, and its writes are what is held back.
  */
 import { zoomStep } from "../backends-kit.mjs";
-import { boardEdge, editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { boardEdge, canvasFrame, editMode, onCanvasAt, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -26,23 +29,18 @@ const until = async (test, ms = 8000) => {
 };
 
 /**
- * The server's messages to the page held back while `lag.ms` is set, in order: a round trip as slow
- * as a far network's, so what the stage shows between a drop and its answer lasts long enough to see.
- * Routed before a reload, which the page's socket then goes through.
+ * The canvas frame's writes to the canvas held back while `lag.ms` is set: a round trip as slow as a
+ * far network's, so what the stage shows between a drop and its answer lasts long enough to see. The
+ * frame sends an edit as a verb call (`/api/v1/canvas.…`) and hears it back on its own stream, so a
+ * write held back is an answer held back.
  */
 const lag = { ms: 0 };
 async function laggedSocket(page) {
-	let queue = Promise.resolve();
-	await page.routeWebSocket(/\/ws/, (ws) => {
-		const server = ws.connectToServer();
-		ws.onMessage((message) => server.send(message));
-		server.onMessage((message) => {
-			const ms = lag.ms;
-			queue = queue.then(() => (ms ? new Promise((resolve) => setTimeout(resolve, ms)) : undefined)).then(() => ws.send(message));
-		});
+	await page.route(/\/api\/v1\/canvas\./, async (route) => {
+		const ms = lag.ms;
+		if (ms) await new Promise((resolve) => setTimeout(resolve, ms));
+		await route.continue();
 	});
-	await page.reload({ waitUntil: "load" });
-	await rest(page, { start: 300 });
 }
 
 /**
@@ -51,9 +49,10 @@ async function laggedSocket(page) {
  * the carried offset while carried). None may be back at the box it was picked up from.
  */
 async function boardStaysDropped(page, label, { picture }) {
+	const canvas = await canvasFrame(page);
 	// The server draws the pictures, and a busy machine takes a while: wait for one on screen before looking.
-	if (picture) await page.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
-	const candidates = await page.evaluate((picture) => {
+	if (picture) await canvas.waitForFunction(() => JSON.parse(globalThis.__decksRust?.picturedKey || "[]").length > 0, null, { timeout: 15000 }).catch(() => {});
+	const candidates = await canvas.evaluate((picture) => {
 		const pictured = new Set(JSON.parse(globalThis.__decksRust.picturedKey || "[]"));
 		return window.__decksBoards()
 			.filter((one) => {
@@ -66,9 +65,9 @@ async function boardStaysDropped(page, label, { picture }) {
 	let grip;
 	for (const path of candidates) {
 		// A board shown as a picture has no node, so no edge band to hold: it is picked up by its picture.
-		const hasNode = (await page.locator(`.board-node[data-path="${path}"]`).count()) > 0;
+		const hasNode = (await canvas.locator(`.board-node[data-path="${path}"]`).count()) > 0;
 		grip = hasNode ? await boardEdge(page, path) : null;
-		grip ??= await page.evaluate((path) => {
+		grip ??= await canvas.evaluate((path) => {
 			const at = (x, y) => window.__decksPictureAt(x, y) === path || document.elementFromPoint(x, y)?.closest(".board-node")?.dataset.path === path;
 			const r = window.__decksBoards().find((one) => one.path === path).rect;
 			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.5, 0.5], [0.2, 0.8]]) {
@@ -78,17 +77,19 @@ async function boardStaysDropped(page, label, { picture }) {
 			}
 			return null;
 		}, path);
+		// And not under the page's side panel, bars or composer, which the frame cannot see.
+		if (grip && !(await onCanvasAt(page, grip.x, grip.y))) grip = null;
 		if (grip) {
 			pick = { path };
 			break;
 		}
 	}
-	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await page.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
-	const from = await page.evaluate((path) => {
+	if (!pick) return say(`${label}: a board on screen to pick up`, false, JSON.stringify(await canvas.evaluate(() => ({ zoom: globalThis.__decksRust.camera.zoom, pictured: globalThis.__decksRust.picturedKey, boards: window.__decksBoards().map((b) => [Math.round(b.rect.x), Math.round(b.rect.y), Math.round(b.rect.width)]) }))));
+	const from = await canvas.evaluate((path) => {
 		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
-	await page.evaluate((path) => {
+	await canvas.evaluate((path) => {
 		const engine = globalThis.__decksRust;
 		globalThis.__boardFrames = [];
 		globalThis.__boardSampling = true;
@@ -105,7 +106,7 @@ async function boardStaysDropped(page, label, { picture }) {
 		};
 		requestAnimationFrame(sample);
 	}, pick.path);
-	const startNode = await page.evaluate((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect().toJSON(), pick.path);
+	const startNode = await canvas.evaluate((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect().toJSON(), pick.path);
 	await page.mouse.move(grip.x, grip.y);
 	await page.mouse.down();
 	for (let i = 1; i <= 12; i++) {
@@ -114,16 +115,16 @@ async function boardStaysDropped(page, label, { picture }) {
 	}
 	await page.waitForTimeout(100);
 	lag.ms = 400;
-	const dropAt = await page.evaluate(() => performance.now());
+	const dropAt = await canvas.evaluate(() => performance.now());
 	await page.mouse.up();
 	await page.waitForTimeout(1500);
 	lag.ms = 0;
-	const frames = await page.evaluate(() => {
+	const frames = await canvas.evaluate(() => {
 		globalThis.__boardSampling = false;
 		return globalThis.__boardFrames;
 	});
 	const after = frames.filter((f) => f.t > dropAt);
-	const to = await page.evaluate((path) => {
+	const to = await canvas.evaluate((path) => {
 		const board = globalThis.__decksRust.boards.find((one) => one.path === path);
 		return { x: board.x, y: board.y };
 	}, pick.path);
@@ -142,8 +143,9 @@ async function boardStaysDropped(page, label, { picture }) {
 
 /** Zoomed out until the boards are pictures, not pages. */
 async function zoomToPictures(page) {
+	const canvas = await canvasFrame(page);
 	for (let i = 0; i < 16; i++) {
-		if (await page.evaluate(() => window.__decksBoards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
+		if (await canvas.evaluate(() => window.__decksBoards().some((one) => JSON.parse(globalThis.__decksRust.picturedKey || "[]").includes(one.path) && one.rect.width > 40 && one.rect.x > 300 && one.rect.y > 60 && one.rect.right < innerWidth - 200 && one.rect.bottom < innerHeight - 160))) break;
 		await zoomStep(page, 60);
 		await settle(page, 350);
 	}
@@ -159,7 +161,8 @@ async function zoomToPictures(page) {
  */
 async function liveAndSmall(page) {
 	const view = page.viewportSize();
-	const zoom = () => page.evaluate(() => globalThis.__decksRust.camera.zoom);
+	const canvas = await canvasFrame(page);
+	const zoom = () => canvas.evaluate(() => globalThis.__decksRust.camera.zoom);
 	const middle = { x: (300 + view.width - 200) / 2, y: (60 + view.height - 160) / 2 };
 	await page.mouse.move(middle.x, middle.y);
 	const pinch = async (dy) => {
@@ -170,7 +173,7 @@ async function liveAndSmall(page) {
 	};
 	for (let i = 0; i < 40 && (await zoom()) > 0.45; i++) await pinch(40);
 	await rest(page).catch(() => {});
-	const off = await page.evaluate((middle) => {
+	const off = await canvas.evaluate((middle) => {
 		const narrowest = window.__decksBoards().sort((a, b) => a.rect.width - b.rect.width)[0];
 		if (!narrowest) return null;
 		const r = narrowest.rect;
@@ -186,8 +189,8 @@ async function liveAndSmall(page) {
 async function boardDrops(page, engine) {
 	await laggedSocket(page);
 	await editMode(page, true);
+	// A board is never live now, only its picture: small enough that a whole board fits between the chrome.
 	await liveAndSmall(page);
-	await boardStaysDropped(page, `${engine}, a live board`, { picture: false });
 	await zoomToPictures(page);
 	await boardStaysDropped(page, `${engine}, a board shown as a picture`, { picture: true });
 }
@@ -197,11 +200,12 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const cam = await page.evaluate(() => globalThis.__decksRust.camera);
-const r = await page.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
+const canvas = await canvasFrame(page);
+const cam = await canvas.evaluate(() => globalThis.__decksRust.camera);
+const r = await canvas.evaluate(() => document.querySelector(".stage").getBoundingClientRect().toJSON());
 // The engine's camera is the stage point at the middle of the window: a box there.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "lift-a", fill: "#4c8bf5" }, box: { x1: cam.x - 60 / cam.zoom, y1: cam.y - 40 / cam.zoom, x2: cam.x + 60 / cam.zoom, y2: cam.y + 40 / cam.zoom } }] });
-say("the box is drawn", !!(await until(() => page.evaluate(() => globalThis.__decksRust?.placed.get("lift-a")))));
+say("the box is drawn", !!(await until(() => canvas.evaluate(() => globalThis.__decksRust?.placed.get("lift-a")))));
 await editMode(page, true);
 const x = r.left + r.width / 2;
 const y = r.top + r.height / 2;
@@ -211,13 +215,13 @@ for (let i = 1; i <= 10; i++) {
 	await page.mouse.move(x + i * 10, y + i * 5);
 	await page.waitForTimeout(30);
 }
-const during = await page.evaluate(() => [...globalThis.__decksRust.lifted]);
+const during = await canvas.evaluate(() => [...globalThis.__decksRust.lifted]);
 say("dragged, the box is lifted", during.includes("lift-a"), JSON.stringify(during));
-const before = await page.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const before = await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
 await page.mouse.up();
-const down = await until(async () => (await page.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 4000);
+const down = await until(async () => (await canvas.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 4000);
 say("dropped, it is put down once the saved drawing has come", down);
-const moved = await page.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
+const moved = await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-a").box);
 say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.stringify({ before, moved }));
 
 // Into a column's slot: the outline rides the glide.
@@ -233,7 +237,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 			{ op: "insert", node: { type: "rectangle", id: "lift-b", fill: "#ff3355" }, box: { x1: cam.x - 300 / z, y1: cam.y + 120 / z, x2: cam.x - 200 / z, y2: cam.y + 180 / z } },
 		],
 	});
-	const box = (id) => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+	const box = (id) => canvas.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
 	await until(async () => (await box("lift-r3")) && (await box("lift-b")));
 	await settle(page, 600);
 	await page.keyboard.press("Escape");
@@ -243,7 +247,7 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
 	await settle(page, 300);
 	// Every frame from here: the selection's outline, and where the engine last said the item glides from.
-	await page.evaluate(() => {
+	await canvas.evaluate(() => {
 		const engine = globalThis.__decksRust;
 		const own = engine.onGlide;
 		engine.onGlide = (shifts) => {
@@ -272,9 +276,9 @@ say("…where it was dropped", moved.x > before.x && moved.y > before.y, JSON.st
 	await page.mouse.move(r1.x + 60, (r1.y + r1.height + r2.y) / 2, { steps: 20 });
 	await settle(page, 200);
 	await page.mouse.up();
-	const joined = await until(async () => (await page.evaluate(() => globalThis.__decksRust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
+	const joined = await until(async () => (await canvas.evaluate(() => globalThis.__decksRust.placed.get("lift-b")?.parent)) === "lift-col", 4000);
 	await settle(page, 400);
-	const frames = await page.evaluate(() => {
+	const frames = await canvas.evaluate(() => {
 		globalThis.__sampling = false;
 		return globalThis.__frames;
 	});

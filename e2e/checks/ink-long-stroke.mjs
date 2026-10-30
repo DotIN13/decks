@@ -13,12 +13,13 @@
  * - shaped as it grows, a frame at the end of a 2,000-point stroke costs the page less than shaped
  *   whole (main-thread time, CDP `TaskDuration`, over the first and the last 30 frames).
  *
- * The pointer events are dispatched in the page (one `pointermove` a sample), so the times are the
- * stage's and not the harness's. `INK_ROUNDS` (1) pairs are drawn for each kind and length; the
+ * The pointer events are dispatched in the canvas frame (one `pointermove` a sample), so the times are
+ * the stage's and not the harness's; they are the frame's own thread's when it runs in a process of its
+ * own (a sandboxed frame may), else the page's. `INK_ROUNDS` (1) pairs are drawn for each kind and length; the
  * times are printed (and written to `INK_OUT`, when set), each the median over the rounds.
  */
 import { writeFileSync } from "node:fs";
-import { open, rest, resetStage, say, socket } from "../harness.mjs";
+import { canvasFrame, open, rest, resetStage, say, socket } from "../harness.mjs";
 
 const ROUNDS = Math.max(1, Number(process.env.INK_ROUNDS ?? 1));
 const PER_FRAME = 4;
@@ -43,14 +44,16 @@ const { browser, page, context, errors } = await open({ width: 1400, height: 900
 await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const cdp = await context.newCDPSession(page);
+const canvas = await canvasFrame(page);
+// The frame's own session when it is out of the page's process, else the page's, which then holds it.
+const cdp = await context.newCDPSession(canvas).catch(() => context.newCDPSession(page));
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 const taskMs = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration").value * 1000;
 
-await page.click('.v3-tool[data-tool="pen"]');
-await page.waitForSelector(".stage-ink");
+await canvas.click('.v3-tool[data-tool="pen"]');
+await canvas.waitForSelector(".stage-ink");
 
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	/*
 	 * The stroke under the pen is drawn by the engine now (`props.layer.ink`, 540345fc), with no SVG
 	 * path to read; `__inkOnSvg` puts it back on the glass as an `.ink-live` path, the same shape's
@@ -95,24 +98,24 @@ await page.evaluate(() => {
 	};
 });
 
-const inks = () => page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
+const inks = () => canvas.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node?.metadata?.type === "decks.ink").map((p) => ({ id: p.node.id, points: p.node.metadata.points })));
 
 /** One stroke of `points` points, shaped whole (`whole`) or as it grows: its paths, its frame times, and what the file got. */
 const stroke = async ({ pen, points, whole }) => {
-	await page.evaluate((whole) => (globalThis.__inkWhole = whole), whole);
+	await canvas.evaluate((whole) => (globalThis.__inkWhole = whole), whole);
 	const had = new Set((await inks()).map((ink) => ink.id));
 	const frames = Math.round(points / PER_FRAME);
-	await page.evaluate((pen) => globalThis.__ink.down(pen), pen);
+	await canvas.evaluate((pen) => globalThis.__ink.down(pen), pen);
 	let t = await taskMs();
-	const atStart = await page.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: TIMED, k: PER_FRAME });
+	const atStart = await canvas.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: TIMED, k: PER_FRAME });
 	const startMs = ((await taskMs()) - t) / (TIMED + 2);
 	const half = Math.round(frames / 2) - TIMED;
-	const atHalf = await page.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: half, k: PER_FRAME });
-	await page.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: frames - 2 * TIMED - half, k: PER_FRAME });
+	const atHalf = await canvas.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: half, k: PER_FRAME });
+	await canvas.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: frames - 2 * TIMED - half, k: PER_FRAME });
 	t = await taskMs();
-	const atEnd = await page.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: TIMED, k: PER_FRAME });
+	const atEnd = await canvas.evaluate(({ n, k }) => globalThis.__ink.moves(n, k), { n: TIMED, k: PER_FRAME });
 	const endMs = ((await taskMs()) - t) / (TIMED + 2);
-	await page.evaluate(() => globalThis.__ink.up());
+	await canvas.evaluate(() => globalThis.__ink.up());
 	const made = await until(async () => (await inks()).find((ink) => !had.has(ink.id)), 8000);
 	// Off the canvas again, so every stroke is drawn over the same drawing.
 	if (made) {

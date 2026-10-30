@@ -1,130 +1,79 @@
 /**
  * Which board is selected — by every way in, and above all by pressing the board itself.
  *
- * The blue outline is `[data-selected="true"]` on the board's node, and *a lot* asks which board
- * that is: the inspector, the arrow keys on a deck, the double-click that opens a flow document's
- * source, `f` for the focus view, `⌫` to take a board off the canvas, the title bar's own menu.
- *
- * There are three ways to select one — the title bar, the rail, and the board itself — and the
- * third did not work. A press inside a board lands in the frame, which is a document of its own
- * and sends nothing up to the canvas, so the surface's own handler never sees it; and the listener
- * `BoardFrame` attached *inside* the frame was gated on the board having no components:
- *
- *     if (props.board.format !== "component") { … }
- *
- * which left a placed board with no way to be selected by pressing it at all. Browse is where
- * every session starts and where `Editor.ts` returns on its first line (`enabled()` is edit mode
- * **and** zoomed past the interaction threshold), so what a person actually did was click a board,
- * see nothing happen, and click its title bar instead — the same gesture meaning two things.
- *
- * What this check asserts, then, is the rule that replaced it: **a press inside a board selects
- * that board, whatever its format** — and it does so without reloading the frame,
- * because a selection that redrew the page under the pointer would be worse than no selection.
+ * A board is drawn only as its picture now (no page of its own on the canvas), so what this asserts
+ * is the rule left: **a press on a board's picture selects that board**, a press on another moves
+ * the selection to it, and flying to a board selects it. The selected board is the one the pill
+ * (`BoardCallout`) is over; its "New tab" link names the board's file.
  */
-import { boardPath, flyToBoard, open, resetStage, say, settle, stagePath } from "../harness.mjs";
+import { boardPath, canvasFrame, flyToBoard, onCanvasAt, open, resetStage, say, settle, stagePath, zoom } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 await resetStage(page);
 await settle(page, 800);
+const canvas = await canvasFrame(page);
 
-/** Every board, where it is on screen, and whether its frame takes the pointer. */
-const boards = () =>
-	page.evaluate(() =>
-		[...document.querySelectorAll(".board-node")].map((node) => {
-			const r = node.getBoundingClientRect();
-			return { path: node.dataset.path, x: r.x, y: r.y, w: r.width, h: r.height, inert: node.dataset.inert };
-		}),
-	);
+/** The board the pill is over, by its file name, or nothing. */
+const selected = () =>
+	canvas.evaluate(() => {
+		const pill = document.querySelector(".stage-fixed > .board-callout");
+		const link = pill?.querySelector('a[aria-label="New tab"]')?.getAttribute("href") ?? "";
+		return pill && link ? decodeURIComponent(link.split("?")[0].split("/").pop()) : "";
+	});
+const file = (path) => path.split("/").pop();
 
-const selected = () => page.evaluate(() => [...document.querySelectorAll('.board-node[data-selected="true"]')].map((n) => n.dataset.path));
-
-/** The centre of what is left of a board once the app's own chrome is off, or nothing. */
-const inside = (board) => {
-	const x0 = Math.max(board.x, 250);
-	const x1 = Math.min(board.x + board.w, 1400);
-	const y0 = Math.max(board.y, 115);
-	const y1 = Math.min(board.y + board.h, 940);
-	return x1 - x0 < 24 || y1 - y0 < 24 ? undefined : { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
-};
-
-/*
- * Fly to a board, so the deck is at a zoom where the frames take the pointer.
- *
- * Not the bar's centre: the acts at the right-hand end hold the buttons, and a double-click that
- * lands on one of them presses it.
- */
 const first = (await boardPath("plan.html")) && (await stagePath(page, "boards/plan.html"));
 await flyToBoard(page, first);
 await settle(page, 900);
-say("flying to a board selects it from its title bar", (await selected()).includes(first), (await selected()).join(", ") || "nothing selected");
+say("flying to a board selects it", (await selected()) === file(first), (await selected()) || "nothing selected");
 
-/*
- * And back out, until two boards share the viewport.
- *
- * Under the interaction threshold the frame stops taking the pointer — the app puts
- * `data-inert="true"` on the node and a press lands on the surface, which selected the board all
- * along. The case that did nothing is above that threshold, so the check has to be above it too.
- */
-for (let i = 0; i < 6; i++) {
-	const level = Number(((await page.locator('.v3-zoom-value').textContent()) ?? "0").replace(/[^0-9.]/g, ""));
-	if (level <= 62) break;
-	await page.keyboard.press("Control+Minus");
+// Back out until two boards share the window.
+for (let i = 0; i < 8 && (await zoom(page)) > 30; i++) {
+	await page.mouse.move(800, 500);
+	await page.keyboard.down("Control");
+	await page.mouse.wheel(0, 120);
+	await page.keyboard.up("Control");
 	await settle(page, 300);
 }
 
-const live = (await boards()).filter((board) => board.inert === "false" && inside(board));
-say("two boards are on screen with their frames taking the pointer", live.length >= 2, live.map((b) => b.path).join(", "));
-
-/*
- * The gesture, on a board that is **not** the selected one — which is the only version of it that
- * says anything: a press on the board you already selected cannot tell a handler from silence.
- */
-const other = live.find((board) => board.path !== first);
-/* A point whose press reaches the board's own page: the middle of what is on screen, or failing that
-   the nearest point clear of a neighbour's edge band, which a board raised over this one keeps. */
-const at = other && (await page.evaluate(([path, first]) => {
-	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-	const [x0, x1, y0, y1] = first;
-	const hits = (x, y) => document.elementFromPoint(x, y)?.closest(".board-node") === node && !document.elementFromPoint(x, y)?.classList.contains("board-edge");
-	for (let d = 0; d <= 200; d += 10) for (const [dx, dy] of [[0, -d], [0, d], [-d, 0], [d, 0]]) {
-		const x = (x0 + x1) / 2 + dx, y = (y0 + y1) / 2 + dy;
-		if (hits(x, y)) return { x, y };
+/** A point on a board's picture, clear of the page's chrome and of the pill. */
+const pointOn = async (path) => {
+	const points = await canvas.evaluate((wanted) => {
+		const r = window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+		if (!r) return [];
+		const out = [];
+		for (const fy of [0.5, 0.35, 0.65, 0.2, 0.8]) for (const fx of [0.5, 0.3, 0.7]) {
+			const x = r.x + r.width * fx, y = r.y + r.height * fy;
+			if (x > 2 && y > 2 && x < innerWidth - 2 && y < innerHeight - 2 && window.__decksPictureAt?.(x, y) === wanted && !document.elementFromPoint(x, y)?.closest(".board-callout")) out.push({ x, y });
+		}
+		return out;
+	}, path);
+	for (const at of points) if (await onCanvasAt(page, at.x, at.y)) return at;
+	return undefined;
+};
+const paths = await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path));
+let other, at;
+for (const path of paths) {
+	if (path === first) continue;
+	at = await pointOn(path);
+	if (at) {
+		other = path;
+		break;
 	}
-}, [other.path, (() => { const p = inside(other); return p ? [p.x - 1, p.x + 1, p.y - 1, p.y + 1] : [0, 0, 0, 0]; })()]));
-await page.evaluate((path) => {
-	const frame = document.querySelector(`.board-node[data-path="${path}"] iframe`);
-	if (frame) frame.contentWindow.__stillHere = 7;
-}, other?.path);
-
-if (at && other) {
+}
+if (other && at) {
 	await page.mouse.click(at.x, at.y);
-	await settle(page, 350);
-	const now = await selected();
-	const under = await page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); const r = (e) => { const b = e?.getBoundingClientRect(); return b ? [b.x, b.y, b.width, b.height].map(Math.round).join(",") : "-"; }; return `${el?.tagName.toLowerCase()}.${String(el?.className ?? "").split(" ")[0]} ${el?.dataset?.side} ${r(el)} ${el?.closest("[data-path]")?.getAttribute("data-path") ?? el?.dataset?.board ?? ""}`; }, [at.x, at.y]);
-	say("a press inside a board's own body selects it", now.includes(other.path), `pressed ${other.path} at ${Math.round(at.x)},${Math.round(at.y)} on ${under}, selected ${now.join(", ") || "nothing"}`);
-	say("…and it is the only one selected", now.length === 1, `${now.length} selected`);
-	const here = await page.evaluate(
-		(path) => document.querySelector(`.board-node[data-path="${path}"] iframe`)?.contentWindow?.__stillHere ?? null,
-		other.path,
-	);
-	say("…without reloading the board under the pointer", here === 7, "a reload would have taken the marker with it");
-
-	/* And back, the same way — so the rule is a rule and not one lucky target. */
-	const back = inside(live.find((board) => board.path === first));
+	await settle(page, 400);
+	say("a press on a board's picture selects it", (await selected()) === file(other), `pressed ${other} at ${Math.round(at.x)},${Math.round(at.y)}, selected ${(await selected()) || "nothing"}`);
+	const back = await pointOn(first);
 	if (back) {
 		await page.mouse.click(back.x, back.y);
-		await settle(page, 350);
-		say("…and pressing the first board moves the selection back", (await selected()).includes(first), (await selected()).join(", ") || "nothing");
-	}
+		await settle(page, 400);
+		say("…and pressing the first board moves the selection back", (await selected()) === file(first), (await selected()) || "nothing");
+	} else say("…the first board is still on screen to press", false);
 } else {
-	say("two boards to press", false, "the fixture gave this check only one board on screen");
+	say("two boards to press", false, "no other board's picture is on screen clear of the chrome");
 }
-
-/*
- * There was a last case here: in edit mode, picking up a component inside a board selected the
- * board. Picking components inside a board's page from the canvas was removed on purpose, and the
- * case with it.
- */
 
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 

@@ -18,7 +18,7 @@
  * `DECKS_E2E_SHOTS=<dir>` keeps every picture and the two canvas screenshots.
  */
 import { existsSync, writeFileSync } from "node:fs";
-import { API, asPerson, deckState, open, say, settle, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, open, say, settle, socket } from "../harness.mjs";
 
 /** Picture pixels an edge may be off by: antialiasing and the canvas's own zoom not being exactly the picture's. */
 const NEAR = 2;
@@ -36,7 +36,9 @@ const until = async (test, ms = 15000) => {
 
 const keep = process.env.DECKS_E2E_SHOTS;
 const { browser, page, errors } = await open({ width: 1600, height: 1000, scheme: "light", boards: true });
-await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+// The stage and its engine are in the canvas frame; the screenshots and the pixel counting are the page's.
+const canvas = await canvasFrame(page);
+await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 
 // Empty paper to the right of every board, so the items' surroundings are paper.
 const deck = await deckState();
@@ -64,12 +66,12 @@ say("the text item and the rectangle are on the stage", !!landed);
 
 /** The canvas's camera: `translate(a, b) scale(z) translate(c, d)` on the world, inside the stage's box. */
 const camera = () =>
-	page.evaluate(() => {
+	canvas.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
 		const rect = document.querySelector(".stage").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
 	});
-const itemBox = (id) => page.evaluate((id) => {
+const itemBox = (id) => canvas.evaluate((id) => {
 	const r = window.__decksPenBox?.(id);
 	return r && r.width > 0 ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
 }, id);
@@ -82,7 +84,7 @@ async function zoomTo(want) {
 		if (!cam) break;
 		if (want >= 1 ? cam.zoom >= want : cam.zoom <= want) break;
 		const at = toScreen(cam, X + 120, Y + 100);
-		await page.evaluate(([at, dy]) => {
+		await canvas.evaluate(([at, dy]) => {
 			const stage = document.querySelector(".stage");
 			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
 		}, [at, want >= 1 ? -12 : 12]);
@@ -96,12 +98,12 @@ async function zoomTo(want) {
 		const dx = at.x - mid.x;
 		const dy = at.y - mid.y;
 		if (Math.abs(dx) < 4 && Math.abs(dy) < 4) break;
-		await page.evaluate(([dx, dy, mid]) => {
+		await canvas.evaluate(([dx, dy, mid]) => {
 			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
-	await page.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	await settle(page, 1800);
 	return camera();
 }

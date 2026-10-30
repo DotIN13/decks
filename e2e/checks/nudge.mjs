@@ -11,14 +11,17 @@
  * drawing must show the step within `WITHIN` frames, never stand still for more than that while
  * presses are owed, and once everything has landed the server's drawing (read over a socket of
  * the check's own) must have each moved by the sum of the presses; nothing may be drawn going back
- * from the first press until a while after the last answer landed, and a board's page goes with it.
- * Cases: one board selected by a press on its edge (held, and with Shift for steps of 10), two
+ * from the first press until a while after the last answer landed.
+ * Cases: one board selected by a press on its picture (held, and with Shift for steps of 10), two
  * boards, one item (held, pressed, Shift), two items, and two items with a board picked beside them.
+ *
+ * The canvas is in its frame (`canvasFrame`), which sends the person's edits itself (`canvas.batch`,
+ * held back here) and follows the drawing on a stream of its own, which is not held back.
  *
  *   node e2e/run.mjs nudge
  *   NUDGE_ENGINES=chromium NUDGE_LAGS=400 node e2e/run.mjs nudge
  */
-import { API, asPerson, boardEdge, liveZoom, open, rest, resetStage, say, settle, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, liveZoom, onCanvasAt, open, rest, resetStage, say, settle, socket } from "../harness.mjs";
 
 const REPEATS = 30;
 const GAP = 30;
@@ -96,8 +99,6 @@ const SAMPLER = () => {
 			for (const path of probe.boards ?? []) {
 				const b = e.boards.find((one) => one.path === path);
 				if (b) out[path] = [r(b.x + carrying.dx), r(b.y + carrying.dy)];
-				const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect();
-				if (node) out[`page ${path}`] = [r(node.x), r(node.y)];
 			}
 			return out;
 		},
@@ -127,6 +128,8 @@ async function run(engine, lags) {
 	await rest(page, { start: 0 });
 	await lagged(page);
 	await liveZoom(page);
+	/** The canvas frame, where the stage, its engine and the sampler are. */
+	const cv = () => canvasFrame(page);
 	const link = await socket();
 	const agentId = await until(() => link.last("agents")?.focused);
 	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
@@ -155,11 +158,11 @@ async function run(engine, lags) {
 		for (const ms of lags) {
 			const label = `${engine}: ${name}, ${pressBy === "hold" ? "held" : "pressed"} ${REPEATS} times${shift ? " with Shift" : ""}, answers ${ms} ms away`;
 			await settle(page, 300);
-			const start = await page.evaluate((probe) => globalThis.__nd.where(probe), probe);
+			const start = await (await cv()).evaluate((probe) => globalThis.__nd.where(probe), probe);
 			const startServer = Object.fromEntries((probe.items ?? []).map((id) => [id, [serverNode(id)?.x, serverNode(id)?.y]]));
 			const startBoards = await serverBoards();
 			lag.ms = ms;
-			await page.evaluate((probe) => globalThis.__nd.start(probe), probe);
+			await (await cv()).evaluate((probe) => globalThis.__nd.start(probe), probe);
 			if (shift) await page.keyboard.down("Shift");
 			if (pressBy === "hold") {
 				for (let i = 0; i < REPEATS; i++) {
@@ -178,10 +181,10 @@ async function run(engine, lags) {
 			await page.waitForTimeout(ms + 200);
 			await until(() => lag.queued === 0, 20000);
 			await settle(page, 800);
-			const { frames, keys } = await page.evaluate(() => globalThis.__nd.stop());
+			const { frames, keys } = await (await cv()).evaluate(() => globalThis.__nd.stop());
 			const [dx, dy] = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[key];
 			const total = keys.length * step;
-			const ids = Object.keys(start).filter((k) => !k.startsWith("page "));
+			const ids = Object.keys(start);
 			// Each keydown drawn within WITHIN frames: the n-th press's position reached by the frame WITHIN after it.
 			const late = [];
 			const along = (s, id) => (dx ? s[id]?.[0] - start[id][0] : s[id]?.[1] - start[id][1]) * (dx || dy);
@@ -193,7 +196,7 @@ async function run(engine, lags) {
 			});
 			const backwards = [];
 			for (let i = 1; i < frames.length; i++) for (const id of ids) if (along(frames[i].s, id) < along(frames[i - 1].s, id)) backwards.push({ frame: i, id, from: along(frames[i - 1].s, id), to: along(frames[i].s, id) });
-			const end = await page.evaluate((probe) => globalThis.__nd.where(probe), probe);
+			const end = await (await cv()).evaluate((probe) => globalThis.__nd.where(probe), probe);
 			const endBoards = await serverBoards();
 			const server = {};
 			for (const id of probe.items ?? []) server[id] = (dx ? serverNode(id)?.x - startServer[id][0] : serverNode(id)?.y - startServer[id][1]) * (dx || dy);
@@ -202,13 +205,6 @@ async function run(engine, lags) {
 			say(`${label}: each press is drawn within ${WITHIN} frames`, keys.length === REPEATS && late.length === 0, `${keys.length} keydowns; late ${late.length}: ${JSON.stringify(late.slice(0, 6))}`);
 			say(`${label}: nothing is drawn going back`, backwards.length === 0, JSON.stringify(backwards.slice(0, 6)));
 			say(`${label}: drawn and on the server ${total} along at the end`, ids.every((id) => drawnEnd[id] === total && server[id] === total), JSON.stringify({ total, drawnEnd, server }));
-			if (probe.boards?.length) {
-				// A board's page goes with its box: the page moved on screen as far as the box did (at this zoom).
-				const z = await page.evaluate(() => globalThis.__decksRust.camera.zoom);
-				const pages = probe.boards.map((path) => [path, Math.round(((dx ? end[`page ${path}`]?.[0] - start[`page ${path}`]?.[0] : end[`page ${path}`]?.[1] - start[`page ${path}`]?.[1]) * (dx || dy)) / z)]);
-				// The page's corner is read in whole pixels, so a stage unit or so either way at this zoom.
-				say(`${label}: each board's page moved with it`, pages.every(([, moved]) => Math.abs(moved - total) <= 1.5 / z + 0.5), JSON.stringify({ pages, zoom: z }));
-			}
 			// Back where it started, untimed, for the next lag.
 			const back = { ArrowRight: "ArrowLeft", ArrowLeft: "ArrowRight", ArrowDown: "ArrowUp", ArrowUp: "ArrowDown" }[key];
 			for (let i = 0; i < keys.length; i++) {
@@ -228,19 +224,39 @@ async function run(engine, lags) {
 		return out;
 	};
 
-	// Two boards on screen, picked by their edges (the second with Shift).
+	// Two boards on screen, picked by a press on their pictures (the second with Shift): the whole canvas framed first.
+	await (await cv()).locator("[aria-label='Fit everything on the canvas']").first().click();
+	await rest(page);
 	const onScreen = await until(
-		() =>
-			page.evaluate(() =>
+		async () =>
+			(await cv()).evaluate(() =>
 				window
 					.__decksBoards()
-					.filter((one) => one.node && one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
+					.filter((one) => one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 					.map((one) => one.path),
 			),
 		6000,
 	);
+	/** A point on a board's picture that is the canvas's, not the page's chrome over it. */
+	const pictureSpot = async (path) => {
+		const points = await (await cv()).evaluate((wanted) => {
+			const r = window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const out = [];
+			if (!r) return out;
+			for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) for (const fx of [0.5, 0.3, 0.7]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
+			}
+			// The stage may not name the picture under a point while items are selected: its middle, then.
+			if (!out.length) out.push({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+			return out;
+		}, path);
+		for (const at of points) if (await onCanvasAt(page, at.x, at.y)) return at;
+		return null;
+	};
 	const pickBoard = async (path, shift) => {
-		const grip = await boardEdge(page, path);
+		const grip = await pictureSpot(path);
 		if (!grip) return false;
 		if (shift) await page.keyboard.down("Shift");
 		await page.mouse.click(grip.x, grip.y);
@@ -248,7 +264,7 @@ async function run(engine, lags) {
 		return true;
 	};
 	const boardsHere = [];
-	for (const path of onScreen ?? []) if (boardsHere.length < 2 && (await boardEdge(page, path))) boardsHere.push(path);
+	for (const path of onScreen ?? []) if (boardsHere.length < 2 && (await pictureSpot(path))) boardsHere.push(path);
 	if (process.env.NUDGE_BOARDS !== "0" && boardsHere.length) {
 		await pickBoard(boardsHere[0], false);
 		await hold("one board", { boards: [boardsHere[0]] }, "ArrowRight", 1);
@@ -262,24 +278,24 @@ async function run(engine, lags) {
 	} else say(`${engine}: boards on screen to nudge`, false, JSON.stringify(onScreen));
 
 	// Items, on bare canvas right of the boards at 100%.
-	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		there = !!(await until(async () => (await cv()).evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
 	}
 	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
-	const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+	const cam = await (await cv()).evaluate(() => globalThis.__decksRust.camera);
 	const at = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx), y1: Math.round(cam.y + dy), x2: Math.round(cam.x + dx + w), y2: Math.round(cam.y + dy + h) });
 	send([
 		{ op: "insert", node: { type: "rectangle", id: "nd-a", fill: "#4c8bf5" }, box: at(-300, -150, 120, 80) },
 		{ op: "insert", node: { type: "rectangle", id: "nd-b", fill: "#f5a04c" }, box: at(-300, 50, 120, 80) },
 	]);
-	await until(() => page.evaluate(() => ["nd-a", "nd-b"].every((id) => globalThis.__decksRust.placed.has(id))), 6000);
+	await until(async () => (await cv()).evaluate(() => ["nd-a", "nd-b"].every((id) => globalThis.__decksRust.placed.has(id))), 6000);
 	await settle(page, 400);
 	const centre = async (id) => {
-		const b = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id), 4000);
+		const b = await until(async () => (await cv()).evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id), 4000);
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
 	const a = await centre("nd-a");
@@ -296,7 +312,7 @@ async function run(engine, lags) {
 	if (process.env.NUDGE_BOARDS !== "0" && boardsHere.length) {
 		await page.keyboard.press("Escape");
 		await page.keyboard.press("Escape");
-		const board = await page.evaluate((path) => globalThis.__decksRust.boards.find((one) => one.path === path), boardsHere[0]);
+		const board = await (await cv()).evaluate((path) => globalThis.__decksRust.boards.find((one) => one.path === path), boardsHere[0]);
 		send([
 			{ op: "update", id: "nd-a", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y) } },
 			{ op: "update", id: "nd-b", set: { x: Math.round(board.x + board.w + 80), y: Math.round(board.y + 200) } },
@@ -305,7 +321,7 @@ async function run(engine, lags) {
 		let moved = false;
 		for (let i = 0; i < 4 && !moved; i++) {
 			await call("view.move", [to]);
-			moved = !!(await until(() => page.evaluate((to) => Math.abs(globalThis.__decksRust.camera.zoom - to.zoom) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - to.x) < 50, to), 4000));
+			moved = !!(await until(async () => (await cv()).evaluate((to) => Math.abs(globalThis.__decksRust.camera.zoom - to.zoom) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - to.x) < 50, to), 4000));
 		}
 		say(`${engine}: the camera shows the board and the items at 50%`, moved);
 		await settle(page, 800);

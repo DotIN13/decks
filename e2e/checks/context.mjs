@@ -21,7 +21,7 @@
  * `usage.mjs`, which has been cut from the suite and is covered by nothing now. This file is
  * about which of the two is drawn at which width.
  */
-import { open, resetStage, say, settle, ready, rest } from "../harness.mjs";
+import { canvasFrame, open, resetStage, say, settle, ready, rest } from "../harness.mjs";
 
 const wrap = () => {
 	if (window.top !== window.self) return;
@@ -235,38 +235,41 @@ const agent = {
 	await browser.close();
 }
 
-// --- a coarse pointer: no bars, and a tapped board's menu ------------------------------
+// --- a coarse pointer: no bars, and a tapped board's menu, in the canvas frame ------------
 
 /*
  * Its own context, and no synthetic agent in it: `resetStage` plays the deck onto the agent the
  * server has focused, so a fed agent in place would put the boards on a canvas the browser is not
  * looking at. A touchscreen draws no title bars; a tap selects a board, and its actions are a
- * menu over it (`canvas/BoardCallout.tsx`).
+ * menu over it (`canvas/BoardCallout.tsx`). A board is only its picture now, with no edge band of
+ * its own to carry it by (a card's is `stage-gestures.mjs`'s and `card-phone.mjs`'s to check).
  */
 {
 	// The fixture laid out before the page opens, so the page lands on it (it lands at once now, not 3 s later).
 	await resetStage();
 	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	await settle(page, 1400);
-	const bars = await page.evaluate(() => document.querySelectorAll(".bar-layer .chrome").length);
+	const canvas = await canvasFrame(page);
+	const bars = await canvas.evaluate(() => document.querySelectorAll(".bar-layer .chrome").length);
 	say("a touchscreen draws no title bars", bars === 0, `${bars} bars`);
-	const target = await page.evaluate(() => {
+	const target = await canvas.evaluate(() => {
 		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
 		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
 		// The stage's boards, pictures among them: a phone has one live page at most (`device.ts`), and a tap on a picture selects it as on a page.
 		const found = (globalThis.__decksBoards?.() ?? [])
-			.map(({ rect: r }) => {
+			.map(({ path, rect: r }) => {
 				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
-				return { x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
+				return { path, x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
 			})
 			.sort((a, b) => b.area - a.area)[0];
-		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2 } : null;
+		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2, path: found.path } : null;
 	});
-	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
+	const under = target ? await canvas.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${String(e?.className).split(" ")[0]} picture=${globalThis.__decksPictureAt?.(x, y)} zoom=${globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
 	if (target) await page.touchscreen.tap(target.x, target.y);
 	await settle(page, 900);
-	const tapped = await page.evaluate(() => document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null);
-	const menu = await page.evaluate(() => {
+	// The board tapped: a picture has no node to say it is selected, so it is the one under the tap.
+	const tapped = target?.path ?? null;
+	const menu = await canvas.evaluate((path) => {
 		const callout = document.querySelector(".board-callout");
 		if (!callout) return null;
 		const items = [...callout.querySelectorAll("[role=menuitem]")];
@@ -280,12 +283,11 @@ const agent = {
 			// The pill is centred on the board's middle wherever that is, off the screen included (`BoardCallout.tsx`, `place`).
 			centre: Math.round((box(callout).left + box(callout).right) / 2),
 			boardMid: (() => {
-				const path = document.querySelector('.board-node[data-selected="true"]')?.dataset.path;
 				const r = (window.__decksBoards?.() ?? []).find((one) => one.path === path)?.rect;
 				return r ? Math.round(r.left + r.width / 2) : null;
 			})(),
 		};
-	});
+	}, tapped);
 	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "New tab", "Comment", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
 	/*
 	 * On the screen whenever the board's middle leaves it room: the pill keeps its edge, centred on what it is
@@ -300,86 +302,6 @@ const agent = {
 		JSON.stringify(menu),
 	);
 
-	/* One finger on the selected board's edge moves the board: a phone has no mouse to drag it by. */
-	// The board's menu glides to its slot over the board's edge: the point is chosen once it has come to rest.
-	await settle(page, 800);
-	const edge = await page.evaluate(() => {
-		const node = document.querySelector('.board-node[data-selected="true"]');
-		if (!node) return null;
-		for (const band of node.querySelectorAll(".board-edge")) {
-			const r = band.getBoundingClientRect();
-			const along = band.dataset.side === "n" || band.dataset.side === "s";
-			// Many points along each band: the board's menu (`.board-callout`) and its corner handles (`.pen-handle`)
-			// sit over parts of it, and a point they cover is skipped rather than taken.
-			for (const f of [0.5, 0.3, 0.7, 0.2, 0.8, 0.4, 0.6, 0.1, 0.9, 0.15, 0.85, 0.35, 0.65, 0.45, 0.55, 0.25, 0.75]) {
-				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 5 : r.right - 5;
-				const y = along ? (band.dataset.side === "n" ? r.y + 5 : r.bottom - 5) : r.y + r.height * f;
-				// Clear of the menu by more than a fingertip: a touch snaps to the nearest button within its reach (touch adjustment).
-				const menu = document.querySelector(".board-callout")?.getBoundingClientRect();
-				const nearMenu = menu && x > menu.left - 12 && x < menu.right + 12 && y > menu.top - 12 && y < menu.bottom + 12;
-				if (!nearMenu && x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
-					// Where the board is on the canvas, not on screen: a pan would move it on screen too.
-					const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
-					return { x, y, path: node.dataset.path, left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), zoom, band: Math.round(along ? r.height : r.width) };
-				}
-			}
-		}
-		return null;
-	});
-	say("a selected board has an edge a finger can take, 22 px wide", edge !== null && edge.band >= 20, JSON.stringify(edge));
-	if (edge) {
-		const cdp = await page.context().newCDPSession(page);
-		const point = (x, y) => [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }];
-		await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(edge.x, edge.y) });
-		for (let i = 1; i <= 8; i++) {
-			await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(edge.x + i * 6, edge.y + i * 4) });
-			await page.waitForTimeout(16);
-		}
-		/*
-		 * Mid-drag, the board's picture is carried on the sheet's carried layer and its page waits, hidden,
-		 * where it was picked up (`PenLayer.carry`): the outline and the picture are both the finger's
-		 * travel from the page, 48 by 32, and there are no resize handles to leave behind.
-		 */
-		await page.waitForFunction((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.hasAttribute("data-carried"), edge.path, { timeout: 3000 }).catch(() => {});
-		const midway = await page.evaluate((path) => {
-			const element = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-			const node = element.getBoundingClientRect();
-			const outline = document.querySelector('.pen-selection[data-board="true"]')?.getBoundingClientRect();
-			const zoom = Number(globalThis.__decksCameraTransform?.().match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
-			const carried = document.querySelector(".stage-carried:not([hidden])")?.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
-			// With the C++ engine, the picture is the engine's, moved by the drag's offset (`engine-stage.ts`, `carry`).
-			const engine = globalThis.__decksEngine?.carried;
-			const engineCarries = engine?.paths.has(path) ? [Math.round(engine.dx * zoom), Math.round(engine.dy * zoom)] : null;
-			return {
-				hidden: element.hasAttribute("data-carried") && getComputedStyle(element.querySelector(".surface")).visibility === "hidden",
-				dx: outline ? Math.round(outline.left - node.left) : null,
-				dy: outline ? Math.round(outline.top - node.top) : null,
-				picture: carried ? [Math.round(Number(carried[1]) * zoom), Math.round(Number(carried[2]) * zoom)] : engineCarries,
-				handles: document.querySelectorAll(".pen-handle[data-board]").length,
-			};
-		}, edge.path);
-		say(
-			"…its picture carried with the finger, its outline with it, its page waiting unseen and its handles put away",
-			midway.hidden && Math.abs(midway.dx - 48) <= 1 && Math.abs(midway.dy - 32) <= 1 && midway.picture !== null && Math.abs(midway.picture[0] - 48) <= 1 && Math.abs(midway.picture[1] - 32) <= 1 && midway.handles === 0,
-			JSON.stringify(midway),
-		);
-		await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-		const moved = await page
-			.waitForFunction(
-				(was) => {
-					const node = document.querySelector(`.board-node[data-path="${CSS.escape(was.path)}"]`);
-					const left = Number.parseFloat(node?.style.left ?? "NaN");
-					const top = Number.parseFloat(node?.style.top ?? "NaN");
-					// 48 by 32 screen pixels, in canvas units at this zoom.
-					return Math.abs(left - was.left - 48 / was.zoom) < 12 / was.zoom && Math.abs(top - was.top - 32 / was.zoom) < 12 / was.zoom ? { left, top } : false;
-				},
-				edge,
-				{ timeout: 5000 },
-			)
-			.then((handle) => handle.jsonValue())
-			.catch(() => null);
-		say("…and one finger dragged along it moves the board with the finger", moved !== null, JSON.stringify({ was: [edge.left, edge.top], now: moved }));
-	}
 
 	say("no console errors in a phone's board menu", errors.length === 0, errors.join(" | "));
 	await browser.close();

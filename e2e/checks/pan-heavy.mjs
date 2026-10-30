@@ -26,7 +26,7 @@
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { deckState, open, say, socket } from "../harness.mjs";
+import { canvasFrame, deckState, open, say, socket } from "../harness.mjs";
 import { CELL, GRID, writePerfCanvas } from "../perf-canvas.mjs";
 
 const RUNS = Math.max(1, Number(process.env.PAN_HEAVY_RUNS ?? 5));
@@ -102,6 +102,8 @@ const { page, context, errors } = await open({ width: W, height: H, dpr: DPR, bo
 const cdp = await context.newCDPSession(page);
 await cdp.send("Performance.enable", { timeDomain: "threadTicks" });
 if (THROTTLE > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
+/** The canvas frame, where the stage is: found again after each reload (`goCanvas`). */
+let canvas;
 const metrics = async () => Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
 
 const goCanvas = async (canvas) => {
@@ -110,13 +112,15 @@ const goCanvas = async (canvas) => {
 	await until(() => link.received.some((m) => m.type === "stage.pen" && m.stage === canvas), 20000);
 	// The page opens on the agent's canvas; a page already open is reloaded onto it.
 	await page.reload({ waitUntil: "domcontentloaded" });
-	await page.evaluate(helpers);
+	// The stage is in the canvas frame, made again with the page.
+	canvas = await canvasFrame(page);
+	await canvas.evaluate(helpers);
 	const ok = await page
 		.waitForFunction((n) => (globalThis.__decksBoards?.().length ?? 0) >= n, canvas === "perf" ? 90 : Math.min(20, realBoards.length), { timeout: 30000 })
 		.then(() => true)
 		.catch(() => false);
 	if (!ok && process.env.PAN_HEAVY_DEBUG) say("DEBUG", false, JSON.stringify([...new Set(link.received.map((m) => m.type))]), JSON.stringify(link.received.filter((m) => /board|stage$/.test(m.type)).slice(-3)).slice(0, 3000));
-	say(`the stage shows the ${canvas} canvas`, ok, String(await page.evaluate(() => globalThis.__decksBoards?.().length)));
+	say(`the stage shows the ${canvas} canvas`, ok, String(await canvas.evaluate(() => globalThis.__decksBoards?.().length)));
 };
 
 const helpers = () => {
@@ -189,7 +193,7 @@ const helpers = () => {
 
 /** Until the camera is still, no tile has come for `ms`, and live boards have their pages. */
 const quiet = (ms = 1500, cap = 20000) =>
-	page.evaluate(
+	canvas.evaluate(
 		async ({ ms, cap }) => {
 			const t0 = performance.now();
 			let last = globalThis.__decksSheet?.tiles ?? 0;
@@ -214,7 +218,7 @@ const quiet = (ms = 1500, cap = 20000) =>
 /** One pan there and back with real wheel input at 120 Hz, the pointer at `point`. */
 const pan = async (point) => {
 	const before = await metrics();
-	await page.evaluate(() => globalThis.__pan.record());
+	await canvas.evaluate(() => globalThis.__pan.record());
 	const n = Math.round(SECONDS * 120);
 	const t0 = Date.now();
 	const sent = [];
@@ -227,9 +231,9 @@ const pan = async (point) => {
 	}
 	await Promise.all(sent);
 	const ms = Date.now() - t0;
-	await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
-	const frames = await page.evaluate(() => globalThis.__pan.stop());
-	const seen = await page.evaluate(() => globalThis.__pan.seen());
+	await canvas.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+	const frames = await canvas.evaluate(() => globalThis.__pan.stop());
+	const seen = await canvas.evaluate(() => globalThis.__pan.seen());
 	const after = await metrics();
 	const gaps = frames.slice(1).map((t, i) => t - frames[i]);
 	const per = (k) => ((after[k] - before[k]) * 1000) / Math.max(1, gaps.length);
@@ -297,10 +301,10 @@ for (const scenario of SCENARIOS) {
 		await quiet(1500);
 	}
 	const spot = busiest(scenario.canvas, scenario.zoom);
-	await page.evaluate((z) => globalThis.__pan.zoomTo(z), scenario.zoom);
-	await page.evaluate(({ x, y }) => globalThis.__pan.panTo(x, y), spot);
+	await canvas.evaluate((z) => globalThis.__pan.zoomTo(z), scenario.zoom);
+	await canvas.evaluate(({ x, y }) => globalThis.__pan.panTo(x, y), spot);
 	await quiet(2000);
-	const state = await page.evaluate(() => globalThis.__pan.state());
+	const state = await canvas.evaluate(() => globalThis.__pan.state());
 	// The pointer where a person's would be: the middle of the window, over a board when one is there.
 	const point = { x: W / 2, y: H / 2 };
 	const variants = AB ? ["off", "on"] : ["base"];
@@ -310,7 +314,7 @@ for (const scenario of SCENARIOS) {
 	for (let run = -1; run <= RUNS; run++) {
 		for (const v of variants) {
 			// A key starting __ is a page global the code reads as it goes; any other a localStorage key.
-			if (AB) await page.evaluate(({ k, on }) => (k.startsWith("__") ? (globalThis[k] = on) : on ? localStorage.setItem(k, "1") : localStorage.removeItem(k)), { k: AB, on: v === "on" });
+			if (AB) await canvas.evaluate(({ k, on }) => (k.startsWith("__") ? (globalThis[k] = on) : on ? localStorage.setItem(k, "1") : localStorage.removeItem(k)), { k: AB, on: v === "on" });
 			// The camera at rest between pans: code that reads the switch when a move starts reads it afresh.
 			await quiet(400, 4000);
 			const tracing = run === 0;
@@ -341,7 +345,7 @@ for (const scenario of SCENARIOS) {
 			// A traced run is slower; it is not one of the runs counted.
 			if (run >= 1) runs[v].push(one);
 			// Back where the run started, at rest, so every run begins the same.
-			await page.evaluate(({ x, y }) => globalThis.__pan.panTo(x, y), spot);
+			await canvas.evaluate(({ x, y }) => globalThis.__pan.panTo(x, y), spot);
 			await quiet(1200);
 		}
 	}

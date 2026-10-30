@@ -14,7 +14,7 @@
  *
  * Needs no model: every stage here is made the way a drawing makes one, over the socket.
  */
-import { open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { open, resetStage, say, settle, socket, rest, zoom as zoomOf } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -119,7 +119,8 @@ say("…and the server says so too", sent.find((one) => one.name === wanted)?.ag
  * several boards at once. Pinned here as well as in the unit test because the number that matters
  * is the one that comes out of the whole round trip — the pick, the boards arriving, the camera.
  */
-const zoom = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+// Read in the canvas frame, made again for the canvas arrived at.
+const zoom = await zoomOf(page);
 say("…at the arriving zoom, the same for every stage", zoom === 30, `${zoom}%`);
 say("…and says nothing about it: a toast for a thing you just did is noise", (await page.evaluate(() => document.querySelectorAll(".notice").length)) === 0);
 

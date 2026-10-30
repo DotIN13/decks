@@ -17,7 +17,7 @@
  * questions are fed: a question outstanding for the agent you are *not* looking at cannot be
  * produced on demand any other way.
  */
-import { deckState, open, ready, say, selectBoard, settle, socket, still } from "../harness.mjs";
+import { canvasFrame, deckState, focusCanvas, open, ready, say, selectBoard, settle, socket, still } from "../harness.mjs";
 
 const { browser, page, errors, stopAnswering } = await open({ width: 1500, height: 1000 });
 /* The harness presses Allow on any dialog it sees, and this check is about dialogs being left alone. */
@@ -94,20 +94,27 @@ const { id: A, shown: adaBoard } = await make("Ada", paths[0], 0);
 const { id: B, shown: boBoard } = await make("Bo", paths.at(-1), 3200);
 
 /** Everything that should belong to one conversation, read in one go. */
-const look = () =>
-	page.evaluate(() => {
-		// The camera, not the world's style: the world's transform holds only the scroll origin and zoom now.
-		const world = globalThis.__decksCameraTransform?.() ?? null;
-		return {
-			world: world ?? "?",
-			zoom: document.querySelector('.v3-zoom-value')?.textContent?.trim(),
-			// Every board on the stage, picture or page: a `.board-node` is only a board whose page is live.
-			shown: (window.__decksBoards?.() ?? []).map((board) => board.path),
-			typed: document.querySelector(".dockfield")?.textContent ?? "",
-			selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,
-			dialog: document.querySelector(".dialog-card")?.innerText?.replace(/\s+/g, " ").trim() ?? null,
-		};
-	});
+/** The canvas frame on screen, if the conversation has a canvas: made again on each canvas. */
+const canvasNow = () => canvasFrame(page, { timeout: 4000 }).catch(() => undefined);
+const look = async () => {
+	// The canvas's half, in its frame: the camera, the zoom, the boards on the stage and the selection.
+	const canvas = await canvasNow();
+	const stage = canvas
+		? await canvas.evaluate(() => ({
+				// The camera, not the world's style: the world's transform holds only the scroll origin and zoom now.
+				world: globalThis.__decksCameraTransform?.() ?? "?",
+				zoom: document.querySelector(".v3-zoom-value")?.textContent?.trim(),
+				shown: (window.__decksBoards?.() ?? []).map((board) => board.path),
+				selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,
+			}))
+		: { world: "?", zoom: undefined, shown: [], selected: null };
+	// The page's half: the draft and the question.
+	const own = await page.evaluate(() => ({
+		typed: document.querySelector(".dockfield")?.textContent ?? "",
+		dialog: document.querySelector(".dialog-card")?.innerText?.replace(/\s+/g, " ").trim() ?? null,
+	}));
+	return { ...stage, ...own };
+};
 
 /*
  * Switch the way a person does: the composer's recipient chip opens the agent list, and a
@@ -122,15 +129,11 @@ const goTo = async (name, expected) => {
 	await page.locator(".dock-to-chip").click();
 	await page.waitForSelector(".popover", { timeout: 4000 });
 	await page.locator('.popover [data-agent="true"]').filter({ hasText: name }).first().click();
-	await page
-		.waitForFunction(
-			(wanted) => JSON.stringify((window.__decksBoards?.() ?? []).map((board) => board.path).sort()) === JSON.stringify(wanted),
-			[...expected].sort(),
-			{ timeout: 10000 },
-		)
-		.catch(() => {});
+	// The frame of the canvas it goes to: the one on screen may still be the last agent's for a moment.
+	const deadline = Date.now() + 10000;
+	while (Date.now() < deadline && JSON.stringify((await look()).shown.sort()) !== JSON.stringify([...expected].sort())) await settle(page, 150);
 	await settle(page, 400);
-	await still(page);
+	if (await canvasNow()) await still(page);
 	if (expected.length) await ready(page);
 };
 
@@ -153,12 +156,12 @@ say("…and the chip now addresses her", /^to Ada/.test((await page.locator(".do
  * same verb and only works when the cursor is not in a field — after an open it usually is,
  * so the fit quietly did nothing and the check ran on whatever view the page loaded with.
  */
-await page.locator('[aria-label="Fit everything on the canvas"]').click();
+await (await canvasFrame(page)).locator('[aria-label="Fit everything on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await selectBoard(page, await page.evaluate(() => (window.__decksBoards?.() ?? [])[0]?.path));
-await page.waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
+await selectBoard(page, await (await canvasFrame(page)).evaluate(() => (window.__decksBoards?.() ?? [])[0]?.path));
+await (await canvasFrame(page)).waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
 await settle(page, 500);
@@ -177,7 +180,7 @@ say("switching to Bo swaps the stage for his", JSON.stringify(bo.shown) === JSON
  * changed and the camera did not, leaving the viewport thousands of pixels from the only board
  * on screen.
  */
-say("…and the camera went with it", bo.world !== ada.world, `${ada.zoom} → ${bo.zoom}`);
+say("…and the camera went with it", bo.world !== ada.world, `${ada.zoom} → ${bo.zoom} · ${ada.world} → ${bo.world}`);
 /*
  * The sharpest of the five: a half-written prompt used to follow you, addressed to the new
  * agent and one Enter from being sent to a conversation it was not written for.
@@ -241,7 +244,7 @@ const empty = await look();
  * it lands on the canvas's origin at 100%, never on the camera of the agent being left, which used
  * to be saved a moment later as this one's own.
  */
-const origin = await page.evaluate(() => {
+const origin = await (await canvasNow())?.evaluate(() => {
 	const m = (globalThis.__decksCameraTransform?.() ?? "").match(/scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/);
 	return m ? { zoom: Number(m[1]), x: -Number(m[2]), y: -Number(m[3]) } : null;
 });

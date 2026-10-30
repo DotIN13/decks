@@ -8,7 +8,7 @@
  *
  * Needs no model: the card goes in over the wire.
  */
-import { open, say, settle, socket, deckState } from "../harness.mjs";
+import { focusCanvas, open, say, settle, socket, deckState } from "../harness.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 
 const until = async (test, ms = 8000) => {
@@ -37,9 +37,11 @@ await settle(page, 1500);
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+// The canvas, its cards and their editor are in the canvas frame; a key reaches it while the focus is there.
+const canvas = await focusCanvas(page);
 
 // Near life size, and off to the side of the boards, so the card has the screen to itself.
-const matrix = () => page.evaluate(() => {
+const matrix = () => canvas.evaluate(() => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
@@ -47,7 +49,7 @@ const matrix = () => page.evaluate(() => {
 // to land and stay, or it moves the canvas out from under the card's place worked out below.
 const steady = async (opening = false) => {
 	for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
-		const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+		const now = await canvas.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
 		if (now !== last) [last, since] = [now, Date.now()];
 		else if (Date.now() - since > (opening ? 1500 : 500) && !(opening && now.includes("scale(1) translate(0px, 0px)"))) break;
 	}
@@ -61,7 +63,7 @@ for (let i = 0; i < 30; i++) {
 }
 // The zoom keys glide: where the boards are is known once the camera has stopped.
 await steady();
-const clear = () => page.evaluate(({ w }) => {
+const clear = () => canvas.evaluate(({ w }) => {
 	const stage = document.querySelector(".stage");
 	// On a phone the stage's own surface answers for bare canvas as well as the stage.
 	const bare = (el) => el === stage || el?.classList?.contains("surface");
@@ -98,7 +100,7 @@ link.send({
 	],
 });
 const box = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
+	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
 	return now && now.height > 80 ? now : undefined;
 }, 12000);
 say("a card is drawn on the phone", !!box, JSON.stringify(box && { w: Math.round(box.width), h: Math.round(box.height) }));
@@ -107,7 +109,7 @@ say("a card is drawn on the phone", !!box, JSON.stringify(box && { w: Math.round
 await page.touchscreen.tap(box.x + 40, box.y + 30);
 await page.waitForTimeout(120);
 await page.touchscreen.tap(box.x + 40, box.y + 30);
-const opened = await until(() => page.evaluate(() => {
+const opened = await until(() => canvas.evaluate(() => {
 	const editor = document.querySelector(".pen-card-editor");
 	if (!editor) return undefined;
 	const r = editor.getBoundingClientRect();
@@ -116,13 +118,13 @@ const opened = await until(() => page.evaluate(() => {
 say("a double tap opens the card as it reads, inside the screen", !!opened && opened.left >= 0 && opened.right <= view.w, JSON.stringify({ ...opened, screen: view.w }));
 
 // A tap on ✓ accepts the suggestion.
-const accept = await page.evaluate(() => document.querySelector(".pce-sug [data-accept]")?.getBoundingClientRect().toJSON());
+const accept = await canvas.evaluate(() => document.querySelector(".pce-sug [data-accept]")?.getBoundingClientRect().toJSON());
 if (accept) await page.touchscreen.tap(accept.x + accept.width / 2, accept.y + accept.height / 2);
-const accepted = await until(() => page.evaluate(() => !document.querySelector(".pce-sug") && document.querySelector(".pce-body").textContent.includes("about Ohara")), 2000);
+const accepted = await until(() => canvas.evaluate(() => !document.querySelector(".pce-sug") && document.querySelector(".pce-body").textContent.includes("about Ohara")), 2000);
 say("a tap on ✓ accepts an agent's suggestion", !!accepted);
 
 // A selection gets the style bar, on the screen.
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const text = document.querySelector(".pce-body > p").firstChild;
 	const range = document.createRange();
 	range.setStart(text, 0);
@@ -130,7 +132,7 @@ await page.evaluate(() => {
 	getSelection().removeAllRanges();
 	getSelection().addRange(range);
 });
-const bar = await until(() => page.evaluate(() => {
+const bar = await until(() => canvas.evaluate(() => {
 	const el = document.querySelector(".pce-bar");
 	if (!el || getComputedStyle(el).display === "none") return undefined;
 	const r = el.getBoundingClientRect();
@@ -139,7 +141,7 @@ const bar = await until(() => page.evaluate(() => {
 say("a selection gets the style bar, inside the screen", !!bar && bar.left >= 0 && bar.right <= view.w && bar.top >= 0, JSON.stringify({ ...bar, screen: view.w }));
 
 // Words typed at the end go in, and a tap on the canvas saves them.
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const p = document.querySelector(".pce-body > p");
 	const range = document.createRange();
 	range.selectNodeContents(p);
@@ -155,17 +157,18 @@ say("…as one edit to that block: the others keep their ids", JSON.stringify(ca
 
 // A finger picks a picture with a tap and carries it into the card.
 await settle(page, 600);
-const drawn = await page.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
+const drawn = await canvas.evaluate(() => globalThis.__decksPenBox?.("phone-card"));
 /* Above the properties sheet a tap brings up, which takes the bottom 42% of a phone (v3). */
 const spot = world(view.w / 2 - 60, Math.min(view.h * 0.58 - 80, drawn.y + drawn.height + 40));
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "phone-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...spot, x2: spot.x1 + 120, y2: spot.y1 + 68 } }] });
-const picture = await until(() => page.evaluate(() => globalThis.__decksPenBox?.("phone-picture")));
-const first = await page.evaluate(() => globalThis.__decksPenBox?.("p-h"));
-const props = () => page.evaluate(() => !!document.querySelector(".props-panel"));
+const picture = await until(() => canvas.evaluate(() => globalThis.__decksPenBox?.("phone-picture")));
+const first = await canvas.evaluate(() => globalThis.__decksPenBox?.("p-h"));
+const props = () => canvas.evaluate(() => !!document.querySelector(".props-panel"));
 await page.touchscreen.tap(picture.x + picture.width / 2, picture.y + picture.height / 2);
 await settle(page, 400);
 say("a tap on a picture selects it, and its properties show as on a desk", await until(props, 2000));
 const cdp = await page.context().newCDPSession(page);
+
 const point = (x, y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
 const from = { x: picture.x + picture.width / 2, y: picture.y + picture.height / 2 };
 const to = { x: first.x + 80, y: first.y + first.height + 6 };
@@ -176,7 +179,7 @@ for (let i = 1; i <= 16; i++) {
 	await page.waitForTimeout(16);
 }
 await settle(page, 150);
-ghost = await page.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+ghost = await canvas.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
 await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 const placed = await until(() => {
 	const kids = cardNode()?.children?.map((n) => n.id) ?? [];
@@ -187,12 +190,12 @@ say("…riding below and right of the finger over the card, clear of it", !!ghos
 
 // A tap on the picture in the card selects it there, its properties with it.
 const inCard = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("phone-picture"));
+	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("phone-picture"));
 	return now && Math.abs(now.y - picture.y) > 20 ? now : undefined;
 });
-await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);
+if (inCard) await page.touchscreen.tap(inCard.x + inCard.width / 2, inCard.y + inCard.height / 2);
 await settle(page, 600);
-say("a tap on the picture in the card shows its properties", await until(props, 2000));
+say("a tap on the picture in the card shows its properties", !!inCard && (await until(props, 2000)));
 
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-card" }] });
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "phone-picture" }] });

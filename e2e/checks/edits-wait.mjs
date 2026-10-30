@@ -2,23 +2,24 @@
  * Every edit a person makes on the canvas, with the server's answer held back: does the screen show
  * the drawing as it was before the edit until the answer comes?
  *
- * The page's socket is routed and every message from the server is held back `LAG` ms (a far
- * network's round trip, as Studio over the tailnet). For each operation the stage is set up over
+ * The canvas frame's line to the harness (the answer to each edit it sends, and the stream it follows
+ * the drawing on, `lagCanvasLine`) and the page's socket are held back `LAG` ms (a far network's
+ * round trip, as Studio over the tailnet). For each operation the stage is set up over
  * the socket, the edit is made by input (a drag, a key, a click in a panel), and every animation
  * frame from the moment of the committing event (the pointer let go, the key pressed) for 1.5 s it is
  * written down what is drawn: the engine's box and fields for the items the edit touches (its laid
- * out drawing, `__decksRust.placed`), how many items there are, a board's box in the engine and its
- * page on screen, and the selection's outline. A frame shows the old state when any of those is as
+ * out drawing, `__decksRust.placed`), how many items there are, a board's box in the engine (a board
+ * is its picture), and the selection's outline. A frame shows the old state when any of those is as
  * it was before the edit and is not as it is once everything has landed.
  *
  * The person's edits are shown at once and kept on top of the server's drawings until the one that
- * has them arrives (`packages/canvas/src/drawing.ts`), so every case asks for no frame of the old
+ * has them arrives (`packages/canvas/src/model/drawing.ts`), so every case asks for no frame of the old
  * state. A board made from a file is the server's to make (`board.create`) and is not driven here.
  *
  *   node e2e/run.mjs edits-wait                       # Chromium, then WebKit for a few
  *   EDITS_WAIT_TABLE=1 node e2e/run.mjs edits-wait    # and the table, as JSON, for a report
  */
-import { API, asPerson, boardEdge, liveZoom, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, lagCanvasLine, liveZoom, onCanvasAt, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
 
 const LAG = 400;
 const WINDOW = 1500;
@@ -34,6 +35,10 @@ const until = async (test, ms = 8000) => {
 
 /** The server's messages to the page held back while `lag.ms` is set, in order (as `drop-lands.mjs`). */
 const lag = { ms: 0, queued: 0 };
+/** The canvas frame's line, held back with the socket (`lagCanvasLine`). */
+let line;
+/** The canvas frame, asked for each time: a reload makes it again. */
+let cv;
 async function laggedSocket(page) {
 	let queue = Promise.resolve();
 	await page.routeWebSocket(/\/ws/, (ws) => {
@@ -93,11 +98,6 @@ const SAMPLER = () => {
 				const b = e.boards.find((one) => one.path === path);
 				const carrying = e.carriedCount > 0 ? e.carriedBy : { dx: 0, dy: 0 };
 				out[`board ${path}`] = b ? JSON.stringify([r(b.x + carrying.dx), r(b.y + carrying.dy), r(b.w), r(b.h)]) : "absent";
-				const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-				if (probe.page) {
-					const n = node?.getBoundingClientRect();
-					out[`page ${path}`] = n ? JSON.stringify([r(n.x), r(n.y), r(n.width), r(n.height)]) : "absent";
-				}
 			}
 			if (probe.outline) {
 				const o = document.querySelector(".pen-selection")?.getBoundingClientRect();
@@ -153,19 +153,21 @@ async function op(page, engine, name, { probe, setup, prepare, commit, cleanup, 
 	try {
 		if (setup) await setup();
 		await settle(page, 400);
-		const before = await page.evaluate((probe) => globalThis.__ew.sample(probe), probe);
+		const before = await (await cv()).evaluate((probe) => globalThis.__ew.sample(probe), probe);
 		if (prepare) await prepare();
 		await settle(page, 250);
-		await page.evaluate((probe) => globalThis.__ew.start(probe), probe);
+		await (await cv()).evaluate((probe) => globalThis.__ew.start(probe), probe);
 		lag.ms = LAG;
-		await commit(() => page.evaluate(() => globalThis.__ew.armCommit()));
+		await line.set(LAG);
+		await commit(async () => (await cv()).evaluate(() => globalThis.__ew.armCommit()));
 		await page.waitForTimeout(WINDOW);
 		lag.ms = 0;
-		const { frames, commitAt } = await page.evaluate(() => globalThis.__ew.stop());
+		await line.set(0);
+		const { frames, commitAt } = await (await cv()).evaluate(() => globalThis.__ew.stop());
 		// Everything held back has reached the page (each message waits its turn behind the one before).
-		await until(() => lag.queued === 0, 15000);
+		await until(async () => lag.queued === 0 && (await line.queued()) === 0, 15000);
 		await settle(page, 600 + wait);
-		const after = await page.evaluate((probe) => globalThis.__ew.sample(probe), probe);
+		const after = await (await cv()).evaluate((probe) => globalThis.__ew.sample(probe), probe);
 		const changed = Object.keys(after).filter((k) => before[k] !== after[k]);
 		const later = frames.filter((f) => f.t > commitAt);
 		const old = later.filter((f) => changed.some((k) => f.s[k] === before[k]));
@@ -176,8 +178,9 @@ async function op(page, engine, name, { probe, setup, prepare, commit, cleanup, 
 		say(`${engine}: ${name}: no frame shows it as it was, with the server's answer ${LAG} ms away`, old.length === 0 && later.length > 20, `${old.length} of ${later.length} frames old (${which.join(", ")}); first ${JSON.stringify(old[0]?.s)}`);
 	} catch (error) {
 		lag.ms = 0;
+		await line.set(0);
 		say(`${engine}: ${name}: ran`, false, error instanceof Error ? error.stack : String(error));
-		await page.evaluate(() => globalThis.__ew?.stop()).catch(() => {});
+		await (await cv()).evaluate(() => globalThis.__ew?.stop()).catch(() => {});
 	}
 	try {
 		await page.keyboard.press("Escape");
@@ -191,25 +194,27 @@ async function op(page, engine, name, { probe, setup, prepare, commit, cleanup, 
 
 async function run(engine, { all }) {
 	const { browser, page, errors } = await open({ width: 1400, height: 900, ...(engine === "webkit" ? { engine: "webkit" } : {}) });
+	cv = () => canvasFrame(page);
 	await page.addInitScript(SAMPLER);
+	line = await lagCanvasLine(page);
 	await rest(page, { start: 0 });
 	await laggedSocket(page);
 	await liveZoom(page);
 	const link = await socket();
 	const agentId = await until(() => link.last("agents")?.focused);
 	const send = (ops) => link.send({ type: "stage.pen.edit", agentId, ops });
-	const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+	const cam = await (await cv()).evaluate(() => globalThis.__decksRust.camera);
 	const z = cam.zoom;
 	/** A box in stage units from screen pixels off the middle of the window. */
 	const at = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx / z), y1: Math.round(cam.y + dy / z), x2: Math.round(cam.x + (dx + w) / z), y2: Math.round(cam.y + (dy + h) / z) });
 	const rect = (id, dx, dy, w = 120, h = 80, fill = "#4c8bf5") => ({ op: "insert", node: { type: "rectangle", id, fill }, box: at(dx, dy, w, h) });
-	const box = (id) => page.evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
+	const box = async (id) => (await cv()).evaluate((id) => globalThis.__decksPenBox?.(id)?.toJSON(), id);
 	const centre = async (id) => {
 		const b = await until(() => box(id), 4000);
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
-	const drawn = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => globalThis.__decksRust.placed.has(id)), ids), 6000);
-	const gone = (...ids) => until(() => page.evaluate((ids) => ids.every((id) => !globalThis.__decksRust.placed.has(id)), ids), 6000);
+	const drawn = (...ids) => until(async () => (await cv()).evaluate((ids) => ids.every((id) => globalThis.__decksRust.placed.has(id)), ids), 6000);
+	const gone = (...ids) => until(async () => (await cv()).evaluate((ids) => ids.every((id) => !globalThis.__decksRust.placed.has(id)), ids), 6000);
 	/** Each deleted on its own: one already gone (inside a frame deleted before it) does not keep the rest. */
 	const del = async (...ids) => {
 		for (const id of ids) send([{ op: "delete", id }]);
@@ -232,15 +237,15 @@ async function run(engine, { all }) {
 		await page.waitForTimeout(80);
 	};
 	const handle = async (selector) => {
-		const r = await until(() => page.evaluate((s) => document.querySelector(s)?.getBoundingClientRect().toJSON(), selector), 3000);
+		const r = await until(async () => (await cv()).evaluate((s) => document.querySelector(s)?.getBoundingClientRect().toJSON(), selector), 3000);
 		if (!r) throw new Error(`no ${selector}`);
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	};
 	/** The properties panel, which shows for what is selected (`pen/Properties.tsx`). */
-	const properties = () => page.locator(".props-panel").first().waitFor({ timeout: 3000 });
+	const properties = async () => (await cv()).locator(".props-panel").first().waitFor({ timeout: 3000 });
 	/** A button on the selection's pill, pressed with the commit armed. */
 	const pillButton = async (label, arm) => {
-		const button = page.locator(`.stage-fixed > .board-callout:not([data-hidden]) [aria-label="${label}"]`).first();
+		const button = (await cv()).locator(`.stage-fixed > .board-callout:not([data-hidden]) [aria-label="${label}"]`).first();
 		await button.waitFor({ timeout: 3000 });
 		const r = await button.boundingBox();
 		await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -248,15 +253,35 @@ async function run(engine, { all }) {
 		await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
 	};
 
-	// Boards first, where the canvas opens on them.
+	// Boards first, the whole canvas framed: a board is its picture, pressed and dragged where it is.
+	await (await cv()).locator("[aria-label='Fit everything on the canvas']").first().click();
+	await rest(page);
+	/** A point on a board's picture that is the canvas's, not the page's chrome over it. */
+	const pictureSpot = async (path) => {
+		const points = await (await cv()).evaluate((wanted) => {
+			const r = window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
+			const out = [];
+			if (!r) return out;
+			for (const fy of [0.5, 0.3, 0.7]) for (const fx of [0.5, 0.3, 0.7]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
+			}
+			// The stage may not name the picture under a point while it is selected: its middle, then.
+			if (!out.length) out.push({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+			return out;
+		}, path);
+		for (const at of points) if (await onCanvasAt(page, at.x, at.y)) return at;
+		return null;
+	};
 	const pick = async () => {
-		const paths = await page.evaluate(() =>
+		const paths = await (await cv()).evaluate(() =>
 			window.__decksBoards()
-				.filter((one) => one.node && one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
+				.filter((one) => one.rect.width >= 40 && one.rect.x >= 120 && one.rect.y >= 60 && one.rect.right <= innerWidth - 140 && one.rect.bottom <= innerHeight - 120)
 				.map((one) => one.path),
 		);
 		for (const path of paths) {
-			const grip = await boardEdge(page, path);
+			const grip = await pictureSpot(path);
 			if (grip) return { path, grip };
 		}
 		return undefined;
@@ -264,11 +289,11 @@ async function run(engine, { all }) {
 	const board = await until(pick, 6000);
 	if (!board) say(`${engine}: a board on screen to change`, false);
 	else {
-		const probe = { boards: [board.path], page: true };
-		await op(page, engine, "a board moved by its edge", {
+		const probe = { boards: [board.path] };
+		await op(page, engine, "a board moved by a drag on its picture", {
 			probe,
 			prepare: async () => {
-				const grip = await boardEdge(page, board.path);
+				const grip = await pictureSpot(board.path);
 				await drag(grip, { x: grip.x + 120, y: grip.y + 60 }, 12);
 			},
 			commit: async (arm) => {
@@ -279,7 +304,7 @@ async function run(engine, { all }) {
 		await op(page, engine, "a board resized by a corner", {
 			probe,
 			setup: async () => {
-				const grip = await boardEdge(page, board.path);
+				const grip = await pictureSpot(board.path);
 				await page.mouse.click(grip.x, grip.y);
 			},
 			prepare: async () => {
@@ -295,12 +320,12 @@ async function run(engine, { all }) {
 			await op(page, engine, "a board hidden from its pill", {
 				probe,
 				setup: async () => {
-					const grip = await boardEdge(page, board.path);
+					const grip = await pictureSpot(board.path);
 					await page.mouse.click(grip.x, grip.y);
-					await page.locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
+					await (await cv()).locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().waitFor({ timeout: 3000 });
 				},
 				commit: async (arm) => {
-					const r = await page.locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
+					const r = await (await cv()).locator('.stage-fixed > .board-callout:not([data-hidden]) [aria-label="Hide"]').first().boundingBox();
 					await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 					await arm();
 					await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
@@ -312,16 +337,16 @@ async function run(engine, { all }) {
 	const person = await asPerson();
 	const call = async (verb, args) => (await fetch(`${API}/api/v1/${verb}`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args }) })).json();
 	const home = (await call("view.camera", [])).value;
-	const spot = await page.evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
+	const spot = await (await cv()).evaluate(() => ({ x: Math.max(...globalThis.__decksRust.boards.map((b) => b.x + b.w), 0) + 4000, y: 0 }));
 	let there = false;
 	for (let i = 0; i < 4 && !there; i++) {
 		const asked = await call("view.move", [{ x: spot.x, y: spot.y, zoom: 1 }]);
-		there = !!(await until(() => page.evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
+		there = !!(await until(async () => (await cv()).evaluate((x) => Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01 && Math.abs(globalThis.__decksRust.camera.x - x) < 2000, spot.x), 4000));
 		if (!there) console.log(`view.move did not land (${JSON.stringify(asked)}); again`);
 	}
 	say(`${engine}: the camera is on bare canvas at 100%`, there);
 	await settle(page, 600);
-	const moved = await page.evaluate(() => globalThis.__decksRust.camera);
+	const moved = await (await cv()).evaluate(() => globalThis.__decksRust.camera);
 	Object.assign(cam, moved);
 	const zz = moved.zoom;
 	const at2 = (dx, dy, w, h) => ({ x1: Math.round(cam.x + dx / zz), y1: Math.round(cam.y + dy / zz), x2: Math.round(cam.x + (dx + w) / zz), y2: Math.round(cam.y + (dy + h) / zz) });
@@ -330,10 +355,10 @@ async function run(engine, { all }) {
 	void rect;
 
 	const items = (...ids) => ({ items: ids });
-	const madeIds = async (had) => (await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id))).filter((id) => !had.includes(id));
+	const madeIds = async (had) => (await (await cv()).evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id))).filter((id) => !had.includes(id));
 	let had = [];
 	const remember = async () => {
-		had = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id));
+		had = await (await cv()).evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => !p.parent).map((p) => p.node.id));
 	};
 	const dropMade = async () => {
 		const made = await madeIds(had);
@@ -405,7 +430,7 @@ async function run(engine, { all }) {
 			await page.keyboard.press("Shift+ArrowRight");
 		},
 		cleanup: async () => {
-			const both = await page.evaluate(() => ({ note: globalThis.__decksRust.placed.has("ew-agent"), x: globalThis.__decksRust.placed.get("ew-race")?.box.x }));
+			const both = await (await cv()).evaluate(() => ({ note: globalThis.__decksRust.placed.has("ew-agent"), x: globalThis.__decksRust.placed.get("ew-race")?.box.x }));
 			say(`${engine}: …and the agent's note and the person's nudge are both drawn once both have landed`, both.note && Math.abs(both.x - (Math.round(cam.x - 200 / zz) + 10)) < 1.5, JSON.stringify(both));
 			await del("ew-race", "ew-agent");
 		},
@@ -418,13 +443,15 @@ async function run(engine, { all }) {
 		await clickOn("ew-refused");
 		await settle(page, 300);
 		lag.ms = LAG;
+		await line.set(LAG);
 		send([{ op: "delete", id: "ew-refused" }]);
 		await page.waitForTimeout(60);
 		await page.keyboard.press("Shift+ArrowRight");
-		const shown = await until(() => page.evaluate(() => globalThis.__decksRust.placed.get("ew-refused")?.box.x), 300);
-		const gone = await until(() => page.evaluate(() => !globalThis.__decksRust.placed.has("ew-refused")), 8000);
+		const shown = await until(async () => (await cv()).evaluate(() => globalThis.__decksRust.placed.get("ew-refused")?.box.x), 300);
+		const gone = await until(async () => (await cv()).evaluate(() => !globalThis.__decksRust.placed.has("ew-refused")), 8000);
 		lag.ms = 0;
-		await until(() => lag.queued === 0, 15000);
+		await line.set(0);
+		await until(async () => lag.queued === 0 && (await line.queued()) === 0, 15000);
 		say(`${engine}: an edit the server refuses is shown at once, then the server's drawing (the item gone) wins`, shown !== undefined && gone, JSON.stringify({ shown, gone }));
 		await page.keyboard.press("Escape");
 		await settle(page, 300);
@@ -524,7 +551,7 @@ async function run(engine, { all }) {
 		prepare: async () => {
 			const c = await centre("ew-words");
 			await page.mouse.dblclick(c.x, c.y);
-			await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
+			await until(async () => (await cv()).evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
 			await page.keyboard.press("End");
 			await page.keyboard.type(" and after");
 		},
@@ -546,7 +573,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const swatch = page.locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
+			const swatch = (await cv()).locator('.props-panel .props-swatches button[aria-pressed="false"]').nth(2);
 			await swatch.waitFor({ timeout: 3000 });
 			const r = await swatch.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -568,7 +595,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const button = page.locator('.props-panel [aria-label="Bring to the front"]').first();
+			const button = (await cv()).locator('.props-panel [aria-label="Bring to the front"]').first();
 			const r = await button.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 			await arm();
@@ -589,7 +616,7 @@ async function run(engine, { all }) {
 			await properties();
 		},
 		commit: async (arm) => {
-			const button = page.locator('.props-panel [aria-label="Align left edges"]').first();
+			const button = (await cv()).locator('.props-panel [aria-label="Align left edges"]').first();
 			const r = await button.boundingBox();
 			await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
 			await arm();
@@ -661,7 +688,7 @@ async function run(engine, { all }) {
 			prepare: async () => {
 				await page.keyboard.press("Escape");
 				// The arrow is picked by its middle handle's line: select it from the drawing's own selection, as a click on it does.
-				const mid = await page.evaluate((id) => {
+				const mid = await (await cv()).evaluate((id) => {
 					const p = globalThis.__decksRust.placed.get(id);
 					return p ? { x: p.box.x + p.box.w / 2, y: p.box.y + p.box.h / 2 } : undefined;
 				}, arrowId);
@@ -710,7 +737,7 @@ async function run(engine, { all }) {
 		},
 		cleanup: async () => {
 			await dropMade();
-			const arrows = await page.evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node.metadata?.type === "decks.arrow").map((p) => p.node.id));
+			const arrows = await (await cv()).evaluate(() => [...globalThis.__decksRust.placed.values()].filter((p) => p.node.metadata?.type === "decks.arrow").map((p) => p.node.id));
 			await del("ew-a", "ew-b", "ew-c", ...arrows);
 		},
 	});
@@ -783,9 +810,9 @@ async function run(engine, { all }) {
 		probe: { count: true },
 		prepare: async () => {
 			await remember();
-			await page.click('.v3-tool[data-tool="pen"]');
-			await page.waitForSelector(".stage-ink");
-			await page.click('.v3-tray [aria-label^="Pen"]');
+			await (await cv()).click('.v3-tool[data-tool="pen"]');
+			await (await cv()).waitForSelector(".stage-ink");
+			await (await cv()).click('.v3-tray [aria-label^="Pen"]');
 			await drag({ x: 600, y: 420 }, { x: 820, y: 470 }, 14);
 		},
 		commit: async (arm) => {
@@ -796,11 +823,11 @@ async function run(engine, { all }) {
 	await op(page, engine, "an ink stroke erased", {
 		probe: { count: true },
 		setup: async () => {
-			await page.click('.v3-tool[data-tool="pen"]');
-			await page.waitForSelector(".stage-ink");
+			await (await cv()).click('.v3-tool[data-tool="pen"]');
+			await (await cv()).waitForSelector(".stage-ink");
 		},
 		prepare: async () => {
-			await page.click('.v3-tray [aria-label^="Eraser"]');
+			await (await cv()).click('.v3-tray [aria-label^="Eraser"]');
 			await drag({ x: 700, y: 380 }, { x: 712, y: 520 }, 12);
 		},
 		commit: async (arm) => {
@@ -808,7 +835,7 @@ async function run(engine, { all }) {
 			await page.mouse.up();
 		},
 		cleanup: async () => {
-			await page.click('.v3-tool[data-tool="pen"]').catch(() => {});
+			await (await cv()).click('.v3-tool[data-tool="pen"]').catch(() => {});
 			await dropMade();
 		},
 	});

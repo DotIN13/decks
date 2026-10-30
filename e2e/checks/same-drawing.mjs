@@ -8,7 +8,10 @@
  * three things: the page's copy of the drawing is the server's; the layout the stage holds, made up
  * change by change, is the one its engine gives whole; and it is the one a fresh page lays out.
  */
-import { editMode, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
+import { canvasFrame, editMode, focusCanvas, open, resetStage, rest, say, settle, socket } from "../harness.mjs";
+
+/** The canvas frame, asked for each time: a reload makes it again. */
+const inCanvas = async (page) => canvasFrame(page);
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -25,12 +28,12 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
-const cam = await page.evaluate(() => globalThis.__decksRust.camera);
+const cam = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.camera);
 const z = cam.zoom;
 const at = (dx, dy, w, h) => ({ x1: cam.x + dx / z, y1: cam.y + dy / z, x2: cam.x + (dx + w) / z, y2: cam.y + (dy + h) / z });
 /** The layout as the stage holds it, made up change by change, and as its engine gives it whole. */
-const layouts = () =>
-	page.evaluate(() => {
+const layouts = async () =>
+	(await inCanvas(page)).evaluate(() => {
 		const engine = globalThis.__decksRust;
 		const r = (n) => Math.round(n * 100) / 100;
 		const held = [...engine.placed.values()].map((p) => [p.node.id, r(p.box.x), r(p.box.y), r(p.box.w), r(p.box.h), p.parent ?? null, p.order]);
@@ -54,7 +57,7 @@ const agree = async (after) => {
 let edits = 0;
 const edit = async (ops, ready, arg) => {
 	link.send({ type: "stage.pen.edit", agentId, ops });
-	const done = await until(() => page.evaluate(ready, arg));
+	const done = await until(async () => (await inCanvas(page)).evaluate(ready, arg));
 	await agree(`edit ${++edits}`);
 	return done;
 };
@@ -80,36 +83,37 @@ say(
 );
 const arrow = { type: "path", id: "sd-arrow", stroke: "#6b7280", strokeWidth: 3, geometry: "M2 2 L100 50", width: 102, height: 52, viewBox: [0, 0, 102, 52], metadata: { type: "decks.arrow", from: { item: "sd-a" }, to: { item: "sd-b" }, route: "curved" } };
 say("…an arrow joins two of them", !!(await edit([{ op: "insert", node: arrow, box: at(-100, 0, 102, 52) }], () => globalThis.__decksRust.placed.has("sd-arrow"))));
-const tallBefore = await page.evaluate(() => globalThis.__decksRust.placed.get("sd-n2").box.y);
+const tallBefore = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-n2").box.y);
 say(
 	"…longer words in a column's first note move the one under it",
 	!!(await edit([{ op: "update", id: "sd-n1", set: { content: "One, now with a great many more words in it, so that it wraps onto several lines in the column" } }], (y) => globalThis.__decksRust.placed.get("sd-n2").box.y > y + 10, tallBefore)),
 );
 say("…a child added to the column", !!(await edit([{ op: "insert", parent: "sd-col", node: { type: "note", id: "sd-n3", metadata: { type: "decks.markdown" }, content: "Three", width: 160 } }], () => globalThis.__decksRust.placed.get("sd-n3")?.parent === "sd-col")));
 say("…one deleted", !!(await edit([{ op: "delete", id: "sd-gone" }], () => !globalThis.__decksRust.placed.has("sd-gone"))));
-const bx = await page.evaluate(() => globalThis.__decksRust.placed.get("sd-b").box.x);
+const bx = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-b").box.x);
 say("…one moved, and its arrow follows", !!(await edit([{ op: "update", id: "sd-b", set: { x: Math.round(bx + 80) } }], (x) => globalThis.__decksRust.placed.get("sd-b").box.x > x + 40, bx)));
 
 // --- a person's drag of the joined box: its arrow bends during the drag and lands with it -------------
 await settle(page, 600);
 await editMode(page, true);
+await focusCanvas(page);
 await page.keyboard.press("Escape");
-const a = await page.evaluate(() => globalThis.__decksPenBox("sd-a").toJSON());
+const a = await (await inCanvas(page)).evaluate(() => globalThis.__decksPenBox("sd-a").toJSON());
 const ax = a.x + a.width / 2;
 const ay = a.y + a.height / 2;
-const before = await page.evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
+const before = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
 await page.mouse.move(ax, ay);
 await page.mouse.down();
 for (let i = 1; i <= 12; i++) {
 	await page.mouse.move(ax + i * 8, ay - i * 6);
 	await page.waitForTimeout(25);
 }
-const lifted = await page.evaluate(() => [...globalThis.__decksRust.lifted]);
+const lifted = await (await inCanvas(page)).evaluate(() => [...globalThis.__decksRust.lifted]);
 await agree("a drag's step");
 say("a person's drag lifts the box and bends its arrow", lifted.includes("sd-a") && lifted.includes("sd-arrow"), JSON.stringify(lifted));
 await page.mouse.up();
-say("…and is put down", await until(async () => (await page.evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000));
-const after = await page.evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
+say("…and is put down", await until(async () => (await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.lifted.size)) === 0, 5000), JSON.stringify(await (await inCanvas(page)).evaluate(() => [...globalThis.__decksRust.lifted])));
+const after = await (await inCanvas(page)).evaluate(() => globalThis.__decksRust.placed.get("sd-a").box);
 say("…where it was dropped", after.x > before.x && after.y < before.y, JSON.stringify({ before, after }));
 await settle(page, 1200);
 
@@ -124,7 +128,7 @@ const serverDoc = server?.doc;
 say("the page's drawing is the server's", !!serverDoc && JSON.stringify(canon(live.doc)) === JSON.stringify(canon(serverDoc)));
 
 await page.reload({ waitUntil: "load" });
-await until(() => page.evaluate(() => globalThis.__decksRust?.placed?.has("sd-arrow")), 15000);
+await until(async () => (await inCanvas(page)).evaluate(() => globalThis.__decksRust?.placed?.has("sd-arrow")), 15000);
 await settle(page, 1200);
 const fresh = await layouts();
 say("a fresh page lays the drawing out the same", JSON.stringify(fresh.held) === JSON.stringify(live.held), first(fresh.held, live.held) || `${fresh.held.length} items`);

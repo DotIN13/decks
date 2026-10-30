@@ -9,7 +9,7 @@
  *
  * Needs no model: the card goes in over the wire, and the rest is presses.
  */
-import { editMode, open, resetStage, say, settle, socket, deckState } from "../harness.mjs";
+import { editMode, focusCanvas, open, resetStage, say, settle, socket, deckState } from "../harness.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 
 const until = async (test, ms = 8000) => {
@@ -65,15 +65,17 @@ await settle(page, 1200);
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 await editMode(page, true);
+// The canvas, its cards and their editor are in the canvas frame; a key reaches it while the focus is there.
+const canvas = await focusCanvas(page);
 // Near life size, so the card is big enough to press into; the zoom keys step by a fifth.
-const matrix = () => page.evaluate(() => {
+const matrix = () => canvas.evaluate(() => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { a: m.a, e: m.e, f: m.f };
 });
 // The camera opens at the origin and a few seconds later fits what the agent has up: wait for that
 // to land and stay, or it moves the canvas out from under the card's place worked out below.
 for (let last = "", since = Date.now(), end = Date.now() + 15000; Date.now() < end; await settle(page, 150)) {
-	const now = await page.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
+	const now = await canvas.evaluate(() => globalThis.__decksCameraTransform?.() ?? "");
 	if (now !== last) [last, since] = [now, Date.now()];
 	else if (Date.now() - since > 1500 && !now.includes("scale(1) translate(0px, 0px)")) break;
 }
@@ -86,9 +88,9 @@ for (let i = 0; i < 30; i++) {
 // Off to the side of the boards, where the card has the canvas to itself. Every board's box is read as
 // well as what is under the pointer: a board drawn as its picture takes no hits, and one that goes live
 // grows to its page's height, so a board anywhere in the card's columns is in the way.
-const clear = () => page.evaluate(() => {
+const clear = () => canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
-	for (let y = 90; y <= 640; y += 50) for (let x = 420; x <= 820; x += 50) if (document.elementFromPoint(x, y) !== stage) return false;
+	for (let y = 150; y <= 700; y += 50) for (let x = 420; x <= 820; x += 50) if (document.elementFromPoint(x, y) !== stage) return false;
 	return (window.__decksBoards?.() ?? []).every(({ rect }) => rect.right < 400 || rect.left > 840);
 });
 for (let i = 0; i < 12 && !(await clear()); i++) {
@@ -105,29 +107,30 @@ for (let i = 0; i < 20; i++) {
 	if (now.e === m.e && now.f === m.f && now.a === m.a) break;
 	m = now;
 }
-const world = { x1: Math.round((420 - m.e) / m.a), y1: Math.round((90 - m.f) / m.a) };
+// Clear of the page's top bar too, which sits over the canvas frame: the card's style bar shows above its words.
+const world = { x1: Math.round((420 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
 // A card left by a run that stopped half way would keep the id, and the insert would be refused.
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-editor" }] });
 await settle(page, 400);
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "card-editor", content: SOURCE, metadata: { type: "decks.markdown" }, width: 360 }, box: world }] });
 // Drawn once its fonts have arrived, which is when it is as tall as its markdown.
 const box = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
 	return now && now.height > 300 ? now : undefined;
 }, 12000);
 say("a card in Obsidian's markdown is drawn", !!box && box.height > 300, JSON.stringify(box && { h: Math.round(box.height) }));
 
 /** The camera at rest: a selection made while it moves keeps the style bar hidden, and the bar's menus with it. */
-const still = () => page.waitForFunction(() => {
+const still = () => canvas.waitForFunction(() => {
 	const d = document.querySelector(".stage")?.dataset ?? {};
 	return d.moving !== "true" && d.gliding !== "true" && d.sliding !== "true";
 }, null, { timeout: 5000, polling: 50 }).catch(() => {});
 const openCard = async () => {
 	// Where the card is now: the camera has moved since the card was first found.
 	await still();
-	const at = (await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"))) ?? box;
+	const at = (await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"))) ?? box;
 	await page.mouse.dblclick(at.x + 40, at.y + 30);
-	const opened = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+	const opened = await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 	await still();
 	return opened;
 };
@@ -139,7 +142,7 @@ const openCard = async () => {
  */
 const press = async (selector) => {
 	// Found again until it holds still: the bar is drawn again as the words under it change.
-	const r = await until(() => page.evaluate((selector) => {
+	const r = await until(() => canvas.evaluate((selector) => {
 		const el = document.querySelector(selector);
 		// A long menu (the fonts) scrolls in itself: bring the option into it, and only it.
 		const menu = el?.closest(".pce-menu");
@@ -154,7 +157,7 @@ const press = async (selector) => {
 	await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
 };
 say("a double-click opens it as it reads", await openCard());
-const shown = await page.evaluate(() => ({
+const shown = await canvas.evaluate(() => ({
 	blocks: [...document.querySelector(".pce-body").children].map((c) => c.tagName.toLowerCase()),
 	suggestion: !!document.querySelector(".pce-sug del") && !!document.querySelector(".pce-sug ins"),
 	highlight: document.querySelector(".pce-body mark")?.dataset.c,
@@ -163,7 +166,7 @@ const shown = await page.evaluate(() => ({
 }));
 say("…headings, lists, a callout, a suggestion, a coloured highlight and coloured words", shown.suggestion && shown.highlight === "yellow" && shown.colour === "red" && shown.callout === "tip", JSON.stringify(shown));
 
-await page.click(".pce-sug [data-accept]");
+await canvas.click(".pce-sug [data-accept]");
 await page.keyboard.press("Control+Enter");
 const accepted = await until(() => onDisk() === SOURCE.replace("{~~Arashiyama~>Ohara~~}{>>quieter in November<<}", "Ohara"));
 say("accepting a suggestion changes those words and leaves every other byte as it was", !!accepted, JSON.stringify(onDisk()?.split("\n").slice(4, 7)));
@@ -177,14 +180,14 @@ const frame = (() => {
 		}
 	}
 })();
-say("…and the note card from before is now a card frame, one markdown item per block", frame?.type === "frame" && frame?.metadata?.type === "decks.card" && frame.children?.length === 8, JSON.stringify(frame?.children?.map((n) => n.type)));
+say("…and the note card from before is now a card frame, one markdown item per block", frame?.type === "frame" && frame?.metadata?.type === "decks.markdown-card" && frame.children?.length === 8, JSON.stringify({ type: frame?.type, meta: frame?.metadata?.type, kids: frame?.children?.map((n) => n.type) }));
 
 await settle(page, 400);
 await openCard();
 await settle(page, 300);
 // Swept with the pointer, the bar waits for the lift: none while the words are still being chosen.
 {
-	const words = await page.evaluate(() => {
+	const words = await canvas.evaluate(() => {
 		const r = document.querySelector(".pce-body > p").getBoundingClientRect();
 		return { x: r.x + 3, y: r.y + Math.min(r.height / 2, 10), w: Math.min(r.width - 6, 140) };
 	});
@@ -193,12 +196,12 @@ await settle(page, 300);
 	await page.mouse.move(words.x + words.w / 2, words.y, { steps: 4 });
 	await page.mouse.move(words.x + words.w, words.y, { steps: 4 });
 	await page.waitForTimeout(500);
-	const during = await page.evaluate(() => ({ off: document.querySelector(".pce-bar").hasAttribute("data-off"), selected: !getSelection().isCollapsed }));
+	const during = await canvas.evaluate(() => ({ off: document.querySelector(".pce-bar").hasAttribute("data-off"), selected: !getSelection().isCollapsed }));
 	await page.mouse.up();
-	const after = await until(() => page.evaluate(() => !document.querySelector(".pce-bar").hasAttribute("data-off")), 1500);
+	const after = await until(() => canvas.evaluate(() => !document.querySelector(".pce-bar").hasAttribute("data-off")), 1500);
 	say("words swept with the pointer get the style bar when it lifts, not while sweeping", during.selected && during.off && !!after, JSON.stringify(during));
 }
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const text = document.querySelector(".pce-body > p").firstChild;
 	const range = document.createRange();
 	range.setStart(text, 0);
@@ -206,11 +209,11 @@ await page.evaluate(() => {
 	getSelection().removeAllRanges();
 	getSelection().addRange(range);
 });
-const bar = await until(() => page.evaluate(() => getComputedStyle(document.querySelector(".pce-bar")).display !== "none"), 2000);
+const bar = await until(() => canvas.evaluate(() => getComputedStyle(document.querySelector(".pce-bar")).display !== "none"), 2000);
 say("a selection gets the style bar", !!bar);
 // It goes while the camera moves, and comes back over the words once the camera rests, as the board pill does.
 // Over bare canvas or a board's edge band: a live board's page takes a wheel over it for itself, and the camera stays.
-const bare = await page.evaluate(() => {
+const bare = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const points = [];
 	for (let y = 820; y >= 100; y -= 10) for (let x = 1260; x >= 300; x -= 10) points.push({ x, y, at: document.elementFromPoint(x, y) });
@@ -219,8 +222,8 @@ const bare = await page.evaluate(() => {
 await page.mouse.move(bare?.x ?? 1100, bare?.y ?? 700);
 await page.mouse.wheel(0, 60);
 await page.waitForTimeout(30);
-const gone = await page.evaluate(() => document.querySelector(".pce-bar").hasAttribute("data-hidden"));
-const back = await until(() => page.evaluate(() => {
+const gone = await canvas.evaluate(() => document.querySelector(".pce-bar").hasAttribute("data-hidden"));
+const back = await until(() => canvas.evaluate(() => {
 	const tools = document.querySelector(".pce-bar:not([data-hidden]) .pce-tools")?.getBoundingClientRect();
 	const words = getSelection().rangeCount ? getSelection().getRangeAt(0).getBoundingClientRect() : undefined;
 	if (!tools || !words) return undefined;
@@ -237,23 +240,23 @@ await press('.pce-bar [data-menu="fg"]');
 await press('.pce-bar .pce-menu[data-open] [data-fg="blue"]');
 
 const drag = async (from, to) => {
-	const f = await page.locator(from).first().boundingBox();
+	const f = await canvas.locator(from).first().boundingBox();
 	await page.mouse.move(f.x + 12, f.y + 8);
 	await page.mouse.down();
 	await page.mouse.move(f.x + 24, f.y + 4, { steps: 3 });
 	await page.mouse.move(to.x, to.y, { steps: 10 });
-	const seen = await page.evaluate(() => {
+	const seen = await canvas.evaluate(() => {
 		const ghost = document.querySelector(".pce-ghost")?.getBoundingClientRect();
 		return { ghost: ghost && { x: ghost.x, y: ghost.y }, line: getComputedStyle(document.querySelector(".pce-line")).display, caret: getComputedStyle(document.querySelector(".pce-caret")).display };
 	});
 	await page.mouse.up();
 	return seen;
 };
-const heading = await page.locator(".pce-body h1").boundingBox();
+const heading = await canvas.locator(".pce-body h1").boundingBox();
 const at = { x: heading.x + 100, y: heading.y + heading.height + 4 };
 const file = await drag('.pce-piece[data-kind="file"]', at);
 say("a file drags between lines: its ghost below and right of the pointer, and a line where it lands", file.line === "block" && file.ghost && file.ghost.x > at.x && file.ghost.y > at.y, JSON.stringify(file));
-const paragraph = await page.locator(".pce-body > p").first().boundingBox();
+const paragraph = await canvas.locator(".pce-body > p").first().boundingBox();
 const wiki = await drag('.pce-piece[data-kind="wiki"]', { x: paragraph.x + 160, y: paragraph.y + 10 });
 say("a [[link]] drags into a sentence, with a caret where it lands", wiki.caret === "block", JSON.stringify(wiki));
 await page.keyboard.press("Control+Enter");
@@ -278,7 +281,7 @@ const idsBefore = (cardNode()?.children ?? []).map((n) => n.id);
 await settle(page, 400);
 await openCard();
 await settle(page, 300);
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const cell = [...document.querySelectorAll(".pce-table td")].find((td) => td.textContent.trim() === "Fushimi");
 	const range = document.createRange();
 	range.selectNodeContents(cell);
@@ -291,7 +294,7 @@ await page.keyboard.press("Shift+Tab");
 await page.keyboard.type("Sat");
 await page.keyboard.press("Tab");
 await page.keyboard.type("Kyoto");
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const title = document.querySelector(".pce-chead");
 	const range = document.createRange();
 	range.selectNodeContents(title);
@@ -310,9 +313,9 @@ say("…and the save is edits to those two items: every block keeps its id", JSO
 // The card goes to Obsidian as a .md file, without its colours and with the suggestion's original words.
 await page.keyboard.press("Escape");
 await settle(page, 300);
-const cardBox = await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+const cardBox = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
 await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 6);
-const exportButton = page.locator('[title="Export to Obsidian (.md)"]');
+const exportButton = canvas.locator('[title="Export to Obsidian (.md)"]');
 await exportButton.waitFor({ timeout: 3000 }).catch(() => {});
 const [download] = await Promise.all([page.waitForEvent("download", { timeout: 5000 }).catch(() => undefined), exportButton.click().catch(() => {})]);
 const note = download ? readFileSync(await download.path(), "utf8") : "";
@@ -324,7 +327,7 @@ await settle(page, 300);
 await openCard();
 await settle(page, 300);
 const across = (button) =>
-	page.evaluate(() => {
+	canvas.evaluate(() => {
 		const ed = document.querySelector(".pce-body");
 		const at = (el, off) => {
 			const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -363,7 +366,7 @@ const choose = async (menu, option) => {
 	await press(`.pce-bar [data-menu="${menu}"]`);
 	await press(`.pce-bar .pce-menu[data-open] ${option}`);
 };
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const words = document.querySelector(".pce-body h1");
 	const range = document.createRange();
 	range.selectNodeContents(words);
@@ -371,7 +374,7 @@ await page.evaluate(() => {
 	getSelection().addRange(range);
 });
 await choose("block", '[data-block="h2"]');
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	const cell = [...document.querySelectorAll(".pce-body > p")].find((p) => p.textContent.includes("Thursday"));
 	const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
 	const text = [...(function* () { for (let n = walk.nextNode(); n; n = walk.nextNode()) yield n; })()].find((n) => n.textContent.includes("Budget"));
@@ -395,10 +398,10 @@ say("the bar's menus make a block a heading, and set words in serif and underlin
 await page.keyboard.press("Escape");
 await settle(page, 400);
 const blockIds = (cardNode()?.children ?? []).map((n) => n.id);
-const firstBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[0]);
-const secondBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[1]);
+const firstBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[0]);
+const secondBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockIds[1]);
 await page.mouse.dblclick(firstBox.x + 40, (firstBox.y + firstBox.height + secondBox.y) / 2);
-const lineOpen = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor") && !document.querySelector(".canvas-menu")), 3000);
+const lineOpen = await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor") && !document.querySelector(".canvas-menu")), 3000);
 await page.keyboard.type("A new line in the gap");
 await page.keyboard.press("Control+Enter");
 const lined = await until(() => ((cardNode()?.children ?? [])[1]?.content === "A new line in the gap" ? true : undefined));
@@ -407,14 +410,14 @@ await page.keyboard.press("Escape");
 await settle(page, 400);
 const wordsId = (cardNode()?.children ?? []).find((n) => (n.content ?? "").startsWith("A new line"))?.id;
 // Waited for: the new line's layout comes back from the worker a moment after the file has it.
-const wordsBox = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
+const wordsBox = await until(() => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), wordsId), 8000);
 await page.mouse.dblclick(wordsBox.x + 2, wordsBox.y + wordsBox.height / 2);
-await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 // The start of the line, by Home: the card moves the caret itself, where a Mac's Home would scroll the stage
 // (the canvas went 110,000 px up), so the camera is held to where it was too.
-const cameraBefore = await page.evaluate(() => globalThis.__decksCameraTransform());
+const cameraBefore = await canvas.evaluate(() => globalThis.__decksCameraTransform());
 await page.keyboard.press("Home");
-say("Home in a card moves its caret and leaves the canvas where it was", (await page.evaluate(() => globalThis.__decksCameraTransform())) === cameraBefore);
+say("Home in a card moves its caret and leaves the canvas where it was", (await canvas.evaluate(() => globalThis.__decksCameraTransform())) === cameraBefore);
 await page.keyboard.type("Look: ");
 await page.keyboard.press("Control+Enter");
 const caretAt = await until(() => ((cardNode()?.children ?? []).some((n) => n.content === "Look: A new line in the gap") ? true : undefined));
@@ -441,9 +444,9 @@ link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: "card-pic
 await settle(page, 300);
 const beside = { x1: Math.round((880 - m.e) / m.a), y1: Math.round((150 - m.f) / m.a) };
 link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "card-picture", name: "Gate", cornerRadius: 8, fill: "#9ec5f0" }, box: { ...beside, x2: beside.x1 + 160, y2: beside.y1 + 90 } }] });
-const picture = await until(() => page.evaluate(() => globalThis.__decksPenBox?.("card-picture")));
+const picture = await until(() => canvas.evaluate(() => globalThis.__decksPenBox?.("card-picture")));
 const kids = where("card-picture")?.kids ?? [];
-const second = await page.evaluate((id) => globalThis.__decksPenBox?.(id), kids[1]);
+const second = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), kids[1]);
 await page.mouse.click(picture.x + 30, picture.y + 30);
 await settle(page, 200);
 await page.mouse.move(picture.x + 30, picture.y + 30);
@@ -453,8 +456,8 @@ const aim = { x: second.x + 60, y: second.y + second.height + 6 };
 await page.mouse.move(aim.x, aim.y, { steps: 14 });
 await settle(page, 200);
 // The selection's outline is drawn where the carried item is drawn.
-const carried = await page.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
-const looks = await page.evaluate(() => {
+const carried = await canvas.evaluate(() => document.querySelector(".pen-selection")?.getBoundingClientRect().toJSON());
+const looks = await canvas.evaluate(() => {
 	const ghost = document.querySelector(".pen-drag-ghost:not([hidden])");
 	const style = ghost && getComputedStyle(ghost);
 	return { ghost: !!ghost, tilted: style?.rotate === "2deg", shadow: !!style?.filter.includes("drop-shadow"), handles: [...document.querySelectorAll(".pen-handle, .pen-anchor")].filter((h) => getComputedStyle(h).visibility !== "hidden").length };
@@ -466,7 +469,7 @@ say("…as a ghost of itself, tilted and lifted on a shadow, with no handles rou
 say("…and while it is carried over the card it rides below and right of the pointer", !!carried && carried.x > aim.x && carried.y > aim.y, JSON.stringify({ aim, at: carried && { x: Math.round(carried.x), y: Math.round(carried.y) } }));
 // Once the card has laid it out among its blocks.
 const inside = await until(async () => {
-	const now = await page.evaluate(() => globalThis.__decksPenBox?.("card-picture"));
+	const now = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-picture"));
 	return now && Math.abs(now.x - picture.x) > 40 ? now : undefined;
 });
 await page.mouse.click(inside.x + 20, inside.y + 20);
@@ -481,8 +484,8 @@ say("…and dragged off the card it leaves it", !!out && out.inCard === -1, JSON
 
 // A file dropped from the desktop onto the card goes into it as a file's chip, which is ![[path]] in its markdown.
 const before = (cardNode()?.children ?? []).length;
-const onCard = await page.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
-await page.evaluate(({ x, y }) => {
+const onCard = await canvas.evaluate(() => globalThis.__decksPenBox?.("card-editor"));
+await canvas.evaluate(({ x, y }) => {
 	const data = new DataTransfer();
 	data.items.add(new File(["%PDF-1.4 plan"], "itinerary-2.pdf", { type: "application/pdf" }));
 	const target = document.elementFromPoint(x, y) ?? document.body;
@@ -491,34 +494,34 @@ await page.evaluate(({ x, y }) => {
 const filed = await until(() => (cardNode()?.children ?? []).find((n) => n.metadata?.type === "decks.file" && /itinerary-2\.pdf$/.test(n.metadata.path)), 12000);
 say("a file dropped on a card goes into it as a file's chip", !!filed && (cardNode()?.children ?? []).length === before + 1, JSON.stringify(filed && { name: filed.name, path: filed.metadata.path, kids: filed.children?.map((c) => c.type) }));
 // What the page asks to open, rather than a real tab: a headless browser need not show one.
-await page.evaluate(() => {
+await canvas.evaluate(() => {
 	globalThis.__opened = [];
 	window.open = (url) => (globalThis.__opened.push(String(url)), null);
 });
-const chip = await until(() => page.evaluate((id) => globalThis.__decksPenBox?.(id), filed?.id));
+const chip = await until(() => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), filed?.id));
 if (chip) await page.mouse.dblclick(chip.x + chip.width / 2, chip.y + chip.height / 2);
-const opened = await until(() => page.evaluate(() => globalThis.__opened?.[0]), 3000);
+const opened = await until(() => canvas.evaluate(() => globalThis.__opened?.[0]), 3000);
 say("…and a double-click on the chip opens the file", /itinerary-2\.pdf$/.test(opened ?? ""), opened);
 
 // A block's grip, in the card's margin, drags the block out of the card, and a drag puts it back.
 await page.keyboard.press("Escape");
 await settle(page, 400);
 const blockId = (cardNode()?.children ?? []).find((n) => n.type === "text" && (n.content ?? "").startsWith("Look:"))?.id;
-const blockBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), blockId);
+const blockBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), blockId);
 await page.mouse.move(blockBox.x + 40, blockBox.y + 6);
 // The stage's grip, not the drawing bar's own `.pen-tools .pen-grip`.
-const grip = await until(() => page.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
+const grip = await until(() => canvas.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
 say("hovering a card's block shows its grip in the card's margin", !!grip && grip.right <= blockBox.x + 2 && Math.abs(grip.top - blockBox.y) < 12, JSON.stringify({ grip: grip && Math.round(grip.x), block: Math.round(blockBox.x) }));
 // Browsing shows it too: a card's blocks are drawn items, and those drag in both modes.
 await editMode(page, false);
 await page.mouse.move(blockBox.x + 40, blockBox.y - 80);
 await page.mouse.move(blockBox.x + 40, blockBox.y + 6, { steps: 3 });
-const browsing = await until(() => page.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
+const browsing = await until(() => canvas.evaluate(() => document.querySelector(".world .pen-grip")?.getBoundingClientRect().toJSON()), 2000);
 say("…and browsing, the same grip", !!browsing && Math.abs(browsing.x - grip.x) < 2 && Math.abs(browsing.y - grip.y) < 2, JSON.stringify(browsing && { x: Math.round(browsing.x), y: Math.round(browsing.y) }));
 await editMode(page, true);
 await page.mouse.move(blockBox.x + 40, blockBox.y - 80);
 await page.mouse.move(blockBox.x + 40, blockBox.y + 6, { steps: 3 });
-await until(() => page.evaluate(() => !!document.querySelector(".world .pen-grip")), 2000);
+await until(() => canvas.evaluate(() => !!document.querySelector(".world .pen-grip")), 2000);
 if (grip) {
 	await page.mouse.move(grip.x + 6, grip.y + 8);
 	await page.mouse.down();
@@ -553,7 +556,7 @@ if (freeAt) {
 	await page.mouse.click(freeAt.x, freeAt.y);
 	await page.keyboard.press("t");
 	await page.mouse.click(freeAt.x, freeAt.y);
-	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
+	await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-card-editor")), 3000);
 	await page.keyboard.type("A **bold** idea");
 	await page.keyboard.press("Control+Enter");
 }

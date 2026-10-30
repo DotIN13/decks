@@ -1,12 +1,12 @@
 /**
- * Cards on a real canvas: a canvas whose boards were turned into cards opens with each near card in a
- * shadow root, no iframe for them, the card's styles applied, and a card's script running.
+ * Cards on a real canvas, in the canvas frame: a canvas whose boards were turned into cards opens with
+ * each near card in a shadow root, no iframe for them, the card's styles applied, and a card's script running.
  *
  * Run against a server holding the `*-cards` canvases (`~/decks-studio-demo/run-cards-test.sh`):
  * DECKS_E2E_WEB=http://127.0.0.1:4870 DECKS_E2E_API=http://127.0.0.1:4870 node e2e/checks/cards-smoke.mjs <canvas>
  */
 import { chromium } from "playwright";
-import { API, WEB, asPerson, say, failed } from "../harness.mjs";
+import { API, WEB, asPerson, canvasFrame, say, failed } from "../harness.mjs";
 
 const canvas = process.argv[2] ?? "ep3-cards";
 const call = async (verb, args = [], headers = {}) => {
@@ -24,7 +24,7 @@ await page.waitForTimeout(2500);
 const went = await call("view.goto", [canvas], person);
 say(`view.goto ${canvas}`, !went.error, JSON.stringify(went).slice(0, 200));
 await page.waitForTimeout(6000);
-const seen = await page.evaluate(() => {
+const seen = await (await canvasFrame(page)).evaluate(() => {
 	const surfaces = [...document.querySelectorAll(".card-surface")];
 	const frames = document.querySelectorAll("iframe.plain-board-page").length;
 	return { cards: surfaces.length, hosts: document.querySelectorAll(".card-host").length, frames };

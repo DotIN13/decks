@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, editMode, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, deckState, editMode, firstOnCanvas, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -57,21 +57,33 @@ await editMode(page, true);
  * Somewhere empty to put them, in stage coordinates. A film over a board would still draw, but a
  * press on it is a press on the board's page, and the point here is to press the item.
  */
-// Asked until it answers: on a busy machine the canvas is still landing, or its pages still loading over the bare canvas, at the first look.
-const spot = await page
-	.waitForFunction(() => {
+// Asked until it answers: on a busy machine the canvas is still landing at the first look. The canvas
+// frame finds the places bare of its own things; the page says which are not under its own chrome.
+const canvas = await canvasFrame(page);
+let spot;
+// Where the canvas lands may be all boards: after a few looks, the view is moved aside to bare canvas.
+for (let look = 0, deadline = Date.now() + 15000; !spot && Date.now() < deadline; look++) {
+	const places = await canvas.evaluate(() => {
 		const stage = document.querySelector(".stage");
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		const out = [];
 		for (let y = 160; y < 760; y += 40) {
 			for (let x = 360; x < 1200; x += 40) {
-				if (empty(x, y) && empty(x + 320, y) && empty(x, y + 300) && empty(x + 320, y + 300)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+				const points = [[x, y], [x + 320, y], [x, y + 300], [x + 320, y + 300]];
+				if (points.every(([px, py]) => empty(px, py))) out.push({ points, x: (x - m.e) / m.a, y: (y - m.f) / m.a });
 			}
 		}
-		return null;
-	}, null, { timeout: 8000, polling: 200 })
-	.then((handle) => handle.jsonValue())
-	.catch(() => undefined);
+		return out;
+	});
+	spot = await firstOnCanvas(page, places);
+	if (!spot && look >= 3) {
+		await page.mouse.move(800, 450);
+		await page.mouse.wheel(1500, 0);
+		await rest(page).catch(() => {});
+	}
+	if (!spot) await settle(page, 200);
+}
 say("the canvas has room for them", !!spot);
 
 if (spot) {
@@ -108,7 +120,7 @@ if (spot) {
 	// A rectangle is what pen.dev opens, which is the whole reason for the shape.
 	say("…and pen's own type, so another tool can open the stage", written?.every((n) => n.type === "rectangle") === true, JSON.stringify(written?.map((n) => n.type)));
 
-	const boxOf = (id) => page.evaluate((one) => globalThis.__decksPenBox?.(one), id);
+	const boxOf = (id) => canvas.evaluate((one) => globalThis.__decksPenBox?.(one), id);
 	const filmBox = await until(async () => {
 		const box = await boxOf("media-film");
 		return box && box.width > 0 ? box : undefined;
@@ -120,30 +132,30 @@ if (spot) {
 	 * an item does. The item has to be on screen; nothing else is asked of the zoom.
 	 */
 	if (filmBox) {
-		const players = await page.evaluate(() => document.querySelectorAll("video, audio").length);
+		const players = await canvas.evaluate(() => document.querySelectorAll("video, audio").length);
 		say("nothing is decoding: there is no player on the canvas at rest", players === 0, `players ${players}`);
 		await page.mouse.click(filmBox.x + filmBox.width * 0.75, filmBox.y + filmBox.height * 0.4);
-		const player = await until(() => page.evaluate(() => {
+		const player = await until(() => canvas.evaluate(() => {
 			const one = document.querySelector(".pen-player video");
 			return one ? { players: document.querySelectorAll(".pen-player video, .pen-player audio").length, src: one.getAttribute("src") } : undefined;
 		}));
 		say("one click on a film mounts one player over it", !!player && player.players === 1, JSON.stringify(player));
 		say("…and it plays the file the item names", (player?.src ?? "").includes("a-film.mp4"), player?.src);
-		const picked = await until(() => page.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
+		const picked = await until(() => canvas.evaluate(() => document.querySelectorAll(".pen-selection:not([data-board])").length === 1));
 		say("…and the click selects it, as any drawn item", !!picked);
 
 		// Letting go of the item does not stop it: a film keeps playing while you work elsewhere.
 		await page.keyboard.press("Escape");
 		await settle(page, 400);
-		const kept = await page.evaluate(() => document.querySelectorAll(".pen-player").length === 1);
+		const kept = await canvas.evaluate(() => document.querySelectorAll(".pen-player").length === 1);
 		say("…and letting go of it leaves it playing", kept);
 
 		// The sound's own play button, where the still drew it, starts it in the film's place.
 		const sound = await boxOf("media-sound");
 		await page.mouse.click(sound.x + sound.height / 2, sound.y + sound.height / 2);
-		const swapped = await until(() => page.evaluate(() => (document.querySelector(".pen-player")?.dataset.kind === "audio" && document.querySelectorAll(".pen-player").length === 1 ? true : undefined)));
+		const swapped = await until(() => canvas.evaluate(() => (document.querySelector(".pen-player")?.dataset.kind === "audio" && document.querySelectorAll(".pen-player").length === 1 ? true : undefined)));
 		say("a click on a sound plays it instead: one player at a time", !!swapped);
-		const parts = await page.evaluate(() => ({ disc: !!document.querySelector(".pen-player-disc"), wave: !!document.querySelector(".pen-player-wave"), name: document.querySelector(".pen-player-name")?.textContent }));
+		const parts = await canvas.evaluate(() => ({ disc: !!document.querySelector(".pen-player-disc"), wave: !!document.querySelector(".pen-player-wave"), name: document.querySelector(".pen-player-name")?.textContent }));
 		say("…drawn as its card: a play button, its name and its waveform", parts.disc && parts.wave && parts.name === "a-talk.m4a", JSON.stringify(parts));
 	}
 

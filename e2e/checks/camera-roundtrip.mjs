@@ -5,7 +5,7 @@
  * it while they were away. This reads the camera itself at each step of the round trip, so the
  * answer is a number rather than an impression.
  */
-import { open, resetStage, say, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, open, resetStage, say, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 10000) => {
 	const deadline = Date.now() + ms;
@@ -22,9 +22,9 @@ await rest(page, { start: 0 });
 const link = await socket();
 const focused = await until(() => link.last("agents")?.focused);
 
-/** The camera, read off the world's own transform, which is what the eye sees. */
-const camera = () =>
-	page.evaluate(() => {
+/** The camera, read off the world's own transform in the canvas frame (made again on a switch), which is what the eye sees. */
+const camera = async () =>
+	(await canvasFrame(page)).evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform());
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	});

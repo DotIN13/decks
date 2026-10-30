@@ -17,7 +17,7 @@
  *
  * `DECKS_E2E_SHOTS=<dir>` keeps the screenshots.
  */
-import { open, rest, say, settle } from "../harness.mjs";
+import { canvasFrame, open, rest, say, settle } from "../harness.mjs";
 import { TARGETS, zoomStep } from "../backends-kit.mjs";
 import { join } from "node:path";
 
@@ -26,11 +26,13 @@ const flag = (on) => `globalThis.__decksTilePixels = ${on};`;
 /** Wait until the stage is at rest and has every tile of its window at its resting scale. */
 async function sharp(page) {
 	await rest(page, { start: 200, timeout: 8000 }).catch(() => {});
-	await page.waitForFunction(() => (globalThis.__decksSheet?.settledAt ?? 0) > 0, null, { timeout: 15000 }).catch(() => {});
+	// The stage and its engine are in the canvas frame.
+	const canvas = await canvasFrame(page);
+	await canvas.waitForFunction(() => (globalThis.__decksSheet?.settledAt ?? 0) > 0, null, { timeout: 15000 }).catch(() => {});
 	// Quiet: no tile in for 600 ms.
 	let last = -1;
 	for (let i = 0; i < 40; i++) {
-		const n = await page.evaluate(() => globalThis.__decksSheet?.tiles ?? 0);
+		const n = await canvas.evaluate(() => globalThis.__decksSheet?.tiles ?? 0);
 		if (n === last) break;
 		last = n;
 		await settle(page, 600);
@@ -39,17 +41,20 @@ async function sharp(page) {
 
 async function shots(target, on, label) {
 	const { browser, page, errors } = await open({ ...target.open, scheme: "light", init: flag(on) });
-	await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
+	const canvas = await canvasFrame(page);
+	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
 	const out = { label, errors, pictures: [], boards: [] };
 	/*
 	 * A screenshot, and where the boards are on it, in its pixels: a board's picture is the page's own
 	 * (not a tile) and is made again from its page on each visit, a little differently, so it is left out.
 	 */
 	/* The chrome is not what is compared: the floats over the canvas (the tool column, the bars, the composer) are hidden for the picture. */
-	await page.addStyleTag({ content: ".pen-tools, .dock, .v3-bar, .panel-shell, .notices { visibility: hidden !important; }" });
+	const hidden = { content: ".pen-tools, .dock, .v3-bar, .panel-shell, .notices, .v3-zoom, .frame-tool-row { visibility: hidden !important; }" };
+	await page.addStyleTag(hidden);
+	await canvas.addStyleTag(hidden);
 	const snap = async () => {
 		out.pictures.push((await page.screenshot()).toString("base64"));
-		out.boards.push(await page.evaluate(() => (window.__decksBoards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
+		out.boards.push(await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map(({ rect: r }) => [r.left, r.top, r.right, r.bottom].map((v) => v * devicePixelRatio))));
 	};
 	// Out by fixed steps (not until the boards are pictures, which depends on timing), so every page is at the same zoom.
 	// Where it opens is not compared: live boards' pages differ a little from page to page.
@@ -67,7 +72,7 @@ async function shots(target, on, label) {
 	await zoomStep(page, -25);
 	await sharp(page);
 	await snap();
-	out.stats = await page.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
+	out.stats = await canvas.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
 	out.compare = (a, b, boards) =>
 		page.evaluate(
 			async ([one, two, boards]) => {
@@ -142,9 +147,10 @@ for (const target of TARGETS) {
 // Unasked, WebKit hands tiles over as bytes and Chromium as pictures (`pixelsFirst`).
 for (const target of TARGETS) {
 	const { browser, page } = await open({ ...target.open, scheme: "light", boards: false });
-	await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
+	const canvas = await canvasFrame(page);
+	await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 });
 	await sharp(page);
-	const stats = await page.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
+	const stats = await canvas.evaluate(() => ({ ...window.__decksEngine.stats(), pixelTiles: globalThis.__decksSheet?.pixelTiles ?? 0, tiles: globalThis.__decksSheet?.tiles ?? 0 }));
 	const webkit = target.open.engine === "webkit";
 	say(`${target.label}: unasked, tiles come as ${webkit ? "bytes" : "pictures"}`, stats.tiles > 0 && (webkit ? stats.pixelTiles === stats.tiles : stats.pixelTiles === 0), JSON.stringify(stats));
 	await browser.close();

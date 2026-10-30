@@ -10,7 +10,7 @@
  * camera subtracts it; folded, it declares nothing. Both are checked, because the difference is
  * invisible until a fit goes wrong.
  */
-import { open, say, settle, zoom, ZOOM_IN_PAGE, ready, rest } from "../harness.mjs";
+import { canvasFrame, focusCanvas, open, say, settle, zoom, ZOOM_IN_PAGE, ready, rest } from "../harness.mjs";
 
 // The panel remembers its tab on this device; this check leaves it on Canvas.
 const { browser, page, errors } = await open({ width: 1400, height: 900, panelTab: "canvas" });
@@ -71,16 +71,18 @@ try {
 	 * The Canvas tab is what is on this canvas: one row per board under "Boards", and the
 	 * heading's count is the rows'. The stage's own list (`__decksBoards`) is the reference.
 	 */
-	const listed = await page.evaluate(() => {
+	// The stage is in the canvas frame.
+	const onStage = await (await canvasFrame(page)).evaluate(() => (window.__decksBoards?.() ?? []).length);
+	const listed = await page.evaluate((stage) => {
 		const rows = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-item[data-kind="board"]')];
 		const head = [...document.querySelectorAll('.panel-list[data-tab="canvas"] .v3-sec')].find((sec) => sec.textContent.startsWith("Boards"));
 		return {
 			rows: rows.length,
 			names: rows.map((row) => row.textContent.trim()),
 			count: Number(head?.querySelector(".v3-sec-n")?.textContent ?? NaN),
-			stage: (window.__decksBoards?.() ?? []).length,
+			stage,
 		};
-	});
+	}, onStage);
 	say("the Canvas tab lists every board on the canvas, once", listed.rows >= 1 && listed.rows === listed.stage && new Set(listed.names).size === listed.rows, JSON.stringify(listed));
 	say("…and the Boards heading counts them", listed.count === listed.rows, JSON.stringify(listed));
 
@@ -160,8 +162,9 @@ try {
 	say("in a narrow window the panel is still there", (await page.locator(".panel-shell").count()) >= 1);
 	const narrow = await settled("360px");
 	say("…still a column beside the canvas, declaring its width", (await mounted()) === 1 && narrow === "360px", `${await mounted()} / ${narrow}`);
+	await focusCanvas(page);
 	await page.keyboard.press("0");
-	await page.waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
+	await (await canvasFrame(page)).waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
 	say("…so fit still frames the deck at a workable zoom", (await zoom(page)) > 5, `${await zoom(page)}%`);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

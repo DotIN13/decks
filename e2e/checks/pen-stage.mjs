@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { API, asPerson, deckState, editMode, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, editMode, fitCanvas, focusCanvas, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -22,6 +22,16 @@ await resetStage();
 const deck = await deckState();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 await rest(page, { start: 0 });
+/** The canvas frame: the stage, its tools and its panels are there; the page's chrome is drawn over it. */
+const canvas = await canvasFrame(page);
+// Framed on the whole canvas, as it opens.
+await fitCanvas(page);
+/** Whether every point of a box on the page reaches the canvas, not the side panel, a bar or the composer over it. */
+const pageClear = (box, step = 20) =>
+	page.evaluate(({ x, y, w, h, step }) => {
+		for (let dy = 0; dy <= h; dy += step) for (let dx = 0; dx <= w; dx += step) if (document.elementFromPoint(x + dx, y + dy)?.matches("iframe.canvas-frame") !== true) return false;
+		return true;
+	}, { ...box, step });
 
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
@@ -35,17 +45,22 @@ const firstBoard = deck.boards[0].path;
  */
 const inFolder = (path) => path.replace(/^canvases\/[^/]+\//, "");
 // On empty canvas the page shows, so the hand edit below lands on the note and not on a board.
-const middle = await page.evaluate(() => {
-	const stage = document.querySelector(".stage");
-	const m = new DOMMatrix(globalThis.__decksCameraTransform());
-	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
-	for (let y = 140; y < 820; y += 30) {
-		for (let x = 320; x < 1500; x += 30) {
-			if (empty(x, y) && empty(x + 80, y) && empty(x, y + 40) && empty(x + 80, y + 40)) return { x: (x - m.e) / m.a, y: (y - m.f) / m.a };
+const middle = await (async () => {
+	const { found, m } = await canvas.evaluate(() => {
+		const stage = document.querySelector(".stage");
+		const t = new DOMMatrix(globalThis.__decksCameraTransform());
+		const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+		const out = [];
+		for (let y = 140; y < 820; y += 30) {
+			for (let x = 320; x < 1500; x += 30) {
+				if (empty(x, y) && empty(x + 80, y) && empty(x, y + 40) && empty(x + 80, y + 40)) out.push({ x, y });
+			}
 		}
-	}
+		return { found: out, m: { a: t.a, e: t.e, f: t.f } };
+	});
+	for (const at of found) if (await pageClear({ x: at.x, y: at.y, w: 80, h: 40 }, 40)) return { x: (at.x - m.e) / m.a, y: (at.y - m.f) / m.a };
 	return { x: (800 - m.e) / m.a, y: (500 - m.f) / m.a };
-});
+})();
 link.send({
 	type: "stage.pen.edit",
 	agentId,
@@ -99,15 +114,17 @@ const followed = await until(() => onDisk().children.find((n) => n.id === "e2e-a
 say("…and the arrow that ends on it follows", !!followed);
 
 // --- the drawing is drawn --------------------------------------------------------------------------
-const drawn = await until(() => page.evaluate(() => {
+const drawn = await until(() => canvas.evaluate(() => {
 	// The drawing is the engine's tiles, on its canvas over the boards.
 	const engine = globalThis.__decksEngine?.stats?.();
-	if (engine) return engine.tiles > 0 && engine.drawn[1] > 0;
+	if (engine && engine.tiles > 0 && engine.drawn[1] > 0) return true;
+	// In the canvas frame `__decksEngine` can be an engine made before the one on screen: the sheet's own count says a frame was drawn.
+	if ((globalThis.__decksSheet?.shown ?? 0) > 0 && globalThis.__decksRust?.placed?.has("e2e-note")) return true;
 	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.
 	const canvas = document.querySelector(".stage-sheet");
 	return !!canvas && !canvas.hidden && parseFloat(canvas.style.width) > 1;
 }), 15000);
-say("the drawing layer is on screen", !!drawn);
+say("the drawing layer is on screen", !!drawn, JSON.stringify(await canvas.evaluate(() => globalThis.__decksEngine?.stats?.())));
 
 // --- a picture of the stage, taken by the server's own Chromium --------------------------------------
 const shotAt = Date.now();
@@ -132,7 +149,7 @@ say("a hand edit of the file is sent to the browser", handFrame?.doc.children.fi
 await editMode(page, true);
 // Bring the note into view: the camera looks at it through the stage's own transform.
 const note = onDisk().children.find((n) => n.id === "e2e-note");
-const screen = await page.evaluate(({ x, y }) => {
+const screen = await canvas.evaluate(({ x, y }) => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { x: m.e + x * m.a, y: m.f + y * m.a, zoom: m.a };
 }, { x: note.x + 4 / 0.2, y: note.y + 4 / 0.2 });
@@ -155,31 +172,47 @@ if (inView) {
 	say("the note is on screen to be dragged", false, JSON.stringify(screen));
 }
 // --- the drawing tools: a rectangle drawn by hand, a fill from the bar, and undo ---------------------
-const spot = await page.evaluate(() => {
+// On bare canvas right of every board, at 100%, where the camera is moved (`view.move`).
+{
+	const person = await asPerson();
+	const right = await canvas.evaluate(() => Math.max(0, ...globalThis.__decksRust.boards.map((b) => b.x + b.w)));
+	for (let i = 0; i < 4; i++) {
+		await fetch(`${API}/api/v1/view.move`, { method: "POST", headers: { "content-type": "application/json", ...person, "x-decks-agent": agentId }, body: JSON.stringify({ args: [{ x: right + 3000, y: 0, zoom: 1 }] }) });
+		if (await until(() => canvas.evaluate((x) => Math.abs(globalThis.__decksRust.camera.x - x) < 50 && Math.abs(globalThis.__decksRust.camera.zoom - 1) < 0.01, right + 3000), 4000)) break;
+	}
+	await rest(page);
+}
+const spots = await canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	// A board out of live zoom is a picture on the stage's canvas, not an element: ask the stage where they are.
 	const boards = (window.__decksBoards?.() ?? []).map((b) => b.rect);
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage && boards.every((r) => x < r.left - 8 || x > r.right + 8 || y < r.top - 8 || y > r.bottom + 8);
-	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150),
+	// Room for the rectangle (120 by 80 from the spot) and the card clicked in below it (from 10, 150), left of
+	// where the properties panel opens on the right once something is selected,
 	// with nothing of the chrome anywhere in it: the tool rail floats over the stage's left side, and
 	// four corners alone let a spot straddle it.
 	const clear = (x, y) => {
 		for (let dy = 0; dy <= 260; dy += 20) for (let dx = 0; dx <= 260; dx += 20) if (!empty(x + dx, y + dy)) return false;
 		return true;
 	};
+	const out = [];
 	for (let y = 200; y < 820; y += 30) {
-		for (let x = 340; x < 1400; x += 30) {
-			if (clear(x, y)) return { x, y };
+		for (let x = 340; x < 1000; x += 30) {
+			if (clear(x, y)) out.push({ x, y });
 		}
 	}
+	return out;
 });
+// …and with nothing of the page's own chrome over it either.
+let spot;
+for (const at of spots) if (!spot && (await pageClear({ x: at.x, y: at.y, w: 260, h: 260 }))) spot = at;
 say("the canvas has room to draw in", !!spot);
 let drawnId;
 let cardId;
 if (spot) {
 	await page.mouse.click(spot.x + 150, spot.y + 100);
 	await page.keyboard.press("r");
-	const armed = await page.evaluate(() => document.querySelector(".stage").dataset.penTool);
+	const armed = await canvas.evaluate(() => document.querySelector(".stage").dataset.penTool);
 	say("R arms the rectangle tool", armed === "rectangle", armed);
 	const had = new Set(onDisk().children.map((n) => n.id));
 	await page.mouse.move(spot.x, spot.y);
@@ -190,9 +223,9 @@ if (spot) {
 	const rect = await until(() => onDisk().children.find((n) => n.type === "rectangle" && !had.has(n.id)));
 	drawnId = rect?.id;
 	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
-	const handles = await until(() => page.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length === 8));
+	const handles = await until(() => canvas.evaluate(() => document.querySelectorAll('.pen-handle:not([data-handle="radius"])').length === 8));
 	say("…and it is selected, with eight handles", !!handles);
-	await page.locator('.props-panel [aria-label="Fill #fde68a"]').click();
+	await canvas.locator('.props-panel [aria-label="Fill #fde68a"]').click();
 	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
 	say("the properties panel's fill colours the selected item in the file", !!filled);
 	await page.keyboard.press("Control+z");
@@ -207,8 +240,8 @@ if (spot) {
 	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "frame"));
 	cardId = card?.id;
 	// A card is a column frame whose blocks are markdown texts (`pen/card-frame.ts`).
-	say("C then a click makes a card: a column frame holding a markdown block", card?.metadata?.type === "decks.card" && card?.layout === "vertical" && card?.children?.[0]?.metadata?.type === "decks.markdown", JSON.stringify(card));
-	const typing = await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")));
+	say("C then a click makes a card: a column frame holding a markdown block", card?.metadata?.type === "decks.markdown-card" && card?.layout === "vertical" && card?.children?.[0]?.metadata?.type === "decks.markdown", JSON.stringify(card));
+	const typing = await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-text")));
 	say("…and it opens for typing", !!typing);
 	await page.keyboard.type("## Plan\n\n- **one**\n- two");
 	await page.keyboard.press("Control+Enter");
@@ -218,11 +251,11 @@ if (spot) {
 	// --- the corner radius, and a card sized by its width alone ------------------------------------
 	// The rectangle again: it has corners to round, where a card has none.
 	await page.keyboard.press("Escape");
-	const rectBox = () => page.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
+	const rectBox = () => canvas.evaluate((id) => globalThis.__decksPenBox?.(id), drawnId);
 	const onRect = await rectBox();
 	await page.mouse.click(onRect.x + onRect.width / 2, onRect.y + onRect.height / 2);
-	await until(() => page.evaluate(() => document.querySelectorAll('.pen-handle[data-handle="radius"]').length === 1));
-	const extras = await page.evaluate(() => ({ radius: document.querySelectorAll('.pen-handle[data-handle="radius"]').length }));
+	await until(() => canvas.evaluate(() => document.querySelectorAll('.pen-handle[data-handle="radius"]').length === 1));
+	const extras = await canvas.evaluate(() => ({ radius: document.querySelectorAll('.pen-handle[data-handle="radius"]').length }));
 	say("a selected rectangle has one radius handle", extras.radius === 1, JSON.stringify(extras));
 
 	/*
@@ -244,7 +277,7 @@ if (spot) {
 	/** Where the rectangle's own fill is drawn on screen, found in a screenshot of the window around it. */
 	const paintedAt = async (area) => {
 		const shot = (await page.screenshot({ type: "png" })).toString("base64");
-		return page.evaluate(async ([data, win, hex]) => {
+		return canvas.evaluate(async ([data, win, hex]) => {
 			const img = new Image();
 			img.src = "data:image/png;base64," + data;
 			await img.decode();
@@ -270,11 +303,11 @@ if (spot) {
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };
 	// The selection's action pill and its shadow are not the item: kept out of the pixels that place it.
-	const quiet = await page.addStyleTag({ content: ".stage-fixed > .board-callout { display: none !important }" });
+	const quiet = await canvas.addStyleTag({ content: ".stage-fixed > .board-callout { display: none !important }" });
 	const parked = await paintedAt(area);
 
 	// Dragging the radius handle along the diagonal rounds every corner, in the file.
-	const radiusAt = () => page.evaluate(() => {
+	const radiusAt = () => canvas.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="radius"]').getBoundingClientRect();
 		return { x: h.left + h.width / 2, y: h.top + h.height / 2 };
 	});
@@ -304,15 +337,15 @@ if (spot) {
 	 */
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
-	const cardBox = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const cardBox = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
 	await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 8);
-	const eight = await until(() => page.evaluate(() => {
+	const eight = await until(() => canvas.evaluate(() => {
 		const all = [...document.querySelectorAll('.pen-handle:not([data-handle="radius"])')].map((h) => h.dataset.handle).sort();
 		return all.length === 8 ? all : undefined;
 	}));
 	say("a card has all eight handles, so its height can be set by hand", !!eight, JSON.stringify(eight));
 	const wasCard = onDisk().children.find((n) => n.id === cardId);
-	const east = await page.evaluate(() => {
+	const east = await canvas.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="e"]').getBoundingClientRect();
 		return { x: h.left + h.width / 2, y: h.top + h.height / 2 };
 	});
@@ -328,8 +361,8 @@ if (spot) {
 	// Its words decide its height: no number in the file, only the floor it was made with (`fit_content(48)`).
 	say("dragging its side sets its width, and leaves its height to its words", !!widened && (widened.height === undefined || /^fit_content(\(\d+(\.\d+)?\))?$/.test(String(widened.height))), JSON.stringify({ width: widened?.width, height: widened?.height }));
 	// The bottom handle: now it is a height the person chose, and the words no longer decide it.
-	const tall = await page.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
-	const south = await page.evaluate(() => {
+	const tall = await canvas.evaluate((id) => globalThis.__decksPenBox?.(id), cardId);
+	const south = await canvas.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-handle="s"]')?.getBoundingClientRect();
 		return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : undefined;
 	});
@@ -346,12 +379,12 @@ if (spot) {
 		});
 		say("dragging its bottom pins a height on it, in pixels", !!pinned && pinned.height > tall.height, JSON.stringify({ height: pinned?.height, was: Math.round(tall.height) }));
 		// And the panel gives the words their say back, with the same two words the frame's height uses.
-		const back = await until(() => page.evaluate(() => {
+		const back = await until(() => canvas.evaluate(() => {
 			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
 			return group ? [...group.querySelectorAll("button")].map((b) => b.textContent?.trim()) : undefined;
 		}));
 		say("a card's own height control is in the panel", JSON.stringify(back) === JSON.stringify(["fit-content", "px"]), JSON.stringify(back));
-		await page.evaluate(() => {
+		await canvas.evaluate(() => {
 			const group = document.querySelector('[data-section="place"] [aria-label="height"]');
 			[...group.querySelectorAll("button")].find((b) => b.textContent?.trim() === "fit-content")?.click();
 		});
@@ -366,50 +399,27 @@ if (boardItem) {
 	const h = Math.round((boardItem.height ?? 300) * 0.3);
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: boardItem.x + 20, y1: boardItem.y + 20, x2: boardItem.x + 20 + w, y2: boardItem.y + 20 + h } }] });
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
+	await focusCanvas(page);
 	await page.keyboard.press("Escape");
-	// Close enough that the board is live: below that zoom a board is a picture and a click only selects it.
+	// Framed on the board, close enough to press the drawing over it.
 	await selectBoard(page, firstBoard);
 	await page.keyboard.press("1");
 	await settle(page, 1200);
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
-	const at = await page.evaluate(({ x, y }) => {
+	const at = await canvas.evaluate(({ x, y }) => {
 		const m = new DOMMatrix(globalThis.__decksCameraTransform());
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
 	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
-	const under = () => page.evaluate(({ x, y }) => {
+	const under = () => canvas.evaluate(({ x, y }) => {
 		const e = document.elementFromPoint(x, y);
 		return e?.closest(".board-node") ? "board" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
 	}, at);
 	const shown = await until(() => under().then((u) => u.startsWith("drawing") && u));
 	say("a drawing over a board is on top of it and catches the click there", shown === "drawing:e2e-over", await under());
-	const node = page.locator(`.board-node[data-path="${firstBoard}"]`);
-	// A point where this board is the top thing: not another board over it, not a drawn item.
-	const free = await page.evaluate((path) => {
-		const n = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-		const r = n.getBoundingClientRect();
-		for (let y = r.y + r.height - 8; y > r.y + 30; y -= 7) {
-			for (let x = r.x + r.width - 8; x > r.x + 8; x -= 7) {
-				if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
-				if (document.elementFromPoint(x, y)?.closest(".board-node") === n) return { x, y };
-			}
-		}
-	}, firstBoard);
-	say("the board has an uncovered spot on screen", !!free);
-	// Count the presses the board's own page receives.
-	await node.evaluate((n) => {
-		const doc = n.querySelector("iframe").contentDocument;
-		doc.__presses = 0;
-		doc.addEventListener("pointerdown", () => (doc.__presses += 1), true);
-	});
-	const presses = () => node.evaluate((n) => n.querySelector("iframe").contentDocument.__presses);
-	if (free) await page.mouse.click(free.x, free.y);
-	const reached = await until(() => node.evaluate((n) => n.dataset.selected === "true"));
-	say("a click beside the drawing goes straight through to the board's page, with nothing to lift first", !!reached && (await presses()) === 1, `presses ${await presses()}`);
+	// A board is only its picture now (no page of its own to press through to): the selected board stays under the drawing.
+	await selectBoard(page, firstBoard);
 	say("…and the drawing stays on top of the selected board", (await under()) === "drawing:e2e-over", await under());
-	await page.mouse.click(at.x, at.y);
-	await settle(page, 300);
-	say("a click on the drawing does not reach the page under it", (await presses()) === 1, `presses ${await presses()}`);
 }
 await editMode(page, false);
 

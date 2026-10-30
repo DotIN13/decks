@@ -12,7 +12,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { boardEdge, deckState, editMode, highlightMode, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
+import { canvasFrame, deckState, editMode, fitCanvas, focusCanvas, highlightMode, onCanvasAt, open, resetStage, say, selectBoard, settle, socket, rest } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -30,8 +30,17 @@ await rest(page, { start: 0 });
 const link = await socket();
 const agentId = await until(() => link.last("agents")?.focused);
 say("the server says which agent is focused", !!agentId);
+/** The canvas frame: the stage, its tools and its panels are there; the side panel and the composer are the page's, over it. */
+const canvas = await canvasFrame(page);
+/** The first of these points the page leaves to the canvas (not under its side panel, a bar or the composer). */
+const firstOnCanvas = async (points) => {
+	for (const at of points ?? []) if (await onCanvasAt(page, at.x, at.y)) return at;
+	return undefined;
+};
+// The canvas framed on its boards, as it opens.
+await fitCanvas(page);
 
-const matrix = () => page.evaluate(() => {
+const matrix = () => canvas.evaluate(() => {
 	const m = new DOMMatrix(globalThis.__decksCameraTransform());
 	return { e: m.e, f: m.f, a: m.a };
 });
@@ -39,7 +48,7 @@ const toWorld = (m, x, y) => ({ x: Math.round((x - m.e) / m.a), y: Math.round((y
 const toScreen = (m, x, y) => ({ x: m.e + x * m.a, y: m.f + y * m.a });
 
 // A stretch of bare canvas to work in, zooming out until there is one.
-const findRoom = () => page.evaluate(() => {
+const findRoom = () => canvas.evaluate(() => {
 	const stage = document.querySelector(".stage");
 	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
 	for (let y = 130; y + 300 < 780; y += 20) {
@@ -104,7 +113,7 @@ const onDisk = () => {
 	return lastRead;
 };
 const item = (id) => onDisk().children.find((n) => n.id === id);
-await until(() => page.evaluate(() => !!window.__decksPenBox?.("g-b")));
+await until(() => canvas.evaluate(() => !!window.__decksPenBox?.("g-b")));
 await settle(page, 300);
 const centre = async (id) => {
 	const n = item(id);
@@ -115,19 +124,19 @@ const centre = async (id) => {
 const drawnWhereFileSays = (id) =>
 	until(async () => {
 		const want = await centre(id);
-		return page.evaluate(({ id, want }) => {
+		return canvas.evaluate(({ id, want }) => {
 			const r = window.__decksPenBox?.(id);
 			if (!r) return false;
 			return Math.abs(r.x + r.width / 2 - want.x) < 3 && Math.abs(r.y + r.height / 2 - want.y) < 3;
 		}, { id, want });
 	}, 4000);
-const count = (selector) => page.evaluate((s) => document.querySelectorAll(s).length, selector);
+const count = (selector) => canvas.evaluate((s) => document.querySelectorAll(s).length, selector);
 /** A board's item on disk names it from the canvas's folder (`boards/x.html`); the stage names it from the deck. */
 const itemOf = (doc, path) => doc.children.find((n) => n.metadata?.path === path || n.metadata?.path === path.replace(/^canvases\/[^/]+\//, ""));
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
-say("the canvas is browsing", (await page.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
-say("…and the tool column is there, select pressed: that is browsing", (await count(".pen-tools button[data-tool]")) >= 10 && (await page.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
+say("the canvas is browsing", (await canvas.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
+say("…and the tool column is there, select pressed: that is browsing", (await count(".pen-tools button[data-tool]")) >= 10 && (await canvas.evaluate(() => document.querySelector('.pen-tools [data-tool="select"]')?.getAttribute("aria-pressed"))) === "true");
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
 await settle(page, 300);
@@ -163,40 +172,24 @@ const movedBoth = await until(() => {
 });
 say("dragging one selected item moves the whole selection", !!movedBoth, JSON.stringify({ before: [before.a.x, before.b.x], now: [item("g-a").x, item("g-b").x] }));
 
-// A press on a board's picture, clear of anything drawn over it; on a live board, on the band along its
-// edge (shown while the pointer is over the board): a press inside its page is the page's, which picks
-// the board but does not see Shift.
-const inView = (x, y) => x > 320 && x < 1560 && y > 90 && y < 900;
+// A press on a board's picture, clear of anything drawn over it.
 let bar;
-for (const one of await page.evaluate(() => window.__decksBoards().map(({ path, node, rect }) => ({ path, node, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })))) {
-	if (!one.node) {
-		// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
-		bar = await page.evaluate(({ path, rect: r }) => {
-			// The boards end 60 px left of the room, partly under the side panel (360 px): their right-hand strip is what shows.
-			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8], [0.85, 0.5], [0.92, 0.3]]) {
-				const x = r.x + r.width * fx;
-				const y = r.y + r.height * fy;
-				if (x > 320 && x < 1560 && y > 90 && y < 900 && document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === path) return { x, y, path };
-			}
-		}, one);
-	} else {
-		const r = one.rect;
-		const inside = [[0.5, 0.5], [0.8, 0.5], [0.5, 0.2], [0.8, 0.8]].map(([fx, fy]) => ({ x: r.x + r.width * fx, y: r.y + r.height * fy })).find((p) => inView(p.x, p.y));
-		if (!inside) continue;
-		await page.mouse.move(inside.x, inside.y);
-		await settle(page, 150);
-		bar = await page.evaluate((path) => {
-			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
-			for (const band of node?.querySelectorAll(".board-edge") ?? []) {
-				const b = band.getBoundingClientRect();
-				for (const f of [0.5, 0.3, 0.7]) {
-					const x = band.dataset.side === "n" || band.dataset.side === "s" ? b.x + b.width * f : b.x + b.width / 2;
-					const y = band.dataset.side === "n" || band.dataset.side === "s" ? b.y + b.height / 2 : b.y + b.height * f;
-					if (x > 320 && x < 1560 && y > 90 && y < 900 && document.elementFromPoint(x, y) === band) return { x, y, path };
-				}
-			}
-		}, one.path);
-	}
+for (const one of await canvas.evaluate(() => window.__decksBoards().map(({ path, rect }) => ({ path, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })))) {
+	// A board is its picture: the stage says which board is under a point (`Stage.tsx`), or its node's inert surface is there.
+	const points = await canvas.evaluate(({ path, rect: r }) => {
+		const stage = document.querySelector(".stage");
+		const out = [];
+		// The boards end 60 px left of the room, partly under the side panel (360 px): their right-hand strip is what shows.
+		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8], [0.85, 0.5], [0.92, 0.3]]) {
+			const x = r.x + r.width * fx;
+			const y = r.y + r.height * fy;
+			const hit = document.elementFromPoint(x, y);
+			const on = hit?.closest(".board-node")?.dataset.path === path || (hit === stage && window.__decksPictureAt(x, y) === path);
+			if (x > 320 && x < 1560 && y > 90 && y < 900 && on) out.push({ x, y, path });
+		}
+		return out;
+	}, one);
+	bar = await firstOnCanvas(points);
 	if (bar) break;
 }
 say("a board is on screen to press", !!bar);
@@ -276,11 +269,11 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	m = await matrix();
 	const from = await centre("g-b");
 	/*
-	 * Aim b's top four screen pixels above a's: the snap closes the gap. Above rather than below,
-	 * because a fixture board's edge lies 20 units under a's top here (a guide at y 3840 from x 2680),
-	 * and four pixels below a's top at 30% is nearer that edge than a's, so b rightly snapped to it.
+	 * Aim b's top four screen pixels below a's: the snap closes the gap. Below, at the zoom the whole
+	 * canvas is framed at: fixture boards' edges lie a few units above a's top here (3836, 3840 against
+	 * a's 3843), and four pixels above a's top was nearer those than a's, so b rightly snapped to them.
 	 */
-	const wantDy = (a.y - b.y) * m.a - 4;
+	const wantDy = (a.y - b.y) * m.a + 4;
 	await page.mouse.move(from.x, from.y);
 	await page.mouse.down();
 	await page.mouse.move(from.x + 10, from.y + wantDy / 2, { steps: 4 });
@@ -350,6 +343,11 @@ let ITEM_WASH = "";
 	say("…and letting go puts it in as a pill, with an icon of its own", dropped.length === 1 && dropped[0].kind === "item" && dropped[0].id === "g-a" && dropped[0].icon, JSON.stringify(dropped));
 	const after = item("g-a");
 	say("…and leaves the item where it was, because that was never a move", after.x === before.x && after.y === before.y, JSON.stringify({ before: [before.x, before.y], after: [after.x, after.y] }));
+	// Put back if it was moved after all, so what follows finds it where it was.
+	if (after.x !== before.x || after.y !== before.y) {
+		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "update", id: "g-a", set: { x: before.x, y: before.y } }] });
+		await until(() => item("g-a").x === before.x && item("g-a").y === before.y);
+	}
 
 	/* The field is shared with everything below: leave it empty, and leave the keyboard to the
 	   canvas — the stage's tools are single letters, and `a` typed into a focused field is an `a`. */
@@ -358,6 +356,8 @@ let ITEM_WASH = "";
 	await page.keyboard.press("Backspace");
 	await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
 	await page.keyboard.press("Escape");
+	// The keys are the canvas's again: its tools are single letters.
+	await focusCanvas(page);
 	await settle(page, 200);
 }
 
@@ -379,7 +379,7 @@ let ITEM_WASH = "";
 	say("drawing an arrow lights up what its start joins", lit === 1, String(lit));
 	const arrow = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.arrow"));
 	say("an arrow let go on bare canvas joins its start and stops at a point", arrow?.metadata.from === "g-a" && Array.isArray(arrow?.metadata.to), JSON.stringify(arrow?.metadata));
-	const end = await until(() => page.evaluate(() => {
+	const end = await until(() => canvas.evaluate(() => {
 		const h = document.querySelector('.pen-handle[data-end="to"]');
 		if (!h) return undefined;
 		const r = h.getBoundingClientRect();
@@ -387,7 +387,7 @@ let ITEM_WASH = "";
 	}));
 	say("…and the selected arrow has a handle on each end", !!end && (await count(".pen-handle[data-end]")) === 2);
 	// A line is shown by its ends, not by a rectangle round it: no box and no sizing handles.
-	const boxed = await page.evaluate(() => ({
+	const boxed = await canvas.evaluate(() => ({
 		selection: document.querySelectorAll(".pen-selection:not([data-board])").length,
 		sizers: document.querySelectorAll(".pen-handle:not([data-end]):not([data-bend])").length,
 	}));
@@ -404,21 +404,21 @@ let ITEM_WASH = "";
 		const rejoined = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.to === "g-b");
 		say("…and letting go joins the arrow to it", !!rejoined, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
 		// Its style, from the properties panel: a curve, heads at both ends, dashed. The path is redrawn from it.
-		await page.click('.props-panel [data-route="curved"]');
+		await canvas.click('.props-panel [data-route="curved"]');
 		const curved = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			// Two items side by side on one level are joined by a straight line even when curved.
 			return now?.metadata.route === "curved" ? now : undefined;
 		});
 		say("an arrow's bar makes it curved", !!curved, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await page.click('.props-panel [data-heads="both"]');
-		await page.click('.props-panel [data-dash="dashed"]');
+		await canvas.click('.props-panel [data-heads="both"]');
+		await canvas.click('.props-panel [data-dash="dashed"]');
 		const styled = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now?.metadata.heads === "both" && now.metadata.dash === true && now.geometry.split("M").length - 1 === 3 ? now : undefined;
 		});
 		say("…with a head at each end, and dashed", !!styled, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
-		await page.click('.props-panel [data-route="straight"]');
+		await canvas.click('.props-panel [data-route="straight"]');
 		const straight = await until(() => {
 			const now = onDisk().children.find((n) => n.id === arrow.id);
 			return now && now.metadata.route === undefined && !/ C/.test(now.geometry) ? now : undefined;
@@ -434,7 +434,7 @@ let ITEM_WASH = "";
 	await drawnWhereFileSays("g-a");
 	const a = await centre("g-a");
 	const touch = (type, id, x, y, target = ".stage") =>
-		page.evaluate(({ type, id, x, y, target }) => {
+		canvas.evaluate(({ type, id, x, y, target }) => {
 			const t = type === "pointerdown" ? document.elementFromPoint(x, y) : document.querySelector(target) ?? window;
 			t.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 31, clientX: x, clientY: y, bubbles: true, composed: true, buttons: type === "pointerup" ? 0 : 1 }));
 		}, { type, id, x, y, target });
@@ -449,10 +449,13 @@ let ITEM_WASH = "";
 	const dragged = await until(() => Math.abs(item("g-a").x - was - Math.round(60 / m.a)) <= 2);
 	say("…and once it is selected, a finger drags it", !!dragged, JSON.stringify({ was, now: item("g-a").x }));
 	// Bare canvas: a finger that pans keeps the selection, and a tap there lets it go, as a click does.
-	const bare = await page.evaluate(() => {
-		for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
-		return null;
-	});
+	const bareSpots = () =>
+		canvas.evaluate(() => {
+			const out = [];
+			for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) out.push({ x, y });
+			return out.slice(0, 400);
+		});
+	const bare = (await firstOnCanvas(await bareSpots())) ?? null;
 	if (bare) {
 		const target = ".stage";
 		await until(() => count(".pen-selection").then((n) => n === 1), 2000);
@@ -463,10 +466,7 @@ let ITEM_WASH = "";
 		await touch("pointerup", 31, bare.x, bare.y, target);
 		await settle(page, 300);
 		const kept = await count(".pen-selection");
-		const back = await page.evaluate(() => {
-			for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
-			return null;
-		});
+		const back = (await firstOnCanvas(await bareSpots())) ?? null;
 		await touch("pointerdown", 31, back.x, back.y);
 		await touch("pointerup", 31, back.x, back.y, target);
 		const gone = await until(() => count(".pen-selection").then((n) => n === 0), 2000);
@@ -479,15 +479,15 @@ let ITEM_WASH = "";
 {
 	const at = item("g-b");
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "g-note", content: "Words to edit" }, box: { x1: at.x, y1: at.y + at.height + Math.round(60 / m.a) } }] });
-	await until(() => page.evaluate(() => !!window.__decksPenBox?.("g-note")));
+	await until(() => canvas.evaluate(() => !!window.__decksPenBox?.("g-note")));
 	// A note is as tall as its words, so the file has no size for it: aim at what is drawn.
 	await settle(page, 400);
-	const c = await page.evaluate(() => {
+	const c = await canvas.evaluate(() => {
 		const r = window.__decksPenBox("g-note");
 		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 	});
 	await page.mouse.dblclick(c.x, c.y);
-	const fit = await until(() => page.evaluate(() => {
+	const fit = await until(() => canvas.evaluate(() => {
 		const editor = document.querySelector(".pen-text");
 		const hit = window.__decksPenBox?.("g-note");
 		if (!editor || !hit) return undefined;
@@ -497,14 +497,14 @@ let ITEM_WASH = "";
 	}), 3000);
 	say("double-clicking a note opens an editor exactly on it, with no handles over it", !!fit && fit.dx < 2 && fit.dy < 2 && fit.dw < 2 && fit.handles === 0, JSON.stringify(fit));
 	// The editor takes the caret a frame after it opens.
-	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 2000);
+	await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-text")), 2000);
 	await page.keyboard.press("End");
 	await page.keyboard.type(" and more");
 	// A double-click inside the editor picks a word; it is not a double-click on the canvas.
 	// Every board on the stage, with a node or only a picture.
-	const boards = () => page.evaluate(() => window.__decksBoards().length);
+	const boards = () => canvas.evaluate(() => window.__decksBoards().length);
 	const boardsBefore = await boards();
-	const inEditor = await page.evaluate(() => {
+	const inEditor = await canvas.evaluate(() => {
 		const r = document.querySelector(".pen-text").getBoundingClientRect();
 		return { x: r.x + 20, y: r.y + r.height / 2 };
 	});
@@ -519,15 +519,15 @@ let ITEM_WASH = "";
 // --- a card grows round its title as the title is typed ----------------------------------------------
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
-	const at = await page.evaluate(() => {
+	const at = await canvas.evaluate(() => {
 		const r = window.__decksPenBox("g-note");
 		return { x: r.x, y: r.y + r.height + 40 };
 	});
 	await page.keyboard.press("c");
 	await page.mouse.click(at.x, at.y);
-	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.card"));
-	await until(() => page.evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
-	const height = () => page.evaluate((id) => window.__decksPenBox?.(id)?.height ?? 0, card?.id);
+	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.markdown-card"));
+	await until(() => canvas.evaluate(() => !!document.activeElement?.closest(".pen-text")), 3000);
+	const height = () => canvas.evaluate((id) => window.__decksPenBox?.(id)?.height ?? 0, card?.id);
 	const before = await until(height, 3000);
 	await page.keyboard.type("# A heading\n\nA paragraph long enough to wrap onto a second and then a third line of the card\n\n- a point\n- another");
 	const grown = await until(async () => (await height()) > before * 1.3, 3000);
@@ -546,7 +546,8 @@ let ITEM_WASH = "";
 	say("in edit mode an item outlines itself under the pointer, before any press", !!(await until(() => count(".pen-hover:not([data-board])").then((n) => n === 1), 2000)));
 	await page.mouse.move(room.x + 5, room.y + 5);
 	say("…and the outline goes when the pointer leaves it", !!(await until(() => count(".pen-hover").then((n) => n === 0), 2000)));
-	const spot = await page.evaluate(() => {
+	const spot = await firstOnCanvas(await canvas.evaluate(() => {
+		const out = [];
 		for (const one of window.__decksBoards()) {
 			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
 			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
@@ -554,12 +555,13 @@ let ITEM_WASH = "";
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width - 30;
 			const y = r.y + Math.min(80, r.height / 2);
-			if (x > 320 && x < 1560 && y > 120 && y < 880 && (node.picture ? document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : document.elementFromPoint(x, y)?.closest(".board-node") === node)) return { x, y, path: node.dataset.path };
+			if (x > 320 && x < 1560 && y > 120 && y < 880 && (node.picture ? document.elementFromPoint(x, y) === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : document.elementFromPoint(x, y)?.closest(".board-node") === node)) out.push({ x, y, path: node.dataset.path });
 		}
-	});
+		return out;
+	}));
 	if (spot) {
 		await page.mouse.move(spot.x, spot.y, { steps: 3 });
-		const outlined = await until(() => page.evaluate((path) => {
+		const outlined = await until(() => canvas.evaluate((path) => {
 			const hover = document.querySelector('.pen-hover[data-board="true"]');
 			const n = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.getBoundingClientRect() ?? window.__decksBoards().find((one) => one.path === path)?.rect;
 			if (!hover || !n) return undefined;
@@ -577,7 +579,8 @@ let ITEM_WASH = "";
 // --- a board's handles: an item's, at any zoom --
 {
 	// The boards sit behind the panel and under the composer here, so the canvas is panned to them and back.
-	const find = () => page.evaluate(() => {
+	const find = async () => firstOnCanvas(await canvas.evaluate(() => {
+		const out = [];
 		for (const one of window.__decksBoards()) {
 			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
 			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
@@ -586,10 +589,11 @@ let ITEM_WASH = "";
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				const at = document.elementFromPoint(x, y);
-				if (x > 320 && x < 1500 && y > 290 && y < 880 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button")) return { x, y, path: node.dataset.path };
+				if (x > 320 && x < 1500 && y > 290 && y < 880 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node) && !at.closest("a, button")) out.push({ x, y, path: node.dataset.path });
 			}
 		}
-	});
+		return out;
+	}));
 	await page.mouse.move(900, 500);
 	let target = await find();
 	let panned = { x: 0, y: 0 };
@@ -602,8 +606,8 @@ let ITEM_WASH = "";
 	say("a board is on screen to press", !!target);
 	if (target) {
 		await page.mouse.click(target.x, target.y);
-		const handles = () => page.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-board="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
-		const outline = () => page.evaluate(() => {
+		const handles = () => canvas.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-board="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
+		const outline = () => canvas.evaluate(() => {
 			const box = document.querySelector('.pen-selection[data-board="true"]');
 			const m = new DOMMatrix(globalThis.__decksCameraTransform());
 			return box ? Math.round(Number.parseFloat(getComputedStyle(box).boxShadow.split(" ").at(-1)) * m.a * 10) / 10 : 0;
@@ -628,8 +632,8 @@ let ITEM_WASH = "";
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------
-await page.click('.v3-tool[data-tool="pen"]');
-await page.waitForSelector(".stage-ink");
+await canvas.click('.v3-tool[data-tool="pen"]');
+await canvas.waitForSelector(".stage-ink");
 {
 	const had = new Set(onDisk().children.map((n) => n.id));
 	const p = { x: room.x + 40, y: room.y + 250 };
@@ -643,12 +647,12 @@ await page.waitForSelector(".stage-ink");
 	say("a stroke held still at its end straightens into a line", line?.metadata.points.length === 6, JSON.stringify(line?.metadata.points));
 
 	// Two fingers down and up together: the stroke is taken back.
-	const sheet = await page.evaluate(() => {
+	const sheet = await canvas.evaluate(() => {
 		const r = document.querySelector(".stage-ink").getBoundingClientRect();
 		return { x: r.x + r.width - 200, y: r.y + r.height / 2 };
 	});
 	const finger = (type, id, x, y) =>
-		page.evaluate(({ type, id, x, y }) => {
+		canvas.evaluate(({ type, id, x, y }) => {
 			document.querySelector(".stage-ink").dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 41, clientX: x, clientY: y, bubbles: true, composed: true }));
 		}, { type, id, x, y });
 	await finger("pointerdown", 41, sheet.x, sheet.y);
@@ -667,9 +671,9 @@ await page.waitForSelector(".stage-ink");
 	await page.mouse.up();
 	const stroke = await until(() => onDisk().children.find((n) => !had2.has(n.id) && n.metadata?.type === "decks.ink"));
 	await settle(page, 400);
-	await page.click('.v3-tray [aria-label^="Lasso"]');
+	await canvas.click('.v3-tray [aria-label^="Lasso"]');
 	await page.mouse.click(p.x + 80, p.y + 10);
-	const corner = await until(() => page.evaluate(() => {
+	const corner = await until(() => canvas.evaluate(() => {
 		const c = document.querySelector('.ink-corner[data-corner="se"]');
 		if (!c) return undefined;
 		const r = c.getBoundingClientRect();
@@ -704,8 +708,8 @@ await page.keyboard.press("Escape");
 	await page.mouse.move(900, 500);
 	await page.mouse.wheel(-700, 0);
 	await settle(page, 400);
-	// A live board is dragged by the band along its edge.
-	const path = await page.evaluate(() => {
+	// A board is its picture, dragged where it is pressed.
+	const path = await canvas.evaluate(() => {
 		for (const one of window.__decksBoards()) {
 			// A board below the live zoom has no node, only its picture: the stage says where it is (`Stage.tsx`).
 			const node = document.querySelector(`.board-node[data-path="${CSS.escape(one.path)}"]`) ?? { picture: true, dataset: { path: one.path }, getBoundingClientRect: () => one.rect };
@@ -716,16 +720,29 @@ await page.keyboard.press("Escape");
 			if (x > 320 && x < 1560 && y > 150 && y < 800 && (node.picture ? at === document.querySelector(".stage") && window.__decksPictureAt(x, y) === node.dataset.path : at?.closest(".board-node") === node)) return node.dataset.path;
 		}
 	});
+	/** A point on the board's picture the page leaves to the canvas. */
+	const grip = async (wanted) =>
+		firstOnCanvas(await canvas.evaluate((wanted) => {
+			const r = window.__decksBoards().find((one) => one.path === wanted)?.rect;
+			const out = [];
+			if (!r) return out;
+			for (const [fx, fy] of [[0.5, 0.2], [0.3, 0.3], [0.7, 0.3], [0.5, 0.5]]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				const hit = document.elementFromPoint(x, y);
+				if (hit?.closest(".board-node")?.dataset.path === wanted || (hit === document.querySelector(".stage") && window.__decksPictureAt(x, y) === wanted)) out.push({ x, y });
+			}
+			return out;
+		}, wanted));
 	let chrome;
 	if (path) {
 		await selectBoard(page, path);
-		await page.waitForSelector(".board-edge", { timeout: 4000 }).catch(() => {});
-		const edge = await boardEdge(page, path);
-		if (edge) chrome = { ...edge, path };
+		const at = await grip(path);
+		if (at) chrome = { ...at, path };
 	}
-	say("a live board has an edge to drag by", !!chrome, JSON.stringify(chrome ?? null));
+	say("a board on screen to drag", !!chrome, JSON.stringify(chrome ?? null));
 	if (chrome) {
-		// Dragged by its edge, the board moves, and the page inside it is not pressed.
+		// Dragged by its picture, the board moves.
 		const start = itemOf(onDisk(), chrome.path);
 		await page.mouse.move(chrome.x, chrome.y);
 		await page.mouse.down();
@@ -736,12 +753,12 @@ await page.keyboard.press("Escape");
 			const now = itemOf(onDisk(), chrome.path);
 			return now && start && now.x > start.x ? now : undefined;
 		});
-		say("a drag on a live board's edge moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
+		say("a drag on a board moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
 		if (moved) {
 			link.send({ type: "board.move", path: chrome.path, x: start.x, y: start.y });
 			await until(() => itemOf(onDisk(), chrome.path)?.x === start.x);
 			await settle(page, 500);
-			const again = await boardEdge(page, chrome.path);
+			const again = await grip(chrome.path);
 			if (again) Object.assign(chrome, again);
 		}
 		const box = await page.locator(".composer-box").boundingBox();

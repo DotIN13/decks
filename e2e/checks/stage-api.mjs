@@ -4,7 +4,7 @@
  * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
  */
-import { ask, deckState, emptyCanvas, freshAgent, open, openPanel, say, settle, socket } from "../harness.mjs";
+import { ask, canvasFrame, deckState, emptyCanvas, freshAgent, open, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const two = deck.boards.map((board) => board.path).slice(0, 2);
@@ -14,7 +14,12 @@ const two = deck.boards.map((board) => board.path).slice(0, 2);
 const base = (path) => path.split("/").pop();
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
-const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
+// What is on the stage, in the canvas frame (none while the conversation has no canvas); a board placed on a canvas is its copy there, so compared by file.
+const onCanvas = async () => {
+	const canvas = await canvasFrame(page, { timeout: 5000 }).catch(() => undefined);
+	const paths = canvas ? await canvas.evaluate(() => (window.__decksBoards?.() ?? []).map((one) => one.path)) : [];
+	return paths.map(base).sort();
+};
 // `.row-name` — the row says a board's *basename*, and that is the class it says it in. It was
 // `.file`, which the panel's rows have never rendered; the two lists were compared as two
 // empty arrays and matched.
@@ -44,11 +49,11 @@ await ask(page, `With the decks command, show ${two[0]} and ${two[1]}, then list
 // was always mounted.
 await openPanel(page, "context");
 await settle(page, 400);
-say("showing puts exactly those two up", (await onCanvas()).join() === two.slice().sort().join(), (await onCanvas()).join(" "));
+say("showing puts exactly those two up", (await onCanvas()).join() === two.map(base).sort().join(), (await onCanvas()).join(" "));
 say("the panel lists the same two", (await inPanel()).join() === two.map(base).sort().join(), (await inPanel()).join(" "));
 
 await ask(page, `With the decks command, hide ${two[1]}.`);
-say("hide takes one off, leaving the other", (await onCanvas()).join() === two[0], (await onCanvas()).join(" "));
+say("hide takes one off, leaving the other", (await onCanvas()).join() === base(two[0]), (await onCanvas()).join(" "));
 say("…and the panel still lists both", (await inPanel()).length === 2, (await inPanel()).join(" "));
 
 const tidy = await socket();

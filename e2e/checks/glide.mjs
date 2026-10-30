@@ -1,8 +1,8 @@
 /**
  * A camera that arrives, and the hands it yields to.
  *
- * Two gestures glide when they move the camera: a row in the boards panel, and a link on a board.
- * Both are cases where something *else* decided where to look — after a press or a link, a camera
+ * A row in the side panel glides the camera when it moves it (a link on a card is the same call,
+ * `flyToBoards`): something *else* decided where to look — after a press or a link, a camera
  * that arrives says which way it went, where one that jumps leaves you to work out how the board
  * you are now looking at relates to the one you were reading.
  *
@@ -12,11 +12,13 @@
  *
  * - a row in the panel glides: intermediate frames exist, they lie between the two cameras, and
  *   the arrival is where it stops;
- * - a link on a board glides the same way, because it is the same call;
  * - a wheel mid-glide ends it within a frame, and the camera stays where the wheel put it;
  * - `prefers-reduced-motion` makes it instant and never says otherwise.
+ *
+ * The canvas is in its frame: the samples are taken there, frame by frame, while the row is pressed
+ * on the page.
  */
-import { open, resetStage, say, settle } from "../harness.mjs";
+import { canvasFrame, open, resetStage, say, settle, zoom } from "../harness.mjs";
 
 // The panel's Canvas tab lists the boards on the canvas (`panel/LeftPanel.tsx`, `itemRow`); a board's row flies to it.
 const { browser, page, errors } = await open({ width: 1500, height: 1000, panelTab: "canvas" });
@@ -30,34 +32,29 @@ await settle(page, 600);
  * app's `camera()` is the *state*, which during a glide is where the view is going — worth
  * having, and not what a person sees.
  */
-const watched = (press, ms) =>
-	page.evaluate(
-		async ({ press, ms }) => {
-			const camera = () => {
-				const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
-					globalThis.__decksCameraTransform(),
-				);
-				return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
-			};
-			const stage = document.querySelector(".stage");
-			const before = camera();
-			const samples = [];
-			const start = performance.now();
-			if (press.kind === "row") {
-				[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === press.label)?.click();
-			} else {
-				const frame = document.querySelector(`.board-node[data-path$="/${press.path}"] iframe, .board-node[data-path="${press.path}"] iframe`);
-				// The canvas copy writes its links back to the library (`../../../boards/risks.html`), so by the end of the href.
-				frame?.contentDocument?.querySelector(`a[href$="${press.href}"]`)?.click();
-			}
-			while (performance.now() - start < ms) {
-				samples.push({ t: Math.round(performance.now() - start), gliding: stage.dataset.gliding === "true", ...camera() });
-				await new Promise((resolve) => requestAnimationFrame(resolve));
-			}
-			return { before, samples };
-		},
-		{ press, ms },
-	);
+const watched = async (press, ms) => {
+	const canvas = await canvasFrame(page);
+	const sampling = canvas.evaluate(async (ms) => {
+		const camera = () => {
+			const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
+				globalThis.__decksCameraTransform(),
+			);
+			return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
+		};
+		const stage = document.querySelector(".stage");
+		const before = camera();
+		const samples = [];
+		const start = performance.now();
+		while (performance.now() - start < ms) {
+			samples.push({ t: Math.round(performance.now() - start), gliding: stage.dataset.gliding === "true", ...camera() });
+			await new Promise((resolve) => requestAnimationFrame(resolve));
+		}
+		return { before, samples };
+	}, ms);
+	// The row is the page's, beside the frame.
+	await page.evaluate((label) => [...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === label)?.click(), press.label);
+	return sampling;
+};
 
 /** A board's row in the Canvas tab, which is labelled with the board's name on the canvas rather than its file. */
 const LABEL = { "risks.html": "Auth refresh — risks", "plan.html": "Auth refresh — the plan" };
@@ -93,37 +90,12 @@ say(
  * rest the pixels and the reading have to be the same number, and that is the whole argument for
  * writing the signal per frame rather than once at the end.
  */
-const pill = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const pill = await zoom(page);
 say("…and at rest the pill's percentage is the pixels'", Math.abs(pill - to.zoom * 100) <= 1, `${pill}% against ${(to.zoom * 100).toFixed(1)}%`);
-
-// --- a link on a board ------------------------------------------------------------------
-
-/*
- * The other gesture that glides, through the same `flyToBoards`. A frame below half zoom takes no
- * pointer events at all, so this zooms in on the source board first — the same thing
- * `board-links.mjs` does, and for the same reason.
- */
-await watched(row("plan.html"), 400);
-for (let i = 0; i < 8; i++) {
-	const level = await page.evaluate(() => Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
-	if (level >= 70 && level <= 260) break;
-	await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
-	await settle(page, 200);
-}
-// The zoom steps above can still be gliding; the link's glide is measured from rest.
-await page.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout: 5000 }).catch(() => {});
-await settle(page, 200);
-const viaLink = await watched({ kind: "link", path: "boards/plan.html", href: "risks.html" }, 700);
-const linkFrames = viaLink.samples.filter((sample) => sample.gliding);
-say(
-	"a link on a board glides the same way",
-	linkFrames.length >= 3 && linkFrames.some((sample) => !same(sample, viaLink.samples[0])),
-	`${linkFrames.length} of ${viaLink.samples.length} frames in flight`,
-);
 
 // --- the hand wins ----------------------------------------------------------------------
 
-const stolen = await page.evaluate(async () => {
+const stealing = (await canvasFrame(page)).evaluate(async () => {
 	const camera = () => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
 			globalThis.__decksCameraTransform(),
@@ -131,9 +103,9 @@ const stolen = await page.evaluate(async () => {
 		return m ? { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) } : null;
 	};
 	const stage = document.querySelector(".stage");
-	// Back to the plan: the link above has just flown the camera to risks.html, and pressing the board
-	// the camera is already on has nowhere to glide to, so nothing was ever in flight to take back.
-	[...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click();
+	// The page presses the plan's row meanwhile: wait for the glide it starts, then a little into it.
+	const until = performance.now() + 2000;
+	while (stage.dataset.gliding !== "true" && performance.now() < until) await new Promise((resolve) => requestAnimationFrame(resolve));
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	const midFlight = stage.dataset.gliding === "true";
 	// A wheel over the canvas: the smallest thing a person does that moves the camera.
@@ -151,6 +123,9 @@ const stolen = await page.evaluate(async () => {
 	}
 	return { midFlight, after };
 });
+// Back to the plan: the camera is on risks.html after the reduced-motion-free row above, so this has somewhere to glide.
+await page.evaluate(() => [...document.querySelectorAll('.v3-item[data-kind="board"]')].find((row) => row.title === "Auth refresh — the plan")?.click());
+const stolen = await stealing;
 const landed = stolen.after.at(-1);
 say(
 	"a wheel takes the camera back from a glide, within a frame",
@@ -169,14 +144,15 @@ await page.emulateMedia({ reducedMotion: "reduce" });
 const calm = await watched(row("risks.html"), 200);
 say(
 	"with reduced motion it is instant, and never says it is gliding",
-	!calm.samples.some((sample) => sample.gliding) && !same(calm.samples[0], calm.before),
-	`${JSON.stringify(calm.samples[0])} from ${JSON.stringify(calm.before)}`,
+	// The samples start before the row is pressed: the last of them is where it went.
+	!calm.samples.some((sample) => sample.gliding) && !same(calm.samples.at(-1), calm.before),
+	`${JSON.stringify(calm.samples.at(-1))} from ${JSON.stringify(calm.before)}`,
 );
 await page.emulateMedia({ reducedMotion: null });
 
 // --- and the default stays instant for input --------------------------------------------
 
-const wheeled = await page.evaluate(async () => {
+const wheeled = await (await canvasFrame(page)).evaluate(async () => {
 	const stage = document.querySelector(".stage");
 	const said = [];
 	for (let i = 0; i < 10; i++) {

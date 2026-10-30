@@ -11,8 +11,17 @@
  * **Wait for the app, never for the clock.** These scripts used to pad every page load
  * with `waitForTimeout(2500)`. Two thirds of the suite's runtime was those pads, and they
  * are the wrong tool twice over: 2.5s is ~2s longer than a board actually needs, and it is
- * still too short on a loaded machine, so it was simultaneously slow and flaky. Boards
- * publish `window.__boardReady`, which is the thing to wait on.
+ * still too short on a loaded machine, so it was simultaneously slow and flaky. The stage says
+ * when it has drawn and when its camera rests, which are the things to wait on.
+ *
+ * **The canvas is in a frame.** The app draws the canvas in a sandboxed iframe of its own
+ * (`iframe.canvas-frame`, origin "null"), with its tools, zoom bar, pen bar and comment popover
+ * beside it in there; the page keeps the side panel, the top bars, the composer and the
+ * conversation. So what a check reads of the canvas it reads in that frame: `canvasFrame(page)`
+ * finds it (it is made again when the conversation moves to another canvas, so ask again after a
+ * switch), and `open` hands back the one it opened on as `canvas`. The frame fills the window, so
+ * a point in it is the same point on the page, and `page.mouse` presses it; keys reach the canvas
+ * only while the focus is in the frame (`focusCanvas`).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright";
@@ -117,7 +126,7 @@ export async function deckState(api) {
  * when the stage has that and not the library board itself; any other path is itself.
  */
 export async function stagePath(page, path) {
-	return page.evaluate((wanted) => {
+	return (await canvasFrame(page)).evaluate((wanted) => {
 		const all = window.__decksBoards?.() ?? [];
 		if (!/^boards\//.test(wanted) || all.some((one) => one.path === wanted)) return wanted;
 		const file = wanted.slice("boards/".length);
@@ -173,20 +182,13 @@ export function write(file, text) {
  * any more.
  */
 export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr, engine = "chromium", init, panelTab = "canvas" } = {}) {
-	/*
-	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
-	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the renderer
-	 * alone — the DOM renderer is the default — and it stays on because turning it off would
-	 * change the browser every check runs in. `renderers.mjs` was the only check that needed
-	 * it and has been cut, so neither canvas renderer is exercised now.
-	 */
 	// WebGPU, which the stage's engine draws with: headless Chromium has it only when asked.
 	const gpu = ["--enable-unsafe-webgpu", ...(process.platform === "darwin" ? ["--use-angle=metal"] : ["--enable-unsafe-swiftshader"])];
 	/*
 	 * `engine: "webkit"` is Safari's engine, for what only a phone's browser does (no WebGPU, WebGL 2
 	 * in a worker): `backends.mjs`. It takes none of Chromium's flags.
 	 */
-	const browser = engine === "webkit" ? await webkit.launch() : await chromium.launch({ /* DECKS_E2E_HEADED=1: a real window, composited to the screen as a person's is */ headless: process.env.DECKS_E2E_HEADED !== "1", args: ["--enable-blink-features=CanvasDrawElement", ...gpu, ...(process.env.DECKS_E2E_CHROME_ARGS ? process.env.DECKS_E2E_CHROME_ARGS.split(" ") : [])] });
+	const browser = engine === "webkit" ? await webkit.launch() : await chromium.launch({ /* DECKS_E2E_HEADED=1: a real window, composited to the screen as a person's is */ headless: process.env.DECKS_E2E_HEADED !== "1", args: [...gpu, ...(process.env.DECKS_E2E_CHROME_ARGS ? process.env.DECKS_E2E_CHROME_ARGS.split(" ") : [])] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
 	// `dpr` is a retina screen without a phone attached to it: a canvas renderer can be right
@@ -206,27 +208,20 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		if (!/localStorage/.test(error.message)) errors.push(error.message);
 	});
 	/*
-	 * Top frame only, and that guard is load-bearing.
-	 *
-	 * An init script runs in *every* frame, and a board is served from `/api/board/...`
-	 * into a same-origin iframe — so this cleared `localStorage` again every time a
-	 * thumbnail mounted, wiping whatever the app had persisted since the page loaded. The
-	 * symptom was a panel that forgot its tab and its fold partway through a check, which
-	 * reads as a bug in the panel.
+	 * Top frame only, and that guard is load-bearing: an init script runs in *every* frame, the
+	 * canvas frame among them, and clearing storage there again would wipe what the page had kept.
 	 */
-	await page.addInitScript(([wanted, renderer, tab]) => {
+	await page.addInitScript(([wanted, tab]) => {
 		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
 			// The side panel opens on the tab it was left on; the checks start on Canvas, which lists the boards (`panelTab`).
 			if (tab) localStorage.setItem("decks.panelTab", tab);
-			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
-			if (renderer) localStorage.setItem("decks.renderer", renderer);
 		} catch {
 			/* private mode, or a page that has no storage access yet */
 		}
-	}, [scheme, process.env.DECKS_E2E_RENDERER ?? "", panelTab]);
+	}, [scheme, panelTab]);
 	/*
 	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
 	 * server remembers which agent each browser is on, so there is no address to name a place
@@ -260,6 +255,8 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		await liveZoom(page);
 		await ready(page);
 	}
+	// The canvas frame, once it has drawn: a check that opened without boards may still be waiting for it.
+	const canvas = await canvasFrame(page).catch(() => undefined);
 	/*
 	 * Editing is off by default in the app now, so a check about editing has to ask for it.
 	 *
@@ -269,78 +266,110 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * the chrome do not, and are better off in the default state a person actually lands in.
 	 */
 	if (edit) await editMode(page);
-	return { browser, page, context, errors, asked, stopAnswering: () => clearInterval(watch) };
+	return { browser, page, canvas, context, errors, asked, stopAnswering: () => clearInterval(watch) };
 }
 
 /**
- * Wait until every board on the canvas has finished mounting.
- *
- * `__boardReady` is set by `board-host/lib/board.js` once the document has rendered its
- * components, which is the same signal the app itself waits for.
+ * The canvas frame (`iframe.canvas-frame`), once its stage is there: where the canvas, its tools, its
+ * zoom bar and its popovers are. Made again when the conversation moves to another canvas, so a
+ * check asks for it again after a switch rather than keeping the one it had.
  */
+export async function canvasFrame(page, { timeout = 30000 } = {}) {
+	const deadline = Date.now() + timeout;
+	for (;;) {
+		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
+		if (frame && (await frame.evaluate(() => !!document.querySelector(".stage")).catch(() => false))) return frame;
+		if (Date.now() > deadline) throw new Error("the canvas frame never showed its stage");
+		await page.waitForTimeout(100);
+	}
+}
+
+/** Put the focus in the canvas frame, on its stage, so a key pressed next is the canvas's. */
+export async function focusCanvas(page) {
+	const canvas = await canvasFrame(page);
+	await canvas.evaluate(() => {
+		if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
+		document.querySelector(".stage")?.focus({ preventScroll: true });
+	});
+	return canvas;
+}
+
+/**
+ * Whether a point on the page reaches the canvas: what is there on the page is the canvas frame,
+ * not the side panel, a top bar or the composer drawn over it.
+ */
+export function onCanvasAt(page, x, y) {
+	return page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.matches("iframe.canvas-frame") === true, [x, y]);
+}
+
+/**
+ * Of the places offered (each `{ points: [[x, y], …] }`, and anything else), the first whose every
+ * point reaches the canvas rather than the page's chrome over it: what a scan in the frame, which
+ * cannot see the page's side panel, bars or composer, found, checked against the page.
+ */
+export async function firstOnCanvas(page, places) {
+	const index = await page.evaluate((all) => all.findIndex((points) => points.every(([x, y]) => document.elementFromPoint(x, y)?.matches("iframe.canvas-frame") === true)), places.map((place) => place.points));
+	return index < 0 ? undefined : places[index];
+}
+
 /** What a check that edits the drawing used to ask for, kept for those checks: browse, with the pen put away. */
 export async function editMode(page, on = true) {
 	/*
-	 * There is no edit mode any more: browse (the cursor) moves and retypes what is drawn, and a
-	 * board's page is never edited from the canvas (`AgentPill.tsx`, the mode set). So either way
-	 * this puts the canvas in browse with the pen put away, which is what editing a drawing needs.
+	 * There is no edit mode any more: browse (the cursor) moves and retypes what is drawn. So either
+	 * way this puts the canvas in browse with the pen put away, which is what editing a drawing needs.
 	 */
 	void on;
+	const canvas = await canvasFrame(page);
 	/* Select stands alone and is browsing: pressing it puts the pen and the hand down and turns highlights off. */
-	const browse = page.locator('.v3-tool[data-tool="select"]:visible').first();
-	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await page.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
-	await page.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
+	const browse = canvas.locator('.v3-tool[data-tool="select"]:visible').first();
+	if ((await browse.count()) && ((await browse.getAttribute("aria-pressed")) !== "true" || (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.mode)) !== "browse")) await browse.click();
+	await canvas.waitForFunction(() => (document.querySelector(".stage")?.dataset.mode ?? "browse") === "browse", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
 /**
- * The canvas in v3's edit mode: outlines under the pointer, a flow board's block grips, Alt for
- * distances (the tool column's highlighting select, key E). `editMode` puts it back in browse.
+ * The canvas in v3's edit mode: outlines under the pointer, Alt for distances (the tool column's
+ * highlighting select, key E). `editMode` puts it back in browse.
  */
 export async function highlightMode(page) {
-	if ((await page.evaluate(() => document.querySelector(".stage")?.dataset.mode)) === "edit") return;
-	await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+	const canvas = await canvasFrame(page);
+	if ((await canvas.evaluate(() => document.querySelector(".stage")?.dataset.mode)) === "edit") return;
+	await focusCanvas(page);
 	await page.keyboard.press("e");
-	await page.waitForFunction(() => document.querySelector(".stage")?.dataset.mode === "edit", null, { timeout: 4000 });
+	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.mode === "edit", null, { timeout: 4000 });
 	await page.waitForTimeout(120);
 }
 
 /**
- * Zoom in about the middle until boards are live (`data-live` on the stage), if they are not.
+ * Zoom in about the middle until the stage is live (`data-live`), if it is not.
  *
- * Boards have pages and take the pointer only at the device's live zoom (`INTERACT_ZOOM`, 20% on
- * a desktop), and a fixture fitted into a laptop window opens just under it. Every check that
- * reaches into a board needs it live, so this is where they get it; a check about the fitted
- * camera itself reads it before calling anything that zooms.
+ * Items take the pointer only at the device's live zoom (`INTERACT_ZOOM`, 20% on a desktop), and a
+ * fixture fitted into a laptop window opens just under it. Every check that reaches into an item
+ * needs it live, so this is where they get it; a check about the fitted camera itself reads it
+ * before calling anything that zooms.
  */
 export async function liveZoom(page, { tries = 12 } = {}) {
-	await page.waitForSelector(".stage", { timeout: 30000 });
+	const canvas = await canvasFrame(page);
 	// Below the live zoom a board has no node, only its picture (`Stage.tsx`): the stage lists them.
-	const boards = () => page.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
-	await page.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+	const boards = () => canvas.evaluate(() => window.__decksBoards?.().length ?? document.querySelectorAll(".board-node").length);
+	await canvas.waitForFunction(() => (window.__decksBoards?.().length ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
 	for (let i = 0; i < tries; i++) {
 		// Up to the old pause, but no longer than it takes the camera to rest live: most opens are live at once.
-		await page
+		await canvas
 			.waitForFunction(() => {
 				const stage = document.querySelector(".stage")?.dataset;
 				return stage?.live === "true" && stage.gliding !== "true" && stage.moving !== "true";
 			}, null, { timeout: i === 0 ? 400 : 350, polling: 50 })
 			.catch(() => {});
-		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
-			// Live is decided when the camera rests; the pages start a moment later. Wait for one.
-			await page
-				.waitForFunction(() => [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")].some((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 15000 })
-				.catch(() => {});
-			return true;
-		}
+		if (await canvas.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) return true;
 		if ((await boards()) === 0) return false;
-		await page.evaluate(() => {
+		await canvas.evaluate(() => {
 			const stage = document.querySelector(".stage");
 			const rect = stage.getBoundingClientRect();
 			/*
 			 * Toward the biggest board on screen, not the stage's centre: where the stage fills the
 			 * screen (a phone) the centre can fall between boards, and zooming in there leaves every
-			 * board off screen with no page to wait for.
+			 * board off screen.
 			 */
 			const seen = (r) => Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) * Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
 			const rects = (window.__decksBoards?.() ?? []).map((one) => one.rect);
@@ -358,45 +387,31 @@ export async function liveZoom(page, { tries = 12 } = {}) {
 	return false;
 }
 
+/**
+ * Wait until the canvas has drawn: the stage's sheet shown, or the Rust engine's first frame; then,
+ * for a moment, for the items awake near the window (cards, documents, apps) to show their surfaces
+ * (`item-slot.tsx`, `data-inert` until then). A board is only ever its picture.
+ */
 export async function ready(page, { timeout = 30000 } = {}) {
-	/*
-	 * Below the device's live zoom a board is its picture on the stage's sheet and none has a
-	 * document (`Stage.tsx`, `data-live`) and no node either: ready is the sheet having drawn them.
-	 * At it and above, ready is every page showing having said so; a page kept hidden for going back
-	 * (`live-set.ts`, `data-hidden-page`) never shows. Which of the two is asked again at every poll:
-	 * a page opens at 100% and lands at its canvas's zoom moments later, often below the live zoom,
-	 * and a wait that decided "pages" at the first look waited out its time for pages that had gone.
-	 */
-	await page.waitForSelector(".stage", { timeout });
-	await page.waitForFunction(
-		() => {
-			if (document.querySelector(".stage")?.dataset.live !== "true") {
-				// The Rust engine has no sheet: ready is its first frame drawn.
-				return document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksEngine?.stats?.().engine === "rust" && (globalThis.__decksSheet?.shown ?? 0) > 0);
-			}
-			const frames = [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")];
-			return frames.length > 0 && frames.every((frame) => frame.contentWindow?.__boardReady === true);
-		},
+	const canvas = await canvasFrame(page, { timeout });
+	await canvas.waitForFunction(
+		() => document.querySelector(".stage-sheet")?.hidden === false || (globalThis.__decksSheet?.shown ?? 0) > 0,
 		null,
 		{ timeout, polling: 100 },
 	);
+	await canvas.waitForFunction(() => [...document.querySelectorAll(".board-node")].every((node) => node.dataset.inert !== "true"), null, { timeout: 5000, polling: 100 }).catch(() => {});
 }
 
 /**
  * Wait for the camera to stop moving.
  *
- * A press at a coordinate is only about the thing under it — the same lesson `geometry.mjs` and
- * `inspector.mjs` both learned the hard way, and the reason their comments are as long as they
- * are. A camera that *arrives* rather than jumping adds a new way to be wrong about that: measure
- * a component's box while the view is still gliding and the press lands wherever the box has got
- * to by then, which is a mis-click reported as a wrong name three assertions later.
- *
- * So a check that moves the camera with a gesture — a row in the panel, a link on a board — and
- * then presses coordinates waits here first. `data-gliding` is the stage's own answer, and it is
- * there for exactly this; the transform-only checks in `glide.mjs` read it frame by frame.
+ * A press at a coordinate is only about the thing under it. A camera that *arrives* rather than
+ * jumping adds a way to be wrong about that: measure a box while the view is still gliding and the
+ * press lands wherever the box has got to by then. `data-gliding` is the stage's own answer.
  */
 export async function still(page, { timeout = 5000 } = {}) {
-	await page.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout });
+	const canvas = await canvasFrame(page);
+	await canvas.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout });
 }
 
 /**
@@ -404,23 +419,19 @@ export async function still(page, { timeout = 5000 } = {}) {
  * on a stage card — instead of a fixed pause long enough for the longest glide.
  *
  * Two steps, because the move may not have begun when this is called: up to `start` ms for it to
- * begin (and if it never does, nothing moved), then for it to end. Then, as a glide that ends live
- * mounts pages, for the boards on screen to be ready, and one frame for whatever reads layout.
+ * begin (and if it never does, nothing moved), then for it to end; then one frame for whatever
+ * reads layout.
  */
 export async function rest(page, { start = 300, timeout = 6000 } = {}) {
+	const canvas = await canvasFrame(page);
 	const moving = (want) => {
 		const stage = document.querySelector(".stage")?.dataset;
 		return (stage?.gliding === "true" || stage?.moving === "true") === want;
 	};
 	// (Playwright reads a timeout of 0 as "forever", so `start: 0` skips the first step instead.)
-	if (start > 0) await page.waitForFunction(moving, true, { timeout: start, polling: "raf" }).catch(() => {});
-	await page.waitForFunction(moving, false, { timeout, polling: "raf" });
-	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
-		await page
-			.waitForFunction(() => [...document.querySelectorAll(".board-node:not([data-hidden-page]) iframe")].every((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 5000 })
-			.catch(() => {});
-	}
-	await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+	if (start > 0) await canvas.waitForFunction(moving, true, { timeout: start, polling: "raf" }).catch(() => {});
+	await canvas.waitForFunction(moving, false, { timeout, polling: "raf" });
+	await canvas.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
 /**
@@ -432,7 +443,10 @@ export async function rest(page, { start = 300, timeout = 6000 } = {}) {
  * before it emptied.
  */
 export async function emptyCanvas(page, { timeout = 15000 } = {}) {
-	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksBoards?.().length ?? 0) === 0, null, { timeout });
+	// A conversation with no canvas yet has no frame at all, which is as empty as a canvas gets.
+	const canvas = await canvasFrame(page, { timeout: Math.min(timeout, 5000) }).catch(() => undefined);
+	if (!canvas) return;
+	await canvas.waitForFunction(() => document.querySelectorAll(".board-node").length === 0 && (window.__decksBoards?.().length ?? 0) === 0, null, { timeout });
 }
 
 /**
@@ -708,11 +722,11 @@ export async function openAgents(page) {
  * this to be a function rather than a selector copied eleven times.
  */
 export async function zoom(page) {
-	const text = await page.locator('.v3-zoom-value').first().textContent();
+	const text = await (await canvasFrame(page)).locator(".v3-zoom-value").first().textContent();
 	return Number((text ?? "0%").replace(/[^\d.]/g, ""));
 }
 
-/** The same reading, from inside the page, for a `waitForFunction`. */
+/** The same reading, from inside the canvas frame, for its `waitForFunction`. */
 export const ZOOM_IN_PAGE = `Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
 
 /**
@@ -894,33 +908,40 @@ export function rangeOfAttr(html, attr, value) {
 /**
  * Select a board the way a person does now that boards have no title bars: click it. The point is
  * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
- * then the board's pill (`canvas/BoardCallout.tsx`), or on a desktop its selected title bar, is waited for.
+ * then the board's pill (`canvas/BoardCallout.tsx`) is waited for.
  */
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
 export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	path = await stagePath(page, path);
-	// A board below the live zoom has no node, only its picture on the stage's sheet (`Stage.tsx`): the stage says where it is.
-	const spot = () => page.evaluate((wanted) => {
+	const canvas = await canvasFrame(page);
+	// A board is its picture on the stage's sheet; a card, a document or an app awake has a node. The stage says where each is.
+	const candidates = () => canvas.evaluate((wanted) => {
 		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
 		const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
-		if (!r) return null;
+		if (!r) return [];
 		const stage = document.querySelector(".stage");
+		const out = [];
 		for (const fy of [0.08, 0.2, 0.35, 0.5, 0.65, 0.8]) {
 			for (const fx of [0.5, 0.25, 0.75, 0.1, 0.9]) {
 				const x = r.x + r.width * fx;
 				const y = r.y + r.height * fy;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
 				const hit = document.elementFromPoint(x, y);
-				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : hit === stage && window.__decksPictureAt?.(x, y) === wanted) return { x, y };
+				if (node ? hit && hit.closest(".board-node") === node && !hit.closest("a, button, input, textarea, select") : (hit === stage || stage?.contains(hit)) && window.__decksPictureAt?.(x, y) === wanted) out.push({ x, y });
 			}
 		}
-		return null;
+		return out;
 	}, path);
+	// And not under the page's own chrome: the side panel, a top bar, the composer.
+	const spot = async () => {
+		for (const at of await candidates()) if (await onCanvasAt(page, at.x, at.y)) return at;
+		return null;
+	};
 	let at = await spot();
 	// Off screen, or under the chrome: fit the canvas, as a person looking for it would.
 	if (!at) {
-		const fitButton = page.locator('button[aria-label="Fit everything on the canvas"]').first();
+		const fitButton = canvas.locator('button[aria-label="Fit everything on the canvas"]').first();
 		if (await fitButton.isVisible().catch(() => false)) {
 			await fitButton.click();
 			await rest(page);
@@ -929,7 +950,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 	}
 	// Still under the composer or a panel: pan it to the middle of the window.
 	if (!at) {
-		const off = await page.evaluate((wanted) => {
+		const off = await canvas.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
 			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return null;
@@ -943,7 +964,7 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 		}
 	}
 	if (!at) {
-		const why = await page.evaluate((wanted) => {
+		const why = await canvas.evaluate((wanted) => {
 			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
 			const r = node?.getBoundingClientRect() ?? window.__decksBoards?.().find((one) => one.path === wanted)?.rect;
 			if (!r) return "not on the canvas";
@@ -953,8 +974,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 		throw new Error(`no uncovered point on ${path} to click: ${why}`);
 	}
 	await page.mouse.click(at.x, at.y);
-	// The pill on a touch screen; on a desktop the board's own title bar, selected.
-	await page.waitForSelector(`.board-callout:not([data-hidden]), .bar-layer .chrome[data-selected][data-path="${path}"]`, { timeout });
+	// The selected item's pill (`canvas/BoardCallout.tsx`).
+	await canvas.waitForSelector(".board-callout:not([data-hidden])", { timeout });
 	await page.waitForTimeout(150);
 }
 
@@ -965,100 +986,87 @@ export async function flyToBoard(page, path) {
 	await rest(page);
 }
 
-/** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
+/**
+ * One of the selected item's actions on its pill, by its word: Fit, Focus, New tab, Hide. `label` may
+ * be a list, of which the first the pill offers is pressed; false when it offers none.
+ */
 export async function pressBoardAction(page, label) {
-	// The selected board's title bar on a desktop. A bar too narrow for its buttons shows none (there
-	// is no ⋯ to hold them, `BoardFrame`), so there the board's own keys are used where it has them, and
-	// otherwise the camera frames the board (`1`) so the bar has its buttons. The pill on a touch screen.
-	// `label` may be a list, of which the first the board offers is pressed; false when it offers none.
 	const labels = [label].flat();
-	const any = (prefix) => labels.map((one) => `${prefix}[data-act="${one}"]`).join(", ");
-	const bar = () => page.locator(`.bar-layer .chrome[data-selected]:not([data-tight]) :is(${any("")})`).first();
+	const canvas = await canvasFrame(page);
 	/*
-	 * A bar under the composer or a panel cannot be pressed — a board that lands low on a fresh
-	 * deck has it there — and a click on it waits thirty seconds for nothing. `1` frames the
-	 * selected board, which is what Fit does, and brings the bar into the open for anything else.
-	 */
-	const covered = () =>
-		bar().evaluate((button) => {
-			const r = button.getBoundingClientRect();
-			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-			return !hit || !(hit === button || button.contains(hit));
-		});
-	if ((await bar().count()) && (await covered())) {
-		await page.keyboard.press("1");
-		if (labels.includes("Fit")) return true;
-		await rest(page);
-	}
-	if (await bar().count()) return bar().click().then(() => true);
-	if ((await page.locator(`.bar-layer .chrome[data-selected][data-tight]`).count()) > 0) {
-		const key = labels.includes("Present") || labels.includes("Fullscreen") ? "f" : labels.includes("Focus") ? "d" : undefined;
-		if (key) {
-			await page.keyboard.press(key);
-			return true;
-		}
-		// `1` frames the selected board, which brings its bar back with its buttons.
-		await page.keyboard.press("1");
-		for (let i = 0; i < 10 && (await bar().count()) === 0; i++) await page.waitForTimeout(200);
-		if (await bar().count()) return bar().click().then(() => true);
-		return false;
-	}
-	/*
-	 * The pill sits only over the board's top edge or under its bottom one and stays there, so with a
-	 * board filling the screen it is off it, or under the composer: `1` frames the selected board, which
+	 * The pill sits only over the item's top edge or under its bottom one and stays there, so with an
+	 * item filling the screen it is off it, or under the composer: `1` frames the selected item, which
 	 * is what Fit does, and brings the pill into the open for anything else.
 	 */
-	const outOfReach = () =>
-		page.evaluate(() => {
+	const pillAt = () =>
+		canvas.evaluate(() => {
 			const pill = document.querySelector(".stage-fixed > .board-callout");
-			if (!pill) return false;
-			if (pill.hasAttribute("data-hidden")) return true;
+			if (!pill || pill.hasAttribute("data-hidden")) return null;
 			const r = pill.getBoundingClientRect();
 			const x = r.x + r.width / 2;
 			const y = r.y + r.height / 2;
-			if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return true;
+			if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
 			const hit = document.elementFromPoint(x, y);
-			return !hit || !pill.contains(hit);
+			return hit && pill.contains(hit) ? { x, y } : null;
 		});
-	if (await outOfReach()) {
+	// The pill hides while the camera moves and comes back a moment after it rests.
+	const shownPill = () => canvas.waitForFunction(() => { const pill = document.querySelector(".stage-fixed > .board-callout"); return !!pill && !pill.hasAttribute("data-hidden"); }, null, { timeout: 3000 }).catch(() => {});
+	const at = await pillAt();
+	if (!at || !(await onCanvasAt(page, at.x, at.y))) {
+		await focusCanvas(page);
 		await page.keyboard.press("1");
 		if (labels.includes("Fit")) return true;
 		await rest(page);
+		await shownPill();
 	}
-	const pill = page.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
+	const pill = canvas.locator(`.board-callout :is(${labels.map((one) => `[role=menuitem][aria-label="${one}"]`).join(", ")})`).first();
 	if ((await pill.count()) === 0) return false;
+	// The button itself under the page's chrome (the side panel, say) though the pill's middle is not: framed once more, then pressed where it is.
+	const button = await pill.boundingBox();
+	if (button && !(await onCanvasAt(page, button.x + button.width / 2, button.y + button.height / 2))) {
+		await focusCanvas(page);
+		await page.keyboard.press("1");
+		await rest(page);
+		await shownPill();
+	}
+	const box = await pill.boundingBox();
+	if (box && (await onCanvasAt(page, box.x + box.width / 2, box.y + box.height / 2))) return page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).then(() => true);
 	return pill.click().then(() => true);
 }
 
 /**
- * A point on the band along a live board's edge, which moves it (`BoardFrame`): on the
- * screen and uncovered, or null. The band shows on a board whose page takes the pointer.
+ * A point on the band along an awake item's edge, which moves it (`item-slot.tsx`): on the screen
+ * and uncovered, or null. The band shows on the item under the pointer or the selected one.
  */
 export async function boardEdge(page, path) {
 	path = await stagePath(page, path);
-	// The bands are drawn on the board under the pointer (or the selected one), so point at it first.
-	const box = await page.locator(`.board-node[data-path="${path}"]`).boundingBox();
+	const canvas = await canvasFrame(page);
+	// The bands are drawn on the item under the pointer (or the selected one), so point at it first.
+	const box = await canvas.locator(`.board-node[data-path="${path}"]`).boundingBox().catch(() => null);
 	if (box) {
 		const x = Math.min(Math.max(box.x + box.width / 2, 2), page.viewportSize().width - 2);
 		const y = Math.min(Math.max(box.y + Math.min(box.height / 2, 40), 2), page.viewportSize().height - 2);
 		await page.mouse.move(x, y);
-		await page.waitForFunction((wanted) => [...document.querySelectorAll(".board-edge")].some((band) => band.closest(".board-node")?.dataset.path === wanted), path, { timeout: 2000 }).catch(() => {});
+		await canvas.waitForFunction((wanted) => [...document.querySelectorAll(".board-edge")].some((band) => band.closest(".board-node")?.dataset.path === wanted), path, { timeout: 2000 }).catch(() => {});
 	}
-	return page.evaluate((wanted) => {
+	const points = await canvas.evaluate((wanted) => {
+		const out = [];
 		for (const band of document.querySelectorAll(".board-edge")) {
 			if (band.closest(".board-node")?.dataset.path !== wanted) continue;
 			const r = band.getBoundingClientRect();
 			const along = band.dataset.side === "n" || band.dataset.side === "s";
 			for (const f of [0.5, 0.3, 0.7, 0.15, 0.85]) {
-				// The outer part of the band: clear of the page's own edge.
+				// The outer part of the band: clear of the item's own edge.
 				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 3 : r.right - 3;
 				const y = along ? (band.dataset.side === "n" ? r.y + 3 : r.bottom - 3) : r.y + r.height * f;
 				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
-				if (document.elementFromPoint(x, y) === band) return { x, y, side: band.dataset.side };
+				if (document.elementFromPoint(x, y) === band) out.push({ x, y, side: band.dataset.side });
 			}
 		}
-		return null;
+		return out;
 	}, path);
+	for (const at of points) if (await onCanvasAt(page, at.x, at.y)) return at;
+	return null;
 }
 
 /**
@@ -1083,4 +1091,86 @@ export async function freshAgent(page, workspace) {
 	await page.locator('.popover [data-agent="true"]').filter({ hasText: made.name }).first().click();
 	await page.waitForTimeout(800);
 	return made;
+}
+
+/**
+ * The canvas frame's line to the harness held back, as a far network holds it: the answer to each edit
+ * the frame sends (`canvas.batch`) and every change on the stream it follows the drawing on
+ * (`/api/v1/events`), each `ms` late and in order. The page's own socket is the check's to route.
+ *
+ * Call it before the page loads (it installs a script in every frame, and the frame made after it
+ * is what it reaches), then `set(ms)` around what is measured; `queued()` is what is still held back.
+ */
+export async function lagCanvasLine(page) {
+	const state = { ms: 0, queued: 0 };
+	await page.addInitScript(() => {
+		if (!location.pathname.endsWith("canvas-frame.html")) return;
+		const real = globalThis.fetch.bind(globalThis);
+		globalThis.__decksLag = { ms: 0, queued: 0 };
+		globalThis.fetch = async (input, init) => {
+			const response = await real(input, init);
+			const url = typeof input === "string" ? input : (input?.url ?? String(input));
+			if (!/\/v1\/events\b/.test(url) || !response.body) return response;
+			const reader = response.body.getReader();
+			const lag = globalThis.__decksLag;
+			let last = 0;
+			const body = new ReadableStream({
+				start(controller) {
+					void (async () => {
+						for (;;) {
+							const { done, value } = await reader.read();
+							const at = Math.max(Date.now() + lag.ms, last);
+							last = at;
+							lag.queued++;
+							setTimeout(() => {
+								lag.queued--;
+								try {
+									if (done) controller.close();
+									else controller.enqueue(value);
+								} catch {
+									/* the frame stopped reading */
+								}
+							}, at - Date.now());
+							if (done) return;
+						}
+					})().catch((error) => controller.error(error));
+				},
+				cancel: (reason) => reader.cancel(reason),
+			});
+			return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+		};
+	});
+	await page.route(/\/api\/v1\/canvas\.batch/, async (route) => {
+		const ms = state.ms;
+		state.queued++;
+		try {
+			const response = await route.fetch();
+			if (ms) await new Promise((resolve) => setTimeout(resolve, ms));
+			await route.fulfill({ response });
+		} catch {
+			await route.abort().catch(() => {});
+		} finally {
+			state.queued--;
+		}
+	});
+	const inFrame = async (run, arg) => {
+		const frame = page.frames().find((one) => !one.isDetached() && one.url().includes("canvas-frame.html"));
+		return frame ? frame.evaluate(run, arg).catch(() => undefined) : undefined;
+	};
+	return {
+		async set(ms) {
+			state.ms = ms;
+			await inFrame((ms) => globalThis.__decksLag && (globalThis.__decksLag.ms = ms), ms);
+		},
+		async queued() {
+			return state.queued + ((await inFrame(() => globalThis.__decksLag?.queued ?? 0)) ?? 0);
+		},
+	};
+}
+
+/** Fit everything on the canvas, as the zoom bar's button in the frame does, and wait for the camera to rest. */
+export async function fitCanvas(page) {
+	const canvas = await canvasFrame(page);
+	await canvas.locator("[aria-label='Fit everything on the canvas']").first().click();
+	await rest(page);
 }

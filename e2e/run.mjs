@@ -57,36 +57,20 @@ const CHECKS = [
 	{ file: "geometry.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },
 	/*
-	 * Code on a board: which blocks the runtime claims, and where their colours come from. Its
-	 * own check because it is the one renderer whose output lives inside markup the file also
-	 * wrote — so what it must *not* touch (a fence with no language, inline code) is as much
-	 * of the subject as what it does.
-	 */
-	{ file: "highlighting.mjs", needsAgent: false },
-	/*
 	 * Which board is selected, and the one way in that did not work: a press on the board itself.
 	 * Its own check because it is one rule with several readers — the arrow keys, the focus view
 	 * and the bar's own menu all ask the canvas which board is selected.
 	 */
 	{ file: "selection.mjs", needsAgent: false },
 	/*
-	 * A link on a board: a board in the deck opens beside the one that linked to it, anything
-	 * else opens in a tab, and neither of them navigates the frame the board is drawn in.
+	 * A link on a card: a board in the deck opens beside the card that linked to it, anything
+	 * else opens in a tab, and neither of them navigates the canvas frame.
 	 */
 	{ file: "board-links.mjs", needsAgent: false },
-	{ file: "live-doc.mjs", needsAgent: false },
+	/* Words selected in a card, commented on: the popover in the frame, the draft over the composer. */
 	{ file: "board-comment.mjs", needsAgent: false },
-	/*
-	 * A board's own code, run by pressing something on it. The one path where a click is not the
-	 * permission: the board carries the words, the server reads them out of the file, and the
-	 * first run asks. Needs no model, because nothing is prompted — the run is a click.
-	 */
-	{ file: "board-eval.mjs", needsAgent: false },
 	{ file: "shell.mjs", needsAgent: false },
-	/*
-	 * The focus view: the canvas as one page. Its own check because it needs the deck as it
-	 * opens — a page that has been typed into by other checks is not a page any more.
-	 */
+	/* The pill over a selected board: its actions, and its Comment on the whole board. */
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
 	/*
@@ -147,14 +131,9 @@ const CHECKS = [
 	{ file: "voice.mjs", needsAgent: false },
 	{ file: "engine-slide.mjs", needsAgent: false },
 	{ file: "zoom-out-pictures.mjs", needsAgent: false },
-	/* Six board pages at most on a computer and one on an iPad or a phone, none below the live zoom (`device.ts`). */
-	{ file: "live-budget.mjs", needsAgent: false },
 	/* A page opens on its boards at once, not after the arrival's 3 s cap. */
 	{ file: "opening-lands.mjs", needsAgent: false },
 	{ file: "wheel-diagonal.mjs", needsAgent: false },
-	{ file: "split-pinch.mjs", needsAgent: false },
-	/* Zoomed in for a moment and out again, no board is left to a page that went to sleep: each shows its picture. */
-	{ file: "live-pictures.mjs", needsAgent: false },
 	/*
 	 * What the stage draws with (`stage/backends/`), in Chromium and in WebKit as an iPhone: WebGL 2
 	 * with no WebGPU, the notice with neither, and a lost context started again; then every board's

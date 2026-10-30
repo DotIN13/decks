@@ -13,7 +13,7 @@
  * `DECKS_E2E_SHOTS=<dir>` keeps the pictures.
  */
 import { writeFileSync } from "node:fs";
-import { API, asPerson, deckState, open, say, settle, socket } from "../harness.mjs";
+import { API, asPerson, canvasFrame, deckState, open, say, settle, socket } from "../harness.mjs";
 
 const keep = process.env.DECKS_E2E_SHOTS;
 const ID = "ph-frame";
@@ -31,7 +31,9 @@ const until = async (test, ms = 15000) => {
 };
 
 const { browser, page, errors } = await open({ width: 1400, height: 900, scheme: "light", boards: true });
-await page.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
+// The stage and its engine are in the canvas frame; the screenshots and the pixel reading are the page's.
+const canvas = await canvasFrame(page);
+await canvas.waitForFunction(() => window.__decksEngine?.stats?.().workerBackend, null, { timeout: 30000 }).catch(() => {});
 
 const deck = await deckState();
 const placed = deck.boards.filter((b) => Number.isFinite(b.x) && Number.isFinite(b.y));
@@ -49,7 +51,7 @@ const landed = await until(() => link.received.some((m) => m.type === "stage.pen
 say("the placeholder frame is on the stage", !!landed);
 
 /** The accent as `[r, g, b]`, as the page resolves `--color-accent` in this scheme. */
-const accent = await page.evaluate(() => {
+const accent = await canvas.evaluate(() => {
 	const c = document.createElement("canvas").getContext("2d");
 	c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#3b5cf6";
 	c.fillRect(0, 0, 1, 1);
@@ -57,7 +59,7 @@ const accent = await page.evaluate(() => {
 });
 
 const camera = () =>
-	page.evaluate(() => {
+	canvas.evaluate(() => {
 		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(globalThis.__decksCameraTransform?.() ?? "");
 		const rect = document.querySelector(".stage").getBoundingClientRect();
 		return m ? { left: rect.left + Number(m[1]), top: rect.top + Number(m[2]), zoom: Number(m[3]), cx: Number(m[4]), cy: Number(m[5]), dpr: devicePixelRatio, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } } : null;
@@ -70,7 +72,7 @@ async function zoomToOne() {
 		const cam = await camera();
 		if (!cam || Math.abs(cam.zoom - 1) < 0.08) break;
 		const at = toScreen(cam, X + W / 2, Y + H / 2);
-		await page.evaluate(([at, dy]) => {
+		await canvas.evaluate(([at, dy]) => {
 			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
 		}, [at, cam.zoom < 1 ? -6 : 6]);
 		await settle(page, 60);
@@ -82,12 +84,12 @@ async function zoomToOne() {
 		const dx = at.x - mid.x;
 		const dy = at.y - mid.y;
 		if (Math.abs(dx) < 4 && Math.abs(dy) < 4) break;
-		await page.evaluate(([dx, dy, mid]) => {
+		await canvas.evaluate(([dx, dy, mid]) => {
 			document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy, clientX: mid.x, clientY: mid.y, bubbles: true, cancelable: true }));
 		}, [dx, dy, mid]);
 		await settle(page, 120);
 	}
-	await page.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
+	await canvas.waitForFunction(() => (window.__decksEngine.stats().tiles ?? 0) > 0, null, { timeout: 20000 }).catch(() => {});
 	await settle(page, 1800);
 	return camera();
 }
@@ -167,7 +169,7 @@ const plain = await onCanvas("no-writer");
 say("with no writer the edge is dashed in the accent", plain.accent.band > 400 && plain.accent.turns >= 10, JSON.stringify(plain));
 say("with no writer there is no name tag", plain.accent.tag < 40 && plain.green.band < 40, JSON.stringify(plain));
 
-await page.evaluate(() => window.__decksRust.setWriter({ name: "Atelier", color: "#2eaf5a" }));
+await canvas.evaluate(() => window.__decksRust.setWriter({ name: "Atelier", color: "#2eaf5a" }));
 await settle(page, 1500);
 const named = await onCanvas("writer");
 say("with a writer the edge is dashed in the writer's colour", named.green.band > 400 && named.green.turns >= 10 && named.accent.band < 40, JSON.stringify(named));

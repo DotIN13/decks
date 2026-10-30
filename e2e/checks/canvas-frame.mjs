@@ -6,7 +6,7 @@
  * of drawing landed on nothing and Fit did nothing. Here a canvas holds only three notes, far from
  * the origin; switching to it must show them, and so must Fit after the view is moved away.
  */
-import { open, rest, resetStage, say, settle, socket } from "../harness.mjs";
+import { canvasFrame, open, rest, resetStage, say, settle, socket } from "../harness.mjs";
 
 const until = async (test, ms = 10000) => {
 	const deadline = Date.now() + ms;
@@ -35,7 +35,7 @@ const canvas = await until(() => (link.received.filter((m) => m.type === "stages
 say("the second chat has a canvas of drawing only", !!canvas, String(canvas));
 
 // What the camera shows: are the notes' middle and the window's middle close, at a zoom where notes read?
-const middleShown = () => page.evaluate(() => {
+const middleShown = async () => (await canvasFrame(page)).evaluate(() => {
 	// The camera as the stage reports it: the world's own transform holds only the origin and the zoom now.
 	const m = globalThis.__decksCameraTransform?.().match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/);
 	if (!m) return null;
@@ -55,7 +55,7 @@ await page.mouse.move(700, 450);
 for (let i = 0; i < 20; i++) await page.mouse.wheel(4000, 4000);
 await settle(page, 600);
 say("…the view was moved away from them", !near(await middleShown()), JSON.stringify(await middleShown()));
-await page.locator("[aria-label='Fit everything on the canvas']").click();
+await (await canvasFrame(page)).locator("[aria-label='Fit everything on the canvas']").click();
 const fitted = await until(async () => { const c = await middleShown(); return near(c) ? c : undefined; }, 4000);
 say("Fit frames the drawing too", !!fitted, JSON.stringify(await middleShown()));
 

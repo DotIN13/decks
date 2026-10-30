@@ -5,13 +5,18 @@
  * A resize is written twice: to this stage's file, where the board is drawn at what the drag let go
  * at, and to the board's own file, the size another stage takes it at next, as an agent's fit
  * writes it. A double-click on empty canvas is the Note tool's click: a note there, open for typing.
+ *
+ * A board is only its picture on the canvas now (no page of its own in it), so what this asked of a
+ * board's page (kept through a resize, its content a floor for its height) is gone with it.
  */
-import { boardPath, flyToBoard, open, read, resetStage, say, settle, socket, stagePath, write } from "../harness.mjs";
+import { boardPath, canvasFrame, flyToBoard, onCanvasAt, open, read, resetStage, say, selectBoard, settle, socket, stagePath, write } from "../harness.mjs";
 
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000, edit: true });
 await resetStage(page);
 await settle(page, 900);
+/** The canvas frame: the stage, the boards' nodes and their handles are there. */
+const canvas = await canvasFrame(page);
 
 /** The `{"w":…,"h":…}` the board file declares, which is the number the drag has to move. */
 const metaOf = (text) => {
@@ -48,7 +53,7 @@ const select = async (path) => {
 	 * one's. Hiding the rest is what a person does with the ×, and it makes the click mean what it
 	 * says.
 	 */
-	const others = (await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
+	const others = (await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))).filter((other) => other !== path);
 	const link = await socket();
 	for (const other of others) link.send({ type: "board.hide", path: other });
 	// Brought back if an earlier select hid it, as its row in the panel used to (`App.tsx`, `playAndFrame`).
@@ -61,14 +66,14 @@ const select = async (path) => {
 	await flyToBoard(page, path);
 	await settle(page, 300);
 	for (let i = 0; i < 8; i++) {
-		const level = await page.evaluate(() =>
+		const level = await canvas.evaluate(() =>
 			Number((document.querySelector('.v3-zoom-value')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
 		);
 		if (level >= 70 && level <= 200) break;
 		await page.keyboard.press(level < 70 ? "Control+Equal" : "Control+Minus");
 		await settle(page, 250);
 	}
-	await page.frameLocator(`.board-node[data-path="${path}"] iframe`).locator("h1, h3, body").first().click();
+	await selectBoard(page, path);
 	await settle(page, 600);
 	await cornerOnScreen(path);
 };
@@ -80,7 +85,7 @@ const select = async (path) => {
  */
 const cornerOnScreen = async (path) => {
 	for (let i = 0; i < 6; i++) {
-		const below = await page.evaluate((wanted) => {
+		const below = await canvas.evaluate((wanted) => {
 			const corner = document.querySelector(`.pen-handle[data-board="${wanted}"][data-handle="se"]`)?.getBoundingClientRect();
 			return !!corner && corner.bottom > window.innerHeight - 140;
 		}, path);
@@ -92,14 +97,14 @@ const cornerOnScreen = async (path) => {
 
 /** Drag the handle by screen pixels, and report what the node was drawn at half way through. */
 const dragHandle = async (path, dx, dy) => {
-	const handle = page.locator(`.pen-handle[data-board="${path}"][data-handle="se"]`);
+	const handle = canvas.locator(`.pen-handle[data-board="${path}"][data-handle="se"]`);
 	await handle.waitFor({ state: "visible", timeout: 6000 });
 	const box = await handle.boundingBox();
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	await page.mouse.down();
 	await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 10 });
 	await settle(page, 200);
-	const during = await page.evaluate((wanted) => {
+	const during = await canvas.evaluate((wanted) => {
 		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
 		return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
 	}, path);
@@ -130,7 +135,7 @@ await select(componentPath);
  * where the resize is, and it is the same corner on every kind of document.
  */
 const handleAt = (wanted) =>
-	page.evaluate((path) => {
+	canvas.evaluate((path) => {
 		const node = document.querySelector(`.board-node[data-path="${path}"]`);
 		const sizer = document.querySelector(`.pen-handle[data-board="${path}"][data-handle="se"]`);
 		if (!node || !sizer) return null;
@@ -155,7 +160,7 @@ const handleAt = (wanted) =>
  * which does not, so ninety words of a source file rendered as a text node inside every `.board-node` and
  * sat under eight boards. Nothing in the toolchain objects. The DOM does.
  */
-const stray = await page.evaluate(() => {
+const stray = await canvas.evaluate(() => {
 	const found = [];
 	for (const el of document.querySelectorAll("*")) {
 		if (el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
@@ -177,15 +182,6 @@ say(
 );
 say("…a real target, drawn in screen pixels", both !== null && both.w >= 8 && both.cursor === "nwse-resize", JSON.stringify(both));
 
-// A mark on the page in the frame: a reload would take it away.
-const markPage = (wanted) =>
-	page.evaluate((wanted) => {
-		const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
-		if (frame?.contentWindow) frame.contentWindow.__kept = true;
-		return !!frame?.contentWindow;
-	}, wanted);
-const pageKept = (wanted) => page.evaluate((wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`)?.contentWindow?.__kept === true, wanted);
-await markPage(componentPath);
 const dragged = await dragHandle(componentPath, 140, 90);
 say(
 	"the box follows the drag, before anything is written",
@@ -196,7 +192,7 @@ say(
 await page.waitForTimeout(1500);
 const nowComponent = read(component);
 const drawnAt = (wanted) =>
-	page.evaluate((wanted) => {
+	canvas.evaluate((wanted) => {
 		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
 		return { w: Math.round(Number.parseFloat(node.style.width)), h: Math.round(Number.parseFloat(node.style.height)) };
 	}, wanted);
@@ -206,12 +202,11 @@ say(
 	Math.abs(drawn.w - dragged.w) <= 2 && Math.abs(drawn.h - dragged.h) <= 2,
 	`drawn ${drawn.w}x${drawn.h}, dragged ${dragged.w}x${dragged.h}`,
 );
-say("…without reloading the page in it", await pageKept(componentPath));
 const writtenMeta = metaOf(nowComponent);
 say("…and writes that size to the board's own file", Math.abs(writtenMeta?.w - drawn.w) <= 1 && Math.abs(writtenMeta?.h - drawn.h) <= 1, JSON.stringify(writtenMeta));
 // The person's own resize is theirs: the board's new file time must not read as an agent's change.
 await page.waitForTimeout(600);
-const glows = await page.evaluate((wanted) => {
+const glows = await canvas.evaluate((wanted) => {
 	const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
 	return { glow: Boolean(node?.querySelector(".news-glow")) };
 }, componentPath);
@@ -223,7 +218,7 @@ say("…and a board you resized does not glow as news", !glows.glow, JSON.string
 await select(componentPath);
 await settle(page, 400);
 const before = await drawnAt(componentPath);
-const handle = page.locator(`.pen-handle[data-board="${componentPath}"][data-handle="se"]`);
+const handle = canvas.locator(`.pen-handle[data-board="${componentPath}"][data-handle="se"]`);
 await handle.waitFor({ state: "visible", timeout: 6000 });
 const grip = await handle.boundingBox();
 await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
@@ -231,7 +226,7 @@ await page.mouse.down();
 await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 60, { steps: 10 });
 await settle(page, 200);
 const letGo = await drawnAt(componentPath);
-await page.evaluate((wanted) => {
+await canvas.evaluate((wanted) => {
 	const seen = (window.__heights = []);
 	const sample = () => {
 		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
@@ -242,7 +237,7 @@ await page.evaluate((wanted) => {
 }, componentPath);
 await page.mouse.up();
 await page.waitForTimeout(2200);
-const heights = await page.evaluate(() => window.__heights);
+const heights = await canvas.evaluate(() => window.__heights);
 say(
 	"a board made shorter never draws taller than where it was let go",
 	letGo.h < before.h - 40 && Math.max(...heights) <= letGo.h + 1 && Math.abs(heights.at(-1) - letGo.h) <= 1,
@@ -279,21 +274,6 @@ say(
 	`${flowBefore.w}x${flowBefore.h} → ${flowDrawn.w}x${flowDrawn.h}, ${JSON.stringify(metaOf(read(flow)))}`,
 );
 
-// Dragged far shorter than its words: the file takes the shorter height as a floor, and the board stays as tall as its content.
-const content = await page.evaluate((wanted) => {
-	const doc = document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentDocument;
-	return Math.ceil(doc.querySelector(".doc").getBoundingClientRect().height);
-}, flowPath);
-await cornerOnScreen(flowPath);
-const zoomNow = await page.evaluate(() => globalThis.__decksRust.camera.zoom);
-await dragHandle(flowPath, 0, -(flowDrawn.h - 260) * zoomNow);
-await page.waitForTimeout(1500);
-const floored = await drawnAt(flowPath);
-say(
-	"…and its height is a floor: dragged shorter than its content, the file says so and the board stays as tall as the content",
-	(metaOf(read(flow))?.h ?? 0) < content - 40 && Math.abs(floored.h - content) <= 2,
-	`content ${content}, drawn ${floored.h}, file ${JSON.stringify(metaOf(read(flow)))}`,
-);
 
 // --- a double-click on a board's own bar is not a double-click on empty canvas ----------
 
@@ -303,10 +283,10 @@ say(
  * gesture that already meant "go to this board". Done here, before the canvas is emptied, because
  * it needs a board to click.
  */
-const countNow = await page.evaluate(() => document.querySelectorAll(".board-node").length);
+const countNow = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
 await flyToBoard(page, flowPath);
 await settle(page, 900);
-const countAfterBar = await page.evaluate(() => document.querySelectorAll(".board-node").length);
+const countAfterBar = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
 /*
  * The claim is that the count did **not** grow, not that it is one: the hides above are best-effort (they
  * go out on a socket and this block does not read the canvas back), and requiring `countNow === 1` made this
@@ -325,33 +305,37 @@ say("a double-click on a board's own bar makes nothing", countAfterBar === count
  * canvas is both simpler and closer to what the gesture is for: a double-click on empty canvas.
  */
 const link = await socket();
-for (const path of await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {
+for (const path of await canvas.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path))) {
 	link.send({ type: "board.hide", path });
 }
 await new Promise((resolve) => setTimeout(resolve, 800));
 link.close();
 await settle(page, 800);
 
-const empty = await page.evaluate(() => document.querySelectorAll(".board-node").length);
+const empty = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
 say("the canvas can be emptied for the press", empty === 0, `${empty} board(s) left`);
 
-const spot = await page.evaluate(() => {
+const spots = await canvas.evaluate(() => {
+	const out = [];
 	for (let y = 160; y < window.innerHeight - 220; y += 40)
 		for (let x = 320; x < window.innerWidth - 200; x += 40) {
 			const el = document.elementFromPoint(x, y);
-			if (el && !el.closest(".board-node") && !el.closest(".float") && !el.closest("aside") && !el.closest(".notice") && !el.closest(".inspector")) return { x, y };
+			if (el && !el.closest(".board-node") && !el.closest(".float") && !el.closest("aside") && !el.closest(".notice") && !el.closest(".inspector")) out.push({ x, y });
 		}
-	return null;
+	return out;
 });
+// …and not under the page's own chrome drawn over the canvas (the side panel, the bars, the composer).
+let spot = null;
+for (const at of spots) if (!spot && (await onCanvasAt(page, at.x, at.y)) && (await onCanvasAt(page, at.x + 300, at.y + 120))) spot = at;
 say("there is empty canvas to double-click on", spot !== null, JSON.stringify(spot));
 
 const pens = await socket();
 await page.mouse.dblclick(spot.x, spot.y);
 // The same note the Note tool makes with a click there: its corner at the point, open for typing.
-const typing = await page.waitForSelector(".pen-text", { timeout: 3000 }).catch(() => null);
-const focused = await page.evaluate(() => !!document.activeElement?.classList.contains("pen-text"));
+const typing = await canvas.waitForSelector(".pen-text", { timeout: 3000 }).catch(() => null);
+const focused = await canvas.evaluate(() => !!document.activeElement?.classList.contains("pen-text"));
 say("a double-click on empty canvas starts a note, open for typing", !!typing && focused, `editor ${!!typing}, focused ${focused}`);
-const box = await page.evaluate(() => {
+const box = await canvas.evaluate(() => {
 	const r = document.querySelector(".pen-text")?.getBoundingClientRect();
 	return r ? { x: Math.round(r.x), y: Math.round(r.y) } : null;
 });
@@ -361,7 +345,7 @@ await page.mouse.click(spot.x + 300, spot.y + 120);
 await settle(page, 1500);
 const notes = (pens.last("stage.pen")?.doc?.children ?? []).filter((node) => node.type === "note");
 say("…and the note is saved with what was typed", JSON.stringify(notes).includes("hello"), `${notes.length} note(s)`);
-const boardsAfter = await page.evaluate(() => document.querySelectorAll(".board-node").length);
+const boardsAfter = await canvas.evaluate(() => document.querySelectorAll(".board-node").length);
 say("…and no board was made", boardsAfter === 0, `${boardsAfter} board(s)`);
 pens.close();
 
