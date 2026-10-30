@@ -264,9 +264,11 @@ export function guard(gate: Gate) {
 				/*
 				 * Readable by a sandboxed page: the canvas frame fetches its cards and imports their modules
 				 * with `Origin: null`. The ticket in the address is the credential, and what it admits is the
-				 * canvas's own files, which that frame shows anyway.
+				 * canvas's own files, which that frame shows anyway. A board picture's stand-in mark too, or the
+				 * frame keeps the stand-in and never asks again for the picture (`render/engine.ts`).
 				 */
 				res.setHeader("Access-Control-Allow-Origin", "*");
+				res.setHeader("Access-Control-Expose-Headers", "X-Decks-Stand-In, Content-Disposition");
 				next();
 				return;
 			}
