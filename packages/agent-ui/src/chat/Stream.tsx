@@ -2,10 +2,10 @@ import { dayKey, formatDate, yearOf } from "@decks/ui";
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Icon } from "@decks/ui";
 import { closeHistory, historyShown } from "../edge.ts";
-import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
+import { earlierLabel, hasEarlier, LOAD_MORE_AT, WINDOW, windowStart } from "./history-page.ts";
 import { WorkingSign } from "./StatusLine.tsx";
 import { turnCards, type TurnCard } from "./turn-cards.ts";
 import { signPlacement } from "./working-sign.ts";
@@ -82,7 +82,12 @@ export function Stream(props: {
 	onClose?: () => void;
 	timeMachine?: boolean | "buttons";
 }) {
-	const shownNow = () => props.shown ?? historyShown();
+	/*
+	 * A memo, so what reads it runs again when the conversation is shown or put away and not on every
+	 * change behind the host's answer: the app's reads the window's width, and as a function this took
+	 * every resize for an opening and threw a reader who had scrolled up back to the foot.
+	 */
+	const shownNow = createMemo(() => props.shown ?? historyShown());
 	const close = () => (props.onClose ? props.onClose() : closeHistory());
 	let column!: HTMLElement;
 	let head: HTMLDivElement | undefined;
@@ -120,10 +125,19 @@ export function Stream(props: {
 	 * machine each — and a conversation has no upper bound. Reaching towards the top widens
 	 * the window; coming back to the foot throws the extra away, so a chat that has been
 	 * open all day costs what one just opened costs.
+	 *
+	 * The window starts at a row (`from`), not at a count from the end: rows arriving at the foot
+	 * leave it where it is (`windowStart`). Unset, it is the last `WINDOW` rows, and the row that
+	 * starts them is kept as soon as they are drawn.
 	 */
-	const [windowed, setWindowed] = createSignal(WINDOW);
-	const shown = createMemo(() => windowOf(props.items, windowed()) as ChatItem[]);
-	const hidden = () => hiddenCount(props.items.length, shown().length);
+	const [from, setFrom] = createSignal<string | undefined>();
+	const start = createMemo(() => windowStart(props.items, from(), WINDOW));
+	createEffect(() => {
+		const id = props.items[start()]?.id;
+		if (id !== untrack(from)) setFrom(id);
+	});
+	const shown = createMemo(() => (start() === 0 ? props.items : props.items.slice(start())) as ChatItem[]);
+	const hidden = () => start();
 	const earlier = () => hasEarlier({ total: props.items.length, hidden: hidden(), more: props.more });
 
 	/** True while a page is on its way, so the column asks once. */
@@ -132,9 +146,9 @@ export function Stream(props: {
 	/**
 	 * Show more of the conversation, keeping what the reader is looking at where it is.
 	 *
-	 * Measure, grow, and hand the added height straight back to `scrollTop`: the column
-	 * grows *upwards*, so without the correction every page would throw the reader down the
-	 * page by exactly the height of what they asked for.
+	 * The column grows *upwards*, so without a correction every page would throw the reader down
+	 * the page by exactly the height of what they asked for. The row they are reading is held where
+	 * it is (`hold`), there and again as the new rows' pictures load (`settle`).
 	 *
 	 * Two sources, in order. The window is widened first, because those rows are already
 	 * here; only once it has caught up with what was sent does this go to the server, which
@@ -143,23 +157,21 @@ export function Stream(props: {
 	const showEarlier = () => {
 		if (!scroller) return;
 		if (hidden() > 0) {
-			const before = scroller.scrollHeight;
-			setWindowed((size) => size + WINDOW);
-			scroller.scrollTop += scroller.scrollHeight - before;
+			hold(() => setFrom(props.items[Math.max(0, start() - WINDOW)]?.id));
 			rearmTop();
 			return;
 		}
 		if (fetching || !props.more) return;
 		fetching = true;
-		const before = scroller?.scrollHeight ?? 0;
 		void props
 			.onEarlier()
 			.then((added) => {
 				if (!scroller || added === 0) return;
-				// The window has to grow by what arrived, or the page is fetched and then
-				// immediately hidden again by the window it landed outside of.
-				setWindowed((size) => size + added);
-				scroller.scrollTop += scroller.scrollHeight - before;
+				// The window has to take in what arrived, or the page is fetched and then
+				// immediately hidden again by the window it landed outside of. The page went in
+				// front while the window still started at the old first row, so the reader's row
+				// has not moved yet: it is held from here.
+				hold(() => setFrom(props.items[0]?.id));
 				rearmTop();
 			})
 			.finally(() => {
@@ -183,13 +195,20 @@ export function Stream(props: {
 	 */
 	createEffect((previous: string | undefined) => {
 		const latest = [...props.items].reverse().find((item) => item.kind === "user")?.id;
-		if (previous !== undefined && latest && latest !== previous && pinned() && windowed() !== WINDOW) setWindowed(WINDOW);
+		if (previous !== undefined && latest && latest !== previous && pinned() && untrack(start) < props.items.length - WINDOW) setFrom(undefined);
 		return latest;
 	});
 
-	/* A different conversation is a different window. */
+	/*
+	 * A different conversation is a different window, and opens at its newest turn: the place kept
+	 * was the other conversation's, and kept here it left the new one somewhere in its middle.
+	 */
 	createEffect((previous: string | undefined) => {
-		if (previous !== undefined && props.agentId !== previous) setWindowed(WINDOW);
+		if (previous !== undefined && props.agentId !== previous) {
+			setFrom(undefined);
+			setPinned(true);
+			toFootNow();
+		}
 		return props.agentId;
 	});
 
@@ -201,6 +220,8 @@ export function Stream(props: {
 	 * applied to that rather than to everything held.
 	 */
 	const cards = createMemo<TurnCard[]>(() => turnCards(shown()));
+	const cardById = createMemo(() => new Map(cards().map((card) => [card.id, card])));
+	const cardIds = createMemo(() => cards().map((card) => card.id), undefined, { equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]) });
 
 	/*
 	 * The wheel scrolls the column from anywhere over it, not only over a card.
@@ -312,10 +333,7 @@ export function Stream(props: {
 		 * one measure that says how much is missing.
 		 */
 		const at = props.items.findIndex((item) => item.id === target.id);
-		if (at !== -1) {
-			const needed = props.items.length - at;
-			if (needed > windowed()) setWindowed(needed + WINDOW);
-		}
+		if (at !== -1 && at < untrack(start)) setFrom(props.items[Math.max(0, at - WINDOW)]?.id);
 		requestAnimationFrame(() => {
 			const element = scroller.querySelector(`[data-item="${cssEscape(target.id)}"]`);
 			// Not marked as travelled: the history can be open before the turn has arrived, and
@@ -335,30 +353,89 @@ export function Stream(props: {
 	});
 
 	/*
-	 * Following the foot.
+	 * Following the foot, and holding still away from it.
 	 *
-	 * - Whether to follow is one IntersectionObserver on a 1px row after the last card: the foot in
-	 *   sight, or within 48px of it. It says where the reader has put the column; it never moves it.
-	 * - Following happens when the conversation changes (a card arrives, a reply's text grows, the
-	 *   working sign comes or goes), in the same pass that draws the change, before it is painted:
-	 *   no observer of sizes, and no frame's delay for a reader's scroll to slip into.
-	 * - Only from where the column's last follow left it, or from the very foot: the observer's word is
-	 *   a frame behind the reader, and in the frame they start to scroll up it still says follow. Any
-	 *   scroll of theirs moves the column off that spot, so nothing pulls them back down.
+	 * - Whether the reader is at the foot is what their last scroll left (`atFoot`, read on each
+	 *   scroll event): what the conversation does to its own height changes nothing about it, and a
+	 *   scroll of theirs lets go of the foot from its first frame. The IntersectionObserver on a 1px
+	 *   row after the last card says whether the foot is in sight (`pinned`), for the "Latest
+	 *   messages" button and for throwing pages away on a send.
+	 * - At the foot, the column goes back to it whenever its height changes: a card arrives or a
+	 *   reply grows (the effect below, before the change is painted), or anything in it changes size
+	 *   later (a ResizeObserver on every row and on the column): a picture loading, a tool group
+	 *   opened, a pill measured, the window resized. Following only the first left the reader behind
+	 *   the foot when a picture came in after the follow: the foot out of sight, and following off.
+	 * - Away from it, the row the reader is looking at stays where it is on screen (`anchor`) when
+	 *   anything above it changes size, rows put in above it included.
 	 * - The browser's own scroll anchoring is off for the column (`overflow-anchor: none`,
-	 *   `stream.css`): it moved the place under content that changed, against both the follow and the
-	 *   place `showEarlier` keeps by hand.
+	 *   `stream.css`): Safari has none, and where there is one it picked its own row and corrected
+	 *   before this did, so the place was moved twice. This is the one that keeps it.
 	 * - Reaching back is a second observer, on an empty row before the first card, within
 	 *   `LOAD_MORE_AT` of the top; asked again each time the window grows, so a reader who stays near
 	 *   the top keeps loading.
 	 */
-	/** Where the column's last scroll to the foot left it: a scroll from anywhere else is the reader's. */
-	let followedTo: number | undefined;
+	/** Whether the reader's last scroll left them at the foot. */
+	let atFoot = true;
+	/** The row the reader is looking at, away from the foot, and how far down the column it was. */
+	let anchor: { el: Element; top: number } | undefined;
+	const readAnchor = () => {
+		const box = scroller.getBoundingClientRect();
+		for (const el of scroller.querySelectorAll("[data-item]")) {
+			const row = el.getBoundingClientRect();
+			if (row.bottom > box.top) return { el, top: row.top - box.top };
+		}
+		return undefined;
+	};
 	const toFootNow = () => {
 		if (!scroller) return;
 		scroller.scrollTop = scroller.scrollHeight;
-		followedTo = scroller.scrollTop;
+		atFoot = true;
+		anchor = undefined;
 	};
+	/** After the column changed: back to the foot if the reader was there, else their row back where it was. */
+	const settle = () => {
+		if (!scroller || !untrack(shownNow)) return;
+		if (atFoot) return toFootNow();
+		// Drawn again (its card named by another row), it is found by its id.
+		if (anchor && !anchor.el.isConnected) {
+			const again = scroller.querySelector(`[data-item="${cssEscape(anchor.el.getAttribute("data-item") ?? "")}"]`);
+			anchor = again ? { el: again, top: anchor.top } : undefined;
+		}
+		if (!anchor) {
+			anchor = readAnchor();
+			return;
+		}
+		const moved = anchor.el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - anchor.top;
+		if (Math.abs(moved) >= 0.5) scroller.scrollTop += moved;
+	};
+	/** Change the rows with the reader's row held where it is. */
+	const hold = (change: () => void) => {
+		if (!atFoot) anchor = readAnchor();
+		change();
+		settle();
+	};
+	onMount(() => {
+		const scrolled = () => {
+			atFoot = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 2;
+			anchor = atFoot ? undefined : readAnchor();
+		};
+		scroller.addEventListener("scroll", scrolled, { passive: true });
+		onCleanup(() => scroller.removeEventListener("scroll", scrolled));
+		if (typeof ResizeObserver === "undefined") return;
+		const sized = new ResizeObserver(() => settle());
+		sized.observe(scroller);
+		const watch = () => {
+			for (const row of scroller.children) sized.observe(row);
+		};
+		watch();
+		// Rows come and go: each is watched from when it is put in, and one taken out is no longer observed.
+		const rows = new MutationObserver(watch);
+		rows.observe(scroller, { childList: true });
+		onCleanup(() => {
+			rows.disconnect();
+			sized.disconnect();
+		});
+	});
 	createEffect(() => {
 		if (!shownNow() || !scroller) return;
 		// What changes the conversation's height: a card, a reply's words as they stream, the working sign.
@@ -366,10 +443,7 @@ export function Stream(props: {
 		const last = props.items.at(-1);
 		if (last?.kind === "assistant" && last.streaming) last.text.length;
 		signing();
-		if (!untrack(pinned)) return;
-		const untouched = followedTo !== undefined && Math.abs(scroller.scrollTop - followedTo) < 1;
-		const atFoot = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 2;
-		if (untouched || atFoot) toFootNow();
+		settle();
 	});
 	let footWatch: IntersectionObserver | undefined;
 	let topWatch: IntersectionObserver | undefined;
@@ -387,8 +461,6 @@ export function Stream(props: {
 			([seen]) => {
 				if (!seen) return;
 				setPinned(seen.isIntersecting);
-				// The reader brought the foot into sight: following goes on from where they are.
-				if (seen.isIntersecting) followedTo = scroller.scrollTop;
 			},
 			{ root: scroller, rootMargin: "0px 0px 48px 0px", threshold: 0 },
 		);
@@ -503,14 +575,20 @@ export function Stream(props: {
 				</Show>
 
 				{/*
-				 * `Index`, not `For`. Cards are recomputed on every token of a streaming reply and
-				 * `For` keys by reference, so each recomputation would replace every card in the
-				 * column — closing whichever tool group was open and dropping the selection out of
-				 * the text you were copying. `Index` keys by position and updates in place, which
-				 * is what `TurnBar` does for the same reason.
+				 * Keyed by the card's id, and each card read by its id as it changes. Cards are
+				 * recomputed on every token of a streaming reply, so keyed by the card itself every
+				 * recomputation would replace every card in the column — closing whichever tool group
+				 * was open and dropping the selection out of the text you were copying. Keyed by
+				 * position (`Index`, as it was), a page put in above or a row taken away there moved
+				 * every card into its neighbour's place: each was drawn again, its pictures loading
+				 * from nothing, and the column moved under the reader.
 				 */}
-				<Index each={cards()}>
-					{(card, index) => (
+				<For each={cardIds()}>
+					{(id, index) => {
+						// The last one read, while a card that has just gone is taken out.
+						let last = cardById().get(id)!;
+						const card = () => (last = cardById().get(id) ?? last);
+						return (
 						<>
 							{/*
 							 * The line between one day and the next, in sentence case — this is what
@@ -519,7 +597,7 @@ export function Stream(props: {
 							 * hairline lands on top of whatever board is behind the column and reads as
 							 * a board's own rule, and a chip is opaque like everything else here.
 							 */}
-							<Show when={divides(cards()[index - 1]?.at, card().at)}>
+							<Show when={divides(cards()[index() - 1]?.at, card().at)}>
 								{(label) => <div class="stream-day">{label()}</div>}
 							</Show>
 							<Turn
@@ -536,8 +614,9 @@ export function Stream(props: {
 								timeMachine={props.timeMachine}
 							/>
 						</>
-					)}
-				</Index>
+						);
+					}}
+				</For>
 
 				{/*
 				 * The working sign, in the flow rather than as a float of its own.

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ChatItem } from "@decks/protocol";
-import { earlierLabel, hasEarlier, hiddenCount, prepend, windowOf, WINDOW } from "./history-page.ts";
+import { earlierLabel, hasEarlier, hiddenCount, prepend, windowOf, windowStart, WINDOW } from "./history-page.ts";
 
 const rows = (n: number, prefix = "u") =>
 	Array.from({ length: n }, (_, i) => ({ kind: "user", id: `${prefix}${i}`, text: `${i}`, at: i }) as ChatItem);
@@ -76,4 +76,35 @@ test("an empty page changes nothing but is still a new array", () => {
 
 test("the window starts at a screenful, not at everything", () => {
 	assert.equal(WINDOW, 60);
+});
+
+test("the window stays at the row it started at as rows arrive at the foot", () => {
+	const all = rows(200);
+	const start = windowStart(all, undefined, 60);
+	assert.equal(start, 140, "a first look is the tail");
+	const from = all[start]!.id;
+	const more = [...all, ...rows(5, "n")];
+	assert.equal(windowStart(more, from, 60), 140, "five more at the foot take nothing away above");
+	assert.equal(windowStart([...rows(60, "p"), ...more], from, 60), 200, "a page put in front moves the index, not the row");
+});
+
+test("a window whose first row has gone starts at the tail again", () => {
+	const all = rows(100);
+	assert.equal(windowStart(all, "gone", 60), 40);
+	assert.equal(windowStart(rows(10), "gone", 60), 0);
+	assert.equal(windowStart([], "u1", 60), 0);
+});
+
+test("a window starts where a turn does", () => {
+	const turn = (i: number) =>
+		[
+			{ kind: "user", id: `u${i}`, text: `${i}`, at: i },
+			{ kind: "tool", id: `t${i}`, name: "Bash", title: "ls", state: "done" },
+			{ kind: "assistant", id: `a${i}`, text: "ok", at: i },
+		] as ChatItem[];
+	const all = Array.from({ length: 10 }, (_, i) => turn(i)).flat();
+	assert.equal(windowStart(all, undefined, 4), 24, "four from the end is in turn 8, which starts at 24");
+	assert.equal(all[windowStart(all, undefined, 5)]!.id, "u8", "the tail goes back to the message that began its first turn");
+	assert.equal(all[windowStart(all, "a3", 60)]!.id, "u3", "and so does a row asked for");
+	assert.equal(windowStart(all.slice(1), "a0", 60), 0, "before any message of yours, the start of all");
 });

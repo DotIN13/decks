@@ -46,6 +46,28 @@ export function windowOf<T>(items: readonly T[], size: number): readonly T[] {
 	return items.length <= size ? items : items.slice(items.length - size);
 }
 
+/**
+ * Where the window over the conversation starts, as an index into what is held: at the row it
+ * started at before (`from`), or `size` rows from the end when there is none or it is gone (a
+ * new conversation, a rewind).
+ *
+ * By the row and not by a count from the end, and that is the difference between a still column
+ * and a jumping one: counted from the end, every row arriving at the foot slid the window down by
+ * one, taking a row away above the reader and shifting every card into its neighbour's place, so
+ * each was drawn again with its pictures loading from nothing. A reader scrolled up was moved by
+ * all of it, and one at the foot was left behind when the pictures came in after the follow.
+ *
+ * And at the start of a turn, the message of yours that began it: a window that started in the
+ * middle of one drew that turn's card from its middle, and when the window widened the card was
+ * named by another row and drawn again, the one card a reader at the top was looking at.
+ */
+export function windowStart(items: readonly { id: string; kind?: string }[], from: string | undefined, size: number): number {
+	let at = from === undefined ? -1 : items.findIndex((item) => item.id === from);
+	if (at === -1) at = Math.max(0, items.length - Math.max(0, size));
+	while (at > 0 && at < items.length && items[at]!.kind !== "user") at--;
+	return at;
+}
+
 /** How many rows are held but not rendered. */
 export function hiddenCount(total: number, shown: number): number {
 	return Math.max(0, total - shown);

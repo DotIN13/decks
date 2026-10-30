@@ -126,6 +126,8 @@ await settle(page, 600);
 await page.locator(".stream .tool-kids .tool > .row:not([disabled])").first().click();
 await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
 say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
+// Its whole output is asked for as it opens: what it says while that is on its way is not the column churning, below.
+await page.waitForFunction(() => ![...document.querySelectorAll(".stream .tool .more")].some((el) => /Loading the rest/.test(el.textContent ?? "")), null, { timeout: 10000 }).catch(() => {});
 
 /*
  * The user's message carries the way back: Rewind and Fork as two named buttons under it, out
