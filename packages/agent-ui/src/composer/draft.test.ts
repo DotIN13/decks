@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftLabel, draftText, LABEL_LIMIT, normalize, parseDraft, serializeDraft, shortLabel, textDraft, type Draft } from "./draft.ts";
+import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftLabel, draftText, fileMention, LABEL_LIMIT, mentionAddress, normalize, parseDraft, serializeDraft, shortLabel, textDraft, type Draft } from "./draft.ts";
 
 const pill = (id: string, label = "“Keep it short.”") => ({ type: "mention" as const, kind: "comment" as const, id, label });
 
@@ -31,7 +31,7 @@ test("the clipboard round trip keeps pills, and refuses what it does not know", 
 	const draft: Draft = [{ type: "text", text: "a" }, pill("c1")];
 	assert.deepEqual(parseDraft(serializeDraft(draft)), draft);
 	assert.equal(parseDraft("{}"), null);
-	assert.equal(parseDraft(JSON.stringify([{ type: "mention", kind: "file", id: "x", label: "y" }])), null);
+	assert.equal(parseDraft(JSON.stringify([{ type: "mention", kind: "folder", id: "x", label: "y" }])), null);
 	assert.equal(parseDraft("not json"), null);
 });
 
@@ -77,4 +77,18 @@ test("a label is cut to fit a sentence, whatever it is a label for", () => {
 	assert.equal(shortLabel("  a note   with  spaces "), "a note with spaces");
 	assert.equal(shortLabel("x".repeat(40)).length, LABEL_LIMIT);
 	assert.ok(shortLabel("x".repeat(40)).endsWith("…"));
+});
+
+test("an attached file is a pill that the agent still reads as @path", () => {
+	const file = fileMention("assets/plan.pdf");
+	assert.deepEqual(file, { type: "mention", kind: "file", id: "assets/plan.pdf", label: "plan.pdf" });
+	assert.equal(mentionAddress(file), "@assets/plan.pdf");
+	const draft: Draft = [{ type: "text", text: "The numbers are in " }, file, { type: "text", text: "." }];
+	// What `@path` typed into the text used to send.
+	assert.equal(draftForAgent(draft), "The numbers are in @assets/plan.pdf.");
+	assert.equal(draftForAgent([file]), "@assets/plan.pdf");
+	assert.equal(draftIsEmpty([file]), false);
+	assert.deepEqual(draftComments([file, pill("c1")]), ["c1"]);
+	assert.deepEqual(parseDraft(serializeDraft(draft)), draft);
+	assert.equal(parseDraft(JSON.stringify([{ type: "mention", kind: "folder", id: "a", label: "a" }])), null);
 });

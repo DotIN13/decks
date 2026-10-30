@@ -14,22 +14,31 @@
  * - a **board**, whose id is its path;
  * - an **item** drawn on the stage, whose id is its id in `canvas.pen`.
  *
- * The last two arrive by dragging the thing onto the input bar (`canvas/Stage.tsx`). They are
+ * - a **file** in the deck, attached with the paperclip or dropped on the bar, whose id is its path.
+ *
+ * Boards and items arrive by dragging the thing onto the input bar (`canvas/Stage.tsx`). They are
  * pills rather than typed text for the reason the comment is: what a mention stands for should
  * not have to be guessed back out of its label, and a thing you dragged is a thing you pointed
- * at, not a path you typed. A file attached from disk is still spelled `@path` in plain text,
- * because a file has no identity here to lose.
+ * at, not a path you typed. A file was spelled `@path` in plain text; it is a pill now too, so
+ * everything you put in sits where you put it, looking like what it is, and the agent still
+ * reads it as `@path` (`mentionAddress`).
  */
 
 /** What a pill stands for. Each has its own colour and icon in the field. */
-export type MentionKind = "comment" | "board" | "item";
+export type MentionKind = "comment" | "board" | "item" | "file";
+
+const KINDS: readonly string[] = ["comment", "board", "item", "file"];
+/** Whether a string names a kind of pill: what a draft read back from the DOM or the clipboard is checked by. */
+export function isMentionKind(kind: unknown): kind is MentionKind {
+	return typeof kind === "string" && KINDS.includes(kind);
+}
 
 export type DraftNode =
 	| { type: "text"; text: string }
 	| {
 			type: "mention";
 			kind: MentionKind;
-			/** The comment's id in `state/comments.ts`, a board's path, or an item's id on the stage. */
+			/** The comment's id in `state/comments.ts`, a board's or a file's path, or an item's id on the stage. */
 			id: string;
 			/** What the pill shows after its icon: the quoted words, the board's title, the item's name. */
 			label: string;
@@ -77,12 +86,12 @@ export function commentLabel(quote: string): string {
 /**
  * How the agent reads a pill that stands for a thing with an address.
  *
- * A board is `@boards/plan.html`, which is how a file dropped on the bar is already spelled,
- * because the path is what an agent opens it by. A drawn item has no file, so it is the same
+ * A board is `@boards/plan.html`, and a file `@assets/plan.pdf`, as an attached file has always
+ * been spelled, because the path is what an agent opens it by. A drawn item has no file, so it is the same
  * spelling with the kind said: its id on the stage, which is what `decks.canvas.read()` lists.
  */
 export function mentionAddress(node: DraftMention): string {
-	return node.kind === "board" ? `@${node.id}` : `@item:${node.id}`;
+	return node.kind === "board" || node.kind === "file" ? `@${node.id}` : `@item:${node.id}`;
 }
 
 /**
@@ -121,6 +130,11 @@ export function draftForAgent(draft: Draft): string {
 	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention" && node.kind !== "comment") ? "" : written;
 }
 
+/** A file's pill: its name, standing for its path in the deck. */
+export function fileMention(path: string): DraftMention {
+	return { type: "mention", kind: "file", id: path, label: path.split("/").pop() || path };
+}
+
 /** The comments the draft carries, in the order their pills sit in it — not the other pills. */
 export function draftComments(draft: Draft): string[] {
 	const ids: string[] = [];
@@ -156,7 +170,7 @@ export function parseDraft(raw: string): Draft | null {
 			if (value.type === "text" && typeof value.text === "string") draft.push({ type: "text", text: value.text });
 			else if (
 				value.type === "mention" &&
-				(value.kind === "comment" || value.kind === "board" || value.kind === "item") &&
+				isMentionKind(value.kind) &&
 				typeof value.id === "string" &&
 				typeof value.label === "string"
 			) {

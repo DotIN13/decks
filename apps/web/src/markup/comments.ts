@@ -10,7 +10,7 @@
  * Everything here is pure, so what the agent will read is a function that can be tested.
  */
 
-export { commentBlock, QUOTE_LIMIT, quoteOf, withComments, type BoardComment } from "@decks/canvas/comments";
+export { commentBlock, commentItem, QUOTE_LIMIT, quoteOf, withComments, type BoardComment } from "@decks/canvas/comments";
 import type { BoardComment } from "@decks/canvas/comments";
 
 // --- kept between reloads ------------------------------------------------------------

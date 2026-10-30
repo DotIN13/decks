@@ -52,19 +52,25 @@ export function commentBlock(comments: BoardComment[]): string {
 	const head = drawn
 		? comments.length === 1 ? "A comment on items drawn on a canvas:" : `${comments.length} comments on items drawn on a canvas:`
 		: comments.length === 1 ? "A comment on a board. The quoted words are what I selected:" : `${comments.length} comments on boards. The quoted words are what I selected:`;
-	const items = comments.map((comment, index) => {
-		// A comment with no words points at the place and says nothing more.
-		const said = comment.text.trim() ? `\n${comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n")}` : "";
-		if (comment.items?.length) {
-			const named = comment.items.map((id) => `"${id}"`).join(", ");
-			return `${index + 1}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
-		}
-		const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
-		// No quote: a comment on the whole board, from its pill.
-		if (!comment.quote) return `${index + 1}. ${where}, the whole board${said}`;
-		return `${index + 1}. ${where}\n   > ${comment.quote}${said}`;
-	});
+	const items = comments.map((comment, index) => commentItem(comment, index + 1));
 	return `${head}\n\n${items.join("\n\n")}`;
+}
+
+/**
+ * One comment as the agent reads it in that list, numbered `n`: what a pill's Exact text shows, and
+ * what `commentBlock` joins.
+ */
+export function commentItem(comment: BoardComment, n: number): string {
+	// A comment with no words points at the place and says nothing more.
+	const said = comment.text.trim() ? `\n${comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n")}` : "";
+	if (comment.items?.length) {
+		const named = comment.items.map((id) => `"${id}"`).join(", ");
+		return `${n}. on ${comment.board}, ${comment.items.length === 1 ? "item" : "items"} ${named}${comment.quote ? ` ("${comment.quote}")` : ""}${said}`;
+	}
+	const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
+	// No quote: a comment on the whole board, from its pill.
+	if (!comment.quote) return `${n}. ${where}, the whole board${said}`;
+	return `${n}. ${where}\n   > ${comment.quote}${said}`;
 }
 
 /** A message with the waiting comments in front of it; either half may be empty. */
