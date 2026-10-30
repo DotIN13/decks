@@ -109,7 +109,6 @@ export type ClientMessage =
 	 * reading without it (an older frame) is fitted with a margin under it.
 	 */
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number; /** The width the frame laid the board out at. */ at?: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
-	| { type: "board.undo"; path: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	| { type: "board.play"; path: string; /** The stage on screen. */ stage?: string }
 	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */

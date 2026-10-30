@@ -7,7 +7,6 @@ export { boxOf, fitInto, frames } from "../camera/camera.ts";
 export type { Camera } from "@decks/protocol";
 // For a host that drives the camera itself (the Decks app): the camera's maths, its animation, and the panels' insets.
 export * from "../camera/camera.ts";
-export * from "../camera/morph.ts";
 export * from "../camera/touched.ts";
 export * from "../camera/insets.ts";
 export * from "../camera/spring.ts";

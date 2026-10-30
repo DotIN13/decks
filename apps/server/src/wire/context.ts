@@ -21,7 +21,7 @@ export type Reply = (message: ServerMessage) => void;
  * One frame's handler.
  *
  * The message is narrowed to *that* frame's variant, so a handler for `board.move` cannot
- * read `message.text` and a handler for `board.undo` cannot forget `message.path`. That narrowing
+ * read `message.text` and a handler for `board.delete` cannot forget `message.path`. That narrowing
  * is the whole reason the table is typed this way rather than as
  * `Record<string, (message: ClientMessage, ...) => void>`: the second form would compile
  * and would move every mistake to run time.

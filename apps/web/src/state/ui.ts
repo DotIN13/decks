@@ -1,15 +1,12 @@
-import { api } from "../connections/connection.ts";
 import type { UsageReport } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { notice } from "./notices.ts";
 import { send } from "./socket.ts";
 
 /**
  * What the browser is showing that the server has no opinion about.
  *
- * Layer 2: it imports `socket` (to ask for a usage report) and `notices` (to say when a
- * board could not be read), and nothing imports it back. Everything here is *browser* state
+ * Layer 2: it imports `socket` (to ask for a usage report), and nothing imports it back. Everything here is *browser* state
  * — which panel is open, which modal is up, what the composer was handed — as distinct from
  * `deck`, which is the server's view of the world. A reload is allowed to lose all of it.
  *
@@ -54,46 +51,6 @@ const panelOpensWith = (): boolean => {
 };
 
 function createUi() {
-	/**
-	 * The board being edited as its own source, once its file has arrived.
-	 *
-	 * Fetched rather than read out of the frame. The frame holds the *rendered* markdown, and
-	 * rendering is one-way — recovering the source from it is the round trip this editor
-	 * exists to avoid. `?raw=1` is the same parameter the shell uses to ask for the file
-	 * behind a board.
-	 */
-	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string } | undefined>();
-
-	/**
-	 * Open a board's file in the textarea.
-	 *
-	 * There is one document editor and it is the file itself. This used to take a `kind` as well,
-	 * because a flow document could be opened in a second editor that wrote ops off a GrapesJS
-	 * model rather than the whole file; that editor is gone (it drew the board as a stack of
-	 * blocks and refused most of the writes it did make), and with it the distinction. A board
-	 * is edited by its own gestures — a run of words retyped in place, a card dragged — or, with
-	 * ⌥, as the bytes it is.
-	 */
-	const openSource = (path: string) => {
-		void fetch(api(`/board/${path}?raw=1`))
-			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
-			.then((source) => {
-				/*
-				 * Already editing this file: a second arrival is not a second editor.
-				 *
-				 * The editor is keyed on the object this signal holds (`BoardFrame`'s `<Show keyed>`), so
-				 * setting it again tears the open editor down and builds a new one — and anything typed
-				 * into the first one goes with it. Two requests for the same file are easy to end up
-				 * with: a double-click on the board's bar can land on the button, and a press whose
-				 * pointerdown already dismissed the editor resolves after a second one has opened.
-				 */
-				const open = editingSource();
-				if (open?.path === path) return;
-				setEditingSource({ path, source });
-			})
-			.catch(() => notice("error", `Could not read ${path} to edit it.`));
-	};
-
 	/** The file picker, open: what it answers to, and what for — the canvas's File button, the composer's paperclip, or a board's embed. */
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; google?: boolean; purpose?: "canvas" | "attach" | "embed" } | undefined>(undefined);
 
@@ -237,15 +194,6 @@ function createUi() {
 	const [unread, setUnread] = createStore<Record<string, number>>({});
 
 	/**
-	 * The board being read on its own, filling the canvas.
-	 *
-	 * A *view* of the canvas rather than an overlay: the chrome stays, so the inspector, the
-	 * composer and every panel work exactly as they do beside the canvas. What changes is that the camera is confined to one
-	 * board, so the canvas becomes a page you scroll (`canvas/Stage.tsx`).
-	 */
-	const [focus, setFocus] = createSignal<string | undefined>();
-
-	/**
 	 * Whether the app has opened, so the rest of the panel's list may be drawn: chat first, then the rest.
 	 *
 	 * Opened means the deck is laid out and the chat you are looking at has its history — the two
@@ -274,11 +222,6 @@ function createUi() {
 	};
 
 	return {
-		focus,
-		setFocus,
-		editingSource,
-		setEditingSource,
-		openSource,
 		picking,
 		setPicking,
 		boardsOpen,
@@ -312,11 +255,6 @@ export type Ui = ReturnType<typeof createUi>;
 export const ui = createUi();
 
 export const {
-	focus,
-	setFocus,
-	editingSource,
-	setEditingSource,
-	openSource,
 	picking,
 	setPicking,
 	boardsOpen,

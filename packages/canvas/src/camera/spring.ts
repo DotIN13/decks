@@ -20,14 +20,3 @@ export function springCurve(ms: number, response = SPRING_RESPONSE): (t: number)
  * and 420ms as too fast.)
  */
 export const SPRING_RESPONSE = 0.38;
-export const SPRING_MS = 500;
-export const SPRING_BACK_RESPONSE = 0.32;
-export const SPRING_BACK_MS = 410;
-
-/** The same curve as a CSS `linear()` easing, for the Web Animations API and transitions. */
-export function springEasing(ms: number, response = SPRING_RESPONSE, points = 32): string {
-	const curve = springCurve(ms, response);
-	const stops: string[] = [];
-	for (let i = 0; i <= points; i++) stops.push(curve(i / points).toFixed(4));
-	return `linear(${stops.join(", ")})`;
-}

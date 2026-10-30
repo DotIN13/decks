@@ -124,12 +124,6 @@ export class Revisions {
 		return sha;
 	}
 
-	/** The sha before the current one, if there is one to go back to. */
-	previous(path: string): string | undefined {
-		const history = this.order.get(path) ?? [];
-		return history.length >= 2 ? history[history.length - 2]!.sha : undefined;
-	}
-
 	/**
 	 * The version a board was at, at a moment in time.
 	 *
@@ -158,14 +152,6 @@ export class Revisions {
 		// Nothing that old: the board is newer than the moment asked about, so its
 		// first version is the closest true answer.
 		return (match ?? history[0])!.sha;
-	}
-
-	/** Drop the newest entry for one board: after an undo, it is no longer current. */
-	pop(path: string): void {
-		const history = this.order.get(path);
-		if (!history || history.length < 2) return;
-		history.pop();
-		this.save();
 	}
 
 	history(path: string): readonly string[] {

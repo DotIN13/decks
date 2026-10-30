@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, interactZoom, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, interactZoom, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -203,23 +203,15 @@ test("halfway through a glide is halfway for the camera's position, and the geom
 test("a glide never overshoots and never goes backwards", () => {
 	const from = { x: 0, y: 0, zoom: 1 };
 	const to = { x: 900, y: -400, zoom: 0.25 };
+	const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 	let last = from;
 	for (let step = 0; step <= 40; step++) {
-		const at = between(from, to, easeOutCubic(step / 40));
+		const at = between(from, to, ease(step / 40));
 		assert.ok(at.x >= last.x && at.y <= last.y && at.zoom <= last.zoom, `overshot at step ${step}: ${JSON.stringify(at)}`);
 		assert.ok(at.x <= to.x && at.y >= to.y && at.zoom >= to.zoom, `past the target at step ${step}`);
 		last = at;
 	}
 	assert.deepEqual(last, to);
-});
-
-test("the ease leaves at speed and arrives slowly", () => {
-	assert.equal(easeOutCubic(0), 0);
-	assert.equal(easeOutCubic(1), 1);
-	// The first tenth of the time is already a quarter of the distance; the last tenth is 1%.
-	assert.ok(easeOutCubic(0.1) > 0.25, String(easeOutCubic(0.1)));
-	assert.ok(1 - easeOutCubic(0.9) < 0.01, String(1 - easeOutCubic(0.9)));
-	for (let t = 0; t < 1; t += 0.05) assert.ok(easeOutCubic(t) < easeOutCubic(t + 0.05), `not rising at ${t}`);
 });
 
 /*

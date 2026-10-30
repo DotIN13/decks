@@ -39,8 +39,7 @@ export const TOKEN_IDLE_MS = 24 * 3_600_000;
 
 /** The prefix of every harness token, whoever its subject. */
 export const HARNESS_PREFIX = "dk_h_";
-/** The prefixes harness tokens had before (a tab's or a terminal's, a site's, an agent's), still read by their hash. */
-export const OLD_PREFIXES = ["dk_p_", "dk_s_", "dk_a_"] as const;
+// Tokens issued under the older prefixes (dk_p_, dk_s_, dk_a_) are still read, by their hash.
 
 /** The subjects a harness token is issued for: the person, a site the person paired, an agent. */
 type Subject = Extract<PrincipalKind, "person" | "site" | "agent">;

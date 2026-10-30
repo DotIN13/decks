@@ -4,7 +4,7 @@ import type { CreateSpec, QueuedWork, SendSpec, StageAgentHooks } from "./tool.t
 /**
  * The stage object a *board* is when it runs its own code.
  *
- * `stage/eval.ts` takes any stage object, and this is the one a board gets: the same API an
+ * `stage/caller-run.ts` builds a stage object for a caller, and this is the one a board gets: the same API an
  * agent has, with two questions answered rather than inherited.
  *
  * **Whose canvas is it.** Every canvas verb is keyed by a conversation (`service.show(id)`)

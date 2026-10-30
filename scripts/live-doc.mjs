@@ -1,5 +1,5 @@
 /**
- * Bundle the document page into `runtime/lib/live-doc.js`, the one module a `[data-live="doc"]`
+ * Bundle the document page into `packages/board-host/lib/live-doc.js`, the one module a `[data-live="doc"]`
  * board loads (`runtime/live-doc.ts`). Committed output, like the other bundles in `lib/`.
  *
  *     npm run build:live-doc

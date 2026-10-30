@@ -15,11 +15,6 @@ const tag = typeof document === "undefined" ? null : document.querySelector<HTML
 const token = tag?.content || undefined;
 tag?.remove();
 
-/** The token itself, for the SDK; nothing on a page the harness did not give one (a frame, the public Decks). */
-export function sessionToken(): string | undefined {
-	return token;
-}
-
 /** The header to send on a request, or nothing on a page with no token. */
 export function authHeaders(): Record<string, string> {
 	return token ? { Authorization: `Bearer ${token}` } : {};

@@ -1,6 +1,6 @@
 /*
  * A frame probe for measuring a device from outside (`?probe=<url>`): every frame's time, the camera,
- * the pages and the engine's tiles, and the touches and pinches that moved it, sent to `<url>` once a
+ * the engine's tiles, and the touches and pinches that moved it, sent to `<url>` once a
  * second as one JSON line; and the gestures themselves, as `__pilot` for an inspector to call
  * (`scripts/ipad-profile.mjs`). Nothing runs without the parameter.
  *
@@ -10,7 +10,7 @@
  */
 const target = new URLSearchParams(location.search).get("probe");
 
-type Frame = { t: number; gap: number; busy: number; top: string[]; zoom: number; x: number; y: number; pages: number; tiles: number; sheet: number; pictures: number };
+type Frame = { t: number; gap: number; busy: number; top: string[]; zoom: number; x: number; y: number; tiles: number; sheet: number; pictures: number };
 
 /** Time spent in each handler and frame callback since the last batch, by what it handles and where it was registered: `key → [calls, total ms, longest ms]`. */
 const work = new Map<string, [number, number, number]>();
@@ -100,7 +100,7 @@ if (target) {
 		const top = [...frameWork].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, ms]) => `${Math.round(ms * 10) / 10} ${key}`);
 		const busy = Math.round([...frameWork.values()].reduce((a, b) => a + b, 0) * 10) / 10;
 		frameWork = new Map();
-		frames.push({ t: Math.round(t), gap: Math.round((t - last) * 10) / 10, busy, top, ...cam, pages: document.querySelectorAll("iframe.plain-board-page").length, tiles: engine?.tiles ?? 0, sheet: sheet?.tiles ?? 0, pictures: engine?.pictures ?? 0 });
+		frames.push({ t: Math.round(t), gap: Math.round((t - last) * 10) / 10, busy, top, ...cam, tiles: engine?.tiles ?? 0, sheet: sheet?.tiles ?? 0, pictures: engine?.pictures ?? 0 });
 		last = t;
 		nativeFrame(tick);
 	};

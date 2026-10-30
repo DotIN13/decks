@@ -34,7 +34,7 @@ export function safeCanvasFolder(name: unknown): name is string {
 	return typeof name === "string" && name.length > 0 && name.length <= 200 && name !== "." && name !== ".." && !/[/\\\0]/.test(name);
 }
 
-export const CANVAS_PATH_ERROR = "A path inside a canvas's boards/, frames/, files/, assets/, docs/ or .pictures/, with no empty, . or .. parts and no hidden folder.";
+export const CANVAS_PATH_ERROR = "A path inside a canvas's boards/, cards/, frames/, files/, assets/, docs/ or .pictures/, with no empty, . or .. parts and no hidden folder.";
 
 /**
  * Whether a file path may name a file of a canvas: in one of its bundle's parts, every segment a

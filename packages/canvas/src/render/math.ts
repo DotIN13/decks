@@ -70,22 +70,6 @@ export function formulaOf(cp: number): Formula | undefined {
 	return cp >= MATH_FIRST && cp <= MATH_LAST ? formulas.get(cp - MATH_FIRST) : undefined;
 }
 
-/** Hand every formula `text` carries to an engine that has not had it yet. */
-const handed = new WeakMap<object, Set<number>>();
-export function handFormulas(text: string, engine: { math(formula: Formula): void }): void {
-	let seen = handed.get(engine);
-	for (const ch of text) {
-		const cp = ch.codePointAt(0)!;
-		if (cp < MATH_FIRST || cp > MATH_LAST) continue;
-		const formula = formulas.get(cp - MATH_FIRST);
-		if (!formula) continue;
-		if (!seen) handed.set(engine, (seen = new Set()));
-		if (seen.has(formula.number)) continue;
-		seen.add(formula.number);
-		engine.math(formula);
-	}
-}
-
 /**
  * A text's words with each formula in them turned into its character: `$$…$$` set as a display formula
  * and `$…$` in the line, read as Obsidian reads them, so "$5 and $10" stays money: the opening `$` is

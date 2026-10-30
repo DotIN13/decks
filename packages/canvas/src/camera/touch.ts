@@ -177,21 +177,8 @@ export function createTouches(options: { now?: () => number } = {}): Touches {
  * `step` is one frame of it: how far to pan over `dt` milliseconds, and the speed left.
  */
 export const COAST_TAU = 325;
-/** Slower than this (px/ms) at release is a finger that stopped, not one that threw. */
-export const COAST_MIN = 0.15;
-/** A throw faster than this (px/ms) coasts as if it were this fast, so a flick cannot fling the canvas away. */
-export const COAST_MAX = 5;
-
 export function coastStep(v: { vx: number; vy: number }, dt: number, tau = COAST_TAU): { dx: number; dy: number; v: { vx: number; vy: number } } {
 	const keep = Math.exp(-dt / tau);
 	const travel = tau * (1 - keep);
 	return { dx: v.vx * travel, dy: v.vy * travel, v: { vx: v.vx * keep, vy: v.vy * keep } };
-}
-
-/** The speed a coast starts at: nothing below `COAST_MIN`, and capped at `COAST_MAX`. */
-export function coastStart(v: { vx: number; vy: number }): { vx: number; vy: number } | undefined {
-	const speed = Math.hypot(v.vx, v.vy);
-	if (speed < COAST_MIN) return undefined;
-	const scale = speed > COAST_MAX ? COAST_MAX / speed : 1;
-	return { vx: v.vx * scale, vy: v.vy * scale };
 }

@@ -3,7 +3,7 @@
  *
  * The renderer's own typography: headings at four sizes, lists and their nesting depth,
  * the table that scrolls in its own box, quotes, rules, inline code, links and strong. It
- * was the largest single block in `index.css` and it belongs to no region — `chat/Markdown.tsx`
+ * was the largest single block in `index.css` and it belongs to no region — `@decks/agent-ui` (`chat/MarkdownView.tsx`)
  * draws it in the conversation and in a card — so it gets a sheet named for what it styles.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
@@ -11,7 +11,7 @@
 @layer components {
 	/* --- markdown inside a reply -------------------------------------------------
  *
- * The blocks `chat/Markdown.tsx` builds. Everything here is spacing and weight: the
+ * The blocks `@decks/agent-ui` (`chat/MarkdownView.tsx`) builds. Everything here is spacing and weight: the
  * elements are real (`p`, `ul`, `blockquote`, `code`), so the browser does the typography
  * and this only has to stop a document's worth of default margins from opening up inside a
  * 360px bubble.

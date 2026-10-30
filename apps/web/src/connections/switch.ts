@@ -9,7 +9,7 @@ import { scratch } from "../state/agent.ts";
 import { setMode, setSelected } from "../state/selection.ts";
 import { setDrawing, setInkSelection } from "@decks/canvas/tools";
 import { setPenSelection, setPenTool } from "@decks/canvas/tools";
-import { setFocus, setPicking, setSettings } from "../state/ui.ts";
+import { setPicking, setSettings } from "../state/ui.ts";
 import { stop } from "../state/socket.ts";
 import { setBackend, setPairing } from "./backend.ts";
 import { readAddress } from "./connection.ts";
@@ -54,7 +54,6 @@ function forget(): void {
 	setInkSelection(undefined);
 	setPenSelection([]);
 	setPenTool("select");
-	setFocus(undefined);
 	setPicking(undefined);
 	setSettings(false);
 }

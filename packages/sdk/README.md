@@ -89,5 +89,5 @@ const settings = await decks.request("/api/harness");     // any other door, wit
 ```
 
 The token goes in the `Authorization` header of every request and never in an address; a frame or a
-tab carries a ticket instead. `keepTickets(onChange).want(paths)` keeps tickets fresh for pages that
-stay shown.
+tab carries a pass instead. `keepCanvasPass(canvas, onPass)` keeps a canvas's pass fresh while it
+is shown, and `stop()` ends it.

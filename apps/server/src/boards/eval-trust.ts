@@ -4,11 +4,10 @@ import { join } from "node:path";
 /**
  * Which boards this install has allowed to run their own code.
  *
- * A board's code runs in the **server process** (`stage/eval.ts` is a `new Function`, not a
- * sandbox, deliberately, because the agent that wrote the board already has `bash`). What is
- * new here is the *trigger*: the code runs because a person pressed something on a board,
- * and a board is a file that may have been written by an agent that had just read a web
- * page. So the click is not the permission. This is.
+ * A board's code calls the stage verbs an agent has (`stage/caller-run.ts`), deliberately,
+ * because the agent that wrote the board already has `bash`. What is new here is the *trigger*:
+ * the code runs because a person pressed something on a board, and a board is a file that may
+ * have been written by an agent that had just read a web page. So the click is not the permission. This is.
  *
  * One list, on the install rather than on a deck, for the reason `browser/bridge.ts` gives about
  * the pairing code: what a machine trusts should not have to be re-granted per deck. It is

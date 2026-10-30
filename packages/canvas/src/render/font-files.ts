@@ -79,11 +79,6 @@ function fileName(family: string, subset: string, files: number): string {
 	return files === 1 ? family : `${family} ${subset}`;
 }
 
-/** The name a Fontsource file is registered under, by its family's id and its subset, as the chain lists it. */
-export function registeredName(id: string, subset: string): string | undefined {
-	return fallbackList().find((f) => f.id === id && f.subset === subset)?.name;
-}
-
 const covers = (ranges: Int32Array, cp: number): boolean => {
 	let lo = 0;
 	let hi = ranges.length / 2 - 1;

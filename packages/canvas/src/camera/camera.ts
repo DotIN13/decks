@@ -82,15 +82,6 @@ export function between(from: Camera, to: Camera, t: number): Camera {
 	};
 }
 
-/**
- * Leaves at speed, arrives slowly.
- *
- * `1 - (1 - t)³`, and the shape is the whole argument for it: the middle of a camera move is
- * uninteresting and the end is the destination, so the end is what should be quiet. An
- * ease-in-out starts by hesitating, which reads as the app thinking about it.
- */
-export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
 /** World -> screen, in CSS pixels relative to the stage element. */
 export function toScreen(camera: Camera, view: Viewport, world: { x: number; y: number }) {
 	return {

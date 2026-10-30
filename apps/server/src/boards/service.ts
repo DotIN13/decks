@@ -48,7 +48,7 @@ export interface BoardHooks {
  * It is a service for three reasons that showed up separately:
  *
  * - **A board write and its revision are one act.** Every path that writes a board also
- *   records it — `newBoard`, `newWebBoard`, `undo` — and the one
+ *   records it — `newBoard` and `newWebBoard` — and the one
  *   place that got it wrong (`boards.restore`, which wrote without recording) was the bug
  *   the split made visible.
  * - **The extent bookkeeping is a browser fact, not a deck fact.** What a frame measured is
@@ -350,29 +350,9 @@ export class BoardService {
 		// and show it in the same turn without a race.
 		const board = this.deck.refresh(path);
 		if (board) {
-			this.blank.set(path, board.rev);
 			this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		}
 		return path;
-	}
-
-	/**
-	 * Boards written by `newBoard` and not touched since, by path, at the revision they were made.
-	 *
-	 * A new board is a title and nothing else for the second or two before its writer fills it in.
-	 * Measured in that moment it is a strip a title tall, so the canvas shrank it and then grew it
-	 * again when the content landed: a board flickering while it was being written. Its first size
-	 * is kept until the file changes, and the first measurement of real content sets it.
-	 */
-	private readonly blank = new Map<string, number>();
-
-	/** Whether this revision of a board is still the blank one `newBoard` wrote. */
-	stillBlank(path: string, rev: number): boolean {
-		const made = this.blank.get(path);
-		if (made === undefined) return false;
-		if (made === rev) return true;
-		this.blank.delete(path);
-		return false;
 	}
 
 	/**
@@ -532,31 +512,6 @@ export class BoardService {
 			: file.replace(/^\.\//, "");
 		const normalized = relative.split("\\").join("/");
 		return this.deck.board(normalized) ? normalized : undefined;
-	}
-
-	/**
-	 * Undo the last change to a board, whoever made it.
-	 *
-	 * One mechanism for both authors, because the store holds both (§6.7). Undoing
-	 * writes the previous revision back rather than reversing the edit: there is no
-	 * inverse of "the agent rewrote this file", but there is a copy of what it said
-	 * before.
-	 */
-	undo(path: string, reply: (message: ServerMessage) => void): void {
-		const previous = this.revisions.previous(path);
-		if (!previous) {
-			reply({ type: "notice", level: "info", text: "Nothing further to undo on this board." });
-			return;
-		}
-		try {
-			const content = this.revisions.read(previous);
-			writeFileSync(this.deck.fileOf(path), content);
-			this.revisions.pop(path);
-			const updated = this.deck.refresh(path);
-			if (updated) this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
-		} catch (error) {
-			reply({ type: "error", text: `Could not undo: ${(error as Error).message}` });
-		}
 	}
 
 	/**

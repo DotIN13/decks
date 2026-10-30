@@ -168,7 +168,7 @@ sudo -u decks -H bash -c "cd /srv/decks/app/packages/stage && cargo build --rele
 
 ### The browser
 
-The `board-debug` skill drives Chromium to screenshot a board, read its console and
+The `card-debug` skill drives Chromium to screenshot a board, read its console and
 measure its elements. That is a capability of the agent rather than a test tool, so a
 deployment that skips it ships an agent that cannot see its own work. Two halves, and they
 need different privileges:
@@ -244,7 +244,7 @@ Environment=NODE_ENV=production
 Environment=DECKS_DATA_DIR=/srv/decks/data
 # Loopback only. The private-network proxy (§8) is the sole way in, so the
 # plain-HTTP port is unreachable from every interface on the host. It is also
-# the address the board-debug skill's browser connects back to.
+# the address the card-debug skill's browser connects back to.
 Environment=DECKS_HOST=127.0.0.1
 Environment=DECKS_PORT=4329
 

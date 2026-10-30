@@ -6,7 +6,7 @@ import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
-import {createComputed, createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
+import {createComputed, createEffect, createMemo, createSignal, onCleanup, onMount, Show, untrack, type JSX} from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { createFileDrops } from "./app/files.ts";
 import { Settings } from "./settings/Settings.tsx";
@@ -27,7 +27,7 @@ import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { pens } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
-import { boardsOpen, boardsStarted, focus, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
+import { boardsOpen, boardsStarted, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
 import { destination, destinationLabel, stripMention, withoutName } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
@@ -163,25 +163,6 @@ export function App() {
 		}
 		return out;
 	});
-	/*
-	 * Reading a board in the focus view is what takes its "changed" mark off. Said once per
-	 * opening; the server ignores a board already read since its last write, and the next write
-	 * brings the mark back.
-	 */
-	createEffect(
-		watch(
-			() => {
-				const path = focus();
-				// The file's time is part of the key: a board rewritten while it is open is still
-				// being read, so the mark must not come back under the reader's eyes.
-				return path ? `${state.boards.find((board) => board.path === path)?.modifiedAt ?? 0}|${path}` : undefined;
-			},
-			(key) => {
-				if (key) send({ type: "board.seen", path: key.slice(key.indexOf("|") + 1) });
-			},
-		),
-	);
-
 	/*
 	 * The bar's destination, decided in one place.
 	 *
@@ -497,8 +478,8 @@ export function App() {
 			});
 			onCleanup(() => right.disconnect());
 		}
-		/* How tall the composer is, as a variable: the focus view pads its foot by it so a
-		   page scrolls clear of the bar. Measured, because the bar grows with its text. */
+		/* How tall the composer is, as a variable: the conversation pads its foot by it so the
+		   last lines scroll clear of the bar (`v3.css`). Measured, because the bar grows with its text. */
 		if (typeof ResizeObserver !== "undefined") {
 			const publish = () => document.documentElement.style.setProperty("--dock-h", `${Math.round(dock.getBoundingClientRect().height)}px`);
 			const watcher = new ResizeObserver(publish);
@@ -1321,7 +1302,7 @@ export function App() {
 	};
 
 	return (
-		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""} data-focus={focus() === undefined ? undefined : ""}>
+		<div class="app" data-presenting={presenting() ? "true" : undefined} data-phone={phone() ? "true" : undefined} data-reader={can("write") ? undefined : ""}>
 			{/*
 				No title bar.
 				*
@@ -1529,7 +1510,7 @@ export function App() {
 					onAbortAgent={(id) => send({ type: "agent.abort", id })}
 					onPick={(board) => playAndFrame(board.path)}
 					/*
-					 * Delete the file. The row asks twice before this is called (`BoardRow.tsx`).
+					 * Delete the file.
 					 *
 					 * Nothing is cleaned up here on purpose: the board leaves the deck when the
 					 * server says `board.changed … removed`, which is the same message the watcher

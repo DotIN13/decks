@@ -134,9 +134,7 @@ export function LeftPanel(props: {
 	 * Delete a board's file. Absent means no row has a delete on it.
 	 *
 	 * Every row has it, in all three sections: a board is a board wherever it is listed, and
-	 * a rule that depends on which heading it is under is a rule to remember. The row does
-	 * the asking — two presses, `BoardRow.tsx` — so by the time this is called it has been
-	 * said twice.
+	 * a rule that depends on which heading it is under is a rule to remember.
 	 */
 	onDelete?: (board: Board) => void;
 	/** Take a board off the canvas, keeping the file. */
@@ -164,7 +162,7 @@ export function LeftPanel(props: {
 	chats?: AgentChat[];
 	identities?: Record<string, Identity>;
 	unread?: Record<string, number>;
-	/** Boards that are news, each in its writer's colour: the dot at the end of the row (`BoardRow`). */
+	/** Boards that are news, each in its writer's colour: the dot at the end of the row. */
 	news?: Record<string, string>;
 	onFocusAgent?: (id: string) => void;
 	/** Make an agent in a workspace (`undefined` for none) — the `+` on a heading of the workspace cut. */

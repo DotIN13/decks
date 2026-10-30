@@ -13,14 +13,13 @@ function deckWith(text: string) {
 	return { root, deck: Deck.open(root) };
 }
 
-test("the current state is revision zero, so the first edit has something to undo to", () => {
+test("the current state is revision zero, so the first edit has something to go back to", () => {
 	const { root, deck } = deckWith("<title>one</title>");
 	const revisions = new Revisions(deck);
 	assert.equal(revisions.history("boards/a.html").length, 1);
-	assert.equal(revisions.previous("boards/a.html"), undefined, "nothing before the beginning");
 
 	revisions.record("boards/a.html", "<title>two</title>");
-	const back = revisions.previous("boards/a.html");
+	const back = revisions.history("boards/a.html")[0];
 	assert.ok(back);
 	assert.equal(revisions.read(back), "<title>one</title>");
 	rmSync(root, { recursive: true, force: true });
@@ -47,21 +46,7 @@ test("the order survives a restart — the bug the index exists to fix", () => {
 	const after = new Revisions(Deck.open(root));
 	assert.equal(after.history("boards/a.html").length, 3, "three versions, not one");
 	assert.equal(after.read(after.history("boards/a.html")[0]!), "<title>one</title>", "the oldest is still the oldest");
-	assert.equal(after.read(after.previous("boards/a.html")!), "<title>two</title>");
-	rmSync(root, { recursive: true, force: true });
-});
-
-test("undo walks back one step at a time", () => {
-	const { root, deck } = deckWith("<title>one</title>");
-	const revisions = new Revisions(deck);
-	revisions.record("boards/a.html", "<title>two</title>");
-	revisions.record("boards/a.html", "<title>three</title>");
-
-	assert.equal(revisions.read(revisions.previous("boards/a.html")!), "<title>two</title>");
-	revisions.pop("boards/a.html");
-	assert.equal(revisions.read(revisions.previous("boards/a.html")!), "<title>one</title>");
-	revisions.pop("boards/a.html");
-	assert.equal(revisions.previous("boards/a.html"), undefined, "and no further");
+	assert.equal(after.read(after.history("boards/a.html")[1]!), "<title>two</title>");
 	rmSync(root, { recursive: true, force: true });
 });
 

@@ -86,18 +86,3 @@ export interface FrameAt {
 	/** The camera's zoom: one board pixel is this many stage pixels. */
 	scale: number;
 }
-
-/** A position inside a board → the same position on the stage. */
-export const pointFromBoard = (at: FrameAt, x: number, y: number): Point<"stage"> => ({
-	x: at.left + x * at.scale,
-	y: at.top + y * at.scale,
-});
-
-/**
- * A movement in stage pixels → board pixels, for scrolling a box inside a board, which is
- * laid out in board pixels. No offset: a difference has no origin.
- */
-export const deltaToBoard = (at: FrameAt, dx: number, dy: number): Delta<"board"> => ({
-	dx: dx / at.scale,
-	dy: dy / at.scale,
-});
