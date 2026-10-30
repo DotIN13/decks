@@ -99,3 +99,20 @@ export function stripMention(text: string, name: string): string {
 	}
 	return joined.replace(/[ \t]{2,}/g, " ").trim();
 }
+
+/**
+ * A draft without the first `@name` in its words, as `stripMention` takes it out of the text: what a
+ * message to a named agent is kept as (`messageParts`). Only the words are touched, never a pill.
+ */
+export function withoutName<T extends { type: string; text?: string }>(draft: readonly T[], name: string): T[] {
+	let done = false;
+	return draft.map((node) => {
+		if (done || node.type !== "text" || typeof node.text !== "string") return node;
+		const mention = findMention(node.text, [name]);
+		if (!mention) return node;
+		done = true;
+		const before = node.text.slice(0, mention.at);
+		const after = node.text.slice(mention.end);
+		return { ...node, text: /\s$/.test(before) || before === "" ? before + after.replace(/^\s+/, "") : before + after };
+	});
+}

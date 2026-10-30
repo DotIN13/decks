@@ -1,11 +1,12 @@
-import { FROM_CANVAS, type PillAbout } from "@decks/agent-ui/composer";
+import type { PillAbout } from "@decks/agent-ui/composer";
+import type { MessageMention, MessagePart } from "@decks/protocol";
 import { commentItem } from "../../markup/comments.ts";
 import type { WaitingComment } from "../../state/comments.ts";
-import { commentLabel, mentionAddress, type Draft, type DraftMention } from "./draft.ts";
+import { commentLabel, mentionAddress, shortLabel, type Draft, type DraftMention } from "./draft.ts";
 
 /**
- * What a pill is about, for its tooltip and its card (`@decks/agent-ui` `pill-card.ts`), and a sent
- * message read back into its pills.
+ * What a pill is about, for its tooltip and its card (`@decks/agent-ui` `pill-card.ts`), what a sent
+ * message keeps of its pills (`messageParts`), and a sent message read back into its pills.
  *
  * Pure, so the exact text a card shows is tested against what the message is built from: a comment's
  * is `commentItem`, the entry `commentBlock` lists it as, and a board's, an item's or a file's is
@@ -20,23 +21,43 @@ export function pathName(path: string): string {
 
 /** Looks a board's title up by its path; the app's boards know theirs. */
 export type TitleOf = (path: string) => string | undefined;
+/** Looks a drawn item's name up by its id: its own name, or a few of its words (the layers list's label). */
+export type ItemName = (id: string) => string | undefined;
+
+const none = () => undefined;
 
 /**
- * A comment's pill. A comment from the canvas shows its whole text, not only on hover, marked as from
- * the canvas: anything there can hand one over, a card's script too, and it goes with your next
- * message, so you read all of what goes (`state/comments.ts`, `cleanFrameComment`).
+ * What a comment is called: the title of the board or card it is on, or the drawn item it is on by its
+ * name (`3 items` for several). A comment kept with a sent message has its name as its `title`.
  */
-export function commentPill(comment: WaitingComment): DraftMention {
-	const where = comment.quote ? commentLabel(comment.quote) : comment.board.split("/").pop() ?? comment.board;
-	if (comment.from !== "canvas") return { type: "mention", kind: "comment", id: comment.id, label: where };
-	const quote = comment.quote ? `“${comment.quote}”` : where;
-	return { type: "mention", kind: "comment", id: comment.id, label: `${FROM_CANVAS} ${quote}${comment.text ? ` — ${comment.text}` : ""}` };
+export function commentName(comment: WaitingComment, titleOf: TitleOf = none, itemName: ItemName = none): string {
+	if (comment.title) return comment.title;
+	const items = comment.items ?? [];
+	if (items.length > 1) return `${items.length} items`;
+	if (items.length === 1) return itemName(items[0]!) ?? items[0]!;
+	return titleOf(comment.board) ?? pathName(comment.board);
+}
+
+/**
+ * A comment's pill: the start of its quote, or the name of what it is on when it quotes nothing. A
+ * comment from the canvas is as short as yours, with a dashed edge (`from`); all of it is in its card.
+ */
+export function commentPill(comment: WaitingComment, titleOf?: TitleOf, itemName?: ItemName): DraftMention {
+	const name = commentName(comment, titleOf, itemName);
+	return {
+		type: "mention",
+		kind: "comment",
+		id: comment.id,
+		label: comment.quote ? commentLabel(comment.quote) : shortLabel(name),
+		name,
+		...(comment.from === "canvas" ? { from: "canvas" as const } : {}),
+	};
 }
 
 /** What comment `n` of a message is about: the board or card it is on, the quote, the note, and its entry in the message. */
-export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleOf = () => undefined): PillAbout {
+export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleOf = none, itemName: ItemName = none): PillAbout {
 	const drawn = !!comment.items?.length;
-	const name = drawn ? (comment.items!.length === 1 ? comment.items![0]! : `${comment.items!.length} items`) : comment.title ?? titleOf(comment.board) ?? pathName(comment.board);
+	const name = commentName(comment, titleOf, itemName);
 	const where = drawn ? `on ${pathName(comment.board.replace(/\/canvas\.pen$/, ""))}` : `on “${name}”${comment.component ? `, #${comment.component}` : ""}`;
 	return {
 		name,
@@ -49,44 +70,112 @@ export function aboutComment(comment: WaitingComment, n: number, titleOf: TitleO
 	};
 }
 
+/** What a board, an item or a file is called: its title, its name or words, its file's name. */
+export function addressName(node: DraftMention, titleOf: TitleOf = none, itemName: ItemName = none): string {
+	if (node.kind === "file") return node.name ?? (node.id.split("/").pop() || node.id);
+	if (node.kind === "item") return itemName(node.id) ?? node.name ?? node.label;
+	return titleOf(node.id) ?? node.name ?? node.label;
+}
+
 /** What a board, an item or a file pill is about. */
-export function aboutAddress(node: DraftMention, titleOf: TitleOf = () => undefined): PillAbout {
+export function aboutAddress(node: DraftMention, titleOf?: TitleOf, itemName?: ItemName): PillAbout {
 	const exact = mentionAddress(node);
-	if (node.kind === "file") return { name: pathName(node.id), of: "file", source: `File, in the deck as ${node.id}`, exact };
-	if (node.kind === "item") return { name: node.label, of: "shape", source: "On the canvas, a drawn item", exact };
-	return { name: titleOf(node.id) ?? node.label, of: "card", source: "On the canvas, a board or card", exact };
+	const name = addressName(node, titleOf, itemName);
+	if (node.kind === "file") return { name, of: "file", source: `File, in the deck as ${node.id}`, exact };
+	if (node.kind === "item") return { name, of: "shape", source: "On the canvas, a drawn item", exact };
+	return { name, of: "card", source: `On the canvas, a board or card: ${node.id}`, exact };
 }
 
-// --- a sent message, read back ----------------------------------------------------------
+// --- a sent message, kept as its parts --------------------------------------------------
 
-/*
- * Which comments came from the canvas is not in the message: the agent reads them like yours. So it is
- * remembered on this device as they are sent, by their entry without its number, for the dashed edge.
+/**
+ * A message as it is sent, as data (`MessagePart`): its words, and each pill with what it is called, who
+ * put it in, and what its card shows, kept with the message beside the text the agent gets, which this
+ * does not change. `comments` are the comments the message carries, in the order `[comment n]` counts
+ * them (`withComments`); a comment pill whose comment is not among them was not sent, and is left out.
+ * `canvas` is the canvas a drawn item is on.
  */
-const CANVAS_KEY = "decks.sent-from-canvas";
-const CANVAS_LIMIT = 100;
-type Store = Pick<Storage, "getItem" | "setItem">;
-const unnumbered = (entry: string) => entry.replace(/^\d+\. /, "");
-
-function canvasEntries(store: Store | undefined): string[] {
-	try {
-		const raw: unknown = JSON.parse(store?.getItem(CANVAS_KEY) ?? "[]");
-		return Array.isArray(raw) ? raw.filter((one): one is string => typeof one === "string") : [];
-	} catch {
-		return [];
+export function messageParts(draft: Draft, comments: readonly WaitingComment[], names: { titleOf?: TitleOf; itemName?: ItemName; canvas?: string } = {}): MessagePart[] {
+	const parts: MessagePart[] = [];
+	for (const node of draft) {
+		if (node.type === "text") {
+			if (node.text) parts.push({ type: "text", text: node.text });
+			continue;
+		}
+		if (node.kind === "comment") {
+			const n = comments.findIndex((comment) => comment.id === node.id) + 1;
+			const comment = comments[n - 1];
+			if (!comment) continue;
+			parts.push({
+				type: "mention",
+				kind: "comment",
+				id: comment.id,
+				name: commentName(comment, names.titleOf, names.itemName),
+				from: comment.from === "canvas" ? "canvas" : "you",
+				label: commentPill(comment, names.titleOf, names.itemName).label,
+				...(comment.quote ? { quote: comment.quote } : {}),
+				...(comment.text ? { note: comment.text } : {}),
+				path: comment.board,
+				...(comment.items?.length ? { items: [...comment.items] } : {}),
+				...(comment.component ? { component: comment.component } : {}),
+				exact: commentItem(comment, n),
+			});
+			continue;
+		}
+		const path = node.kind === "item" ? names.canvas : node.id;
+		parts.push({
+			type: "mention",
+			kind: node.kind,
+			id: node.id,
+			name: addressName(node, names.titleOf, names.itemName),
+			from: "you",
+			label: node.label,
+			...(path ? { path } : {}),
+			exact: mentionAddress(node),
+		});
 	}
+	return parts;
 }
 
-/** Remember the comments from the canvas in a message about to be sent. */
-export function rememberFromCanvas(store: Store | undefined, comments: readonly WaitingComment[]): void {
-	const handed = comments.filter((comment) => comment.from === "canvas").map((comment) => unnumbered(commentItem(comment, 1)));
-	if (!handed.length) return;
-	try {
-		store?.setItem(CANVAS_KEY, JSON.stringify([...canvasEntries(store).filter((one) => !handed.includes(one)), ...handed].slice(-CANVAS_LIMIT)));
-	} catch {
-		/* a full store: the pill is drawn as yours */
-	}
+/** The comment a stored comment part was written from, for its card and for showing it. */
+function partComment(part: MessageMention): WaitingComment {
+	return {
+		id: part.id,
+		board: part.path ?? "",
+		quote: part.quote ?? "",
+		text: part.note ?? "",
+		at: 0,
+		title: part.name,
+		...(part.items?.length ? { items: [...part.items] } : {}),
+		...(part.component ? { component: part.component } : {}),
+		...(part.from === "canvas" ? { from: "canvas" as const } : {}),
+	};
 }
+
+/** A message's stored parts, read into the pills it was written with and what each is about. */
+export function readParts(parts: readonly MessagePart[]): SentReading | undefined {
+	const comments = new Map<string, WaitingComment>();
+	const exact = new Map<string, string>();
+	const draft: Draft = [];
+	for (const part of parts) {
+		if (part.type === "text") {
+			draft.push({ type: "text", text: part.text });
+			continue;
+		}
+		const name = part.name || part.id;
+		if (part.kind === "comment") {
+			const comment = partComment(part);
+			comments.set(part.id, comment);
+			if (part.exact) exact.set(part.id, part.exact);
+			draft.push(commentPill(comment));
+			continue;
+		}
+		draft.push({ type: "mention", kind: part.kind, id: part.id, label: part.label || shortLabel(name), name });
+	}
+	return draft.some((node) => node.type === "mention") ? { draft, comments, exact } : undefined;
+}
+
+// --- a sent message, read back from its text (one sent before parts were kept) -------------
 
 const HEADS: Array<[RegExp, (match: RegExpExecArray) => number]> = [
 	[/^A comment on a board\. The quoted words are what I selected:$/, () => 1],
@@ -123,7 +212,7 @@ const COMMENT_REF = /\[comment (\d+)\]/g;
 
 export interface SentReading {
 	draft: Draft;
-	/** The comments the message carried, by their pills' ids, read back out of its text. */
+	/** The comments the message carried, by their pills' ids. */
 	comments: Map<string, WaitingComment>;
 	/** Each comment's entry exactly as it was sent. */
 	exact: Map<string, string>;
@@ -135,7 +224,7 @@ export interface SentReading {
  * when the words did not place them, and each address in the words is a board's, an item's or a
  * file's pill again. Nothing to draw as a pill: `undefined`, and the bubble is the text.
  */
-export function readSent(text: string, store?: Store, titleOf: TitleOf = () => undefined): SentReading | undefined {
+export function readSent(text: string, titleOf: TitleOf = none): SentReading | undefined {
 	const comments = new Map<string, WaitingComment>();
 	const exact = new Map<string, string>();
 	let said = text;
@@ -145,7 +234,6 @@ export function readSent(text: string, store?: Store, titleOf: TitleOf = () => u
 		return match ? count(match) : 0;
 	}).find((count) => count > 0);
 	if (head && lines[1] === "") {
-		const handed = canvasEntries(store);
 		let at = 2;
 		for (let n = 1; n <= head; n++) {
 			if (!lines[at]?.startsWith(`${n}. `)) return undefined;
@@ -154,7 +242,6 @@ export function readSent(text: string, store?: Store, titleOf: TitleOf = () => u
 			while (at < lines.length && lines[at]!.startsWith("   ")) entry.push(lines[at++]!);
 			const comment = readEntry(entry, n);
 			const written = entry.join("\n");
-			if (handed.includes(unnumbered(written))) comment.from = "canvas";
 			comments.set(comment.id, comment);
 			exact.set(comment.id, written);
 			if (n < head) {
@@ -182,7 +269,7 @@ export function readSent(text: string, store?: Store, titleOf: TitleOf = () => u
 		if ("comment" in mark && !comments.has(mark.comment!)) continue;
 		draft.push({ type: "text", text: said.slice(from, mark.at) });
 		if ("comment" in mark) {
-			draft.push(commentPill(comments.get(mark.comment!)!));
+			draft.push(commentPill(comments.get(mark.comment!)!, titleOf));
 			placed.add(mark.comment!);
 		} else {
 			const address = mark.address!;
@@ -194,17 +281,18 @@ export function readSent(text: string, store?: Store, titleOf: TitleOf = () => u
 	draft.push({ type: "text", text: said.slice(from) });
 	// Comments the words did not place, in front, in their order.
 	const front = [...comments.keys()].filter((id) => !placed.has(id));
-	const lead: Draft = front.flatMap((id, index) => [...(index ? [{ type: "text" as const, text: " " }] : []), commentPill(comments.get(id)!)]);
+	const lead: Draft = front.flatMap((id, index) => [...(index ? [{ type: "text" as const, text: " " }] : []), commentPill(comments.get(id)!, titleOf)]);
 	if (lead.length && said.trim()) lead.push({ type: "text", text: " " });
 	const whole = [...lead, ...draft].filter((node) => node.type !== "text" || node.text !== "");
 	return whole.some((node) => node.type === "mention") ? { draft: whole, comments, exact } : undefined;
 }
 
-/** What a pill in a sent message is about: a comment's card shows its entry exactly as it was sent. */
+/** What a pill in a sent message is about: as it was sent, by the name it had and the exact words it went as. */
 export function aboutSent(reading: SentReading, node: DraftMention, titleOf?: TitleOf): PillAbout | undefined {
+	// A board, an item or a file carries the name it was sent with (`readParts`), or its title now.
 	if (node.kind !== "comment") return aboutAddress(node, titleOf);
 	const comment = reading.comments.get(node.id);
 	if (!comment) return undefined;
-	const n = Number(node.id.slice("sent-".length));
+	const n = [...reading.comments.keys()].indexOf(node.id) + 1;
 	return { ...aboutComment(comment, n, titleOf), exact: reading.exact.get(node.id) ?? commentItem(comment, n) };
 }

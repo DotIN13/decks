@@ -16,7 +16,7 @@ import { carriesFiles } from "../../board/file-drop.ts";
 import type { WaitingComment } from "../../state/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
 import { draftComments, draftForAgent, draftIsEmpty, draftText, fileMention, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
-import { aboutAddress, aboutComment, commentPill, type TitleOf } from "./pill-about.ts";
+import { aboutAddress, aboutComment, commentPill, type ItemName, type TitleOf } from "./pill-about.ts";
 import type { PillHost } from "@decks/agent-ui/composer";
 import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
@@ -28,8 +28,6 @@ import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
 import { filterMentionables, MentionMenu, type Mentionable } from "./MentionMenu.tsx";
 import { Recipient, type RecipientProps } from "./Recipient.tsx";
 
-/** What a pill for a comment from the canvas starts with (`commentPill`); `ink.css` lets such a pill wrap and dashes its edge. */
-export { FROM_CANVAS } from "@decks/agent-ui/composer";
 
 /**
  * The input bar, floating over the canvas.
@@ -71,13 +69,16 @@ export function Composer(props: {
 	modes: AgentMode[];
 	mode: AgentMode | undefined;
 	onMode: (mode: AgentMode) => void;
-	/** The typed words, and the ids of the comments whose pills were in the field with them. */
-	onSend: (text: string, comments: string[]) => void;
+	/**
+	 * The typed words, the ids of the comments whose pills were in the field with them, and the draft
+	 * itself, for the message to be kept as it was written (`messageParts`).
+	 */
+	onSend: (text: string, comments: string[], draft: Draft) => void;
 	/**
 	 * Ctrl+Enter (⌘+Enter on a Mac) while the agent works: the words wait for the turn to end
 	 * (`DeckAgent.queueMine`). Enter still steers the turn; with nothing running both just send.
 	 */
-	onQueue?: (text: string, comments: string[]) => void;
+	onQueue?: (text: string, comments: string[], draft: Draft) => void;
 	/** What is queued for this agent, oldest first, and whether Stop is holding it. */
 	queued?: { items: Array<{ id: string; text: string }>; held: boolean };
 	/** A queued row's buttons: take it off, send it now as a steer, or send a held queue. */
@@ -107,7 +108,7 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string }>; files?: string[] } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string; name?: string }>; files?: string[] } | undefined;
 	/**
 	 * The draft above has been put in the field: forget it. A handover happens once — a draft
 	 * still held after it was taken is one that can be put back by anything that re-reads it,
@@ -118,6 +119,8 @@ export function Composer(props: {
 	onDropFiles?: (files: File[]) => void;
 	/** A board's or card's title by its path, for the name on a pill's card. */
 	titleOf?: TitleOf;
+	/** A drawn item's name by its id, for a comment on one. */
+	itemName?: ItemName;
 	/** Show what a pill is about: the board, card or item on the canvas, the file. */
 	onShowPill?: (pill: DraftMention, comment?: WaitingComment) => void;
 	/**
@@ -184,7 +187,7 @@ export function Composer(props: {
 		props.onText?.(draftText(next));
 		if (held !== undefined) parked.set(held, next);
 	};
-	const pillFor = commentPill;
+	const pillFor = (comment: WaitingComment) => commentPill(comment, props.titleOf, props.itemName);
 	const commentOf = (id: string) => props.comments?.find((candidate) => candidate.id === id);
 	/*
 	 * What each pill is about: the tooltip and the card a press opens (`pill-about.ts`). A comment's
@@ -192,9 +195,9 @@ export function Composer(props: {
 	 */
 	const pills: PillHost = {
 		about: (node) => {
-			if (node.kind !== "comment") return aboutAddress(node, props.titleOf);
+			if (node.kind !== "comment") return aboutAddress(node, props.titleOf, props.itemName);
 			const comment = commentOf(node.id);
-			return comment ? aboutComment(comment, draftComments(nodes()).indexOf(node.id) + 1, props.titleOf) : undefined;
+			return comment ? aboutComment(comment, draftComments(nodes()).indexOf(node.id) + 1, props.titleOf, props.itemName) : undefined;
 		},
 		show: (node) => props.onShowPill?.(node, node.kind === "comment" ? commentOf(node.id) : undefined),
 		remove: (node) => field?.remove(node),
@@ -478,8 +481,8 @@ export function Composer(props: {
 		if (draftIsEmpty(nodes())) return;
 		// The comments go as ids beside the words: what the agent reads for each is composed
 		// from the comment itself (`commentBlock`), not from what its pill happens to show.
-		if (queue && props.busy && props.onQueue) props.onQueue(draftForAgent(nodes()), draftComments(nodes()));
-		else props.onSend(draftForAgent(nodes()), draftComments(nodes()));
+		if (queue && props.busy && props.onQueue) props.onQueue(draftForAgent(nodes()), draftComments(nodes()), nodes());
+		else props.onSend(draftForAgent(nodes()), draftComments(nodes()), nodes());
 		// `put` forgets the page's parked copy with it, or switching away and back would bring
 		// back a prompt that has already been sent.
 		put([]);

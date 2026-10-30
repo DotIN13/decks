@@ -62,8 +62,8 @@ export function takeComments(agentId: string): BoardComment[] {
 
 /**
  * A comment the canvas frame handed over: marked, so its pill says where it came from. Anything in the
- * frame can hand one over, a card's script too, so its whole text is shown in the composer, never only
- * on hover: what goes with your next message is what you can read there.
+ * frame can hand one over, a card's script too, so its pill has a dashed amber edge and its card says a
+ * card handed it over; the card's Exact text is all of what goes with your next message.
  */
 export type WaitingComment = BoardComment & { from?: "canvas" };
 
@@ -93,7 +93,7 @@ export function frameTexts(values: unknown, count = FRAME_IDS_LIMIT): string[] {
 }
 
 type FrameComment = { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] };
-type FramePill = { kind: "board" | "item"; id: string; label: string };
+type FramePill = { kind: "board" | "item"; id: string; label: string; name?: string };
 type FrameInk = { action: "drawing" | "board" | "send"; ids: string[]; canvas: string; box: { x: number; y: number; w: number; h: number } };
 
 /** A comment from the frame, every text in it cleaned and cut. */
@@ -116,7 +116,7 @@ export function cleanFramePills(pills: readonly FramePill[]): FramePill[] {
 	return pills
 		.slice(0, FRAME_IDS_LIMIT)
 		.filter((pill) => pill && (pill.kind === "board" || pill.kind === "item"))
-		.map((pill) => ({ kind: pill.kind, id: frameText(pill.id), label: frameText(pill.label) }))
+		.map((pill) => ({ kind: pill.kind, id: frameText(pill.id), label: frameText(pill.label), ...(pill.name ? { name: frameText(pill.name) } : {}) }))
 		.filter((pill) => pill.id !== "");
 }
 

@@ -28,7 +28,7 @@ import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state}
 import { pens } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
 import { boardsOpen, boardsStarted, focus, releaseBoards, draft, ops, openUsage, picking, readUsage, setBoardsOpen, setDraft, setOps, setPicking, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport } from "./state/ui.ts";
-import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
+import { destination, destinationLabel, stripMention, withoutName } from "./app/send-from-bar.ts";
 import { makeFloat } from "@decks/ui/float";
 import { isNews } from "./panel/board-news.ts";
 import { FilePicker } from "./board/FilePicker.tsx";
@@ -55,8 +55,8 @@ import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
 import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
 import { canvasItems, type CanvasItem } from "@decks/canvas/tools";
 import { setMineReader } from "@decks/agent-ui/chat";
-import { aboutSent, readSent, rememberFromCanvas } from "./chat/composer/pill-about.ts";
-import type { DraftMention } from "./chat/composer/draft.ts";
+import { aboutSent, messageParts, readParts, readSent } from "./chat/composer/pill-about.ts";
+import type { Draft, DraftMention } from "./chat/composer/draft.ts";
 import type { WaitingComment } from "./state/comments.ts";
 import { boxOf, fitInto } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
@@ -189,7 +189,7 @@ export function App() {
 			agents: state.chats.map((chat) => ({ id: chat.id, name: agentName(chat.id) })),
 		};
 	};
-	const sendFromBar = (typed: string, commentIds: string[] = [], queue = false) => {
+	const sendFromBar = (typed: string, commentIds: string[] = [], queue = false, draft?: Draft) => {
 		const dest = destination(typed, barContext());
 		/*
 		 * The comments whose pills were in the field go in front of the words, whoever the words
@@ -199,14 +199,21 @@ export function App() {
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
 		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused) : [];
 		const notes = commentIds.flatMap((id) => held.filter((note) => note.id === id));
-		rememberFromCanvas(typeof localStorage === "undefined" ? undefined : localStorage, notes);
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
+				/*
+				 * The message as it was written, kept with it beside the text the agent gets (which this does not
+				 * change): each pill by name, who put it in, and what its card shows, so the conversation draws it
+				 * again after a reload and on another device. The `@name` that picked the agent is not part of it.
+				 */
+				const stage = stageOf(state.focused)?.name;
+				const written = draft && messageParts(dest.named ? withoutName(draft, dest.name) : draft, notes, { titleOf, itemName, ...(stage ? { canvas: `canvases/${stage}` } : {}) });
+				const parts = written?.some((part) => part.type === "mention") ? { parts: written } : {};
 				// Ctrl+Enter: held for the end of the turn, by the server (`DeckAgent.queueMine`), which sends it at once if there is none.
-				if (queue) send({ type: "agent.queue", id: dest.id, action: "add", text: line });
-				else send({ type: "agent.prompt", id: dest.id, text: line });
+				if (queue) send({ type: "agent.queue", id: dest.id, action: "add", text: line, ...parts });
+				else send({ type: "agent.prompt", id: dest.id, text: line, ...parts });
 				return;
 			}
 			case "note":
@@ -824,7 +831,8 @@ export function App() {
 	 * shown in the composer and sent only when you press Send there: anything in the frame can hand
 	 * these over, a card's script too, so nothing from it goes to an agent on its word alone. Every text
 	 * in them is cleaned of what cannot be seen and cut at 2,000 characters (`cleanFrame*`), and a
-	 * comment's pill shows its whole text, marked as from the canvas: what is sent is what you can read.
+	 * comment's pill has a dashed edge, marked as from the canvas, and its card's Exact text is all of what
+	 * is sent.
 	 */
 	const frameComment = (handed: { path: string; title: string; quote: string; text: string; send?: boolean; component?: string; items?: string[] }) => {
 		const agentId = state.focused;
@@ -1139,6 +1147,8 @@ export function App() {
 	};
 	/** A board's or card's title by its path, for the name on a pill's card. */
 	const titleOf = (path: string) => state.boards.find((one) => one.path === path)?.title;
+	/** A drawn item's name by its id, as the layers list calls it: its own name, or a few of its words. */
+	const itemName = (id: string) => canvasItems(stagePen()?.doc).items.find((one) => one.id === id)?.label;
 	/**
 	 * Show what a pill is about (its card's name): a file opens in a new tab; a board, a card or a drawn
 	 * item, or what a comment is on, is found on the canvas and framed as the side panel's rows do.
@@ -1155,9 +1165,9 @@ export function App() {
 		if (board) return flyTo(board);
 		notice("info", "That is not on this canvas.");
 	};
-	// A message you sent, read back into its pills: from the stored text, so history after a reload has them too.
-	setMineReader((text) => {
-		const reading = readSent(text, typeof localStorage === "undefined" ? undefined : localStorage, titleOf);
+	// A message you sent, read back into its pills: from the parts kept with it, or, sent before they were, from its text.
+	setMineReader((text, parts) => {
+		const reading = (parts?.length ? readParts(parts) : undefined) ?? readSent(text, titleOf);
 		return reading && { draft: reading.draft, pills: { about: (node) => aboutSent(reading, node, titleOf), show: (node) => showPill(node, node.kind === "comment" ? reading.comments.get(node.id) : undefined) } };
 	});
 	onCleanup(() => setMineReader(undefined));
@@ -1747,8 +1757,8 @@ export function App() {
 						modes={runtimeFor(focusedChat()?.kind)?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
-						onSend={sendFromBar}
-						onQueue={(text, comments) => sendFromBar(text, comments, true)}
+						onSend={(text, comments, draft) => sendFromBar(text, comments, false, draft)}
+						onQueue={(text, comments, draft) => sendFromBar(text, comments, true, draft)}
 						{...(queuedFor(state.focused) ? { queued: queuedFor(state.focused)! } : {})}
 						onQueueAction={(action, item) => {
 							const id = state.focused;
@@ -1825,6 +1835,7 @@ export function App() {
 						onDraftTaken={() => setDraft(undefined)}
 						onDropFiles={(files) => void intoComposer(files)}
 						titleOf={titleOf}
+						itemName={itemName}
 						onShowPill={showPill}
 					/>
 				</div>
