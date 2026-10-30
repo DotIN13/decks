@@ -9,3 +9,5 @@ export * from "../edit/ink.ts";
 export * from "../model/card-frame.ts";
 // A file dropped on a canvas, as the items that hold it.
 export * from "../model/file-drop.ts";
+// The drawing's top-level items as a layers list, for a sidebar.
+export { canvasItems, type CanvasItem, type ItemKind } from "../model/layers.ts";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PenDocument } from "@decks/pen";
-import { canvasItems } from "./canvas-items.ts";
+import { canvasItems } from "./layers.ts";
 
 const doc = {
 	version: "2.6",

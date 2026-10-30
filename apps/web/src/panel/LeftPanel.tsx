@@ -33,7 +33,7 @@ import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
 import { agentSections, recentAgents, type AgentRow as AgentListRow, type AgentSection } from "../agents/agent-sections.ts";
 import { DecksLineMark } from "./DecksLineMark.tsx";
-import { canvasItems, type CanvasItem, type ItemKind } from "./canvas-items.ts";
+import { canvasItems, type CanvasItem, type ItemKind } from "@decks/canvas/tools";
 import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 
 /**

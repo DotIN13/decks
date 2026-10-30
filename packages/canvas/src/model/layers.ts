@@ -1,7 +1,7 @@
 import { baseTheme, placements, type PenDocument } from "@decks/pen";
 
 /**
- * The Canvas tab: the drawing's top-level items, as Studio's editor lists its layers, each with
+ * The layers list (the Decks page's Canvas tab): the drawing's top-level items, as Studio's editor lists its layers, each with
  * its box; the arrows are one row, since a canvas can have dozens and none has a name.
  */
 

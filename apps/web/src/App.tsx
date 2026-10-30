@@ -53,7 +53,7 @@ import { syncRings } from "./agents/ring-sync.ts";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelApp, type PanelTab } from "./panel/LeftPanel.tsx";
 import { CanvasSwitcher } from "./canvas/CanvasSwitcher.tsx";
-import type { CanvasItem } from "./panel/canvas-items.ts";
+import type { CanvasItem } from "@decks/canvas/tools";
 import { boxOf, fitInto } from "@decks/canvas/camera";
 import { baseTheme, placements } from "@decks/pen";
 import { createLanding, type CameraOwner } from "@decks/canvas/camera";
