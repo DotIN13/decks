@@ -1,4 +1,4 @@
-import { apply, arrowEndItem, baseTheme, diff, editDocument, isArrow, parse, placements, reroute, walk, type Frame, type MeasureText, type PenDocument, type PenEdit, type PenNode, type Placed } from "@decks/pen";
+import { apply, arrowEndItem, withDecksColors, baseTheme, diff, editDocument, isArrow, parse, placements, reroute, walk, type Frame, type MeasureText, type PenDocument, type PenEdit, type PenNode, type Placed } from "@decks/pen";
 import type { Board } from "@decks/protocol";
 import { createSignal, untrack, type Accessor } from "solid-js";
 import type { DocEdits } from "../render/types.ts";
@@ -443,8 +443,10 @@ export function createDrawing(text: string | PenDocument, options: DrawingOption
 		showOver(onTop(next));
 	};
 
-	const edit = (ops: unknown[]) => {
-		if (options.readOnly || ops.length === 0) return false;
+	const edit = (given: unknown[]) => {
+		if (options.readOnly || given.length === 0) return false;
+		// What the tools make is coloured by the drawing's own light/dark variables: defined here when it lacks them.
+		const ops = withDecksColors(untrack(doc), given);
 		if (host) {
 			const prev = untrack(doc);
 			let next: PenDocument | undefined;

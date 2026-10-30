@@ -130,15 +130,15 @@ const options = (fields: Partial<MakeOptions> = {}): MakeOptions => ({
 test("a click makes each tool's item at its own size, its corner at the point", () => {
 	const point = { x: 10.4, y: 20.6 };
 	assert.deepEqual(makeAtOp("rectangle", "r", point, options()), {
-		op: { op: "insert", node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8, id: "r" }, box: { x1: 10, y1: 21, x2: 170, y2: 121 } },
-		node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8, id: "r" },
+		op: { op: "insert", node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8, id: "r" }, box: { x1: 10, y1: 21, x2: 170, y2: 121 } },
+		node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8, id: "r" },
 		box: { x: 10, y: 21, w: 160, h: 100 },
 	});
-	assert.deepEqual(makeAtOp("ellipse", "e", point, options()).op, { op: "insert", node: { type: "ellipse", fill: "#c7ddf7", id: "e" }, box: { x1: 10, y1: 21, x2: 130, y2: 141 } });
+	assert.deepEqual(makeAtOp("ellipse", "e", point, options()).op, { op: "insert", node: { type: "ellipse", fill: "$decks-shape-2", id: "e" }, box: { x1: 10, y1: 21, x2: 130, y2: 141 } });
 	assert.equal(FRAME_RADIUS, 30);
 	assert.deepEqual(makeAtOp("frame", "f", point, options()).op, {
 		op: "insert",
-		node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: 18, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 30, clip: true, id: "f" },
+		node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: 18, fill: "$decks-frame", stroke: "$decks-frame-line", strokeWidth: 1, cornerRadius: 30, clip: true, id: "f" },
 		box: { x1: 10, y1: 21, x2: 410, y2: 141 },
 	});
 	// A text's height is its words': its box has no bottom.
@@ -161,7 +161,7 @@ test("a click makes each tool's item at its own size, its corner at the point", 
 	});
 	assert.deepEqual(makeAtOp("icon", "i", point, options({ icon: { library: "phosphor", name: "heart" } })).op, {
 		op: "insert",
-		node: { type: "icon", id: "i", name: "heart", library: "phosphor", icon: "heart", fill: "#1f2328", weight: 400 },
+		node: { type: "icon", id: "i", name: "heart", library: "phosphor", icon: "heart", fill: "$decks-ink", weight: 400 },
 		box: { x1: 10, y1: 21, x2: 58, y2: 69 },
 	});
 });
@@ -184,15 +184,15 @@ test("a shape is the library's, square for a star, 160×120 for a decision, else
 });
 
 test("from the insert panel the item is put with its middle at the point", () => {
-	assert.deepEqual(makeAtOp("rectangle", "r", { x: 100, y: 100 }, { ...options(), centred: true }).op, { op: "insert", node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8, id: "r" }, box: { x1: 20, y1: 50, x2: 180, y2: 150 } });
+	assert.deepEqual(makeAtOp("rectangle", "r", { x: 100, y: 100 }, { ...options(), centred: true }).op, { op: "insert", node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8, id: "r" }, box: { x1: 20, y1: 50, x2: 180, y2: 150 } });
 	// Into the frame under the point.
-	assert.deepEqual(makeAtOp("ellipse", "e", { x: 5, y: 5 }, { ...options(), parent: "col" }).op, { op: "insert", parent: "col", node: { type: "ellipse", fill: "#c7ddf7", id: "e" }, box: { x1: 5, y1: 5, x2: 125, y2: 125 } });
+	assert.deepEqual(makeAtOp("ellipse", "e", { x: 5, y: 5 }, { ...options(), parent: "col" }).op, { op: "insert", parent: "col", node: { type: "ellipse", fill: "$decks-shape-2", id: "e" }, box: { x1: 5, y1: 5, x2: 125, y2: 125 } });
 });
 
 test("a drag makes the box between press and release, at least 8 each way", () => {
 	assert.deepEqual(drawnOp("rectangle", "r", { x: 100, y: 100 }, { x: 40.4, y: 300.6 }, options()), {
-		op: { op: "insert", node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8, id: "r" }, box: { x1: 40, y1: 100, x2: 100, y2: 301 } },
-		node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8, id: "r" },
+		op: { op: "insert", node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8, id: "r" }, box: { x1: 40, y1: 100, x2: 100, y2: 301 } },
+		node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8, id: "r" },
 		box: { x: 40, y: 100, w: 60, h: 201 },
 	});
 	assert.deepEqual(drawnOp("frame", "f", { x: 0, y: 0 }, { x: 3, y: 2 }, { ...options(), parent: "col" }).op.box, { x1: 0, y1: 0, x2: 8, y2: 8 });

@@ -216,17 +216,21 @@ export const FRAME_PAD = 18;
 export const NOTE_CORNER = 12;
 export const FRAME_RADIUS = NOTE_CORNER + FRAME_PAD;
 
-/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
+/**
+ * What each tool makes, before its box: pen's own items, with nothing of ours in them but their
+ * colours, the drawing's own light/dark variables (`@decks/pen` `DECKS_COLORS`), which the drawing's
+ * edit defines when it does not have them yet (`withDecksColors`, `model/drawing.ts`).
+ */
 export const MADE: Record<Exclude<MakingTool, "shape" | "icon">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
-	rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
-	ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
+	rectangle: { node: { type: "rectangle", fill: "$decks-shape", cornerRadius: 8 }, w: 160, h: 100 },
+	ellipse: { node: { type: "ellipse", fill: "$decks-shape-2" }, w: 120, h: 120 },
 	/*
 	 * A frame made by hand is a column, because that is what a frame is for: things in an order,
 	 * arranged for you. It hugs what it holds, and the height it is drawn at is its floor
 	 * (`fit_content(h)`, written by the insert in `@decks/pen`'s `ops.ts`): an empty one is still
 	 * something to drop into, and it grows as things go in.
 	 */
-	frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 120 },
+	frame: { node: { type: "frame", name: "Frame", layout: "vertical", gap: 12, padding: FRAME_PAD, fill: "$decks-frame", stroke: "$decks-frame-line", strokeWidth: 1, cornerRadius: FRAME_RADIUS, clip: true }, w: 400, h: 120 },
 	// A text's words are markdown, as a card's blocks are, typed into with the card's toolbar.
 	text: { node: { type: "text", content: "", fontSize: 24, textGrowth: "fixed-width", metadata: { type: MARKDOWN } }, w: 320, h: 32 },
 	/*
@@ -263,7 +267,7 @@ export function madeSize(tool: MakingTool, shape: string): { w: number; h: numbe
 /** The item a tool makes, with its id: a shape from the library (`@decks/pen`, `makeShape`), the icon picked, or the tool's own. */
 export function madeNode(tool: MakingTool, id: string, size: { w: number; h: number }, options: MakeOptions): PenNode {
 	if (tool === "shape") return makeShape(shapeKind(options.shape) ?? SHAPES[0]!, { frame: id, outline: options.nextId() }, size);
-	if (tool === "icon") return { type: "icon", id, name: options.icon.name, library: options.icon.library, icon: options.icon.name, fill: "#1f2328", weight: 400 } as PenNode;
+	if (tool === "icon") return { type: "icon", id, name: options.icon.name, library: options.icon.library, icon: options.icon.name, fill: "$decks-ink", weight: 400 } as PenNode;
 	// A card is a column frame of blocks (`pen/card-frame.ts`), starting with one empty one.
 	if (tool === "card") return options.card(id, options.nextId());
 	return { ...MADE[tool].node, id } as PenNode;

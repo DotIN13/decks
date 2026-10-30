@@ -229,7 +229,7 @@ if (spot) {
 	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
 	say("the properties panel's fill colours the selected item in the file", !!filled);
 	await page.keyboard.press("Control+z");
-	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
+	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "$decks-shape");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
 
 	// A card is pen's own note with a mark that says its words are markdown, and it opens for typing.
@@ -298,7 +298,10 @@ if (spot) {
 			return n ? { x: x1, y: y1, n } : null;
 		}, [shot, area, hex]);
 	};
-	const hex = String(onDisk().children.find((n) => n.id === drawnId)?.fill ?? "#dbe4f0");
+	const own = String(onDisk().children.find((n) => n.id === drawnId)?.fill ?? "#dbe4f0");
+	// A colour the tool gave it is the drawing's own variable: its dark value, as this check's page is dark.
+	const values = own.startsWith("$") ? onDisk().variables?.[own.slice(1)]?.value : undefined;
+	const hex = Array.isArray(values) ? String((values.find((entry) => entry.theme) ?? values[0]).value).slice(0, 7) : own;
 	const home = await rectBox();
 	// Wide enough to catch the item drawn where the move left off, which is where it used to jump to.
 	const area = { x: Math.round(home.x - 140), y: Math.round(home.y - 140), w: Math.round(home.width + 280), h: Math.round(home.height + 280) };

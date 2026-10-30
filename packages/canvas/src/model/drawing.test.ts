@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply as applyOps, applyEdits, baseTheme, type PenDocument, type PenEdit } from "@decks/pen";
+import { apply as applyOps, applyEdits, baseTheme, DECKS_COLORS, resolve, type PenDocument, type PenEdit } from "@decks/pen";
 import { boardsAhead, boardsOf, createDrawing, PENDING_MS, together } from "./drawing.ts";
 
 const sample = (): PenDocument => ({
@@ -421,4 +421,18 @@ test("an edit routes again only the arrows it touches; the others stay as the se
 	const guessed = createDrawing(structuredClone(served), { host: { send: () => {}, step: () => {} } });
 	guessed.edit([{ op: "update", id: "card", set: { y: 5 } }]);
 	assert.notEqual(routed?.y, guessed.doc().children.find((node) => node.id === "card-box")?.y, "the card's measured height, not the estimate's, places its arrow");
+});
+
+test("a tool's item comes with the Decks colours it uses, defined once, and reads dark in the dark", () => {
+	const sent: unknown[][] = [];
+	const drawing = createDrawing(sample(), { host: { send: (ops) => void sent.push(ops), step: () => {} } });
+	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "r", fill: "$decks-shape", cornerRadius: 8 }, box: { x1: 0, y1: 0, x2: 160, y2: 100 } }]);
+	assert.equal((sent[0]![0] as { op: string }).op, "variables", "the variables come first, in the same edit");
+	const doc = drawing.doc();
+	assert.deepEqual(doc.themes, { mode: ["light", "dark"] });
+	assert.equal(doc.children.find((node) => node.id === "r")?.fill, "$decks-shape");
+	drawing.edit([{ op: "insert", node: { type: "rectangle", id: "s", fill: "$decks-shape" }, box: { x1: 200, y1: 0, x2: 360, y2: 100 } }]);
+	assert.equal(sent[1]!.length, 1, "a second one defines nothing");
+	assert.equal(resolve(doc, "$decks-shape", baseTheme(doc, "light")), "#dbe4f0");
+	assert.equal(resolve(doc, "$decks-shape", baseTheme(doc, "dark")), DECKS_COLORS["decks-shape"]!.dark);
 });

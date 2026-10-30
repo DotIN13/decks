@@ -155,7 +155,7 @@ if (sv) {
 	await page.mouse.up();
 	const picked = await until(() => {
 		const fill = fillOf();
-		return typeof fill === "string" && fill !== "#ffffff" ? fill : undefined;
+		return typeof fill === "string" && fill !== before.fill ? fill : undefined;
 	});
 	say("…and sets the fill once, when it is let go", !!picked, String(picked));
 	await page.keyboard.press("Escape");

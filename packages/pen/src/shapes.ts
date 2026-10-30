@@ -246,7 +246,8 @@ export function roundedGeometry(w: number, h: number, r: number): string {
 
 /**
  * A new shape of a kind, at a size, ready to insert. `ids` are the frame's and the outline's, fresh
- * in the document. White with a dark line, except a line-only shape, which has no fill.
+ * in the document. Paper with an ink line (`$decks-figure`, `$decks-figure-line`: `withDecksColors`
+ * defines them), except a line-only shape, which has no fill.
  */
 export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string }, size: { w: number; h: number }): PenNode {
 	const w = Math.max(8, Math.round(size.w));
@@ -278,8 +279,8 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 				viewBox: kind.build ? [0, 0, w, h] : [0, 0, 100, 100],
 				geometry: kind.build ? kind.build(w, h, radius ?? 0) : kind.geometry,
 				...(kind.fillRule ? { fillRule: kind.fillRule } : {}),
-				...(kind.line ? {} : { fill: "#ffffff" }),
-				stroke: "#1f2328",
+				...(kind.line ? {} : { fill: "$decks-figure" }),
+				stroke: "$decks-figure-line",
 				strokeWidth: 1.5,
 				strokeAlignment: "center",
 				strokeLinejoin: "round",
@@ -290,7 +291,7 @@ export function makeShape(kind: ShapeKind, ids: { frame: string; outline: string
 
 /** The words a new label starts with: centred, as wide as the shape allows, wrapping inside it. */
 export function makeLabel(id: string, content = ""): PenNode {
-	return { type: "text", id, content, fontSize: 14, fontWeight: 500, textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "#1f2328" };
+	return { type: "text", id, content, fontSize: 14, fontWeight: 500, textAlign: "center", textGrowth: "fixed-width", width: "fill_container", fill: "$decks-ink" };
 }
 
 /**
