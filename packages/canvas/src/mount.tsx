@@ -99,6 +99,17 @@ export function createEditor(
 		setCameraSignal(next);
 		options.onCamera?.(next);
 	};
+	/*
+	 * The camera the host put the canvas at (`setCamera`, `glide`, `fit`), if it has: what the stage opens on
+	 * when its boards first arrive, rather than the camera it was made with. A canvas frame is made with the
+	 * page's camera as it was, and the page's landing can reach it before its boards do; opening on the
+	 * camera it was made with then undid the landing, and the frame told the page so.
+	 */
+	let asked: Camera | undefined;
+	const putCamera = (next: Camera) => {
+		asked = next;
+		setCamera(next);
+	};
 
 	/*
 	 * Park the view under its scope as the camera moves (a little after it stops), when the scope
@@ -208,7 +219,9 @@ export function createEditor(
 			glide={ownGlide()}
 			boardPill={true}
 			{...(options.onProperties ? { onProperties: options.onProperties } : {})}
-			opening={{ camera: opening }}
+			opening={{ get camera() {
+				return asked ?? opening;
+			} }}
 			{...(options.canvasName ? { stageName: options.canvasName() } : {})}
 			onTool={() => setPenTool("select")}
 			boards={boards}
@@ -268,7 +281,7 @@ export function createEditor(
 		glide: (to, ms = 420) =>
 			batch(() => {
 				setGlideAsk(ms > 0 ? { token: ++glides, ms } : undefined);
-				setCamera(to);
+				putCamera(to);
 			}),
 		document: () => untrack(doc),
 		text: () => serialize(untrack(doc)),
@@ -298,12 +311,12 @@ export function createEditor(
 			setSelected(page);
 			options.onSelect?.(page);
 		},
-		fit: () => setCamera(fitAll(untrack(doc), size(), look())),
+		fit: () => putCamera(fitAll(untrack(doc), size(), look())),
 		edit,
 		undo: () => step("undo"),
 		redo: () => step("redo"),
 		camera: () => untrack(camera),
-		setCamera,
+		setCamera: putCamera,
 		restored: firstView !== undefined,
 		reloadBoard: (path) => setReloads((all) => ({ ...all, [path]: (all[path] ?? 0) + 1 })),
 		dispose() {
