@@ -284,7 +284,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 				const page = untrack(pages).find((one) => one.path === path);
 				const at = path.split("/").map(encodeURIComponent).join("/");
 				if (start.pictures.includes("{path}")) return start.pictures.replace("{path}", at).replace("{scheme}", scheme);
-				return `${start.pictures}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}`;
+				// The whole page's picture (`whole=1`), which the server sends at the GPU's widths and compressed; without it, a gallery card's.
+				return `${start.pictures}${at}?scheme=${scheme}${page ? `&v=${page.rev}` : ""}&whole=1`;
 			},
 			cardScripts: (path) => trust(path) !== "friend",
 			// How a card measured, kept by the harness for `decks canvas fit` to report.
