@@ -531,7 +531,8 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 
 	if (chrome) {
 		// The app's own chrome, here beside the canvas: its tools are this frame's, and nothing of them crosses.
-		const view = chrome({
+		// Made inside the render's root, so its effects and its parts' onMount run (a float's grip, the pen's state).
+		const view = () => chrome({
 			handle,
 			revision,
 			offer,
@@ -551,13 +552,14 @@ async function run(root: HTMLElement, start: Start, end: FrameEnd, chrome: Frame
 			narrow,
 			dock,
 			panel: (name) => end.emit("panel", { name }),
+			storage,
 			canvas: start.canvas.name,
 		});
 		render(() => (
 			<>
 				{editor.surface()}
 				{cursors()}
-				{view}
+				{view()}
 			</>
 		), root);
 		return;

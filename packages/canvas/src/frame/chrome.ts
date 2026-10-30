@@ -39,6 +39,8 @@ export interface FrameChrome {
 	narrow: Accessor<boolean>;
 	/** How far up from the bottom the page's dock reaches, in pixels. */
 	dock: Accessor<number>;
+	/** What the frame keeps between visits, kept by the page (where a float was put, say): the frame has no storage of its own. */
+	storage: Pick<Storage, "getItem" | "setItem">;
 	/** The canvas's name, and the frame's own width, for a chrome that lays out by it. */
 	canvas: string;
 }

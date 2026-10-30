@@ -2,7 +2,8 @@ import type { FrameChrome } from "@decks/canvas";
 import { insets } from "@decks/canvas/camera";
 import { PenBar } from "@decks/canvas/host";
 import { drawing, setDrawing } from "@decks/canvas/tools";
-import { createEffect, Show } from "solid-js";
+import { makeFloat } from "@decks/ui/float";
+import { createEffect, onCleanup, Show } from "solid-js";
 import { CommentPopup } from "../markup/CommentPopup.tsx";
 import { PenTray } from "../v3/PenTray.tsx";
 import { ToolColumn } from "../v3/ToolColumn.tsx";
@@ -32,6 +33,59 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 	createEffect(() => {
 		if (drawing() && chrome.comment()) chrome.setComment(undefined);
 	});
+	/*
+	 * The tool column as a float, as it was on the page: dragged by the grip at its head, and a hard throw
+	 * at either edge tucks it behind that edge with its tab showing. Home is where the stylesheet puts it,
+	 * measured while it stands there; where it was put is kept by the page, as the frame's other values are.
+	 */
+	const floatTools = (tools: HTMLElement, grip: HTMLElement): { unstow: () => void } => {
+		let seen: { x: number; y: number } | undefined;
+		const bounds = () => {
+			const { left, right, top } = insets();
+			return { x: left, y: top, w: innerWidth - left - right, h: innerHeight - top - chrome.dock() };
+		};
+		const home = () => {
+			if (!tools.hasAttribute("data-floating") && !tools.hasAttribute("data-stowed")) {
+				const r = tools.getBoundingClientRect();
+				seen = { x: r.left, y: r.top };
+			}
+			const box = bounds();
+			return seen ?? { x: box.x + 12, y: box.y + box.h / 2 - tools.offsetHeight / 2 };
+		};
+		const cssPx = (name: string, fallback: number) => parseFloat(getComputedStyle(tools).getPropertyValue(name)) || fallback;
+		const float = makeFloat(tools, {
+			key: "pen-tools",
+			handle: grip,
+			ignore: "button, input, label",
+			home,
+			bounds,
+			size: () => ({ w: tools.offsetWidth, h: tools.offsetHeight }),
+			read: () => ({ x: tools.offsetLeft, y: tools.offsetTop }),
+			stow: { tab: () => cssPx("--stowtab-w", 20), tabHeight: () => cssPx("--stowtab-h", 48) },
+			storage: chrome.storage as Storage,
+			apply: (p, atHome, stowed) => {
+				// Put away, everything but the tab is out of reach as well as out of sight.
+				if (stowed) tools.setAttribute("data-stowed", stowed);
+				else tools.removeAttribute("data-stowed");
+				for (const child of tools.children) if (!child.hasAttribute("data-stowtab")) child.toggleAttribute("inert", stowed !== undefined);
+				if (atHome || !p) {
+					tools.removeAttribute("data-floating");
+					tools.style.left = "";
+					tools.style.top = "";
+					return;
+				}
+				tools.setAttribute("data-floating", "true");
+				tools.style.left = `${p.x}px`;
+				tools.style.top = `${p.y}px`;
+			},
+		});
+		createEffect(() => {
+			insets();
+			float.restore();
+		});
+		onCleanup(() => float.dispose());
+		return { unstow: () => float.unstow() };
+	};
 	const comment = (text: string, send: boolean) => {
 		const target = chrome.comment();
 		if (!target) return;
@@ -49,7 +103,7 @@ export function DecksFrameChrome(chrome: FrameChrome) {
 			{/* A column at the left; on a phone, a row just above the page's dock, as the page drew it there. */}
 			<Show
 				when={chrome.narrow()}
-				fallback={<ToolColumn onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
+				fallback={<ToolColumn onStep={step} onFloat={floatTools} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />}
 			>
 				<div class="frame-tool-row" style={{ bottom: `${chrome.dock() + 8}px` }}>
 					<ToolColumn row onStep={step} onApps={() => chrome.panel("apps")} onOpenFile={() => chrome.panel("files")} onPen={setPen} mode={chrome.mode()} onMode={(next) => chrome.setMode(next)} />
