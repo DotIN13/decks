@@ -7,3 +7,5 @@ export { naturalSize } from "../items/natural-size.ts";
 export * from "../edit/pen-tools.ts";
 export * from "../edit/ink.ts";
 export * from "../model/card-frame.ts";
+// A file dropped on a canvas, as the items that hold it.
+export * from "../model/file-drop.ts";

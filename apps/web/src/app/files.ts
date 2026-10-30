@@ -2,8 +2,7 @@ import { onCleanup, onMount } from "solid-js";
 import { toWorld } from "@decks/canvas/camera";
 import { camera } from "../state/camera.ts";
 import { guardDocumentDrops, naturalSize } from "../board/file-drop.ts";
-import { CARD, MEDIA } from "@decks/pen";
-import { cardChildren, CARD_GAP, CARD_PAD, CARD_RADIUS, fileCard, fileItem, FILE_CARD_W, liveFileItem, markdownText } from "@decks/canvas/tools";
+import { cardPicture, centredOp, fileCardOps, fileItem, liveFileOps, markdownText, mediaItem, pictureItem, rowOps, wordsCard, type DroppedItem, type FilePreview, type SizedItem } from "@decks/canvas/tools";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
 import { send } from "../state/socket.ts";
@@ -34,15 +33,6 @@ const RASTER = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico
 const WORDS = new Set(["md", "markdown", "mdx", "txt", "text"]);
 /** A card holds a note's worth of words, not a book: past this a text file goes on a board. */
 const CARD_BYTES = 256 * 1024;
-/** How wide a dropped picture lands on the stage, at most, in stage pixels. */
-const PICTURE_W = 640;
-/** How wide a dropped text file's card is, in stage pixels. */
-const CARD_W = 480;
-/** The gap between items dropped together. */
-const GAP = 32;
-/** A sound has no picture, so it lands as a strip wide enough for a name and a time. */
-const SOUND_W = 420;
-const SOUND_H = 72;
 
 /**
  * Films and sounds the server could read (`files/media.ts`).
@@ -240,33 +230,20 @@ export function createFileDrops() {
 		const stamp = Date.now().toString(36);
 		let n = 0;
 		const fresh = () => `file-${stamp}-${n++}`;
+		/** What the server made of a deck file to show it by (`/api/where`). */
+		const previewOf = async (path: string) => ((await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: FilePreview }).preview;
 		const live = all.filter((one) => LIVE.test(one));
 		if (agentId && live.length) {
-			const ops: Array<Record<string, unknown>> = [];
-			let at = middle.x;
-			for (const path of live) {
-				const where = (await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { preview: string; w: number; h: number } };
-				const node = liveFileItem(path, fresh, { ...(where.preview ? { still: where.preview.preview, w: where.preview.w, h: where.preview.h } : {}), url: fromStage });
-				const w = Number(node.width);
-				ops.push({ op: "insert", node, box: { x1: Math.round(at - w / 2), y1: Math.round(middle.y - 200), x2: Math.round(at + w / 2) } });
-				at += w + GAP;
-			}
-			void editDrawing(agentId, ops);
+			const files = [];
+			for (const path of live) files.push({ path, preview: await previewOf(path) });
+			void editDrawing(agentId, liveFileOps(files, middle, fresh, fromStage));
 		}
 		const paths = all.filter((one) => !FULL.test(one) && !LIVE.test(one));
 		if (!agentId || paths.length === 0) return;
-		const total = paths.length * FILE_CARD_W + GAP * (paths.length - 1);
-		let x = Math.round(middle.x - total / 2);
-		const ops: Array<Record<string, unknown>> = [];
-		for (const path of paths) {
-			const where = (await (await fetch(api(`/where?path=${encodeURIComponent(path)}`))).json().catch(() => ({}))) as { preview?: { preview: string; w: number; h: number; pages?: number; title?: string } };
-			// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
-			const node = fileCard(fromStage(path), fresh, { ...(where.preview ?? {}), url: fromStage });
-			const tall = where.preview ? Math.min(420, (FILE_CARD_W * where.preview.h) / Math.max(1, where.preview.w)) + 52 : 52;
-			ops.push({ op: "insert", node, box: { x1: x, y1: Math.round(middle.y - tall / 2), x2: x + FILE_CARD_W } });
-			x += FILE_CARD_W + GAP;
-		}
-		void editDrawing(agentId, ops);
+		const files = [];
+		// Its path from the stage's own folder, as a file's chip in a card has it, so a double-click opens it (`openFileOf`).
+		for (const path of paths) files.push({ path: fromStage(path), preview: await previewOf(path) });
+		void editDrawing(agentId, fileCardOps(files, middle, fresh, fromStage));
 	};
 
 	/**
@@ -290,11 +267,8 @@ export function createFileDrops() {
 				}
 				const natural = isRaster(file) ? await naturalSize(file) : undefined;
 				const asset = await uploadAsset(file, (fraction) => report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
-				if (isRaster(file)) {
-					const w = Math.round(Math.min(into.inner, natural?.width ?? into.inner));
-					const h = Math.round(natural ? (w * natural.height) / Math.max(1, natural.width) : w * 0.5625);
-					ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: { type: "rectangle", name: file.name, cornerRadius: 6, width: w, height: h, fill: { type: "image", url: fromStage(asset.path), mode: "fill" } } });
-				} else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromStage(asset.path), none) });
+				if (isRaster(file)) ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: cardPicture(file.name, fromStage(asset.path), into.inner, natural) });
+				else ops.push({ op: "insert", parent: into.card, index: into.index + ops.length, node: fileItem(fromStage(asset.path), none) });
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
@@ -313,72 +287,27 @@ export function createFileDrops() {
 		const agentId = state.focused;
 		if (!agentId) return;
 		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
-		const items: Array<{ node: Record<string, unknown>; w: number; h?: number }> = [];
+		const items: DroppedItem[] = [];
 		const failures: string[] = [];
 		for (const [index, file] of files.entries()) {
 			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
 			try {
 				if (isWords(file)) {
-					const words = await file.text();
-					// A card: a column of its blocks (`canvas/pen/card-frame.ts`), each given its id by the server.
-					const children = cardChildren(words, [], { fresh: () => "", inner: CARD_W - CARD_PAD * 2 });
-					items.push({ node: { type: "frame", name: file.name, layout: "vertical", gap: CARD_GAP, padding: CARD_PAD, cornerRadius: CARD_RADIUS, metadata: { type: CARD, file: file.name }, children }, w: CARD_W });
+					items.push(wordsCard(file.name, await file.text()));
 					continue;
 				}
 				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
 				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`), stageOnScreen());
-				/*
-				 * A film or a sound: pen's own rectangle, filled with the still the server wrote and
-				 * marked as media (`@decks/pen`, `MEDIA`). pen.dev opens it as the rectangle it is,
-				 * showing the poster, which is the right thing to show for something not playing.
-				 * The canvas draws the still and puts a play badge on it; nothing decodes until it is
-				 * pressed, which is what the measurement asked for.
-				 */
 				// Only a file named as a film or a sound: ffmpeg reads a still picture as a one-frame film.
-				if (asset.media && isPlayable(file)) {
-					const facts = asset.media;
-					const sound = facts.kind === "audio";
-					const w = sound ? SOUND_W : Math.min(PICTURE_W, facts.w ?? natural.width);
-					const h = sound ? SOUND_H : Math.round((w * (facts.h ?? natural.height)) / Math.max(1, facts.w ?? natural.width));
-					items.push({
-						node: {
-							type: "rectangle",
-							name: file.name,
-							cornerRadius: 8,
-							...(facts.poster ? { fill: { type: "image", url: fromStage(facts.poster), mode: "fill" } } : { fill: "#1f2328" }),
-							metadata: {
-								type: MEDIA,
-								kind: facts.kind,
-								file: asset.path,
-								...(facts.poster ? { poster: facts.poster } : {}),
-								...(facts.seconds === undefined ? {} : { seconds: facts.seconds }),
-								...(facts.peaks ? { peaks: facts.peaks } : {}),
-							},
-						},
-						w,
-						h,
-					});
-					continue;
-				}
-				const w = Math.min(PICTURE_W, natural.width);
-				const h = Math.round((w * natural.height) / Math.max(1, natural.width));
-				items.push({ node: { type: "rectangle", name: file.name, cornerRadius: 8, fill: { type: "image", url: fromStage(asset.path), mode: "fill" } }, w, h });
+				if (asset.media && isPlayable(file)) items.push(mediaItem(file.name, asset.path, asset.media, fromStage, natural));
+				else items.push(pictureItem(file.name, fromStage(asset.path), natural));
 			} catch (error) {
 				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		}
 		if (items.length > 0) {
-			const total = items.reduce((sum, item) => sum + item.w, 0) + GAP * (items.length - 1);
-			const tallest = Math.max(...items.map((item) => item.h ?? 240));
-			let x = Math.round(middle.x - total / 2);
-			const y = Math.round(middle.y - tallest / 2);
 			const stamp = Date.now().toString(36);
-			const ops = items.map((item, i) => {
-				const box = item.h === undefined ? { x1: x, y1: y, x2: x + item.w } : { x1: x, y1: y, x2: x + item.w, y2: y + item.h };
-				x += item.w + GAP;
-				return { op: "insert", node: { ...item.node, id: `drop-${stamp}-${i}` }, box };
-			});
-			void editDrawing(agentId, ops);
+			void editDrawing(agentId, rowOps(items, middle, (i) => `drop-${stamp}-${i}`));
 		}
 		const added = items.length === 0 ? "" : `${items.length === 1 ? files[0]?.name : `${items.length} files`} put on the canvas`;
 		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
@@ -506,10 +435,8 @@ export function createFileDrops() {
 		const where = (await (await fetch(api(`/where?path=${encodeURIComponent(picked)}`))).json().catch(() => ({ inDeck: false }))) as { inDeck: boolean; path?: string; media?: { kind: "video" | "audio"; poster?: string; peaks?: number[]; seconds?: number; w?: number; h?: number } };
 		const inDeck = where.inDeck && !!where.path;
 		const deckPath = where.path ?? picked;
-		const place = (node: Record<string, unknown>, w: number, h: number) => {
-			if (!agentId) return;
-			const box = { x1: Math.round(middle.x - w / 2), y1: Math.round(middle.y - h / 2), x2: Math.round(middle.x + w / 2), y2: Math.round(middle.y + h / 2) };
-			void editDrawing(agentId, [{ op: "insert", node: { ...node, id: `file-${Date.now().toString(36)}` }, box }]);
+		const place = (item: SizedItem) => {
+			if (agentId) void editDrawing(agentId, [centredOp(item, middle, `file-${Date.now().toString(36)}`)]);
 		};
 		const name = picked.split("/").pop() ?? picked;
 		if (inDeck && RASTER.has(extension)) {
@@ -519,27 +446,13 @@ export function createFileDrops() {
 				image.onerror = () => resolve({ width: 480, height: 360 });
 				image.src = api(`/file?path=${encodeURIComponent(deckPath)}`);
 			});
-			const w = Math.min(PICTURE_W, natural.width);
-			place({ type: "rectangle", name, cornerRadius: 8, fill: { type: "image", url: fromStage(deckPath), mode: "fill" } }, w, Math.round((w * natural.height) / Math.max(1, natural.width)));
+			place(pictureItem(name, fromStage(deckPath), natural));
 			return undefined;
 		}
 		if (inDeck && PLAYABLE.has(extension)) {
 			const facts = where.media;
 			if (facts) {
-				const sound = facts.kind === "audio";
-				const w = sound ? SOUND_W : Math.min(PICTURE_W, facts.w ?? 640);
-				const h = sound ? SOUND_H : Math.round((w * (facts.h ?? 360)) / Math.max(1, facts.w ?? 640));
-				place(
-					{
-						type: "rectangle",
-						name,
-						cornerRadius: 8,
-						...(facts.poster ? { fill: { type: "image", url: fromStage(facts.poster), mode: "fill" } } : { fill: "#1f2328" }),
-						metadata: { type: MEDIA, kind: facts.kind, file: deckPath, ...(facts.poster ? { poster: facts.poster } : {}), ...(facts.seconds === undefined ? {} : { seconds: facts.seconds }), ...(facts.peaks ? { peaks: facts.peaks } : {}) },
-					},
-					w,
-					h,
-				);
+				place(mediaItem(name, deckPath, facts, fromStage));
 				return undefined;
 			}
 		}
