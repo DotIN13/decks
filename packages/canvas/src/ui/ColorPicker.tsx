@@ -1,12 +1,19 @@
+import { DECKS_COLORS, decksColorOf } from "@decks/pen";
 import Pipette from "lucide-solid/icons/pipette";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { portalLayer } from "@decks/ui";
 import { Icon } from "@decks/ui";
+import { scheme } from "../lib/theme.ts";
 
 /**
  * A colour picker for the properties panel: a square of shade and brightness, a strip of hues, the
- * colour as hex, a dropper where the browser has one, and the panel's own swatches.
+ * colour as hex, a dropper where the browser has one, the adaptive colours, and the panel's own swatches.
+ *
+ * The adaptive colours are the drawing's own light/dark variables (`@decks/pen` `DECKS_COLORS`): a
+ * pick writes `"$decks-ink"`, which the drawing's edit defines when it lacks it, and the colour
+ * follows the canvas between light and dark. Anything picked in the square, the strip, the hex or
+ * the dropper is that colour, written as hex, and stays it in both.
  *
  * The browser's own picker (`<input type="color">`) is a different window on every system and is
  * not where the rest of the panel is. This one opens under the swatch that asked for it, in the
@@ -47,10 +54,30 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 	return `#${to(r)}${to(g)}${to(b)}`;
 }
 
+/** The adaptive colours on offer, by name: one of each look, without the tools' near-twins (figure, card). */
+export const ADAPTIVE = ["decks-ink", "decks-muted", "decks-line", "decks-frame-line", "decks-frame", "decks-shape", "decks-shape-2", "decks-red", "decks-yellow", "decks-green", "decks-blue"];
+
+/** A swatch's paint: an adaptive colour split corner to corner, light over dark; any other colour as it is. */
+export function swatchPaint(color: string): string {
+	const decks = DECKS_COLORS[decksColorOf(color) ?? ""];
+	return decks ? `linear-gradient(135deg, ${decks.light} 0 50%, ${decks.dark} 50% 100%)` : color;
+}
+
+/** An adaptive colour's tooltip: its name and its two values. */
+export function adaptiveTitle(name: string): string {
+	const decks = DECKS_COLORS[name]!;
+	return `${decks.name} (adaptive): ${decks.light} in light, ${decks.dark} in dark`;
+}
+
 const PALETTE = ["#ffffff", "#f3f4f6", "#9ca3af", "#57606a", "#1f2328", "#fecaca", "#fde68a", "#bbf7d0", "#bfdbfe", "#e9d5ff", "#dc2626", "#d97706", "#16a34a", "#2563eb", "#7c3aed"];
 
 export function ColorPicker(props: {
+	/** The field's colour: a hex, or a variable (`"$decks-ink"`). */
 	value: string | undefined;
+	/** What a variable comes to on the canvas now, for the square and the hex; a hex is itself. */
+	shown?: string | undefined;
+	/** Whether the adaptive colours are offered (not for a shadow, whose colour carries its own alpha). */
+	adaptive?: boolean;
 	anchor: HTMLElement;
 	label: string;
 	onCommit: (hex: string) => void;
@@ -58,7 +85,10 @@ export function ColorPicker(props: {
 	onLive?: (hex?: string) => void;
 	onClose: () => void;
 }) {
-	const [hsv, setHsv] = createSignal<Hsv>(hexToHsv(props.value ?? "#ffffff"));
+	const decksNow = (value: string | undefined) => DECKS_COLORS[decksColorOf(value) ?? ""]?.[scheme()];
+	const [hsv, setHsv] = createSignal<Hsv>(hexToHsv(props.shown ?? decksNow(props.value) ?? props.value ?? "#ffffff"));
+	/** The field holds a variable: no swatch of a fixed colour is its colour, whatever it comes to now. */
+	const variable = () => props.value?.startsWith("$") === true;
 	const hex = () => hsvToHex(hsv());
 	const [place, setPlace] = createSignal({ left: 0, top: 0 });
 	let card: HTMLDivElement | undefined;
@@ -176,6 +206,29 @@ export function ColorPicker(props: {
 						</button>
 					</Show>
 				</div>
+				<Show when={props.adaptive !== false}>
+				<div class="color-palette" role="group" aria-label="Adaptive colours">
+					<span class="color-caption text-faint">Adaptive</span>
+					<For each={ADAPTIVE}>
+						{(name) => (
+							<button
+								type="button"
+								class="props-swatch"
+								data-adaptive={name}
+								style={{ "--swatch": swatchPaint(`$${name}`) }}
+								data-on={props.value === `$${name}` ? "true" : undefined}
+								aria-pressed={props.value === `$${name}`}
+								aria-label={adaptiveTitle(name)}
+								title={adaptiveTitle(name)}
+								onClick={() => {
+									setHsv(hexToHsv(DECKS_COLORS[name]![scheme()]));
+									if (props.value !== `$${name}`) props.onCommit(`$${name}`);
+								}}
+							/>
+						)}
+					</For>
+				</div>
+				</Show>
 				<div class="color-palette" role="group" aria-label="Colours">
 					<For each={PALETTE}>
 						{(color) => (
@@ -183,7 +236,7 @@ export function ColorPicker(props: {
 								type="button"
 								class="props-swatch"
 								style={{ "--swatch": color }}
-								data-on={hex() === color ? "true" : undefined}
+								data-on={!variable() && hex() === color ? "true" : undefined}
 								aria-label={color}
 								title={color}
 								onClick={() => {

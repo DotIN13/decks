@@ -376,6 +376,11 @@
 		flex-wrap: wrap;
 		gap: 5px;
 	}
+	/* The adaptive colours' heading: a line of its own above their split swatches, light over dark. */
+	.color-caption {
+		flex-basis: 100%;
+		font-size: var(--type-note, 12px);
+	}
 
 	/* A set of choices that read as one control: the pressed one is a raised card in a tray. */
 	.seg-set {

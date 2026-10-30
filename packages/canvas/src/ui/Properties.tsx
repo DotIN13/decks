@@ -1,4 +1,4 @@
-import { arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isCard, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
+import { baseTheme, DECKS_COLORS, decksColorOf, resolve, arrowBend, arrowEndAt, arrowEndItem, arrowEndSide, arrowLabel, arrowStyle, indexOf, isArrow, isCard, isMarkdown, isPointEnd, isShape, parseColor, toHex, makeLabel, newId, ids as penIds, SHAPES, shapeKind, shapeLabel, shapeOutline, type ArrowSide, type PenDocument, type PenNode } from "@decks/pen";
 import type { LucideIcon } from "lucide-solid";
 import AlignCenterHorizontal from "lucide-solid/icons/align-center-horizontal";
 import AlignCenterVertical from "lucide-solid/icons/align-center-vertical";
@@ -42,7 +42,8 @@ import { obsidianNote } from "../model/card-frame.ts";
 import { createEffect, createMemo, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { penBoxes, penSelection, penTyping, setInsertPanel, setPenLive, setPenSelection } from "../edit/pen-tools.ts";
 import { Icon } from "@decks/ui";
-import { ColorPicker } from "./ColorPicker.tsx";
+import { adaptiveTitle, ColorPicker, swatchPaint } from "./ColorPicker.tsx";
+import { scheme } from "../lib/theme.ts";
 import { ICON_LIBRARIES } from "../render/icon-index.ts";
 
 /**
@@ -59,8 +60,13 @@ import { ICON_LIBRARIES } from "../render/icon-index.ts";
  * that shrink and sets of buttons that wrap, so a long value wraps rather than pushing the panel
  * sideways.
  */
-const SWATCHES = ["#ffffff", "#dbe4f0", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#e9d5ff", "#1f2328"];
-const LINES = ["#1f2328", "#57606a", "#8a8f98", "#2563eb", "#16a34a", "#d97706", "#dc2626", "#ffffff"];
+/*
+ * The quick swatches. The neutrals, and the accents that have a dark twin, are the drawing's own
+ * light/dark colours (`@decks/pen` `DECKS_COLORS`, drawn split light over dark), so what is picked
+ * here reads on a dark canvas too; the pastels are fixed, as a sticky note's paper is.
+ */
+const SWATCHES = ["$decks-frame", "$decks-shape", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#e9d5ff", "$decks-ink"];
+const LINES = ["$decks-ink", "$decks-muted", "$decks-line", "$decks-blue", "$decks-green", "$decks-yellow", "$decks-red", "$decks-frame"];
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 const FONTS = ["Inter", "JetBrains Mono", "Source Serif 4", "Merriweather", "Caveat", "Space Grotesk", "IBM Plex Sans", "Noto Sans SC"];
 const WEIGHTS = [300, 400, 500, 600, 700, 800];
@@ -86,6 +92,13 @@ export const hexOf = (value: unknown): string | undefined => {
 	// Whatever notation it is written in: the swatches and the field speak hex (`@decks/pen`).
 	return typeof text === "string" ? toHex(parseColor(text)) : undefined;
 };
+/** The colour a value names, for the panel: a variable as it is written (`"$decks-ink"`), anything else as hex (`hexOf`). */
+export const colorOf = (value: unknown): string | undefined => {
+	const first = Array.isArray(value) ? value[0] : value;
+	const type = first && typeof first === "object" ? (first as { type?: string }).type : undefined;
+	const text = typeof first === "string" ? first : type === "color" || type === "solid" ? (first as { color?: unknown }).color : undefined;
+	return typeof text === "string" && /^\$[\w-]+$/.test(text) ? text : hexOf(value);
+};
 type FillMode = "none" | "solid" | "linear" | "radial";
 const gradientOf = (value: unknown): { type: "gradient"; gradientType?: string; rotation?: unknown; colors?: Array<{ color: string; position: number }> } | undefined => {
 	const first = Array.isArray(value) ? value[0] : value;
@@ -107,7 +120,7 @@ const lineWidthOf = (node: PenNode): number => {
 };
 const lineColorOf = (node: PenNode): string | undefined => {
 	const legacy = legacyStroke(node);
-	return hexOf(legacy ? legacy.fill : node.stroke);
+	return colorOf(legacy ? legacy.fill : node.stroke);
 };
 const numberOf = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
 /** One value for every item, or Mixed. */
@@ -208,12 +221,20 @@ export function Properties(props: {
 	/** A colour control's live drag: each step drawn, nothing saved, and nothing is the drawing itself again. */
 	const live = (apply: (color: string) => void) => (color?: string) => (color === undefined ? setPenLive(undefined) : apply(color));
 
+	/** What a colour field's value comes to on the canvas now: a variable resolved in the drawing for the scheme, a hex as it is. */
+	const shownOf = (value: string | typeof MIXED | undefined): string | undefined => {
+		if (!value || value === MIXED) return undefined;
+		if (!value.startsWith("$")) return value;
+		const doc = props.doc;
+		return (doc ? hexOf(resolve(doc, value, baseTheme(doc, scheme()))) : undefined) ?? DECKS_COLORS[decksColorOf(value) ?? ""]?.[scheme()];
+	};
+
 	// --- fill ------------------------------------------------------------------------------------
 	const fillMode = () => shared(fillTargets(), fillModeOf);
-	const fillHex = () => shared(fillTargets(), (node) => hexOf(node.fill) ?? hexOf(gradientOf(node.fill)?.colors?.[0]?.color));
+	const fillHex = () => shared(fillTargets(), (node) => colorOf(node.fill) ?? colorOf(gradientOf(node.fill)?.colors?.[0]?.color));
 	const setFillMode = (mode: FillMode) =>
 		set(fillTargets(), (node) => {
-			const base = hexOf(node.fill) ?? hexOf(gradientOf(node.fill)?.colors?.[0]?.color) ?? "#dbe4f0";
+			const base = colorOf(node.fill) ?? colorOf(gradientOf(node.fill)?.colors?.[0]?.color) ?? "$decks-shape";
 			if (mode === "none") return { fill: null };
 			if (mode === "solid") return { fill: base };
 			const end = gradientOf(node.fill)?.colors?.[1]?.color ?? "#ffffff";
@@ -227,7 +248,7 @@ export function Properties(props: {
 			colors[stop] = { color, position: stop === 0 ? 0 : 1 };
 			return { fill: { ...gradient, colors } };
 		});
-	const gradientEnd = () => shared(fillTargets(), (node) => hexOf(gradientOf(node.fill)?.colors?.[1]?.color));
+	const gradientEnd = () => shared(fillTargets(), (node) => colorOf(gradientOf(node.fill)?.colors?.[1]?.color));
 	const gradientTurn = () => shared(fillTargets(), (node) => numberOf(gradientOf(node.fill)?.rotation, 90));
 
 	// --- line ------------------------------------------------------------------------------------
@@ -243,7 +264,7 @@ export function Properties(props: {
 			const legacy = legacyStroke(node);
 			if (legacy) return width === 0 ? { stroke: null } : { stroke: { ...legacy, thickness: width } };
 			if (width <= 0) return isArrow(node) ? { strokeWidth: 1 } : { stroke: null, strokeWidth: null };
-			return { strokeWidth: width, ...(node.stroke === undefined || node.stroke === null ? { stroke: "#1f2328" } : {}) };
+			return { strokeWidth: width, ...(node.stroke === undefined || node.stroke === null ? { stroke: "$decks-ink" } : {}) };
 		});
 	const dashOf = (node: PenNode): "solid" | "dashed" | "dotted" => (isArrow(node) ? (arrowStyle(node.metadata).dash ? "dashed" : "solid") : node.strokeDash === "dashed" || node.strokeDash === "dotted" ? node.strokeDash : "solid");
 	const lineDash = () => shared(lineTargets(), dashOf);
@@ -259,7 +280,7 @@ export function Properties(props: {
 	const fontWeight = () => shared(words(), (node) => Number(node.fontWeight ?? 400));
 	const italic = () => shared(words(), (node) => node.fontStyle === "italic");
 	const textAlign = () => shared(words(), (node) => node.textAlign ?? "left");
-	const textColor = () => shared(words().filter((node) => node.type === "text"), (node) => hexOf(node.fill));
+	const textColor = () => shared(words().filter((node) => node.type === "text"), (node) => colorOf(node.fill));
 	const lineHeight = () => shared(words(), (node) => numberOf(node.lineHeight, 0));
 	const spacing = () => shared(words(), (node) => numberOf(node.letterSpacing, 0));
 	/** A shape's words, typed in the panel: its text, or a new one made inside it. */
@@ -497,7 +518,7 @@ export function Properties(props: {
 												const renamed = !node.name || node.name === node.metadata?.kind;
 												return [
 													{ op: "update", id: node.id, set: { metadata: { ...(node.metadata ?? {}), kind: kind.name }, ...(renamed ? { name: kind.name } : {}) } },
-													...(outline ? [{ op: "update", id: outline.id, set: { geometry: kind.geometry, fillRule: kind.fillRule ?? null, ...(kind.line ? { fill: null } : outline.fill === undefined ? { fill: "#ffffff" } : {}) } }] : []),
+													...(outline ? [{ op: "update", id: outline.id, set: { geometry: kind.geometry, fillRule: kind.fillRule ?? null, ...(kind.line ? { fill: null } : outline.fill === undefined ? { fill: "$decks-figure" } : {}) } }] : []),
 												];
 											}),
 										);
@@ -634,12 +655,12 @@ export function Properties(props: {
 								<Swatches colors={SWATCHES} value={fillHex()} onPick={(color) => setFillColor(color)} label="Fill" />
 								<div class="props-row">
 									<span class="props-label">{fillMode() === "linear" || fillMode() === "radial" ? "From" : "Colour"}</span>
-									<ColorField value={fillHex()} onCommit={(color) => setFillColor(color)} onLive={live((color) => setFillColor(color, 0, true))} label="Fill colour" />
+									<ColorField value={fillHex()} shown={shownOf(fillHex())} onCommit={(color) => setFillColor(color)} onLive={live((color) => setFillColor(color, 0, true))} label="Fill colour" />
 								</div>
 								<Show when={fillMode() === "linear" || fillMode() === "radial"}>
 									<div class="props-row">
 										<span class="props-label">To</span>
-										<ColorField value={gradientEnd()} onCommit={(color) => setFillColor(color, 1)} onLive={live((color) => setFillColor(color, 1, true))} label="Second colour" />
+										<ColorField value={gradientEnd()} shown={shownOf(gradientEnd())} onCommit={(color) => setFillColor(color, 1)} onLive={live((color) => setFillColor(color, 1, true))} label="Second colour" />
 									</div>
 									<Show when={fillMode() === "linear"}>
 										<div class="props-row">
@@ -657,7 +678,7 @@ export function Properties(props: {
 							<Swatches colors={LINES} value={lineColor()} onPick={setLineColor} label="Line" />
 							<div class="props-row">
 								<span class="props-label">Colour</span>
-								<ColorField value={lineColor()} onCommit={setLineColor} onLive={live((color) => setLineColor(color, true))} label="Line colour" />
+								<ColorField value={lineColor()} shown={shownOf(lineColor())} onCommit={setLineColor} onLive={live((color) => setLineColor(color, true))} label="Line colour" />
 							</div>
 							<div class="props-row">
 								<span class="props-label">Width</span>
@@ -844,7 +865,7 @@ export function Properties(props: {
 								<Swatches colors={LINES} value={textColor()} onPick={(color) => setTextColor(color)} label="Text colour" />
 								<div class="props-row">
 									<span class="props-label">Colour</span>
-									<ColorField value={textColor()} onCommit={(color) => setTextColor(color)} onLive={live((color) => setTextColor(color, true))} label="Text colour" />
+									<ColorField value={textColor()} shown={shownOf(textColor())} onCommit={(color) => setTextColor(color)} onLive={live((color) => setTextColor(color, true))} label="Text colour" />
 								</div>
 							</Show>
 						</Section>
@@ -880,10 +901,10 @@ export function Properties(props: {
 									onChange={(event) => set(icons(), () => ({ weight: Number(event.currentTarget.value) }))}
 								/>
 							</div>
-							<Swatches colors={LINES} value={shared(icons(), (node) => hexOf(node.fill))} onPick={(color) => setIconColor(color)} label="Icon colour" />
+							<Swatches colors={LINES} value={shared(icons(), (node) => colorOf(node.fill))} onPick={(color) => setIconColor(color)} label="Icon colour" />
 							<div class="props-row">
 								<span class="props-label">Colour</span>
-								<ColorField value={shared(icons(), (node) => hexOf(node.fill))} onCommit={(color) => setIconColor(color)} onLive={live((color) => setIconColor(color, true))} label="Icon colour" />
+								<ColorField value={shared(icons(), (node) => colorOf(node.fill))} shown={shownOf(shared(icons(), (node) => colorOf(node.fill)))} onCommit={(color) => setIconColor(color)} onLive={live((color) => setIconColor(color, true))} label="Icon colour" />
 							</div>
 						</Section>
 					</Show>
@@ -1006,7 +1027,7 @@ function Effects(props: {
 						</div>
 						<div class="props-row">
 							<span class="props-label">Colour</span>
-							<ColorField value={hexOf(s().color)} onCommit={(color) => setShadow({ color: shadowColor(color) })} onLive={props.onLive((color) => setShadow({ color: shadowColor(color) }, true))} label="Shadow colour" />
+							<ColorField value={hexOf(s().color)} adaptive={false} onCommit={(color) => setShadow({ color: shadowColor(color) })} onLive={props.onLive((color) => setShadow({ color: shadowColor(color) }, true))} label="Shadow colour" />
 						</div>
 					</>
 				)}
@@ -1091,9 +1112,16 @@ function NumField(props: { label: string; value: number | typeof MIXED | undefin
 	);
 }
 
-/** A hex colour: typed, or picked in the colour picker that its swatch opens (`ColorPicker.tsx`). */
+/**
+ * A colour: a hex typed, or picked in the colour picker that its swatch opens (`ColorPicker.tsx`),
+ * or one of the drawing's variables (`$decks-ink`), picked there or typed, shown by its name.
+ */
 function ColorField(props: {
 	value: string | typeof MIXED | undefined;
+	/** What a variable comes to now, for the swatch and the picker. */
+	shown?: string | undefined;
+	/** Whether the picker offers the adaptive colours: not for a shadow, whose colour carries its own alpha. */
+	adaptive?: boolean;
 	onCommit: (color: string) => void;
 	/** Every step of a drag in the picker, drawn and not saved; nothing puts the drawing back (`ColorPicker`). */
 	onLive?: (color?: string) => void;
@@ -1103,7 +1131,12 @@ function ColorField(props: {
 	const [picking, setPicking] = createSignal(false);
 	let swatch: HTMLButtonElement | undefined;
 	const commit = (text: string) => {
-		const clean = text.trim().replace(/^#?/, "#").toLowerCase();
+		const named = text.trim();
+		if (props.adaptive !== false && named.startsWith("$")) {
+			if (decksColorOf(named) && named !== hex()) props.onCommit(named);
+			return;
+		}
+		const clean = named.replace(/^#?/, "#").toLowerCase();
 		if (/^#[0-9a-f]{6}$/.test(clean) && clean !== hex()) props.onCommit(clean);
 		else if (/^#[0-9a-f]{3}$/.test(clean)) props.onCommit(`#${clean[1]}${clean[1]}${clean[2]}${clean[2]}${clean[3]}${clean[3]}`);
 	};
@@ -1118,11 +1151,11 @@ function ColorField(props: {
 				aria-expanded={picking()}
 				title={`Pick any ${props.label.toLowerCase()}`}
 				aria-label={`Pick any ${props.label.toLowerCase()}`}
-				style={{ "--swatch": hex() || "transparent" }}
+				style={{ "--swatch": props.shown ?? (hex().startsWith("$") ? "transparent" : hex() || "transparent") }}
 				onClick={() => setPicking(!picking())}
 			/>
 			<Show when={picking() && swatch}>
-				<ColorPicker value={hex() || undefined} anchor={swatch!} label={props.label} onCommit={props.onCommit} {...(props.onLive ? { onLive: props.onLive } : {})} onClose={() => setPicking(false)} />
+				<ColorPicker value={hex() || undefined} shown={props.shown} adaptive={props.adaptive !== false} anchor={swatch!} label={props.label} onCommit={props.onCommit} {...(props.onLive ? { onLive: props.onLive } : {})} onClose={() => setPicking(false)} />
 			</Show>
 			<label class="field props-num props-hex">
 				<input
@@ -1148,11 +1181,12 @@ function Swatches(props: { colors: readonly string[]; value: string | typeof MIX
 					<button
 						type="button"
 						class="props-swatch"
-						style={{ "--swatch": color }}
+						style={{ "--swatch": swatchPaint(color) }}
+						data-adaptive={decksColorOf(color)}
 						data-on={props.value === color ? "true" : undefined}
 						aria-pressed={props.value === color}
-						title={`${props.label} ${color}`}
-						aria-label={`${props.label} ${color}`}
+						title={`${props.label} ${decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color}`}
+						aria-label={`${props.label} ${decksColorOf(color) ? adaptiveTitle(decksColorOf(color)!) : color}`}
 						onClick={() => props.onPick(color)}
 					/>
 				)}
