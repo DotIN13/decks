@@ -36,3 +36,6 @@ dist-public/
 # The antigravity runtime's own home, created under the data directory on first use.
 /e2e/fixture/antigravity-home/
 dist-packages/
+
+# Old scratch decks, kept out of the tree.
+/_scratch/
