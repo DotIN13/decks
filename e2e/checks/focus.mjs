@@ -41,7 +41,8 @@ const chip = await page
 	.waitForSelector('.composer-box [data-component="mention-pill"][data-kind="comment"]', { timeout: 4000 })
 	.then((el) => el.textContent())
 	.catch(() => null);
-say("…and Enter puts it over the input bar, named by its board", chip?.trim() === NOTES.split("/").pop(), String(chip));
+// A comment from the canvas shows its whole text, marked as from the canvas (`Composer.tsx`, `FROM_CANVAS`).
+say("…and Enter puts it over the input bar, named by its board", chip?.trim() === `from the canvas · ${NOTES.split("/").pop()} — Shorter, please.`, String(chip));
 await page.evaluate(() => localStorage.removeItem("decks.comments"));
 
 
