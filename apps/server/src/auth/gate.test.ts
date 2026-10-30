@@ -108,7 +108,7 @@ test("decks login trades a code from decks pair code for a person token, which c
 		const login = await post("/api/login", {}, { code });
 		assert.equal(login.status, 200);
 		const token = String(login.body.token);
-		assert.match(token, /^dk_p_/);
+		assert.match(token, /^dk_h_/);
 		assert.equal((await post("/api/login", {}, { code })).status, 403, "spent");
 		const now = await post("/api/v1/now", bearer(token));
 		assert.equal(now.status, 200);
@@ -205,7 +205,7 @@ test("a tab of its own is written a fresh person token, never stored and alone i
 			const tab = await getPage(`${origin}${path}`, { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none" });
 			const token = /<meta name="decks-session" content="([^"]+)">/.exec(tab.html)?.[1];
 			assert.ok(token, `a tab at ${path} is given a token`);
-			assert.match(token, /^dk_p_/);
+			assert.match(token, /^dk_h_/);
 			seen.add(token);
 			assert.equal(tab.headers["cross-origin-opener-policy"], "same-origin");
 			assert.equal(tab.headers["cache-control"], "no-store");

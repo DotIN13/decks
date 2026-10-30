@@ -89,7 +89,7 @@ test("with the harness's store, an agent's token is an agent principal there, an
 	const tokens = new TokenStore(join(mkdtempSync(join(tmpdir(), "decks-bridge-")), "tokens.json"));
 	const bridge = new StageBridge(tokens);
 	const token = bridge.issue("ada");
-	assert.match(token, /^dk_a_/);
+	assert.match(token, /^dk_h_/);
 	assert.deepEqual((tokens.verify(token) as { principal: unknown }).principal, { kind: "agent", id: "ada" });
 	assert.equal(bridge.issue("ada"), token, "the same one while it works");
 	bridge.revoke("ada");

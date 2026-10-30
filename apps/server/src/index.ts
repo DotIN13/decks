@@ -1,6 +1,5 @@
 import { socketPrincipal } from "./auth/guard.ts";
 import { actsAsPerson } from "./auth/principal.ts";
-import { TAB_IDLE_MS } from "./auth/tokens.ts";
 import { extraHosts, hostAllowed } from "./auth/hosts.ts";
 import { writeCliToken, type CliToken } from "./auth/cli-token.ts";
 import { createServer } from "node:http";
@@ -48,7 +47,7 @@ app.attach(hub);
 // It asks this harness for canvas pictures as the person, with a token of its own that it renews when it runs out.
 let syncToken: string | undefined;
 const studioToken = () => {
-	if (!syncToken || !app.tokens.verify(syncToken).ok) syncToken = app.tokens.issue({ kind: "person" }, { label: "Studio sync", idle: TAB_IDLE_MS }).token;
+	if (!syncToken || !app.tokens.verify(syncToken).ok) syncToken = app.tokens.issue({ kind: "person" }, { label: "Studio sync" }).token;
 	return syncToken;
 };
 const studio = startStudio(app.deck.path, process.env, `http://127.0.0.1:${config.port}`, () => app.apps.list(), studioToken);

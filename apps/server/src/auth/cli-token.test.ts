@@ -59,14 +59,14 @@ test("decks login with no code trades the token the harness wrote for its own us
 		assert.equal(statSync(cliTokenFile(dataDir)).mode & 0o777, 0o600, "only this user reads it");
 		const file = readCliToken(dataDir);
 		assert.equal(file?.url, "http://127.0.0.1:4830");
-		assert.match(String(file?.token), /^dk_p_/);
+		assert.match(String(file?.token), /^dk_h_/);
 
 		assert.equal((await post("/api/login", {}, {})).status, 403, "no code and no token");
 		assert.equal((await post("/api/login", bearer(app.tokens.issue({ kind: "person" }, { label: "Decks tab" }).token), {})).status, 403, "a tab's token is not traded");
 		const login = await post("/api/login", bearer(file!.token), { label: "decks login on test" });
 		assert.equal(login.status, 200, login.text);
 		const token = String(login.body.token);
-		assert.match(token, /^dk_p_/);
+		assert.match(token, /^dk_h_/);
 		assert.notEqual(token, file!.token, "the terminal's own, which outlives a restart");
 		assert.equal((await post("/api/v1/now", bearer(token))).status, 200);
 

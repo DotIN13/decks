@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { bearerOf, fromAnotherSite, isDoor, isPageRead, isPublic, queryTokenOf, socketPrincipal, verifyOn } from "./guard.ts";
 import { fromPrivateNetwork, isPrivateAddress, isTopNavigation, PairCodes, pairWithoutCode, withSession } from "./issue.ts";
 import { Tickets } from "./tickets.ts";
-import { BOARD_IDLE_MS, TAB_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
+import { BOARD_IDLE_MS, TOKEN_IDLE_MS, TokenStore, tokenDays } from "./tokens.ts";
 
 const DAY = 86_400_000;
 
@@ -16,13 +16,13 @@ function store(name = "tokens.json", options: { days?: number; now?: number } = 
 	return { dir, file: join(dir, ".decks", name), tokens: new TokenStore(join(dir, ".decks", name), options) };
 }
 
-test("a token says its kind in its prefix, is kept only as its hash, in a file only this user reads", () => {
+test("a harness token is one kind whoever its subject, is kept only as its hash, in a file only this user reads", () => {
 	const { file, tokens } = store();
 	const person = tokens.issue({ kind: "person" }, { label: "decks login" });
 	const site = tokens.issue({ kind: "site", origin: "https://studio.test", label: "Decks Studio" });
-	assert.match(person.token, /^dk_p_[\w-]{43}$/);
-	assert.match(site.token, /^dk_s_/);
-	assert.match(tokens.issue({ kind: "agent", id: "a1" }).token, /^dk_a_/);
+	assert.match(person.token, /^dk_h_[\w-]{43}$/);
+	assert.match(site.token, /^dk_h_/);
+	assert.match(tokens.issue({ kind: "agent", id: "a1" }).token, /^dk_h_/);
 	assert.match(tokens.issue({ kind: "app", name: "notes" }).token, /^dk_x_/);
 	assert.match(tokens.issue({ kind: "board", path: "boards/a.html" }).token, /^dk_b_/);
 	const text = readFileSync(file, "utf8");
@@ -53,32 +53,71 @@ test("a site's token works only from its own site or from a caller that sends no
 	assert.deepEqual(tokens.verify(token, { origin: "https://evil.test" }), { ok: false, reason: "elsewhere" });
 });
 
-test("tokens slide: a person's and a site's last their days unused, a tab's and a board's a day, an agent's until taken back", () => {
+test("tokens slide: every one lasts a day unused but the decks command's in a terminal, which lasts thirty, and an agent's lasts as long as its agent", () => {
 	const t0 = Date.now();
 	const { file, tokens } = store("tokens.json", { days: 30, now: t0 });
-	const kept = tokens.issue({ kind: "site", label: "A" }, { now: t0 });
-	const left = tokens.issue({ kind: "site", label: "B" }, { now: t0 });
-	const tab = tokens.issue({ kind: "person" }, { idle: TAB_IDLE_MS, now: t0 });
+	const terminal = tokens.issue({ kind: "person" }, { label: "decks login", terminal: true, now: t0 });
+	const left = tokens.issue({ kind: "person" }, { label: "decks login", terminal: true, now: t0 });
+	const tab = tokens.issue({ kind: "person" }, { label: "Decks tab", now: t0 });
+	const site = tokens.issue({ kind: "site", label: "Studio", origin: "https://studio.test" }, { now: t0 });
+	const file2 = tokens.issue({ kind: "person" }, { label: "decks login on this machine", now: t0 });
 	const board = tokens.issue({ kind: "board", path: "boards/a.html" }, { now: t0 });
 	const agent = tokens.issue({ kind: "agent", id: "a1" }, { now: t0 });
-	assert.ok(tokens.verify(kept.token, { now: t0 + 20 * DAY }).ok, "used on day 20");
-	assert.ok(tokens.verify(kept.token, { now: t0 + 45 * DAY }).ok, "45 days in, 25 since it was last used");
+	assert.ok(tokens.verify(terminal.token, { now: t0 + 20 * DAY }).ok, "a terminal's, used on day 20");
+	assert.ok(tokens.verify(terminal.token, { now: t0 + 45 * DAY }).ok, "45 days in, 25 since it was last used");
 	assert.deepEqual(tokens.verify(left.token, { now: t0 + 31 * DAY }), { ok: false, reason: "expired" });
 	assert.deepEqual(tokens.verify(left.token, { now: t0 }), { ok: false, reason: "unknown" }, "and forgotten");
-	assert.equal(TAB_IDLE_MS, DAY);
+	assert.equal(TOKEN_IDLE_MS, DAY);
 	assert.equal(BOARD_IDLE_MS, DAY);
-	assert.ok(tokens.verify(tab.token, { now: t0 + 23 * 3_600_000 }).ok);
-	assert.ok(!tokens.verify(tab.token, { now: t0 + 23 * 3_600_000 + DAY + 1 }).ok, "a tab's token left a day");
-	assert.ok(tokens.verify(board.token, { now: t0 + 23 * 3_600_000 }).ok);
-	assert.ok(!tokens.verify(board.token, { now: t0 + 23 * 3_600_000 + DAY + 1 }).ok);
+	for (const [name, one] of [["a tab's", tab], ["a site's", site], ["the file decks login reads", file2], ["a board's", board]] as const) {
+		assert.ok(tokens.verify(one.token, { now: t0 + 23 * 3_600_000, origin: "https://studio.test" }).ok, `${name}, used within the day`);
+		assert.ok(!tokens.verify(one.token, { now: t0 + 23 * 3_600_000 + DAY + 1, origin: "https://studio.test" }).ok, `${name} left a day`);
+	}
 	assert.ok(tokens.verify(agent.token, { now: t0 + 400 * DAY }).ok, "an agent's lives as long as its agent");
 	assert.equal(tokenDays({}), 30);
 	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "7" }), 7);
 	assert.equal(tokenDays({ DECKS_TOKEN_DAYS: "nonsense" }), 30);
 	// What is written down outlives the process; an agent's token is not written down.
 	const again = new TokenStore(file, { days: 30, now: t0 + 45 * DAY });
-	assert.ok(again.verify(kept.token, { now: t0 + 45 * DAY }).ok);
+	assert.ok(again.verify(terminal.token, { now: t0 + 45 * DAY }).ok);
 	assert.deepEqual(again.verify(agent.token), { ok: false, reason: "unknown" }, "an agent's token ends with the harness");
+});
+
+test("tokens of the kinds from before are read as harness tokens with their subject, and nobody is signed out by the change", () => {
+	const dir = mkdtempSync(join(tmpdir(), "decks-old-kinds-"));
+	const file = join(dir, ".decks", "tokens.json");
+	mkdirSync(join(dir, ".decks"), { recursive: true });
+	const t0 = Date.now();
+	const row = (token: string, principal: object, label: string, last: number, idle: number) => {
+		const hash = createHash("sha256").update(token).digest("hex");
+		return { id: hash.slice(0, 10), hash, principal, label, at: last, last, idle };
+	};
+	// As the store wrote them before: a terminal's and a site's for 30 days, a tab's for a day, no version.
+	writeFileSync(
+		file,
+		JSON.stringify({
+			migrated: true,
+			tokens: [
+				row("dk_p_terminal", { kind: "person" }, "laptop", t0 - 20 * DAY, 30 * DAY),
+				row("dk_s_studio", { kind: "site", label: "Decks Studio", origin: "https://studio.test" }, "Decks Studio", t0 - 10 * DAY, 30 * DAY),
+				row("dk_p_tab", { kind: "person" }, "Decks tab", t0 - 3_600_000, DAY),
+				row("dk_p_gone", { kind: "person" }, "Decks tab", t0 - 2 * DAY, DAY),
+			],
+		}),
+	);
+	const tokens = new TokenStore(file, { days: 30, now: t0 });
+	const terminal = tokens.verify("dk_p_terminal", { now: t0 });
+	assert.deepEqual(terminal.ok && terminal.principal, { kind: "person" }, "a terminal's, the person");
+	const studio = tokens.verify("dk_s_studio", { origin: "https://studio.test", now: t0 });
+	assert.deepEqual(studio.ok && studio.principal, { kind: "site", label: "Decks Studio", origin: "https://studio.test" }, "a site's, still that site");
+	assert.deepEqual(tokens.verify("dk_s_studio", { origin: "https://evil.test", now: t0 }), { ok: false, reason: "elsewhere" }, "and bound to it");
+	assert.ok(tokens.verify("dk_p_tab", { now: t0 }).ok, "a tab's");
+	assert.ok(!tokens.verify("dk_p_gone", { now: t0 }).ok, "one already run out stays out");
+	// The new lives, from the change: the site's a day (it had 20 of its 30 left), the terminal's 30.
+	const later = new TokenStore(file, { days: 30, now: t0 + 2 * DAY });
+	assert.ok(!later.verify("dk_s_studio", { origin: "https://studio.test", now: t0 + 2 * DAY }).ok, "a site's lasts a day unused now");
+	assert.ok(later.verify("dk_p_terminal", { now: t0 + 2 * DAY }).ok, "a terminal's lasts thirty");
+	assert.equal(JSON.parse(readFileSync(file, "utf8")).v, 2, "given the new lives once");
 });
 
 test("revoke takes one token back by id, revokeWhere every token of a principal", () => {

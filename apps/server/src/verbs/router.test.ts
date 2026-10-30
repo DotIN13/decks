@@ -267,3 +267,20 @@ test("a board's token is asked of the person once, by the token's board: refused
 		cleanup();
 	}
 });
+
+test("an agent's harness token calls as that agent while it runs, with no idle limit, and stops working when the agent is removed", async () => {
+	const { app, call, bearer, cleanup } = await open();
+	try {
+		const ada = app.agents.create({ name: "Ada" });
+		const token = app.bridge.issue(ada.id);
+		assert.match(token, /^dk_h_/);
+		assert.equal(app.tokens.verify(token, { now: Date.now() + 400 * 86_400_000 }).ok, true, "no idle limit while its agent is there");
+		const me = await call("me", [], bearer(token));
+		assert.equal((me.body.value as { name: string }).name, "Ada");
+		assert.equal(app.agents.remove(ada.id).removed, true);
+		const after = await call("me", [], bearer(token));
+		assert.equal(after.status, 401, "its agent stopped: its token with it");
+	} finally {
+		cleanup();
+	}
+});

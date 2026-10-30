@@ -40,7 +40,7 @@ export class StageBridge {
 	issue(agentId: string): string {
 		const existing = this.byAgent.get(agentId);
 		if (existing && this.agentOf(existing) === agentId) return existing;
-		const token = this.tokens ? this.tokens.issue({ kind: "agent", id: agentId }).token : `dk_a_${randomBytes(32).toString("base64url")}`;
+		const token = this.tokens ? this.tokens.issue({ kind: "agent", id: agentId }).token : `dk_h_${randomBytes(32).toString("base64url")}`;
 		this.byAgent.set(agentId, token);
 		return token;
 	}

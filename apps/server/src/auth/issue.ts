@@ -5,7 +5,7 @@ import { saveStudioLink, studioOrigin } from "../studio/index.ts";
 import { CLI_TOKEN_LABEL } from "./cli-token.ts";
 import { actsAsPerson } from "./principal.ts";
 import { FOLDER_TICKET_MS, isFolderTicket, MAX_TICKETS, TICKET_MS, ticketPath } from "./tickets.ts";
-import { TAB_IDLE_MS, type TokenStore } from "./tokens.ts";
+import type { TokenStore } from "./tokens.ts";
 import { bearerOf, originOf } from "./guard.ts";
 
 /**
@@ -13,14 +13,15 @@ import { bearerOf, originOf } from "./guard.ts";
  * answered with one.
  *
  * - **A Decks tab.** The Decks page, loaded by a person into a tab of its own (a top-level navigation),
- *   is written a fresh person token for that tab (`withSession`), which lasts a day unused.
+ *   is written a fresh harness token for that tab (`withSession`), which lasts a day unused.
  *   Never a frame's copy of the page or a script's fetch of it: those are answered without.
  * - **`decks login`**, in a terminal: `POST /api/login { code }`, the code from `decks pair code` on
- *   the harness's own machine (`PairCodes`), for a person token that lasts `DECKS_TOKEN_DAYS` unused.
+ *   the harness's own machine (`PairCodes`), for a harness token that lasts `DECKS_TOKEN_DAYS` unused
+ *   (30 days unless set), the one token that lasts longer than a day.
  * - **Agents and app servers**: made when their process starts and taken back when it stops, by the
  *   agent (`stage/bridge.ts`) and the apps (`apps/service.ts`); no request asks for them.
  * - **Pairing**: `POST /api/pair` and `POST /api/studio/connect` trade a code, or a site this harness
- *   can place, for a site token, bound to the page's site.
+ *   can place, for a harness token as that site, bound to the page's site, lasting a day unused.
  * - **A board**: `POST /api/tokens { kind: "board", path, stage? }`, asked by the person or a site for
  *   a board it is about to show.
  * - **A canvas pass**: `POST /api/passes { canvas }`, asked by the person or a site for the sandboxed
@@ -209,9 +210,9 @@ export function isTopNavigation(headers: Record<string, string | string[] | unde
 	return headers["sec-fetch-dest"] === "document" && headers["sec-fetch-mode"] === "navigate";
 }
 
-/** A person token for one Decks tab, which lasts a day unused. */
+/** A harness token for one Decks tab, the person's, which lasts a day unused. */
 export function tabToken(store: TokenStore): string {
-	return store.issue({ kind: "person" }, { label: "Decks tab", idle: TAB_IDLE_MS }).token;
+	return store.issue({ kind: "person" }, { label: "Decks tab" }).token;
 }
 
 /** The Decks page with its tab's token in it, read once at start by `web/src/lib/session.ts`. */
@@ -331,7 +332,8 @@ export function doorRoutes(app: App): express.Router {
 		const asked = String(((req.body ?? {}) as { label?: unknown }).label ?? "decks login").slice(0, 80) || "decks login";
 		// Never the file's own label, which the next start takes back (`cli-token.ts`).
 		const label = asked === CLI_TOKEN_LABEL ? "decks login" : asked;
-		const { token } = app.tokens.issue({ kind: "person" }, { label });
+		// The `decks` command's own: thirty days unused (`DECKS_TOKEN_DAYS`), where every other lasts a day.
+		const { token } = app.tokens.issue({ kind: "person" }, { label, terminal: true });
 		res.json({ token, name: app.deck.name });
 	});
 
